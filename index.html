@@ -1647,6 +1647,7 @@ const LANDMARKS = [
     o: [-1809, 1139], ua: [0.2172, 0.9761], pitch: [0, 110, -3, 62], curves: [16.5, 90.5, 28.5], rin: 37.5, rout: 47.5, sprint: 90.5, apron: [10, 50, '#a8503c'], mats: [[114, 32], [118, 45]], dugouts: [41, 61],
     towers: [[-36, -16], [140, -14], [-36, 76], [138, 78]],
     stands: [{ ab: [28, 78, -40, -21], h: 7.5, roof: 3.4, segs: 3 }, { ab: [8, 28, -36, -21], h: 4, roof: 2.4, segs: 1 }, { ab: [78, 100, -36, -21], h: 4, roof: 2.4, segs: 1 }] } },
+  { n: 'Scuola primaria e secondaria di primo grado "Pier Giorgio Frassati"', x: -719.0, z: 679.9, build: buildCasa, o: { wall: '#e6d7b8', h: 7.6, floors: 2, metal: '#6a6763', trim: '#d9cdb3', solar: true } }, // Seveso, by the Santuario: beige, panels on the roof
   // the oratorio of San Carlo on the Altopiano (via Sant'Ambrogio and via delle Groane): the church and its wings, light walls under light metal roofs with
   // a teal trim, the little bell gable on the long wing; the court with the fountain, the basket court, the playground
   { n: 'Chiesa di San Carlo Borromeo', x: -1975.4, z: 1550.8, build: buildCasa, o: { wall: '#e4dccb', h: 8.5, floors: 2, metal: '#e2e4e4', trim: '#4f9a8d', bell: [-1976.5, 1542] } },
@@ -1672,7 +1673,7 @@ const LANDMARKS = [
   { n: 'Liceo paritario "Pier Giorgio Frassati"', x: 1152.1, z: 2092.8, build: buildPalazzo, o: { style: 'scuolaocra', h: 9.2, front: [1145.0, 2104.0] } }, // Baruccana, via Colombo: L-shaped, two floors on a basement
   { n: 'Palestra Frassati', x: 1155.1, z: 2049.8, build: buildPalestra, o: { h: 6.8 } }, // the prefabricated gym in red panels
   { n: 'Seminario di Seveso', x: -717.1, z: 837.0, build: buildPalazzo, // Seminario Arcivescovile, now Centro Pastorale Ambrosiano: Quadrio's convent, enlarged by the Pollacks
-    o: { style: 'seminario', h: 12.7, front: [-780.7, 832.5], portal: 'arch', sign: 'SEMINARIO ARCIVESCOVILE DI MILANO', signW: 8.6, signCol: '#55524b', signY: 8.15, fence: 7, lantern: { at: [-763.0, 818.0], w: 5.6, h: 4.5 } } },
+    o: { style: 'seminario', cloister: true, h: 12.7, front: [-780.7, 832.5], portal: 'arch', sign: 'SEMINARIO ARCIVESCOVILE DI MILANO', signW: 8.6, signCol: '#55524b', signY: 8.15, fence: 7, lantern: { at: [-763.0, 818.0], w: 5.6, h: 4.5 } } },
   { n: 'Secondaria I grado “Traversi”', x: 544.4, z: -384.8, build: buildPalazzo, // the Palazzo delle Scuole Professionali (Aldo Vicini, 1932) on via Indipendenza
     o: { style: 'traversi', front: [516.1, -360.2], portal: 'door', balcony: 'stone', porch: true, attic: { w: 15, h: 1.9 }, sign: 'S C V O L E    P R O F E S S I O N A L I', signW: 13, signCol: '#6a655b', fence: 6.5 } },
   { n: 'Stazione di Meda', x: 377.5, z: -540.5, build: buildPalazzo, o: { style: 'stazione', h: 8.8, front: [375.9, -545.1], sign: 'M E D A', signW: 3.2, signCol: '#5f6266', canopy: [[388.6, -548.6], [403.5, -563.2], 7.5] } }, // the 2023 makeover: white, green shutters, the steel-tree canopy
@@ -2272,6 +2273,18 @@ function buildPalazzo(L, B, G) {
     g.fillStyle = '#003399'; g.fillRect(w / 2, 0, w / 2, h); g.fillStyle = '#ffcc00';
     for (let i = 0; i < 12; i++) { const an = i / 12 * TAU; g.beginPath(); g.arc(w * 0.75 + Math.cos(an) * 20, h / 2 + Math.sin(an) * 20, 2.6, 0, TAU); g.fill(); }
   }, false);
+  if (o.cloister) for (const q of o.cloister === true ? holes : [o.cloister]) { // the cloister: a white arcade on piers all round the court at the ground floor, the walk behind it in shade
+    const A = sArea(q), FC = lmFrame(new THREE.Matrix4());
+    for (let i = 0; i < q.length; i++) {
+      const a = q[i], c = q[(i + 1) % q.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 4) continue;
+      let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; const [qx, qz] = centroid(q); if ((qx - a[0]) * nx + (qz - a[1]) * nz < 0) { nx = -nx; nz = -nz; } // into the court
+      const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, nb = Math.max(1, Math.round(Ln / 3.6)), bw = Ln / nb, gy = Math.min(groundH(a[0], a[1]), groundH(c[0], c[1])), AH = 4.2 * k;
+      const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(ex, 0, ez), new THREE.Vector3(0, 1, 0), new THREE.Vector3(nx, 0, nz)).setPosition(a[0] + nx * 0.06, gy, a[1] + nz * 0.06));
+      T.geo(trim, lmBox(Ln, AH, 0.06, Ln / 2, AH / 2, -0.05), null, COL('#3a3632')); // the dark walk behind
+      for (let b = 0; b < nb; b++) { const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(bw, 0); sh.lineTo(bw, AH); sh.lineTo(0, AH); sh.lineTo(0, 0); sh.holes.push(archShape(bw - 0.7, 0, AH - 0.6).getPoints ? (() => { const hp = new THREE.Path(); const r = (bw - 0.7) / 2, cx = bw / 2; hp.moveTo(cx - r, 0); hp.lineTo(cx + r, 0); hp.lineTo(cx + r, AH - 0.6 - r); hp.absarc(cx, AH - 0.6 - r, r, 0, Math.PI, false); hp.lineTo(cx - r, 0); return hp; })() : null);
+        T.geo(trim, new THREE.ShapeGeometry(sh, 10).translate(b * bw, 0, 0.05), null, COL('#f4f1ea')); }
+    }
+  }
   mkMesh(wall, LMAT[o.style], 10, 'cast', G); mkMesh(trim, MAT.roof, 10, 'cast', G); mkMesh(roof, LMAT.coppi, 10, 'cast', G);
   if (o.flags) mkMesh(flag, new THREE.MeshLambertMaterial({ map: flagTex, side: THREE.DoubleSide }), 10, false, G);
   if (o.sign) {
@@ -3018,6 +3031,8 @@ function buildCasa(L, B, G) {
       F.geo(Bs.trim, lmBox(1.3, 1.6, 0.08, 0, 0, 0).rotateY(ry).translate(x + nx * 0.03, y, z + nz * 0.03), null, COL(o.frame || '#ece8de'));
       F.geo(Bs.trim, lmBox(1.05, 1.35, 0.08, 0, 0, 0).rotateY(ry).translate(x + nx * 0.07, y, z + nz * 0.07), null, COL('#33393f')); }
   }
+  if (o.solar) { const [cx, cz] = centroid(ring), inner = lmOffset(ring, 2.2); let le = 0, ux = 1, uz = 0; for (let i = 0; i < ring.length; i++) { const p = ring[i], q = ring[(i + 1) % ring.length], l = hyp(q[0] - p[0], q[1] - p[1]); if (l > le) { le = l; ux = (q[0] - p[0]) / l; uz = (q[1] - p[1]) / l; } }
+    for (let v = -30; v < 30; v += 1.9) for (let u = -30; u < 30; u += 1.1) { const x = cx + ux * u - uz * v, z = cz + uz * u + ux * v; if (!inPoly(x, z, inner) || (Math.round(u * 3 + v) & 3) === 0) continue; F.geo(Bs.trim, lmBox(1.0, 0.06, 1.7, 0, 0, 0).rotateY(Math.atan2(-uz, ux)).translate(x, H + 0.55, z), null, COL('#27334a')); } } // panels over the roof
   if (o.bell) { const [bx, bz] = o.bell, y = groundH(bx, bz) - groundH(bx, bz) + yr; // a little bell gable: a pier with an arched opening and a cross
     F.geo(Bs.plaster, lmBox(1.6, 2.6, 0.5, bx, y + 1.0, bz), null, COL(o.wall)); F.geo(Bs.trim, lmBox(0.7, 1.1, 0.55, bx, y + 1.3, bz), null, COL('#2b2a29'));
     F.geo(Bs.trim, new THREE.ConeGeometry(1.05, 0.7, 4).rotateY(Math.PI / 4).translate(bx, y + 2.65, bz), null, COL(o.metal || '#8e4630')); lmCross(F, Bs.trim, bx, y + 3.0, bz, 0.6, COL('#3c3c40')); }
