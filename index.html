@@ -437,10 +437,15 @@ function resample(pts, step) {
   return o;
 }
 const bbox = pts => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; } return [x0, z0, x1, z1]; };
+// buildings in the map that are not there (mostly from Overture): dropped by the centroid of their footprint
+const GHOSTS = [
+  [1243.7, -553.8], [1261.4, -549.6], // a house and a shed across the Curie drive from via Marie Curie
+];
 for (const T of TILES) {
   const d = T.d;
   for (const B of d.b || []) {
     const outer = dec(B.p); if (outer.length < 3) continue;
+    { const [gx, gz] = centroid(outer); if (GHOSTS.some(([x, z]) => hyp(gx - x, gz - z) < 1.5)) continue; }
     const holes = (B.k || []).map(dec).filter(h => h.length >= 3), bb = bbox(outer);
     const rec = { pts: outer, holes, h: B.h, t: B.t, bb };
     T.bld.push(rec);
