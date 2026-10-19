@@ -701,7 +701,7 @@ function buildTile(T) {
     }
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  buildSignals(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G); buildCaserme(T, G);
+  buildSignals(T, G); buildSegnali(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G); buildCaserme(T, G);
   buildCemetery(T, G); buildLandmarks(T, G); buildPiazze(T, G); buildPlazas(T, G); buildStairwells(T, G); buildPlatforms(T, G); buildParkingLines(T, G); buildParkFurniture(T, G);
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
