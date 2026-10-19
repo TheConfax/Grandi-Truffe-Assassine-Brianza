@@ -86,6 +86,9 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 #pause { position: fixed; inset: 0; z-index: 9; background: rgba(14,15,20,.8); display: grid; place-items: center; text-align: center; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 #pause h2 { font-family: var(--display); font-size: clamp(36px, 7vw, 64px); margin: 0 0 10px; color: var(--ocra); }
 #pause p { font-size: 19px; margin: 6px 0; }
+body:not(.debug) .dbg { display: none !important; }
+#pause .dbgline { margin-top: 14px; font-size: 14px; } #pause .dbgline button { font: 600 14px system-ui; padding: 6px 12px; border-radius: 4px; border: 0; background: var(--ocra); color: #15161c; cursor: pointer; margin: 2px; } #dbgcode { width: 110px; font: 14px system-ui; padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,.25); background: #15161c; color: #fff; text-align: center; }
+#dbghud { position: fixed; left: 50%; transform: translateX(-50%); bottom: 6px; z-index: 8; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
 #osm { position: fixed; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(2px + env(safe-area-inset-bottom, 0px)); font-size: 11px; color: rgba(251,245,230,.7); text-shadow: 0 1px 0 #000; }
 #touch { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
 .tb { position: absolute; pointer-events: auto; width: 74px; height: 74px; border-radius: 50%; border: 2px solid rgba(251,245,230,.55); background: rgba(18,20,27,.42); color: var(--ink); font-family: var(--display); font-size: 22px; display: grid; place-items: center; touch-action: none; }
@@ -115,7 +118,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 <div id="touch" hidden></div>
 <div id="fx"><h2 id="fxt"></h2></div>
 <div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span>Premi M per tornare in strada</span></div></div>
-<div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>G</kbd> guida arcade/realistica · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>B</kbd> segnala punto · <kbd>U</kbd> audio</p><p id="padline" hidden></p><p>Premi <kbd>P</kbd> per riprendere</p></div></div>
+<div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>G</kbd> guida arcade/realistica · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p></div></div>
 
 <div id="start">
   <div class="wrap">
@@ -133,7 +136,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
       <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>
       <div><kbd>N</kbd> avanti di 2 ore</div>
       <div><kbd>R</kbd> radio Discoradio on/off</div>
-      <div><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>
+      <div class="dbg"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>
     </div>
     <button id="go" type="button">ACCENDI IL MOTORE</button>
     <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale.</p>
@@ -1917,7 +1920,7 @@ function pollPad() {
   if (!GP.seen) {
     GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id);
     const L = GP.ps ? { t: 'R2', b: 'L2', h: '✕', o: '○', s: '□', y: '△', c: 'R1', m: 'Create', p: 'Options', r: 'R3' } : { t: 'RT', b: 'LT', h: 'A', o: 'B', s: 'X', y: 'Y', c: 'RB', m: 'View', p: 'Menu', r: 'R3' };
-    const txt = `${L.t} gas · ${L.b} freno · ${L.h} freno a mano · ${L.o} turbo · ${L.s} clacson · ${L.y} sali/scendi · ${L.c} visuale · ${L.r} segnala punto · ${L.m} mappa · ${L.p} pausa · ${GP.ps ? 'L1' : 'LB'} +2 ore · freccia su radio`;
+    const txt = `${L.t} gas · ${L.b} freno · ${L.h} freno a mano · ${L.o} turbo · ${L.s} clacson · ${L.y} sali/scendi · ${L.c} visuale · ${DEBUG ? L.r + ' segnala punto · ' : ''}${L.m} mappa · ${L.p} pausa · ${GP.ps ? 'L1' : 'LB'} +2 ore · freccia su radio`;
     toast((GP.ps ? 'DualSense' : 'Controller') + ' collegato: ' + txt); const pl = document.getElementById('padline'); if (pl) { pl.hidden = false; pl.textContent = 'Controller: ' + txt; }
   }
 }
@@ -2310,15 +2313,40 @@ function toggleRadio() { radioOn = !radioOn; radioErr = false; toast(radioOn ? '
 
 // ---------------------------------------------------------------- bug reports: R3 on the pad, B on the keyboard
 let spotDb = null, spotN = 0; (async () => { try { spotDb = await window.claude?.use?.('db'); } catch (e) { spotDb = null; } })();
+let DEBUG = false; try { const q = new URLSearchParams(location.search); if (q.has('debug')) localStorage.setItem('gtaDebug', q.get('debug') === '0' ? '0' : '1'); DEBUG = localStorage.getItem('gtaDebug') === '1'; } catch (e) { }
+function spotsLocal() { try { return JSON.parse(localStorage.getItem('gtaSpots') || '[]'); } catch (e) { return []; } }
+function setDebug(on) { DEBUG = on; try { localStorage.setItem('gtaDebug', on ? '1' : '0'); } catch (e) { } document.body.classList.toggle('debug', on); updDbgMenu(); toast(on ? '🛠 Modalità debug attiva' : '🛠 Modalità debug spenta'); }
+function updDbgMenu() { const b = document.getElementById('dbgdl'); if (b) b.textContent = '⬇ Scarica segnalazioni (' + spotsLocal().length + ')'; }
+function exportSpots() {
+  const a = spotsLocal(); if (!a.length) { toast('Nessuna segnalazione salvata'); return; }
+  const txt = JSON.stringify(a, null, 1);
+  try { const u = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); const l = document.createElement('a'); l.href = u; l.download = 'segnalazioni-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); } catch (e) { }
+  toast('⬇ ' + a.length + ' segnalazioni scaricate'); try { navigator.clipboard.writeText(txt).then(() => toast('📋 ' + a.length + ' segnalazioni scaricate e copiate negli appunti')).catch(() => { }); } catch (e) { }
+}
+function clearSpots() { try { localStorage.removeItem('gtaSpots'); } catch (e) { } spotN = 0; updDbgMenu(); toast('🗑 Segnalazioni svuotate'); }
+let dbgT = 0, dbgFps = 60;
+function updDebugHud(dt) {
+  const el = document.getElementById('dbghud'); if (!el) return; if (!DEBUG) { el.hidden = true; return; } el.hidden = false;
+  if (dt > 0) dbgFps = dbgFps * 0.95 + 0.05 / dt; if ((dbgT -= dt) > 0) return; dbgT = 0.25;
+  const v = P.mode === 'car' ? P.car : null, x = v ? v.x : P.x, z = v ? v.z : P.z, y = v ? v.y : P.y;
+  const lat = META.lat0 - z / 110540, lon = META.lon0 + x / (111320 * Math.cos(META.lat0 * Math.PI / 180));
+  el.textContent = 'DEBUG · ' + lat.toFixed(5) + ', ' + lon.toFixed(5) + ' · x ' + x.toFixed(0) + ' z ' + z.toFixed(0) + ' y ' + y.toFixed(1) + ' · ' + (streetAt(x, z) || '-') + ' · ' + dbgFps.toFixed(0) + ' fps · segnalazioni ' + spotsLocal().length;
+}
 async function reportSpot() {
+  if (!DEBUG) return;
   const v = P.mode === 'car' ? P.car : null, x = v ? v.x : P.x, z = v ? v.z : P.z, y = v ? v.y : P.y;
   const lat = META.lat0 - z / 110540, lon = META.lon0 + x / (111320 * Math.cos(META.lat0 * Math.PI / 180));
   const rec = { x: +x.toFixed(1), z: +z.toFixed(1), y: +y.toFixed(1), suolo: +groundH(x, z).toFixed(1), lat: +lat.toFixed(6), lon: +lon.toFixed(6), via: streetAt(x, z) || '', zona: placeAt(x, z) || '', direzione: Math.round(((v ? v.h : P.h) * 180 / Math.PI + 360) % 360), modo: P.mode, velocita: v ? Math.round(v.speed * 3.6) : 0, cam: camMode, ora: $('clock') ? $('clock').textContent : '', quando: new Date().toISOString(), versione: 'v16' };
   spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }
   let saved = false; if (spotDb) { try { await spotDb.collection('segnalazioni').add(rec); saved = true; } catch (e) { saved = false; } }
-  if (!saved) { try { const a = JSON.parse(localStorage.getItem('gtaSpots') || '[]'); a.push(rec); localStorage.setItem('gtaSpots', JSON.stringify(a)); } catch (e) { } }
-  toast('📍 Punto ' + spotN + ' segnalato' + (rec.via ? ': ' + rec.via : '') + (saved ? '' : ' (solo in locale)'));
+  try { const a = spotsLocal(); a.push(rec); localStorage.setItem('gtaSpots', JSON.stringify(a)); } catch (e) { } updDbgMenu();
+  toast('📍 Punto ' + spotN + ' segnalato' + (rec.via ? ': ' + rec.via : '') + (saved ? ' (anche su claude.ai)' : ''));
 }
+(() => { document.body.classList.toggle('debug', DEBUG); updDbgMenu();
+  const c = document.getElementById('dbgcode'); if (!c) return;
+  ['keydown', 'keyup', 'keypress'].forEach(k => c.addEventListener(k, e => { e.stopPropagation(); if (k === 'keydown' && (e.key === 'Enter' || e.key === 'Escape')) c.blur(); }));
+  c.addEventListener('change', () => { const v = c.value.trim().toUpperCase(); c.value = ''; if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'); });
+  document.getElementById('dbgdl').onclick = exportSpots; document.getElementById('dbgclr').onclick = clearSpots; })();
 function updVisuals(dt) {
   const cx = camera.position.x, cz = camera.position.z;
   for (const v of VEH) {
@@ -2413,7 +2441,7 @@ function frame(t) {
   if (running && !paused) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
   else if (!running) { now += dt; P.h += dt * 0.08; } // slow orbit behind the title
   { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
-  updVisuals(running && !paused ? dt : 0); updRadio(dt);
+  updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);
   updCamera(running ? dt : dt * 0.4);
   if (running) { updHud(dt); updAudio(); }
   renderer.render(scene, camera);

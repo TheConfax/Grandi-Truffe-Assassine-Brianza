@@ -1,6 +1,6 @@
 # Grandi Truffe Assassine · Brianza
 
-Gioco in stile GTA nel browser, ambientato a Meda, Seveso, Barlassina, Baruccana e Cabiate con strade, edifici e dislivelli veri. Three.js, un solo file HTML più i dati della mappa.
+Gioco vibecoded in stile GTA nel browser, ambientato a Meda, Seveso, Barlassina, Baruccana e Cabiate con strade, edifici e dislivelli veri. Three.js, un solo file HTML più i dati della mappa.
 
 ## Giocare
 
@@ -13,7 +13,7 @@ La radio in macchina (Discoradio, stream ufficiale) funziona solo fuori da claud
 
 - `index.html`: il gioco completo
 - `brianza.json`: mappa generata dalla pipeline
-- `src/`: sorgenti (`build_data.py` pipeline dei dati, `world3.js` mondo, `extras.js` giorno/notte, danni, radio, `assemble3.py` che monta `game.src.html` nel gioco finale)
+- `src/`: sorgenti; `python src/assemble3.py` rigenera `index.html` dopo ogni modifica
 - `data/`: dati grezzi (OSM, Overture, WorldCover), esclusi da git perché troppo grandi
 
 ## Crediti dei dati

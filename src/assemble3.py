@@ -1,5 +1,7 @@
 import re
-s = open('/home/claude/gta/game.src.html').read()
+import os
+HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
+s = open(os.path.join(HERE, 'game.src.html'), encoding='utf-8').read()
 def rep(old, new, cnt=1):
     global s
     assert s.count(old) == cnt, (s.count(old), old[:100])
@@ -39,7 +41,7 @@ const flatMat""", """  parent.add(m); return m;
 const flatMat""")
 
 # ---- world: replace everything from "the world" to "audio" with the tiled world + level-aware collisions
-world = open('/home/claude/gta/world3.js').read()
+world = open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
 function collideStatic(p, r, y) {
@@ -69,7 +71,7 @@ function rayWalls(ax, az, bx, bz, solidOnly) {
 cut("// ---------------------------------------------------------------- the world\n", "// ---------------------------------------------------------------- audio\n",
     "// ---------------------------------------------------------------- the world\nconst ground = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false }));\ngroundTex.repeat.set(1200, 1200); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.5; ground.receiveShadow = true; ground.renderOrder = -4; scene.add(ground);\n" + coll + world + "\n")
 # ---- trains
-cut("// ---------------------------------------------------------------- train (Ferrovia Milano-Asso)\n", "// ---------------------------------------------------------------- spawning helpers\n", open('/home/claude/gta/trains3.js').read() + "\n")
+cut("// ---------------------------------------------------------------- train (Ferrovia Milano-Asso)\n", "// ---------------------------------------------------------------- spawning helpers\n", open(os.path.join(HERE, 'trains3.js'), encoding='utf-8').read() + "\n")
 rep("if (TR) for (const c of TR.circ) check(c[0], c[1]);", "for (const c of TRAIN_CIRC) check(c[0], c[1]);")
 rep("if (TR) for (const [cx, cz, tvx, tvz] of TR.circ) {\n    for (const v of VEH)", "for (const [cx, cz, tvx, tvz] of TRAIN_CIRC) {\n    for (const v of VEH)")
 rep("if (TR && p.state !== 'dead') for (const [cx, cz, tvx, tvz] of TR.circ)", "if (p.state !== 'dead') for (const [cx, cz, tvx, tvz] of TRAIN_CIRC)")
@@ -313,7 +315,7 @@ rep("  tileTick(STATION.x, STATION.z, 0, 420);\n  for (const T of TILES) T.dist 
 rep("#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ink);", "#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ocra);")
 rep("#start h1 { font-family: var(--display);", "#start h1 { color: var(--ocra) !important; font-family: var(--display);")
 # ---- day & night, car damage
-rep("function updVisuals(dt) {", open('/home/claude/gta/extras.js').read() + "\nfunction updVisuals(dt) {")
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'extras.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("updSignals(); updGates(dt); updFountains();", "updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWrecks(dt); updFuel(dt);")
 rep("    add(boxG(S.W, S.bh, S.L), paint, 0, by, 0);", "    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);")
 rep("  scene.add(g);\n  return { g, body, wheels };", "  if (!S.ape) { const hp = new THREE.Mesh(makeCar.hp || (makeCar.hp = new THREE.PlaneGeometry(3.4, 9).rotateX(-Math.PI / 2)), HEADPOOL_MAT); hp.position.set(0, 0.14, hl + 4.4); hp.renderOrder = 12; g.add(hp); }\n  scene.add(g);\n  return { g, body, wheels, bm: typeof bm !== 'undefined' ? bm : null, paint };")
@@ -364,7 +366,47 @@ rep("      <div><kbd>N</kbd> avanti di 2 ore</div>", "      <div><kbd>N</kbd> av
 rep("<kbd>N</kbd> +2 ore · <kbd>B</kbd> segnala punto", "<kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>B</kbd> segnala punto")
 rep("${GP.ps ? 'L1' : 'LB'} +2 ore`", "${GP.ps ? 'L1' : 'LB'} +2 ore · freccia su radio`")
 rep("CC BY 4.0.</p>", "CC BY 4.0. Edifici aggiuntivi e altezze: <a href=\"https://overturemaps.org\" target=\"_blank\" rel=\"noopener\">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href=\"https://www.discoradio.it\" target=\"_blank\" rel=\"noopener\">Discoradio</a>, stream ufficiale.</p>")
-open('/home/claude/gta/game3.src.html', 'w').write(s)
+
+# ---- debug mode (code DEBUG in the pause menu, or ?debug in the URL): bug reports, coordinates HUD, export
+rep("async function reportSpot() {", """let DEBUG = false; try { const q = new URLSearchParams(location.search); if (q.has('debug')) localStorage.setItem('gtaDebug', q.get('debug') === '0' ? '0' : '1'); DEBUG = localStorage.getItem('gtaDebug') === '1'; } catch (e) { }
+function spotsLocal() { try { return JSON.parse(localStorage.getItem('gtaSpots') || '[]'); } catch (e) { return []; } }
+function setDebug(on) { DEBUG = on; try { localStorage.setItem('gtaDebug', on ? '1' : '0'); } catch (e) { } document.body.classList.toggle('debug', on); updDbgMenu(); toast(on ? '🛠 Modalità debug attiva' : '🛠 Modalità debug spenta'); }
+function updDbgMenu() { const b = document.getElementById('dbgdl'); if (b) b.textContent = '⬇ Scarica segnalazioni (' + spotsLocal().length + ')'; }
+function exportSpots() {
+  const a = spotsLocal(); if (!a.length) { toast('Nessuna segnalazione salvata'); return; }
+  const txt = JSON.stringify(a, null, 1);
+  try { const u = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); const l = document.createElement('a'); l.href = u; l.download = 'segnalazioni-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); } catch (e) { }
+  toast('⬇ ' + a.length + ' segnalazioni scaricate'); try { navigator.clipboard.writeText(txt).then(() => toast('📋 ' + a.length + ' segnalazioni scaricate e copiate negli appunti')).catch(() => { }); } catch (e) { }
+}
+function clearSpots() { try { localStorage.removeItem('gtaSpots'); } catch (e) { } spotN = 0; updDbgMenu(); toast('🗑 Segnalazioni svuotate'); }
+let dbgT = 0, dbgFps = 60;
+function updDebugHud(dt) {
+  const el = document.getElementById('dbghud'); if (!el) return; if (!DEBUG) { el.hidden = true; return; } el.hidden = false;
+  if (dt > 0) dbgFps = dbgFps * 0.95 + 0.05 / dt; if ((dbgT -= dt) > 0) return; dbgT = 0.25;
+  const v = P.mode === 'car' ? P.car : null, x = v ? v.x : P.x, z = v ? v.z : P.z, y = v ? v.y : P.y;
+  const lat = META.lat0 - z / 110540, lon = META.lon0 + x / (111320 * Math.cos(META.lat0 * Math.PI / 180));
+  el.textContent = 'DEBUG · ' + lat.toFixed(5) + ', ' + lon.toFixed(5) + ' · x ' + x.toFixed(0) + ' z ' + z.toFixed(0) + ' y ' + y.toFixed(1) + ' · ' + (streetAt(x, z) || '-') + ' · ' + dbgFps.toFixed(0) + ' fps · segnalazioni ' + spotsLocal().length;
+}
+async function reportSpot() {
+  if (!DEBUG) return;""")
+rep("  if (!saved) { try { const a = JSON.parse(localStorage.getItem('gtaSpots') || '[]'); a.push(rec); localStorage.setItem('gtaSpots', JSON.stringify(a)); } catch (e) { } }",
+    "  try { const a = spotsLocal(); a.push(rec); localStorage.setItem('gtaSpots', JSON.stringify(a)); } catch (e) { } updDbgMenu();")
+rep("(saved ? '' : ' (solo in locale)')", "(saved ? ' (anche su claude.ai)' : '')")
+rep("updVisuals(running && !paused ? dt : 0); updRadio(dt);", "updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);")
+rep("      <div><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>", "      <div class=\"dbg\"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>")
+rep("<kbd>B</kbd> segnala punto · ", "<span class=\"dbg\"><kbd>B</kbd> segnala punto · </span>")
+rep("${L.r} segnala punto · ", "${DEBUG ? L.r + ' segnala punto · ' : ''}")
+rep("<p id=\"padline\" hidden></p>", "<p id=\"padline\" hidden></p><p class=\"dbgline\"><span class=\"dbg\"><button id=\"dbgdl\" type=\"button\">⬇ Scarica segnalazioni</button> <button id=\"dbgclr\" type=\"button\">🗑 Svuota</button> </span><input id=\"dbgcode\" type=\"text\" spellcheck=\"false\" autocomplete=\"off\" placeholder=\"codice\" maxlength=\"12\"></p>")
+rep("#pause p { font-size: 19px; margin: 6px 0; }", "#pause p { font-size: 19px; margin: 6px 0; }\nbody:not(.debug) .dbg { display: none !important; }\n#pause .dbgline { margin-top: 14px; font-size: 14px; } #pause .dbgline button { font: 600 14px system-ui; padding: 6px 12px; border-radius: 4px; border: 0; background: var(--ocra); color: #15161c; cursor: pointer; margin: 2px; } #dbgcode { width: 110px; font: 14px system-ui; padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,.25); background: #15161c; color: #fff; text-align: center; }\n#dbghud { position: fixed; left: 50%; transform: translateX(-50%); bottom: 6px; z-index: 8; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }")
+rep("<div id=\"pause\" hidden>", "<div id=\"dbghud\" hidden></div><div id=\"pause\" hidden>")
+rep("function updVisuals(dt) {", """(() => { document.body.classList.toggle('debug', DEBUG); updDbgMenu();
+  const c = document.getElementById('dbgcode'); if (!c) return;
+  ['keydown', 'keyup', 'keypress'].forEach(k => c.addEventListener(k, e => { e.stopPropagation(); if (k === 'keydown' && (e.key === 'Enter' || e.key === 'Escape')) c.blur(); }));
+  c.addEventListener('change', () => { const v = c.value.trim().toUpperCase(); c.value = ''; if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'); });
+  document.getElementById('dbgdl').onclick = exportSpots; document.getElementById('dbgclr').onclick = clearSpots; })();
+function updVisuals(dt) {""")
+
+open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')
 left = [m.start() for m in re.finditer(r'surfY\(|TR\.circ|D\.(areas|rails|rivers|train|trees|surf|fences|crossings|buildings|hw|hh)\b|MAPC|MOX', s)]
 print('leftover refs', [s[i:i + 40] for i in left])

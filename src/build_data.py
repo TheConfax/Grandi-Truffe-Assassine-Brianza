@@ -136,7 +136,8 @@ for members, t in rels:
         ir = join_rings(inners)
         for o in join_rings(outers): add_building(o, ir, t, outers[0] if outers else 'r')
 import os
-OVT = '/mnt/user-data/uploads/GTA-Brianza/edifici_overture.geojson'
+DATA = os.environ.get('GTA_DATA', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data'))
+OVT = os.path.join(DATA, 'edifici_overture.geojson')
 ms_h, ms_only = {}, []
 if os.path.exists(OVT):
     for f_ in json.load(open(OVT))['features']:
@@ -205,7 +206,7 @@ for at, o, ir in areas:
     if g is not None:
         g = g.intersection(RECT.buffer(60))
         if not g.is_empty: area_geoms.append((at, g))
-WCF = '/tmp/claude-0/-home-claude/f9f3057e-6cc4-5c8c-884c-70f97326a909/scratchpad/wc/wc.npy'
+WCF = os.path.join(DATA, 'wc', 'wc.npy')
 WC = None; WC_BUILT = None
 if os.path.exists(WCF):
     WC = np.load(WCF); wlon0, wlat0, wsx = map(float, open(WCF.replace('wc.npy', 'wc_meta.txt')).read().split())
