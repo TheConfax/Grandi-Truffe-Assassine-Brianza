@@ -1,8 +1,11 @@
 // ---------------------------------------------------------------- day & night
 let TOD = 17.2; // ore del giorno, 1 ora di gioco = 1 minuto reale
 const WX = { cloud: 0.12, rain: 0, fog: 0, wet: 0, flash: 0 }; // weather mix, driven by weather3.js
-const HEADPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,236,190,0.9)', 'rgba(255,236,190,0)'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
-const LAMPPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,214,150,0.85)', 'rgba(255,214,150,0)'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+// glow textures are opaque, light on black, and only ever added: canvas alpha gradients upload as rainbow speckles on iOS Safari
+const glowTex = (stops, size = 64) => canvasTex(size, size, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); stops.forEach(([t, r, gg, b]) => gr.addColorStop(t, `rgb(${r | 0},${gg | 0},${b | 0})`)); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, false);
+const poolTex = (r, g, b, a) => glowTex([[0, r * a, g * a, b * a], [1, 0, 0, 0]]);
+const HEADPOOL_MAT = new THREE.MeshBasicMaterial({ map: poolTex(255, 236, 190, 0.9), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+const LAMPPOOL_MAT = new THREE.MeshBasicMaterial({ map: poolTex(255, 214, 150, 0.85), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const WIN_EMI = (kind) => canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd890'; if (kind === 'old') g.fillRect(48, 32, 32, 54); else if (kind === 'modern') { g.fillRect(16, 28, 44, 52); g.fillStyle = '#c99a50'; g.fillRect(68, 28, 44, 52); } });
 const WIN_LIT = { value: 0 }; // share of windows lit, each window decides by its own hash
 const WIN_SKY = { value: new THREE.Color(0) }; // sky mirrored by the panes, each window at its own angle
@@ -20,7 +23,7 @@ const litAt = h => { for (let i = 1; i < LIT_KEYS.length; i++) if (h <= LIT_KEYS
 MAT.lampHead.emissive = new THREE.Color(0xffd890);
 const headSpot = new THREE.SpotLight(0xfff0d0, 0, 70, 0.55, 0.6, 1.2); headSpot.castShadow = false; scene.add(headSpot, headSpot.target);
 // glare: halos round street lamps and car lights (brake and reverse lights too), stars, moon and the sun's glow
-const haloTex = canvasTex(64, 64, (g, w, h) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); [[0, 1], [0.1, 0.9], [0.3, 0.3], [0.6, 0.08], [1, 0]].forEach(([t, a]) => gr.addColorStop(t, `rgba(255,255,255,${a})`)); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, false);
+const haloTex = glowTex([[0, 1], [0.1, 0.9], [0.3, 0.3], [0.6, 0.08], [1, 0]].map(([t, a]) => [t, 255 * a, 255 * a, 255 * a]));
 const glowMat = (size, col, extra) => new THREE.PointsMaterial(Object.assign({ map: haloTex, size, color: col, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }, extra));
 const LAMPGLOW_MAT = glowMat(5, 0xffd49a);
 const CARGLOW = [2.4, 1.5].map(size => { // [heads, tails]: one Points each, refilled every frame from the cars on screen
@@ -33,7 +36,7 @@ const SKY_R = 6200, STARS = (() => {
   const s = new THREE.Points(g, new THREE.PointsMaterial({ size: 2, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false })); s.frustumCulled = false; s.renderOrder = -3; scene.add(s); return s;
 })();
 const skySprite = (tex, size, extra) => { const s = new THREE.Sprite(new THREE.SpriteMaterial(Object.assign({ map: tex, transparent: true, opacity: 0, depthWrite: false, fog: false }, extra))); s.scale.setScalar(size); s.renderOrder = -2; s.frustumCulled = false; scene.add(s); return s; };
-const MOON = skySprite(canvasTex(64, 64, (g) => { g.fillStyle = '#eef0f4'; g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill(); g.fillStyle = 'rgba(150,158,175,0.45)'; for (const [x, y, r] of [[22, 24, 7], [38, 20, 5], [40, 38, 9], [24, 42, 4], [30, 30, 3]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } }, false), 150);
+const MOON = skySprite(canvasTex(64, 64, (g) => { g.fillStyle = '#000'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#eef0f4'; g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill(); g.fillStyle = '#b4bac6'; for (const [x, y, r] of [[22, 24, 7], [38, 20, 5], [40, 38, 9], [24, 42, 4], [30, 30, 3]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } }, false), 150, { blending: THREE.AdditiveBlending });
 const MOONHALO = skySprite(haloTex, 900, { blending: THREE.AdditiveBlending, color: 0x8ea4d8 });
 const SUNGLOW = skySprite(haloTex, 1800, { blending: THREE.AdditiveBlending });
 const LIGHTS = { on: 0 }, _gv = new THREE.Vector3();
