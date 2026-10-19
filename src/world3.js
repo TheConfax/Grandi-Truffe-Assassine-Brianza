@@ -74,6 +74,11 @@ const NO_HEDGES = [
 const GHOSTS = [
   [1243.7, -553.8], [1261.4, -549.6], // a house and a shed across the Curie drive from via Marie Curie
 ];
+// walls missing from the map, as barriers of the tile their first point falls in: { p, t (1 wall, 2 low wall with railing, 3 hedge), h }
+const EXTRA_BARRIERS = [
+  { p: [[-566.2, 870.2], [-570.0, 888.0], [-573.9, 906.5]], t: 1, h: 1.7 }, // the Seminario park wall along via Verga, between the two pieces OSM has
+];
+for (const e of EXTRA_BARRIERS) { const d = TILES[tileOf(e.p[0][0], e.p[0][1])].d, enc = []; let px = 0, pz = 0; for (const [x, z] of e.p) { const X = Math.round(x * 10), Z = Math.round(z * 10); enc.push(X - px, Z - pz); px = X; pz = Z; } (d.ba || (d.ba = [])).push({ p: enc, t: e.t, h: e.h }); }
 for (const T of TILES) {
   const d = T.d;
   for (const B of d.b || []) {
@@ -416,7 +421,7 @@ function buildTile(T) {
     for (let j = 0; j < nn; j++) for (let i = 0; i < nn; i++) { const k = j * w + i; triUp(b, k, k + 1, k + w + 1); triUp(b, k, k + w + 1, k + w); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(b.i); g.computeVertexNormals();
     const m = new THREE.Mesh(g, MAT.terrain); m.renderOrder = -2; m.receiveShadow = true; G.add(m);
-    const dm = new THREE.Mesh(g, MAT.depth); dm.position.y = -0.5; dm.renderOrder = -1; G.add(dm);
+    const dm = new THREE.Mesh(g, MAT.depth); dm.position.y = -1.5; dm.renderOrder = -1; G.add(dm); // deep enough that a road cut into a bump of the terrain (its profile is smoothed) is not hidden by it
   }
   // land use
   {

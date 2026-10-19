@@ -181,7 +181,7 @@ function buildPlazas(T, G) {
     if (!q.coll) WALLS.add(cx - 1.2, cz - 1.2, cx + 1.2, cz + 1.2, { r: 1.1, x: cx, z: cz, y0: gy - 3, y1: gy + 0.5 });
     q.coll = true;
   }
-  if (yb.i.length) { LMAT.yard = LMAT.yard || new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); mkMesh(yb, LMAT.yard, 1, false, G); }
+  if (yb.i.length) { mkMesh(yb, LMAT.yard, 2, false, G); }
   lmFlush(Bs, G);
 }
 // school yards: the map paints the whole school ground as one paved area, the game draws it as lawn; these are the hard surfaces seen from above
@@ -223,7 +223,7 @@ function buildPiazze(T, G) {
     }
     if (y.court) { for (let k = 0; k < 4; k++) line(L2(y.p[k], y.p[(k + 1) % 4], 0), L2(y.p[k], y.p[(k + 1) % 4], 1), 0.08); line(L2(p0, p3, 0.5), L2(p1, p2, 0.5), 0.08); }
   }
-  if (yb.i.length) { LMAT.yard = LMAT.yard || new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); mkMesh(yb, LMAT.yard, 1, false, G); }
+  if (yb.i.length) { mkMesh(yb, LMAT.yard, 2, false, G); }
   for (const q of PIAZZE) {
     const [sw, nw, ne, se] = q.p, [cx, cz] = centroid(q.p); if (Math.abs(cx - T.cx) > TS / 2 || Math.abs(cz - T.cz) > TS / 2) continue;
     const b = VBuf(), NU = 40, NV = 30, P = (u, v) => [nw[0] + (ne[0] - nw[0]) * u + (sw[0] - nw[0]) * v + ((se[0] - sw[0]) - (ne[0] - nw[0])) * u * v, nw[1] + (ne[1] - nw[1]) * u + (sw[1] - nw[1]) * v + ((se[1] - sw[1]) - (ne[1] - nw[1])) * u * v];
@@ -397,6 +397,9 @@ const LMAT = {
   mosaic: new THREE.MeshLambertMaterial({ map: mosaicTex, emissiveMap: mosaicTex, emissive: 0xffffff, emissiveIntensity: 0.1, side: THREE.DoubleSide }),
   tondo: new THREE.MeshLambertMaterial({ map: tondoTex }), clock: new THREE.MeshLambertMaterial({ map: clockTex, emissiveMap: clockTex, emissive: 0xfff2d0, emissiveIntensity: 0, side: THREE.DoubleSide }),
 };
+// painted ground (yards, courts, lawns, park paths, the stadiums): flat like the land use under it, never writing depth, so the roads drawn after it
+// (renderOrder 5) always come out on top and nothing pokes through the asphalt
+LMAT.yard = new THREE.MeshLambertMaterial({ vertexColors: true, depthWrite: false });
 for (const k in PAL_STYLE) { const t = palTex(PAL_STYLE[k], false), e = palTex(PAL_STYLE[k], true); t.wrapT = e.wrapT = THREE.ClampToEdgeWrapping; LMAT[k] = new THREE.MeshLambertMaterial({ map: t, emissiveMap: e, emissive: 0xffc870, emissiveIntensity: 0 }); LM_GLOW.push({ m: LMAT[k], a: 0, b: 0.3 }); }
 LM_GLOW.push({ m: LMAT.lattice, a: 0, b: 0.5 }, { m: LMAT.glass, a: 0.06, b: 0.9 }, { m: LMAT.warm, a: 0, b: 0.8 }, { m: LMAT.mosaic, a: 0.1, b: 0.4 }, { m: LMAT.clock, a: 0, b: 0.6 });
 
@@ -685,7 +688,8 @@ function buildPalazzo(L, B, G) {
   if (o.attic) { const { w, h } = o.attic; box(0, H + h / 2 - 0.1, 0.2, w, h, 0.5, CREAM); box(0, H + h + 0.05, 0.25, w + 0.5, 0.22, 0.75, CREAM); for (const sd of [-1, 1]) lmUrn(F, trim, sd * (w / 2 - 0.3), H + h + 0.15, 0.25, 1.2, CREAM); }
   if (o.sign) { const w = o.signW || 6.4, hh = o.attic ? 0.75 : 0.4, y = o.signY || (o.attic ? H + o.attic.h / 2 - 0.1 : ((st.H || MUN_H) - 0.5) * k), sz = o.attic ? 0.47 : o.portal === 'arch' ? 0.46 : 0.05, i0 = sign.p.length / 3; for (const [x, yy, u, v] of [[-w / 2, y - hh / 2, 0, 0], [w / 2, y - hh / 2, 1, 0], [w / 2, y + hh / 2, 1, 1], [-w / 2, y + hh / 2, 0, 1]]) F.v(sign, x, yy, sz, 0, 0, 1, u, v); sign.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
   if (o.fence) { // garden railing along the front: low wall, pillars with stone vases, iron bars, the gate on the entrance
-    const zf = o.fence, xa = -(Ln - s0) - 2, xb = s0 + 2, IRONF = COL('#2f3133'), PIL = COL('#cfc9bc');
+    const xa = -(Ln - s0) - 2, xb = s0 + 2, IRONF = COL('#2f3133'), PIL = COL('#cfc9bc'), W3 = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(M);
+    let zf = o.fence; while (zf > 1.5 && [xa, (xa + xb) / 2, xb].some(x => { const v = W3(x, zf); return onAnyRoad(v.x, v.z, 1.2); })) zf -= 0.5; // pulled back to the edge of the street
     box((xa + xb) / 2, 0.3, zf, xb - xa, 0.6, 0.4, PIL);
     for (let x = xa; x <= xb + 0.01; x += (xb - xa) / Math.round((xb - xa) / 3.4)) { box(x, 0.95, zf, 0.5, 1.9, 0.5, PIL); lmUrn(F, trim, x, 1.9, zf, 0.75, PIL); }
     for (let x = xa + 0.3; x < xb - 0.2; x += 0.16) if (Math.abs(x) > 1.6) box(x, 1.15, zf, 0.03, 1.1, 0.03, IRONF);
@@ -752,7 +756,7 @@ function buildPalazzo(L, B, G) {
       T.geo(trim, new THREE.ShapeGeometry(fr, 12).translate(0, 0, L2 + 0.05), null, STONE);
     }
     { const g = VBuf(); try { polyFill(g, q, [], 0.1, 3, COL('#b3ab9c')); for (const bd of CL.beds) polyFill(g, bd, [], 0.17, 3, COL('#567f3c')); } catch (e) { } // gravel walks, the four lawns over them
-      LMAT.yard = LMAT.yard || new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); mkMesh(g, LMAT.yard, 1, false, G); }
+      mkMesh(g, LMAT.yard, 2, false, G); }
     for (const [x, z] of CL.trees) { const y = groundH(x, z); addBox(trim, x, y + 1.6, z, 0.4, 3.2, 0.4, COL('#5a4632')); const tg = new THREE.IcosahedronGeometry(3.2, 0).scale(1, 1.1, 1).translate(x, y + 5.6, z), F2 = lmFrame(new THREE.Matrix4()); F2.geo(trim, tg, null, COL('#3f6a34')); }
     for (const hd of CL.hedges) for (let j = 1; j < hd.length; j++) { const [x0, z0] = hd[j - 1], [x1, z1] = hd[j], Lh = hyp(x1 - x0, z1 - z0), y = groundH((x0 + x1) / 2, (z0 + z1) / 2);
       addBox(trim, (x0 + x1) / 2, y + 0.45, (z0 + z1) / 2, Lh + 0.7, 0.9, 0.7, COL('#3d6a32'), Math.atan2(-(z1 - z0), x1 - x0)); }
@@ -1469,7 +1473,7 @@ function buildStadio(L, B, G) {
   line([W(p0, q0), W(p1, q0), W(p1, q1), W(p0, q1), W(p0, q0)]); line([W(am, q0), W(am, q1)]);
   const circ = (a, b, r, t0 = 0, t1 = TAU) => { const pts = []; for (let i = 0; i <= 24; i++) { const t = t0 + (t1 - t0) * i / 24; pts.push(W(a + Math.cos(t) * r, b + Math.sin(t) * r)); } return pts; }; line(circ(am, pm, 9.15));
   for (const [e, sg] of [[p0, 1], [p1, -1]]) { line([W(e, pm - 20.15), W(e + sg * 16.5, pm - 20.15), W(e + sg * 16.5, pm + 20.15), W(e, pm + 20.15)]); line([W(e, pm - 9.15), W(e + sg * 5.5, pm - 9.15), W(e + sg * 5.5, pm + 9.15), W(e, pm + 9.15)]); line(circ(e + sg * 11, pm, 9.15, sg > 0 ? -0.93 : Math.PI - 0.93, sg > 0 ? 0.93 : Math.PI + 0.93)); }
-  LMAT.yard = LMAT.yard || new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); mkMesh(g, LMAT.yard, 1, false, G);
+  mkMesh(g, LMAT.yard, 2, false, G);
   const hAt = (a, b) => groundH(...W(a, b)) - gy, WHITE = COL('#f2f2ee');
   for (const [e, sg] of [[p0, 1], [p1, -1]]) { const y = hAt(e, pm); for (const d of [-3.66, 3.66]) box(Bs.trim, 0.12, 2.44, 0.12, e, y + 1.22, pm + d, WHITE); box(Bs.trim, 0.12, 0.12, 7.44, e, y + 2.44, pm, WHITE); box(Bs.trim, 1.8, 0.04, 7.3, e - sg * 0.9, y + 2.2, pm, COL('#d8d8d4')); } // goals, the net on top
   for (const [a, b] of o.mats) box(Bs.trim, 5, 0.5, 4, a, hAt(a, b) + 0.25, b, COL('#2f5fb0')); // the mats of the high jump and pole vault

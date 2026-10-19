@@ -203,7 +203,7 @@ RADIO.addEventListener('error', () => {
 RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown[radioSt]) { radioShown[radioSt] = true; toast(STATIONS[radioSt].hello); } });
 function stopRadio() { RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
 function updRadio(dt) {
-  const want = radioOn && running && !paused && P.mode === 'car' && !(AU && AU.muted);
+  const want = radioOn && running && !paused && P.mode === 'car' && !P.car.spec.two && !(AU && AU.muted); // no radio on bikes, scooters and motorbikes
   if (P.mode === 'car' && stationFor(P.car) !== radioSt) { radioSt = stationFor(P.car); radioUrl = 0; radioErr = false; STATIC.quiet = false; if (!RADIO.paused) stopRadio(); } // another car, another station: retune
   if (want && RADIO.paused && !radioErr) { RADIO.src = STATIONS[radioSt].urls[radioUrl]; RADIO.volume = radioVol; RADIO.play().catch(() => { }); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } // fresh src = back to live, not to a stale buffer
   if (AU && AU.on) updStatic(dt, want);
