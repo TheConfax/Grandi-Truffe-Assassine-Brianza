@@ -41,6 +41,14 @@ const LANDMARKS = [
         { pts: [[-509.6, -802.2], [-493.2, -808.2], [-486.6, -792.1], [-503.1, -785.3]], h: 8.4, floors: 2 }, { pts: [[-503.1, -785.3], [-486.6, -792.1], [-481.9, -778.1], [-498.4, -771.0]], h: 8.4, floors: 2 }],
       steps: [{ pts: [[-535.5, -807.6], [-528.7, -810.4], [-523.3, -797.8], [-532.7, -793.6]], n: 8, h: 2.4 }],
       walkway: [[-578.8, -718.1], [-549.3, -727.1], [-544.3, -722.0], [-515.0, -741.3]] } },
+  { n: 'Medateca', x: 501.6, z: -451.3, build: buildMedateca, o: { h: 14.9, front: [506.9, -458.5], side: [509.5, -445.5] } }, // the civic library on via Yuri Gagarin
+  { n: 'Palazzo delle banche', x: 479.1, z: -438.3, build: buildModern, // Intesa Sanpaolo and BPER on the roundabout: a two-floor podium behind a portico, the glass block over it
+    o: { wall: '#7f868c', glass: '#3f505b', roof: '#6d6f71', h: 7.2, floors: 2, portico: true, ribbon: 0.72, base: [[471.6, -462.3], [488.3, -450.0], [504.2, -438.3], [482.1, -408.6], [449.5, -432.5]], wings: [{ inset: 3.0, h: 20.4, floors: 6 }], hvac: 6 } },
+  { n: 'Auxologico Meda', x: 585.6, z: -601.3, build: buildModern, // the low white clinic on via Umberto Pace: terracotta entrances and louvres, a light well, solar panels all over the roof
+    o: { wall: '#f1f0ec', glass: '#34414a', roof: '#a8a59f', h: 8.4, floors: 2, punched: true, porch: true, solar: 0.75, hvac: 9,
+      wells: [[[548.95, -584.16], [546.45, -585.82], [553.05, -595.84], [555.55, -594.18]]] } },
+  { n: 'Residenza di via Gagarin', x: 559.1, z: -544.7, build: buildModern, // the new block by the park: taupe walls, white balconies wrapping round every floor, panels on the roof
+    o: { wall: '#8e7e6f', glass: '#3a4148', roof: '#d9d8d4', h: 19.5, floors: 6, balc: true, solar: 0.5, hvac: 2, ribbon: 0.62 } },
   { n: 'Palestra del Curie', x: 1306.5, z: -552.4, build: buildPalestra, o: { h: 10.4, white: true } }, // white, a metal roof, little ochre windows along the bottom
   { n: 'Scuola Statale Primaria San Giorgio', x: 1235.1, z: -398.8, build: buildModern, o: { brick: true, h: 7.6, floors: 2 } }, // Vico Magistretti and Gae Aulenti (1968-74): exposed brick, flat roof
   { n: 'Liceo paritario "Pier Giorgio Frassati"', x: 1152.1, z: 2092.8, build: buildPalazzo, o: { style: 'scuolaocra', h: 9.2, front: [1145.0, 2104.0] } }, // Baruccana, via Colombo: L-shaped, two floors on a basement
@@ -79,7 +87,7 @@ for (const L of LANDMARKS) {
   const gy = Math.min(...B.pts.map(p => groundH(p[0], p[1])));
   if (o.base) {
     for (const ring of [B.pts, ...B.holes]) for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length]; gridDrop(WALLS, a[0], a[1], c[0], c[1], s => s.ax === a[0] && s.az === a[1] && s.bx === c[0] && s.bz === c[1]); }
-    for (const r of [o.base, ...(o.wings || []).map(w => w.pts)]) { lmRingWalls(r, gy - 3, gy + 15); const rec = { pts: r, holes: [], bb: bbox(r) }; BLD.add(rec.bb[0], rec.bb[1], rec.bb[2], rec.bb[3], rec); }
+    for (const r of [o.base, ...(o.wings || []).map(w => w.pts)].filter(Boolean)) { lmRingWalls(r, gy - 3, gy + 15); const rec = { pts: r, holes: [], bb: bbox(r) }; BLD.add(rec.bb[0], rec.bb[1], rec.bb[2], rec.bb[3], rec); }
   }
 }
 // ---------------------------------------------------------------- piazze: paving drawn over the car park of the map, no stalls, no lamp posts
@@ -99,11 +107,38 @@ const piazzaTex = canvasTex(1024, 768, (g, w, h) => { // u along SW -> SE... lai
   g.strokeStyle = 'rgba(90,50,40,.35)'; g.lineWidth = 1; for (let x = 250; x < 720; x += 24) { g.beginPath(); g.moveTo(x, 230); g.lineTo(x, 540); g.stroke(); } for (let y = 230; y < 540; y += 24) { g.beginPath(); g.moveTo(250, y); g.lineTo(720, y); g.stroke(); } g.restore();
   g.strokeStyle = '#e8e2d6'; g.lineWidth = 3; oct(70, 80, 900, 690, 150); g.stroke(); g.strokeRect(250, 230, 470, 310); // white stone kerbs round the patterns
 });
+// small squares in the parks: a round of beaten gravel, a stone basin in the middle with a pole and its weathervane, curved stone benches in a ring,
+// round shrubs on the street side; c, r, benches, shrubs (the angle from the centre they gather around), trees: a row of conifers [[x, z]...]
+const PLAZAS = [
+  { n: 'Parco Fusetti', c: [565.2, -426.1], r: 6.6, benches: 5, shrubs: -0.9, trees: [[500.9, -386.4], [504.2, -390.8], [507.5, -395.2], [510.8, -399.6], [514.1, -404.0], [517.4, -408.4], [520.7, -412.8], [524.0, -417.2], [527.3, -421.6], [530.6, -426.0]] },
+];
+const nearPlaza = (x, z, m = 2) => PLAZAS.some(q => hyp(x - q.c[0], z - q.c[1]) < q.r + m);
+function buildPlazas(T, G) {
+  const F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), yb = VBuf(), STONE = COL('#bdb7ab');
+  for (const q of PLAZAS) {
+    const [cx, cz] = q.c; if (tileOf(cx, cz) !== T.t) continue; const gy = groundH(cx, cz), circ = n => Array.from({ length: n }, (_, i) => [cx + Math.cos(i / n * TAU) * q.r, cz + Math.sin(i / n * TAU) * q.r]);
+    try { polyFill(yb, circ(40), [], 0.04, 6, COL('#b6a88e')); } catch (e) { }
+    F.geo(Bs.trim, new THREE.CylinderGeometry(1.0, 1.1, 0.45, 20).translate(cx, gy + 0.22, cz), null, STONE); F.geo(Bs.trim, new THREE.CylinderGeometry(0.78, 0.78, 0.05, 20).translate(cx, gy + 0.43, cz), null, COL('#6f8f98'));
+    F.geo(Bs.trim, new THREE.CylinderGeometry(0.05, 0.06, 3.4, 6).translate(cx, gy + 1.9, cz), null, COL('#3a3c3e'));
+    F.geo(Bs.trim, lmBox(1.1, 0.05, 0.05, cx, gy + 3.6, cz), null, COL('#dcdcd8')); F.geo(Bs.trim, lmBox(0.05, 0.05, 1.1, cx, gy + 3.6, cz).rotateY(0), null, COL('#dcdcd8')); // the vane
+    for (let k = 0; k < q.benches; k++) { // each bench three blocks on the arc
+      const a0 = k / q.benches * TAU + 0.3;
+      for (let j = -1; j <= 1; j++) { const a = a0 + j * 0.14, x = cx + Math.cos(a) * (q.r - 1.2), z = cz + Math.sin(a) * (q.r - 1.2); F.geo(Bs.trim, lmBox(0.75, 0.45, 0.5, 0, 0, 0).rotateY(-a + Math.PI / 2).translate(x, groundH(x, z) + 0.22, z), null, STONE); if (!q.coll) WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.35, x, z, y0: gy - 3, y1: gy + 0.5 }); }
+    }
+    for (let k = 0; k < 6; k++) { const a = q.shrubs + (k - 2.5) * 0.32, d = q.r + 0.6 + (k % 2) * 0.8, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; F.geo(Bs.trim, new THREE.IcosahedronGeometry(0.75, 0).scale(1, 0.8, 1).translate(x, groundH(x, z) + 0.55, z), null, COL(k % 2 ? '#3f6e34' : '#4b7a3c')); }
+    for (const [x, z] of q.trees || []) { const y = groundH(x, z); F.geo(Bs.trim, new THREE.CylinderGeometry(0.15, 0.2, 1.6, 6).translate(x, y + 0.8, z), null, COL('#4f3c2a')); F.geo(Bs.trim, new THREE.ConeGeometry(1.7, 8.5, 7).translate(x, y + 5.6, z), null, COL('#2f5a33')); if (!q.coll) WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.3, x, z, y0: y - 3, y1: y + 5 }); }
+    if (!q.coll) WALLS.add(cx - 1.2, cz - 1.2, cx + 1.2, cz + 1.2, { r: 1.1, x: cx, z: cz, y0: gy - 3, y1: gy + 0.5 });
+    q.coll = true;
+  }
+  if (yb.i.length) { LMAT.yard = LMAT.yard || new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); mkMesh(yb, LMAT.yard, 1, false, G); }
+  lmFlush(Bs, G);
+}
 // school yards: the map paints the whole school ground as one paved area, the game draws it as lawn; these are the hard surfaces seen from above
 const YARDS = [
   { p: [[-664.5, -741.4], [-617.3, -742.6], [-603.1, -705.0], [-651.5, -700.3]], col: '#b9b6ae', roads: true }, // the Diaz playground with its road-safety course (mapped as a car park)
   { p: [[-586.1, -831.9], [-578.3, -833.5], [-532.9, -731.6], [-539.3, -729.2]], col: '#9a4a3c', lanes: 4 }, // the running track between the Diaz and the Anna Frank
   { p: [[-580.6, -833.0], [-561.7, -834.2], [-552.3, -807.2], [-566.5, -801.3]], col: '#c0604a', court: true }, // the red court by the Anna Frank gym
+  { p: [[538.4, -410.7], [515.6, -380.3], [536.4, -364.7], [559.2, -395.1]], col: '#4f8a6c' }, { p: [[536.2, -401.1], [524.2, -385.1], [535.4, -376.7], [547.4, -392.7]], col: '#b4553f', court: true }, // the Traversi court
   { p: [[1231.0, -555.6], [1236.1, -566.5], [1336.1, -520.5], [1330.6, -508.7]], col: '#a9a8a3' }, // the Curie drive from via Marie Curie, under the bridges
   { p: [[1258.9, -486.3], [1266.1, -502.5], [1279.7, -496.6], [1272.0, -480.5]], col: '#c2bdb2' }, { p: [[1280.8, -531.8], [1274.2, -518.7], [1288.0, -513.3], [1292.7, -525.7]], col: '#c2bdb2' }, // its two courts
 ];
@@ -141,7 +176,7 @@ function buildLandmarks(T, G) { for (const L of LANDMARKS) if (L.t === T.t) { co
 // landings (meshes flagged walk) are left out, so steps can still be climbed
 function lmMeshColl(L, meshes) {
   const C = 0.4, cells = new Map(), key = (i, j) => i * 100000 + j, o = L.o || {};
-  const rings = o.base ? [o.base, ...(o.wings || []).map(w => w.pts)] : [L.b.pts];
+  const rings = o.base ? [o.base, ...(o.wings || []).map(w => w.pts).filter(Boolean)] : [L.b.pts];
   for (const m of meshes) {
     if (!m.isMesh || m.userData.walk) continue;
     const P = m.geometry.attributes.position.array, I = m.geometry.index ? m.geometry.index.array : null, nT = (I ? I.length : P.length / 3) / 3, v = k => I ? I[k] : k;
@@ -1106,7 +1141,7 @@ function buildParkFurniture(T, G) {
         const x = A[0] + ux * s, z = A[1] + uz * s; k++;
         if (x < x0 || x >= x0 + TS || z < z0 || z >= z0 + TS || !inPark(x, z)) continue;
         const sd = k % 2 ? 1 : -1, off = r.w / 2 + 0.9, bx = x + nx * off * sd, bz = z + nz * off * sd, gy = groundH(bx, bz);
-        if (inBuilding(bx, bz, 1.2) || onAnyRoad(bx, bz, 0.2) && !onFoot(bx, bz)) continue;
+        if (inBuilding(bx, bz, 1.2) || onAnyRoad(bx, bz, 0.2) && !onFoot(bx, bz) || nearPlaza(bx, bz)) continue;
         if (k % 3) { // bench facing the path, a bin beside it
           const R = ry + (sd > 0 ? Math.PI : 0), at = (dx, dz) => [bx + Math.cos(R) * dx + Math.sin(R) * dz, bz - Math.sin(R) * dx + Math.cos(R) * dz];
           F.geo(Bs.trim, lmBox(1.8, 0.07, 0.42, 0, gy + 0.45, 0).rotateY(R).translate(bx, 0, bz), null, WOOD);
@@ -1121,7 +1156,7 @@ function buildParkFurniture(T, G) {
   for (const r of D.roads) { // small closed loops of path (a round plaza): a raised bed of flowers inside
     if (r.c !== 6 || r.g.length < 8 || r.g[0] !== r.g[r.g.length - 1]) continue;
     const pts = r.g.map(i => N[i]), [cx, cz] = centroid(pts.slice(0, -1)), rad = Math.min(...pts.map(p => hyp(p[0] - cx, p[1] - cz))) - r.w / 2 - 0.3;
-    if (rad < 1.5 || rad > 9 || tileOf(cx, cz) !== T.t || !inPark(cx, cz, 14) || onAnyRoad(cx, cz, 0) && !onFoot(cx, cz)) continue;
+    if (rad < 1.5 || rad > 9 || nearPlaza(cx, cz) || tileOf(cx, cz) !== T.t || !inPark(cx, cz, 14) || onAnyRoad(cx, cz, 0) && !onFoot(cx, cz)) continue;
     const gy = groundH(cx, cz);
     F.geo(Bs.trim, new THREE.CylinderGeometry(rad, rad, 0.4, 28).translate(cx, gy + 0.2, cz), null, COL('#bcb6aa'));
     F.geo(Bs.trim, new THREE.CylinderGeometry(rad - 0.25, rad - 0.25, 0.1, 28).translate(cx, gy + 0.42, cz), null, COL('#5d4632'));
@@ -1129,6 +1164,40 @@ function buildParkFurniture(T, G) {
   }
   if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
   if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
+}
+
+// the Medateca on via Yuri Gagarin: a red box; on the street front the glazed ground floor, a red band with a slit window and, above, white fins
+// in front of dark glass up to the red parapet; the side on the garden red with scattered square windows and a band of glass over the ground floor;
+// a glazed lantern on the roof. o.front, o.side: points by the street front and by the garden side
+function buildMedateca(L, B, G) {
+  const o = L.o, ring = lmSimplify(B.pts, 0.4), F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), H = gy + o.h, A = sArea(ring);
+  const RED = COL('#b23a2c'), DARK = COL('#2d3a40'), FIN = COL('#e3e3df'), GL = COL('#5d7d86'), near = (q, a, c) => segDist(q[0], q[1], a[0], a[1], c[0], c[1]);
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.3) continue;
+    let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
+    const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, ry = Math.atan2(-ez, ex), P = (s, y, q) => [a[0] + ex * s + nx * q, y, a[1] + ez * s + nz * q];
+    const quad = (s0, s1, y0, y1, q, col) => F.face(Bs.trim, [P(s0, y0, q), P(s1, y0, q), P(s1, y1, q), P(s0, y1, q)], 2, col);
+    const front = near(o.front, a, c) < 3, side = near(o.side, a, c) < 3;
+    F.face(Bs.plaster, [P(0, gy - 1, 0), P(Ln, gy - 1, 0), P(Ln, H, 0), P(0, H, 0)], 2, RED);
+    F.geo(Bs.trim, lmBox(Ln + 0.3, 0.6, 0.35, 0, 0, 0).rotateY(ry).translate((a[0] + c[0]) / 2 + nx * 0.12, H + 0.3, (a[1] + c[1]) / 2 + nz * 0.12), null, RED);
+    if (front) {
+      quad(0.7, Ln - 0.7, gy + 0.1, gy + 3.3, 0.06, GL); for (let t = 0.7; t <= Ln - 0.6; t += 1.7) F.geo(Bs.trim, lmBox(0.1, 3.2, 0.1, 0, 0, 0).translate(...[P(t, 0, 0.1)].map(q => [q[0], gy + 1.7, q[2]])[0]), null, DARK);
+      quad(1.5, Ln - 1.5, gy + 3.9, gy + 4.4, 0.04, DARK); // the slit window in the red band
+      quad(0.7, Ln - 0.7, gy + 5.0, H - 1.2, 0.04, DARK);
+      for (let t = 1.0; t < Ln - 0.8; t += 0.62) F.geo(Bs.trim, lmBox(0.14, H - 1.2 - gy - 5.0, 0.55, 0, 0, 0).rotateY(ry).translate(a[0] + ex * t + nx * 0.35, (gy + 5.0 + H - 1.2) / 2, a[1] + ez * t + nz * 0.35), null, FIN);
+    } else if (side) {
+      quad(Ln * 0.45, Ln - 0.6, gy + 0.1, gy + 3.0, 0.05, GL); // the glazed part of the ground floor towards the garden
+      quad(0.8, Ln - 0.8, gy + 3.7, gy + 4.6, 0.05, DARK); for (let t = 0.8; t < Ln - 0.7; t += 0.5) F.geo(Bs.trim, lmBox(0.06, 0.9, 0.08, 0, 0, 0).translate(...[P(t, 0, 0.09)].map(q => [q[0], gy + 4.15, q[2]])[0]), null, FIN);
+      const W = [[0.25, 6.4], [0.42, 6.4], [0.58, 6.4], [0.35, 8.6], [0.52, 8.6], [0.68, 8.6], [0.3, 10.8], [0.47, 10.8], [0.64, 10.8], [0.8, 10.8]];
+      for (const [t, y] of W) { quad(Ln * t - 0.45, Ln * t + 0.45, gy + y, gy + y + 0.9, 0.05, COL('#e8e4dc')); quad(Ln * t - 0.33, Ln * t + 0.33, gy + y + 0.12, gy + y + 0.78, 0.07, DARK); }
+      quad(Ln * 0.12 - 0.5, Ln * 0.12 + 0.5, gy + 5.4, H - 1.6, 0.05, DARK); // the tall slot near the street corner
+    }
+  }
+  try { polyFill(Bs.trim, ring, [], H + 0.02, 2, COL('#7f7a74')); } catch (e) { }
+  const [cx, cz] = centroid(ring), bx = cx + (o.side[0] - cx) * 0.35, bz = cz + (o.side[1] - cz) * 0.35, ry = Math.atan2(-(o.side[1] - cz), o.side[0] - cx);
+  F.geo(Bs.trim, lmBox(7.5, 2.0, 6.5, 0, 0, 0).rotateY(ry).translate(bx, H + 1.0, bz), null, COL('#e2e0da')); // the lantern on the roof, glazed on top
+  F.geo(Bs.trim, lmBox(5.5, 0.4, 4.5, 0, 0, 0).rotateY(ry).translate(bx, H + 2.15, bz), null, GL);
+  lmFlush(Bs, G);
 }
 
 // a school gym of the seventies: prefabricated panels in faded red, a band of windows under the eaves, a shallow metal roof
@@ -1157,7 +1226,11 @@ function buildPalestra(L, B, G) { // o.white: white render instead of the panels
 // spine: [a, b] (a glass barrel vault along the roof with arched glazed bays at both ends), planters: [[x, z]] (a bed with a little tree),
 // base (a ring for the lower block instead of the footprint), glass, roof (colours), sky (one skylight every so many m2 of roof), wings[].kind 'gym' (a row of
 // small windows along the top and the bottom instead of the ribbons), steps: [{ pts, n, h }] (an open-air flight from the first edge up to the third),
-// walkway: [[x, z]...] (a covered path on posts, its barrel canopy stepping down with the ground, red ribs) }
+// walkway: [[x, z]...] (a covered path on posts, its barrel canopy stepping down with the ground, red ribs),
+// ribbon (share of each floor the window ribbons take), punched (single windows instead of ribbons), portico (the ground floor of the base set back
+// behind pillars), balc (balcony slabs on every floor, glass parapets), porch (terracotta entrances and louvres on the long sides), solar (share of
+// the top roof under panels), hvac (plant boxes on the roof), wells: [quad] (glazed light wells in the roof); wings[].inset: a wing drawn on the
+// footprint pulled in by that many metres }
 const bridgeSign = t => canvasTex(1024, 128, (g, w, h) => {
   g.fillStyle = '#f4f4f1'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f2a44'; g.textAlign = 'center'; g.textBaseline = 'middle';
   const L = t.split('\n'); g.font = `${L.length > 1 ? 46 : 50}px Georgia, serif`; L.forEach((s, i) => g.fillText(s, w * 0.44, h / 2 + (i - (L.length - 1) / 2) * 50 + 3));
@@ -1183,22 +1256,48 @@ function buildModern(L, B, G) {
         for (let s = 1.0; s < Ln - 0.8; s += 1.6) for (const y of [h - 1.3, 1.1]) F.geo(Bs.trim, lmBox(0.7, 0.55, 0.1, 0, 0, 0).rotateY(ry).translate(a[0] + ex * s + nx * 0.06, gy + y, a[1] + ez * s + nz * 0.06), null, COL('#2f3a44'));
         continue;
       }
+      if (o.porch && Ln > 25) { // terracotta at the entrance in the middle, terracotta louvres high up near the corners
+        const s0 = Ln * 0.38, s1 = Ln * 0.6, P = (s, y, q) => [a[0] + ex * s + nx * q, y, a[1] + ez * s + nz * q];
+        F.face(Bs.trim, [P(s0, gy, 0.08), P(s1, gy, 0.08), P(s1, gy + 3.8, 0.08), P(s0, gy + 3.8, 0.08)], 2, COL('#c0603e'));
+        F.face(Bs.trim, [P(s0 + 1.5, gy, 0.12), P(s1 - 1.5, gy, 0.12), P(s1 - 1.5, gy + 2.8, 0.12), P(s0 + 1.5, gy + 2.8, 0.12)], 2, GLASS);
+        for (const [t0, t1] of [[0.06, 0.2], [0.8, 0.94]]) for (let t = Ln * t0; t < Ln * t1; t += 0.55) F.geo(Bs.trim, lmBox(0.12, h - 4.6, 0.4, 0, 0, 0).rotateY(ry).translate(a[0] + ex * t + nx * 0.25, gy + (h + 3.6) / 2, a[1] + ez * t + nz * 0.25), null, COL('#c97b55'));
+      }
+      if (o.portico && !kind && h <= o.h) { // a portico all along: the ground floor glazed and set back, square pillars in front
+        band(gy + 0.1, gy + 3.4, -1.6, GLASS); band(gy + 3.4, gy + 3.5, 0.02, COL('#5e6266'));
+        for (let s = 1.2; s < Ln - 0.6; s += 4.5) F.geo(Bs.trim, lmBox(0.5, 3.4, 0.5, 0, 0, 0).translate(a[0] + ex * s + nx * 0.2, gy + 1.7, a[1] + ez * s + nz * 0.2), null, COL('#b9bcbe'));
+      }
+      if (o.balc && Ln > 6) for (let f = 1; f < floors; f++) { // balconies on every floor: a white slab and a glass parapet
+        const y = gy + 0.9 + f * fh - 0.15;
+        F.geo(Bs.trim, lmBox(Ln + 1.2, 0.26, 1.5, 0, 0, 0).rotateY(ry).translate(mx + nx * 0.75, y, mz + nz * 0.75), null, COL('#f4f4f1'));
+        F.face(Bs.trim, [[a[0] - ex * 0.6 + nx * 1.48, y + 0.13, a[1] - ez * 0.6 + nz * 1.48], [c[0] + ex * 0.6 + nx * 1.48, y + 0.13, c[1] + ez * 0.6 + nz * 1.48], [c[0] + ex * 0.6 + nx * 1.48, y + 1.1, c[1] + ez * 0.6 + nz * 1.48], [a[0] - ex * 0.6 + nx * 1.48, y + 1.1, a[1] - ez * 0.6 + nz * 1.48]], 2, COL('#a9bcc6'));
+      }
       if (court) { // round the courts: the ground floor all glass between steel posts, an ochre band above it
         band(gy + 0.15, gy + 3.2, 0.06, GLASS); band(gy + 3.2, gy + 4.0, 0.12, OCRA);
         for (let s = 0.4; s <= Ln - 0.3; s += 2.2) F.geo(Bs.trim, lmBox(0.12, 3.05, 0.1, 0, 0, 0).translate(a[0] + ex * s + nx * 0.1, gy + 1.68, a[1] + ez * s + nz * 0.1), null, COL('#33383d'));
       }
-      for (let f = court ? 1 : 0; f < floors; f++) { // ribbon window with mullions
-        const y0 = gy + 0.9 + f * fh + 0.25, y1 = y0 + fh * 0.5, m = 0.8, q = 0.05;
+      if (o.punched) { for (let f = 0; f < floors; f++) for (let s = 2.2; s < Ln - 1.8; s += 3.6) { if (o.porch && Ln > 25 && s > Ln * 0.36 && s < Ln * 0.62) continue; const y = gy + 0.9 + f * fh + fh * 0.4; F.geo(Bs.trim, lmBox(1.4, 1.3, 0.1, 0, 0, 0).rotateY(ry).translate(a[0] + ex * s + nx * 0.04, y, a[1] + ez * s + nz * 0.04), null, GLASS); } continue; }
+      for (let f = court || (o.portico && !kind && h <= o.h) ? 1 : 0; f < floors; f++) { // ribbon window with mullions
+        const y0 = gy + 0.9 + f * fh + 0.25, y1 = y0 + fh * (o.ribbon || 0.5), m = 0.8, q = 0.05;
         F.face(Bs.trim, [[a[0] + ex * m + nx * q, y0, a[1] + ez * m + nz * q], [c[0] - ex * m + nx * q, y0, c[1] - ez * m + nz * q], [c[0] - ex * m + nx * q, y1, c[1] - ez * m + nz * q], [a[0] + ex * m + nx * q, y1, a[1] + ez * m + nz * q]], 2, GLASS);
         for (let s = m; s <= Ln - m + 0.01; s += 1.6) F.geo(Bs.trim, lmBox(0.09, y1 - y0, 0.08, 0, 0, 0).translate(a[0] + ex * s + nx * 0.08, (y0 + y1) / 2, a[1] + ez * s + nz * 0.08), null, FRAME);
         F.geo(Bs.trim, lmBox(Ln - 2 * m, 0.08, 0.14, 0, 0, 0).rotateY(ry).translate(mx + nx * 0.1, y0 - 0.04, mz + nz * 0.1), null, FRAME);
       }
     }
     try { polyFill(Bs.trim, ring, [], top + 0.02, 2, COL(o.roof || '#8f8c86')); } catch (e) { }
+    if (kind === 'top' || (!o.wings && kind !== 'gym')) { // roof plant: solar panels in rows along the longest side, plant boxes, light wells
+      let le = 0, ux = 1, uz = 0; for (let i = 0; i < ring.length; i++) { const p = ring[i], q = ring[(i + 1) % ring.length], l = hyp(q[0] - p[0], q[1] - p[1]); if (l > le) { le = l; ux = (q[0] - p[0]) / l; uz = (q[1] - p[1]) / l; } }
+      const inner = lmOffset(ring, 1.6), [cx, cz] = centroid(ring), R2 = Math.sqrt(Math.abs(A)), ry = Math.atan2(-uz, ux), wells = o.wells || [];
+      if (o.solar) for (let v = -R2; v < R2; v += 2.0) for (let u = -R2; u < R2; u += 1.1) {
+        const x = cx + ux * u - uz * v, z = cz + uz * u + ux * v; if (!inPoly(x, z, inner) || wells.some(w => inPoly(x, z, lmOffset(w, -1.2))) || rand() > o.solar) continue;
+        F.geo(Bs.trim, lmBox(1.0, 0.08, 1.6, 0, 0, 0).rotateX(0.18).rotateY(ry).translate(x, top + 0.45, z), null, COL('#27334a'));
+      }
+      for (let k = 0; k < (o.hvac || 0); k++) { const u = (rand() - 0.5) * R2, v = (rand() - 0.5) * R2, x = cx + ux * u - uz * v, z = cz + uz * u + ux * v; if (inPoly(x, z, inner)) F.geo(Bs.trim, lmBox(1.6 + rand() * 2, 1.0 + rand(), 1.4 + rand(), 0, 0, 0).rotateY(ry).translate(x, top + 0.6, z), null, COL('#b9bcbf')); }
+      for (const w of wells) { try { polyFill(Bs.trim, w, [], top + 0.05, 2, COL('#3d4f5a')); } catch (e) { } const A2 = sArea(w); for (let i = 0; i < w.length; i++) { const p = w[i], q = w[(i + 1) % w.length], l = hyp(q[0] - p[0], q[1] - p[1]); F.geo(Bs.trim, lmBox(l, 0.9, 0.12, 0, 0, 0).rotateY(Math.atan2(-(q[1] - p[1]), q[0] - p[0])).translate((p[0] + q[0]) / 2, top + 0.45, (p[1] + q[1]) / 2), null, COL('#e4e6e6')); } }
+    }
     if (o.sky) { const [x0, z0, x1, z1] = bbox(ring); for (let k = Math.round(Math.abs(A) / o.sky); k > 0; k--) { const x = x0 + rand() * (x1 - x0), z = z0 + rand() * (z1 - z0); if (inPoly(x, z, lmOffset(ring, 1.2))) F.geo(Bs.trim, lmBox(0.9, 0.3, 0.9, x, top + 0.15, z), null, COL('#eef0f0')); } }
   };
   block(o.base || ring, o.h, o.floors, o.courts);
-  for (const w of o.wings || []) block(lmOffset(w.pts, -0.15), w.h, w.floors, null, w.kind); // a hair proud of the lower block, so the faces don't fight
+  for (const w of o.wings || []) block(w.inset ? lmOffset(ring, w.inset) : lmOffset(w.pts, -0.15), w.h, w.floors, null, w.kind || (w.inset ? 'top' : undefined)); // a hair proud of the lower block, so the faces don't fight
   for (const st of o.steps || []) { // a flight of steps: n treads from the first edge to the third, each with its riser
     const [p0, p1, p2, p3] = st.pts, sy = groundH((p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2), L2 = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
     for (let i = 0; i < st.n; i++) {
