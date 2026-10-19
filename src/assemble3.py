@@ -404,6 +404,9 @@ rep("function updVisuals(dt) {", """(() => { document.body.classList.toggle('deb
   c.addEventListener('change', () => { const v = c.value.trim().toUpperCase(); c.value = ''; if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'); });
   document.getElementById('dbgdl').onclick = exportSpots; document.getElementById('dbgclr').onclick = clearSpots; })();
 function updVisuals(dt) {""")
+# ---- sounds: footsteps, tyres, passing cars, ambience
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'sound3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("  if (running) { updHud(dt); updAudio(); }", "  if (running) { updHud(dt); updAudio(); updSfx(dt); }")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')
