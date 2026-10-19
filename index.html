@@ -1240,12 +1240,19 @@ function buildFuel(T, G) {
     const tot = new THREE.Mesh(boxG(1.6, 4.4, 0.4), [lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), tm, tm]); tot.position.set(9.5, 2.2, -(4.5 + 2)); tot.castShadow = true; root.add(tot);
   }
 }
-function fuelHits(v) {
-  if (v.speed < 6) return;
-  for (const f of FUEL) { if (Math.abs(f.x - v.x) > 14 || Math.abs(f.z - v.z) > 14) continue;
-    for (const pump of f.pumps) if (pump.alive && hyp(pump.x - v.x, pump.z - v.z) < v.rad + 1.4) { pump.alive = false; pump.burn = 9; if (pump.body) pump.body.material = lam(0x1d1b19); boom(pump.x, f.gy + 1, pump.z, 1.2); v.health = Math.max(0, v.health - 35); } }
+// a pump goes up, scorches black and catches fire; the blast sets off every other pump nearby, so the fire runs across the forecourt
+function ignitePump(f, pump, k = 1.8) {
+  if (!pump.alive) return;
+  pump.alive = false; pump.burn = 14; if (pump.body) pump.body.material = lam(0x1d1b19);
+  boom(pump.x, f.gy + 1, pump.z, k);
+  for (const g of FUEL) for (const o of g.pumps) if (o.alive && hyp(o.x - pump.x, o.z - pump.z) < 11) ignitePump(g, o, 1.4);
 }
-function updFuel(dt) { for (const f of FUEL) for (const pump of f.pumps) if (pump.burn > 0) { pump.burn -= dt; if (rnd() < 0.8) puff(pump.x + (rnd() - 0.5), f.gy + 1.5, pump.z + (rnd() - 0.5), rnd() < 0.5 ? '#ff7a1e' : '#ffc23a', 1 + rnd(), 0.6, 2.6); } }
+function fuelHits(v) {
+  if (v.speed < 3) return;
+  for (const f of FUEL) { if (Math.abs(f.x - v.x) > 16 || Math.abs(f.z - v.z) > 16) continue;
+    for (const pump of f.pumps) if (pump.alive && hyp(pump.x - v.x, pump.z - v.z) < v.rad + 2.6) { ignitePump(f, pump); v.health = Math.max(0, v.health - 35); } }
+}
+function updFuel(dt) { for (const f of FUEL) for (const pump of f.pumps) if (pump.burn > 0) { pump.burn -= dt; for (let i = 0; i < 2; i++) if (rnd() < 0.8) puff(pump.x + (rnd() - 0.5) * 1.4, f.gy + 1.5 + rnd(), pump.z + (rnd() - 0.5) * 1.4, rnd() < 0.5 ? '#ff7a1e' : '#ffc23a', 1.2 + rnd() * 1.2, 0.6, 3.0); } }
 
 // ---------------------------------------------------------------- cemeteries: rows of graves, crosses and cypresses
 const CYP_G = (() => { const g = new THREE.ConeGeometry(0.9, 9, 7); g.translate(0, 5.2, 0); return g; })(), TOMB_G = new THREE.BoxGeometry(0.95, 0.28, 2.0), STONE_G = new THREE.BoxGeometry(0.8, 1.0, 0.14);
