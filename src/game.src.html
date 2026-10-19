@@ -875,8 +875,9 @@ function makeCar(model, color) {
     add(boxG(S.W + 0.02, 0.17, 0.12), M_DARK, 0, bot + 0.08, hl + 0.02, false); add(boxG(S.W + 0.02, 0.17, 0.12), M_DARK, 0, bot + 0.08, -hl - 0.02, false);
   }
   const lx = S.ape ? 0.45 : S.W / 2 - 0.3;
-  if (S.two) { add(boxG(0.16, 0.12, 0.06), M_HEAD, 0, lightY, lightZ + 0.04, false); add(boxG(0.14, 0.08, 0.05), M_TAIL, 0, S.pedal ? 0.9 : S.seatY + 0.02, -hl + (S.pedal ? 0.25 : 0.12), false); }
-  else for (const x of [-lx, lx]) { add(boxG(0.38, 0.14, 0.06), M_HEAD, x, lightY, lightZ, false); add(boxG(0.38, 0.14, 0.06), M_TAIL, x, lightY + 0.02, -lightZ, false); }
+  const tail = M_TAIL.clone(), ud = body.userData = { hl: [], tl: [], tail }; // own tail lamps (brake lights), glare points just outside each lens
+  if (S.two) { const ty = S.pedal ? 0.9 : S.seatY + 0.02, tz = -hl + (S.pedal ? 0.25 : 0.12); add(boxG(0.16, 0.12, 0.06), M_HEAD, 0, lightY, lightZ + 0.04, false); add(boxG(0.14, 0.08, 0.05), tail, 0, ty, tz, false); ud.hl.push([0, lightY, lightZ + 0.2]); ud.tl.push([0, ty, tz - 0.15]); }
+  else for (const x of [-lx, lx]) { add(boxG(0.38, 0.14, 0.06), M_HEAD, x, lightY, lightZ, false); add(boxG(0.38, 0.14, 0.06), tail, x, lightY + 0.02, -lightZ, false); ud.hl.push([x, lightY, lightZ + 0.18]); ud.tl.push([x, lightY + 0.02, -lightZ - 0.15]); }
   const wheels = [];
   for (const [x, z, front] of wheelPos) { // two-wheelers: wheels hang from the leaning body
     const piv = new THREE.Group(); piv.position.set(x, S.wr, z); (S.two ? body : g).add(piv); const w = new THREE.Mesh(S.two ? thinWheelG(S.wr, S.pedal) : wheelG(S.wr), M_TYRE); piv.add(w); wheels.push({ piv, w, front });

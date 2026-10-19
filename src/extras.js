@@ -4,11 +4,12 @@ const HEADPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,236,
 const LAMPPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,214,150,0.85)', 'rgba(255,214,150,0)'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const WIN_EMI = (kind) => canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd890'; if (kind === 'old') g.fillRect(48, 32, 32, 54); else if (kind === 'modern') { g.fillRect(16, 28, 44, 52); g.fillStyle = '#c99a50'; g.fillRect(68, 28, 44, 52); } });
 const WIN_LIT = { value: 0 }; // share of windows lit, each window decides by its own hash
+const WIN_SKY = { value: new THREE.Color(0) }; // sky mirrored by the panes, each window at its own angle
 for (const [k, kind] of [['old', 'old'], ['mod', 'modern']]) {
   MAT[k].emissiveMap = WIN_EMI(kind); MAT[k].emissive = new THREE.Color(0xffc870); MAT[k].emissiveIntensity = 0;
   MAT[k].onBeforeCompile = sh => {
-    sh.uniforms.uLit = WIN_LIT;
-    sh.fragmentShader = 'uniform float uLit;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float wh = fract(sin(dot(floor(vUv) + 0.37, vec2(12.9898, 78.233))) * 43758.5453);\n  totalEmissiveRadiance *= step(wh, uLit) * (0.7 + 0.6 * fract(wh * 7.13));');
+    sh.uniforms.uLit = WIN_LIT; sh.uniforms.uSky = WIN_SKY;
+    sh.fragmentShader = 'uniform float uLit;\nuniform vec3 uSky;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float wh = fract(sin(dot(floor(vUv) + 0.37, vec2(12.9898, 78.233))) * 43758.5453);\n  totalEmissiveRadiance *= step(wh, uLit) * (0.7 + 0.6 * fract(wh * 7.13));\n  totalEmissiveRadiance += uSky * emissiveColor.r * (0.45 + 0.8 * fract(wh * 3.71)) * (0.75 + 0.25 * vUv.y - 0.25 * floor(vUv.y));');
   };
   MAT[k].needsUpdate = true;
 }
@@ -17,6 +18,47 @@ const LIT_KEYS = [[0, 0.3], [1, 0.16], [3, 0.06], [5.5, 0.05], [6.5, 0.18], [7.5
 const litAt = h => { for (let i = 1; i < LIT_KEYS.length; i++) if (h <= LIT_KEYS[i][0]) { const [a, va] = LIT_KEYS[i - 1], [b, vb] = LIT_KEYS[i]; return va + (vb - va) * (h - a) / (b - a); } return 0.3; };
 MAT.lampHead.emissive = new THREE.Color(0xffd890);
 const headSpot = new THREE.SpotLight(0xfff0d0, 0, 70, 0.55, 0.6, 1.2); headSpot.castShadow = false; scene.add(headSpot, headSpot.target);
+// glare: halos round street lamps and car lights (brake and reverse lights too), stars, moon and the sun's glow
+const haloTex = canvasTex(64, 64, (g, w, h) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); [[0, 1], [0.1, 0.9], [0.3, 0.3], [0.6, 0.08], [1, 0]].forEach(([t, a]) => gr.addColorStop(t, `rgba(255,255,255,${a})`)); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, false);
+const glowMat = (size, col, extra) => new THREE.PointsMaterial(Object.assign({ map: haloTex, size, color: col, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }, extra));
+const LAMPGLOW_MAT = glowMat(5, 0xffd49a);
+const CARGLOW = [2.4, 1.5].map(size => { // [heads, tails]: one Points each, refilled every frame from the cars on screen
+  const g = new THREE.BufferGeometry(), n = 800; g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setDrawRange(0, 0);
+  const p = new THREE.Points(g, glowMat(size, 0xffffff, { vertexColors: true, opacity: 1 })); p.frustumCulled = false; p.renderOrder = 14; scene.add(p); p.n = n; return p;
+});
+const SKY_R = 6200, STARS = (() => {
+  const p = [], c = []; for (let i = 0; i < 1100; i++) { const u = 0.04 + srnd() * 0.96, a = srnd() * Math.PI * 2, r = Math.sqrt(1 - u * u), k = 0.35 + srnd() ** 3 * 0.65; p.push(Math.cos(a) * r * SKY_R, u * SKY_R, Math.sin(a) * r * SKY_R); c.push(k, k, k * (0.9 + srnd() * 0.2)); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3));
+  const s = new THREE.Points(g, new THREE.PointsMaterial({ size: 2, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false })); s.frustumCulled = false; s.renderOrder = -3; scene.add(s); return s;
+})();
+const skySprite = (tex, size, extra) => { const s = new THREE.Sprite(new THREE.SpriteMaterial(Object.assign({ map: tex, transparent: true, opacity: 0, depthWrite: false, fog: false }, extra))); s.scale.setScalar(size); s.renderOrder = -2; s.frustumCulled = false; scene.add(s); return s; };
+const MOON = skySprite(canvasTex(64, 64, (g) => { g.fillStyle = '#eef0f4'; g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill(); g.fillStyle = 'rgba(150,158,175,0.45)'; for (const [x, y, r] of [[22, 24, 7], [38, 20, 5], [40, 38, 9], [24, 42, 4], [30, 30, 3]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } }, false), 150);
+const MOONHALO = skySprite(haloTex, 900, { blending: THREE.AdditiveBlending, color: 0x8ea4d8 });
+const SUNGLOW = skySprite(haloTex, 1800, { blending: THREE.AdditiveBlending });
+const LIGHTS = { on: 0 }, _gv = new THREE.Vector3();
+function skyAt(s, x, y, z) { s.position.set(camera.position.x + x * SKY_R * 0.97, camera.position.y + y * SKY_R * 0.97, camera.position.z + z * SKY_R * 0.97); }
+function updGlow() {
+  const L = lightTones(), on = LIGHTS.on;
+  STARS.position.copy(camera.position); STARS.material.opacity = clamp((-L.elDeg - 3) / 9, 0, 1);
+  skyAt(MOON, -L.E, -L.U, L.Nn); skyAt(MOONHALO, -L.E, -L.U, L.Nn); // full moon: right across the sky from the sun
+  MOON.material.opacity = clamp(-L.U * 12 + 0.2, 0, 1) * clamp(0.25 + L.night, 0, 1); MOONHALO.material.opacity = MOON.material.opacity * 0.35 * L.night;
+  skyAt(SUNGLOW, L.E, L.U, -L.Nn); SUNGLOW.material.opacity = clamp(L.U * 10 + 0.3, 0, 1) * (0.32 + 0.4 * L.dusk); SUNGLOW.material.color.setRGB(1, 0.86 - 0.28 * L.dusk, 0.62 - 0.4 * L.dusk);
+  LAMPGLOW_MAT.opacity = 0.85 * on;
+  const [H, T] = CARGLOW, hp = H.geometry.attributes.position, hc = H.geometry.attributes.color, tp = T.geometry.attributes.position, tc = T.geometry.attributes.color; let nh = 0, nt = 0;
+  for (const v of VEH) {
+    const ud = v.m.body.userData; if (!ud.tl) continue;
+    const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen, fs = v.fwdSpeed, brk = live && v.inp.brk > 0, rev = brk && fs < -0.5, stop = brk && !rev;
+    ud.tail.emissiveIntensity = M_TAIL.emissiveIntensity + (stop ? 2.2 : 0);
+    if (!v.m.g.visible) continue;
+    const kh = live ? on : 0, kt = live ? 0.45 * on + (stop ? 0.85 : 0) : 0; if (kh < 0.02 && kt < 0.02 && !rev) continue;
+    v.m.g.updateMatrixWorld(true); const mw = v.m.body.matrixWorld;
+    const cx = camera.position.x - v.x, cz = camera.position.z - v.z, cl = hyp(cx, cz) || 1, face = (Math.sin(v.h) * cx + Math.cos(v.h) * cz) / cl; // lamps shine forward/backward: glare only towards the camera
+    const fh = clamp(face * 1.6 + 0.1, 0, 1), ft = clamp(-face * 1.6 + 0.35, 0, 1);
+    if (kh * fh >= 0.02) for (const q of ud.hl) { if (nh >= H.n) break; _gv.set(q[0], q[1], q[2]).applyMatrix4(mw); hp.setXYZ(nh, _gv.x, _gv.y, _gv.z); hc.setXYZ(nh++, kh * fh, kh * fh * 0.93, kh * fh * 0.78); }
+    for (const q of ud.tl) { if (nt >= T.n) break; _gv.set(q[0], q[1], q[2]).applyMatrix4(mw); tp.setXYZ(nt, _gv.x, _gv.y, _gv.z); if (rev) tc.setXYZ(nt++, 0.75 * ft, 0.75 * ft, 0.72 * ft); else tc.setXYZ(nt++, kt * ft, kt * ft * 0.1, kt * ft * 0.06); }
+  }
+  H.geometry.setDrawRange(0, nh); T.geometry.setDrawRange(0, nt); hp.needsUpdate = hc.needsUpdate = tp.needsUpdate = tc.needsUpdate = true;
+}
 const SKY_C = {
   day: ['#5e8fd0', '#a9c3e0', '#f1dcb6', '#f6d7a8'], dusk: ['#2c3e74', '#b0708a', '#f39a5a', '#ffb070'], night: ['#0a1022', '#16234a', '#2a3a66', '#3a4570'],
 };
@@ -34,9 +76,9 @@ function updDayNight(dt) {
   const L = lightTones(); nightK = L.night;
   // sun runs east -> south -> west, moon light when it is down
   if (L.U > 0) SUN_DIR.set(L.E, Math.max(0.12, L.U), -L.Nn).normalize(); else SUN_DIR.set(0.3, 0.8, 0.45).normalize(); // night: soft moonlight from high up
-  sun.intensity = 0.3 + 0.6 * L.day;
+  sun.intensity = 0.3 + 0.8 * L.day;
   sun.color.copy(mixHex(0x8fa6d8, 0xffdcae, L.day)).lerp(new THREE.Color(0xff9356), L.dusk * 0.6);
-  hemi.intensity = 0.5 + 0.28 * L.day; hemi.color.copy(mixHex(0x5a6fa8, 0xdbe8ff, L.day)); hemi.groundColor.copy(mixHex(0x2a2a36, 0x8a7f6a, L.day));
+  hemi.intensity = 0.5 + 0.12 * L.day; hemi.color.copy(mixHex(0x5a6fa8, 0xdbe8ff, L.day)); hemi.groundColor.copy(mixHex(0x2a2a36, 0x8a7f6a, L.day));
   const fog = mixHex(0x1f2a44, 0xebd9ba, L.day).lerp(new THREE.Color(0xe39a72), L.dusk * 0.55); scene.fog.color.copy(fog); scene.fog.far = 560 + 160 * L.day;
   _far.material.color.setScalar(0.18 + 0.82 * L.day); _near.material.color.setScalar(0.15 + 0.85 * L.day);
   if (Math.abs(TOD - skyT) > 0.04 || skyT < 0) { // redraw the 4x256 sky gradient now and then
@@ -45,7 +87,8 @@ function updDayNight(dt) {
     g.fillStyle = gr; g.fillRect(0, 0, skyCanvas.width, h); scene.background.needsUpdate = true;
   }
   // street lamps, windows, car lights
-  const lampsOn = clamp((3 - L.elDeg) / 7, 0, 1); WIN_LIT.value = litAt(TOD);
+  const lampsOn = clamp((3 - L.elDeg) / 7, 0, 1); WIN_LIT.value = litAt(TOD); LIGHTS.on = lampsOn;
+  WIN_SKY.value.copy(mixHex(SKY_C.night[1], SKY_C.day[1], L.day)).lerp(new THREE.Color(SKY_C.dusk[2]), L.dusk * 0.5).multiplyScalar(0.12 + 0.3 * L.day);
   for (const m of SIGN_MATS) m.emissiveIntensity = 0.05 + 0.75 * lampsOn;
   for (const g of LM_GLOW) g.m.emissiveIntensity = g.a + g.b * lampsOn;
   MAT.lampHead.emissiveIntensity = 0.3 + 2.4 * lampsOn; LAMPPOOL_MAT.opacity = 0.75 * lampsOn;
