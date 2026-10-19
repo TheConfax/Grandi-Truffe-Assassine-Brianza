@@ -113,12 +113,34 @@ const RADIO_URL = 'https://icstream.rds.radio/disco';
 const RADIO = new Audio(); RADIO.preload = 'none';
 const IN_CLAUDE = /claudeusercontent\.com|claude\.ai/.test(location.hostname);
 let radioOn = true, radioVol = 0, radioErr = false, radioShown = false;
+// static while the tuner looks for the station: band-passed hiss with crackles and a drifting whistle, until the stream plays (at least 0.9 s)
+const STATIC = { g: null, t: 0, tuning: false };
+function staticInit() {
+  if (STATIC.g || !AU.on) return; const C = AU.ctx, len = C.sampleRate * 2, b = C.createBuffer(1, len, C.sampleRate), d = b.getChannelData(0);
+  for (let i = 0, cr = 0; i < len; i++) { if (rnd() < 0.0005) cr = 1; cr *= 0.996; d[i] = (rnd() * 2 - 1) * (0.3 + cr * 1.7) * (rnd() < 0.0015 ? 3.5 : 1); }
+  const s = C.createBufferSource(); s.buffer = b; s.loop = true;
+  const f = C.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = 0.6;
+  const w = C.createOscillator(); w.type = 'sine'; w.frequency.value = 2200; const wg = C.createGain(); wg.gain.value = 0.06;
+  const g = C.createGain(); g.gain.value = 0;
+  s.connect(f); f.connect(g); w.connect(wg); wg.connect(g); g.connect(AU.master); s.start(); w.start();
+  Object.assign(STATIC, { g, f, w });
+}
+function updStatic(dt, want) {
+  staticInit(); if (!STATIC.g) return; const C = AU.ctx, t = C.currentTime;
+  STATIC.t -= dt; if (STATIC.tuning && STATIC.t < -6) { STATIC.tuning = false; STATIC.quiet = true; } // a stream that never answers stops hissing (until the radio is switched again)
+  const on = want && !radioErr && (STATIC.tuning || STATIC.t > 0);
+  STATIC.g.gain.setTargetAtTime(on ? 0.11 : 0, t, on ? 0.03 : 0.12);
+  if (on) { STATIC.w.frequency.setTargetAtTime(1500 + Math.sin(now * 2.3) * 700 + rnd() * 250, t, 0.08); STATIC.f.frequency.setTargetAtTime(1300 + rnd() * 900, t, 0.05); }
+}
+RADIO.addEventListener('playing', () => { STATIC.tuning = false; STATIC.quiet = false; });
+RADIO.addEventListener('error', () => { STATIC.tuning = false; });
 RADIO.addEventListener('error', () => { if (radioOn && RADIO.getAttribute('src') && !radioErr) { radioErr = true; toast(IN_CLAUDE ? '📻 Su claude.ai la radio è bloccata: gioca dalla versione su GitHub Pages' : '📻 Discoradio non raggiungibile'); toastT = 6; } });
 RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown) { radioShown = true; toast('📻 Discoradio · il ritmo della tua città'); } });
 function updRadio(dt) {
   const want = radioOn && running && !paused && P.mode === 'car' && !(AU && AU.muted);
-  if (want && RADIO.paused && !radioErr) { RADIO.src = RADIO_URL; RADIO.volume = radioVol; RADIO.play().catch(() => { }); } // fresh src = back to live, not to a stale buffer
+  if (want && RADIO.paused && !radioErr) { RADIO.src = RADIO_URL; RADIO.volume = radioVol; RADIO.play().catch(() => { }); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } // fresh src = back to live, not to a stale buffer
+  if (AU && AU.on) updStatic(dt, want);
   radioVol = lerp(radioVol, want ? 0.6 : 0, 1 - Math.exp(-3 * dt)); try { RADIO.volume = clamp(radioVol, 0, 1); } catch (e) { }
   if (!want && !RADIO.paused && radioVol < 0.02) { RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
 }
-function toggleRadio() { radioOn = !radioOn; radioErr = false; toast(radioOn ? '📻 Radio accesa' : '📻 Radio spenta'); }
+function toggleRadio() { radioOn = !radioOn; radioErr = false; STATIC.quiet = false; toast(radioOn ? '📻 Radio accesa' : '📻 Radio spenta'); }
