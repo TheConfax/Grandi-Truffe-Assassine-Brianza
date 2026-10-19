@@ -1560,6 +1560,8 @@ const LANDMARKS = [
   { n: 'Chiesa di San Giacomo', x: 1181.3, z: -451.7, f: [1186.7, -433.3, 1163.8, -443.5], len: 29.2, build: buildSanGiacomo },
   { n: 'Cappella di San Pietro da Verona Martire', x: -1707.0, z: 680.5, ry: 0.6, build: buildCappellaSPM },
   { n: 'Villa Bianca', x: -1611.1, z: 936.5, build: buildVillaBianca },
+  { n: 'Seminario di Seveso', x: -717.1, z: 837.0, build: buildPalazzo, // Seminario Arcivescovile, now Centro Pastorale Ambrosiano: Quadrio's convent, enlarged by the Pollacks
+    o: { style: 'seminario', h: 12.7, front: [-780.7, 832.5], portal: 'arch', sign: 'SEMINARIO ARCIVESCOVILE DI MILANO', signW: 8.6, signCol: '#55524b', signY: 8.15, fence: 7, lantern: { at: [-763.0, 818.0], w: 5.6, h: 4.5 } } },
   { n: 'Secondaria I grado “Traversi”', x: 544.4, z: -384.8, build: buildPalazzo, // the Palazzo delle Scuole Professionali (Aldo Vicini, 1932) on via Indipendenza
     o: { style: 'traversi', front: [516.1, -360.2], portal: 'door', balcony: 'stone', porch: true, attic: { w: 15, h: 1.9 }, sign: 'S C V O L E    P R O F E S S I O N A L I', signW: 13, signCol: '#6a655b', fence: 6.5 } },
   { n: 'Stazione di Meda', x: 377.5, z: -540.5, build: buildPalazzo, o: { style: 'stazione', h: 8.8, front: [375.9, -545.1], sign: 'M E D A', signW: 3.2, signCol: '#5f6266', canopy: [[388.6, -548.6], [403.5, -563.2], 7.5] } }, // the 2023 makeover: white, green shutters, the steel-tree canopy
@@ -1625,6 +1627,7 @@ const PAL_STYLE = {
   dho: { wall: '#dfbb63', trim: '#f4ead2', shut: '#3f5a3c', plinth: '#b9b09c', light: ['#c9a654', '#ecd08a'], gShut: true },
   besana: { wall: '#d8c391', trim: '#c4bfb2', shut: '#9c978c', plinth: '#a9a397', light: ['#bfa977', '#e6d4a4'], gShut: true, ped: true },
   traversi: { wall: '#d3d2cc', trim: '#e9e8e3', shut: '#ddd8cc', plinth: '#b8b2a5', light: ['#cfcabd', '#eeeae2'], H: 11.1, floors: 2, noShut: true, blinds: true, lesene: true, archedUp: true },
+  seminario: { wall: '#ece5d4', trim: '#f7f3ea', shut: '#ece5d4', plinth: '#b9b4a8', light: ['#ddd4c0', '#f6f0e2'], noShut: true },
   stazione: { wall: '#f1efe9', trim: '#dedad1', shut: '#2f5a3a', plinth: '#9d9b96', light: ['#dcd9d2', '#ffffff'], H: 8.8, floors: 2, arched: true },
   ferrario: { wall: '#c23b2a', trim: '#e2b25a', shut: '#c23b2a', plinth: '#d9cfc0', light: ['#a83324', '#d4513c'], noShut: true },
 };
@@ -1903,7 +1906,18 @@ function buildPalazzo(L, B, G) {
   const bays = bayOf(Ln, true), bw = Ln / bays, s0 = (Math.floor(clamp(((fx - a[0]) * ex + (fz - a[1]) * ez) / Ln, 0, 0.999) * bays) + 0.5) * bw;
   const M = new THREE.Matrix4().makeBasis(new THREE.Vector3(nz, 0, -nx), new THREE.Vector3(0, 1, 0), new THREE.Vector3(nx, 0, nz)).setPosition(a[0] + ex * s0, gF, a[1] + ez * s0), F = lmFrame(M);
   const box = (x, y, z, w, h, dd, col) => F.geo(trim, lmBox(w, h, dd, x, y, z), null, col);
-  if (o.portal === 'door') { // stone portal with a keystone
+  if (o.portal === 'arch') { // a grey stone frontispiece: rusticated base, the big arch with its fan light, pilasters, the frieze with the name
+    const SG = COL('#c9c6bf'), SD = COL('#a9a59d'), w2 = Math.min(bw * 1.4, 6.2);
+    box(0, 4.6, 0.12, 2 * w2, 9.2, 0.24, SG); box(0, 8.2, 0.3, 2 * w2 + 0.4, 1.3, 0.3, COL('#d6d3cc')); box(0, 9.05, 0.38, 2 * w2 + 0.8, 0.35, 0.6, SG);
+    for (const x of [-w2 + 0.4, -2.2, 2.2, w2 - 0.4]) box(x, 3.8, 0.32, 0.6, 7.6, 0.2, SD);
+    for (let y = 0.6; y < 3.2; y += 0.55) box(0, y, 0.25, 2 * w2, 0.05, 0.05, SD);
+    F.geo(trim, new THREE.ShapeGeometry(archShape(3.0, 0, 5.4), 14).translate(0, 0, 0.26), null, COL('#2c2a27'));
+    F.geo(trim, new THREE.RingGeometry(1.5, 1.85, 16, 1, 0, Math.PI).translate(0, 3.9, 0.27), null, SD);
+    for (let k = 1; k < 8; k++) F.geo(trim, lmBox(0.05, 1.4, 0.04, 0, 0.7, 0).rotateZ(Math.PI / 2 - k * Math.PI / 8).translate(0, 3.9, 0.29), null, COL('#4a4844')); // the fan light
+    for (const x of [-1.75, 1.75]) box(x, 1.95, 0.3, 0.08, 3.9, 0.08, COL('#26282b'));
+    for (const sd of [-1, 1]) F.geo(trim, new THREE.ShapeGeometry(archShape(1.2, 1.4, 3.6), 10).translate(sd * (w2 - 1.6), 0, 0.26), null, COL('#3a4048'));
+    box(0, 0.08, 1.8, 2 * w2 + 1, 0.16, 3.0, STONE);
+  } else if (o.portal === 'door') { // stone portal with a keystone
     box(0, 1.95, 0.05, 2.4, 3.9, 0.1, DOOR); box(0, 1.95, 0.08, 0.06, 3.9, 0.1, COL('#2e2018'));
     for (const x of [-1.45, 1.45]) box(x, 2.1, 0.18, 0.5, 4.2, 0.36, STONE);
     box(0, 4.15, 0.2, 3.5, 0.5, 0.42, STONE); box(0, 4.15, 0.42, 0.45, 0.62, 0.1, CREAM); box(0, 0.06, 0.6, 4.2, 0.16, 1.2, STONE);
@@ -1941,7 +1955,7 @@ function buildPalazzo(L, B, G) {
     for (let i = 0; i < NI; i++) for (let j = 0; j < NJ; j++) { const q = base + i * (NJ + 1) + j; flag.i.push(q, q + 1, q + NJ + 2, q, q + NJ + 2, q + NJ + 1); }
   }
   if (o.attic) { const { w, h } = o.attic; box(0, H + h / 2 - 0.1, 0.2, w, h, 0.5, CREAM); box(0, H + h + 0.05, 0.25, w + 0.5, 0.22, 0.75, CREAM); for (const sd of [-1, 1]) lmUrn(F, trim, sd * (w / 2 - 0.3), H + h + 0.15, 0.25, 1.2, CREAM); }
-  if (o.sign) { const w = o.signW || 6.4, hh = o.attic ? 0.75 : 0.4, y = o.attic ? H + o.attic.h / 2 - 0.1 : ((st.H || MUN_H) - 0.5) * k, sz = o.attic ? 0.47 : 0.05, i0 = sign.p.length / 3; for (const [x, yy, u, v] of [[-w / 2, y - hh / 2, 0, 0], [w / 2, y - hh / 2, 1, 0], [w / 2, y + hh / 2, 1, 1], [-w / 2, y + hh / 2, 0, 1]]) F.v(sign, x, yy, sz, 0, 0, 1, u, v); sign.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
+  if (o.sign) { const w = o.signW || 6.4, hh = o.attic ? 0.75 : 0.4, y = o.signY || (o.attic ? H + o.attic.h / 2 - 0.1 : ((st.H || MUN_H) - 0.5) * k), sz = o.attic ? 0.47 : o.portal === 'arch' ? 0.46 : 0.05, i0 = sign.p.length / 3; for (const [x, yy, u, v] of [[-w / 2, y - hh / 2, 0, 0], [w / 2, y - hh / 2, 1, 0], [w / 2, y + hh / 2, 1, 1], [-w / 2, y + hh / 2, 0, 1]]) F.v(sign, x, yy, sz, 0, 0, 1, u, v); sign.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
   if (o.fence) { // garden railing along the front: low wall, pillars with stone vases, iron bars, the gate on the entrance
     const zf = o.fence, xa = -(Ln - s0) - 2, xb = s0 + 2, IRONF = COL('#2f3133'), PIL = COL('#cfc9bc');
     box((xa + xb) / 2, 0.3, zf, xb - xa, 0.6, 0.4, PIL);
@@ -1957,6 +1971,16 @@ function buildPalazzo(L, B, G) {
   if (o.ped) { // pediment over the middle of the front, with an oculus
     const { w, h } = o.ped; F.face(trim, [[-w / 2, H - 0.1, 0.06], [w / 2, H - 0.1, 0.06], [0, H + h, 0.06]], 2, COL(st.wall)); F.geo(trim, new THREE.CircleGeometry(0.55, 14).translate(0, H + h * 0.38, 0.1), null, COL('#2b3038'));
     for (const sd of [-1, 1]) F.geo(trim, new THREE.BoxGeometry(hyp(w / 2, h) + 0.4, 0.3, 0.6).rotateZ(-sd * Math.atan2(h, w / 2)).translate(sd * w / 4, H + h / 2, 0.2), null, CREAM);
+  }
+  if (o.lantern) { // a square tower over the roof crowned by an octagonal lantern and a little dome
+    const { at: [tx, tz], w, h } = o.lantern, q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [tx + (ex * u + nx * v) * w / 2, tz + (ez * u + nz * v) * w / 2]), ty = top + 2.4;
+    walls(q, false, top - 0.4, ty + h, -1, 2.0); hip([[q, false]], ty + h, w / 2 - 0.3);
+    const yc = ty + h + 0.42 * (w / 2 + 0.6), WL = lmFrame(new THREE.Matrix4().makeTranslation(tx, yc, tz));
+    WL.geo(trim, new THREE.CylinderGeometry(w * 0.3, w * 0.32, 2.4, 8).translate(0, 1.2, 0), null, CREAM);
+    for (let k2 = 0; k2 < 8; k2++) WL.geo(trim, lmBox(0.45, 1.3, 0.1, 0, 1.25, w * 0.3).rotateY((k2 + 0.5) * Math.PI / 4), null, COL('#2c2e31'));
+    WL.geo(trim, new THREE.CylinderGeometry(w * 0.36, w * 0.36, 0.25, 8).translate(0, 2.45, 0), null, CREAM);
+    WL.geo(trim, new THREE.SphereGeometry(w * 0.32, 8, 5, 0, TAU, 0, Math.PI / 2).scale(1, 0.9, 1).translate(0, 2.55, 0), null, COL('#a24a35'));
+    WL.geo(trim, new THREE.CylinderGeometry(0.35, 0.45, 0.8, 8).translate(0, 2.55 + w * 0.29 + 0.3, 0), null, CREAM); lmCross(WL, trim, 0, 3.2 + w * 0.29, 0, 1.0, COL('#3c3c40'));
   }
   if (o.tower) { // a corner tower with battlements
     const { at: [tx, tz], w, h } = o.tower, q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [tx + (ex * u + nx * v) * w / 2, tz + (ez * u + nz * v) * w / 2]); // square to the front wall
