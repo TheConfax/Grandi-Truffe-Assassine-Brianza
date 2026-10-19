@@ -3,7 +3,8 @@
 // a 22.4 m dome on a drum with 20 pink windows, the cross at about 43 m), the Palazzo del Comune in piazza Municipio (1870-1885, three floors,
 // plain string courses, wooden eaves) and piazza Vittorio Veneto: Villa Antona Traversi (the Benedictine monastery of San Vittore turned into
 // a neoclassical villa by Leopold Pollack), the church of San Vittore with its barocchetto facade and the Santuario del Santo Crocifisso
-// (the old parish church, facade of 1893 with protiro and four statues, bell tower finished in 1920). Footprints and collisions stay the OSM ones.
+// (the old parish church, facade of 1893 with protiro and four statues, bell tower finished in 1920); San Pietro Martire on the Seveso border
+// (Camillo Fari, consecrated 1969, rhomboid plan, the saint in bronze by Giancarlo Fontana outside). Footprints and collisions stay the OSM ones.
 // f: the two facade corners; the model's x runs from the second to the first, i.e. left to right for someone facing the facade
 const LANDMARKS = [
   { n: 'Chiesa di Santa Maria Nascente', x: 33.3, z: -331.6, f: [64.0, -378.0, 80.0, -362.6], build: buildChiesaMeda },
@@ -11,6 +12,7 @@ const LANDMARKS = [
   { n: 'Villa Antona Traversi', x: 112.8, z: -780.5, build: buildPalazzo, o: { style: 'villa', h: 14.5, front: [138.1, -741.3], portal: 'portico', arches: 5, balcony: 'stone', belv: { w: 13, d: 9, h: 3.65 } } },
   { n: 'Chiesa di San Vittore', x: 99.9, z: -755.1, f: [83.9, -763.5, 94.0, -772.2], build: buildSanVittore },
   { n: 'Santuario del Santo Crocefisso', x: 93.3, z: -822.4, f: [89.0, -801.2, 71.6, -815.9], tower: [67.5, -825.0], build: buildCrocifisso },
+  { n: 'Chiesa di San Pietro Martire', x: -736.7, z: 466.7, build: buildSanPietroMeda }, // via San Carlo, by the level crossing on the Seveso border
 ];
 const LM_GLOW = []; // { m, a, b }: emissive a by day, a + b once the street lamps are on
 for (const L of LANDMARKS) {
@@ -522,4 +524,37 @@ function buildCrocifisso(L, B, G) {
   }
   mkMesh(Bs.plaster, LMAT.plaster, 10, 'cast', G); mkMesh(Bs.coppi, LMAT.coppi, 10, 'cast', G); mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
   mkMesh(Bs.warm, LMAT.warm, 10, false, G); mkMesh(Bs.clock, LMAT.clock, 10, false, G);
+}
+
+// San Pietro Martire, Meda: the rhomboid hall under one sloping roof that climbs from the entrance tip (west) to the choir (east), brick walls
+// with slit windows, concrete corners and fascia, a cross over the choir and the bronze saint at the door. No photo found yet: the shape follows the plan.
+function buildSanPietroMeda(L, B, G) {
+  const ring = lmSimplify(B.pts, 0.6), F = lmFrame(new THREE.Matrix4()), Bs = { brick: Buf(), trim: Buf(), warm: Buf() };
+  const xs = ring.map(p => p[0]), xW = Math.min(...xs), xE = Math.max(...xs), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), bot = gy - 0.8;
+  const roofY = x => gy + 7.5 + (x - xW) / (xE - xW) * 8.0, A = sArea(ring), CONC = COL('#b9b4aa'), ZINC = COL('#7f8389'), BRONZE = COL('#5b4632');
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], L2 = hyp(c[0] - a[0], c[1] - a[1]); if (L2 < 0.3) continue;
+    let nx = (c[1] - a[1]) / L2, nz = -(c[0] - a[0]) / L2; if (A < 0) { nx = -nx; nz = -nz; }
+    F.face(Bs.brick, [[a[0], bot, a[1]], [c[0], bot, c[1]], [c[0], roofY(c[0]), c[1]], [a[0], roofY(a[0]), a[1]]]);
+    const ex = (c[0] - a[0]) / L2, ez = (c[1] - a[1]) / L2, n = Math.floor((L2 - 1.5) / 3.2); // slit windows of coloured glass
+    for (let k = 0; k < n; k++) {
+      const s0 = (L2 - (n - 1) * 3.2) / 2 + k * 3.2, x = a[0] + ex * s0 + nx * 0.05, z = a[1] + ez * s0 + nz * 0.05, top = roofY(x) - 1.2;
+      if (top - gy < 3.5) continue;
+      F.face(Bs.warm, [[x - ex * 0.28, gy + 1.4, z - ez * 0.28], [x + ex * 0.28, gy + 1.4, z + ez * 0.28], [x + ex * 0.28, top, z + ez * 0.28], [x - ex * 0.28, top, z - ez * 0.28]]);
+    }
+    const ry = Math.atan2(-ez, ex), ya = roofY(a[0]), yc = roofY(c[0]); // concrete fascia following the slope, pillar at the corner
+    F.geo(Bs.trim, new THREE.BoxGeometry(L2 + 0.4, 0.7, 0.45).rotateZ(Math.atan2(yc - ya, L2)).rotateY(ry).translate((a[0] + c[0]) / 2 + nx * 0.15, (ya + yc) / 2 - 0.25, (a[1] + c[1]) / 2 + nz * 0.15), null, CONC);
+    F.geo(Bs.trim, lmBox(0.6, ya - bot, 0.6, a[0], (bot + ya) / 2, a[1]), null, CONC);
+  }
+  F.face(Bs.trim, ring.map(p => [p[0], roofY(p[0]) + 0.08, p[1]]), 2, ZINC); // the one roof plane, in zinc
+  // entrance at the west tip: concrete canopy on two posts, bronze doors; the cross over the choir; San Pietro Martire in bronze on his plinth
+  const wi = xs.indexOf(xW), w = ring[wi], ei = xs.indexOf(xE), e = ring[ei], ux = 1, gw = groundH(w[0], w[1]);
+  F.geo(Bs.trim, lmBox(4.2, 0.35, 9.0, w[0] - 1.6, gw + 4.0, w[1]), null, CONC);
+  for (const dz of [-4.0, 4.0]) F.geo(Bs.trim, lmBox(0.35, 4.0, 0.35, w[0] - 3.4, gw + 2.0, w[1] + dz), null, CONC);
+  F.geo(Bs.trim, lmBox(0.12, 3.2, 3.4, w[0] - 0.05, gw + 1.6, w[1]), null, COL('#4a3b2c'));
+  F.face(Bs.warm, [[w[0] - 0.07, gw + 3.3, w[1] - 1.7], [w[0] - 0.07, gw + 3.3, w[1] + 1.7], [w[0] - 0.07, gw + 3.85, w[1] + 1.7], [w[0] - 0.07, gw + 3.85, w[1] - 1.7]]);
+  lmCross(F, Bs.trim, e[0] - 1.5, roofY(e[0] - 1.5), (ring.reduce((t, p) => t + p[1], 0) / ring.length), 3.2, COL('#9a9ca0'));
+  const sx = w[0] - 7.0 * ux, sz = w[1] + 5.5, sg = groundH(sx, sz);
+  F.geo(Bs.trim, lmBox(1.1, 1.5, 1.1, sx, sg + 0.75, sz), null, COL('#cfc6b2')); lmStatue(F, Bs.trim, sx, sg + 1.5, sz, 1.25, BRONZE);
+  mkMesh(Bs.brick, LMAT.brick, 10, 'cast', G); mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G); mkMesh(Bs.warm, LMAT.warm, 10, false, G);
 }
