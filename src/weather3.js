@@ -55,14 +55,15 @@ function wetPaint(w) {
 for (const m of [_far, _near]) m.material.transparent = true; // the Prealpi fade out behind rain and fog
 
 // clouds: big soft sprites on the dome round the camera, more of them as the sky fills up, drifting with the wind
-const CLOUD_TEX = canvasTex(256, 128, (g, w, h) => {
+const CLOUD_TEX = canvasTex(256, 128, (g, w, h) => { // an opaque grey mask (alphaMap): see glowTex for why not canvas alpha
+  g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.globalCompositeOperation = 'lighter';
   for (let i = 0; i < 16; i++) {
     const x = 40 + srnd() * 176, y = 52 + srnd() * 40 - Math.abs(x - 128) * 0.12, r = 18 + srnd() * 30, gr = g.createRadialGradient(x, y, 0, x, y, r);
-    gr.addColorStop(0, 'rgba(255,255,255,0.75)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    gr.addColorStop(0, 'rgb(150,150,150)'); gr.addColorStop(0.6, 'rgb(70,70,70)'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
   }
 }, false);
 const CLOUDS = []; for (let i = 0; i < 34; i++) {
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: CLOUD_TEX, transparent: true, opacity: 0, depthWrite: false, fog: false })), k = 0.7 + srnd() * 0.8;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ alphaMap: CLOUD_TEX, transparent: true, opacity: 0, depthWrite: false, fog: false })), k = 0.7 + srnd() * 0.8;
   s.scale.set(2200 * k, 900 * k, 1); s.renderOrder = -2; s.frustumCulled = false; scene.add(s);
   CLOUDS.push({ s, a: srnd() * Math.PI * 2, e: (0.1 + srnd() * 0.35), o: 0.6 + srnd() * 0.4 });
 }
