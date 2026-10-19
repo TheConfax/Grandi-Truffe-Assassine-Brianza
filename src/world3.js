@@ -668,6 +668,9 @@ function buildTile(T) {
     const pool = Buf(); // warm light pools on the street at night
     for (const [X, Z] of d.lp) { const x = X / 10 + 1.15, z = Z / 10, gy = surfAt(x, z, 1e4) + 0.14, i = pool.p.length / 3, R = 7; vtx(pool, x - R, gy, z - R, 0, 1, 0, 0, 0); vtx(pool, x + R, gy, z - R, 0, 1, 0, 1, 0); vtx(pool, x + R, gy, z + R, 0, 1, 0, 1, 1); vtx(pool, x - R, gy, z + R, 0, 1, 0, 0, 1); triUp(pool, i, i + 1, i + 2); triUp(pool, i, i + 2, i + 3); }
     put(pool, LAMPPOOL_MAT, 12);
+    const gp = []; for (const [X, Z] of d.lp) { const x = X / 10, z = Z / 10; gp.push(x + 1.15, surfAt(x, z, 1e4) + 6.82, z); } // glare under each lamp head
+    const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
+    const glare = new THREE.Points(pg, LAMPGLOW_MAT); glare.renderOrder = 14; G.add(glare);
   }
 }
 function tileTick(px, pz, budgetMs, force) {
