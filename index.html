@@ -142,12 +142,12 @@ body:not(.debug) .dbg { display: none !important; }
       <div><kbd>PAD</kbd> controller DualSense o Xbox</div>
       <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>
       <div><kbd>N</kbd> avanti di 2 ore</div>
-      <div><kbd>R</kbd> radio Discoradio on/off</div>
+      <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>
       <div><kbd>Q</kbd> / <kbd>E</kbd> in moto: peso indietro (impennata col gas) / avanti (stoppie in frenata)</div>
       <div class="dbg"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>
     </div>
     <button id="go" type="button">ACCENDI IL MOTORE</button>
-    <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale.</p>
+    <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale; <a href="https://www.radiomaria.it" target="_blank" rel="noopener">Radio Maria</a>.</p>
   </div>
 </div>
 
@@ -1426,6 +1426,7 @@ const TRAFFIC_MIX = [['panda', 22], ['hatch', 22], ['sedan', 13], ['wagon', 10],
 const PARKED_MIX = [['panda', 25], ['hatch', 25], ['sedan', 15], ['wagon', 12], ['suv', 14], ['sport', 3], ['van', 6], ['ape', 3], ['scooter', 5], ['moto', 2], ['bici', 4]];
 function pickModel(mix, r = rnd) { let t = r() * mix.reduce((s, m) => s + m[1], 0); for (const [m, w] of mix) if ((t -= w) < 0) return m; return mix[0][0]; }
 const M_GLASS = lam(0x2e3d4e), M_TYRE = lam(0x1b1b1d), M_HEAD = lam(0xfff6d8, { emissive: 0xfff2c0, emissiveIntensity: 0.6 }), M_TAIL = lam(0xa01818, { emissive: 0xa01010, emissiveIntensity: 0.5 }), M_DARK = lam(0x2a2b2f), M_TRIM = lam(0x16181c);
+const M_GLASS_SEE = new THREE.MeshLambertMaterial({ color: 0x2e3d4e, transparent: true, opacity: 0.42, depthWrite: false }); // police cab: the crew shows through
 const M_SIR_A = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 }), M_SIR_B = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 });
 const CAR_COLS = ['#c8332b', '#f2f2ee', '#2f3540', '#9aa3ad', '#2c4f8f', '#e0b23b', '#3f6b4a', '#7b2d3a', '#d8d0c0', '#16181c', '#5b8fb8', '#b85d2a'];
 const MODEL_COLS = { scooter: ['#9cc8b4', '#e8e2d2', '#c8332b', '#2c4f8f', '#f2c230', '#16181c'], moto: ['#c8102e', '#1f5fbf', '#16181c', '#f2f2ee', '#e2562a', '#3f6b4a'], bici: ['#2c4f8f', '#c8332b', '#16181c', '#e8e2d2', '#3f6b4a', '#e0b23b'], sport: ['#c8102e', '#f2c230', '#16181c', '#e8e6e0', '#1f5fbf', '#e2562a'], van: ['#f2f2ee', '#d8d0c0', '#9aa3ad', '#c9cdd2'], ape: ['#7fb3c8', '#e8e4d8', '#9dbb6a', '#d9cf9a', '#c94f3d'], suv: ['#2f3540', '#9aa3ad', '#f2f2ee', '#16181c', '#5a6b4e', '#7b2d3a'] };
@@ -1436,7 +1437,7 @@ const wheelG = r => { const k = 'w' + r; return _geo[k] || (_geo[k] = new THREE.
 function makeCar(model, color) {
   const S = MODELS[model], g = new THREE.Group(), body = new THREE.Group(), hl = S.L / 2, paint = lam(color); g.add(body); g.rotation.order = 'YXZ';
   const add = (geo, mat, x, y, z, shadow = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; body.add(m); return m; };
-  let wheelPos, lightY, lightZ = hl + 0.01, rider = null;
+  let wheelPos, lightY, lightZ = hl + 0.01, rider = null, crew = null;
   if (S.two) { // scooter, moto, bici: frame, seat, bars, two thin wheels and a seated rider (shown when an AI rides it)
     const wr = S.wr, sy = S.seatY, tilt = (m, a) => { m.rotation.x = a; return m; };
     if (model === 'bici') {
@@ -1491,7 +1492,7 @@ function makeCar(model, color) {
   } else {
     const bot = S.wr * 0.9, by = bot + S.bh / 2, [cw, ch, cl, cz] = S.cab, cy = bot + S.bh + ch / 2;
     var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);
-    add(boxG(cw, ch, cl), M_GLASS, 0, cy, cz, false);
+    add(boxG(cw, ch, cl), model === 'police' ? M_GLASS_SEE : M_GLASS, 0, cy, cz, false);
     add(boxG(cw + 0.04, 0.07, cl - 0.12), paint, 0, cy + ch / 2 + 0.03, cz);
     for (const x of [-1, 1]) add(boxG(0.06, ch, 0.12), paint, x * (cw / 2 + 0.005), cy, cz + cl / 2 - 0.08, false);
     if (S.spoiler) { add(boxG(S.W - 0.1, 0.06, 0.34), M_TRIM, 0, bot + S.bh + 0.3, -hl + 0.2); for (const x of [-0.6, 0.6]) add(boxG(0.08, 0.28, 0.1), M_TRIM, x, bot + S.bh + 0.14, -hl + 0.25, false); add(boxG(0.7, 0.06, 1.1), M_TRIM, 0, bot + S.bh + 0.005, hl - 0.75, false); }
@@ -1500,6 +1501,7 @@ function makeCar(model, color) {
       add(boxG(S.W + 0.02, 0.16, S.L + 0.02), lam(0x1d4fb8), 0, by + 0.04, 0, false);
       add(boxG(cw + 0.06, 0.1, 0.5), lam(0x1d4fb8), 0, cy + ch / 2 + 0.09, cz + 0.2, false);
       add(boxG(0.5, 0.16, 0.34), M_SIR_A, -0.3, cy + ch / 2 + 0.2, cz, false); add(boxG(0.5, 0.16, 0.34), M_SIR_B, 0.3, cy + ch / 2 + 0.2, cz, false);
+      crew = [-1, 1].map(sd => { const c = makeCop(); body.add(c.g); copSeat(c, sd * 0.38, bot + S.bh * 0.45, cz + 0.1); return c; }); // two officers up front, shown while the AI drives
     }
     wheelPos = [[-S.W / 2 + 0.05, hl - 0.78, 1], [S.W / 2 - 0.05, hl - 0.78, 1], [-S.W / 2 + 0.05, -hl + 0.78, 0], [S.W / 2 - 0.05, -hl + 0.78, 0]];
     lightY = bot + S.bh * 0.68;
@@ -1514,7 +1516,7 @@ function makeCar(model, color) {
   }
   if (!S.ape) { const hp = new THREE.Mesh(makeCar.hp || (makeCar.hp = new THREE.PlaneGeometry(3.4, 9).rotateX(-Math.PI / 2)), HEADPOOL_MAT); hp.position.set(0, 0.14, hl + 4.4); if (S.two) hp.scale.set(0.6, 1, 0.75); hp.renderOrder = 12; g.add(hp); }
   scene.add(g);
-  return { g, body, wheels, rider, bm: typeof bm !== 'undefined' ? bm : null, paint };
+  return { g, body, wheels, rider, crew, bm: typeof bm !== 'undefined' ? bm : null, paint };
 }
 const thinWheelG = (r, spoke) => { const k = 't' + r + spoke; if (_geo[k]) return _geo[k]; const t = new THREE.TorusGeometry(r - (spoke ? 0.025 : 0.05), spoke ? 0.025 : 0.06, 6, 16).rotateY(Math.PI / 2); return _geo[k] = t; };
 function pedal(m, v) { const S = v.spec, c = Math.sin(v.spin * 0.55) * 0.42; m.L.rotation.x = S.legA - S.crouch - 0.2 + c; m.R.rotation.x = S.legA - S.crouch - 0.2 - c; }
@@ -1522,6 +1524,10 @@ function seatPose(m, S) { // ped model sat on a two-wheeler: hips on the saddle,
   const c = S.crouch; m.g.position.set(0, S.seatY - 0.84 + 0.04, S.seatZ); m.g.rotation.set(0, 0, 0);
   m.inner.rotation.set(c, 0, 0); m.inner.position.set(0, 0.84 * (1 - Math.cos(c)), -0.84 * Math.sin(c)); // pivot on the hips, not on the feet
   m.L.rotation.x = m.R.rotation.x = S.legA - c; m.AL.rotation.x = m.AR.rotation.x = S.armA - c;
+}
+function copSeat(m, x, hipY, z) { // officer sat in a car, scaled to fit under the roof: thighs forward, hands on the wheel
+  const k = 0.85; m.g.scale.setScalar(k); m.g.position.set(x, hipY - 0.84 * k, z); m.g.rotation.set(0, 0, 0);
+  m.L.rotation.x = m.R.rotation.x = -1.4; m.AL.rotation.x = m.AR.rotation.x = -0.95;
 }
 const PGEO = { leg: new THREE.BoxGeometry(0.17, 0.82, 0.2).translate(0, -0.41, 0), torso: new THREE.BoxGeometry(0.46, 0.62, 0.26), head: new THREE.BoxGeometry(0.24, 0.27, 0.25), arm: new THREE.BoxGeometry(0.12, 0.6, 0.14).translate(0, -0.3, 0), hair: new THREE.BoxGeometry(0.26, 0.08, 0.27) };
 const SHIRTS = ['#c8332b', '#2c4f8f', '#e8e2d2', '#3f6b4a', '#e0b23b', '#7b2d3a', '#5b8fb8', '#d97b4a', '#444a55', '#a07dbd'], PANTS = ['#2a3142', '#3b3b3b', '#5b4b3a', '#1f2a44', '#7a6a55'], SKIN = ['#f0c9a0', '#d9a77c', '#b07a52', '#8a5a3a', '#f5d6b8'], HAIR = ['#2a1d15', '#4a3020', '#c9a35a', '#7a7a7a', '#141414'];
@@ -1533,6 +1539,7 @@ function makePed(shirt, pants, skin, hair) {
   const AL = add(PGEO.arm, shirt, -0.3, 1.44, 0), AR = add(PGEO.arm, shirt, 0.3, 1.44, 0);
   scene.add(g); return { g, inner, L, R, AL, AR };
 }
+const makeCop = () => makePed('#1d2f5a', '#1a2238', pick(SKIN), '#f2f2ee'); // Polizia Locale: dark blue uniform, white cap
 function animPed(m, phase, amp) { const s = Math.sin(phase) * amp; m.L.rotation.x = s; m.R.rotation.x = -s; m.AL.rotation.x = -s * 0.8; m.AR.rotation.x = s * 0.8; }
 
 // ---------------------------------------------------------------- vehicles
@@ -2057,8 +2064,13 @@ function enterExit() {
     if (!best) return;
     if (best.driver === 'ai') { // carjacking: the driver gets out and runs
       const fx = Math.sin(best.h), fz = Math.cos(best.h);
-      const p = spawnPed(false); if (p) { p.x = best.x - fz * 1.8; p.z = best.z + fx * 1.8; p.q = []; p.state = 'flee'; p.t = 4; p.fx = -fz; p.fz = fx; }
-      const wasCop = best.kind === 'police'; best.ai = null;
+      const wasCop = best.kind === 'police';
+      for (const sd of wasCop ? [1, -1] : [1]) { // a police car leaves both officers on the street
+        const p = spawnPed(false); if (!p) continue;
+        if (wasCop) { scene.remove(p.m.g); p.m = makeCop(); }
+        p.x = best.x - fz * 1.8 * sd; p.z = best.z + fx * 1.8 * sd; p.q = []; p.state = 'flee'; p.t = 4; p.fx = -fz * sd; p.fz = fx * sd;
+      }
+      best.ai = null;
       if (wasCop) crime(2.5, 'Hai rubato un\'auto della Polizia Locale!');
       else if (cops().some(c => hyp(c.x - P.x, c.z - P.z) < 50)) crime(1, 'Furto d\'auto davanti alla Polizia!');
       sfxBlip(300, 500, 0.15); best.stolen = !wasCop;
@@ -2463,12 +2475,16 @@ function explodeCar(v) {
 updDayNight(0);
 window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); };
 
-// ---------------------------------------------------------------- car radio: Discoradio live (official stream), only while driving
+// ---------------------------------------------------------------- car radio: Discoradio live (official stream) only while driving; a police car is tuned to Radio Maria
 // claude.ai artifacts allow no external audio (media-src/connect-src 'self'): there the radio stays off with a note
-const RADIO_URL = 'https://icstream.rds.radio/disco';
+const STATIONS = {
+  disco: { name: 'Discoradio', urls: ['https://icstream.rds.radio/disco'], hello: '📻 Discoradio · il ritmo della tua città' },
+  maria: { name: 'Radio Maria', urls: ['https://dreamsiteradiocp2.com/proxy/rmitaly?mp=/stream', 'https://dreamsiteradiocp4.com/proxy/rmitaliamontecarlo?mp=/stream'], hello: '📻 Radio Maria · in volante si prega' }, // second url: same programme on another relay
+};
+const stationFor = v => v && v.kind === 'police' ? 'maria' : 'disco';
 const RADIO = new Audio(); RADIO.preload = 'none';
 const IN_CLAUDE = /claudeusercontent\.com|claude\.ai/.test(location.hostname);
-let radioOn = true, radioVol = 0, radioErr = false, radioShown = false;
+let radioOn = true, radioVol = 0, radioErr = false, radioSt = 'disco', radioUrl = 0; const radioShown = {};
 // static while the tuner looks for the station: band-passed hiss with crackles and a drifting whistle, until the stream plays (at least 0.9 s)
 const STATIC = { g: null, t: 0, tuning: false };
 function staticInit() {
@@ -2489,17 +2505,22 @@ function updStatic(dt, want) {
   if (on) { STATIC.w.frequency.setTargetAtTime(1500 + Math.sin(now * 2.3) * 700 + rnd() * 250, t, 0.08); STATIC.f.frequency.setTargetAtTime(1300 + rnd() * 900, t, 0.05); }
 }
 RADIO.addEventListener('playing', () => { STATIC.tuning = false; STATIC.quiet = false; });
-RADIO.addEventListener('error', () => { STATIC.tuning = false; });
-RADIO.addEventListener('error', () => { if (radioOn && RADIO.getAttribute('src') && !radioErr) { radioErr = true; toast(IN_CLAUDE ? '📻 Su claude.ai la radio è bloccata: gioca dalla versione su GitHub Pages' : '📻 Discoradio non raggiungibile'); toastT = 6; } });
-RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown) { radioShown = true; toast('📻 Discoradio · il ritmo della tua città'); } });
+RADIO.addEventListener('error', () => {
+  if (!radioOn || !RADIO.getAttribute('src') || radioErr) return;
+  const St = STATIONS[radioSt]; if (!IN_CLAUDE && radioUrl < St.urls.length - 1) { RADIO.src = St.urls[++radioUrl]; RADIO.play().catch(() => { }); return; } // try the next relay, still hissing
+  STATIC.tuning = false; radioErr = true; toast(IN_CLAUDE ? '📻 Su claude.ai la radio è bloccata: gioca dalla versione su GitHub Pages' : `📻 ${St.name} non raggiungibile`); toastT = 6;
+});
+RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown[radioSt]) { radioShown[radioSt] = true; toast(STATIONS[radioSt].hello); } });
+function stopRadio() { RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
 function updRadio(dt) {
   const want = radioOn && running && !paused && P.mode === 'car' && !(AU && AU.muted);
-  if (want && RADIO.paused && !radioErr) { RADIO.src = RADIO_URL; RADIO.volume = radioVol; RADIO.play().catch(() => { }); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } // fresh src = back to live, not to a stale buffer
+  if (P.mode === 'car' && stationFor(P.car) !== radioSt) { radioSt = stationFor(P.car); radioUrl = 0; radioErr = false; STATIC.quiet = false; if (!RADIO.paused) stopRadio(); } // another car, another station: retune
+  if (want && RADIO.paused && !radioErr) { RADIO.src = STATIONS[radioSt].urls[radioUrl]; RADIO.volume = radioVol; RADIO.play().catch(() => { }); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } // fresh src = back to live, not to a stale buffer
   if (AU && AU.on) updStatic(dt, want);
   radioVol = lerp(radioVol, want ? 0.6 : 0, 1 - Math.exp(-3 * dt)); try { RADIO.volume = clamp(radioVol, 0, 1); } catch (e) { }
-  if (!want && !RADIO.paused && radioVol < 0.02) { RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
+  if (!want && !RADIO.paused && radioVol < 0.02) stopRadio();
 }
-function toggleRadio() { radioOn = !radioOn; radioErr = false; STATIC.quiet = false; toast(radioOn ? '📻 Radio accesa' : '📻 Radio spenta'); }
+function toggleRadio() { radioOn = !radioOn; radioErr = false; radioUrl = 0; STATIC.quiet = false; toast(radioOn ? '📻 Radio accesa' : '📻 Radio spenta'); }
 
 // ---------------------------------------------------------------- bug reports: R3 on the pad, B on the keyboard
 let spotDb = null, spotN = 0; (async () => { try { spotDb = await window.claude?.use?.('db'); } catch (e) { spotDb = null; } })();
@@ -2678,6 +2699,7 @@ function updVisuals(dt) {
       const r = v.m.rider; r.g.visible = v.driver === 'ai';
       if (r.g.visible && v.spec.pedal) pedal(r, v);
     }
+    if (v.m.crew) for (const c of v.m.crew) c.g.visible = v.driver === 'ai';
     if (!v.sleep) {
       const hl = v.spec.L / 2;
       if (v.health < 35 && rnd() < (v.health <= 0 ? 0.5 : 0.18)) puff(v.x + Math.sin(v.h) * (hl - 0.4), v.y + 1.1, v.z + Math.cos(v.h) * (hl - 0.4), v.health <= 0 ? '#2b2b2b' : '#9a9a9a', 1.4, 1.6);

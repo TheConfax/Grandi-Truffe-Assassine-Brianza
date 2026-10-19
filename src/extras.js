@@ -107,12 +107,16 @@ function explodeCar(v) {
 updDayNight(0);
 window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); };
 
-// ---------------------------------------------------------------- car radio: Discoradio live (official stream), only while driving
+// ---------------------------------------------------------------- car radio: Discoradio live (official stream) only while driving; a police car is tuned to Radio Maria
 // claude.ai artifacts allow no external audio (media-src/connect-src 'self'): there the radio stays off with a note
-const RADIO_URL = 'https://icstream.rds.radio/disco';
+const STATIONS = {
+  disco: { name: 'Discoradio', urls: ['https://icstream.rds.radio/disco'], hello: '📻 Discoradio · il ritmo della tua città' },
+  maria: { name: 'Radio Maria', urls: ['https://dreamsiteradiocp2.com/proxy/rmitaly?mp=/stream', 'https://dreamsiteradiocp4.com/proxy/rmitaliamontecarlo?mp=/stream'], hello: '📻 Radio Maria · in volante si prega' }, // second url: same programme on another relay
+};
+const stationFor = v => v && v.kind === 'police' ? 'maria' : 'disco';
 const RADIO = new Audio(); RADIO.preload = 'none';
 const IN_CLAUDE = /claudeusercontent\.com|claude\.ai/.test(location.hostname);
-let radioOn = true, radioVol = 0, radioErr = false, radioShown = false;
+let radioOn = true, radioVol = 0, radioErr = false, radioSt = 'disco', radioUrl = 0; const radioShown = {};
 // static while the tuner looks for the station: band-passed hiss with crackles and a drifting whistle, until the stream plays (at least 0.9 s)
 const STATIC = { g: null, t: 0, tuning: false };
 function staticInit() {
@@ -133,14 +137,19 @@ function updStatic(dt, want) {
   if (on) { STATIC.w.frequency.setTargetAtTime(1500 + Math.sin(now * 2.3) * 700 + rnd() * 250, t, 0.08); STATIC.f.frequency.setTargetAtTime(1300 + rnd() * 900, t, 0.05); }
 }
 RADIO.addEventListener('playing', () => { STATIC.tuning = false; STATIC.quiet = false; });
-RADIO.addEventListener('error', () => { STATIC.tuning = false; });
-RADIO.addEventListener('error', () => { if (radioOn && RADIO.getAttribute('src') && !radioErr) { radioErr = true; toast(IN_CLAUDE ? '📻 Su claude.ai la radio è bloccata: gioca dalla versione su GitHub Pages' : '📻 Discoradio non raggiungibile'); toastT = 6; } });
-RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown) { radioShown = true; toast('📻 Discoradio · il ritmo della tua città'); } });
+RADIO.addEventListener('error', () => {
+  if (!radioOn || !RADIO.getAttribute('src') || radioErr) return;
+  const St = STATIONS[radioSt]; if (!IN_CLAUDE && radioUrl < St.urls.length - 1) { RADIO.src = St.urls[++radioUrl]; RADIO.play().catch(() => { }); return; } // try the next relay, still hissing
+  STATIC.tuning = false; radioErr = true; toast(IN_CLAUDE ? '📻 Su claude.ai la radio è bloccata: gioca dalla versione su GitHub Pages' : `📻 ${St.name} non raggiungibile`); toastT = 6;
+});
+RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown[radioSt]) { radioShown[radioSt] = true; toast(STATIONS[radioSt].hello); } });
+function stopRadio() { RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
 function updRadio(dt) {
   const want = radioOn && running && !paused && P.mode === 'car' && !(AU && AU.muted);
-  if (want && RADIO.paused && !radioErr) { RADIO.src = RADIO_URL; RADIO.volume = radioVol; RADIO.play().catch(() => { }); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } // fresh src = back to live, not to a stale buffer
+  if (P.mode === 'car' && stationFor(P.car) !== radioSt) { radioSt = stationFor(P.car); radioUrl = 0; radioErr = false; STATIC.quiet = false; if (!RADIO.paused) stopRadio(); } // another car, another station: retune
+  if (want && RADIO.paused && !radioErr) { RADIO.src = STATIONS[radioSt].urls[radioUrl]; RADIO.volume = radioVol; RADIO.play().catch(() => { }); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } // fresh src = back to live, not to a stale buffer
   if (AU && AU.on) updStatic(dt, want);
   radioVol = lerp(radioVol, want ? 0.6 : 0, 1 - Math.exp(-3 * dt)); try { RADIO.volume = clamp(radioVol, 0, 1); } catch (e) { }
-  if (!want && !RADIO.paused && radioVol < 0.02) { RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
+  if (!want && !RADIO.paused && radioVol < 0.02) stopRadio();
 }
-function toggleRadio() { radioOn = !radioOn; radioErr = false; STATIC.quiet = false; toast(radioOn ? '📻 Radio accesa' : '📻 Radio spenta'); }
+function toggleRadio() { radioOn = !radioOn; radioErr = false; radioUrl = 0; STATIC.quiet = false; toast(radioOn ? '📻 Radio accesa' : '📻 Radio spenta'); }

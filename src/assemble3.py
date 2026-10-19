@@ -317,7 +317,7 @@ rep("#start h1 { font-family: var(--display);", "#start h1 { color: var(--ocra) 
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'extras.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("updSignals(); updGates(dt); updFountains();", "updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWrecks(dt); updFuel(dt);")
 rep("    add(boxG(S.W, S.bh, S.L), paint, 0, by, 0);", "    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);")
-rep("  scene.add(g);\n  return { g, body, wheels, rider };", "  if (!S.ape) { const hp = new THREE.Mesh(makeCar.hp || (makeCar.hp = new THREE.PlaneGeometry(3.4, 9).rotateX(-Math.PI / 2)), HEADPOOL_MAT); hp.position.set(0, 0.14, hl + 4.4); if (S.two) hp.scale.set(0.6, 1, 0.75); hp.renderOrder = 12; g.add(hp); }\n  scene.add(g);\n  return { g, body, wheels, rider, bm: typeof bm !== 'undefined' ? bm : null, paint };")
+rep("  scene.add(g);\n  return { g, body, wheels, rider, crew };", "  if (!S.ape) { const hp = new THREE.Mesh(makeCar.hp || (makeCar.hp = new THREE.PlaneGeometry(3.4, 9).rotateX(-Math.PI / 2)), HEADPOOL_MAT); hp.position.set(0, 0.14, hl + 4.4); if (S.two) hp.scale.set(0.6, 1, 0.75); hp.renderOrder = 12; g.add(hp); }\n  scene.add(g);\n  return { g, body, wheels, rider, crew, bm: typeof bm !== 'undefined' ? bm : null, paint };")
 rep("""  impact(v) {
     if (v > 7) { this.health = Math.max(0, this.health - (v - 7) * 1.1); }""", """  impact(v, nx, nz) {
     if (v > 7) { this.health = Math.max(0, this.health - (v - 7) * 1.1); }
@@ -363,10 +363,10 @@ rep("  if (e.code === 'KeyN') skipTime(2);", "  if (e.code === 'KeyN') skipTime(
 rep("  if (edge(4)) skipTime(2);", "  if (edge(4)) skipTime(2);\n  if (edge(12)) toggleRadio();")
 
 rep("  updVisuals(running && !paused ? dt : 0);", "  updVisuals(running && !paused ? dt : 0); updRadio(dt);")
-rep("      <div><kbd>N</kbd> avanti di 2 ore</div>", "      <div><kbd>N</kbd> avanti di 2 ore</div>\n      <div><kbd>R</kbd> radio Discoradio on/off</div>")
+rep("      <div><kbd>N</kbd> avanti di 2 ore</div>", "      <div><kbd>N</kbd> avanti di 2 ore</div>\n      <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>")
 rep("<kbd>N</kbd> +2 ore · <kbd>B</kbd> segnala punto", "<kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>B</kbd> segnala punto")
 rep("${GP.ps ? 'L1' : 'LB'} +2 ore`", "${GP.ps ? 'L1' : 'LB'} +2 ore · freccia su radio`")
-rep("CC BY 4.0.</p>", "CC BY 4.0. Edifici aggiuntivi e altezze: <a href=\"https://overturemaps.org\" target=\"_blank\" rel=\"noopener\">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href=\"https://www.discoradio.it\" target=\"_blank\" rel=\"noopener\">Discoradio</a>, stream ufficiale.</p>")
+rep("CC BY 4.0.</p>", "CC BY 4.0. Edifici aggiuntivi e altezze: <a href=\"https://overturemaps.org\" target=\"_blank\" rel=\"noopener\">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href=\"https://www.discoradio.it\" target=\"_blank\" rel=\"noopener\">Discoradio</a>, stream ufficiale; <a href=\"https://www.radiomaria.it\" target=\"_blank\" rel=\"noopener\">Radio Maria</a>.</p>")
 
 # ---- debug mode (code DEBUG in the pause menu, or ?debug in the URL): bug reports, coordinates HUD, export
 rep("async function reportSpot() {", """let DEBUG = false; try { const q = new URLSearchParams(location.search); if (q.has('debug')) localStorage.setItem('gtaDebug', q.get('debug') === '0' ? '0' : '1'); DEBUG = localStorage.getItem('gtaDebug') === '1'; } catch (e) { }
@@ -410,7 +410,7 @@ function updVisuals(dt) {""")
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'sound3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("  if (running) { updHud(dt); updAudio(); }", "  if (running) { updHud(dt); updAudio(); updSfx(dt); }")
 # help for wheelies and stoppies
-rep("      <div><kbd>R</kbd> radio Discoradio on/off</div>", "      <div><kbd>R</kbd> radio Discoradio on/off</div>\n      <div><kbd>Q</kbd> / <kbd>E</kbd> in moto: peso indietro (impennata col gas) / avanti (stoppie in frenata)</div>")
+rep("      <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>", "      <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>\n      <div><kbd>Q</kbd> / <kbd>E</kbd> in moto: peso indietro (impennata col gas) / avanti (stoppie in frenata)</div>")
 rep("<kbd>R</kbd> radio · ", "<kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · ")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)

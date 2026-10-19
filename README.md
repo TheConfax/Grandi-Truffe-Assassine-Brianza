@@ -7,7 +7,7 @@ Gioco vibecoded in stile GTA nel browser, ambientato a Meda, Seveso, Barlassina,
 - Online: GitHub Pages di questo repository.
 - In locale: `python -m http.server 8000` in questa cartella, poi apri http://localhost:8000/
 
-La radio in macchina (Discoradio, stream ufficiale) funziona solo fuori da claude.ai.
+La radio in macchina (Discoradio, stream ufficiale; Radio Maria sulle auto della Polizia Locale) funziona solo fuori da claude.ai.
 
 ## Struttura
 
