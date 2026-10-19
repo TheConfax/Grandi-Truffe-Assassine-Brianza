@@ -1045,7 +1045,7 @@ function buildTile(T) {
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   buildSignals(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G); buildCaserme(T, G);
-  buildCemetery(T, G); buildLandmarks(T, G); buildPlatforms(T, G); buildParkingLines(T, G);
+  buildCemetery(T, G); buildLandmarks(T, G); buildPlatforms(T, G); buildParkingLines(T, G); buildParkFurniture(T, G);
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {
@@ -2442,6 +2442,51 @@ function buildParkingLines(T, G) {
     }
   }
   if (b.i.length) mkMesh(b, PLAT_MAT.line, 5, false, G);
+}
+
+// park furniture: along the footpaths inside parks and gardens, benches every so often (on alternate sides) and lamp posts, a bin by each bench;
+// a flower bed fills the middle of a small round plaza where paths meet
+function buildParkFurniture(T, G) {
+  const parks = (T.d.a || []).filter(a => a.t === 2).map(a => { const o = dec(a.p); return { o, bb: bbox(o) }; }).filter(p => p.o.length >= 3);
+  if (!parks.length) return;
+  const inPark = (x, z, m = 8) => parks.some(p => { // inside a park or garden, or along its edge
+    if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) return false; if (inPoly(x, z, p.o)) return true;
+    for (let i = 0; i < p.o.length; i++) { const A = p.o[i], C = p.o[(i + 1) % p.o.length]; if (segDist(x, z, A[0], A[1], C[0], C[1]) < m) return true; } return false; });
+  const F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf();
+  const WOOD = COL('#7a5a3c'), IRON = COL('#2e3236'), BIN = COL('#3d5a3a'), x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
+  for (const r of D.roads) {
+    if (r.c !== 6 || r.d || r.t) continue;
+    let acc = 0, k = 0;
+    for (let i = 1; i < r.g.length; i++) {
+      const A = N[r.g[i - 1]], C = N[r.g[i]], Ln = hyp(C[0] - A[0], C[1] - A[1]); if (Ln < 0.5) continue;
+      const ux = (C[0] - A[0]) / Ln, uz = (C[1] - A[1]) / Ln, nx = -uz, nz = ux, ry = Math.atan2(-uz, ux);
+      for (let s = (12 - acc % 12); s < Ln; s += 12) {
+        const x = A[0] + ux * s, z = A[1] + uz * s; k++;
+        if (x < x0 || x >= x0 + TS || z < z0 || z >= z0 + TS || !inPark(x, z)) continue;
+        const sd = k % 2 ? 1 : -1, off = r.w / 2 + 0.9, bx = x + nx * off * sd, bz = z + nz * off * sd, gy = groundH(bx, bz);
+        if (inBuilding(bx, bz, 1.2) || onAnyRoad(bx, bz, 0.2) && !onFoot(bx, bz)) continue;
+        if (k % 3) { // bench facing the path, a bin beside it
+          const R = ry + (sd > 0 ? Math.PI : 0), at = (dx, dz) => [bx + Math.cos(R) * dx + Math.sin(R) * dz, bz - Math.sin(R) * dx + Math.cos(R) * dz];
+          F.geo(Bs.trim, lmBox(1.8, 0.07, 0.42, 0, gy + 0.45, 0).rotateY(R).translate(bx, 0, bz), null, WOOD);
+          F.geo(Bs.trim, lmBox(1.8, 0.36, 0.06, 0, gy + 0.78, -0.2).rotateY(R).translate(bx, 0, bz), null, WOOD);
+          for (const e of [-0.75, 0.75]) { const [px, pz] = at(e, 0); F.geo(Bs.trim, lmBox(0.07, 0.45, 0.45, 0, 0, 0).rotateY(R).translate(px, gy + 0.22, pz), null, IRON); }
+          const [qx, qz] = at(1.4, 0); F.geo(Bs.trim, new THREE.CylinderGeometry(0.22, 0.2, 0.75, 10).translate(qx, gy + 0.37, qz), null, BIN);
+        } else { addBox(lamps, bx, gy + 2.0, bz, 0.11, 4.0, 0.11, null); addBox(heads, bx, gy + 4.05, bz, 0.42, 0.22, 0.42, null); } // park lamp
+      }
+      acc += Ln;
+    }
+  }
+  for (const r of D.roads) { // small closed loops of path (a round plaza): a raised bed of flowers inside
+    if (r.c !== 6 || r.g.length < 8 || r.g[0] !== r.g[r.g.length - 1]) continue;
+    const pts = r.g.map(i => N[i]), [cx, cz] = centroid(pts.slice(0, -1)), rad = Math.min(...pts.map(p => hyp(p[0] - cx, p[1] - cz))) - r.w / 2 - 0.3;
+    if (rad < 1.5 || rad > 9 || tileOf(cx, cz) !== T.t || !inPark(cx, cz, 14) || onAnyRoad(cx, cz, 0) && !onFoot(cx, cz)) continue;
+    const gy = groundH(cx, cz);
+    F.geo(Bs.trim, new THREE.CylinderGeometry(rad, rad, 0.4, 28).translate(cx, gy + 0.2, cz), null, COL('#bcb6aa'));
+    F.geo(Bs.trim, new THREE.CylinderGeometry(rad - 0.25, rad - 0.25, 0.1, 28).translate(cx, gy + 0.42, cz), null, COL('#5d4632'));
+    for (let i = 0; i < 40; i++) { const a = i * 2.4, d = (rad - 0.6) * Math.sqrt((i + 0.5) / 40); F.geo(Bs.trim, new THREE.IcosahedronGeometry(0.28, 0).translate(cx + Math.cos(a) * d, gy + 0.6, cz + Math.sin(a) * d), null, COL(['#d8364a', '#f0c23a', '#e87ab0', '#ffffff', '#5f8f3a'][i % 5])); }
+  }
+  if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
+  if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
 }
 
 // ---------------------------------------------------------------- audio
