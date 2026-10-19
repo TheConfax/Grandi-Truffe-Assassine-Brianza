@@ -86,7 +86,7 @@ for (const L of LANDMARKS) {
 // Piazza del mercato (piazza Aurelio Dozio, Meda): terracotta paving, a band of grey herringbone round an elongated octagon, a plain terracotta
 // rectangle in the middle, grey herringbone across the east end; a row of trees on the west side. p: SW, NW, NE, SE corners
 const PIAZZE = [{ n: 'Piazza del mercato', p: [[-450.4, -679.2], [-477.2, -732.9], [-406.4, -768.0], [-378.4, -715.0]], trees: 1 }];
-const inPiazza = (x, z) => PIAZZE.some(q => inPoly(x, z, q.p));
+const inPiazza = (x, z) => PIAZZE.some(q => inPoly(x, z, q.p)) || YARDS.some(q => inPoly(x, z, q.p)); // no stalls drawn there
 const piazzaTex = canvasTex(1024, 768, (g, w, h) => { // u along SW -> SE... laid out as v: SW->NW (60 m), u: NW->NE (79 m)
   const PINK = '#c58a72', GREY = '#8d8a86';
   g.fillStyle = PINK; g.fillRect(0, 0, w, h); noise(g, w, h, 9000, 0.12, ['#b07460', '#d39c84', '#a8705c']);
@@ -99,7 +99,29 @@ const piazzaTex = canvasTex(1024, 768, (g, w, h) => { // u along SW -> SE... lai
   g.strokeStyle = 'rgba(90,50,40,.35)'; g.lineWidth = 1; for (let x = 250; x < 720; x += 24) { g.beginPath(); g.moveTo(x, 230); g.lineTo(x, 540); g.stroke(); } for (let y = 230; y < 540; y += 24) { g.beginPath(); g.moveTo(250, y); g.lineTo(720, y); g.stroke(); } g.restore();
   g.strokeStyle = '#e8e2d6'; g.lineWidth = 3; oct(70, 80, 900, 690, 150); g.stroke(); g.strokeRect(250, 230, 470, 310); // white stone kerbs round the patterns
 });
+// school yards: the map paints the whole school ground as one paved area, the game draws it as lawn; these are the hard surfaces seen from above
+const YARDS = [
+  { p: [[-664.5, -741.4], [-617.3, -742.6], [-603.1, -705.0], [-651.5, -700.3]], col: '#b9b6ae', roads: true }, // the Diaz playground with its road-safety course (mapped as a car park)
+  { p: [[-586.1, -831.9], [-578.3, -833.5], [-532.9, -731.6], [-539.3, -729.2]], col: '#9a4a3c', lanes: 4 }, // the running track between the Diaz and the Anna Frank
+  { p: [[-580.6, -833.0], [-561.7, -834.2], [-552.3, -807.2], [-566.5, -801.3]], col: '#c0604a', court: true }, // the red court by the Anna Frank gym
+  { p: [[1231.0, -555.6], [1236.1, -566.5], [1336.1, -520.5], [1330.6, -508.7]], col: '#a9a8a3' }, // the Curie drive from via Marie Curie, under the bridges
+  { p: [[1258.9, -486.3], [1266.1, -502.5], [1279.7, -496.6], [1272.0, -480.5]], col: '#c2bdb2' }, { p: [[1280.8, -531.8], [1274.2, -518.7], [1288.0, -513.3], [1292.7, -525.7]], col: '#c2bdb2' }, // its two courts
+];
 function buildPiazze(T, G) {
+  const yb = VBuf(), WH = COL('#eeeeea'), line = (a, b, w) => { const L = hyp(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / L * w / 2, nz = (b[0] - a[0]) / L * w / 2, i0 = yb.p.length / 3; for (const [x, z] of [[a[0] + nx, a[1] + nz], [b[0] + nx, b[1] + nz], [b[0] - nx, b[1] - nz], [a[0] - nx, a[1] - nz]]) vtx(yb, x, 0.07, z, 0, 1, 0, 0, 0, WH); yb.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2, i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }; // both windings: seen from above whichever way the line runs
+  for (const y of YARDS) {
+    const [cx, cz] = centroid(y.p); if (Math.abs(cx - T.cx) > TS / 2 || Math.abs(cz - T.cz) > TS / 2) continue;
+    try { polyFill(yb, y.p, [], 0.035, 10, COL(y.col)); } catch (e) { }
+    const [p0, p1, p2, p3] = y.p, L2 = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    if (y.lanes) for (let k = 0; k <= y.lanes; k++) line(L2(p0, p1, k / y.lanes), L2(p3, p2, k / y.lanes), 0.08);
+    if (y.roads) { // a roundabout in the middle and four little roads off it, with their stop lines
+      const [cx, cz] = centroid(y.p), M = (t, k) => L2(y.p[k], y.p[(k + 1) % 4], t);
+      for (let k = 0; k < 24; k++) for (const r of [3.2, 6.0]) { const a0 = k / 24 * TAU, a1 = (k + 1) / 24 * TAU; line([cx + Math.cos(a0) * r, cz + Math.sin(a0) * r], [cx + Math.cos(a1) * r, cz + Math.sin(a1) * r], 0.12); }
+      for (const [a, b] of [[M(0.5, 0), M(0.5, 2)], [M(0.5, 1), M(0.5, 3)]]) for (const sd of [-1.6, 1.6]) { const L = hyp(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / L * sd, nz = (b[0] - a[0]) / L * sd; line([a[0] + nx, a[1] + nz], [b[0] + nx, b[1] + nz], 0.12); }
+    }
+    if (y.court) { for (let k = 0; k < 4; k++) line(L2(y.p[k], y.p[(k + 1) % 4], 0), L2(y.p[k], y.p[(k + 1) % 4], 1), 0.08); line(L2(p0, p3, 0.5), L2(p1, p2, 0.5), 0.08); }
+  }
+  if (yb.i.length) { LMAT.yard = LMAT.yard || new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); mkMesh(yb, LMAT.yard, 1, false, G); }
   for (const q of PIAZZE) {
     const [sw, nw, ne, se] = q.p, [cx, cz] = centroid(q.p); if (Math.abs(cx - T.cx) > TS / 2 || Math.abs(cz - T.cz) > TS / 2) continue;
     const b = VBuf(), NU = 40, NV = 30, P = (u, v) => [nw[0] + (ne[0] - nw[0]) * u + (sw[0] - nw[0]) * v + ((se[0] - sw[0]) - (ne[0] - nw[0])) * u * v, nw[1] + (ne[1] - nw[1]) * u + (sw[1] - nw[1]) * v + ((se[1] - sw[1]) - (ne[1] - nw[1])) * u * v];

@@ -109,7 +109,7 @@ s = s[:a] + """function parkTile(T) {
     add(m, st.x + (tRnd() - 0.5) * 0.25, st.z + (tRnd() - 0.5) * 0.25, st.h + (tRnd() - 0.5) * 0.05); inStalls++;
   }
   for (const a of T.d.a || []) if (a.t === 4) {
-    const o = dec(a.p), ar = Math.abs(sArea(o)); if (ar < 120) continue;
+    const o = dec(a.p), ar = Math.abs(sArea(o)); if (ar < 120 || inPiazza(...centroid(o))) continue; // squares and school yards mapped as car parks stay empty
     if ((T.stalls || []).some(st => inPoly(st.x, st.z, o))) continue;
     let le = 0, ang = 0; for (let i = 0; i < o.length; i++) { const p = o[i], q = o[(i + 1) % o.length], l = hyp(q[0] - p[0], q[1] - p[1]); if (l > le) { le = l; ang = Math.atan2(q[0] - p[0], q[1] - p[1]); } }
     const n = Math.min(4, Math.floor(ar / 160)), [cx, cz] = centroid(o); let placed = 0;

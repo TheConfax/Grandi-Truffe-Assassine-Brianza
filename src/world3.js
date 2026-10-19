@@ -331,7 +331,7 @@ function edgePts(a, b, off) {
 }
 
 // ---------------------------------------------------------------- tile builder
-const AREA_COL = { 15: '#d9ccab', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6' };
+const AREA_COL = { 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6' };
 const PAL_OLD = ['#dfae62', '#e8c98a', '#dba08a', '#ece4d3', '#d99060', '#c7c9a6', '#e3b98f', '#f0dcb0'];
 const PAL_MOD = ['#dcd7cd', '#cbc4b7', '#bdb5a8', '#e6e0d5', '#c9b9a0', '#d5cbbb'];
 const PAL_IND = ['#aaa69d', '#9d998f', '#b6ae9e', '#8f949a'];
@@ -408,7 +408,8 @@ function buildTile(T) {
     for (const a of d.a || []) {
       const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5) continue; // platforms are built raised, with their furniture
       try {
-        if (a.t <= 3 || (a.t >= 11 && a.t !== 15)) polyFill(gB, outer, holes, 0.02, 9, COL(AREA_COL[a.t] || '#ffffff'));
+        if (a.t <= 3 || a.t >= 11) polyFill(gB, outer, holes, 0.02, 9, COL(AREA_COL[a.t] || '#ffffff'));
+        else if (a.t === 4 && inPiazza(...centroid(outer))) { } // a square or a school yard mapped as a car park: drawn by buildPiazze
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03, 9);
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05, 4);
         else polyFill(pB, outer, holes, a.t === 8 || a.t === 9 ? 0.015 : 0.025, 10, COL(AREA_COL[a.t]));
