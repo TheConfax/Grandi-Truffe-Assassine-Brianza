@@ -408,14 +408,6 @@ function updVisuals(dt) {""")
 # ---- sounds: footsteps, tyres, passing cars, ambience
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'sound3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("  if (running) { updHud(dt); updAudio(); }", "  if (running) { updHud(dt); updAudio(); updSfx(dt); }")
-# ---- no page zoom: pinch, double tap, ctrl + wheel, ctrl +/-/0 (iOS Safari ignores user-scalable, so gestures are blocked too)
-rep('<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">', """<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<script>
-addEventListener('wheel', e => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive: false });
-addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && ['Equal', 'Minus', 'Digit0', 'NumpadAdd', 'NumpadSubtract', 'Numpad0'].includes(e.code)) e.preventDefault(); });
-for (const k of ['gesturestart', 'gesturechange']) addEventListener(k, e => e.preventDefault(), { passive: false });
-addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-</script>""")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')
