@@ -32,9 +32,9 @@ function updWeather(dt) {
   WX.flash = Math.max(0, WX.flash - dt * 4);
   if (WX.rain > 0.85 && (WX.thunderT -= dt) <= 0) { WX.thunderT = 12 + rnd() * 35; WX.flash = 1; const d = 0.8 + rnd() * 4; setTimeout(() => thunder(d), d * 1000); }
   // light: a grey sky softens the sun and the shadows
-  const L = lightTones(), cov = WX.cloud * WX.cloud, grey = new THREE.Color(0x9aa0a8);
+  const L = lightTones(), cov = WX.cloud * WX.cloud, grey = hexC(0x9aa0a8);
   sun.intensity *= 1 - 0.8 * cov - 0.15 * WX.fog; sun.color.lerp(grey, cov * 0.6);
-  hemi.intensity *= 1 + 0.12 * cov - 0.25 * WX.rain * L.day; hemi.color.lerp(new THREE.Color(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
+  hemi.intensity *= 1 + 0.12 * cov - 0.25 * WX.rain * L.day; hemi.color.lerp(hexC(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
   hemi.intensity += WX.flash * 2.2; sun.intensity += WX.flash * 0.8;
   // fog: grey haze, rain curtain, then the real nebbia
   const fogC = mixHex(0x262a33, 0xc3c7cb, L.day);
@@ -68,7 +68,7 @@ const CLOUDS = []; for (let i = 0; i < 34; i++) {
   CLOUDS.push({ s, a: srnd() * Math.PI * 2, e: (0.1 + srnd() * 0.35), o: 0.6 + srnd() * 0.4 });
 }
 // rain: streaks in a box that travels with the camera
-const RAIN_N = 2200, RAIN_BOX = [70, 34, 70], RAIN_P = new Float32Array(RAIN_N * 3);
+const RAIN_N = matchMedia('(pointer: coarse)').matches ? 1300 : 2200, RAIN_BOX = [70, 34, 70], RAIN_P = new Float32Array(RAIN_N * 3);
 for (let i = 0; i < RAIN_N; i++) { RAIN_P[i * 3] = (srnd() - 0.5) * RAIN_BOX[0]; RAIN_P[i * 3 + 1] = srnd() * RAIN_BOX[1]; RAIN_P[i * 3 + 2] = (srnd() - 0.5) * RAIN_BOX[2]; }
 const RAIN = (() => {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RAIN_N * 6), 3)); g.setDrawRange(0, 0);
@@ -77,10 +77,10 @@ const RAIN = (() => {
 function updSkyFx(dt) {
   const L = lightTones(), cp = camera.position;
   WX.drift += dt * 0.004;
-  const cov = 0.22 + 0.78 * WX.cloud, col = mixHex(0x2a3045, 0xffffff, L.day).lerp(new THREE.Color(0xffb48a), L.dusk * 0.6).lerp(new THREE.Color(L.day > 0.5 ? 0x9aa0a8 : 0x1c2028), WX.cloud * WX.cloud * 0.8);
+  const cov = 0.22 + 0.78 * WX.cloud, col = mixHex(0x2a3045, 0xffffff, L.day).lerp(hexC(0xffb48a), L.dusk * 0.6).lerp(hexC(L.day > 0.5 ? 0x9aa0a8 : 0x1c2028), WX.cloud * WX.cloud * 0.8);
   CLOUDS.forEach((c, i) => {
     const show = i / CLOUDS.length < cov, a = c.a + WX.drift, ce = Math.cos(c.e), R = SKY_R * 0.9;
-    c.s.visible = show && WX.fog < 0.95; if (!c.s.visible) return;
+    c.s.visible = show && WX.fog < 0.95 && c.o * (1 - WX.fog) > 0.02; if (!c.s.visible) return;
     c.s.position.set(cp.x + Math.sin(a) * ce * R, cp.y + Math.sin(c.e) * R, cp.z + Math.cos(a) * ce * R);
     c.s.material.opacity = c.o * (0.55 + 0.45 * WX.cloud) * (1 - WX.fog); c.s.material.color.copy(col).multiplyScalar(1 + WX.flash);
   });
