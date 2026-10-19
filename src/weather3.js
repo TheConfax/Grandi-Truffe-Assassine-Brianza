@@ -118,3 +118,4 @@ function thunder(dist) {
   s.connect(fl); fl.connect(g); g.connect(AU.master); s.start(t, 0, 7); s.stop(t + 7);
 }
 window.__setWeather = setWeather;
+window.__FX = { headSpot, CLOUDS, RAIN, STARS, CARGLOW, LAMPGLOW_MAT, LAMPPOOL_MAT, HEADPOOL_MAT, updDayNight, updWeather, updSkyFx, updGlow, wetPaint, setTOD: h => { TOD = h; skyT = -1; } }; // for the test scripts
