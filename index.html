@@ -666,7 +666,9 @@ function nodeInRing(list, x, z, r0, r1, notVisible) {
   return c.length ? pick(c) : null;
 }
 const _v3 = new THREE.Vector3();
-function onScreen(x, z) { _v3.set(x, groundH(x, z) + 1.5, z).project(camera); return Math.abs(_v3.x) < 1.1 && Math.abs(_v3.y) < 1.1 && _v3.z < 1; }
+function onScreen(x, z) { // only within drawing distance: something 2 km ahead of the camera is not "on screen" (it pinned peds and cars there forever)
+  if (Math.abs(x - camera.position.x) > 280 || Math.abs(z - camera.position.z) > 280) return false;
+  _v3.set(x, groundH(x, z) + 1.5, z).project(camera); return Math.abs(_v3.x) < 1.1 && Math.abs(_v3.y) < 1.1 && _v3.z < 1; }
 function edgePts(a, b, off) {
   const [ax, az] = N[a], [bx, bz] = N[b], dx = bx - ax, dz = bz - az, L = hyp(dx, dz) || 1, rx = -dz / L, rz = dx / L;
   return [[ax + rx * off, az + rz * off], [bx + rx * off, bz + rz * off]];
@@ -1641,7 +1643,9 @@ function extendRoute(v) {
   }
 }
 function spawnPed(near) {
-  const a = near ? nodeInRing(WALK_NODES, P.x, P.z, 35, 170, true) : pick(WALK_NODES);
+  // people are where the houses are: around you, preferring walkable nodes with a building within 14 m
+  let a = near ? null : pick(WALK_NODES);
+  if (near) for (let k = 0; k < 4; k++) { const i = nodeInRing(WALK_NODES, P.x, P.z, 25, 140, true); if (i == null) break; a = i; if (inBuilding(N[i][0], N[i][1], 14)) break; }
   if (a == null) return; const e = pick(WALK[a]); if (!e) return; const side = rnd() < 0.5 ? 1 : -1, [p0, p1] = edgePts(a, e.to, e.off * side);
   const m = newPedModel(false);
   const p = { x: p0[0], z: p0[1], h: 0, y: nodeY(a), vx: 0, vz: 0, vy: 0, side, prev: a, cur: e.to, q: [p1], m, state: 'walk', t: 0, phase: rnd() * 6, spd: 1.1 + rnd() * 0.5 };
@@ -1652,6 +1656,12 @@ function pedNext(p) {
   const e = pick(opts), [p0, p1] = edgePts(p.cur, e.to, e.off * p.side); p.q.push(p0, p1); p.prev = p.cur; p.cur = e.to;
 }
 function removePed(p) { scene.remove(p.m.g); PEDS.splice(PEDS.indexOf(p), 1); }
+let pedTgt = 30, pedTgtT = 0;
+function pedTarget() { // crowd size follows the built-up share of the 280 m square around you: town centres busy, fields almost empty
+  let a = 0; BLD.each(P.x - 140, P.z - 140, P.x + 140, P.z + 140, b => { if (b.area === undefined) b.area = Math.abs(sArea(b.pts)) * (b.t === 2 ? 0.15 : b.t === 1 ? 0.3 : 1); a += b.area; }); // warehouses and sheds bring few people
+  let w = 0; NODEG.each(P.x - 140, P.z - 140, P.x + 140, P.z + 140, ({ i }) => { if (WALK[i].length) w++; }); // and the streets to walk on (an industrial estate has few)
+  return Math.round(clamp(Math.min(4 + a / 78400 * 150, 4 + w * 0.3), 4, 56));
+}
 
 function parkTile(T) {
   T.parked = []; srndT = 77 + T.t * 131;
@@ -1697,23 +1707,43 @@ const HEAT_T = [0, 0.5, 2, 4, 7, 11];
 const W = { heat: 0, stars: 0, unseen: 0, seen: false, field: null, fieldT: 0, busted: 0 };
 const starsOf = h => { let s = 0; for (let i = 1; i < HEAT_T.length; i++) if (h >= HEAT_T[i]) s = i; return s; };
 function crime(amount, msg) {
-  const before = W.stars; W.heat = Math.min(16, W.heat + amount); W.stars = starsOf(W.heat); W.unseen = 0;
+  // after a crime the radio knows where you are: a negative clock gives the volanti time to arrive before the stars can fade
+  const before = W.stars; W.heat = Math.min(16, W.heat + amount); W.stars = starsOf(W.heat); W.unseen = Math.min(W.unseen, -(10 + W.stars * 2));
   if (W.stars > before) { sfxBlip(520, 880, 0.3); if (msg) toast(msg); }
 }
 function policeField() { // Dijkstra over the drive graph from the player
-  const src = nearestNode(DRIVE_NODES, P.x, P.z), dist = new Float32Array(N.length).fill(1e9); dist[src] = 0;
-  const heap = [[0, src]];
+  // Float64: with a Float32 store "d > dist[u]" threw away every node whose distance rounded down (the field died after 2 nodes)
+  // seeds: every drivable node within 35 m, so a player in a cul-de-sac, a car park or on foot is still reachable
+  const src = nearestNode(DRIVE_NODES, P.x, P.z), dist = new Float64Array(N.length).fill(1e9), heap = [];
+  const seed = (i, d) => { if (d < dist[i]) { dist[i] = d; heap.push([d, i]); } };
+  seed(src, hyp(N[src][0] - P.x, N[src][1] - P.z)); NODEG.each(P.x - 35, P.z - 35, P.x + 35, P.z + 35, ({ i }) => { if (DRIVE[i].length) { const d = hyp(N[i][0] - P.x, N[i][1] - P.z); if (d < 35) seed(i, d); } });
+  heap.sort((a, b) => a[0] - b[0]);
   const push = it => { heap.push(it); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
   const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (; ;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
-  while (heap.length) { const [d, u] = pop(); if (d > dist[u] || d > 1600) continue; for (const e of DRIVE[u]) { const nd = d + e.L; if (nd < dist[e.to]) { dist[e.to] = nd; push([nd, e.to]); } } }
+  while (heap.length) { const [d, u] = pop(); if (d > dist[u] || d > 2500) continue; for (const e of DRIVE[u]) { const nd = d + e.L; if (nd < dist[e.to]) { dist[e.to] = nd; push([nd, e.to]); } } }
   W.field = dist;
 }
-function spawnPolice() {
-  if (!W.field) policeField();
-  const reach = DRIVE_NODES.filter(i => W.field[i] < 1e8 && W.field[i] < 600);
-  const a = nodeInRing(reach.length ? reach : DRIVE_NODES, P.x, P.z, 110, 300, true); if (a == null) return null; const [x, z] = N[a];
-  const v = new Vehicle('police', '#f4f5f7', x, z, rnd() * TAU); v.driver = 'ai'; v.sleep = false;
-  v.ai = { cop: true, node: a, prev: -1, q: [], blocked: 0, ignore: 0, cruise: 10 };
+function spawnPolice(patrol) {
+  // chase: a node 150 m to (350 + 110 per star) m away by road, so it really comes to you, out of sight; patrol: anywhere on the traffic network around you
+  if (!patrol) policeField();
+  const adj = patrol ? TRAF : DRIVE, r0 = patrol ? 180 : 110, r1 = patrol ? 460 : 300 + W.stars * 60, fMax = 350 + W.stars * 110, c = [];
+  NODEG.each(P.x - r1, P.z - r1, P.x + r1, P.z + r1, ({ i }) => {
+    if (!adj[i].length || !inLim(N[i][0], N[i][1], 20)) return; const d = hyp(N[i][0] - P.x, N[i][1] - P.z); if (d < r0 || d > r1) return;
+    if (!patrol && (W.field[i] < 150 || W.field[i] > fMax)) return; c.push(i);
+  });
+  let a = null;
+  for (let k = 0; k < 16 && c.length; k++) { const i = pick(c); if (onScreen(N[i][0], N[i][1]) || VEH.some(o => hyp(o.x - N[i][0], o.z - N[i][1]) < 9)) continue; a = i; break; }
+  if (a == null) return null;
+  if (patrol) { // on its lane, like the traffic
+    const e = pick(TRAF[a]), [p0, p1] = edgePts(a, e.to, e.off);
+    const v = new Vehicle('police', '#f4f5f7', p0[0], p0[1], Math.atan2(p1[0] - p0[0], p1[1] - p0[1])); v.driver = 'ai'; v.sleep = false; v.y = nodeY(a); v.sync();
+    v.ai = { cop: false, prev: a, cur: e.to, q: [[p1[0], p1[1], e.to, e.sp]], cruise: 9, blocked: 0, ignore: 0 };
+    return v;
+  }
+  const [x, z] = N[a]; let h = rnd() * TAU, bf = 1e18;
+  for (const e of adj[a]) { const f = W.field[e.to]; if (f < bf) { bf = f; h = Math.atan2(N[e.to][0] - x, N[e.to][1] - z); } }
+  const v = new Vehicle('police', '#f4f5f7', x, z, h); v.driver = 'ai'; v.sleep = false; v.y = nodeY(a); v.sync();
+  v.ai = { cop: true, node: a, prev: -1, q: [[x, z]], blocked: 0, ignore: 0, cruise: 10 };
   return v;
 }
 const cops = () => VEH.filter(v => v.kind === 'police' && v.driver === 'ai');
@@ -1985,6 +2015,12 @@ function aiTraffic(v, dt) {
   const t = steerTo(v, tx, tz, cruise, true);
   ai.ignore -= dt;
   if (t < 0.5 && v.speed < 0.5) { ai.blocked += dt; if (ai.blocked > 4 && P.car && hyp(P.car.x - v.x, P.car.z - v.z) < 10) hornOther = 0.3; if (ai.blocked > 7) { ai.ignore = 2.5; ai.blocked = 0; } } else ai.blocked = 0;
+  unstick(v, dt);
+}
+function unstick(v, dt) { // any AI car pressing the gas without moving (wedged on a wall or a kerb corner) backs off, steering the other way
+  const ai = v.ai;
+  if (ai.reverse > 0) { ai.reverse -= dt; v.inp.thr = 0; v.inp.brk = 1; v.inp.steer *= -1; return; }
+  if (v.inp.thr > 0 && v.speed < 0.4) { ai.wedged = (ai.wedged || 0) + dt; if (ai.wedged > 2.5) { ai.reverse = 1.3; ai.wedged = 0; } } else ai.wedged = 0;
 }
 function aiCop(v, dt) {
   const ai = v.ai, tx = P.mode === 'car' ? P.car.x : P.x, tz = P.mode === 'car' ? P.car.z : P.z, d = hyp(tx - v.x, tz - v.z);
@@ -2003,16 +2039,16 @@ function aiCop(v, dt) {
   } else {
     if (ai.node < 0 || !ai.q.length) { ai.node = nearestNode(DRIVE_NODES, v.x, v.z); ai.q = [[N[ai.node][0], N[ai.node][1]]]; }
     let [qx, qz] = ai.q[0];
-    if (hyp(qx - v.x, qz - v.z) < 6 && W.field) {
-      let best = -1, bd = W.field[ai.node];
-      for (const e of DRIVE[ai.node]) { const c = W.field[e.to] + 0.1; if (c < bd) { bd = c; best = e.to; } }
-      if (best >= 0) { ai.node = best; ai.q = [[N[best][0], N[best][1]]]; } else { ai.q = [[tx, tz]]; }
+    if (hyp(qx - v.x, qz - v.z) < 6) {
+      const f = W.field, here = f ? f[ai.node] : 1e9; let best = -1, bd = here;
+      if (here < 1e8) { for (const e of DRIVE[ai.node]) { const c = f[e.to] + 0.1; if (c < bd) { bd = c; best = e.to; } } }
+      else { bd = 1e18; for (const e of DRIVE[ai.node]) { if (e.to === ai.prev && DRIVE[ai.node].length > 1) continue; const c = hyp(N[e.to][0] - tx, N[e.to][1] - tz); if (c < bd) { bd = c; best = e.to; } } } // outside the field: along the roads towards you, never across the houses
+      if (best >= 0) { ai.prev = ai.node; ai.node = best; ai.q = [[N[best][0], N[best][1]]]; } else { ai.q = [[tx, tz]]; }
       [qx, qz] = ai.q[0];
     }
     steerTo(v, qx, qz, 24, false);
   }
-  if (v.speed < 0.6 && (v.inp.thr || ai.sees)) { ai.blocked += dt; if (ai.blocked > 2.5) { ai.reverse = 1.3; ai.blocked = 0; } } else ai.blocked = 0;
-  if (ai.reverse > 0) { ai.reverse -= dt; v.inp.thr = 0; v.inp.brk = 1; v.inp.steer *= -1; }
+  unstick(v, dt);
 }
 let hornOther = 0;
 
@@ -2124,8 +2160,10 @@ function step(dt) {
   if (W.stars > 0) {
     W.fieldT -= dt; if (W.fieldT <= 0) { policeField(); W.fieldT = 1; }
     const want = [0, 1, 2, 3, 4, 6][W.stars], cs = cops();
-    if (cs.length < want && rnd() < dt * 0.6) spawnPolice();
-    if (W.seen) W.unseen = 0; else W.unseen += dt;
+    if (cs.length < want && rnd() < dt * (cs.length ? 0.6 : 2)) spawnPolice();
+    // stars fade only while no cop sees you; a volante close behind (< 90 m) keeps the hunt hot
+    let nc = 1e9; for (const c of cs) nc = Math.min(nc, hyp(c.x - P.x, c.z - P.z));
+    if (W.seen) W.unseen = 0; else W.unseen += dt * (nc < 90 ? 0.25 : 1);
     W.seen = false;
     if (W.unseen > 9 + W.stars * 2.5) { W.stars--; W.heat = W.stars ? HEAT_T[W.stars] + 0.1 : 0; W.unseen = 0; if (!W.stars) { toast('Li hai seminati. Ricercato: zero stelle.'); sfxBlip(880, 440, 0.4); } }
     // busted
@@ -2138,9 +2176,12 @@ function step(dt) {
   const traffic = VEH.filter(v => v.driver === 'ai' && v.kind !== 'police');
   for (const v of traffic) if (hyp(v.x - P.x, v.z - P.z) > 330 && !onScreen(v.x, v.z)) v.remove();
   if (traffic.length < 28 && rnd() < dt * 2.5) spawnTraffic(true);
-  for (const v of VEH.filter(v => v.kind === 'police' && v.driver === 'ai')) if (W.stars === 0 && hyp(v.x - P.x, v.z - P.z) > 260 && cops().length > 2) v.remove();
-  for (const p of PEDS.slice()) if (p.state !== 'dead' && hyp(p.x - P.x, p.z - P.z) > 220 && !onScreen(p.x, p.z)) removePed(p);
-  if (PEDS.length < 48 && rnd() < dt * 4) spawnPed(true);
+  // police everywhere: two patrols always roam around you; out-of-sight volanti left far behind are recycled closer
+  for (const v of cops()) { const d = hyp(v.x - P.x, v.z - P.z); if (!onScreen(v.x, v.z) && (W.stars === 0 ? d > 520 : d > 1100)) v.remove(); }
+  if (W.stars === 0 && cops().length < 2 && rnd() < dt * 0.25) spawnPolice(true);
+  for (const p of PEDS.slice()) if (p.state !== 'dead' && hyp(p.x - P.x, p.z - P.z) > 190 && !onScreen(p.x, p.z)) removePed(p);
+  if ((pedTgtT -= dt) <= 0) { pedTgtT = 1; pedTgt = pedTarget(); }
+  if (PEDS.length < pedTgt && rnd() < dt * 5) spawnPed(true);
   missionStep(dt);
 }
 
@@ -2422,7 +2463,6 @@ function setupWorld(saved) {
   for (const T of TILES) T.dist = hyp(T.cx - STATION.x - 190, T.cz - STATION.z - 66);
   parkTick();
   for (let i = 0; i < 16; i++) spawnTraffic(false);
-  for (let i = 0; i < 36; i++) spawnPed(false);
   // start next to the station with a red Ferari waiting
   const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
   const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
@@ -2431,6 +2471,7 @@ function setupWorld(saved) {
   for (const v of VEH.slice()) if (v !== mine && hyp(v.x - mine.x, v.z - mine.z) < 7) v.remove();
   P.x = mine.x + Math.cos(h) * 2.4; P.z = mine.z - Math.sin(h) * 2.4; if (inBuilding(P.x, P.z, 0.5)) { P.x = mine.x - Math.cos(h) * 2.4; P.z = mine.z + Math.sin(h) * 2.4; }
   P.h = h; P.y = surfAt(P.x, P.z); mine.y = surfAt(mine.x, mine.z); mine.sync(); if (saved && saved.money) P.money = saved.money;
+  pedTgt = pedTarget(); for (let i = 0; i < pedTgt; i++) spawnPed(true); // the first crowd around the start, not scattered over the whole map
   for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePed(p);
 }
 let last = performance.now(), acc = 0;
@@ -2454,5 +2495,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { tileTick, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS };
+window.__G = { tileTick, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget };
 </script>

@@ -94,7 +94,7 @@ rep("ai.q.push([p0[0], p0[1], -1], [p1[0], p1[1], e.to]);", "ai.q.push([p0[0], p
 rep("  let cruise = ai.cruise;\n", "  let cruise = ai.kind !== undefined ? Math.min(v.maxV * 0.85, (ai.q[0][3] || 10) * (ai.kind === 'ape' ? 0.55 : ai.kind === 'van' ? 0.9 : 1) * ai.mood) : ai.cruise;\n")
 rep("const p = { x: p0[0], z: p0[1], h: 0, y: 0,", "const p = { x: p0[0], z: p0[1], h: 0, y: nodeY(a),")
 # police field limited radius
-rep("while (heap.length) { const [d, u] = pop(); if (d > dist[u]) continue;", "while (heap.length) { const [d, u] = pop(); if (d > dist[u] || d > 1600) continue;")
+rep("while (heap.length) { const [d, u] = pop(); if (d > dist[u]) continue;", "while (heap.length) { const [d, u] = pop(); if (d > dist[u] || d > 2500) continue;")
 
 # ---- parked cars: spawned per tile around the player
 a = s.index("function spawnParked() {"); b = s.index("// ---------------------------------------------------------------- wanted level & police")
@@ -209,7 +209,7 @@ rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode =
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
 rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { tileTick, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS };")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -250,7 +250,6 @@ rep("    v.step(dt); v.collide();", "    v.step(dt); gateHits(v); fuelHits(v); v
 # no spawning on top of the player; tougher cars
 rep("  const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off);", "  if (a == null || VEH.some(o => hyp(o.x - N[a][0], o.z - N[a][1]) < 9)) return null;\n  const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off);")
 rep("  const e = pick(WALK[a]); if (!e) return; const side", "  if (a == null) return; const e = pick(WALK[a]); if (!e) return; const side")
-rep("  const a = nodeInRing(reach.length ? reach : DRIVE_NODES, P.x, P.z, 110, 300, true), [x, z] = N[a];", "  const a = nodeInRing(reach.length ? reach : DRIVE_NODES, P.x, P.z, 110, 300, true); if (a == null) return null; const [x, z] = N[a];")
 rep("    if (v > 4) { this.health = Math.max(0, this.health - (v - 4) * 2.2); }", "    if (v > 7) { this.health = Math.max(0, this.health - (v - 7) * 1.1); }")
 rep("      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;", "      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;")
 rep("      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;", "      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;")

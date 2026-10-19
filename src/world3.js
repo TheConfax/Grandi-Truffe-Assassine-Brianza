@@ -307,7 +307,9 @@ function nodeInRing(list, x, z, r0, r1, notVisible) {
   return c.length ? pick(c) : null;
 }
 const _v3 = new THREE.Vector3();
-function onScreen(x, z) { _v3.set(x, groundH(x, z) + 1.5, z).project(camera); return Math.abs(_v3.x) < 1.1 && Math.abs(_v3.y) < 1.1 && _v3.z < 1; }
+function onScreen(x, z) { // only within drawing distance: something 2 km ahead of the camera is not "on screen" (it pinned peds and cars there forever)
+  if (Math.abs(x - camera.position.x) > 280 || Math.abs(z - camera.position.z) > 280) return false;
+  _v3.set(x, groundH(x, z) + 1.5, z).project(camera); return Math.abs(_v3.x) < 1.1 && Math.abs(_v3.y) < 1.1 && _v3.z < 1; }
 function edgePts(a, b, off) {
   const [ax, az] = N[a], [bx, bz] = N[b], dx = bx - ax, dz = bz - az, L = hyp(dx, dz) || 1, rx = -dz / L, rz = dx / L;
   return [[ax + rx * off, az + rz * off], [bx + rx * off, bz + rz * off]];
