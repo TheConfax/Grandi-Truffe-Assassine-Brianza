@@ -1,4 +1,4 @@
-# Builds src/segnaletica.json from OSM API extracts of the game area (t*.xml in the working directory): stop, give way, speed limits, no entry, signs mapped one by one
+# Builds src/segnaletica.json from OSM API extracts of the game area (t*.xml in the working directory): stop, give way, speed limits, no entry, roundabout islands, signs mapped one by one
 import xml.etree.ElementTree as ET, glob, math, json, re, collections
 lat0,lon0=45.6575,9.154;k=111320*math.cos(math.radians(lat0)); HW,HH=2878.8-30,2542.4-30
 XY=lambda la,lo:((lo-lon0)*k, -(la-lat0)*110540)
@@ -98,5 +98,57 @@ for nid,t in ntags.items():
     if dirs: th=math.radians(float(dirs[min(i,len(dirs)-1)])); f=(math.sin(th),-math.cos(th)); d=(-f[0],-f[1])
     else: d=(0,0) # the game finds the road
     add(kd,p,d,ex)
+c=collections.Counter(o[0] for o in out); print(c, len(out))
+json.dump(out,open(__import__('os').path.join(__import__('os').path.dirname(__file__), 'segnaletica.json'),'w'),separators=(',',':'))
+
+# ---- roundabout splitter islands: the nose where a two-way road splits into the oneway lane into the roundabout and the one out of it
+ring=set(); 
+for wid,(t,nd) in ways.items():
+  if t.get('junction') in ('roundabout','circular'): ring.update(nd)
+def touches(nd): return nd[-1] in ring or nd[0] in ring
+isl=0
+for wid,(t,nd) in ways.items():
+  if oneway(t)!=1 or t.get('junction') or len(nd)<2 or nd[-1] not in ring: continue # an entry lane
+  F=nd[0]
+  for w2,(t2,n2) in ways.items():
+    if w2==wid or oneway(t2)!=1 or t2.get('junction') or n2[-1]!=F or n2[0] not in ring: continue # the exit lane ending where the entry starts
+    p=nodes[F]; a=unit(p,nodes[nd[1]]); b=unit(p,nodes[n2[-2]])
+    bx,bz=a[0]+b[0],a[1]+b[1]; l=math.hypot(bx,bz)
+    if l<0.2: continue
+    bx/=l; bz/=l
+    # the island itself: where the two lanes are far enough apart (centre lines more than 6 m, so 1.4 m of kerb between two 2.3 m half lanes),
+    # from there along both lanes towards the roundabout, each side pulled in by half a lane; the post goes on its nose
+    def samples(seq):
+      pts=[]; acc=0
+      for k in range(1,len(seq)):
+        A=nodes[seq[k-1]]; B=nodes[seq[k]]; L=math.hypot(B[0]-A[0],B[1]-A[1]) or 1; ux,uz=(B[0]-A[0])/L,(B[1]-A[1])/L
+        for i_ in range(int(L/1.5)+1):
+          s_=i_*1.5; pts.append((A[0]+ux*s_,A[1]+uz*s_,ux,uz,acc+s_))
+        acc+=L
+        if seq[k] in ring: pts=[q for q in pts if acc-q[4]>4.5]; break
+      return pts
+    def dpoly(x,z,seq):
+      best=1e9
+      for k in range(1,len(seq)):
+        A=nodes[seq[k-1]]; B=nodes[seq[k]]; ex,ez=B[0]-A[0],B[1]-A[1]; L2=ex*ex+ez*ez or 1; t_=max(0,min(1,((x-A[0])*ex+(z-A[1])*ez)/L2)); best=min(best,math.hypot(x-A[0]-ex*t_,z-A[1]-ez*t_))
+      return best
+    cr=a[0]*b[1]-a[1]*b[0]
+    def side(seq,other,sgn):
+      out_=[]
+      for x,z,ux,uz,dd in samples(seq):
+        if dpoly(x,z,other)<6.0: 
+          if out_: break
+          continue
+        out_.append((x-uz*sgn*2.3,z+ux*sgn*2.3))
+      return out_
+    sin_=side(nd,n2,1 if cr>0 else -1); sout=side(n2[::-1],nd,-1 if cr>0 else 1)
+    if len(sin_)<2 or len(sout)<2: continue # no room for an island: the lanes just run side by side
+    nx_,nz_=(sin_[0][0]+sout[0][0])/2,(sin_[0][1]+sout[0][1])/2
+    poly=[(round(x,1),round(z,1)) for x,z in sin_]+[(round(x,1),round(z,1)) for x,z in sout[::-1]]
+    add('isola',(nx_+bx*0.9,nz_+bz*0.9),(bx,bz),poly); isl+=1
+    break
+print('islands',isl)
+noses=[o for o in out if o[0]=='isola']
+out=[o for o in out if not (o[0]=='vietato' and any(math.hypot(o[1]-n[1],o[2]-n[2])<9 for n in noses))] # the island post carries the no entry for the exit lane
 c=collections.Counter(o[0] for o in out); print(c, len(out))
 json.dump(out,open(__import__('os').path.join(__import__('os').path.dirname(__file__), 'segnaletica.json'),'w'),separators=(',',':'))

@@ -19,6 +19,7 @@ function segTexOf(kind, extra) {
       tri(1, '#c8102e'); tri(0.62, '#ffffff'); } // pointing down
     else if (kind === 'vietato') { circ(R + 3, '#ffffff'); circ(R, '#c8102e'); g.fillStyle = '#ffffff'; g.fillRect(cx - 42, cy - 10, 84, 20); }
     else if (kind === 'limite' || kind === 'transito') { circ(R + 3, '#ffffff'); circ(R, '#c8102e'); circ(R - 12, '#ffffff'); if (kind === 'limite') txt(String(extra), extra >= 100 ? 40 : 52, '#111111'); }
+    else if (kind === 'destra') { circ(R + 3, '#ffffff'); circ(R, '#1f4fa0'); g.save(); g.translate(cx, cy); g.rotate(-Math.PI / 4); g.fillStyle = '#ffffff'; g.fillRect(-9, -34, 18, 40); g.beginPath(); g.moveTo(-26, 4); g.lineTo(26, 4); g.lineTo(0, 36); g.closePath(); g.fill(); g.restore(); } // passaggio obbligatorio a destra: the arrow pointing down to the right
     else if (kind === 'unico') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f4fa0'; g.fillRect(5, 5, w - 10, h - 10); g.fillStyle = '#ffffff'; g.fillRect(40, cy - 12, w - 110, 24); g.beginPath(); g.moveTo(w - 70, cy - 36); g.lineTo(w - 30, cy); g.lineTo(w - 70, cy + 36); g.fill(); }
     else if (kind === 'paese') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.strokeStyle = '#111111'; g.lineWidth = 6; g.strokeRect(6, 6, w - 12, h - 12); txt(String(extra || '').toUpperCase(), 40, '#111111'); }
     else if (kind === 'via') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.strokeStyle = '#2a2a2a'; g.lineWidth = 4; g.strokeRect(4, 4, w - 8, h - 8); txt(String(extra || ''), 30, '#1d1d1d', cy, '600'); }
@@ -31,6 +32,7 @@ const SEG_MARK = { line: null, stop: null };
 function segPlace(s) { // the post on the right of the lane, the plate facing the drivers
   if (s.place) return s.place;
   let [kind, x, z, dx, dz] = s, best = null, bd = 1e9;
+  if (kind === 'isola') return (s.place = { px: x, pz: z, dx, dz, hw: 0 }); // on the nose of the splitter island, as computed
   ROADSEG.each(x - 15, z - 15, x + 15, z + 15, g => { if (g.r.c > 5 || g.r.d || g.r.t) return; const d = segDist(x, z, g.a[0], g.a[1], g.b[0], g.b[1]); if (d < bd) { bd = d; best = g; } });
   let hw = best ? best.r.w / 2 : 3, px = x, pz = z;
   if (best) {
@@ -39,6 +41,8 @@ function segPlace(s) { // the post on the right of the lane, the plate facing th
     if (!dx && !dz) { dx = ex / L; dz = ez / L; if ((x - cx) * -dz + (z - cz) * dx < 0) { dx = -dx; dz = -dz; } } // the side of the road it was mapped on is its right
     else { const k = dx * ex / L + dz * ez / L; if (Math.abs(k) > 0.5) { dx = ex / L * Math.sign(k); dz = ez / L * Math.sign(k); } } // squared up with the road
     if (bd < hw + 0.6) { px = cx - dz * (hw + 0.9); pz = cz + dx * (hw + 0.9); } // off the asphalt, on the right
+    for (let k = 0; k < 8 && onAnyRoad(px, pz, 0.25); k++) { px -= dz * 0.6; pz += dx * 0.6; } // still on a road (a junction, a parallel lane): a little further out
+    if (onAnyRoad(px, pz, 0.25)) s.skip = true; // nowhere to stand: better no sign than one in the middle of the road
     s.lane = { cx, cz, hw };
   }
   return (s.place = { px, pz, dx, dz, hw });
@@ -47,9 +51,24 @@ function buildSegnali(T, G) {
   const mk = FBuf(), lettering = FBuf(), WH = COL('#f2f0e8');
   SEGN.forEach((s, idx) => {
     const [kind, x, z] = s; if (tileOf(x, z) !== T.t) return;
-    const { px, pz, dx, dz, hw } = segPlace(s); if (inBuilding(px, pz, 0.3)) return; // a one-way lane through a courtyard: no post in the wall
+    const { px, pz, dx, dz, hw } = segPlace(s); if (s.skip || inBuilding(px, pz, 0.3)) return; // a one-way lane through a courtyard: no post in the wall
     const gy = groundH(px, pz), wide = kind === 'paese' || kind === 'via' || kind === 'unico';
     const root = new THREE.Group(); root.position.set(px, gy, pz); root.rotation.y = Math.atan2(-dx, -dz); G.add(root);
+    if (kind === 'isola') { // the splitter island at a roundabout: a low post with the no entry for the exit lane and, on its right, keep right
+      const root = new THREE.Group(); root.position.set(px, gy, pz); root.rotation.y = Math.atan2(-dx, -dz); G.add(root);
+      for (const [k2, ox] of [['vietato', -0.33], ['destra', 0.33]]) { const [front, rear] = segTexOf(k2);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1.35, 8), SEG_POLE); pole.position.set(ox, 0.67, 0); root.add(pole);
+        const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), front); pl.position.set(ox, 1.05, 0.05); root.add(pl);
+        const bk = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), rear); bk.position.set(ox, 1.05, 0.04); bk.rotation.y = Math.PI; bk.scale.x = -1; root.add(bk); }
+      if (s[5] && s[5].length >= 3) { // the island: a raised kerb all round, paved in porphyry
+        const ring = s[5], top = FBuf(), side = FBuf(), KB = COL('#d9d5ca');
+        try { polyFill(top, ring, [], 0.16, 3, COL('#9b8f86')); } catch (e) { }
+        for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], k = side.p.length / 3; for (const [q, y] of [[a, -0.05], [c, -0.05], [c, 0.17], [a, 0.17]]) vtx(side, q[0], y, q[1], 0, 1, 0, 0, 0, KB); side.i.push(k, k + 1, k + 2, k, k + 2, k + 3, k, k + 2, k + 1, k, k + 3, k + 2); }
+        mkMesh(top, MAT.mark, 7, false, G); mkMesh(side, MAT.mark, 7, false, G);
+      }
+      if (!SEGN_DONE.has(idx)) { SEGN_DONE.add(idx); s.prop = addProp({ x: px, z: pz, y: gy, r: 0.25, h: 1.6, obj: root }); } else if (s.prop) { s.prop.obj = root; if (s.prop.broken) root.rotation.x = -1.45; }
+      return;
+    }
     const top = wide ? 2.5 : 2.3, pw = kind === 'paese' ? 1.5 : kind === 'via' ? 1.3 : kind === 'unico' ? 0.9 : 0.75, ph = kind === 'paese' ? 0.56 : kind === 'via' ? 0.48 : kind === 'unico' ? 0.45 : 0.75;
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, top + ph / 2, 8), SEG_POLE); pole.position.y = (top + ph / 2) / 2; pole.castShadow = true; root.add(pole);
     const [front, rear] = segTexOf(kind, s[5]), plate = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), front); plate.position.set(0, top, 0.06); root.add(plate);
