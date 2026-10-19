@@ -126,6 +126,7 @@ s = s[:a] + """function parkTile(T) {
       add(m, x, z, Math.atan2(ux, uz) + (side < 0 ? Math.PI : 0)); kerb++;
     }
   }
+  parkCaserme(T);
 }
 function parkTick() {
   for (const T of TILES) {
@@ -209,7 +210,7 @@ rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode =
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
 rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { tileTick, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO };")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -407,6 +408,21 @@ function updVisuals(dt) {""")
 # ---- sounds: footsteps, tyres, passing cars, ambience
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'sound3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("  if (running) { updHud(dt); updAudio(); }", "  if (running) { updHud(dt); updAudio(); updSfx(dt); }")
+# ---- caserme: parked volanti and agents on foot at the Carabinieri stations and Polizia Locale headquarters
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'police3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("updWrecks(dt); updFuel(dt);", "updWrecks(dt); updFuel(dt); updCaserme(dt);")
+rep("  missionStep(dt);\n}", "  updCaserme2(dt); missionStep(dt);\n}")
+rep("    if (p.state === 'flee') { p.t -= dt; spd = 5;", "    if (p.cop) { spd = copStep(p, dt); if (spd < 0) continue; }\n    else if (p.state === 'flee') { p.t -= dt; spd = 5;")
+rep("if (v === P.car) { crime(1, W.stars === 0 ? 'Pirata della strada! La Polizia Locale ti cerca.' : null);", "if (v === P.car) { crime(p.cop ? 2.5 : 1, p.cop ? 'Hai investito un agente!' : W.stars === 0 ? 'Pirata della strada! La Polizia Locale ti cerca.' : null);")
+rep("let close = false; for (const c of cs) if (hyp(c.x - P.x, c.z - P.z) < 6.5 && c.speed < 4) close = true;", "let close = footCopClose(); for (const c of cs) if (hyp(c.x - P.x, c.z - P.z) < 6.5 && c.speed < 4) close = true;")
+rep("if (wasCop) crime(2.5, 'Hai rubato un\\'auto della Polizia Locale!');", "if (wasCop) crime(2.5, 'Hai rubato ' + (best.color === CC_COL ? CC_NAME : PL_NAME) + '!');")
+rep("else if (cops().some(c => hyp(c.x - P.x, c.z - P.z) < 50)) crime(", "else if (cops().some(c => hyp(c.x - P.x, c.z - P.z) < 50) || footCopNear(40)) crime(")
+rep("    if (best.fallen) {", "    if (best.caserma && !best.taken && best.driver !== 'ai') { best.taken = true; crime(2, null); const msg = 'Hai rubato ' + (best.caserma.cc ? CC_NAME : PL_NAME) + ' davanti alla caserma!'; setTimeout(() => toast(msg), 1800); }\n    if (best.fallen) {")
+rep("near.kind === 'police' ? 'ruba l\\'auto della Polizia' :", "near.kind === 'police' ? 'ruba ' + (near.color === CC_COL ? 'la gazzella dei Carabinieri' : 'l\\'auto della Polizia') :")
+rep("${near.driver === 'ai' ? (", "${near.caserma && !near.taken && near.driver !== 'ai' ? 'ruba ' + (near.caserma.cc ? 'la gazzella dei Carabinieri' : 'l\\'auto della Polizia Locale') : near.driver === 'ai' ? (")
+rep("}${best.spec.name} · fino a", "}${best.color === CC_COL ? 'Gazzella dei Carabinieri' : best.spec.name} · fino a")
+# busted: you walk out of the door of the caserma
+rep("const n = nearestNode(WALK_NODES, spot.x, spot.z); P.x = N[n][0]; P.z = N[n][1];", "const n = nearestNode(WALK_NODES, spot.x, spot.z); P.x = N[n][0]; P.z = N[n][1]; const cz = kind === 'busted' && CASERME.find(c => c.p === spot); if (cz) { [P.x, P.z] = cz.at(0, 2.4); P.h = Math.atan2(cz.nx, cz.nz); cz.force = true; }")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')

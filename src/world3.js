@@ -645,7 +645,7 @@ function buildTile(T) {
     }
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  buildSignals(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G);
+  buildSignals(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G); buildCaserme(T, G);
   buildCemetery(T, G);
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
@@ -794,7 +794,7 @@ function updFountains() {
 
 // ---------------------------------------------------------------- shop signs (insegne) from the real shops, bars and restaurants
 const SIGN_MATS = [], SIGN_EDGES = new Map(); // how many signs already hang on each wall
-const SIGN_STYLE = { scuola: ['#1f4f9a', '#ffffff'], oratorio: ['#6b3a8c', '#ffffff'], municipio: ['#2f3b4c', '#f2d27e'], biblioteca: ['#5a3d22', '#f6e6c8'], polizia: ['#1d4fb8', '#ffffff'], ospedale: ['#c8102e', '#ffffff'], stazione: ['#1f6b3a', '#ffffff'], bar: ['#1f4d3a', '#f4e7c4'], ristorante: ['#7a1f1a', '#f6e6c8'], 'fast food': ['#c8331f', '#ffe08a'], gelateria: ['#e9a6b9', '#4a1f2c'], farmacia: ['#1d8f4e', '#ffffff'], banca: ['#183a6b', '#ffffff'], poste: ['#f2c230', '#163a7a'], benzinaio: ['#c8102e', '#ffffff'], negozio: ['#25303f', '#f2f2ee'] };
+const SIGN_STYLE = { scuola: ['#1f4f9a', '#ffffff'], oratorio: ['#6b3a8c', '#ffffff'], municipio: ['#2f3b4c', '#f2d27e'], biblioteca: ['#5a3d22', '#f6e6c8'], ospedale: ['#c8102e', '#ffffff'], stazione: ['#1f6b3a', '#ffffff'], bar: ['#1f4d3a', '#f4e7c4'], ristorante: ['#7a1f1a', '#f6e6c8'], 'fast food': ['#c8331f', '#ffe08a'], gelateria: ['#e9a6b9', '#4a1f2c'], farmacia: ['#1d8f4e', '#ffffff'], banca: ['#183a6b', '#ffffff'], poste: ['#f2c230', '#163a7a'], benzinaio: ['#c8102e', '#ffffff'], negozio: ['#25303f', '#f2f2ee'] };
 function buildSigns(T, G) {
   const list = [];
   for (const p of D.pois) {
@@ -887,6 +887,136 @@ function fuelHits(v) {
     for (const pump of f.pumps) if (pump.alive && hyp(pump.x - v.x, pump.z - v.z) < v.rad + 2.6) { ignitePump(f, pump); v.health = Math.max(0, v.health - 35); } }
 }
 function updFuel(dt) { for (const f of FUEL) for (const pump of f.pumps) if (pump.burn > 0) { pump.burn -= dt; for (let i = 0; i < 2; i++) if (rnd() < 0.8) puff(pump.x + (rnd() - 0.5) * 1.4, f.gy + 1.5 + rnd(), pump.z + (rnd() - 0.5) * 1.4, rnd() < 0.5 ? '#ff7a1e' : '#ffc23a', 1.2 + rnd() * 1.2, 0.6, 3.0); } }
+
+// ---------------------------------------------------------------- caserme: Carabinieri stations and Polizia Locale headquarters (door, sign, lantern, flags, parking)
+const CASERME = [];
+for (const p of D.pois) {
+  if (p.k !== 'polizia') continue;
+  const cc = /carabinier|compagnia/i.test(p.n || '');
+  // the building: the one around the point, else a big one close by (the point is often the middle of the fenced compound)
+  let B = null, bs = 1e9;
+  BLD.each(p.x - 40, p.z - 40, p.x + 40, p.z + 40, b => {
+    const inside = inPoly(p.x, p.z, b.pts); let d = 1e9;
+    for (let i = 0; i < b.pts.length; i++) { const a = b.pts[i], c = b.pts[(i + 1) % b.pts.length]; d = Math.min(d, segDist(p.x, p.z, a[0], a[1], c[0], c[1])); }
+    const s = (inside ? 0 : d) - Math.min(Math.sqrt(Math.abs(sArea(b.pts))), 30) * 0.3;
+    if ((inside || d < 35) && b.h >= 3 && s < bs) { bs = s; B = b; }
+  });
+  if (!B) continue;
+  // the front: a long wall looking onto a street, with nothing in between
+  let F = null;
+  for (let i = 0; i < B.pts.length; i++) {
+    const a = B.pts[i], c = B.pts[(i + 1) % B.pts.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 5) continue;
+    const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L;
+    if (inPoly(mx + nx * 0.3, mz + nz * 0.3, B.pts)) { nx = -nx; nz = -nz; }
+    if (inPoly(mx + nx * 0.3, mz + nz * 0.3, B.pts)) continue;
+    let road = null;
+    for (let t = 1; t <= 45 && !road; t += 0.75) {
+      const x = mx + nx * t, z = mz + nz * t; if (t > 1.5 && inBuilding(x, z)) break;
+      ROADSEG.each(x - 1, z - 1, x + 1, z + 1, s => { if (!road && s.r.c <= 5 && !s.r.d && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2) road = { t, s }; });
+    }
+    const score = (road ? road.t : 80) - Math.min(L, 24) * 0.5;
+    if (!F || score < F.score) F = { score, a, c, L, mx, mz, nx, nz, road };
+  }
+  if (!F) continue;
+  const ux = (F.c[0] - F.a[0]) / F.L, uz = (F.c[1] - F.a[1]) / F.L, depth = F.road ? F.road.t - 0.6 : 0;
+  const st = { p, cc, b: B, x: F.mx, z: F.mz, ux, uz, nx: F.nx, nz: F.nz, L: F.L, depth, gy: groundH(F.mx, F.mz), spots: [], posts: [], flags: [], cops: [], next: 0 };
+  // local frame, the same as the props group: lz out of the door, lx along the front
+  st.at = (lx, lz) => [st.x + st.nz * lx + st.nx * lz, st.z - st.nx * lx + st.nz * lz];
+  st.rx = st.nz; st.rz = -st.nx;
+  // parking for the volanti: nose out in front of the building, parallel to the wall in a narrow yard, else at the kerb
+  const out = Math.atan2(st.nx, st.nz), along = Math.atan2(st.rx, st.rz);
+  if (depth >= 6.5) for (const k of [3.4, -3.4, 6.3, -6.3, 9.2, -9.2]) { if (Math.abs(k) > F.L / 2 + 3) continue; const [x, z] = st.at(k, 3.55); st.spots.push({ x, z, h: out }); }
+  else if (depth >= 3.2) for (const k of [4.4, -4.4, 10, -10]) { if (Math.abs(k) > F.L / 2 + 2) continue; const [x, z] = st.at(k, 1.55); st.spots.push({ x, z, h: along }); }
+  if (F.road && F.road.s.r.w >= 7 && F.road.s.r.c >= 2) { // kerb by the station: on the side of the building, along the road
+    const s = F.road.s, sx = s.b[0] - s.a[0], sz = s.b[1] - s.a[1], SL = hyp(sx, sz) || 1, ex = sx / SL, ez = sz / SL;
+    const t0 = (st.x - s.a[0]) * ex + (st.z - s.a[1]) * ez; let ox = -ez, oz = ex; if ((st.x - s.a[0]) * ox + (st.z - s.a[1]) * oz < 0) { ox = -ox; oz = -oz; }
+    for (const k of [5.5, -5.5, 11]) { const t = t0 + k; if (t < 4 || t > SL - 4) continue; const off = s.r.w / 2 - 1.15; st.spots.push({ x: s.a[0] + ex * t + ox * off, z: s.a[1] + ez * t + oz * off, h: Math.atan2(ex, ez), kerb: true }); }
+  }
+  for (const k of [2.2, 5, 7.8]) for (const sd of [-1, 1]) { const [x, z] = st.at(sd * (F.L / 2 + k), 2.9); st.spots.push({ x, z, h: out }); } // beside the building, if that is a yard (checked when parking)
+  // agents: one each side of the door, one walking up and down the front
+  const pz = Math.min(1.25, Math.max(0.6, depth - 0.4));
+  st.posts.push({ lx: -2.3, lz: pz }, { lx: 2.3, lz: pz }, { lx: 0, lz: Math.min(0.75, pz), beat: Math.max(2.5, Math.min(F.L / 2 - 1, 12)) });
+  CASERME.push(st);
+  for (const [lx, lz] of [[-1.55, 1.45], [1.55, 1.45]]) { const [x, z] = st.at(lx, lz); WALLS.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, { r: 0.1, x, z, y0: st.gy - 2, y1: st.gy + 3 }); } // canopy posts
+}
+const townOf = st => placeAt(st.x, st.z) || 'Meda';
+function caserma2Lines(st) {
+  const n = st.p.n || '', town = townOf(st);
+  if (st.cc) return ['CARABINIERI', /compagnia/i.test(n) ? 'Comando Compagnia di ' + town : 'Stazione di ' + town];
+  return ['POLIZIA LOCALE', /comando/i.test(n) ? 'Comando di ' + town : 'Comune di ' + town];
+}
+function flagTex(kind) {
+  return canvasTex(96, 64, (g, w, h) => {
+    if (kind === 'it') { g.fillStyle = '#119246'; g.fillRect(0, 0, w / 3, h); g.fillStyle = '#f4f5f0'; g.fillRect(w / 3, 0, w / 3, h); g.fillStyle = '#ce2b37'; g.fillRect(w * 2 / 3, 0, w / 3 + 1, h); }
+    else if (kind === 'eu') { g.fillStyle = '#003399'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffcc00'; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.beginPath(); g.arc(w / 2 + Math.cos(a) * 19, h / 2 + Math.sin(a) * 19, 2.6, 0, Math.PI * 2); g.fill(); } }
+    else { g.fillStyle = '#f4f5f0'; g.fillRect(0, 0, w, h); g.fillStyle = '#119246'; g.strokeStyle = '#119246'; g.lineWidth = 3; // Lombardia: the green rosa camuna
+      for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; g.beginPath(); g.arc(w / 2 + Math.cos(a) * 16, h / 2 + Math.sin(a) * 16, 4.2, 0, Math.PI * 2); g.fill(); }
+      g.beginPath(); g.ellipse(w / 2, h / 2, 11, 9, 0, 0, Math.PI * 2); g.stroke(); }
+  }, false);
+}
+const FLAG_TEX = {};
+function buildCaserme(T, G) {
+  for (const st of CASERME) {
+    if (tileOf(st.x, st.z) !== T.t) continue;
+    const root = new THREE.Group(); root.position.set(st.x, st.gy, st.z); root.rotation.y = Math.atan2(st.nx, st.nz); G.add(root); st.root = root;
+    const put = (geo, mat, x, y, z, shadow = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; root.add(m); return m; };
+    const blue = st.cc ? 0x14213d : 0x1d4fb8;
+    // entrance: frame, glass door, step and canopy on two posts
+    put(boxG(2.3, 2.8, 0.1), lam(0xd6d1c6), 0, 1.4, 0.02, false);
+    put(boxG(1.9, 2.5, 0.12), lam(0x26313d), 0, 1.25, 0.05, false);
+    put(boxG(0.06, 2.4, 0.13), lam(0x9aa3ad), 0, 1.25, 0.06, false);
+    put(boxG(3.6, 0.16, 1.9), lam(0xbdb6aa), 0, 0.08, 0.95, false);
+    put(boxG(3.6, 0.16, 1.7), lam(0x3c424b), 0, 2.98, 0.85);
+    for (const x of [-1.55, 1.55]) put(boxG(0.1, 2.92, 0.1), lam(0x3c424b), x, 1.46, 1.45);
+    if (st.cc) put(boxG(3.62, 0.08, 1.72), lam(0xc8102e), 0, 2.88, 0.85, false); // red edge under the canopy
+    // sign over the door
+    const [l1, l2] = caserma2Lines(st), W = clamp(st.L * 0.7, 4.6, 7.6), cv = document.createElement('canvas'); cv.width = 512; cv.height = 112; const g = cv.getContext('2d');
+    g.fillStyle = st.cc ? '#14213d' : '#1d4fb8'; g.fillRect(0, 0, 512, 112);
+    if (st.cc) { g.fillStyle = '#c8102e'; g.fillRect(0, 98, 512, 14); } else { g.fillStyle = '#f2f2ee'; g.fillRect(0, 100, 512, 4); g.fillStyle = '#119246'; g.fillRect(0, 104, 512, 8); }
+    g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    let fs = 54; g.font = `bold ${fs}px ${st.cc ? 'Georgia, serif' : 'Arial, sans-serif'}`; while (g.measureText(l1).width > 490 && fs > 20) { fs -= 2; g.font = `bold ${fs}px ${st.cc ? 'Georgia, serif' : 'Arial, sans-serif'}`; }
+    g.fillText(l1, 256, 40); g.font = `24px ${st.cc ? 'Georgia, serif' : 'Arial, sans-serif'}`; g.fillText(l2, 256, 82);
+    const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
+    const sm = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(sm);
+    const edge = lam(blue), sy = Math.max(3.65, Math.min(st.b.h - 0.7, 4.2));
+    put(boxG(W, W * 112 / 512, 0.12), [edge, edge, edge, edge, sm, edge], 0, sy, 0.07, false);
+    // the lantern by the door (the Carabinieri blue lamp; a blue POLIZIA LOCALE light box)
+    const lv = document.createElement('canvas'); lv.width = 256; lv.height = 96; const lg = lv.getContext('2d');
+    lg.fillStyle = st.cc ? '#1f46a8' : '#2a5cff'; lg.fillRect(0, 0, 256, 96); lg.fillStyle = '#ffffff'; lg.textAlign = 'center'; lg.textBaseline = 'middle';
+    if (st.cc) { lg.font = 'bold 38px Georgia, serif'; lg.fillText('CARABINIERI', 128, 50); } else { lg.font = 'bold 34px Arial, sans-serif'; lg.fillText('POLIZIA', 128, 30); lg.fillText('LOCALE', 128, 70); }
+    const lt = new THREE.CanvasTexture(lv), lm = new THREE.MeshLambertMaterial({ map: lt, emissiveMap: lt, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(lm);
+    const lx = W / 2 + 0.95, dark = lam(0x1d1f22);
+    put(boxG(0.09, 0.09, 0.7), dark, lx, 3.12, 0.35, false);
+    put(boxG(1.3, 0.5, 0.5), [lm, lm, dark, dark, lm, lm], lx, 2.82, 0.75, false);
+    put(boxG(1.4, 0.08, 0.58), dark, lx, 3.1, 0.75, false);
+    if (st.cc) put(boxG(0.2, 0.26, 0.2), lam(0xc8102e), lx, 3.27, 0.75, false); // the flaming grenade on top, more or less
+    // flags on poles leaning out of the facade, beside the sign (above it on a narrow front)
+    const kinds = st.cc ? ['it', 'eu'] : ['it', 'lo', 'eu'], side = W / 2 + 0.55 + (kinds.length - 1) * 0.95 < st.L / 2 - 0.3, tilt = 0.85, PL = 2.6;
+    const fy = side ? sy - 0.2 : sy + W * 56 / 512 + 0.35;
+    kinds.forEach((k, i) => {
+      const x = side ? -(W / 2 + 0.55 + i * 0.95) : (i - (kinds.length - 1) / 2) * 1.15;
+      const tip = [x, fy + Math.cos(tilt) * PL, Math.sin(tilt) * PL];
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, PL, 6), lam(0xd9d6cf)); pole.position.set(x, fy + Math.cos(tilt) * PL / 2, Math.sin(tilt) * PL / 2); pole.rotation.x = tilt; root.add(pole);
+      put(new THREE.SphereGeometry(0.07, 8, 6), lam(0xd8b24a), tip[0], tip[1], tip[2], false);
+      // the cloth hangs from the upper part of the pole: hoist along the pole, fly end falling straight down
+      const geo = new THREE.PlaneGeometry(1, 1, 6, 1), pos = geo.attributes.position, s0 = 0.55, s1 = 0.97, H = 1.6, base = [];
+      for (let j = 0; j < pos.count; j++) { const u = pos.getX(j) + 0.5, v = pos.getY(j) + 0.5, s = lerp(s0, s1, v); base.push([x, fy + Math.cos(tilt) * PL * s - u * H, Math.sin(tilt) * PL * s + u * 0.08, u]); }
+      const fm = new THREE.MeshLambertMaterial({ map: FLAG_TEX[k] || (FLAG_TEX[k] = flagTex(k)), side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(geo, fm); mesh.castShadow = true; root.add(mesh);
+      const uv = geo.attributes.uv; for (let j = 0; j < uv.count; j++) uv.setXY(j, base[j][3], uv.getY(j)); // canvas left (hoist) at the pole
+      st.flags.push({ geo, base, ph: i * 1.7 });
+    });
+    updFlags(st, 0);
+  }
+}
+function updFlags(st, t) {
+  for (const f of st.flags) {
+    const pos = f.geo.attributes.position;
+    for (let j = 0; j < pos.count; j++) { const [x, y, z, u] = f.base[j], w = Math.sin(t * 2.6 + f.ph + u * 3.4) * 0.16 * u; pos.setXYZ(j, x + w, y, z + Math.abs(w) * 0.4); }
+    pos.needsUpdate = true; f.geo.computeVertexNormals();
+  }
+}
+function updCaserme(dt) { for (const st of CASERME) if (st.root && st.root.parent && st.root.parent.visible && hyp(st.x - camera.position.x, st.z - camera.position.z) < 160) updFlags(st, now); }
 
 // ---------------------------------------------------------------- cemeteries: rows of graves, crosses and cypresses
 const CYP_G = (() => { const g = new THREE.ConeGeometry(0.9, 9, 7); g.translate(0, 5.2, 0); return g; })(), TOMB_G = new THREE.BoxGeometry(0.95, 0.28, 2.0), STONE_G = new THREE.BoxGeometry(0.8, 1.0, 0.14);
