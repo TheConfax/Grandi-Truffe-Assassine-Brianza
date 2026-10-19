@@ -81,7 +81,7 @@ function scorch(v) { const m = v.m; if (!m.own || !m.base) return; m.paint.color
 function updWrecks(dt) {
   for (const v of VEH) {
     if (v.exploded) { v.roll = lerp(v.roll, v.flip * 0.45, 0.08); continue; }
-    if (v.health > 0) continue;
+    if (v.health > 0 || v.spec.pedal) continue; // a bicycle has nothing to burn
     v.burn = (v.burn || 0) + dt;
     if (rnd() < 0.7) { const hl = v.spec.L / 2 - 0.5; puff(v.x + Math.sin(v.h) * hl + (rnd() - 0.5), v.y + 1.0, v.z + Math.cos(v.h) * hl + (rnd() - 0.5), rnd() < 0.5 ? '#ff7a1e' : '#ffc23a', 0.8 + rnd() * 0.6, 0.45, 2.2); }
     if (v === P.car && !v.warned) { v.warned = true; toast('L\'auto va a fuoco! Scendi subito!'); }

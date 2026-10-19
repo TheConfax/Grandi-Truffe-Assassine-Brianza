@@ -781,14 +781,18 @@ const MODELS = {
   van:    { name: 'Furgone', L: 5.2, W: 2.0, van: true, wr: 0.36, maxV: 43.1, acc: 2.32, grip: 8, snd: 0.75 },
   ape:    { name: 'Motocarro', L: 2.95, W: 1.45, ape: true, wr: 0.27, maxV: 17.5, acc: 2.24, grip: 7.5, snd: 1.9 },
   police: { name: 'Auto della Polizia Locale', L: 4.45, W: 1.84, bh: 0.6, cab: [1.58, 0.56, 2.15, -0.25], wr: 0.34, maxV: 63.9, acc: 4.67, grip: 10, snd: 1 },
+  // two-wheelers: seat height/position for the rider, crouch = forward lean of the rider
+  scooter: { name: 'Scooter', L: 1.85, W: 0.7, two: true, noX: true, wr: 0.27, seatY: 0.8, seatZ: -0.25, crouch: 0.08, legA: -0.85, armA: -1.0, maxV: 25, acc: 2.6, grip: 8.5, snd: 2.1 },
+  moto:    { name: 'Moto', L: 2.1, W: 0.78, two: true, wr: 0.32, seatY: 0.86, seatZ: -0.22, crouch: 0.42, legA: -1.0, armA: -1.2, maxV: 61, acc: 7.6, grip: 10.5, snd: 1.7 },
+  bici:    { name: 'Bicicletta', L: 1.75, W: 0.6, two: true, pedal: true, noX: true, wr: 0.34, seatY: 0.98, seatZ: -0.2, crouch: 0.3, legA: -0.3, armA: -0.95, maxV: 8.3, acc: 1.5, grip: 8, snd: 0 },
 };
-const TRAFFIC_MIX = [['panda', 22], ['hatch', 22], ['sedan', 13], ['wagon', 10], ['suv', 12], ['sport', 5], ['van', 9], ['ape', 6]];
-const PARKED_MIX = [['panda', 25], ['hatch', 25], ['sedan', 15], ['wagon', 12], ['suv', 14], ['sport', 3], ['van', 6], ['ape', 3]];
+const TRAFFIC_MIX = [['panda', 22], ['hatch', 22], ['sedan', 13], ['wagon', 10], ['suv', 12], ['sport', 5], ['van', 9], ['ape', 6], ['scooter', 7], ['moto', 4], ['bici', 6]];
+const PARKED_MIX = [['panda', 25], ['hatch', 25], ['sedan', 15], ['wagon', 12], ['suv', 14], ['sport', 3], ['van', 6], ['ape', 3], ['scooter', 5], ['moto', 2], ['bici', 4]];
 function pickModel(mix, r = rnd) { let t = r() * mix.reduce((s, m) => s + m[1], 0); for (const [m, w] of mix) if ((t -= w) < 0) return m; return mix[0][0]; }
 const M_GLASS = lam(0x2e3d4e), M_TYRE = lam(0x1b1b1d), M_HEAD = lam(0xfff6d8, { emissive: 0xfff2c0, emissiveIntensity: 0.6 }), M_TAIL = lam(0xa01818, { emissive: 0xa01010, emissiveIntensity: 0.5 }), M_DARK = lam(0x2a2b2f), M_TRIM = lam(0x16181c);
 const M_SIR_A = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 }), M_SIR_B = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 });
 const CAR_COLS = ['#c8332b', '#f2f2ee', '#2f3540', '#9aa3ad', '#2c4f8f', '#e0b23b', '#3f6b4a', '#7b2d3a', '#d8d0c0', '#16181c', '#5b8fb8', '#b85d2a'];
-const MODEL_COLS = { sport: ['#c8102e', '#f2c230', '#16181c', '#e8e6e0', '#1f5fbf', '#e2562a'], van: ['#f2f2ee', '#d8d0c0', '#9aa3ad', '#c9cdd2'], ape: ['#7fb3c8', '#e8e4d8', '#9dbb6a', '#d9cf9a', '#c94f3d'], suv: ['#2f3540', '#9aa3ad', '#f2f2ee', '#16181c', '#5a6b4e', '#7b2d3a'] };
+const MODEL_COLS = { scooter: ['#9cc8b4', '#e8e2d2', '#c8332b', '#2c4f8f', '#f2c230', '#16181c'], moto: ['#c8102e', '#1f5fbf', '#16181c', '#f2f2ee', '#e2562a', '#3f6b4a'], bici: ['#2c4f8f', '#c8332b', '#16181c', '#e8e2d2', '#3f6b4a', '#e0b23b'], sport: ['#c8102e', '#f2c230', '#16181c', '#e8e6e0', '#1f5fbf', '#e2562a'], van: ['#f2f2ee', '#d8d0c0', '#9aa3ad', '#c9cdd2'], ape: ['#7fb3c8', '#e8e4d8', '#9dbb6a', '#d9cf9a', '#c94f3d'], suv: ['#2f3540', '#9aa3ad', '#f2f2ee', '#16181c', '#5a6b4e', '#7b2d3a'] };
 const colorFor = (m, r = rnd) => { const a = MODEL_COLS[m] || CAR_COLS; return a[Math.floor(r() * a.length)]; };
 const _geo = {};
 const boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; return _geo[k] || (_geo[k] = new THREE.BoxGeometry(w, h, l)); };
@@ -796,8 +800,43 @@ const wheelG = r => { const k = 'w' + r; return _geo[k] || (_geo[k] = new THREE.
 function makeCar(model, color) {
   const S = MODELS[model], g = new THREE.Group(), body = new THREE.Group(), hl = S.L / 2, paint = lam(color); g.add(body); g.rotation.order = 'YXZ';
   const add = (geo, mat, x, y, z, shadow = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; body.add(m); return m; };
-  let wheelPos, lightY, lightZ = hl + 0.01;
-  if (S.ape) { // motocarro: cab, cassone, three wheels
+  let wheelPos, lightY, lightZ = hl + 0.01, rider = null;
+  if (S.two) { // scooter, moto, bici: frame, seat, bars, two thin wheels and a seated rider (shown when an AI rides it)
+    const wr = S.wr, sy = S.seatY, tilt = (m, a) => { m.rotation.x = a; return m; };
+    if (model === 'bici') {
+      tilt(add(boxG(0.05, 0.05, 0.72), paint, 0, 0.82, 0.08), 0.08);              // top tube
+      tilt(add(boxG(0.05, 0.05, 0.78), paint, 0, 0.6, 0.2), -0.62);                // down tube
+      tilt(add(boxG(0.05, 0.6, 0.05), paint, 0, 0.62, -0.22), -0.25);              // seat tube
+      tilt(add(boxG(0.05, 0.05, 0.6), paint, 0, 0.36, -0.5), 0);                   // chain stay
+      tilt(add(boxG(0.04, 0.72, 0.04), M_TRIM, 0, 0.62, hl - 0.4), 0.3);           // fork
+      add(boxG(0.16, 0.06, 0.26), M_DARK, 0, sy, -0.24);                          // saddle
+      add(boxG(0.56, 0.04, 0.04), M_TRIM, 0, 1.06, hl - 0.52, false);              // bars
+      add(boxG(0.3, 0.04, 0.34), M_TRIM, 0, 0.86, -hl + 0.42, false);             // rack
+      lightY = 0.9; lightZ = hl - 0.45;
+    } else if (model === 'scooter') {
+      add(boxG(0.38, 0.08, 0.8), M_DARK, 0, wr + 0.08, 0.05);                      // footboard
+      add(boxG(0.52, 0.42, 0.72), paint, 0, wr + 0.36, -0.42);                     // rear body
+      add(boxG(0.5, 0.78, 0.12), paint, 0, wr + 0.5, hl - 0.48);                   // leg shield
+      add(boxG(0.34, 0.1, 0.66), M_DARK, 0, sy - 0.04, -0.36);                     // seat
+      tilt(add(boxG(0.08, 0.55, 0.08), M_TRIM, 0, wr + 0.62, hl - 0.38), 0.3);     // steering column
+      add(boxG(0.6, 0.06, 0.06), M_TRIM, 0, sy + 0.36, hl - 0.55, false);          // bars
+      add(boxG(0.3, 0.16, 0.16), paint, 0, wr + 0.12, hl - 0.25, false);           // mudguard
+      lightY = sy + 0.3; lightZ = hl - 0.46;
+    } else {
+      add(boxG(0.24, 0.32, 1.0), M_DARK, 0, wr + 0.26, -0.02);                     // engine + frame
+      add(boxG(0.38, 0.24, 0.52), paint, 0, wr + 0.52, 0.18);                      // tank
+      add(boxG(0.3, 0.1, 0.56), M_DARK, 0, sy - 0.04, -0.32);                      // seat
+      tilt(add(boxG(0.3, 0.12, 0.42), paint, 0, sy + 0.04, -hl + 0.42), -0.25);    // tail
+      tilt(add(boxG(0.5, 0.44, 0.22), paint, 0, wr + 0.62, hl - 0.48), -0.35);     // fairing
+      tilt(add(boxG(0.4, 0.2, 0.04), M_GLASS, 0, wr + 0.9, hl - 0.56, false), -0.7); // screen
+      tilt(add(boxG(0.06, 0.62, 0.06), M_TRIM, 0, wr + 0.32, hl - 0.36), 0.42);    // forks
+      add(boxG(0.62, 0.05, 0.05), M_TRIM, 0, sy + 0.22, hl - 0.68, false);         // bars
+      add(new THREE.CylinderGeometry(0.06, 0.07, 0.7, 8).rotateX(Math.PI / 2), M_TRIM, 0.2, wr + 0.12, -0.5, false); // exhaust
+      lightY = wr + 0.62; lightZ = hl - 0.36;
+    }
+    wheelPos = [[0, hl - wr - 0.04, 1], [0, -hl + wr + 0.04, 0]];
+    rider = makePed(pick(SHIRTS), pick(PANTS), pick(SKIN), pick(HAIR)); body.add(rider.g); seatPose(rider, S); rider.g.visible = false;
+  } else if (S.ape) { // motocarro: cab, cassone, three wheels
     add(boxG(1.32, 1.22, 1.25), paint, 0, 0.98, hl - 0.66);
     add(boxG(1.12, 0.5, 0.05), M_GLASS, 0, 1.3, hl - 0.02, false);
     add(boxG(1.44, 0.12, 1.6), M_DARK, 0, 0.55, -hl + 0.82);
@@ -831,13 +870,21 @@ function makeCar(model, color) {
     add(boxG(S.W + 0.02, 0.17, 0.12), M_DARK, 0, bot + 0.08, hl + 0.02, false); add(boxG(S.W + 0.02, 0.17, 0.12), M_DARK, 0, bot + 0.08, -hl - 0.02, false);
   }
   const lx = S.ape ? 0.45 : S.W / 2 - 0.3;
-  for (const x of [-lx, lx]) { add(boxG(0.38, 0.14, 0.06), M_HEAD, x, lightY, lightZ, false); add(boxG(0.38, 0.14, 0.06), M_TAIL, x, lightY + 0.02, -lightZ, false); }
+  if (S.two) { add(boxG(0.16, 0.12, 0.06), M_HEAD, 0, lightY, lightZ + 0.04, false); add(boxG(0.14, 0.08, 0.05), M_TAIL, 0, S.pedal ? 0.9 : S.seatY + 0.02, -hl + (S.pedal ? 0.25 : 0.12), false); }
+  else for (const x of [-lx, lx]) { add(boxG(0.38, 0.14, 0.06), M_HEAD, x, lightY, lightZ, false); add(boxG(0.38, 0.14, 0.06), M_TAIL, x, lightY + 0.02, -lightZ, false); }
   const wheels = [];
-  for (const [x, z, front] of wheelPos) {
-    const piv = new THREE.Group(); piv.position.set(x, S.wr, z); g.add(piv); const w = new THREE.Mesh(wheelG(S.wr), M_TYRE); piv.add(w); wheels.push({ piv, w, front });
+  for (const [x, z, front] of wheelPos) { // two-wheelers: wheels hang from the leaning body
+    const piv = new THREE.Group(); piv.position.set(x, S.wr, z); (S.two ? body : g).add(piv); const w = new THREE.Mesh(S.two ? thinWheelG(S.wr, S.pedal) : wheelG(S.wr), M_TYRE); piv.add(w); wheels.push({ piv, w, front });
   }
   scene.add(g);
-  return { g, body, wheels };
+  return { g, body, wheels, rider };
+}
+const thinWheelG = (r, spoke) => { const k = 't' + r + spoke; if (_geo[k]) return _geo[k]; const t = new THREE.TorusGeometry(r - (spoke ? 0.025 : 0.05), spoke ? 0.025 : 0.06, 6, 16).rotateY(Math.PI / 2); return _geo[k] = t; };
+function pedal(m, v) { const S = v.spec, c = Math.sin(v.spin * 0.55) * 0.42; m.L.rotation.x = S.legA - S.crouch - 0.2 + c; m.R.rotation.x = S.legA - S.crouch - 0.2 - c; }
+function seatPose(m, S) { // ped model sat on a two-wheeler: hips on the saddle, torso leaning around the hips, legs/arms at absolute angles from the vertical
+  const c = S.crouch; m.g.position.set(0, S.seatY - 0.84 + 0.04, S.seatZ); m.g.rotation.set(0, 0, 0);
+  m.inner.rotation.set(c, 0, 0); m.inner.position.set(0, 0.84 * (1 - Math.cos(c)), -0.84 * Math.sin(c)); // pivot on the hips, not on the feet
+  m.L.rotation.x = m.R.rotation.x = S.legA - c; m.AL.rotation.x = m.AR.rotation.x = S.armA - c;
 }
 const PGEO = { leg: new THREE.BoxGeometry(0.17, 0.82, 0.2).translate(0, -0.41, 0), torso: new THREE.BoxGeometry(0.46, 0.62, 0.26), head: new THREE.BoxGeometry(0.24, 0.27, 0.25), arm: new THREE.BoxGeometry(0.12, 0.6, 0.14).translate(0, -0.3, 0), hair: new THREE.BoxGeometry(0.26, 0.08, 0.27) };
 const SHIRTS = ['#c8332b', '#2c4f8f', '#e8e2d2', '#3f6b4a', '#e0b23b', '#7b2d3a', '#5b8fb8', '#d97b4a', '#444a55', '#a07dbd'], PANTS = ['#2a3142', '#3b3b3b', '#5b4b3a', '#1f2a44', '#7a6a55'], SKIN = ['#f0c9a0', '#d9a77c', '#b07a52', '#8a5a3a', '#f5d6b8'], HAIR = ['#2a1d15', '#4a3020', '#c9a35a', '#7a7a7a', '#141414'];
@@ -856,7 +903,7 @@ const VEH = [];
 class Vehicle {
   constructor(kind, color, x, z, h) {
     Object.assign(this, { kind, x, z, h, vx: 0, vz: 0, steer: 0, health: 100, driver: null, sleep: true, spin: 0, roll: 0, pitch: 0, boost: false, y: 0, slope: 0 });
-    this.spec = MODELS[kind]; this.color = color; this.m = makeCar(kind, color);
+    this.spec = MODELS[kind]; this.color = color; this.m = makeCar(kind, color); if (this.spec.two) this.roll = 0.1; // parked on its stand
     this.rad = this.spec.W / 2 + 0.02; this.co = Math.max(0.2, this.spec.L / 2 - this.rad);
     this.inp = { thr: 0, brk: 0, steer: 0, hand: 0 }; this.ai = null; this.maxV = this.spec.maxV;
     VEH.push(this); this.sync();
@@ -865,6 +912,10 @@ class Vehicle {
   get fwdSpeed() { return this.vx * Math.sin(this.h) + this.vz * Math.cos(this.h); }
   circles() { const fx = Math.sin(this.h) * this.co, fz = Math.cos(this.h) * this.co; return [[this.x + fx, this.z + fz], [this.x - fx, this.z - fz]]; }
   step(dt) {
+    if (this.fallen) { // a two-wheeler on its side just slides to a stop
+      const k = Math.exp(-2.5 * dt); this.vx *= k; this.vz *= k; this.x += this.vx * dt; this.z += this.vz * dt;
+      this.roll = lerp(this.roll, this.fallSide * 1.38, 0.12); this.steer = 0; return;
+    }
     const i = this.inp, fx = Math.sin(this.h), fz = Math.cos(this.h), rx = fz, rz = -fx;
     let v = this.vx * fx + this.vz * fz, lat = this.vx * rx + this.vz * rz;
     const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = S.acc * (bst ? 1.7 : 1), top = this.maxV * (bst ? 1.15 : 1);
@@ -874,7 +925,7 @@ class Vehicle {
     const drag = (0.15 + (thr ? 0 : 0.45 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);
     v -= Math.sign(v) * Math.min(Math.abs(v), drag);
     this.steer = lerp(this.steer, i.steer, 1 - Math.exp(-10 * dt));
-    const sMax = 0.62 / (1 + Math.abs(v) * 0.045);
+    const sMax = 0.62 / (1 + Math.abs(v) * 0.045) * (S.two ? 0.72 : 1);
     let yaw = this.steer * sMax * v / (S.L * 0.62); if (i.hand) yaw *= 1.55;
     const yawMax = (i.hand ? 22 : 13 + S.grip * 0.4) / Math.max(4, Math.abs(v)); yaw = clamp(yaw, -yawMax, yawMax); // grip limit
     this.h = wrapA(this.h + yaw * dt);
@@ -883,7 +934,8 @@ class Vehicle {
     this.vx = fx * v + rx * lat; this.vz = fz * v + rz * lat; // world velocity kept in old frame → slides when grip is low
     this.x += this.vx * dt; this.z += this.vz * dt;
     this.spin += v * dt / S.wr;
-    this.roll = lerp(this.roll, clamp(-yaw * v * 0.004, -0.08, 0.08), 0.1);
+    if (S.two) this.roll = lerp(this.roll, clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85), 0.14); // lean into the bend
+    else this.roll = lerp(this.roll, clamp(-yaw * v * 0.004, -0.08, 0.08), 0.1);
     this.pitch = lerp(this.pitch, clamp((thr - i.brk) * -0.025, -0.04, 0.04), 0.1);
   }
   collide() {
@@ -907,6 +959,7 @@ class Vehicle {
   impact(v) {
     if (v > 4) { this.health = Math.max(0, this.health - (v - 4) * 2.2); }
     if (this === P.car) { sfxCrash(v); if (v > 7) shake = Math.min(1, v / 25); }
+    if (this.spec.two && this.driver && v > 7.5) throwRider(this, v);
   }
   sync() {
     const m = this.m; m.g.position.set(this.x, this.y, this.z); m.g.rotation.y = this.h; m.g.rotation.x = this.slope;
@@ -984,13 +1037,16 @@ function updTrain(dt) {
 }
 
 // ---------------------------------------------------------------- spawning helpers
+// lane line: cars on the lane centre, two-wheelers on its right-hand side, never closer than 0.55 m to the kerb
+const laneOff = (S, e) => S.two ? Math.max(e.off, Math.min(e.off + (e.o ? 1.6 : 0.95), (e.w || 6) / 2 - 0.55)) : e.off;
 function spawnTraffic(near) {
   const a = near ? nodeInRing(TRAF_NODES, P.x, P.z, 90, 260, true) : pick(TRAF_NODES);
   const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off);
-  const kind = pickModel(TRAFFIC_MIX), col = colorFor(kind);
-  const v = new Vehicle(kind, col, p0[0], p0[1], Math.atan2(p1[0] - p0[0], p1[1] - p0[1]));
+  let kind = pickModel(TRAFFIC_MIX); if (e.x && MODELS[kind].noX) kind = 'moto'; // no bikes or small scooters on the superstrada
+  const col = colorFor(kind), [q0, q1] = MODELS[kind].two ? edgePts(a, e.to, laneOff(MODELS[kind], e)) : [p0, p1];
+  const v = new Vehicle(kind, col, q0[0], q0[1], Math.atan2(q1[0] - q0[0], q1[1] - q0[1]));
   const base = kind === 'ape' ? 6.5 : kind === 'van' ? 9 : kind === 'sport' ? 13 : 10.5, mood = rnd() < 0.13 ? 1.45 : 0.75 + rnd() * 0.45; // a few "schegge" in a hurry
-  v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[p1[0], p1[1], e.to]], cruise: Math.min(v.maxV * 0.8, base * mood), blocked: 0, ignore: 0 }; v.sleep = false;
+  v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to]], cruise: Math.min(v.maxV * 0.8, base * mood), blocked: 0, ignore: 0 }; v.sleep = false;
   return v;
 }
 function extendRoute(v) {
@@ -998,7 +1054,8 @@ function extendRoute(v) {
   while (ai.q.length < 4) {
     const last = ai.q.length ? ai.q[ai.q.length - 1][2] : ai.cur, prev = ai.q.length > 1 ? ai.q[ai.q.length - 2][2] : ai.prev;
     let opts = TRAF[last].filter(e => e.to !== prev); if (!opts.length) opts = TRAF[last]; if (!opts.length) break;
-    const e = pick(opts), [p0, p1] = edgePts(last, e.to, e.off);
+    if (v.spec.noX && opts.some(e => !e.x)) opts = opts.filter(e => !e.x);
+    const e = pick(opts), [p0, p1] = edgePts(last, e.to, laneOff(v.spec, e));
     ai.q.push([p0[0], p0[1], -1], [p1[0], p1[1], e.to]);
   }
 }
@@ -1287,8 +1344,9 @@ function enterExit() {
       else if (cops().some(c => hyp(c.x - P.x, c.z - P.z) < 50)) crime(1, 'Furto d\'auto davanti alla Polizia!');
       sfxBlip(300, 500, 0.15); best.stolen = !wasCop;
     }
+    if (best.fallen) { best.fallen = false; best.roll = 0; best.vx = best.vz = 0; } // pick the bike up
     best.driver = 'player'; best.sleep = false; P.car = best; P.mode = 'car'; P.model.g.visible = false;
-    toast(`${best.stolen ? 'Auto rubata · ' : ''}${best.spec.name} · fino a ${Math.round(best.maxV * 3.6)} km/h`); best.stolen = false;
+    toast(`${best.stolen ? (isTwo(best) ? 'Mezzo rubato · ' : 'Auto rubata · ') : ''}${best.spec.name} · fino a ${Math.round(best.maxV * 3.6)} km/h`); best.stolen = false;
   } else {
     const v = P.car; if (v.speed > 5) { toast('Frena prima di scendere'); return; }
     const fx = Math.sin(v.h), fz = Math.cos(v.h);
@@ -1297,6 +1355,21 @@ function enterExit() {
   }
 }
 
+function throwRider(v, sp) { // a hard hit on a two-wheeler: the rider flies off, the bike stays on its side
+  const fx = Math.sin(v.h), fz = Math.cos(v.h), x = v.x + fx * 0.8, z = v.z + fz * 0.8;
+  if (v.driver === 'player') {
+    P.mode = 'foot'; P.car = null; P.model.g.visible = true; P.x = x; P.z = z; P.h = v.h; P.y = v.y + 0.6;
+    P.knock = 1.6; P.vx = v.vx * 0.7; P.vz = v.vz * 0.7; P.vy = 2.5 + sp * 0.12; P.hp -= Math.min(45, 6 + sp * 1.6); shake = Math.max(shake, 0.7);
+    toast('Sei caduto! (' + v.spec.name + ' a terra)');
+  } else {
+    const p = spawnPed(false);
+    if (p) { p.x = x; p.z = z; p.y = v.y; p.q = []; if (sp > 13) { p.state = 'dead'; p.t = 0; p.vx = v.vx * 0.7; p.vz = v.vz * 0.7; p.vy = 3; } else { p.state = 'flee'; p.t = 3; p.fx = fz; p.fz = -fx; } }
+    v.ai = null;
+  }
+  v.driver = null; v.fallen = true; v.fallSide = v.roll > 0 ? 1 : v.roll < 0 ? -1 : (rnd() < 0.5 ? -1 : 1); v.boost = false; v.inp = { thr: 0, brk: 0, steer: 0, hand: 0 }; v.sleep = false;
+}
+const isTwo = v => !!(v && v.spec.two);
+
 // ---------------------------------------------------------------- AI driving
 function steerTo(v, tx, tz, cruise, avoid) {
   const dx = tx - v.x, dz = tz - v.z, want = Math.atan2(dx, dz), diff = wrapA(want - v.h);
@@ -1304,9 +1377,9 @@ function steerTo(v, tx, tz, cruise, avoid) {
   const fv = v.fwdSpeed;
   v.inp.steer = clamp(diff * 2.2, -1, 1) * (fv < 0 ? -1 : 1);
   if (avoid) {
-    const fx = Math.sin(v.h), fz = Math.cos(v.h); let block = 1e9;
-    const check = (x, z) => { const ox = x - v.x, oz = z - v.z, ahead = ox * fx + oz * fz, side = Math.abs(ox * fz - oz * fx); if (ahead > 1 && ahead < 14 && side < 2.1) block = Math.min(block, ahead); };
-    for (const o of VEH) if (o !== v) check(o.x, o.z);
+    const fx = Math.sin(v.h), fz = Math.cos(v.h); let block = 1e9; v.ai.blocker = null;
+    const check = (x, z, o) => { const ox = x - v.x, oz = z - v.z, ahead = ox * fx + oz * fz, side = Math.abs(ox * fz - oz * fx); if (ahead > 1 && ahead < 14 && side < 2.1 && ahead < block) { block = ahead; v.ai.blocker = o || null; } };
+    for (const o of VEH) if (o !== v && !(v.ai.pass > 0 && isTwo(o))) check(o.x, o.z, o); // while overtaking a two-wheeler it is no longer in the way
     for (const p of PEDS) if (p.state !== 'dead') check(p.x, p.z);
     if (P.mode === 'foot') check(P.x, P.z);
     if (TR) for (const c of TR.circ) check(c[0], c[1]);
@@ -1320,16 +1393,33 @@ function aiTraffic(v, dt) {
   const ai = v.ai; extendRoute(v);
   if (!ai.q.length) { v.inp.thr = 0; v.inp.brk = 1; return; }
   let [tx, tz, node] = ai.q[0];
-  if (hyp(tx - v.x, tz - v.z) < 4.5) { ai.q.shift(); if (node >= 0) { ai.prev = ai.cur; ai.cur = node; } extendRoute(v); if (!ai.q.length) return;[tx, tz] = ai.q[0]; }
+  if (hyp(tx - v.x, tz - v.z) < 4.5) { ai.from = ai.q.shift(); if (node >= 0) { ai.prev = ai.cur; ai.cur = node; } extendRoute(v); if (!ai.q.length) return;[tx, tz] = ai.q[0]; }
   let cruise = ai.cruise;
   if (ai.q.length > 1) { // slow for corners
     const [ax, az] = ai.q[0], [bx, bz] = ai.q[1], d = hyp(ax - v.x, az - v.z), turn = Math.abs(wrapA(Math.atan2(bx - ax, bz - az) - Math.atan2(ax - v.x, az - v.z)));
     if (d < 20 && turn > 0.5) cruise = Math.min(cruise, 5.5 + (1 - turn / Math.PI) * 4);
   }
+  if (ai.pass > 0) { // overtaking: follow the lane line (last waypoint → next) moved 2.2 m to the left, aiming 12 m ahead on it (a far node barely changes the heading)
+    const A = ai.from, dx = tx - A[0], dz = tz - A[1], d = hyp(dx, dz) || 1, ux = dx / d, uz = dz / d, k = Math.min(1, ai.pass / 0.6, (3.4 - ai.pass) / 0.6 + 0.35);
+    const sx = tx + uz * 2.2 * k - v.x, sz = tz - ux * 2.2 * k - v.z, along = sx * ux + sz * uz, perp = sx * uz - sz * ux, f = Math.min(12, along);
+    tx = v.x + ux * f + uz * perp; tz = v.z + uz * f - ux * perp;
+  }
   const t = steerTo(v, tx, tz, cruise, true);
+  passStep(v, cruise, dt);
   ai.ignore -= dt;
   if (t < 0.5 && v.speed < 0.5) { ai.blocked += dt; if (ai.blocked > 4 && P.car && hyp(P.car.x - v.x, P.car.z - v.z) < 10) hornOther = 0.3; if (ai.blocked > 7) { ai.ignore = 2.5; ai.blocked = 0; } } else ai.blocked = 0;
   unstick(v, dt);
+}
+function passStep(v, cruise, dt) { // cars overtake slow scooters and bikes when the other lane is clear for 50 m
+  const ai = v.ai, fx = Math.sin(v.h), fz = Math.cos(v.h), rel = o => { const ox = o.x - v.x, oz = o.z - v.z; return [ox * fx + oz * fz, ox * fz - oz * fx]; }; // [ahead, left]
+  if (ai.pass > 0) {
+    ai.pass -= dt;
+    if (ai.pass < 0.4) for (const o of VEH) if (isTwo(o) && o !== v) { const [a, l] = rel(o); if (a > -3.5 && a < 4 && Math.abs(l) < 2.6) { ai.pass = 0.4; break; } } // still alongside: stay out
+    return;
+  }
+  const b = ai.blocker; if (isTwo(v) || !b || !isTwo(b) || b.speed > cruise * 0.8 || hyp(b.x - v.x, b.z - v.z) > 16) return;
+  for (const o of VEH) { if (o === v || o === b) continue; const [a, l] = rel(o); if (a > -4 && a < 50 && l > 0.8 && l < 5) return; }
+  ai.pass = 3.4; if (!ai.from) ai.from = [v.x, v.z]; // the lane line must stay fixed while the car moves aside
 }
 function unstick(v, dt) { // any AI car pressing the gas without moving (wedged on a wall or a kerb corner) backs off, steering the other way
   const ai = v.ai;
@@ -1393,11 +1483,13 @@ function step(dt) {
     const a = VEH[i], b = VEH[j]; if (a.sleep && b.sleep) continue; if (Math.abs(a.x - b.x) > 6 || Math.abs(a.z - b.z) > 6) continue;
     for (const ca of a.circles()) for (const cb of b.circles()) {
       const dx = cb[0] - ca[0], dz = cb[1] - ca[1], d = hyp(dx, dz), RR = a.rad + b.rad; if (d >= RR || d < 1e-5) continue;
-      const nx = dx / d, nz = dz / d, o = (RR - d) / 2; a.x -= nx * o; a.z -= nz * o; b.x += nx * o; b.z += nz * o;
+      // inverse masses: a two-wheeler weighs about a quarter of a car, so it is the one that bounces
+      const ia = isTwo(a) ? 4 : 1, ib = isTwo(b) ? 4 : 1, nx = dx / d, nz = dz / d, o = (RR - d) / (ia + ib); a.x -= nx * o * ia; a.z -= nz * o * ia; b.x += nx * o * ib; b.z += nz * o * ib;
       const rv = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
       if (rv < 0) {
-        const jj = -1.25 * rv / 2; a.vx -= nx * jj; a.vz -= nz * jj; b.vx += nx * jj; b.vz += nz * jj; a.sleep = b.sleep = false;
+        const rs = hyp(b.vx - a.vx, b.vz - a.vz), jj = -1.25 * rv / (ia + ib); a.vx -= nx * jj * ia; a.vz -= nz * jj * ia; b.vx += nx * jj * ib; b.vz += nz * jj * ib; a.sleep = b.sleep = false;
         a.impact(-rv * 0.8); b.impact(-rv * 0.8);
+        for (const [p, q] of [[a, b], [b, a]]) if (isTwo(p) && p.driver && !p.fallen && rs > 8 && !(isTwo(q) && rs < 11)) throwRider(p, rs); // the rider falls on the full closing speed, not just its normal part
         const pl = a === P.car ? b : b === P.car ? a : null;
         if (pl && pl.kind === 'police' && -rv > 3) crime(0.7, 'Hai speronato la Polizia!');
         if (pl && pl.ai && !pl.ai.cop && -rv > 6 && rnd() < 0.3) hornOther = 0.5;
@@ -1435,7 +1527,7 @@ function step(dt) {
       for (const c of v.circles()) {
         const dx = p.x - c[0], dz = p.z - c[1], d = hyp(dx, dz), rr = v.rad + 0.35; if (d > rr) continue;
         const sp = v.speed;
-        if (sp > 4.5) {
+        if (sp > (v.spec.pedal ? 6.5 : 4.5)) {
           p.state = 'dead'; p.t = 0; p.vx = v.vx * 0.9 + dx / (d || 1) * 2; p.vz = v.vz * 0.9 + dz / (d || 1) * 2; p.vy = 3 + sp * 0.25; v.vx *= 0.9; v.vz *= 0.9;
           if (v === P.car) { crime(1, W.stars === 0 ? 'Pirata della strada! La Polizia Locale ti cerca.' : null); sfxCrash(8); P.money = Math.max(0, P.money - 0); }
           break;
@@ -1525,7 +1617,7 @@ function updCamera(dt) {
   } else {
     // follow travel direction in reverse, otherwise heading
     let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }
-    const dist = inCar ? 8.8 + sp * 0.06 : 5.2, ht = inCar ? 3.6 + sp * 0.025 : 2.5;
+    const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
     let cx = px - hx * dist, cz = pz - hz * dist;
     const f = rayWalls(px, pz, cx, cz); let lift = 0; if (f < 1) { const k = Math.max(0.12, f - 0.08); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3; }
     const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
@@ -1546,6 +1638,10 @@ function updVisuals(dt) {
   for (const v of VEH) {
     v.m.g.visible = Math.abs(v.x - cx) < 280 && Math.abs(v.z - cz) < 280; if (!v.m.g.visible) continue;
     v.sync();
+    if (v.m.rider) { // the AI rider shows only while somebody rides; cyclists pedal with the wheel
+      const r = v.m.rider; r.g.visible = v.driver === 'ai';
+      if (r.g.visible && v.spec.pedal) pedal(r, v);
+    }
     if (!v.sleep) {
       const hl = v.spec.L / 2;
       if (v.health < 35 && rnd() < (v.health <= 0 ? 0.5 : 0.18)) puff(v.x + Math.sin(v.h) * (hl - 0.4), v.y + 1.1, v.z + Math.cos(v.h) * (hl - 0.4), v.health <= 0 ? '#2b2b2b' : '#9a9a9a', 1.4, 1.6);
@@ -1561,9 +1657,17 @@ function updVisuals(dt) {
     if (p.state === 'dead') { p.m.inner.rotation.x = lerp(p.m.inner.rotation.x, -Math.PI / 2, 0.15); p.m.inner.position.y = 0.15; animPed(p.m, 0, 0); }
     else { p.m.inner.rotation.x = 0; p.m.inner.position.y = 0; animPed(p.m, p.phase, p.state === 'flee' ? 0.9 : 0.5); }
   }
-  const pm = P.model; pm.g.position.set(P.x, P.y, P.z); pm.g.rotation.y = P.h;
-  if (P.knock > 0) { pm.inner.rotation.x = lerp(pm.inner.rotation.x, -Math.PI / 2, 0.2); pm.inner.position.y = 0.15; }
-  else { pm.inner.rotation.x = 0; pm.inner.position.y = 0; animPed(pm, P.phase, K.hand ? 0.9 : 0.55); }
+  const pm = P.model, ride = P.mode === 'car' && isTwo(P.car);
+  if (ride) { // on a two-wheeler the player sits on it and leans with it
+    if (pm.g.parent !== P.car.m.body) { P.car.m.body.add(pm.g); seatPose(pm, P.car.spec); }
+    pm.g.visible = true;
+    if (P.car.spec.pedal) pedal(pm, P.car);
+  } else {
+    if (pm.g.parent !== scene) { scene.add(pm.g); pm.g.rotation.set(0, 0, 0); pm.g.visible = P.mode === 'foot'; }
+    pm.g.position.set(P.x, P.y, P.z); pm.g.rotation.y = P.h;
+    if (P.knock > 0) { pm.inner.rotation.x = lerp(pm.inner.rotation.x, -Math.PI / 2, 0.2); pm.inner.position.y = 0.15; }
+    else { pm.inner.rotation.x = 0; pm.inner.position.y = 0; animPed(pm, P.phase, K.hand ? 0.9 : 0.55); }
+  }
   updSmoke(dt);
 }
 
@@ -1571,7 +1675,7 @@ function updVisuals(dt) {
 function updAudio() {
   if (!AU.on) return; const C = AU.ctx, t = C.currentTime, m = AU.muted || paused ? 0 : 1;
   const v = P.mode === 'car' ? P.car : null;
-  if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2, gear = Math.min(5, Math.floor(s / gs)), rpm = (s - gear * gs) / gs, k = v.spec.snd * (v.boost ? 1.25 : 1); AU.eng.o1.frequency.setTargetAtTime((48 + rpm * 70 + gear * 9 + v.inp.thr * 12) * k, t, 0.05); AU.eng.o2.frequency.setTargetAtTime((48 + rpm * 70 + gear * 9) * k, t, 0.05); AU.eng.lp.frequency.setTargetAtTime(500 + v.inp.thr * 900 + s * 12 + (v.boost ? 1500 : 0), t, 0.1); AU.eng.eg.gain.setTargetAtTime(m * (v.health > 0 ? 0.13 + v.inp.thr * 0.08 : 0), t, 0.08); }
+  if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2, gear = Math.min(5, Math.floor(s / gs)), rpm = (s - gear * gs) / gs, k = v.spec.snd * (v.boost ? 1.25 : 1); AU.eng.o1.frequency.setTargetAtTime((48 + rpm * 70 + gear * 9 + v.inp.thr * 12) * k, t, 0.05); AU.eng.o2.frequency.setTargetAtTime((48 + rpm * 70 + gear * 9) * k, t, 0.05); AU.eng.lp.frequency.setTargetAtTime(500 + v.inp.thr * 900 + s * 12 + (v.boost ? 1500 : 0), t, 0.1); AU.eng.eg.gain.setTargetAtTime(m * (v.health > 0 && !v.spec.pedal ? 0.13 + v.inp.thr * 0.08 : 0), t, 0.08); }
   else AU.eng.eg.gain.setTargetAtTime(0, t, 0.1);
   let nd = 1e9; if (W.stars) for (const c of cops()) nd = Math.min(nd, hyp(c.x - P.x, c.z - P.z));
   AU.sir.so.frequency.setValueAtTime((now % 1.3) < 0.65 ? 435 : 580, t); // bitonale
@@ -1588,7 +1692,8 @@ function updHud(dt) {
   hornOther -= dt;
   if (P.mode === 'foot' && !W.busted && P.knock <= 0) {
     let near = null; for (const v of VEH) if (hyp(v.x - P.x, v.z - P.z) < 4.2) { near = v; break; }
-    if (near) hint(`<kbd>F</kbd> ${near.driver === 'ai' ? (near.kind === 'police' ? 'ruba l\'auto della Polizia' : 'ruba l\'auto') : 'sali in auto'}`);
+    if (near) { const T = { bici: ['la bici', 'monta sulla bici'], scooter: ['lo scooter', 'monta sullo scooter'], moto: ['la moto', 'monta sulla moto'] }[near.kind] || ['l\'auto', 'sali in auto'];
+      hint(`<kbd>F</kbd> ${near.driver === 'ai' ? (near.kind === 'police' ? 'ruba l\'auto della Polizia' : 'ruba ' + T[0]) : near.fallen ? 'rialza ' + T[0] : T[1]}`); }
   }
   drawMinimap();
   hudT -= dt; if (hudT > 0) return; hudT = 0.08;

@@ -285,7 +285,7 @@ for (const r of D.roads) {
     const ok = inLim(N[a][0], N[a][1], 2) && inLim(N[b][0], N[b][1], 2), open = r.d || !inBuilding((N[a][0] + N[b][0]) / 2, (N[a][1] + N[b][1]) / 2, 0);
     if (r.c <= 6 && ok && !r.x) { WALK[a].push({ to: b, L, off: r.walk }); WALK[b].push({ to: a, L, off: r.walk }); }
     if (r.c <= 5 && ok && open) { DRIVE[a].push({ to: b, L }); DRIVE[b].push({ to: a, L }); }
-    if (r.c <= 3 && ok && open) { TRAF[a].push({ to: b, L, off: r.lane, sp: r.sp || 10 }); if (!r.o) TRAF[b].push({ to: a, L, off: r.lane, sp: r.sp || 10 }); }
+    if (r.c <= 3 && ok && open) { TRAF[a].push({ to: b, L, off: r.lane, sp: r.sp || 10, w: r.w, o: !!r.o, x: !!r.x }); if (!r.o) TRAF[b].push({ to: a, L, off: r.lane, sp: r.sp || 10, w: r.w, o: false, x: !!r.x }); }
   }
 }
 const nodesWith = adj => N.map((_, i) => i).filter(i => adj[i].length);
