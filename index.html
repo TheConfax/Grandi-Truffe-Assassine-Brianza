@@ -320,11 +320,12 @@ function polyFill(b, outer, holes, y, vScale, col) {
   const all = outer.concat(...holes), base = b.p.length / 3;
   let tris = faces;
   if (b.drape) { // draped on the ground: split an edge longer than 4 m at its midpoint (shared, so neighbours stay joined) only where the ground
-    // under it rises above it, so the surface follows a hump instead of cutting a chord under it (asphalt sinking under the grass); flat ground stays
+    // under it strays from it, so the surface follows humps and dips instead of cutting under the grass or floating over a hollow; flat ground stays
     // in big triangles. The decision depends on the edge alone, so both triangles on it split it the same way
     const mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = groundH(all[i][0], all[i][1]));
     const memo = new Map(), L2 = (i, j) => { const l = (all[i][0] - all[j][0]) ** 2 + (all[i][1] - all[j][1]) ** 2; if (l <= 16) return 0; const k = i < j ? i * 1e6 + j : j * 1e6 + i; let r = memo.get(k); if (r !== undefined) return r; r = 0; const a = G(i), c = G(j);
-      for (const t of [0.25, 0.5, 0.75]) if (groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t) - (a + (c - a) * t) > 0.25) { r = l; break; } /* only a hump the chord would sink under: the ground's depth mask is 0.5 m down */ memo.set(k, r); return r; };
+      for (const t of [0.25, 0.5, 0.75]) { const e = groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t) - (a + (c - a) * t); if (e > 0.25 || e < -0.4) { r = l; break; } } /* a hump the chord would sink under, or a dip it would bridge in the air (the car drives down in the dip, under the asphalt); a
+      shallow dip is let go: a wheel a little in the asphalt costs less than three times the triangles */ memo.set(k, r); return r; };
     const M = (i, j) => { const k = i < j ? i * 1e6 + j : j * 1e6 + i; let m = mid.get(k); if (m === undefined) { m = all.length; all.push([(all[i][0] + all[j][0]) / 2, (all[i][1] + all[j][1]) / 2]); mid.set(k, m); } return m; };
     const stack = faces.map(f => [f[0], f[1], f[2]]); tris = [];
     while (stack.length) {
