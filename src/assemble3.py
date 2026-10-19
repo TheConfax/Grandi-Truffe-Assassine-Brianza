@@ -41,7 +41,7 @@ const flatMat""", """  parent.add(m); return m;
 const flatMat""")
 
 # ---- world: replace everything from "the world" to "audio" with the tiled world + level-aware collisions
-world = open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read()
+world = open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
 function collideStatic(p, r, y) {

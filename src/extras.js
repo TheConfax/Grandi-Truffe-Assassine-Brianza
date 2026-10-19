@@ -47,6 +47,7 @@ function updDayNight(dt) {
   // street lamps, windows, car lights
   const lampsOn = clamp((3 - L.elDeg) / 7, 0, 1); WIN_LIT.value = litAt(TOD);
   for (const m of SIGN_MATS) m.emissiveIntensity = 0.05 + 0.75 * lampsOn;
+  for (const g of LM_GLOW) g.m.emissiveIntensity = g.a + g.b * lampsOn;
   MAT.lampHead.emissiveIntensity = 0.3 + 2.4 * lampsOn; LAMPPOOL_MAT.opacity = 0.75 * lampsOn;
   MAT.old.emissiveIntensity = MAT.mod.emissiveIntensity = 0.55 * lampsOn;
   M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn;
