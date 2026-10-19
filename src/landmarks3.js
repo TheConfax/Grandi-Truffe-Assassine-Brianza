@@ -49,6 +49,10 @@ const LANDMARKS = [
       wells: [[[548.95, -584.16], [546.45, -585.82], [553.05, -595.84], [555.55, -594.18]]] } },
   { n: 'Residenza di via Gagarin', x: 559.1, z: -544.7, build: buildModern, // the new block by the park: taupe walls, white balconies wrapping round every floor, panels on the roof
     o: { wall: '#8e7e6f', glass: '#3a4148', roof: '#d9d8d4', h: 19.5, floors: 6, balc: true, solar: 0.5, hvac: 2, ribbon: 0.62 } },
+  // the towers of the seventies between the Medateca and the railway: bare grey concrete, a balcony slab round every floor
+  { n: 'Torre di via Gagarin', x: 518.6, z: -480.3, build: buildModern, o: { wall: '#a8a49b', glass: '#3a3f44', roof: '#8d8a84', h: 28.8, floors: 9, balc: true, ribbon: 0.55, hvac: 2 } },
+  { n: 'Torre di via Pace', x: 483.7, z: -491.9, build: buildModern, o: { wall: '#b3afa5', glass: '#3a3f44', roof: '#8d8a84', h: 21.7, floors: 7, balc: true, ribbon: 0.55, hvac: 2 } },
+  { n: 'Torre della stazione', x: 470.8, z: -541.8, build: buildModern, o: { wall: '#ddd5c2', glass: '#3a3f44', roof: '#8d8a84', h: 21.0, floors: 7, balc: true, ribbon: 0.55, hvac: 2 } },
   { n: 'Palestra del Curie', x: 1306.5, z: -552.4, build: buildPalestra, o: { h: 10.4, white: true } }, // white, a metal roof, little ochre windows along the bottom
   { n: 'Scuola Statale Primaria San Giorgio', x: 1235.1, z: -398.8, build: buildModern, o: { brick: true, h: 7.6, floors: 2 } }, // Vico Magistretti and Gae Aulenti (1968-74): exposed brick, flat roof
   { n: 'Liceo paritario "Pier Giorgio Frassati"', x: 1152.1, z: 2092.8, build: buildPalazzo, o: { style: 'scuolaocra', h: 9.2, front: [1145.0, 2104.0] } }, // Baruccana, via Colombo: L-shaped, two floors on a basement
@@ -142,8 +146,19 @@ const YARDS = [
   { p: [[1231.0, -555.6], [1236.1, -566.5], [1336.1, -520.5], [1330.6, -508.7]], col: '#a9a8a3' }, // the Curie drive from via Marie Curie, under the bridges
   { p: [[1258.9, -486.3], [1266.1, -502.5], [1279.7, -496.6], [1272.0, -480.5]], col: '#c2bdb2' }, { p: [[1280.8, -531.8], [1274.2, -518.7], [1288.0, -513.3], [1292.7, -525.7]], col: '#c2bdb2' }, // its two courts
 ];
+// park paths drawn from the satellite where the map's are too rough: red gravel strips and triangles of pale paving round a bed of grass
+const PARK_PATHS = [ // the park of via Pace (Cesare Tagliabue) between the Medateca towers, the Auxologico and the railway
+  { pts: [[480.3, -591.8], [485.2, -578.7], [499.7, -566.6], [520.6, -550.4], [516.5, -533.2], [524.1, -516.1], [558.1, -505.6], [561.9, -501.2]], w: 2.6, col: '#a2533f' },
+  { pts: [[499.7, -566.6], [521.5, -568.1], [524.6, -564.2], [520.6, -550.4]], tri: true, w: 3.0, col: '#cdbb9a' },
+  { pts: [[516.5, -533.2], [510.6, -516.7], [524.1, -516.1]], tri: true, w: 3.0, col: '#cdbb9a' },
+];
 function buildPiazze(T, G) {
-  const yb = VBuf(), WH = COL('#eeeeea'), line = (a, b, w) => { const L = hyp(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / L * w / 2, nz = (b[0] - a[0]) / L * w / 2, i0 = yb.p.length / 3; for (const [x, z] of [[a[0] + nx, a[1] + nz], [b[0] + nx, b[1] + nz], [b[0] - nx, b[1] - nz], [a[0] - nx, a[1] - nz]]) vtx(yb, x, 0.07, z, 0, 1, 0, 0, 0, WH); yb.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2, i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }; // both windings: seen from above whichever way the line runs
+  const yb = VBuf(), WH = COL('#eeeeea'), strip = (a, b, w, col, y = 0.07) => { const L = hyp(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / L * w / 2, nz = (b[0] - a[0]) / L * w / 2, i0 = yb.p.length / 3; for (const [x, z] of [[a[0] + nx, a[1] + nz], [b[0] + nx, b[1] + nz], [b[0] - nx, b[1] - nz], [a[0] - nx, a[1] - nz]]) vtx(yb, x, y, z, 0, 1, 0, 0, 0, col); yb.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2, i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); };
+  for (const q of PARK_PATHS) {
+    const [cx, cz] = centroid(q.pts); if (tileOf(cx, cz) !== T.t) continue; const col = COL(q.col), P = q.tri ? [...q.pts, q.pts[0]] : q.pts;
+    for (let k = 1; k < P.length; k++) { strip(P[k - 1], P[k], q.w, col, 0.06); const [x, z] = P[k]; for (let i = 0; i < 8; i++) { const a0 = i / 8 * TAU, a1 = (i + 1) / 8 * TAU; const i0 = yb.p.length / 3; vtx(yb, x, 0.06, z, 0, 1, 0, 0, 0, col); vtx(yb, x + Math.cos(a0) * q.w / 2, 0.06, z + Math.sin(a0) * q.w / 2, 0, 1, 0, 0, 0, col); vtx(yb, x + Math.cos(a1) * q.w / 2, 0.06, z + Math.sin(a1) * q.w / 2, 0, 1, 0, 0, 0, col); yb.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 1); } } // round joints
+  }
+  const line = (a, b, w) => { const L = hyp(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / L * w / 2, nz = (b[0] - a[0]) / L * w / 2, i0 = yb.p.length / 3; for (const [x, z] of [[a[0] + nx, a[1] + nz], [b[0] + nx, b[1] + nz], [b[0] - nx, b[1] - nz], [a[0] - nx, a[1] - nz]]) vtx(yb, x, 0.07, z, 0, 1, 0, 0, 0, WH); yb.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2, i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }; // both windings: seen from above whichever way the line runs
   for (const y of YARDS) {
     const [cx, cz] = centroid(y.p); if (Math.abs(cx - T.cx) > TS / 2 || Math.abs(cz - T.cz) > TS / 2) continue;
     try { polyFill(yb, y.p, [], 0.035, 10, COL(y.col)); } catch (e) { }
