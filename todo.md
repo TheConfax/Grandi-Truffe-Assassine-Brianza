@@ -1,5 +1,30 @@
 # Da fare
 
+## Priorità: parcheggi veri da OSM
+Prima di tutto il resto: vedi la sezione **Parcheggi** in fondo. I dati sono già in `data/maplarge.osm`, non serve aspettare Overpass.
+
+## Telecamera
+- [ ] Telecamera più vicina all'auto
+- [ ] Visuale in terza persona
+
+## Altri oggetti OSM
+Conteggi in `data/maplarge.osm` (che è più grande dell'area di gioco). Oggi `build_data.py` usa solo sbarre (`lift_gate`), lampioni e alberi.
+- [ ] Tralicci (`power=tower`, 1049) con le linee elettriche (`power=line`/`minor_line`, 59) e i pali (`power=pole`, 144)
+- [ ] Dossi e piattaforme rialzate (`traffic_calming`, 122): da sentire anche in guida
+- [ ] Paletti (`barrier=bollard`, 385) e blocchi (`barrier=block`, 39); le sbarre (`lift_gate`, 53) ci sono già
+- [ ] Idranti (`emergency=fire_hydrant`, 98)
+- [ ] Campane del vetro (`amenity=recycling`, 69)
+- [ ] Colonnine di ricarica (`amenity=charging_station`, 39)
+- [ ] Antenne e ripetitori (`man_made=mast/tower/antenna`, 134)
+- [ ] Altri possibili: panchine (346), cestini (215), fontanelle (123), giochi dei parchi (88), telecamere (67), distributori automatici (47), rastrelliere (46), cassette postali (32)
+
+## Segnaletica
+- [ ] Segnaletica orizzontale: linee di arresto e scritte STOP, frecce di corsia, piste ciclabili, strisce blu (oggi ci sono le strisce pedonali, 510 attraversamenti)
+- [ ] Verticale: nel gioco c'è (901 cartelli in `src/segnaletica.json`, generati da `src/segnaletica_osm.py`), ma gli estratti OSM `t*.xml` usati per generarla non sono stati salvati. Rigenerarla da `data/maplarge.osm`, che ha 112 `traffic_sign` mappati, e salvare la sorgente in `data/`
+
+## Mappa
+- [ ] Cercare gli edifici fantasma in mappa
+
 ## Stazioni
 Le banchine (rialzate, pensiline, sottopasso, cartelli) ci sono in tutte e cinque le stazioni e il fabbricato di Meda è già quello del 2023. Da sistemare i fabbricati di:
 
@@ -17,6 +42,9 @@ Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Stre
 - [x] Seminario di San Pietro Martire, Seveso (il complesso accanto al santuario)
 - [x] Liceo Frassati di Baruccana con la palestra (foto della perizia del Comune, 2025)
 - [ ] Altre scuole di Seveso: servono foto (Collodi, Leonardo da Vinci / Milani, Bruno Munari, Toti, Don Aurelio Giussani, Frassati di via San Carlo)
+
+## Piccoli monumenti
+- [ ] Lapidi, cippi, edicole, piccoli monumenti sparsi nei quartieri (oltre a quelli qui sotto)
 
 ## Monumenti con le foto già trovate, manca la posizione esatta
 - [ ] Muro dell'ICMESA (via Icmesa, Meda) con il pannello sul 1976
@@ -50,7 +78,7 @@ Le foto sono in Viaggiare in Brianza (guide di Meda e Seveso).
 - I monumenti stanno in `src/landmarks3.js` (lista `LANDMARKS` in cima); `python src/assemble3.py` rigenera `index.html`.
 
 ## Parcheggi
-Oggi i posti sono generati (strisce a pettine dentro i 921 contorni OSM `amenity=parking`). Da fare quando Overpass risponde:
+**Priorità.** Oggi i posti sono generati (strisce a pettine dentro i 921 contorni OSM `amenity=parking`). In `data/maplarge.osm` ci sono già 1964 `amenity=parking_space`, 134 parcheggi con `capacity` e 37 strade con `parking:*`:
 - [ ] Importare in `build_data.py` i posti veri `amenity=parking_space`, la `capacity` dei parcheggi e i parcheggi lungo strada `parking:left/right/both`
 - [ ] Usare i posti veri dove ci sono (forma, direzione, disabili), la `capacity` come tetto per quelli generati
 - [ ] Posti in linea lungo le strade, strisce blu a pagamento in centro
