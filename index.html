@@ -441,6 +441,11 @@ const bbox = pts => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [
 const NO_TREES = [
   [[-408.6, 279.7], [-378.5, 452.1], [-276.1, 434.2], [-306.2, 261.8]], // Stadio Mino Favini
   [[-1835.9, 1110.2], [-1797.9, 1281.0], [-1702.2, 1259.7], [-1740.2, 1088.9]], // Stadio comunale di Seveso
+  [[-741.4, 767.4], [-684.8, 778.6], [-697.6, 837.8], [-754.3, 826.0]], // the cloister of the Seminario di Seveso: its own four trees
+];
+// hedges the map draws where a landmark lays out its own garden
+const NO_HEDGES = [
+  [[-741.4, 767.4], [-684.8, 778.6], [-697.6, 837.8], [-754.3, 826.0]], // the cloister of the Seminario di Seveso
 ];
 // buildings in the map that are not there (mostly from Overture): dropped by the centroid of their footprint
 const GHOSTS = [
@@ -469,6 +474,7 @@ for (const T of TILES) {
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
   for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = groundH(x, z); if (NO_TREES.some(q => inPoly(x, z, q))) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5 }); }
   for (const br of d.ba || []) {
+    if (br.t === 3 && NO_HEDGES.some(q => dec(br.p).every(([x, z]) => inPoly(x, z, q)))) continue; // drawn by the landmark, symmetrical
     const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h }); // follow the ground, not long chords
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = groundH((a[0] + c[0]) / 2, (a[1] + c[1]) / 2); WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }); }
   }
@@ -1673,7 +1679,7 @@ const LANDMARKS = [
   { n: 'Liceo paritario "Pier Giorgio Frassati"', x: 1152.1, z: 2092.8, build: buildPalazzo, o: { style: 'scuolaocra', h: 9.2, front: [1145.0, 2104.0] } }, // Baruccana, via Colombo: L-shaped, two floors on a basement
   { n: 'Palestra Frassati', x: 1155.1, z: 2049.8, build: buildPalestra, o: { h: 6.8 } }, // the prefabricated gym in red panels
   { n: 'Seminario di Seveso', x: -717.1, z: 837.0, build: buildPalazzo, // Seminario Arcivescovile, now Centro Pastorale Ambrosiano: Quadrio's convent, enlarged by the Pollacks
-    o: { style: 'seminario', cloister: true, h: 12.7, front: [-780.7, 832.5], portal: 'arch', sign: 'SEMINARIO ARCIVESCOVILE DI MILANO', signW: 8.6, signCol: '#55524b', signY: 8.15, fence: 7, lantern: { at: [-763.0, 818.0], w: 5.6, h: 4.5 } } },
+    o: { style: 'seminario', cloister: true, passages: true, h: 12.7, front: [-780.7, 832.5], portal: 'arch', sign: 'SEMINARIO ARCIVESCOVILE DI MILANO', signW: 8.6, signCol: '#55524b', signY: 8.15, fence: 7, lantern: { at: [-763.0, 818.0], w: 5.6, h: 4.5 } } },
   { n: 'Secondaria I grado “Traversi”', x: 544.4, z: -384.8, build: buildPalazzo, // the Palazzo delle Scuole Professionali (Aldo Vicini, 1932) on via Indipendenza
     o: { style: 'traversi', front: [516.1, -360.2], portal: 'door', balcony: 'stone', porch: true, attic: { w: 15, h: 1.9 }, sign: 'S C V O L E    P R O F E S S I O N A L I', signW: 13, signCol: '#6a655b', fence: 6.5 } },
   { n: 'Stazione di Meda', x: 377.5, z: -540.5, build: buildPalazzo, o: { style: 'stazione', h: 8.8, front: [375.9, -545.1], sign: 'M E D A', signW: 3.2, signCol: '#5f6266', canopy: [[388.6, -548.6], [403.5, -563.2], 7.5] } }, // the 2023 makeover: white, green shutters, the steel-tree canopy
@@ -1704,6 +1710,19 @@ function lmRingWalls(ring, y0, y1) {
 for (const L of LANDMARKS) {
   const o = L.o || {}, B = L.b; if (!B) continue;
   const gy = Math.min(...B.pts.map(p => groundH(p[0], p[1])));
+  const cl = lmCloister(L);
+  if (cl) { // cut the passages through the walls of the footprint, line them with walls of their own; the hedges stop you like a low wall
+    for (const ps of cl.passages) for (const [px, pz] of [ps.a, ps.b]) for (const [ring, isHole] of [[B.pts, false], ...B.holes.map(h => [h, true])]) {
+      const A = sArea(ring);
+      for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.05 || segDist(px, pz, a[0], a[1], c[0], c[1]) > 0.6) continue;
+        gridDrop(WALLS, a[0], a[1], c[0], c[1], sg => sg.ax === a[0] && sg.az === a[1] && sg.bx === c[0] && sg.bz === c[1]);
+        const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, sp = (px - a[0]) * ex + (pz - a[1]) * ez; let nx = ez, nz = -ex; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; }
+        for (const [s0, s1] of [[0, sp - ps.w / 2], [sp + ps.w / 2, Ln]]) if (s1 - s0 > 0.05) { const x0 = a[0] + ex * s0, z0 = a[1] + ez * s0, x1 = a[0] + ex * s1, z1 = a[1] + ez * s1; WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx, nz, y0: gy - 3, y1: gy + 40 }); } }
+    }
+    for (const ps of cl.passages) for (const sd of [-1, 1]) { const ox = -ps.uz * sd * ps.w / 2, oz = ps.ux * sd * ps.w / 2, x0 = ps.a[0] + ox, z0 = ps.a[1] + oz, x1 = ps.b[0] + ox, z1 = ps.b[1] + oz; WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ps.uz * sd, nz: ps.ux * sd, two: true, y0: gy - 3, y1: gy + 40 }); }
+    for (const [x, z] of cl.trees) WALLS.add(x - 0.5, z - 0.5, x + 0.5, z + 0.5, { r: 0.35, x, z, y0: gy - 3, y1: gy + 5 });
+    for (const hd of cl.hedges) for (let k = 1; k < hd.length; k++) { const [x0, z0] = hd[k - 1], [x1, z1] = hd[k], L2 = hyp(x1 - x0, z1 - z0); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: (z1 - z0) / L2, nz: -(x1 - x0) / L2, two: true, y0: gy - 3, y1: gy + 1.0 }); }
+  }
   if (o.base) {
     for (const ring of [B.pts, ...B.holes]) for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length]; gridDrop(WALLS, a[0], a[1], c[0], c[1], s => s.ax === a[0] && s.az === a[1] && s.bx === c[0] && s.bz === c[1]); }
     B.noSign = true; // signs go on the walls of its volumes
@@ -1806,6 +1825,27 @@ function buildPiazze(T, G) {
         F.geo(Bs.trim, new THREE.CylinderGeometry(0.14, 0.2, 3.2, 6).translate(x, y + 1.6, z), null, COL('#5a4632')); F.geo(Bs.trim, new THREE.IcosahedronGeometry(2.0, 0).scale(1, 1.15, 1).translate(x, y + 4.6, z), null, COL(s % 15 < 7.5 ? '#5f8a44' : '#6b9450')); }
       lmFlush(Bs, G); q.coll = true; }
   }
+}
+// a cloister laid out symmetrically on its court (the footprint's light well): a passage through the building from the middle of each side of the
+// court straight out to the street, and the garden as four identical beds round a cross of paths, each with a low hedge along the paths
+function lmCloister(L) {
+  if (L._cl !== undefined) return L._cl; const B = L.b, o = L.o || {};
+  if (!o.cloister || !B || !B.holes.length) return (L._cl = null);
+  const q = B.holes.reduce((m, h) => Math.abs(sArea(h)) > Math.abs(sArea(m)) ? h : m), C = lmSimplify(q, 0.5);
+  if (C.length !== 4) return (L._cl = null);
+  const P = (u, v) => [0, 1].map(k => C[0][k] + (C[1][k] - C[0][k]) * u + (C[3][k] - C[0][k]) * v + (C[0][k] - C[1][k] + C[2][k] - C[3][k]) * u * v);
+  const [qx, qz] = centroid(C), passages = [], hedges = [];
+  if (o.passages) for (let i = 0; i < 4; i++) {
+    const a = C[i], c = C[(i + 1) % 4], m = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2], Ln = hyp(c[0] - a[0], c[1] - a[1]);
+    let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if ((qx - m[0]) * nx + (qz - m[1]) * nz > 0) { nx = -nx; nz = -nz; } // away from the court
+    let best = 1e9; const ring = B.pts;
+    for (let j = 0; j < ring.length; j++) { const p0 = ring[j], p1 = ring[(j + 1) % ring.length], ex = p1[0] - p0[0], ez = p1[1] - p0[1], den = nx * ez - nz * ex; if (Math.abs(den) < 1e-9) continue;
+      const t = ((p0[0] - m[0]) * ez - (p0[1] - m[1]) * ex) / den, u = ((p0[0] - m[0]) * nz - (p0[1] - m[1]) * nx) / den; if (t > 0.5 && u >= 0 && u <= 1 && t < best) best = t; }
+    if (best < 30) passages.push({ a: m, b: [m[0] + nx * best, m[1] + nz * best], ux: nx, uz: nz, w: 3.0, h: 3.6 });
+  }
+  const bed = [[0.03, 0.46], [0.33, 0.46], [0.46, 0.33], [0.46, 0.03]], lawn = [[0, 0], [0.47, 0], [0.47, 0.335], [0.335, 0.47], [0, 0.47]], beds = []; // one quarter, mirrored into the other three
+  const trees = []; for (const [fu, fv] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const M = ([u, v]) => P(fu ? 1 - u : u, fv ? 1 - v : v); hedges.push(bed.map(M)); beds.push(lawn.map(M)); trees.push(M([0.22, 0.22])); } // a tree in the middle of each lawn
+  return (L._cl = { court: C, passages, hedges, beds, trees });
 }
 function buildLandmarks(T, G) {
   for (const L of LANDMARKS) if (L.t === T.t) {
@@ -2131,7 +2171,7 @@ function buildPalazzo(L, B, G) {
   const poi = D.pois.find(q => q.lm === L), [fx, fz] = o.front || (poi ? [poi.x, poi.z] : [L.x, L.z]), n = outer.length;
   let fi = 0, fd = 1e9; for (let i = 0; i < n; i++) { const a = outer[i], c = outer[(i + 1) % n], d = segDist(fx, fz, a[0], a[1], c[0], c[1]); if (d < fd) { fd = d; fi = i; } }
   const gF = groundH(fx, fz), gmin = Math.min(...outer.map(p => groundH(p[0], p[1]))), top = gF + H, bot = gmin - 0.6;
-  const wall = Buf(), trim = Buf(), roof = Buf(), flag = Buf(), sign = Buf();
+  const wall = Buf(), trim = Buf(), roof = Buf(), flag = Buf(), sign = Buf(), CL = lmCloister(L);
   const CREAM = COL(st.trim), WOOD = COL('#5e4128'), IRON = COL('#26282b'), STONE = COL('#cfc6b2'), DOOR = COL('#4a3324');
   const bayOf = (Ln, odd, bl = 3.7) => { let b = Math.max(1, Math.round(Ln / bl)); if (odd && b % 2 === 0) b++; return b; };
   const walls = (ring, hole, y0, y1, front, bl) => { // the drawing ends at the eaves y1; cornice and brackets (mensole) along the top
@@ -2139,9 +2179,13 @@ function buildPalazzo(L, B, G) {
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], Ln = hyp(dx, dz); if (Ln < 0.05) continue;
       let nx = dz / Ln, nz = -dx / Ln; if ((A < 0) !== hole) { nx = -nx; nz = -nz; }
-      const [u0, u1] = Ln < 2.6 ? [0.02, 0.12] : [0, bayOf(Ln, i === front, bl)], vb = 1 - (y1 - y0) / H, base = wall.p.length / 3;
-      vtx(wall, a[0], y0, a[1], nx, 0, nz, u0, vb); vtx(wall, c[0], y0, c[1], nx, 0, nz, u1, vb); vtx(wall, c[0], y1, c[1], nx, 0, nz, u1, 1); vtx(wall, a[0], y1, a[1], nx, 0, nz, u0, 1);
-      if (nx * (-dz) + nz * dx > 0) wall.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else wall.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
+      const [u0, u1] = Ln < 2.6 ? [0.02, 0.12] : [0, bayOf(Ln, i === front, bl)], vb = 1 - (y1 - y0) / H;
+      const piece = (s0, s1, ya, yb) => { const base = wall.p.length / 3, U = t => u0 + (u1 - u0) * t / Ln, V = y => vb + (y - y0) / (y1 - y0) * (1 - vb);
+        vtx(wall, a[0] + dx / Ln * s0, ya, a[1] + dz / Ln * s0, nx, 0, nz, U(s0), V(ya)); vtx(wall, a[0] + dx / Ln * s1, ya, a[1] + dz / Ln * s1, nx, 0, nz, U(s1), V(ya)); vtx(wall, a[0] + dx / Ln * s1, yb, a[1] + dz / Ln * s1, nx, 0, nz, U(s1), V(yb)); vtx(wall, a[0] + dx / Ln * s0, yb, a[1] + dz / Ln * s0, nx, 0, nz, U(s0), V(yb));
+        if (nx * (-dz) + nz * dx > 0) wall.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else wall.i.push(base, base + 2, base + 1, base, base + 3, base + 2); };
+      const cuts = []; for (const ps of CL ? CL.passages : []) for (const [px, pz] of [ps.a, ps.b]) if (segDist(px, pz, a[0], a[1], c[0], c[1]) < 0.6) cuts.push([(px - a[0]) * dx / Ln + (pz - a[1]) * dz / Ln, ps]);
+      if (!cuts.length) piece(0, Ln, y0, y1);
+      else { cuts.sort((p, q) => p[0] - q[0]); let s = 0; for (const [sp, ps] of cuts) { const gyP = groundH(...ps.a); piece(s, sp - ps.w / 2, y0, y1); piece(sp - ps.w / 2, sp + ps.w / 2, gyP + ps.h, y1); s = sp + ps.w / 2; } piece(s, Ln, y0, y1); }
       const ry = Math.atan2(-dz / Ln, dx / Ln), mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
       addBox(trim, mx + nx * 0.15, y1 - 0.16, mz + nz * 0.15, Ln + 0.3, 0.28, 0.32, CREAM, ry);
       for (let s = 0.45; s < Ln - 0.2; s += 0.9) addBox(trim, a[0] + dx / Ln * s + nx * 0.45, y1 - 0.1, a[1] + dz / Ln * s + nz * 0.45, 0.12, 0.2, 0.9, WOOD, ry);
@@ -2273,17 +2317,34 @@ function buildPalazzo(L, B, G) {
     g.fillStyle = '#003399'; g.fillRect(w / 2, 0, w / 2, h); g.fillStyle = '#ffcc00';
     for (let i = 0; i < 12; i++) { const an = i / 12 * TAU; g.beginPath(); g.arc(w * 0.75 + Math.cos(an) * 20, h / 2 + Math.sin(an) * 20, 2.6, 0, TAU); g.fill(); }
   }, false);
-  if (o.cloister) for (const q of o.cloister === true ? holes : [o.cloister]) { // the cloister: a white arcade on piers all round the court at the ground floor, the walk behind it in shade
-    const A = sArea(q), FC = lmFrame(new THREE.Matrix4());
-    for (let i = 0; i < q.length; i++) {
-      const a = q[i], c = q[(i + 1) % q.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 4) continue;
-      let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; const [qx, qz] = centroid(q); if ((qx - a[0]) * nx + (qz - a[1]) * nz < 0) { nx = -nx; nz = -nz; } // into the court
-      const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, nb = Math.max(1, Math.round(Ln / 3.6)), bw = Ln / nb, gy = Math.min(groundH(a[0], a[1]), groundH(c[0], c[1])), AH = 4.2 * k;
+  if (CL) { // the cloister: a white arcade on piers all round the court at the ground floor, the walk behind it in shade, an odd number of arches a side
+    // so the middle one lines up with the passage; the passages, vaulted, plastered, paved; the hedges round the four beds
+    const q = CL.court, [qx, qz] = centroid(q);
+    for (let i = 0; i < 4; i++) {
+      const a = q[i], c = q[(i + 1) % 4], Ln = hyp(c[0] - a[0], c[1] - a[1]); let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if ((qx - a[0]) * nx + (qz - a[1]) * nz < 0) { nx = -nx; nz = -nz; } // into the court
+      const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, nb = Math.round(Ln / 3.6) | 1, bw = Ln / nb, gy = Math.min(groundH(a[0], a[1]), groundH(c[0], c[1])), AH = 4.2 * k;
       const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(ex, 0, ez), new THREE.Vector3(0, 1, 0), new THREE.Vector3(nx, 0, nz)).setPosition(a[0] + nx * 0.06, gy, a[1] + nz * 0.06));
-      T.geo(trim, lmBox(Ln, AH, 0.06, Ln / 2, AH / 2, -0.05), null, COL('#3a3632')); // the dark walk behind
-      for (let b = 0; b < nb; b++) { const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(bw, 0); sh.lineTo(bw, AH); sh.lineTo(0, AH); sh.lineTo(0, 0); sh.holes.push(archShape(bw - 0.7, 0, AH - 0.6).getPoints ? (() => { const hp = new THREE.Path(); const r = (bw - 0.7) / 2, cx = bw / 2; hp.moveTo(cx - r, 0); hp.lineTo(cx + r, 0); hp.lineTo(cx + r, AH - 0.6 - r); hp.absarc(cx, AH - 0.6 - r, r, 0, Math.PI, false); hp.lineTo(cx - r, 0); return hp; })() : null);
+      const gap = CL.passages.some(ps => segDist(ps.a[0], ps.a[1], a[0], a[1], c[0], c[1]) < 0.6) ? [Ln / 2 - 1.6, Ln / 2 + 1.6] : null;
+      for (const [s0, s1] of gap ? [[0, gap[0]], [gap[1], Ln]] : [[0, Ln]]) T.geo(trim, lmBox(s1 - s0, AH, 0.06, (s0 + s1) / 2, AH / 2, -0.05), null, COL('#3a3632')); // the dark walk behind
+      for (let b = 0; b < nb; b++) { const sh = new THREE.Shape(), r = (bw - 0.7) / 2, cx = bw / 2, hp = new THREE.Path(); sh.moveTo(0, 0); sh.lineTo(bw, 0); sh.lineTo(bw, AH); sh.lineTo(0, AH); sh.lineTo(0, 0);
+        hp.moveTo(cx - r, 0); hp.lineTo(cx + r, 0); hp.lineTo(cx + r, AH - 0.6 - r); hp.absarc(cx, AH - 0.6 - r, r, 0, Math.PI, false); hp.lineTo(cx - r, 0); sh.holes.push(hp);
         T.geo(trim, new THREE.ShapeGeometry(sh, 10).translate(b * bw, 0, 0.05), null, COL('#f4f1ea')); }
     }
+    for (const ps of CL.passages) { // the passage: plastered sides, a barrel vault, stone paving, an arched stone frame on the street front
+      const L2 = hyp(ps.b[0] - ps.a[0], ps.b[1] - ps.a[1]), gy = groundH(...ps.a), w = ps.w, hh = ps.h;
+      const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(ps.uz, 0, -ps.ux), new THREE.Vector3(0, 1, 0), new THREE.Vector3(ps.ux, 0, ps.uz)).setPosition(ps.a[0], gy, ps.a[1])); // x across, z out to the street
+      for (const sd of [-1, 1]) T.geo(trim, lmBox(0.1, hh - w / 2 + 0.05, L2, sd * w / 2, (hh - w / 2) / 2, L2 / 2), null, COL('#d9d1c0'));
+      for (let k = 0; k < 12; k++) { const a0 = k / 12 * Math.PI, a1 = (k + 1) / 12 * Math.PI, yc = hh - w / 2, P = (a, z) => [Math.cos(a) * w / 2, yc + Math.sin(a) * w / 2, z]; T.face(trim, [P(a0, 0), P(a1, 0), P(a1, L2), P(a0, L2)], 2, COL('#cfc7b5')); T.face(trim, [P(a0, 0), P(a0, L2), P(a1, L2), P(a1, 0)], 2, COL('#cfc7b5')); } // the barrel vault, both faces
+      T.geo(trim, lmBox(w, 0.06, L2, 0, 0.03, L2 / 2), null, COL('#9d968a'));
+      const fr = new THREE.Shape(), o2 = w / 2 + 0.45, fh = new THREE.Path(); fr.moveTo(-o2, 0); fr.lineTo(o2, 0); fr.lineTo(o2, hh + 0.45); fr.lineTo(-o2, hh + 0.45); fr.lineTo(-o2, 0);
+      fh.moveTo(-w / 2, 0); fh.lineTo(w / 2, 0); fh.lineTo(w / 2, hh - w / 2); fh.absarc(0, hh - w / 2, w / 2, 0, Math.PI, false); fh.lineTo(-w / 2, 0); fr.holes.push(fh);
+      T.geo(trim, new THREE.ShapeGeometry(fr, 12).translate(0, 0, L2 + 0.05), null, STONE);
+    }
+    { const g = VBuf(); try { polyFill(g, q, [], 0.1, 3, COL('#b3ab9c')); for (const bd of CL.beds) polyFill(g, bd, [], 0.17, 3, COL('#567f3c')); } catch (e) { } // gravel walks, the four lawns over them
+      LMAT.yard = LMAT.yard || new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); mkMesh(g, LMAT.yard, 1, false, G); }
+    for (const [x, z] of CL.trees) { const y = groundH(x, z); addBox(trim, x, y + 1.6, z, 0.4, 3.2, 0.4, COL('#5a4632')); const tg = new THREE.IcosahedronGeometry(3.2, 0).scale(1, 1.1, 1).translate(x, y + 5.6, z), F2 = lmFrame(new THREE.Matrix4()); F2.geo(trim, tg, null, COL('#3f6a34')); }
+    for (const hd of CL.hedges) for (let j = 1; j < hd.length; j++) { const [x0, z0] = hd[j - 1], [x1, z1] = hd[j], Lh = hyp(x1 - x0, z1 - z0), y = groundH((x0 + x1) / 2, (z0 + z1) / 2);
+      addBox(trim, (x0 + x1) / 2, y + 0.45, (z0 + z1) / 2, Lh + 0.7, 0.9, 0.7, COL('#3d6a32'), Math.atan2(-(z1 - z0), x1 - x0)); }
   }
   mkMesh(wall, LMAT[o.style], 10, 'cast', G); mkMesh(trim, MAT.roof, 10, 'cast', G); mkMesh(roof, LMAT.coppi, 10, 'cast', G);
   if (o.flags) mkMesh(flag, new THREE.MeshLambertMaterial({ map: flagTex, side: THREE.DoubleSide }), 10, false, G);
