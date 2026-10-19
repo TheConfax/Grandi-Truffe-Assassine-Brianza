@@ -717,18 +717,26 @@ function buildTile(T) {
     trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; G.add(trunks, crowns);
   }
   const LPS = (d.lp || []).map(([X, Z]) => [X / 10, Z / 10, 0]); LPS.push(...genLamps(T, d, LPS)); // [x, z, arm direction]
-  if (LPS.length) {
-    const lb = Buf(), hb = Buf(), pool = Buf(), gp = [];
-    for (const [x, z, ry] of LPS) {
+  if (LPS.length) { // one instance per lamp, so each can be knocked down on its own: pole and arm, head; the light pool and the glare go with it
+    const pole = Buf(), head = Buf(); addBox(pole, 0, 3.6, 0, 0.14, 7.2, 0.14, null); addBox(pole, 0.6, 7.15, 0, 1.3, 0.1, 0.12, null); addBox(head, 1.15, 7.0, 0, 0.5, 0.14, 0.3, null);
+    const geo = b => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setIndex(b.i); return g; };
+    const n = LPS.length, pm = new THREE.InstancedMesh(geo(pole), MAT.lamp, n), hm = new THREE.InstancedMesh(geo(head), MAT.lampHead, n), o = new THREE.Object3D(), pool = Buf(), gp = [];
+    pm.castShadow = true; pm.renderOrder = hm.renderOrder = 10;
+    LPS.forEach(([x, z, ry], i) => {
       const gy = surfAt(x, z, 1e4), c = Math.cos(ry), s = Math.sin(ry), hx = x + c * 1.15, hz = z - s * 1.15; // the arm reaches out along local +x
-      addBox(lb, x, gy + 3.6, z, 0.14, 7.2, 0.14, null); addBox(lb, x + c * 0.6, gy + 7.15, z - s * 0.6, 1.3, 0.1, 0.12, null, ry); addBox(hb, hx, gy + 7.0, hz, 0.5, 0.14, 0.3, null, ry);
-      const py = surfAt(hx, hz, 1e4) + 0.14, i = pool.p.length / 3, R = 7; // warm light pool on the street at night
-      vtx(pool, hx - R, py, hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, py, hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, py, hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, py, hz + R, 0, 1, 0, 0, 1); triUp(pool, i, i + 1, i + 2); triUp(pool, i, i + 2, i + 3);
+      o.position.set(x, gy, z); o.rotation.set(0, ry, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix);
+      const py = surfAt(hx, hz, 1e4) + 0.14, k = pool.p.length / 3, R = 7; // warm light pool on the street at night
+      vtx(pool, hx - R, py, hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, py, hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, py, hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, py, hz + R, 0, 1, 0, 0, 1); triUp(pool, k, k + 1, k + 2); triUp(pool, k, k + 2, k + 3);
       gp.push(hx, gy + 6.82, hz); // glare under the lamp head
-    }
-    put(lb, MAT.lamp, 10, 'cast'); put(hb, MAT.lampHead, 10); put(pool, LAMPPOOL_MAT, 12);
+      if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
+    });
+    G.add(pm, hm); const poolM = pool.i.length ? mkMesh(pool, LAMPPOOL_MAT, 12, false, G) : null;
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
     const glare = new THREE.Points(pg, LAMPGLOW_MAT); glare.renderOrder = 14; G.add(glare);
+    for (const p of PROPS) if (p.tile === T) p.onBreak = () => { // the lamp goes dark: its pool and its glare drop out of sight
+      if (poolM) { const a = poolM.geometry.attributes.position; for (let q = p.li * 4; q < p.li * 4 + 4; q++) a.setY(q, -9999); a.needsUpdate = true; }
+      pg.attributes.position.setY(p.li, -9999); pg.attributes.position.needsUpdate = true; };
+    T.lampsDone = true;
   }
 }
 function tileTick(px, pz, budgetMs, force) {
@@ -1149,6 +1157,7 @@ function buildSignals(T, G) {
     for (const sd of [1, -1]) { // one pole per direction, on the right-hand kerb, facing the oncoming traffic
       const rx = -sg.uz * sd, rz = sg.ux * sd, px = sg.x + rx * (sg.w / 2 + 1.2) - sg.ux * sd * 4, pz = sg.z + rz * (sg.w / 2 + 1.2) - sg.uz * sd * 4, gy = groundH(px, pz);
       const root = new THREE.Group(); root.position.set(px, gy, pz); root.rotation.y = Math.atan2(-sg.ux * sd, -sg.uz * sd); G.add(root);
+      if (!sg.props) sg.props = []; if (sg.props.length < 2) sg.props.push(addProp({ x: px, z: pz, y: gy, r: 0.15, h: 3.5, obj: root })); else { const pr = sg.props[sd > 0 ? 0 : 1]; pr.obj = root; if (pr.broken) root.rotation.x = 1.45; }
       const pole = new THREE.Mesh(boxG(0.14, 3.4, 0.14), lam(0x3a3d42)); pole.position.y = 1.7; pole.castShadow = true; root.add(pole);
       const head = new THREE.Mesh(boxG(0.36, 1.0, 0.26), lam(0x1d1f22)); head.position.set(0, 3.0, 0.05); root.add(head);
       const m = SIG_MAT[sg.axis];
@@ -1192,7 +1201,8 @@ for (const g of LX) if (g.drive) {
     const gy0 = groundH(px, pz), seg = { ax: px, az: pz, bx: ex, bz: ez, nx: g.ux, nz: g.uz, two: true, dyn: true, on: false, y0: gy0 - 3, y1: gy0 + 2.5 };
     WALLS.add(px, pz, ex, ez, seg);
     const probe = []; for (let t = 0.1; t <= 1; t += 0.2) probe.push([lerp(px, ex, t), lerp(pz, ez, t)]);
-    g.bars.push({ arm, seg, probe });
+    const bar = { arm, seg, probe, root }; g.bars.push(bar);
+    addProp({ x: px, z: pz, y: groundH(px, pz), r: 0.2, h: 3, obj: root, onBreak: () => { bar.broken = true; seg.on = false; bar.probe = []; } }); // the post knocked down takes its arm with it
   }
 }
 

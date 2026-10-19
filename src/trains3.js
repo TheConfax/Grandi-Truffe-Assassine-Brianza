@@ -31,7 +31,7 @@ function updCrossings(dt) {
     const T = g.train !== undefined ? TRAINS[g.train] : null;
     if (T) { const ahead = (g.sT - T.s) * T.dir, endWait = T.wait > 0 && T.atEnd; close = !endWait && ahead > -84 && ahead < 170; }
     g.closed = close; g.ang = clamp(g.ang + (close ? -0.55 : 0.4) * dt, 0, 1);
-    for (const b of g.bars) { b.arm.rotation.z = g.ang * 1.42; b.seg.on = g.ang < 0.3; }
+    for (const b of g.bars) { if (b.broken || b.armGone) continue; b.arm.rotation.z = g.ang * 1.42; b.seg.on = g.ang < 0.3; }
     const fl = (now * 2.4 | 0) % 2; g.lampA.emissiveIntensity = close ? (fl ? 2.2 : 0.05) : 0; g.lampB.emissiveIntensity = close ? (fl ? 0.05 : 2.2) : 0;
     if (close) ring = Math.min(ring, hyp(g.x - P.x, g.z - P.z));
   }
