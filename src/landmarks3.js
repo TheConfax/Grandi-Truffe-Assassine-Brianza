@@ -1372,7 +1372,7 @@ function buildStadio(L, B, G) {
   const [c0, c1, bc] = o.curves, Ri = o.rin, Ro = o.rout, [p0, p1, q0, q1] = o.pitch, pm = (q0 + q1) / 2, am = (p0 + p1) / 2;
   const rOf = (a, b) => hyp(a - clamp(a, c0, c1), b - bc), TRACK = COL('#b5543f'), SAND = COL('#cdb58f'), G1 = COL('#4f8a3a'), G2 = COL('#5a9643'), GR = COL('#5a8a3f');
   const surf = (a, b) => { const r = rOf(a, b); if (r >= Ri && r <= Ro) return TRACK; if (a > c1 && a <= o.sprint && b - bc >= Ri && b - bc <= Ro) return TRACK;
-    if (r < Ri) { if (a >= p0 && a <= p1 && b >= q0 && b <= q1) return Math.floor((a - p0) / 7.5) % 2 ? G1 : G2; const ap = o.apron || [-1e9, bc + 22, null]; return a > p1 && b > ap[0] && b < ap[1] ? (ap[2] ? COL(ap[2]) : SAND) : GR; } // the run-ups and landing pits at the end of the pitch return null; };
+    if (r < Ri) { if (a >= p0 && a <= p1 && b >= q0 && b <= q1) return Math.floor((a - p0) / 7.5) % 2 ? G1 : G2; const ap = o.apron || [-1e9, bc + 22, null]; return a > p1 && b > ap[0] && b < ap[1] ? (ap[2] ? COL(ap[2]) : SAND) : GR; } /* the run-ups and landing pits at the end of the pitch */ return null; };
   const S = 1.5;
   for (let a = c0 - Ro - S; a < Math.max(o.sprint, c1 + Ro) + S; a += S) for (let b = bc - Ro - S; b < bc + Ro + S; b += S) {
     const col = surf(a + S / 2, b + S / 2); if (!col) continue; const i0 = g.p.length / 3;
