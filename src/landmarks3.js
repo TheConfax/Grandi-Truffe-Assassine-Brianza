@@ -4,7 +4,8 @@
 // plain string courses, wooden eaves) and piazza Vittorio Veneto: Villa Antona Traversi (the Benedictine monastery of San Vittore turned into
 // a neoclassical villa by Leopold Pollack), the church of San Vittore with its barocchetto facade and the Santuario del Santo Crocifisso
 // (the old parish church, facade of 1893 with protiro and four statues, bell tower finished in 1920); San Pietro Martire on the Seveso border
-// (Camillo Fari, consecrated 1969, rhomboid plan, the saint in bronze by Giancarlo Fontana outside). Footprints and collisions stay the OSM ones.
+// (Camillo Fari, consecrated 1969, rhomboid plan in yellow brick with white bands, the entrance tower with its concrete screen and the saint
+// in bronze by Giancarlo Fontana on a corbel). Footprints and collisions stay the OSM ones.
 // f: the two facade corners; the model's x runs from the second to the first, i.e. left to right for someone facing the facade
 const LANDMARKS = [
   { n: 'Chiesa di Santa Maria Nascente', x: 33.3, z: -331.6, f: [64.0, -378.0, 80.0, -362.6], build: buildChiesaMeda },
@@ -21,12 +22,15 @@ for (const L of LANDMARKS) {
 }
 function buildLandmarks(T, G) { for (const L of LANDMARKS) if (L.t === T.t) L.build(L, L.b, G); }
 
-const brickTex = canvasTex(256, 256, (g, w, h) => { // 2 m x 2 m of running bond
-  g.fillStyle = '#b9a58f'; g.fillRect(0, 0, w, h);
-  const cs = ['#9b5a3f', '#a6634a', '#8f5038', '#b06e50', '#94553d', '#a85e44', '#86492f', '#7c4430'];
+const brickTexOf = (mortar, cs, dirt) => canvasTex(256, 256, (g, w, h) => { // 2 m x 2 m of running bond
+  g.fillStyle = mortar; g.fillRect(0, 0, w, h);
   for (let r = 0; r < 32; r++) for (let c = -1; c < 8; c++) { g.fillStyle = cs[(rnd() * cs.length) | 0]; g.fillRect(c * 32 + (r % 2) * 16 + 1, r * 8 + 1, 30, 6); }
-  noise(g, w, h, 3000, 0.22, ['#5e3020', '#c98a68', '#6f3a28']);
+  noise(g, w, h, 3000, 0.22, dirt);
 });
+const brickTex = brickTexOf('#b9a58f', ['#9b5a3f', '#a6634a', '#8f5038', '#b06e50', '#94553d', '#a85e44', '#86492f', '#7c4430'], ['#5e3020', '#c98a68', '#6f3a28']);
+const buffTex = brickTexOf('#d8cbb2', ['#cdb183', '#c4a676', '#d6bb8e', '#bfa071', '#d0b789', '#c9ab7c'], ['#9c8460', '#e6d6b4', '#a88f68']); // the yellow brick of the sixties
+const latticeTex = canvasTex(64, 128, (g, w, h) => { g.fillStyle = '#2c2a2b'; g.fillRect(0, 0, w, h); g.fillStyle = '#e8e2d6'; for (let y = 0; y < h; y += 16) for (let x = 0; x < w; x += 16) { g.fillRect(x, y, 16, 3); g.fillRect(x, y, 3, 16); g.beginPath(); g.arc(x + 9, y + 9, 3, 0, TAU); g.fill(); } }); // concrete screen
+const louvreTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#2a2a2c'; g.fillRect(0, 0, w, h); for (let y = 2; y < h; y += 8) { g.fillStyle = '#e4ded2'; g.fillRect(0, y, w, 4); g.fillStyle = '#9a958c'; g.fillRect(0, y + 4, w, 1); } }, false);
 const stoneTex = canvasTex(128, 128, (g, w, h) => { // 2 m: slabs of 1 m x 0.5 m
   g.fillStyle = '#d6cfbf'; g.fillRect(0, 0, w, h); noise(g, w, h, 2200, 0.22, ['#b5ad9c', '#ebe6da', '#c4bba8']);
   g.fillStyle = 'rgba(95,85,70,.3)'; for (let r = 0; r < 4; r++) { g.fillRect(0, r * 32, w, 1); for (let c = 0; c < 2; c++) g.fillRect(c * 64 + (r % 2) * 32, r * 32, 1, 32); }
@@ -94,6 +98,8 @@ const clockTex = canvasTex(128, 128, (g, w, h) => {
 const LMAT = {
   brick: new THREE.MeshLambertMaterial({ map: brickTex, side: THREE.DoubleSide }), stone: new THREE.MeshLambertMaterial({ map: stoneTex, side: THREE.DoubleSide }),
   sand: new THREE.MeshLambertMaterial({ map: stoneTex, color: 0xcbbfa6, side: THREE.DoubleSide }), plaster: new THREE.MeshLambertMaterial({ map: plasterTex, vertexColors: true, side: THREE.DoubleSide }),
+  buff: new THREE.MeshLambertMaterial({ map: buffTex, side: THREE.DoubleSide }), louvre: new THREE.MeshLambertMaterial({ map: louvreTex, side: THREE.DoubleSide }),
+  lattice: new THREE.MeshLambertMaterial({ map: latticeTex, emissiveMap: latticeTex, emissive: 0xffc77a, emissiveIntensity: 0, side: THREE.DoubleSide }),
   coppi: new THREE.MeshLambertMaterial({ map: coppiTex, side: THREE.DoubleSide }), trim: new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }),
   glass: new THREE.MeshLambertMaterial({ color: 0x3b3340, emissive: 0xffa6c0, emissiveIntensity: 0.06, side: THREE.DoubleSide }),
   warm: new THREE.MeshLambertMaterial({ color: 0x2f3036, emissive: 0xffc77a, emissiveIntensity: 0, side: THREE.DoubleSide }), // plain church windows, lit from inside at night
@@ -101,7 +107,7 @@ const LMAT = {
   tondo: new THREE.MeshLambertMaterial({ map: tondoTex }), clock: new THREE.MeshLambertMaterial({ map: clockTex, emissiveMap: clockTex, emissive: 0xfff2d0, emissiveIntensity: 0, side: THREE.DoubleSide }),
 };
 for (const k in PAL_STYLE) { const t = palTex(PAL_STYLE[k], false), e = palTex(PAL_STYLE[k], true); t.wrapT = e.wrapT = THREE.ClampToEdgeWrapping; LMAT[k] = new THREE.MeshLambertMaterial({ map: t, emissiveMap: e, emissive: 0xffc870, emissiveIntensity: 0 }); LM_GLOW.push({ m: LMAT[k], a: 0, b: 0.3 }); }
-LM_GLOW.push({ m: LMAT.glass, a: 0.06, b: 0.9 }, { m: LMAT.warm, a: 0, b: 0.8 }, { m: LMAT.mosaic, a: 0.1, b: 0.4 }, { m: LMAT.clock, a: 0, b: 0.6 });
+LM_GLOW.push({ m: LMAT.lattice, a: 0, b: 0.5 }, { m: LMAT.glass, a: 0.06, b: 0.9 }, { m: LMAT.warm, a: 0, b: 0.8 }, { m: LMAT.mosaic, a: 0.1, b: 0.4 }, { m: LMAT.clock, a: 0, b: 0.6 });
 
 // local frame helpers: everything is modelled in metres around (0,0,0) and moved into place by M while it goes into the buffers
 function lmFrame(M) {
@@ -526,35 +532,44 @@ function buildCrocifisso(L, B, G) {
   mkMesh(Bs.warm, LMAT.warm, 10, false, G); mkMesh(Bs.clock, LMAT.clock, 10, false, G);
 }
 
-// San Pietro Martire, Meda: the rhomboid hall under one sloping roof that climbs from the entrance tip (west) to the choir (east), brick walls
-// with slit windows, concrete corners and fascia, a cross over the choir and the bronze saint at the door. No photo found yet: the shape follows the plan.
+// San Pietro Martire, Meda: the rhomboid hall in yellow brick banded in white concrete under a low copper roof; at the west tip the tall entrance
+// tower: piers with curved heads, the concrete screen up the middle, louvred belfry, green spire, the bronze saint on his corbel over the door
 function buildSanPietroMeda(L, B, G) {
-  const ring = lmSimplify(B.pts, 0.6), F = lmFrame(new THREE.Matrix4()), Bs = { brick: Buf(), trim: Buf(), warm: Buf() };
-  const xs = ring.map(p => p[0]), xW = Math.min(...xs), xE = Math.max(...xs), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), bot = gy - 0.8;
-  const roofY = x => gy + 7.5 + (x - xW) / (xE - xW) * 8.0, A = sArea(ring), CONC = COL('#b9b4aa'), ZINC = COL('#7f8389'), BRONZE = COL('#5b4632');
+  const ring = lmSimplify(B.pts, 0.6), F = lmFrame(new THREE.Matrix4()), Bs = { buff: Buf(), trim: Buf(), lattice: Buf(), louvre: Buf() };
+  const xs = ring.map(p => p[0]), xW = Math.min(...xs), w = ring[xs.indexOf(xW)], gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), bot = gy - 0.8, top = gy + 10.0, A = sArea(ring);
+  const WHITE = COL('#ece7dc'), COPPER = COL('#6f9a86'), BRONZE = COL('#4e3d2c'), DARK = COL('#2c2b2d'), PIPE = COL('#b8b1a3');
   for (let i = 0; i < ring.length; i++) {
-    const a = ring[i], c = ring[(i + 1) % ring.length], L2 = hyp(c[0] - a[0], c[1] - a[1]); if (L2 < 0.3) continue;
-    let nx = (c[1] - a[1]) / L2, nz = -(c[0] - a[0]) / L2; if (A < 0) { nx = -nx; nz = -nz; }
-    F.face(Bs.brick, [[a[0], bot, a[1]], [c[0], bot, c[1]], [c[0], roofY(c[0]), c[1]], [a[0], roofY(a[0]), a[1]]]);
-    const ex = (c[0] - a[0]) / L2, ez = (c[1] - a[1]) / L2, n = Math.floor((L2 - 1.5) / 3.2); // slit windows of coloured glass
-    for (let k = 0; k < n; k++) {
-      const s0 = (L2 - (n - 1) * 3.2) / 2 + k * 3.2, x = a[0] + ex * s0 + nx * 0.05, z = a[1] + ez * s0 + nz * 0.05, top = roofY(x) - 1.2;
-      if (top - gy < 3.5) continue;
-      F.face(Bs.warm, [[x - ex * 0.28, gy + 1.4, z - ez * 0.28], [x + ex * 0.28, gy + 1.4, z + ez * 0.28], [x + ex * 0.28, top, z + ez * 0.28], [x - ex * 0.28, top, z - ez * 0.28]]);
-    }
-    const ry = Math.atan2(-ez, ex), ya = roofY(a[0]), yc = roofY(c[0]); // concrete fascia following the slope, pillar at the corner
-    F.geo(Bs.trim, new THREE.BoxGeometry(L2 + 0.4, 0.7, 0.45).rotateZ(Math.atan2(yc - ya, L2)).rotateY(ry).translate((a[0] + c[0]) / 2 + nx * 0.15, (ya + yc) / 2 - 0.25, (a[1] + c[1]) / 2 + nz * 0.15), null, CONC);
-    F.geo(Bs.trim, lmBox(0.6, ya - bot, 0.6, a[0], (bot + ya) / 2, a[1]), null, CONC);
+    const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.3) continue;
+    let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
+    const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, ry = Math.atan2(-ez, ex), mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
+    F.face(Bs.buff, [[a[0], bot, a[1]], [c[0], bot, c[1]], [c[0], top, c[1]], [a[0], top, a[1]]]);
+    for (let y = gy + 1.6; y < top - 0.5; y += 1.65) F.geo(Bs.trim, lmBox(Ln, 0.16, 0.06, 0, y, 0).rotateY(ry).translate(mx + nx * 0.03, 0, mz + nz * 0.03), null, WHITE); // white bands
+    F.geo(Bs.trim, lmBox(Ln + 0.6, 0.45, 0.5, 0, top - 0.1, 0).rotateY(ry).translate(mx + nx * 0.2, 0, mz + nz * 0.2), null, WHITE);
+    for (let s0 = 2.5; s0 < Ln - 1.5; s0 += 5) F.geo(Bs.trim, lmBox(0.12, top - gy, 0.12, 0, (gy + top) / 2, 0).translate(a[0] + ex * s0 + nx * 0.12, 0, a[1] + ez * s0 + nz * 0.12), null, PIPE); // downpipes
   }
-  F.face(Bs.trim, ring.map(p => [p[0], roofY(p[0]) + 0.08, p[1]]), 2, ZINC); // the one roof plane, in zinc
-  // entrance at the west tip: concrete canopy on two posts, bronze doors; the cross over the choir; San Pietro Martire in bronze on his plinth
-  const wi = xs.indexOf(xW), w = ring[wi], ei = xs.indexOf(xE), e = ring[ei], ux = 1, gw = groundH(w[0], w[1]);
-  F.geo(Bs.trim, lmBox(4.2, 0.35, 9.0, w[0] - 1.6, gw + 4.0, w[1]), null, CONC);
-  for (const dz of [-4.0, 4.0]) F.geo(Bs.trim, lmBox(0.35, 4.0, 0.35, w[0] - 3.4, gw + 2.0, w[1] + dz), null, CONC);
-  F.geo(Bs.trim, lmBox(0.12, 3.2, 3.4, w[0] - 0.05, gw + 1.6, w[1]), null, COL('#4a3b2c'));
-  F.face(Bs.warm, [[w[0] - 0.07, gw + 3.3, w[1] - 1.7], [w[0] - 0.07, gw + 3.3, w[1] + 1.7], [w[0] - 0.07, gw + 3.85, w[1] + 1.7], [w[0] - 0.07, gw + 3.85, w[1] - 1.7]]);
-  lmCross(F, Bs.trim, e[0] - 1.5, roofY(e[0] - 1.5), (ring.reduce((t, p) => t + p[1], 0) / ring.length), 3.2, COL('#9a9ca0'));
-  const sx = w[0] - 7.0 * ux, sz = w[1] + 5.5, sg = groundH(sx, sz);
-  F.geo(Bs.trim, lmBox(1.1, 1.5, 1.1, sx, sg + 0.75, sz), null, COL('#cfc6b2')); lmStatue(F, Bs.trim, sx, sg + 1.5, sz, 1.25, BRONZE);
-  mkMesh(Bs.brick, LMAT.brick, 10, 'cast', G); mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G); mkMesh(Bs.warm, LMAT.warm, 10, false, G);
+  { // low copper roof, hipped up from the eaves
+    let d = 1; for (const t of [6, 4.5, 3, 2]) if (lmInsetOK(ring, lmOffset(ring, t))) { d = t; break; }
+    const o = lmOffset(ring, -0.5), r = lmOffset(ring, d), yr = top + 0.22 * (d + 0.5);
+    for (let i = 0; i < ring.length; i++) { const j = (i + 1) % ring.length; F.face(Bs.trim, [[o[i][0], top + 0.1, o[i][1]], [o[j][0], top + 0.1, o[j][1]], [r[j][0], yr, r[j][1]], [r[i][0], yr, r[i][1]]], 2, COPPER); }
+    F.face(Bs.trim, r.map(p => [p[0], yr, p[1]]), 2, COPPER);
+  }
+  // the entrance tower at the west tip, in its own frame: x across its front, +z out towards via San Carlo
+  const gw = groundH(w[0] - 2, w[1]), T = lmFrame(new THREE.Matrix4().makeRotationY(-Math.PI / 2).setPosition(w[0] - 1.0, gw, w[1]));
+  const tb = g => T.geo(Bs.buff, g, boxUV(2)), tt = (g, c) => T.geo(Bs.trim, g, null, c), CW = 2.7, PW = 1.9, D = 7.0, H = 23.5;
+  tb(lmBox(2 * CW, H + 0.8, D, 0, (H - 0.8) / 2, -D / 2));
+  for (const sd of [-1, 1]) { // piers rising past the core, their heads curving in
+    const x0 = sd * CW, x1 = sd * (CW + PW);
+    tb(lmBox(PW, H + 0.8, D + 0.6, (x0 + x1) / 2, (H - 0.8) / 2, -D / 2 + 0.3));
+    const hd = new THREE.Shape(); hd.moveTo(x0, H); hd.lineTo(x1, H); hd.lineTo(x1, H + 3.6); hd.quadraticCurveTo(x0 + sd * 0.2, H + 3.4, x0, H + 1.4); hd.lineTo(x0, H);
+    tb(new THREE.ExtrudeGeometry(hd, { depth: D + 0.6, bevelEnabled: false, curveSegments: 8 }).translate(0, 0, -D + 0.3));
+    for (let y = 2.6; y < H; y += 2.6) tt(lmBox(PW + 0.02, 0.18, 0.05, (x0 + x1) / 2, y, 0.62), WHITE);
+  }
+  tt(lmBox(3.6, 5.5, 0.08, 0, 2.6, 0.04), WHITE); tt(lmBox(3.0, 5.0, 0.1, 0, 2.5, 0.1), DARK); tt(lmBox(0.05, 5.0, 0.12, 0, 2.5, 0.12), COL('#4a3b2c')); tt(lmBox(4.0, 0.3, 1.6, 0, 5.45, 0.8), WHITE); // door under its canopy
+  T.geo(Bs.lattice, new THREE.PlaneGeometry(1.6, 10.5).translate(0, 13.6, 0.07)); tt(lmBox(2.0, 10.9, 0.06, 0, 13.6, 0.0), WHITE); // the screen up the front
+  T.geo(Bs.louvre, new THREE.PlaneGeometry(3.0, 3.4).translate(0, H - 1.6, 0.05)); T.geo(Bs.louvre, new THREE.PlaneGeometry(3.0, 3.4).rotateY(Math.PI).translate(0, H - 1.6, -D - 0.05));
+  tt(lmBox(3.4, 0.25, 0.3, 0, H - 3.4, 0.15), WHITE); tt(lmBox(2 * CW + 0.1, 0.3, D + 0.1, 0, H + 0.95, -D / 2), WHITE);
+  tt(new THREE.ConeGeometry(1.1, 3.4, 4).rotateY(Math.PI / 4).translate(0, H + 2.8, -1.4), COPPER); tt(new THREE.SphereGeometry(0.2, 8, 6).translate(0, H + 4.6, -1.4), COPPER);
+  tt(lmBox(1.0, 0.35, 0.8, -(CW + PW / 2), 7.8, 0.75), WHITE); lmStatue(T, Bs.trim, -(CW + PW / 2), 7.95, 0.75, 1.15, BRONZE); // San Pietro Martire, Giancarlo Fontana
+  for (let k = 0; k < 4; k++) tt(lmBox(14 - 2 * k, 0.15, 1.2 + 0.0 * k, 0, 0.15 * k - 0.05, 2.0 + 1.2 * (3 - k) / 2), COL('#cfc8b8')); // the sagrato steps
+  mkMesh(Bs.buff, LMAT.buff, 10, 'cast', G); mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G); mkMesh(Bs.lattice, LMAT.lattice, 10, false, G); mkMesh(Bs.louvre, LMAT.louvre, 10, false, G);
 }
