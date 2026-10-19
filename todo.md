@@ -21,3 +21,9 @@ Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Stre
 - [ ] Monumento ai Caduti di Seveso (Nardo Pajella)
 - [ ] Monumento al Falegname, Meda
 - [ ] Casa del Fascio, Seveso
+
+## Parcheggi
+Oggi i posti sono generati (strisce a pettine dentro i 921 contorni OSM `amenity=parking`). Da fare quando Overpass risponde:
+- [ ] Importare in `build_data.py` i posti veri `amenity=parking_space`, la `capacity` dei parcheggi e i parcheggi lungo strada `parking:left/right/both`
+- [ ] Usare i posti veri dove ci sono (forma, direzione, disabili), la `capacity` come tetto per quelli generati
+- [ ] Posti in linea lungo le strade, strisce blu a pagamento in centro
