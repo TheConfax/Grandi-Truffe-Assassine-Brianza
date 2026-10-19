@@ -63,6 +63,7 @@ const bbox = pts => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [
 // places the map fills with trees that are open ground: playing fields
 const NO_TREES = [
   [[-408.6, 279.7], [-378.5, 452.1], [-276.1, 434.2], [-306.2, 261.8]], // Stadio Mino Favini
+  [[-1835.9, 1110.2], [-1797.9, 1281.0], [-1702.2, 1259.7], [-1740.2, 1088.9]], // Stadio comunale di Seveso
 ];
 // buildings in the map that are not there (mostly from Overture): dropped by the centroid of their footprint
 const GHOSTS = [

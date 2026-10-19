@@ -60,6 +60,10 @@ const LANDMARKS = [
     o: [-384, 316], ua: [0.172, 0.985], pitch: [0, 105, 0, 65], curves: [15, 88, 32.5], rin: 36, rout: 43.5, sprint: 126, mats: [[13, -10], [78, -10], [112, 57], [118, 18]], dugouts: [38, 66],
     towers: [[-28, -14], [130, -16], [-28, 82], [128, 84]],
     stands: [{ ab: [35, 80, -42.7, -25.6], h: 9, roof: 3.2, segs: 4 }, { ab: [1.5, 31.5, -40.8, -26.8], h: 4.5, roof: 2.6, segs: 2 }, { ab: [85.5, 115.5, -41.2, -26.6], h: 4.5, roof: 2.6, segs: 2 }] } },
+  { n: 'Stadio comunale di Seveso', x: -1826.0, z: 1194.7, build: buildStadio, o: { // on the edge of the Groane woods below via Monte Rosa, from the 3D views: the stand with four raised canopies
+    o: [-1809, 1139], ua: [0.2172, 0.9761], pitch: [0, 110, -3, 62], curves: [16.5, 90.5, 28.5], rin: 37.5, rout: 47.5, sprint: 90.5, apron: [10, 50, '#a8503c'], mats: [[114, 32], [118, 45]], dugouts: [41, 61],
+    towers: [[-36, -16], [140, -14], [-36, 76], [138, 78]],
+    stands: [{ ab: [28, 78, -40, -21], h: 7.5, roof: 3.4, segs: 3 }, { ab: [8, 28, -36, -21], h: 4, roof: 2.4, segs: 1 }, { ab: [78, 100, -36, -21], h: 4, roof: 2.4, segs: 1 }] } },
   { n: 'Palazzo Buzzi', x: 339.9, z: -446.4, build: buildPalazzo, o: { style: 'buzzi', h: 16.4, front: [344.2, -451.8], balcony: 'stone', balconyW: 9 } }, // ex S.A.L.D.A., Junior B and f.lli Buzzi on the ground floor
   { n: 'Kino', x: 407.0, z: -375.3, build: buildKino, o: { // the bistro at via Indipendenza 34 in the front of the white block
     kino: { front: [[411.3, -381.3], [422.6, -372.7]], d: 9, h: 8.4 }, rest: { pts: [[398.4, -379.3], [401.0, -382.7], [408.2, -377.2], [405.8, -374.1], [417.1, -365.5], [413.1, -359.6], [394.3, -374.0]], h: 12.8, floors: 4, wall: '#efece4', glass: '#3c4248', roof: '#bdbab3', balc: true, ribbon: 0.5 },
@@ -1368,15 +1372,15 @@ function buildStadio(L, B, G) {
   const [c0, c1, bc] = o.curves, Ri = o.rin, Ro = o.rout, [p0, p1, q0, q1] = o.pitch, pm = (q0 + q1) / 2, am = (p0 + p1) / 2;
   const rOf = (a, b) => hyp(a - clamp(a, c0, c1), b - bc), TRACK = COL('#b5543f'), SAND = COL('#cdb58f'), G1 = COL('#4f8a3a'), G2 = COL('#5a9643'), GR = COL('#5a8a3f');
   const surf = (a, b) => { const r = rOf(a, b); if (r >= Ri && r <= Ro) return TRACK; if (a > c1 && a <= o.sprint && b - bc >= Ri && b - bc <= Ro) return TRACK;
-    if (r < Ri) { if (a >= p0 && a <= p1 && b >= q0 && b <= q1) return Math.floor((a - p0) / 7.5) % 2 ? G1 : G2; return a > p1 && b < bc + 22 ? SAND : GR; } return null; };
+    if (r < Ri) { if (a >= p0 && a <= p1 && b >= q0 && b <= q1) return Math.floor((a - p0) / 7.5) % 2 ? G1 : G2; const ap = o.apron || [-1e9, bc + 22, null]; return a > p1 && b > ap[0] && b < ap[1] ? (ap[2] ? COL(ap[2]) : SAND) : GR; } // the run-ups and landing pits at the end of the pitch return null; };
   const S = 1.5;
-  for (let a = c0 - Ro - S; a < o.sprint + S; a += S) for (let b = bc - Ro - S; b < bc + Ro + S; b += S) {
+  for (let a = c0 - Ro - S; a < Math.max(o.sprint, c1 + Ro) + S; a += S) for (let b = bc - Ro - S; b < bc + Ro + S; b += S) {
     const col = surf(a + S / 2, b + S / 2); if (!col) continue; const i0 = g.p.length / 3;
-    for (const [da, db] of [[0, 0], [S, 0], [S, S], [0, S]]) { const [x, z] = W(a + da, b + db); vtx(g, x, 0.05, z, 0, 1, 0, 0, 0, col); }
+    for (const [da, db] of [[0, 0], [S, 0], [S, S], [0, S]]) { const [x, z] = W(a + da, b + db); vtx(g, x, 0.075, z, 0, 1, 0, 0, 0, col); }
     g.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2, i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
   }
   const strip = (A, Bp, w) => { const L2 = hyp(Bp[0] - A[0], Bp[1] - A[1]) || 1, n = Math.ceil(L2 / 2); for (let k = 0; k < n; k++) { const P0 = [A[0] + (Bp[0] - A[0]) * k / n, A[1] + (Bp[1] - A[1]) * k / n], P1 = [A[0] + (Bp[0] - A[0]) * (k + 1) / n, A[1] + (Bp[1] - A[1]) * (k + 1) / n], nx = -(Bp[1] - A[1]) / L2 * w / 2, nz = (Bp[0] - A[0]) / L2 * w / 2, i0 = g.p.length / 3;
-    for (const [x, z] of [[P0[0] + nx, P0[1] + nz], [P1[0] + nx, P1[1] + nz], [P1[0] - nx, P1[1] - nz], [P0[0] - nx, P0[1] - nz]]) vtx(g, x, 0.09, z, 0, 1, 0, 0, 0, COL('#efece4')); g.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2, i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); } };
+    for (const [x, z] of [[P0[0] + nx, P0[1] + nz], [P1[0] + nx, P1[1] + nz], [P1[0] - nx, P1[1] - nz], [P0[0] - nx, P0[1] - nz]]) vtx(g, x, 0.11, z, 0, 1, 0, 0, 0, COL("#efece4")); g.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2, i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); } };
   const line = pts => { for (let k = 1; k < pts.length; k++) strip(pts[k - 1], pts[k], 0.12); };
   const oval = r => { const pts = []; for (let i = 0; i <= 24; i++) { const t = -Math.PI / 2 - i / 24 * Math.PI; pts.push(W(c0 + Math.cos(t) * r, bc + Math.sin(t) * r)); } for (let i = 0; i <= 24; i++) { const t = Math.PI / 2 - i / 24 * Math.PI; pts.push(W(c1 + Math.cos(t) * r, bc + Math.sin(t) * r)); } pts.push(pts[0]); return pts; };
   for (let k = 1; k < 6; k++) line(oval(Ri + (Ro - Ri) * k / 6)); // lanes
