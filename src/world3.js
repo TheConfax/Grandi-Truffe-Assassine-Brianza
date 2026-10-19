@@ -421,7 +421,7 @@ function buildTile(T) {
     for (let j = 0; j < nn; j++) for (let i = 0; i < nn; i++) { const k = j * w + i; triUp(b, k, k + 1, k + w + 1); triUp(b, k, k + w + 1, k + w); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(b.i); g.computeVertexNormals();
     const m = new THREE.Mesh(g, MAT.terrain); m.renderOrder = -2; m.receiveShadow = true; G.add(m);
-    const dm = new THREE.Mesh(g, MAT.depth); dm.position.y = -1.5; dm.renderOrder = -1; G.add(dm); // deep enough that a road cut into a bump of the terrain (its profile is smoothed) is not hidden by it
+    const dm = new THREE.Mesh(g, MAT.depth); dm.position.y = -0.5; dm.renderOrder = -1; G.add(dm); // just under the ground: hides what is buried (walls go a metre down), roads now follow the terrain
   }
   // land use
   {
