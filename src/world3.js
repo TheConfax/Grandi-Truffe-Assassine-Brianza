@@ -39,6 +39,7 @@ const tileOf = (x, z) => clamp(Math.floor((x + META.hw) / TS), 0, NTX - 1) + NTX
 const BUILDINGS = [];
 const SIDEG = new Grid(24), DECKG = new Grid(16), ROADSEG = new Grid(24), STREETS = new Grid(24), NODEG = new Grid(40);
 const SIDE_H = 0.15;
+const PLATG = new Grid(24), PLAT_H = 0.55; // railway platforms (banchine), raised above the rails
 function onAnyRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !s.r.d && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
 function segDist(px, pz, ax, az, bx, bz) { const ex = bx - ax, ez = bz - az, L2 = ex * ex + ez * ez || 1; const t = clamp(((px - ax) * ex + (pz - az) * ez) / L2, 0, 1); return hyp(px - ax - ex * t, pz - az - ez * t); }
 function resample(pts, step) {
@@ -78,6 +79,7 @@ for (const T of TILES) {
     const A = Math.abs(sArea(o)); if (A < 10 || A / per < 0.45) continue; // shards and slivers left between junctions are not sidewalks
     const rec = { o, k, bb }; T.sd.push(rec); SIDEG.add(bb[0], bb[1], bb[2], bb[3], rec);
   }
+  for (const q of d.a || []) if (q.t === 5) { const o = dec(q.p); if (o.length < 3) continue; const rec = { o, k: (q.k || []).map(dec), bb: bbox(o) }; (T.pf || (T.pf = [])).push(rec); PLATG.add(rec.bb[0], rec.bb[1], rec.bb[2], rec.bb[3], rec); }
 }
 function inBuilding(x, z, m = 0) {
   let f = false;
@@ -86,6 +88,7 @@ function inBuilding(x, z, m = 0) {
   return f;
 }
 function onFoot(x, z) { let f = false; ROADSEG.each(x - 6, z - 6, x + 6, z + 6, s => { if (!f && s.r.c === 6 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5) f = true; }); return f; }
+function onPlatform(x, z) { let f = false; PLATG.each(x, z, x, z, s => { if (!f && x >= s.bb[0] && x <= s.bb[2] && z >= s.bb[1] && z <= s.bb[3] && inPoly(x, z, s.o) && !s.k.some(h => inPoly(x, z, h))) f = true; }); return f; }
 function onSide(x, z) {
   let f = false;
   SIDEG.each(x, z, x, z, s => { if (!f && x >= s.bb[0] && x <= s.bb[2] && z >= s.bb[1] && z <= s.bb[3] && inPoly(x, z, s.o) && !s.k.some(h => inPoly(x, z, h))) f = true; });
@@ -199,7 +202,7 @@ for (const td of D.tiles) for (const r of td.rv || []) {
 }
 function surfAt(x, z, cy) { // ground or deck under (x,z), never more than a kerb above the current height
   const rc = riverCut(x, z);
-  let y = groundH(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + (onSide(x, z) ? SIDE_H : 0);
+  let y = groundH(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + (onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : 0);
   if (cy === undefined) return y;
   let under;
   DECKG.each(x, z, x, z, s => {
@@ -391,7 +394,7 @@ function buildTile(T) {
   {
     const gB = VBuf(), pB = VBuf(), zB = FBuf(), wB = VBuf();
     for (const a of d.a || []) {
-      const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3) continue;
+      const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5) continue; // platforms are built raised, with their furniture
       try {
         if (a.t <= 3 || (a.t >= 11 && a.t !== 15)) polyFill(gB, outer, holes, 0.02, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03, 9);
@@ -665,7 +668,7 @@ function buildTile(T) {
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   buildSignals(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G); buildCaserme(T, G);
-  buildCemetery(T, G); buildLandmarks(T, G);
+  buildCemetery(T, G); buildLandmarks(T, G); buildPlatforms(T, G);
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {

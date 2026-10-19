@@ -23,6 +23,7 @@ const LANDMARKS = [
   { n: 'Chiesa di San Giacomo', x: 1181.3, z: -451.7, f: [1186.7, -433.3, 1163.8, -443.5], len: 29.2, build: buildSanGiacomo },
   { n: 'Cappella di San Pietro da Verona Martire', x: -1707.0, z: 680.5, ry: 0.6, build: buildCappellaSPM },
   { n: 'Villa Bianca', x: -1611.1, z: 936.5, build: buildVillaBianca },
+  { n: 'Stazione di Meda', x: 377.5, z: -540.5, build: buildPalazzo, o: { style: 'stazione', h: 8.8, front: [375.9, -545.1], sign: 'M E D A', signW: 3.2, signCol: '#5f6266', canopy: [[388.6, -548.6], [403.5, -563.2], 7.5] } }, // the 2023 makeover: white, green shutters, the steel-tree canopy
   { n: 'Villa Dho', x: -1619.6, z: 1642.0, build: buildPalazzo, o: { style: 'dho', h: 11, front: [-1600.5, 1643.9], portal: 'portico', arches: 3, ped: { w: 9, h: 2.4 }, belv: { w: 4.6, d: 4.6, h: 6.5, flat: true } } },
   { n: 'Villa Besana', x: 326.2, z: -551.4, build: buildPalazzo, o: { style: 'besana', portal: 'door', balcony: 'stone', balconyW: 11, flat: true } },
   { n: 'Casa Ferrario', x: 475.7, z: -957.0, build: buildPalazzo, o: { style: 'ferrario', h: 8.2, portal: 'door', tower: { at: [479.6, -963.0], w: 4.2, h: 6.0 } } },
@@ -84,22 +85,24 @@ const PAL_STYLE = {
   villa: { wall: '#eee5cf', trim: '#fbf8ef', shut: '#5d7a55', plinth: '#c9c1b0', light: ['#d9cfb8', '#f8f2e4'], gShut: true },
   dho: { wall: '#dfbb63', trim: '#f4ead2', shut: '#3f5a3c', plinth: '#b9b09c', light: ['#c9a654', '#ecd08a'], gShut: true },
   besana: { wall: '#d8c391', trim: '#c4bfb2', shut: '#9c978c', plinth: '#a9a397', light: ['#bfa977', '#e6d4a4'], gShut: true, ped: true },
+  stazione: { wall: '#f1efe9', trim: '#dedad1', shut: '#2f5a3a', plinth: '#9d9b96', light: ['#dcd9d2', '#ffffff'], H: 8.8, floors: 2, arched: true },
   ferrario: { wall: '#c23b2a', trim: '#e2b25a', shut: '#c23b2a', plinth: '#d9cfc0', light: ['#a83324', '#d4513c'], noShut: true },
 };
 const palTex = (st, lit) => canvasTex(128, 512, (g, w, h) => { // one bay, pavement to eaves; lit: the emissive map (lit windows only)
-  const Y = m => h - m / MUN_H * h, R = (x0, m0, x1, m1, col) => { g.fillStyle = col; g.fillRect(x0, Y(m1), x1 - x0, Y(m0) - Y(m1)); };
+  const HH = st.H || MUN_H, Y = m => h - m / HH * h, R = (x0, m0, x1, m1, col) => { g.fillStyle = col; g.fillRect(x0, Y(m1), x1 - x0, Y(m0) - Y(m1)); };
   const CREAM = st.trim, GLASS = '#2b3038';
-  if (lit) { R(0, 0, w, MUN_H, '#000'); R(46, 5.45, 82, 7.75, '#ffd890'); return; } // at night only the piano nobile
-  R(0, 0, w, MUN_H, st.wall); noise(g, w, h, 2500, 0.12, st.light);
+  if (lit) { R(0, 0, w, HH, '#000'); R(46, 5.45, 82, 7.75, '#ffd890'); return; } // at night only the piano nobile
+  R(0, 0, w, HH, st.wall); noise(g, w, h, 2500, 0.12, st.light);
   R(0, 0, w, 0.5, st.plinth); // stone plinth
   if (st.bugnato) for (let m = 1.2; m < 4.4; m += 0.5) { R(0, m - 0.04, w, m, 'rgba(110,75,35,.45)'); R(0, m, w, m + 0.03, 'rgba(255,240,200,.35)'); }
-  R(0, 4.36, w, 4.4, 'rgba(0,0,0,.2)'); R(0, 4.4, w, 4.8, CREAM); R(0, 8.76, w, 8.8, 'rgba(0,0,0,.2)'); R(0, 8.8, w, 9.05, CREAM); R(0, 12.1, w, MUN_H, CREAM); R(0, 12.06, w, 12.1, 'rgba(0,0,0,.2)');
+  R(0, 4.36, w, 4.4, 'rgba(0,0,0,.2)'); R(0, 4.4, w, 4.8, CREAM); R(0, 8.76, w, 8.8, 'rgba(0,0,0,.2)'); if (st.floors !== 2) R(0, 8.8, w, 9.05, CREAM); R(0, HH - 0.6, w, HH, CREAM); R(0, HH - 0.64, w, HH - 0.6, 'rgba(0,0,0,.2)');
   const win = (x0, m0, x1, m1, bars) => { R(x0 - 4, m0 - 0.15, x1 + 4, m1 + 0.15, CREAM); R(x0, m0, x1, m1, GLASS); R(62, m0, 66, m1, CREAM); R(x0, (m0 + m1) / 2 + 0.3, x1, (m0 + m1) / 2 + 0.36, CREAM); if (bars) for (let x = x0 + 4; x < x1; x += 7) R(x, m0, x + 1.5, m1, '#15171a'); };
   const shutters = (m0, m1) => { if (st.noShut) return; for (const x of [18, 88]) { R(x, m0, x + 22, m1, st.shut); for (let m = m0 + 0.08; m < m1; m += 0.12) R(x + 2, m, x + 20, m + 0.04, 'rgba(0,0,0,.25)'); } };
   if (st.gShut) shutters(1.3, 3.5); win(46, 1.3, 82, 3.5, !st.gShut); if (st.bugnato) R(58, 3.65, 70, 3.95, CREAM); // ground floor: grated with a keystone, or shuttered
   shutters(5.45, 7.75); win(46, 5.45, 82, 7.75); R(36, 5.1, 92, 5.3, '#e6d8bb'); R(34, 7.95, 94, 8.1, CREAM); // piano nobile: sill and cornice, a pediment on the municipio
   if (st.ped) { g.fillStyle = CREAM; g.beginPath(); g.moveTo(34, Y(8.1)); g.lineTo(94, Y(8.1)); g.lineTo(64, Y(8.62)); g.closePath(); g.fill(); g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(34, Y(8.1), 60, 2); }
-  shutters(9.75, 11.45); win(46, 9.75, 82, 11.45); R(40, 9.5, 88, 9.62, '#e6d8bb');
+  if (st.floors !== 2) { shutters(9.75, 11.45); win(46, 9.75, 82, 11.45); R(40, 9.5, 88, 9.62, '#e6d8bb'); }
+  if (st.arched) { R(44, 1.0, 84, 3.6, st.wall); g.fillStyle = CREAM; g.beginPath(); g.moveTo(44, Y(0.1)); g.lineTo(44, Y(2.9)); g.arc(64, Y(2.9), 20, Math.PI, 0); g.lineTo(84, Y(0.1)); g.fill(); R(48, 0.1, 80, 2.9, '#2b3a33'); g.fillStyle = '#2b3a33'; g.beginPath(); g.arc(64, Y(2.9), 16, Math.PI, 0); g.fill(); } // arched doors on the ground floor
 });
 const plasterTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); noise(g, w, h, 2600, 0.16, ['#d8d8d8', '#c8c8c8', '#f0f0f0']); }); // tinted by vertex colour
 const tondoTex = canvasTex(128, 128, (g, w, h) => { // San Vittore on his rearing horse, the relief over the portal
@@ -304,7 +307,7 @@ function lmInsetOK(r, q) { for (let i = 0; i < r.length; i++) { const j = (i + 1
 // style, h (eaves height if the map's is a guess), front (a point on the main wall, else the POI), portal 'door' | 'portico' with arches, balcony 'iron' | 'stone',
 // flags, sign, belv (a belvedere on the roof over the middle of the front: { w, d, h })
 function buildPalazzo(L, B, G) {
-  const o = L.o, st = PAL_STYLE[o.style], H = o.h || B.h, k = H / MUN_H;
+  const o = L.o, st = PAL_STYLE[o.style], H = o.h || B.h, k = H / (st.H || MUN_H);
   const outer = lmSimplify(B.pts, 0.35), holes = B.holes.filter(q => Math.abs(sArea(q)) > 120).map(q => lmSimplify(q, 0.35)); // light wells stay under the roof
   const poi = D.pois.find(q => q.lm === L), [fx, fz] = o.front || (poi ? [poi.x, poi.z] : [L.x, L.z]), n = outer.length;
   let fi = 0, fd = 1e9; for (let i = 0; i < n; i++) { const a = outer[i], c = outer[(i + 1) % n], d = segDist(fx, fz, a[0], a[1], c[0], c[1]); if (d < fd) { fd = d; fi = i; } }
@@ -393,7 +396,7 @@ function buildPalazzo(L, B, G) {
     for (let i = 0; i <= NI; i++) for (let j = 0; j <= NJ; j++) { const q = tip(1.0 + 1.5 * i / NI), w = Math.sin(i * 1.3 + j * 0.9) * 0.07 * j / NJ; F.v(flag, q[0] + w, q[1] - 1.45 * j / NJ, q[2], 0, 0, 1, off + 0.5 * j / NJ, i / NI); }
     for (let i = 0; i < NI; i++) for (let j = 0; j < NJ; j++) { const q = base + i * (NJ + 1) + j; flag.i.push(q, q + 1, q + NJ + 2, q, q + NJ + 2, q + NJ + 1); }
   }
-  if (o.sign) { const w = 6.4, hh = 0.4, y = 12.2 * k, i0 = sign.p.length / 3; for (const [x, yy, u, v] of [[-w / 2, y - hh / 2, 0, 0], [w / 2, y - hh / 2, 1, 0], [w / 2, y + hh / 2, 1, 1], [-w / 2, y + hh / 2, 0, 1]]) F.v(sign, x, yy, 0.05, 0, 0, 1, u, v); sign.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
+  if (o.sign) { const w = o.signW || 6.4, hh = 0.4, y = ((st.H || MUN_H) - 0.5) * k, i0 = sign.p.length / 3; for (const [x, yy, u, v] of [[-w / 2, y - hh / 2, 0, 0], [w / 2, y - hh / 2, 1, 0], [w / 2, y + hh / 2, 1, 1], [-w / 2, y + hh / 2, 0, 1]]) F.v(sign, x, yy, 0.05, 0, 0, 1, u, v); sign.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
   if (o.belv) { // belvedere: a room on the roof with the top-floor windows, its own hipped roof and brackets
     const { w, d: bd, h } = o.belv, sb = 1.0, P = (x, z) => { const v = new THREE.Vector3(x, 0, z).applyMatrix4(M); return [v.x, v.z]; };
     const ring = [P(-w / 2, -sb), P(w / 2, -sb), P(w / 2, -sb - bd), P(-w / 2, -sb - bd)];
@@ -408,6 +411,14 @@ function buildPalazzo(L, B, G) {
     walls(q, false, bot, top, -1, 2.0); walls(q, false, top, top + h, -1, 2.0); try { polyFill(trim, q, [], top + h + 0.02, 2, COL('#8d8a84')); } catch (e) { }
     for (let i = 0; i < 4; i++) { const a = q[i], c = q[(i + 1) % 4]; for (let t = 0; t < 4; t++) { const u = (t + 0.5) / 4; addBox(trim, lerp(a[0], c[0], u), top + h + 0.45, lerp(a[1], c[1], u), 0.6, 0.9, 0.6, COL(st.wall)); } }
   }
+  if (o.canopy) { // modern canopy over the platform: steel trees holding a tilted roof of glass and metal
+    const [[ax, az], [bx, bz], cw] = o.canopy, Lc = hyp(bx - ax, bz - az), ux = (bx - ax) / Lc, uz = (bz - az) / Lc, gc = groundH(ax, az) + PLAT_H, STEEL = COL('#a7abb0');
+    let px = -uz, pz = ux; if (inBuilding(ax + px * 3, az + pz * 3)) { px = -px; pz = -pz; } // across, away from the building
+    const C = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(ux, 0, uz), new THREE.Vector3(0, 1, 0), new THREE.Vector3(px, 0, pz)).setPosition(ax, gc, az));
+    for (let s = 2.5; s < Lc; s += 6) { C.geo(trim, new THREE.CylinderGeometry(0.16, 0.2, 3.6, 8).translate(s, 1.8, cw / 2), null, STEEL); for (const a of [-0.6, 0.6]) for (const b of [-0.5, 0.5]) C.geo(trim, new THREE.CylinderGeometry(0.06, 0.08, 1.6, 6).translate(0, 0.8, 0).rotateZ(a).rotateX(b).translate(s, 3.5, cw / 2), null, STEEL); }
+    C.geo(trim, lmBox(Lc + 1.0, 0.18, cw + 0.6, Lc / 2, 0, cw / 2).rotateX(0.0).translate(0, 4.35, 0).applyMatrix4(new THREE.Matrix4().makeRotationX(-0.06)), null, COL('#7f868d'));
+    C.geo(trim, lmBox(Lc + 1.0, 0.04, cw + 0.6, Lc / 2, 4.22, cw / 2), null, COL('#c9d6de'));
+  }
   const flagTex = canvasTex(256, 64, (g, w, h) => {
     for (const [i, col] of [[0, '#009246'], [1, '#f1f2f1'], [2, '#ce2b37']]) { g.fillStyle = col; g.fillRect(i * w / 6, 0, w / 6 + 1, h); } // u runs from the pole (hoist) to the fly
     g.fillStyle = '#003399'; g.fillRect(w / 2, 0, w / 2, h); g.fillStyle = '#ffcc00';
@@ -416,7 +427,7 @@ function buildPalazzo(L, B, G) {
   mkMesh(wall, LMAT[o.style], 10, 'cast', G); mkMesh(trim, MAT.roof, 10, 'cast', G); mkMesh(roof, LMAT.coppi, 10, 'cast', G);
   if (o.flags) mkMesh(flag, new THREE.MeshLambertMaterial({ map: flagTex, side: THREE.DoubleSide }), 10, false, G);
   if (o.sign) {
-    const signTex = canvasTex(512, 32, (g, w, h) => { g.fillStyle = '#4a3c2a'; g.font = 'bold 30px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.save(); g.translate(w / 2, h / 2 + 1); g.scale(Math.min(3, w * 0.94 / g.measureText(o.sign).width), 1); g.fillText(o.sign, 0, 0); g.restore(); }, false);
+    const signTex = canvasTex(512, 32, (g, w, h) => { g.fillStyle = o.signCol || '#4a3c2a'; g.font = 'bold 30px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.save(); g.translate(w / 2, h / 2 + 1); g.scale(Math.min(3, w * 0.94 / g.measureText(o.sign).width), 1); g.fillText(o.sign, 0, 0); g.restore(); }, false);
     mkMesh(sign, new THREE.MeshLambertMaterial({ map: signTex, transparent: true, alphaTest: 0.4, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), 10, false, G);
   }
 }
@@ -783,4 +794,84 @@ function buildVillaBianca(L, B, G) {
   for (let i = 0; i < o.length; i++) { const j = (i + 1) % o.length; F0.face(Bs.trim, [[o[i][0], TOP + 0.3, o[i][1]], [o[j][0], TOP + 0.3, o[j][1]], [o[j][0], TOP + 0.6, o[j][1]], [o[i][0], TOP + 0.6, o[i][1]]], 2, WHITE); }
   for (const p of ring) F0.geo(Bs.trim, lmBox(0.3, 0.6, 0.3, p[0], TOP + 0.3, p[1]), null, WHITE);
   lmFlush(Bs, G);
+}
+
+// ---------------------------------------------------------------- railway platforms (banchine): raised slabs with the white edge and the yellow line, and near each station
+// the canopies on posts, the stairs down to the underpass, the blue name boards, benches and lamps
+const PLAT_STATIONS = D.pois.filter(p => p.k === 'stazione');
+const PLAT_MAT = { top: new THREE.MeshLambertMaterial({ map: sidewalkTex, color: 0xd8d4cc }), side: new THREE.MeshLambertMaterial({ map: concreteTex }), line: new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }) };
+const STATION_SIGN = {};
+function stationSignMat(name) { // the blue Ferrovienord board with the station's name
+  if (STATION_SIGN[name]) return STATION_SIGN[name];
+  const t = canvasTex(512, 96, (g, w, h) => { g.fillStyle = '#1f3f8c'; g.fillRect(0, 0, w, h); g.strokeStyle = '#ffffff'; g.lineWidth = 4; g.strokeRect(6, 6, w - 12, h - 12); g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = 56; g.font = `bold ${fs}px Arial, sans-serif`; while (g.measureText(name).width > w - 40 && fs > 20) { fs -= 2; g.font = `bold ${fs}px Arial, sans-serif`; } g.fillText(name, w / 2, h / 2 + 3); }, false);
+  return (STATION_SIGN[name] = new THREE.MeshLambertMaterial({ map: t, side: THREE.DoubleSide }));
+}
+// across-section of a polygon on the line through (cx,cz)+u*s, perpendicular to u: the [vmin, vmax] where it is inside
+function lmSection(poly, cx, cz, ux, uz, s) {
+  const ox = cx + ux * s, oz = cz + uz * s; let lo = 1e9, hi = -1e9;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], c = poly[(i + 1) % poly.length], sa = (a[0] - ox) * ux + (a[1] - oz) * uz, sc = (c[0] - ox) * ux + (c[1] - oz) * uz;
+    if ((sa > 0) === (sc > 0)) continue; const t = sa / (sa - sc), x = a[0] + (c[0] - a[0]) * t, z = a[1] + (c[1] - a[1]) * t, v = (x - ox) * -uz + (z - oz) * ux;
+    lo = Math.min(lo, v); hi = Math.max(hi, v);
+  }
+  return hi > lo ? [lo, hi] : null;
+}
+function buildPlatforms(T, G) {
+  if (!T.pf) return;
+  const top = FBuf(), side = Buf(), line = FBuf(), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf(), warm: Buf() }, boards = new Map();
+  const WHITE = COL('#f2f0ea'), YELLOW = COL('#f2c230'), METAL = COL('#7d858d'), POST = COL('#5d646b'), DARK = COL('#1f2022'), WOOD = COL('#8a6a48');
+  for (const P of T.pf) {
+    try { polyFill(top, P.o, P.k, PLAT_H, 4); } catch (e) { }
+    const A = sArea(P.o);
+    for (const [ring, hole] of [[P.o, false], ...P.k.map(h => [h, true])]) for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.05) continue;
+      let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if ((A < 0) !== hole) { nx = -nx; nz = -nz; }
+      const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), b0 = side.p.length / 3;
+      vtx(side, a[0], ga - 0.3, a[1], nx, 0, nz, 0, 0); vtx(side, c[0], gc - 0.3, c[1], nx, 0, nz, Ln / 2, 0); vtx(side, c[0], gc + PLAT_H, c[1], nx, 0, nz, Ln / 2, 0.4); vtx(side, a[0], ga + PLAT_H, a[1], nx, 0, nz, 0, 0.4);
+      side.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3, b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2);
+      if (hole || !nearRail((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, 4.5)) continue; // track side: white edge and the yellow line inside it
+      for (const [d0, d1, col] of [[0, 0.32, WHITE], [0.85, 0.97, YELLOW]]) { const l0 = line.p.length / 3; for (const [p, d] of [[a, d0], [c, d0], [c, d1], [a, d1]]) vtx(line, p[0] - nx * d, PLAT_H + 0.012, p[1] - nz * d, 0, 1, 0, 0, 0, col); line.i.push(l0, l0 + 1, l0 + 2, l0, l0 + 2, l0 + 3, l0, l0 + 2, l0 + 1, l0, l0 + 3, l0 + 2); }
+    }
+    // furniture, only on the platforms of a station: along the platform's long axis
+    const [cx, cz] = centroid(P.o), st = PLAT_STATIONS.slice().sort((p, q) => hyp(p.x - cx, p.z - cz) - hyp(q.x - cx, q.z - cz))[0];
+    if (!st || hyp(st.x - cx, st.z - cz) > 220) continue;
+    let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P.o) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
+    const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), proj = P.o.map(([x, z]) => (x - cx) * ux + (z - cz) * uz), s0 = Math.min(...proj) + 2, s1 = Math.max(...proj) - 2;
+    const name = (st.n || '').replace(/^Stazione di /, '').toUpperCase(), ry = Math.atan2(-uz, ux);
+    const at = (s, v) => [cx + ux * s - uz * v, cz + uz * s + ux * v];
+    let lastPost = null, stairs = false;
+    for (let s = s0; s <= s1; s += 1) {
+      const sec = lmSection(P.o, cx, cz, ux, uz, s); if (!sec) continue; const wd = sec[1] - sec[0]; if (wd < 2.6) continue;
+      const vm = (sec[0] + sec[1]) / 2, [x, z] = at(s, vm), gy = groundH(x, z) + PLAT_H, dst = hyp(x - st.x, z - st.z), si = Math.round(s - s0);
+      const covered = dst < 60;
+      if (covered && si % 7 === 0) { // canopy: posts down the middle, a metal roof between them, lights underneath
+        F.geo(Bs.trim, lmBox(0.22, 3.4, 0.22, x, gy + 1.7, z), null, POST);
+        if (lastPost && s - lastPost.s <= 7.5) { const cw = Math.min(wd - 0.6, 4.4), mx = (x + lastPost.x) / 2, mz = (z + lastPost.z) / 2, my = (gy + lastPost.gy) / 2 + 3.5; F.geo(Bs.trim, lmBox(s - lastPost.s + 0.1, 0.16, cw, mx, my, mz, ry), null, METAL); F.geo(Bs.warm, lmBox(s - lastPost.s - 0.6, 0.05, 0.25, mx, my - 0.11, mz, ry)); F.geo(Bs.trim, lmBox(s - lastPost.s + 0.1, 0.3, 0.12, mx, my - 0.2, mz, ry), null, POST); }
+        lastPost = { s, x, z, gy };
+      }
+      if (covered && si % 14 === 3 && wd > 3.4) { // bench
+        F.geo(Bs.trim, lmBox(1.8, 0.08, 0.45, x, gy + 0.45, z, ry), null, WOOD); F.geo(Bs.trim, lmBox(1.8, 0.4, 0.06, 0, 0, 0, 0).translate(0, gy + 0.75, -0.22).rotateY(ry).translate(x, 0, z), null, WOOD);
+        for (const e of [-0.75, 0.75]) F.geo(Bs.trim, lmBox(0.08, 0.45, 0.4, 0, gy + 0.22, 0).translate(e, 0, 0).rotateY(ry).translate(x, 0, z), null, POST);
+      }
+      if (!covered && si % 15 === 7) { F.geo(Bs.trim, lmBox(0.14, 4.6, 0.14, x, gy + 2.3, z), null, POST); F.geo(Bs.warm, lmBox(0.6, 0.12, 0.25, x, gy + 4.55, z, ry)); } // platform lamp
+      if (si % 40 === 20 && name) { // name board on two posts, readable from the trains
+        for (const e of [-1.4, 1.4]) { const [px, pz] = [x + ux * e, z + uz * e]; F.geo(Bs.trim, lmBox(0.1, 3.0, 0.1, px, gy + 1.5, pz), null, POST); }
+        const b = boards.get(name) || Buf(); boards.set(name, b); const i0 = b.p.length / 3, nx2 = -uz, nz2 = ux;
+        for (const [e, yy, u, v] of [[-1.5, 2.2, 0, 0], [1.5, 2.2, 1, 0], [1.5, 2.85, 1, 1], [-1.5, 2.85, 0, 1]]) vtx(b, x + ux * e + nx2 * 0.06, gy + yy, z + uz * e + nz2 * 0.06, nx2, 0, nz2, u, v);
+        b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
+      }
+      if (!stairs && dst < 25 && wd > 4.2 && si > 8 && s < s1 - 8) { // stairs down to the underpass: railed opening, a little glass roof
+        stairs = true; const L2 = 6.5, W2 = 0.9;
+        F.geo(Bs.trim, lmBox(L2, 0.04, 2 * W2, x, gy + 0.03, z, ry), null, DARK);
+        for (const e of [-1, 1]) F.geo(Bs.trim, lmBox(L2, 0.06, 0.06, 0, gy + 1.05, e * (W2 + 0.05)).rotateY(ry).translate(x, 0, z), null, COL('#9aa1a8'));
+        for (let k = 0; k <= 4; k++) for (const e of [-1, 1]) F.geo(Bs.trim, lmBox(0.05, 1.05, 0.05, 0, gy + 0.52, 0).translate(-L2 / 2 + k * L2 / 4, 0, e * (W2 + 0.05)).rotateY(ry).translate(x, 0, z), null, COL('#9aa1a8'));
+        F.geo(Bs.trim, lmBox(0.06, 1.05, 2 * W2, 0, gy + 0.52, 0).translate(L2 / 2, 0, 0).rotateY(ry).translate(x, 0, z), null, COL('#9aa1a8'));
+        F.geo(Bs.trim, lmBox(L2 + 0.6, 0.08, 2 * W2 + 0.8, x, gy + 2.6, z, ry), null, COL('#bcd0da'));
+        for (const e of [-1, 1]) F.geo(Bs.trim, lmBox(0.08, 2.6, 0.08, 0, gy + 1.3, 0).translate(e * L2 / 2, 0, W2 + 0.3).rotateY(ry).translate(x, 0, z), null, POST);
+      }
+    }
+  }
+  mkMesh(top, PLAT_MAT.top, 9, false, G); mkMesh(side, PLAT_MAT.side, 9, false, G); mkMesh(line, PLAT_MAT.line, 10, false, G);
+  mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G); if (Bs.warm.i.length) mkMesh(Bs.warm, LMAT.warm, 10, false, G);
+  for (const [n, b] of boards) mkMesh(b, stationSignMat(n), 10, false, G);
 }
