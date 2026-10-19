@@ -437,6 +437,10 @@ function resample(pts, step) {
   return o;
 }
 const bbox = pts => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; } return [x0, z0, x1, z1]; };
+// places the map fills with trees that are open ground: playing fields
+const NO_TREES = [
+  [[-408.6, 279.7], [-378.5, 452.1], [-276.1, 434.2], [-306.2, 261.8]], // Stadio Mino Favini
+];
 // buildings in the map that are not there (mostly from Overture): dropped by the centroid of their footprint
 const GHOSTS = [
   [1243.7, -553.8], [1261.4, -549.6], // a house and a shed across the Curie drive from via Marie Curie
@@ -462,7 +466,7 @@ for (const T of TILES) {
     }
   }
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
-  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = groundH(x, z); T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5 }); }
+  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = groundH(x, z); if (NO_TREES.some(q => inPoly(x, z, q))) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5 }); }
   for (const br of d.ba || []) {
     const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h }); // follow the ground, not long chords
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = groundH((a[0] + c[0]) / 2, (a[1] + c[1]) / 2); WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }); }
@@ -1634,6 +1638,10 @@ const LANDMARKS = [
     wings: [{ ab: [48, 62, 0, 50], h: 8.2, floors: 2, roof: 'hip', pts: [[269.9, -312.9], [278.8, -323.8], [239.8, -355.1], [231.0, -344.3]] }, { ab: [14, 48, 37, 50], h: 8.0, floors: 2, roof: 'ribbed', pts: [[219.6, -309.8], [241.1, -336.1], [231.0, -344.3], [209.5, -317.9]] }], hall: { ab: [21, 46, 1, 21], h: 9.5 }, canopy: { ab: [0, 15, 0, 50], h: 4.4 },
     trees: [[-16, 6], [-11, 10], [-20, 14], [-17, 26], [-15, 31], [-12, -44], [-25, -42], [-35, -42], [-45, -42], [-55, -42], [-25, 36], [-35, 37], [-45, 37], [-55, 37], [22, -44], [35, -44], [50, -44]], slide: [-12, 11],
     base: [[252.1, -292.6], [267.9, -312.0], [252.3, -324.5], [236.5, -305.2]] } },
+  { n: 'Stadio Mino Favini', x: -408.1, z: 378.3, also: [[-418.6, 340.5], [-403.8, 421.8], [-422.9, 394.4]], build: buildStadio, o: { // Meda, the municipal stadium by the SportVillage
+    o: [-384, 316], ua: [0.172, 0.985], pitch: [0, 105, 0, 65], curves: [15, 88, 32.5], rin: 36, rout: 43.5, sprint: 126, mats: [[13, -10], [78, -10], [112, 57], [118, 18]], dugouts: [38, 66],
+    towers: [[-28, -14], [130, -16], [-28, 82], [128, 84]],
+    stands: [{ ab: [35, 80, -42.7, -25.6], h: 9, roof: 3.2, segs: 4 }, { ab: [1.5, 31.5, -40.8, -26.8], h: 4.5, roof: 2.6, segs: 2 }, { ab: [85.5, 115.5, -41.2, -26.6], h: 4.5, roof: 2.6, segs: 2 }] } },
   { n: 'Palazzo Buzzi', x: 339.9, z: -446.4, build: buildPalazzo, o: { style: 'buzzi', h: 16.4, front: [344.2, -451.8], balcony: 'stone', balconyW: 9 } }, // ex S.A.L.D.A., Junior B and f.lli Buzzi on the ground floor
   { n: 'Kino', x: 407.0, z: -375.3, build: buildKino, o: { // the bistro at via Indipendenza 34 in the front of the white block
     kino: { front: [[411.3, -381.3], [422.6, -372.7]], d: 9, h: 8.4 }, rest: { pts: [[398.4, -379.3], [401.0, -382.7], [408.2, -377.2], [405.8, -374.1], [417.1, -365.5], [413.1, -359.6], [394.3, -374.0]], h: 12.8, floors: 4, wall: '#efece4', glass: '#3c4248', roof: '#bdbab3', balc: true, ribbon: 0.5 },
@@ -2928,6 +2936,53 @@ function buildMilani(L, B, G) {
   for (const [a, b] of o.trees || []) { const x = ox + o.ua[0] * a + o.ub[0] * b, z = oz + o.ua[1] * a + o.ub[1] * b, y = groundH(x, z) - gy; T.geo(Bs.trim, new THREE.CylinderGeometry(0.2, 0.28, 2.6, 6).translate(a, y + 1.3, -b), null, COL('#5a4632')); T.geo(Bs.trim, new THREE.IcosahedronGeometry(2.6, 0).scale(1, 0.9, 1).translate(a, y + 4.4, -b), null, COL(Math.abs(a * 7 + b) % 3 < 1.5 ? '#4f7a3a' : '#5d8a44')); }
   { const [a, b] = o.slide, x = ox + o.ua[0] * a + o.ub[0] * b, z = oz + o.ua[1] * a + o.ub[1] * b, y = groundH(x, z) - gy; // the playground: a slide under a yellow cone roof
     T.geo(Bs.trim, lmBox(1.4, 2.0, 1.4, a, y + 1.0, -b), null, COL('#3f7fc0')); T.geo(Bs.trim, new THREE.ConeGeometry(1.2, 1.0, 8).translate(a, y + 2.6, -b), null, COL('#f0c23a')); T.geo(Bs.trim, lmBox(0.8, 0.08, 3.2, a, y + 1.0, -b + 2.0).rotateX(0), null, COL('#3fa0d8')); }
+  lmFlush(Bs, G);
+}
+
+// Stadio Mino Favini, Meda: the pitch inside a red athletics track (six lanes, the sprint straight running on past the bend), sand and blue mats for
+// the jumps, two goals, the dugouts, four floodlight towers; on the west the main stand, seats stepping up under a roof of four cantilevered
+// canopies, with a lower covered stand at each side. Laid out in its own frame: a along the pitch from the corner o, b across it
+function buildStadio(L, B, G) {
+  const o = L.o, [ox, oz] = o.o, [ux, uz] = o.ua, vx = uz, vz = -ux, W = (a, b) => [ox + ux * a + vx * b, oz + uz * a + vz * b], gy = groundH(...W(57, -34));
+  const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(ux, 0, uz), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-vx, 0, -vz)).setPosition(ox, gy, oz)), Bs = lmBuffers(), g = VBuf();
+  const box = (b, w, h, d, a, y, bb, col) => T.geo(b, lmBox(w, h, d, a, y, -bb), null, col);
+  // the ground, cell by cell on a 1.5 m grid so it follows the terrain: track, sand of the jumps, the pitch mown in stripes, then the white lines
+  const [c0, c1, bc] = o.curves, Ri = o.rin, Ro = o.rout, [p0, p1, q0, q1] = o.pitch, pm = (q0 + q1) / 2, am = (p0 + p1) / 2;
+  const rOf = (a, b) => hyp(a - clamp(a, c0, c1), b - bc), TRACK = COL('#b5543f'), SAND = COL('#cdb58f'), G1 = COL('#4f8a3a'), G2 = COL('#5a9643'), GR = COL('#5a8a3f');
+  const surf = (a, b) => { const r = rOf(a, b); if (r >= Ri && r <= Ro) return TRACK; if (a > c1 && a <= o.sprint && b - bc >= Ri && b - bc <= Ro) return TRACK;
+    if (r < Ri) { if (a >= p0 && a <= p1 && b >= q0 && b <= q1) return Math.floor((a - p0) / 7.5) % 2 ? G1 : G2; return a > p1 && b < bc + 22 ? SAND : GR; } return null; };
+  const S = 1.5;
+  for (let a = c0 - Ro - S; a < o.sprint + S; a += S) for (let b = bc - Ro - S; b < bc + Ro + S; b += S) {
+    const col = surf(a + S / 2, b + S / 2); if (!col) continue; const i0 = g.p.length / 3;
+    for (const [da, db] of [[0, 0], [S, 0], [S, S], [0, S]]) { const [x, z] = W(a + da, b + db); vtx(g, x, 0.05, z, 0, 1, 0, 0, 0, col); }
+    g.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2, i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
+  }
+  const strip = (A, Bp, w) => { const L2 = hyp(Bp[0] - A[0], Bp[1] - A[1]) || 1, n = Math.ceil(L2 / 2); for (let k = 0; k < n; k++) { const P0 = [A[0] + (Bp[0] - A[0]) * k / n, A[1] + (Bp[1] - A[1]) * k / n], P1 = [A[0] + (Bp[0] - A[0]) * (k + 1) / n, A[1] + (Bp[1] - A[1]) * (k + 1) / n], nx = -(Bp[1] - A[1]) / L2 * w / 2, nz = (Bp[0] - A[0]) / L2 * w / 2, i0 = g.p.length / 3;
+    for (const [x, z] of [[P0[0] + nx, P0[1] + nz], [P1[0] + nx, P1[1] + nz], [P1[0] - nx, P1[1] - nz], [P0[0] - nx, P0[1] - nz]]) vtx(g, x, 0.09, z, 0, 1, 0, 0, 0, COL('#efece4')); g.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2, i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); } };
+  const line = pts => { for (let k = 1; k < pts.length; k++) strip(pts[k - 1], pts[k], 0.12); };
+  const oval = r => { const pts = []; for (let i = 0; i <= 24; i++) { const t = -Math.PI / 2 - i / 24 * Math.PI; pts.push(W(c0 + Math.cos(t) * r, bc + Math.sin(t) * r)); } for (let i = 0; i <= 24; i++) { const t = Math.PI / 2 - i / 24 * Math.PI; pts.push(W(c1 + Math.cos(t) * r, bc + Math.sin(t) * r)); } pts.push(pts[0]); return pts; };
+  for (let k = 1; k < 6; k++) line(oval(Ri + (Ro - Ri) * k / 6)); // lanes
+  line([W(p0, q0), W(p1, q0), W(p1, q1), W(p0, q1), W(p0, q0)]); line([W(am, q0), W(am, q1)]);
+  const circ = (a, b, r, t0 = 0, t1 = TAU) => { const pts = []; for (let i = 0; i <= 24; i++) { const t = t0 + (t1 - t0) * i / 24; pts.push(W(a + Math.cos(t) * r, b + Math.sin(t) * r)); } return pts; }; line(circ(am, pm, 9.15));
+  for (const [e, sg] of [[p0, 1], [p1, -1]]) { line([W(e, pm - 20.15), W(e + sg * 16.5, pm - 20.15), W(e + sg * 16.5, pm + 20.15), W(e, pm + 20.15)]); line([W(e, pm - 9.15), W(e + sg * 5.5, pm - 9.15), W(e + sg * 5.5, pm + 9.15), W(e, pm + 9.15)]); line(circ(e + sg * 11, pm, 9.15, sg > 0 ? -0.93 : Math.PI - 0.93, sg > 0 ? 0.93 : Math.PI + 0.93)); }
+  LMAT.yard = LMAT.yard || new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); mkMesh(g, LMAT.yard, 1, false, G);
+  const hAt = (a, b) => groundH(...W(a, b)) - gy, WHITE = COL('#f2f2ee');
+  for (const [e, sg] of [[p0, 1], [p1, -1]]) { const y = hAt(e, pm); for (const d of [-3.66, 3.66]) box(Bs.trim, 0.12, 2.44, 0.12, e, y + 1.22, pm + d, WHITE); box(Bs.trim, 0.12, 0.12, 7.44, e, y + 2.44, pm, WHITE); box(Bs.trim, 1.8, 0.04, 7.3, e - sg * 0.9, y + 2.2, pm, COL('#d8d8d4')); } // goals, the net on top
+  for (const [a, b] of o.mats) box(Bs.trim, 5, 0.5, 4, a, hAt(a, b) + 0.25, b, COL('#2f5fb0')); // the mats of the high jump and pole vault
+  for (const a of o.dugouts) { const b = q1 + 4.5, y = hAt(a, b); box(Bs.trim, 6, 0.1, 1.6, a, y + 2.1, b, COL('#cfd6dc')); box(Bs.trim, 6, 2.1, 0.08, a, y + 1.05, b + 0.8, COL('#9aa4ab')); box(Bs.trim, 5.6, 0.45, 0.5, a, y + 0.45, b + 0.3, COL('#2f5fb0')); }
+  for (const [a, b] of o.towers) { const y = hAt(a, b); T.geo(Bs.trim, new THREE.CylinderGeometry(0.25, 0.4, 26, 8).translate(a, y + 13, -b), null, COL('#a9adb1')); box(Bs.trim, 4.2, 2.6, 0.4, a, y + 26.5, b, COL('#d9dcdf')); for (let i = 0; i < 6; i++) box(Bs.trim, 0.55, 0.5, 0.1, a - 1.5 + (i % 3) * 1.5, y + 26.0 + Math.floor(i / 3) * 1.1, b + (b < 30 ? 0.22 : -0.22), COL('#fff6d8')); }
+  // the stands: concrete terraces from the front up to the back wall, the roof on columns at the back, cantilevered canopies over the seats
+  for (const st of o.stands) {
+    const [a0, a1, b0, b1] = st.ab, H = st.h, n = Math.round((b1 - b0) / 0.8), CON = COL('#b9b6ae'), SEAT = COL(st.seat || '#d6d8da');
+    for (let i = 0; i < n; i++) { const bb = b1 - (i + 0.5) * (b1 - b0) / n, y = 0.4 + i * (H - 2.4) / n; box(Bs.walk, a1 - a0, y, (b1 - b0) / n + 0.02, (a0 + a1) / 2, y / 2, bb, CON); if (i % 1 === 0) box(Bs.trim, a1 - a0 - 0.6, 0.35, 0.35, (a0 + a1) / 2, y + 0.2, bb - 0.15, SEAT); }
+    box(Bs.plaster, a1 - a0, H, 0.4, (a0 + a1) / 2, H / 2 - 0.5, b0 + 0.2, CON); for (const a of [a0, a1]) box(Bs.plaster, 0.4, H, b1 - b0, a, H / 2 - 0.5, (b0 + b1) / 2, CON);
+    const segs = st.segs || 1, sw = (a1 - a0) / segs;
+    for (let k = 0; k < segs; k++) { const am2 = a0 + sw * (k + 0.5); // a canopy sloping down to the front, its beam over the back
+      T.geo(Bs.trim, lmBox(sw - 0.3, 0.3, b1 - b0 + 2.5, 0, 0, 0).rotateX(-0.08).translate(am2, H + st.roof, -((b0 + b1) / 2 + 1)), null, COL('#dfe1e3'));
+      box(Bs.trim, 0.6, st.roof + 1.2, 0.6, a0 + sw * k + 0.3, H + st.roof / 2 - 0.2, b0 + 0.6, COL('#8d9094')); box(Bs.trim, 0.8, 1.2, b1 - b0 + 2.5, a0 + sw * k + 0.4, H + st.roof + 0.4, (b0 + b1) / 2 + 1, COL('#8d9094')); }
+    box(Bs.trim, 0.6, st.roof + 1.2, 0.6, a1 - 0.3, H + st.roof / 2 - 0.2, b0 + 0.6, COL('#8d9094'));
+    box(Bs.trim, a1 - a0, 1.0, 0.25, (a0 + a1) / 2, 0.5, b1, COL('#d9d6cf')); // the low wall in front
+  }
   lmFlush(Bs, G);
 }
 
