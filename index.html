@@ -1596,14 +1596,17 @@ const LANDMARKS = [
         { pts: [[-509.6, -802.2], [-493.2, -808.2], [-486.6, -792.1], [-503.1, -785.3]], h: 8.4, floors: 2 }, { pts: [[-503.1, -785.3], [-486.6, -792.1], [-481.9, -778.1], [-498.4, -771.0]], h: 8.4, floors: 2 }],
       steps: [{ pts: [[-535.5, -807.6], [-528.7, -810.4], [-523.3, -797.8], [-532.7, -793.6]], n: 8, h: 2.4 }],
       walkway: [[-578.8, -718.1], [-549.3, -727.1], [-544.3, -722.0], [-515.0, -741.3]] } },
-  { n: 'Medateca', x: 501.6, z: -451.3, build: buildMedateca, o: { h: 14.9, front: [506.9, -458.5], side: [509.5, -445.5] } }, // the civic library on via Yuri Gagarin
-  { n: 'Palazzo delle banche', x: 479.1, z: -438.3, build: buildModern, // Intesa Sanpaolo and BPER on the roundabout: a two-floor podium behind a portico, the glass block over it
-    o: { wall: '#7f868c', glass: '#3f505b', roof: '#6d6f71', h: 7.2, floors: 2, portico: true, ribbon: 0.72, base: [[471.6, -462.3], [488.3, -450.0], [504.2, -438.3], [482.1, -408.6], [449.5, -432.5]], wings: [{ inset: 3.0, h: 20.4, floors: 6 }], hvac: 6 } },
+  { n: 'Medateca', x: 501.6, z: -451.3, build: buildMedateca, o: { h: 14.9, front: [506.9, -458.5], side: [509.5, -445.5], gate: [518.4, -449.9, Math.atan2(-(-452.6 + 464.3), 514.9 - 498.9)] } }, // the civic library on via Yuri Gagarin
+  { n: 'Palazzo delle banche', x: 479.1, z: -438.3, build: buildModern, // on the roundabout: a podium in exposed-aggregate concrete, a ribbon of windows, the bank counters glazed behind round
+    // columns; over it the block in reflecting glass; the Auxologico rehabilitation centre has the podium on via Gagarin
+    o: { wall: '#a69d8d', glass: '#8fa6bb', roof: '#6d6f71', h: 7.2, floors: 2, portico: true, round: true, ribbon: 0.42, base: [[471.6, -462.3], [488.3, -450.0], [504.2, -438.3], [482.1, -408.6], [449.5, -432.5]],
+      wings: [{ inset: 3.0, h: 22.4, floors: 7 }], curtain: true, hvac: 6, signs: [{ at: [484.0, -453.5], text: 'Auxologico Meda Riabilitazione', w: 14, h: 1.0, y: 6.7, bg: '#4a4e52', fg: '#f2f2ee' }] } },
   { n: 'Auxologico Meda', x: 585.6, z: -601.3, build: buildModern, // the low white clinic on via Umberto Pace: terracotta entrances and louvres, a light well, solar panels all over the roof
     o: { wall: '#f1f0ec', glass: '#34414a', roof: '#a8a59f', h: 8.4, floors: 2, punched: true, porch: true, solar: 0.75, hvac: 9,
       wells: [[[548.95, -584.16], [546.45, -585.82], [553.05, -595.84], [555.55, -594.18]]] } },
   { n: 'Residenza di via Gagarin', x: 559.1, z: -544.7, build: buildModern, // the new block by the park: taupe walls, white balconies wrapping round every floor, panels on the roof
     o: { wall: '#8e7e6f', glass: '#3a4148', roof: '#d9d8d4', h: 19.5, floors: 6, balc: true, solar: 0.5, hvac: 2, ribbon: 0.62 } },
+  { n: 'Portici di corso della Resistenza', x: 426.4, z: -486.9, build: buildPortici, o: { h: 10.4, floors: 2 } }, // with the Gala ice-cream parlour on the corner of via Pace
   // the towers of the seventies between the Medateca and the railway: bare grey concrete, a balcony slab round every floor
   { n: 'Torre di via Gagarin', x: 518.6, z: -480.3, build: buildModern, o: { wall: '#a8a49b', glass: '#3a3f44', roof: '#8d8a84', h: 28.8, floors: 9, balc: true, ribbon: 0.55, hvac: 2 } },
   { n: 'Torre di via Pace', x: 483.7, z: -491.9, build: buildModern, o: { wall: '#b3afa5', glass: '#3a3f44', roof: '#8d8a84', h: 21.7, floors: 7, balc: true, ribbon: 0.55, hvac: 2 } },
@@ -2741,7 +2744,7 @@ function buildParkFurniture(T, G) {
 // a glazed lantern on the roof. o.front, o.side: points by the street front and by the garden side
 function buildMedateca(L, B, G) {
   const o = L.o, ring = lmSimplify(B.pts, 0.4), F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), H = gy + o.h, A = sArea(ring);
-  const RED = COL('#b23a2c'), DARK = COL('#2d3a40'), FIN = COL('#e3e3df'), GL = COL('#5d7d86'), near = (q, a, c) => segDist(q[0], q[1], a[0], a[1], c[0], c[1]);
+  const lettering = [], RED = COL('#b23a2c'), DARK = COL('#2d3a40'), FIN = COL('#e3e3df'), GL = COL('#5d7d86'), near = (q, a, c) => segDist(q[0], q[1], a[0], a[1], c[0], c[1]);
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.3) continue;
     let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
@@ -2751,23 +2754,70 @@ function buildMedateca(L, B, G) {
     F.face(Bs.plaster, [P(0, gy - 1, 0), P(Ln, gy - 1, 0), P(Ln, H, 0), P(0, H, 0)], 2, RED);
     F.geo(Bs.trim, lmBox(Ln + 0.3, 0.6, 0.35, 0, 0, 0).rotateY(ry).translate((a[0] + c[0]) / 2 + nx * 0.12, H + 0.3, (a[1] + c[1]) / 2 + nz * 0.12), null, RED);
     if (front) {
-      quad(0.7, Ln - 0.7, gy + 0.1, gy + 3.3, 0.06, GL); for (let t = 0.7; t <= Ln - 0.6; t += 1.7) F.geo(Bs.trim, lmBox(0.1, 3.2, 0.1, 0, 0, 0).translate(...[P(t, 0, 0.1)].map(q => [q[0], gy + 1.7, q[2]])[0]), null, DARK);
+      quad(0.7, Ln - 0.7, gy + 0.1, gy + 3.3, 0.06, GL); lettering.push([P(Ln / 2, gy + 2.3, 0.1), ex, ez, nx, nz, Ln - 2]); for (let t = 0.7; t <= Ln - 0.6; t += 1.7) F.geo(Bs.trim, lmBox(0.1, 3.2, 0.1, 0, 0, 0).translate(...[P(t, 0, 0.1)].map(q => [q[0], gy + 1.7, q[2]])[0]), null, DARK);
       quad(1.5, Ln - 1.5, gy + 3.9, gy + 4.4, 0.04, DARK); // the slit window in the red band
       quad(0.7, Ln - 0.7, gy + 5.0, H - 1.2, 0.04, DARK);
       for (let t = 1.0; t < Ln - 0.8; t += 0.62) F.geo(Bs.trim, lmBox(0.14, H - 1.2 - gy - 5.0, 0.55, 0, 0, 0).rotateY(ry).translate(a[0] + ex * t + nx * 0.35, (gy + 5.0 + H - 1.2) / 2, a[1] + ez * t + nz * 0.35), null, FIN);
-    } else if (side) {
-      quad(Ln * 0.45, Ln - 0.6, gy + 0.1, gy + 3.0, 0.05, GL); // the glazed part of the ground floor towards the garden
-      quad(0.8, Ln - 0.8, gy + 3.7, gy + 4.6, 0.05, DARK); for (let t = 0.8; t < Ln - 0.7; t += 0.5) F.geo(Bs.trim, lmBox(0.06, 0.9, 0.08, 0, 0, 0).translate(...[P(t, 0, 0.09)].map(q => [q[0], gy + 4.15, q[2]])[0]), null, FIN);
-      const W = [[0.25, 6.4], [0.42, 6.4], [0.58, 6.4], [0.35, 8.6], [0.52, 8.6], [0.68, 8.6], [0.3, 10.8], [0.47, 10.8], [0.64, 10.8], [0.8, 10.8]];
-      for (const [t, y] of W) { quad(Ln * t - 0.45, Ln * t + 0.45, gy + y, gy + y + 0.9, 0.05, COL('#e8e4dc')); quad(Ln * t - 0.33, Ln * t + 0.33, gy + y + 0.12, gy + y + 0.78, 0.07, DARK); }
-      quad(Ln * 0.12 - 0.5, Ln * 0.12 + 0.5, gy + 5.4, H - 1.6, 0.05, DARK); // the tall slot near the street corner
+    } else if (side) { // towards the garden: the double-height glazed bay by the fins, a red box standing out with its tall window, slits and little
+      // square windows, a ribbon of windows over the ground floor, glass under it towards the street
+      quad(0, Ln * 0.42, gy + 0.1, gy + 3.0, 0.05, GL);
+      quad(0.8, Ln - 1.0, gy + 3.7, gy + 4.6, 0.05, DARK); for (let t = 0.8; t < Ln - 0.9; t += 0.55) F.geo(Bs.trim, lmBox(0.06, 0.9, 0.08, 0, 0, 0).translate(...[P(t, 0, 0.09)].map(q => [q[0], gy + 4.15, q[2]])[0]), null, FIN);
+      quad(0.3, Ln * 0.26, gy + 5.4, H - 1.0, 0.05, GL); quad(0.3, Ln * 0.26, gy + 8.9, gy + 9.3, 0.08, DARK); // the glazed bay, a dark transom halfway
+      for (let t = 0.3; t <= Ln * 0.26 + 0.01; t += (Ln * 0.26 - 0.3) / 3) F.geo(Bs.trim, lmBox(0.08, H - 1.0 - gy - 5.4, 0.08, 0, 0, 0).translate(...[P(t, 0, 0.09)].map(q => [q[0], (gy + 5.4 + H - 1.0) / 2, q[2]])[0]), null, FIN);
+      const b0 = Ln * 0.3, b1 = Ln * 0.42; // the box standing out half a metre, its tall window
+      F.geo(Bs.trim, lmBox(b1 - b0, H - 2.4 - gy - 5.0, 0.6, 0, 0, 0).rotateY(ry).translate(...[P((b0 + b1) / 2, 0, 0.3)].map(q => [q[0], (gy + 5.0 + H - 2.4) / 2, q[2]])[0]), null, RED);
+      quad(b0 + 0.4, b1 - 0.4, gy + 5.6, H - 3.2, 0.62, GL);
+      for (const [t, y0, y1] of [[0.5, 6.6, 8.6], [0.56, 6.6, 8.6], [0.68, 6.0, 7.6], [0.8, 6.0, 7.6], [0.53, 9.6, 11.4], [0.66, 10.2, 11.8], [0.86, 9.6, 11.4]]) quad(Ln * t - 0.22, Ln * t + 0.22, gy + y0, gy + y1, 0.05, DARK);
+      for (const t of [0.45, 0.62, 0.72, 0.9]) quad(Ln * t - 0.3, Ln * t + 0.3, H - 2.0, H - 1.4, 0.05, DARK);
     }
   }
   try { polyFill(Bs.trim, ring, [], H + 0.02, 2, COL('#7f7a74')); } catch (e) { }
   const [cx, cz] = centroid(ring), bx = cx + (o.side[0] - cx) * 0.35, bz = cz + (o.side[1] - cz) * 0.35, ry = Math.atan2(-(o.side[1] - cz), o.side[0] - cx);
   F.geo(Bs.trim, lmBox(7.5, 2.0, 6.5, 0, 0, 0).rotateY(ry).translate(bx, H + 1.0, bz), null, COL('#e2e0da')); // the lantern on the roof, glazed on top
   F.geo(Bs.trim, lmBox(5.5, 0.4, 4.5, 0, 0, 0).rotateY(ry).translate(bx, H + 2.15, bz), null, GL);
+  if (o.gate) { // the way down to the car park beside it: a little lodge in exposed-aggregate concrete under a dark slab, the railing along the garden
+    const [gx, gz, gr] = o.gate, AG = COL('#a39a89'), y = groundH(gx, gz), ux = Math.cos(gr), uz = -Math.sin(gr);
+    for (const sd of [-1, 1]) F.geo(Bs.trim, lmBox(0.8, 2.6, 3.2, 0, 0, 0).rotateY(gr).translate(gx + ux * sd * 1.7, y + 1.3, gz + uz * sd * 1.7), null, AG);
+    F.geo(Bs.trim, lmBox(4.8, 0.35, 3.8, 0, 0, 0).rotateY(gr).translate(gx, y + 2.75, gz), null, COL('#3b3d40'));
+    for (let k = -1.2; k <= 1.2; k += 0.15) F.geo(Bs.trim, lmBox(0.04, 2.0, 0.04, 0, 0, 0).translate(gx + ux * k, y + 1.0, gz + uz * k), null, COL('#4a4c4e'));
+    for (let k = 2.6; k < 16; k += 0.14) F.geo(Bs.trim, lmBox(0.04, 1.3, 0.04, 0, 0, 0).translate(gx + ux * k, y + 1.25, gz + uz * k), null, COL('#6c7074'));
+    F.geo(Bs.trim, lmBox(13.4, 0.6, 0.35, 0, 0, 0).rotateY(gr).translate(gx + ux * 9.3, y + 0.3, gz + uz * 9.3), null, AG);
+    F.geo(Bs.trim, lmBox(13.4, 0.06, 0.06, 0, 0, 0).rotateY(gr).translate(gx + ux * 9.3, y + 1.9, gz + uz * 9.3), null, COL('#6c7074'));
+  }
   lmFlush(Bs, G);
+  for (const [[x, y, z], ex, ez, nx, nz, w] of lettering) { // MEDATECA repeated on the glass of the ground floor
+    const g = Buf(), T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(ex, 0, ez), new THREE.Vector3(0, 1, 0), new THREE.Vector3(nx, 0, nz)).setPosition(x, y, z));
+    for (const [px, py, u, v] of [[-w / 2, -0.35, 0, 0], [w / 2, -0.35, 1, 0], [w / 2, 0.35, 1, 1], [-w / 2, 0.35, 0, 1]]) T.v(g, px, py, 0, 0, 0, 1, u, v); g.i.push(0, 1, 2, 0, 2, 3);
+    const tex = canvasTex(1024, 64, (cg, W, Hh) => { cg.clearRect(0, 0, W, Hh); cg.fillStyle = 'rgba(235,238,236,.85)'; cg.font = '600 40px Arial, sans-serif'; cg.textBaseline = 'middle'; for (let k = 0, x0 = 10; x0 < W; k++, x0 += cg.measureText('MEDATECA  ').width) cg.fillText('MEDATECA  ', x0, Hh / 2); }, false);
+    mkMesh(g, new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false }), 11, false, G);
+  }
+}
+
+// the shops of corso della Resistenza: a portico on brown-red pillars with striped awnings, the shop windows set back, and over it two floors of
+// beige panels standing out between bordeaux bays with the windows; o: { h, floors }
+const awningTex = canvasTex(64, 32, (g, w, h) => { for (let x = 0; x < w; x += 8) { g.fillStyle = (x / 8) % 2 ? '#f1ece2' : '#6b4a3c'; g.fillRect(x, 0, 8, h); } });
+function buildPortici(L, B, G) {
+  const o = L.o, ring = lmSimplify(B.pts, 0.4), F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), aw = Buf(), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), H = gy + o.h, A = sArea(ring);
+  const BEIGE = COL('#9a8a6c'), BORD = COL('#5c1a24'), PIL = COL('#6a3a30'), GL = COL('#4a5660'), PH = 3.6, fh = (o.h - PH) / o.floors;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.3) continue;
+    let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
+    const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, ry = Math.atan2(-ez, ex), P = (s, y, q) => [a[0] + ex * s + nx * q, y, a[1] + ez * s + nz * q];
+    const quad = (b, s0, s1, y0, y1, q, col) => F.face(b, [P(s0, y0, q), P(s1, y0, q), P(s1, y1, q), P(s0, y1, q)], 2, col);
+    quad(Bs.plaster, 0, Ln, gy + PH, H, 0, BORD); quad(Bs.plaster, 0, Ln, gy - 1, gy + PH, -2.4, COL('#9a948a')); // the bordeaux skin; the shop front 2.4 m back
+    quad(Bs.trim, 0.2, Ln - 0.2, gy + 0.05, gy + PH - 0.5, -2.35, GL);
+    F.face(Bs.trim, [P(0, gy + PH, 0), P(Ln, gy + PH, 0), P(Ln, gy + PH, -2.4), P(0, gy + PH, -2.4)], 2, COL('#5a4a42')); // the portico ceiling
+    if (Ln < 4) continue;
+    for (let t = 0.3; t < Ln; t += 4.2) F.geo(Bs.trim, lmBox(0.35, PH, 0.35, 0, 0, 0).rotateY(ry).translate(...[P(t, 0, -0.2)].map(q => [q[0], gy + PH / 2, q[2]])[0]), null, PIL);
+    const k0 = aw.p.length / 3; for (const [s, y, q, u, v] of [[0, gy + PH - 0.1, 0.9, 0, 0], [Ln, gy + PH - 0.1, 0.9, Ln / 1.6, 0], [Ln, gy + PH + 0.5, -0.05, Ln / 1.6, 1], [0, gy + PH + 0.5, -0.05, 0, 1]]) { const q2 = P(s, y, q); vtx(aw, q2[0], q2[1], q2[2], nx * 0.6, 0.8, nz * 0.6, u, v); } aw.i.push(k0, k0 + 1, k0 + 2, k0, k0 + 2, k0 + 3, k0, k0 + 2, k0 + 1, k0, k0 + 3, k0 + 2); // the striped awning all along
+    for (let t = 0.2; t < Ln - 1.0; t += 4.2) { // a beige panel standing out, then the bordeaux bay with its windows
+      F.geo(Bs.trim, lmBox(Math.min(2.6, Ln - t), H - gy - PH - 0.2, 0.35, 0, 0, 0).rotateY(ry).translate(...[P(t + 1.3, 0, 0.18)].map(q => [q[0], (gy + PH + H) / 2, q[2]])[0]), null, BEIGE);
+      if (t + 3.0 < Ln) for (let f = 0; f < o.floors; f++) { const y0 = gy + PH + f * fh; quad(Bs.trim, t + 2.8, t + 3.9, y0 + fh * 0.35, y0 + fh * 0.85, 0.04, GL); quad(Bs.trim, t + 2.8, t + 3.9, y0 + fh * 0.33, y0 + fh * 0.36, 0.06, COL('#d9d4c8')); }
+    }
+    F.geo(Bs.trim, lmBox(Ln + 0.3, 0.5, 0.45, 0, 0, 0).rotateY(ry).translate(...[P(Ln / 2, 0, 0.2)].map(q => [q[0], H + 0.25, q[2]])[0]), null, BEIGE);
+  }
+  try { polyFill(Bs.trim, ring, [], H + 0.02, 2, COL('#7f7a74')); } catch (e) { }
+  lmFlush(Bs, G); mkMesh(aw, new THREE.MeshLambertMaterial({ map: awningTex, side: THREE.DoubleSide }), 10, false, G);
 }
 
 // a school gym of the seventies: prefabricated panels in faded red, a band of windows under the eaves, a shallow metal roof
@@ -2800,7 +2850,8 @@ function buildPalestra(L, B, G) { // o.white: white render instead of the panels
 // ribbon (share of each floor the window ribbons take), punched (single windows instead of ribbons), portico (the ground floor of the base set back
 // behind pillars), balc (balcony slabs on every floor, glass parapets), porch (terracotta entrances and louvres on the long sides), solar (share of
 // the top roof under panels), hvac (plant boxes on the roof), wells: [quad] (glazed light wells in the roof); wings[].inset: a wing drawn on the
-// footprint pulled in by that many metres }
+// footprint pulled in by that many metres, curtain (the top wing a skin of reflecting glass), round (round columns under the portico),
+// signs: [{ at: [x, z], text, w, y, bg, fg }] boards on the wall nearest to at }
 const bridgeSign = t => canvasTex(1024, 128, (g, w, h) => {
   g.fillStyle = '#f4f4f1'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f2a44'; g.textAlign = 'center'; g.textBaseline = 'middle';
   const L = t.split('\n'); g.font = `${L.length > 1 ? 46 : 50}px Georgia, serif`; L.forEach((s, i) => g.fillText(s, w * 0.44, h / 2 + (i - (L.length - 1) / 2) * 50 + 3));
@@ -2818,8 +2869,16 @@ function buildModern(L, B, G) {
       let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
       const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, ry = Math.atan2(-ez, ex), mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
       const court = (courts || []).some(q => inPoly(mx + nx, mz + nz, q)), band = (y0, y1, q, col) => F.face(Bs.trim, [[a[0] + nx * q, y0, a[1] + nz * q], [c[0] + nx * q, y0, c[1] + nz * q], [c[0] + nx * q, y1, c[1] + nz * q], [a[0] + nx * q, y1, a[1] + nz * q]], 2, col);
+      const skin = kind === 'top' && o.curtain;
       if (o.brick) F.face(Bs.brick, [[a[0], gy - 1, a[1]], [c[0], gy - 1, c[1]], [c[0], top, c[1]], [a[0], top, a[1]]]);
-      else F.face(Bs.plaster, [[a[0], gy - 1, a[1]], [c[0], gy - 1, c[1]], [c[0], top, c[1]], [a[0], top, a[1]]], 2, WALL);
+      else F.face(Bs.plaster, [[a[0], gy - 1, a[1]], [c[0], gy - 1, c[1]], [c[0], top, c[1]], [a[0], top, a[1]]], 2, skin ? COL('#9fb6cc') : WALL);
+      if (skin) { // reflecting glass panels on a grid of grey mullions, a dark band where it sits on the podium
+        band(gy + o.h, gy + o.h + 0.9, 0.08, COL('#55595e'));
+        for (let t = 0; t <= Ln + 0.01; t += 1.8) F.geo(Bs.trim, lmBox(0.1, h - o.h - 0.9, 0.1, 0, 0, 0).translate(a[0] + ex * t + nx * 0.06, gy + (o.h + 0.9 + h) / 2, a[1] + ez * t + nz * 0.06), null, COL('#6b7178'));
+        for (let y = gy + o.h + 0.9; y < top; y += (h - o.h - 0.9) / floors) F.geo(Bs.trim, lmBox(Ln, 0.1, 0.1, 0, 0, 0).rotateY(ry).translate(mx + nx * 0.06, y, mz + nz * 0.06), null, COL('#6b7178'));
+        F.geo(Bs.trim, lmBox(Ln + 0.2, 0.7, 0.3, 0, 0, 0).rotateY(ry).translate(mx + nx * 0.1, top + 0.35, mz + nz * 0.1), null, COL('#6b7178'));
+        continue;
+      }
       F.geo(Bs.trim, lmBox(Ln + 0.2, 0.7, 0.3, 0, 0, 0).rotateY(ry).translate(mx + nx * 0.1, top + 0.35, mz + nz * 0.1), null, CAP); // parapet
       if (Ln < 3) continue;
       if (kind === 'gym') { // the gym: blind walls, a row of little windows high up and one low down
@@ -2834,7 +2893,7 @@ function buildModern(L, B, G) {
       }
       if (o.portico && !kind && h <= o.h) { // a portico all along: the ground floor glazed and set back, square pillars in front
         band(gy + 0.1, gy + 3.4, -1.6, GLASS); band(gy + 3.4, gy + 3.5, 0.02, COL('#5e6266'));
-        for (let s = 1.2; s < Ln - 0.6; s += 4.5) F.geo(Bs.trim, lmBox(0.5, 3.4, 0.5, 0, 0, 0).translate(a[0] + ex * s + nx * 0.2, gy + 1.7, a[1] + ez * s + nz * 0.2), null, COL('#b9bcbe'));
+        for (let s = 1.2; s < Ln - 0.6; s += 4.5) F.geo(Bs.trim, (o.round ? new THREE.CylinderGeometry(0.3, 0.3, 3.4, 12) : lmBox(0.5, 3.4, 0.5, 0, 0, 0)).translate(a[0] + ex * s + nx * 0.2, gy + 1.7, a[1] + ez * s + nz * 0.2), null, COL('#b9bcbe'));
       }
       if (o.balc && Ln > 6) for (let f = 1; f < floors; f++) { // balconies on every floor: a white slab and a glass parapet
         const y = gy + 0.9 + f * fh - 0.15;
@@ -2922,6 +2981,16 @@ function buildModern(L, B, G) {
     const sg = Buf(); for (const [x, y, u, v] of [[0.3, 3.55, 0, 0], [Lb - 0.3, 3.55, 1, 0], [Lb - 0.3, 4.85, 1, 1], [0.3, 4.85, 0, 1]]) T.v(sg, x, y, 0.62, 0, 0, 1, u, v); sg.i.push(0, 1, 2, 0, 2, 3);
     T.geo(Bs.trim, new THREE.CircleGeometry(0.42, 16).translate(Lb / 2, 5.2, 0.66), null, COL('#e0e0dc'));
     signs.push([sg, new THREE.MeshLambertMaterial({ map: bridgeSign(br.sign), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })]);
+  }
+  for (const sg of o.signs || []) { // a board flat on the nearest wall of the base
+    const r = o.base || ring; let best = null; for (let i = 0; i < r.length; i++) { const a = r[i], c = r[(i + 1) % r.length], d = segDist(sg.at[0], sg.at[1], a[0], a[1], c[0], c[1]); if (!best || d < best.d) best = { d, a, c }; }
+    const { a, c } = best, Ln = hyp(c[0] - a[0], c[1] - a[1]), ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, t = clamp((sg.at[0] - a[0]) * ex + (sg.at[1] - a[1]) * ez, sg.w / 2, Ln - sg.w / 2);
+    let nx = ez, nz = -ex; if (inPoly(a[0] + ex * t + nx, a[1] + ez * t + nz, r)) { nx = -nx; nz = -nz; }
+    const cx = a[0] + ex * t + nx * 0.14, cz = a[1] + ez * t + nz * 0.14, hh = sg.h || 0.9, ux = nx > 0 || (nx === 0 && nz < 0) ? 1 : 1, g = Buf();
+    const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(-nz, 0, nx), new THREE.Vector3(0, 1, 0), new THREE.Vector3(nx, 0, nz)).setPosition(cx, gy + sg.y, cz));
+    for (const [x, y, u, v] of [[-sg.w / 2, -hh / 2, 0, 0], [sg.w / 2, -hh / 2, 1, 0], [sg.w / 2, hh / 2, 1, 1], [-sg.w / 2, hh / 2, 0, 1]]) T.v(g, x, y, 0, 0, 0, 1, u, v); g.i.push(0, 1, 2, 0, 2, 3);
+    const tex = canvasTex(1024, Math.round(1024 * hh / sg.w / 4) * 4 || 64, (cg, w, h) => { cg.fillStyle = sg.bg; cg.fillRect(0, 0, w, h); cg.fillStyle = sg.fg; cg.textAlign = 'center'; cg.textBaseline = 'middle'; cg.font = `italic ${Math.round(h * 0.62)}px Georgia, serif`; cg.fillText(sg.text, w / 2, h / 2 + 2); }, false);
+    signs.push([g, new THREE.MeshLambertMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })]);
   }
   lmFlush(Bs, G); for (const [g, m] of signs) mkMesh(g, m, 10, false, G);
 }
