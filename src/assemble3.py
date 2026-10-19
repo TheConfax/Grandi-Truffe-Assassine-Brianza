@@ -493,6 +493,15 @@ let last = performance.now(), acc = 0;
 function frame(t) {""")
 rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto');", "if (v === 'DEBUG') setDebug(!DEBUG); else if (CHEATS[v]) CHEATS[v](); else if (v) toast('Codice sconosciuto');")
 
+# ---- weather: clouds, rain, thunderstorms and fog; codes SOLE, NUVOLE, PIOGGIA, TEMPORALE, NEBBIA
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'weather3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
+rep("13 + S.grip * 0.4) / Math.max(4, Math.abs(v));", "13 + S.grip * (1 - 0.3 * WX.wet) * 0.4) / Math.max(4, Math.abs(v));") # wet tyres slide earlier
+rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
+rep("v -= (arc ? 21 : 11) * dt * i.brk;", "v -= (arc ? 21 : 11) * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
+rep("updGlow();", "updGlow(); updSkyFx(running && !paused ? dt : 0);")
+rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true) };")
+
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')
 left = [m.start() for m in re.finditer(r'surfY\(|TR\.circ|D\.(areas|rails|rivers|train|trees|surf|fences|crossings|buildings|hw|hh)\b|MAPC|MOX', s)]

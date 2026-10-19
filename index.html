@@ -732,6 +732,24 @@ function addBox(b, x, y, z, w, h, d, col, ry = 0) { // axis box rotated about y,
 }
 let srndT = 1;
 const tRnd = () => { srndT = (srndT * 16807) % 2147483647; return srndT / 2147483647; };
+// street lamps every ~30 m along the streets of the towns (OSM maps only a handful): one side on narrow streets, staggered on wide ones
+function genLamps(T, d, osm) {
+  const out = [];
+  for (const ri of d.rp || []) {
+    const r = D.roads[ri]; if (r.c > 3 || r.x || r.d || r.t || r.w < 5) continue;
+    if (!r.cum) { r.cum = [0]; for (let k = 1; k < r.g.length; k++) { const a = N[r.g[k - 1]], b = N[r.g[k]]; r.cum.push(r.cum[k - 1] + hyp(b[0] - a[0], b[1] - a[1])); } }
+    const len = r.cum[r.cum.length - 1], wide = r.w >= 9.5, SP = wide ? 24 : 30, side = ri % 2 ? 1 : -1;
+    for (let s = 6 + ((ri * 7919) % 97) / 97 * SP, n = 0; s < len - 6; s += SP, n++) {
+      let k = 1; while (k < r.cum.length - 1 && r.cum[k] < s) k++;
+      const a = N[r.g[k - 1]], b = N[r.g[k]], L = r.cum[k] - r.cum[k - 1] || 1, f = (s - r.cum[k - 1]) / L, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+      const sd = wide ? (n % 2 ? 1 : -1) : side, off = r.w / 2 + 0.9, x = a[0] + (b[0] - a[0]) * f - uz * off * sd, z = a[1] + (b[1] - a[1]) * f + ux * off * sd;
+      if (tileOf(x, z) !== T.t || onAnyRoad(x, z, 0.3) || inBuilding(x, z, 0.4) || nearRail(x, z, 4) || osm.some(o => hyp(o[0] - x, o[1] - z) < 14)) continue;
+      let town = 0; BLD.each(x - 30, z - 30, x + 30, z + 30, () => { town++; }); if (town < 2) continue; // only where there are houses
+      out.push([x, z, Math.atan2(ux * sd, uz * sd)]); // arm towards the middle of the road
+    }
+  }
+  return out;
+}
 function buildTile(T) {
   if (T.built) return; T.built = true; srndT = 1000 + T.t * 7919;
   const G = new THREE.Group(); scene.add(G); T.group = G;
@@ -1038,14 +1056,17 @@ function buildTile(T) {
     });
     trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; G.add(trunks, crowns);
   }
-  if ((d.lp || []).length) {
-    const lb = Buf(), hb = Buf();
-    for (const [X, Z] of d.lp) { const x = X / 10, z = Z / 10, gy = surfAt(x, z, 1e4); addBox(lb, x, gy + 3.6, z, 0.14, 7.2, 0.14, null); addBox(lb, x + 0.6, gy + 7.15, z, 1.3, 0.1, 0.12, null); addBox(hb, x + 1.15, gy + 7.0, z, 0.5, 0.14, 0.3, null); }
-    put(lb, MAT.lamp, 10, 'cast'); put(hb, MAT.lampHead, 10);
-    const pool = Buf(); // warm light pools on the street at night
-    for (const [X, Z] of d.lp) { const x = X / 10 + 1.15, z = Z / 10, gy = surfAt(x, z, 1e4) + 0.14, i = pool.p.length / 3, R = 7; vtx(pool, x - R, gy, z - R, 0, 1, 0, 0, 0); vtx(pool, x + R, gy, z - R, 0, 1, 0, 1, 0); vtx(pool, x + R, gy, z + R, 0, 1, 0, 1, 1); vtx(pool, x - R, gy, z + R, 0, 1, 0, 0, 1); triUp(pool, i, i + 1, i + 2); triUp(pool, i, i + 2, i + 3); }
-    put(pool, LAMPPOOL_MAT, 12);
-    const gp = []; for (const [X, Z] of d.lp) { const x = X / 10, z = Z / 10; gp.push(x + 1.15, surfAt(x, z, 1e4) + 6.82, z); } // glare under each lamp head
+  const LPS = (d.lp || []).map(([X, Z]) => [X / 10, Z / 10, 0]); LPS.push(...genLamps(T, d, LPS)); // [x, z, arm direction]
+  if (LPS.length) {
+    const lb = Buf(), hb = Buf(), pool = Buf(), gp = [];
+    for (const [x, z, ry] of LPS) {
+      const gy = surfAt(x, z, 1e4), c = Math.cos(ry), s = Math.sin(ry), hx = x + c * 1.15, hz = z - s * 1.15; // the arm reaches out along local +x
+      addBox(lb, x, gy + 3.6, z, 0.14, 7.2, 0.14, null); addBox(lb, x + c * 0.6, gy + 7.15, z - s * 0.6, 1.3, 0.1, 0.12, null, ry); addBox(hb, hx, gy + 7.0, hz, 0.5, 0.14, 0.3, null, ry);
+      const py = surfAt(hx, hz, 1e4) + 0.14, i = pool.p.length / 3, R = 7; // warm light pool on the street at night
+      vtx(pool, hx - R, py, hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, py, hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, py, hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, py, hz + R, 0, 1, 0, 0, 1); triUp(pool, i, i + 1, i + 2); triUp(pool, i, i + 2, i + 3);
+      gp.push(hx, gy + 6.82, hz); // glare under the lamp head
+    }
+    put(lb, MAT.lamp, 10, 'cast'); put(hb, MAT.lampHead, 10); put(pool, LAMPPOOL_MAT, 12);
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
     const glare = new THREE.Points(pg, LAMPGLOW_MAT); glare.renderOrder = 14; G.add(glare);
   }
@@ -2275,7 +2296,7 @@ class Vehicle {
     let v = this.vx * fx + this.vz * fz, lat = this.vx * rx + this.vz * rz;
     const S = this.spec, arc = DRIVE_MODE === 'arcade', dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = (arc ? Math.min(12, S.acc * 2.1) : S.acc) * (bst ? 2.4 : 1), top = this.maxV * (bst ? 1.3 : 1);
     if (thr > 0) { if (v < -0.5) v += 24 * dt; else v += thr * acc * Math.max(0.02, 1 - Math.pow(Math.max(0, v) / top, 2.2)) * dt; } // power curve fitted to real 0-100 times
-    if (i.brk > 0) { if (v > 0.5) v -= (arc ? 21 : 11) * dt * i.brk; else if (!dead) v = Math.max(-11, v - 7 * dt * i.brk); }
+    if (i.brk > 0) { if (v > 0.5) v -= (arc ? 21 : 11) * (1 - 0.25 * WX.wet) * dt * i.brk; else if (!dead) v = Math.max(-11, v - 7 * dt * i.brk); }
     v += 9.81 * Math.sin(this.slope) * (arc ? 0.6 : 1) * dt; // gravity on hills
     const drag = (0.15 + (thr ? 0 : (arc ? 1.6 : 0.45) + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);
     v -= Math.sign(v) * Math.min(Math.abs(v), drag);
@@ -2285,9 +2306,9 @@ class Vehicle {
     const sMax = 0.62 / (1 + Math.abs(v) * 0.045) * (S.two ? 0.4 : 1);
     let yaw = this.steer * sMax * v / (S.L * 0.62); if (i.hand) yaw *= 1.55;
     if (S.two && this.wh > 0.08) yaw *= 0.35; // front wheel in the air
-    const yawMax = (i.hand ? 26 : arc ? 30 : 13 + S.grip * 0.4) / Math.max(4, Math.abs(v)); yaw = clamp(yaw, -yawMax, yawMax); // grip limit
+    const yawMax = (i.hand ? 26 : arc ? 30 : 13 + S.grip * (1 - 0.3 * WX.wet) * 0.4) / Math.max(4, Math.abs(v)); yaw = clamp(yaw, -yawMax, yawMax); // grip limit
     this.h = wrapA(this.h + yaw * dt);
-    lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);
+    lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);
     this.drift = Math.abs(lat);
     this.vx = fx * v + rx * lat; this.vz = fz * v + rz * lat; // world velocity kept in old frame → slides when grip is low
     this.x += this.vx * dt; this.z += this.vz * dt;
@@ -2941,7 +2962,7 @@ function step(dt) {
     }
   }
   // ----- train
-  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWrecks(dt); updFuel(dt); updCaserme(dt);
+  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWeather(dt); updWrecks(dt); updFuel(dt); updCaserme(dt);
   for (const [cx, cz, tvx, tvz] of TRAIN_CIRC) {
     for (const v of VEH) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad; if (d < RT && d > 1e-5) { const nx = dx / d, nz = dz / d; v.x += nx * (RT - d); v.z += nz * (RT - d); v.vx = tvx + nx * 6; v.vz = tvz + nz * 6; v.sleep = false; v.impact(12 + hyp(tvx, tvz)); } }
   }
@@ -3080,6 +3101,7 @@ function updCamera(dt) {
 }
 // ---------------------------------------------------------------- day & night
 let TOD = 17.2; // ore del giorno, 1 ora di gioco = 1 minuto reale
+const WX = { cloud: 0.12, rain: 0, fog: 0, wet: 0, flash: 0 }; // weather mix, driven by weather3.js
 const HEADPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,236,190,0.9)', 'rgba(255,236,190,0)'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const LAMPPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,214,150,0.85)', 'rgba(255,214,150,0)'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const WIN_EMI = (kind) => canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd890'; if (kind === 'old') g.fillRect(48, 32, 32, 54); else if (kind === 'modern') { g.fillRect(16, 28, 44, 52); g.fillStyle = '#c99a50'; g.fillRect(68, 28, 44, 52); } });
@@ -3119,10 +3141,10 @@ const LIGHTS = { on: 0 }, _gv = new THREE.Vector3();
 function skyAt(s, x, y, z) { s.position.set(camera.position.x + x * SKY_R * 0.97, camera.position.y + y * SKY_R * 0.97, camera.position.z + z * SKY_R * 0.97); }
 function updGlow() {
   const L = lightTones(), on = LIGHTS.on;
-  STARS.position.copy(camera.position); STARS.material.opacity = clamp((-L.elDeg - 3) / 9, 0, 1);
+  STARS.position.copy(camera.position); const clear = (1 - WX.cloud * 0.95) * (1 - WX.fog); STARS.material.opacity = clamp((-L.elDeg - 3) / 9, 0, 1) * clear;
   skyAt(MOON, -L.E, -L.U, L.Nn); skyAt(MOONHALO, -L.E, -L.U, L.Nn); // full moon: right across the sky from the sun
-  MOON.material.opacity = clamp(-L.U * 12 + 0.2, 0, 1) * clamp(0.25 + L.night, 0, 1); MOONHALO.material.opacity = MOON.material.opacity * 0.35 * L.night;
-  skyAt(SUNGLOW, L.E, L.U, -L.Nn); SUNGLOW.material.opacity = clamp(L.U * 10 + 0.3, 0, 1) * (0.32 + 0.4 * L.dusk); SUNGLOW.material.color.setRGB(1, 0.86 - 0.28 * L.dusk, 0.62 - 0.4 * L.dusk);
+  MOON.material.opacity = clamp(-L.U * 12 + 0.2, 0, 1) * clamp(0.25 + L.night, 0, 1); MOON.material.opacity *= clear; MOONHALO.material.opacity = MOON.material.opacity * 0.35 * L.night;
+  skyAt(SUNGLOW, L.E, L.U, -L.Nn); SUNGLOW.material.opacity = clamp(L.U * 10 + 0.3, 0, 1) * (0.32 + 0.4 * L.dusk) * clear; SUNGLOW.material.color.setRGB(1, 0.86 - 0.28 * L.dusk, 0.62 - 0.4 * L.dusk);
   LAMPGLOW_MAT.opacity = 0.85 * on;
   const [H, T] = CARGLOW, hp = H.geometry.attributes.position, hc = H.geometry.attributes.color, tp = T.geometry.attributes.position, tc = T.geometry.attributes.color; let nh = 0, nt = 0;
   for (const v of VEH) {
@@ -3142,6 +3164,11 @@ function updGlow() {
 const SKY_C = {
   day: ['#5e8fd0', '#a9c3e0', '#f1dcb6', '#f6d7a8'], dusk: ['#2c3e74', '#b0708a', '#f39a5a', '#ffb070'], night: ['#0a1022', '#16234a', '#2a3a66', '#3a4570'],
 };
+const SKY_OVC = { day: ['#7f8893', '#9aa2ac', '#b2b8be', '#bcc0c4'], night: ['#11141b', '#181c24', '#20242c', '#262a32'] }; // overcast
+function skyWeather(c, i, L) { // grey under cloud, white-grey in the fog
+  c.lerp(mixHex(SKY_OVC.night[i], SKY_OVC.day[i], L.day), clamp((WX.cloud - 0.3) / 0.6, 0, 1) * 0.92);
+  return c.lerp(mixHex(0x262a33, 0xc3c7cb, L.day), WX.fog * (0.55 + 0.15 * i));
+}
 const skyCanvas = scene.background.image, skyCtx = skyCanvas.getContext('2d');
 const mixHex = (a, b, t) => { const A = new THREE.Color(a), B = new THREE.Color(b); return A.lerp(B, t); };
 let skyT = -1, nightK = 0;
@@ -3161,13 +3188,14 @@ function updDayNight(dt) {
   hemi.intensity = 0.5 + 0.12 * L.day; hemi.color.copy(mixHex(0x5a6fa8, 0xdbe8ff, L.day)); hemi.groundColor.copy(mixHex(0x2a2a36, 0x8a7f6a, L.day));
   const fog = mixHex(0x1f2a44, 0xebd9ba, L.day).lerp(new THREE.Color(0xe39a72), L.dusk * 0.55); scene.fog.color.copy(fog); scene.fog.far = 560 + 160 * L.day;
   _far.material.color.setScalar(0.18 + 0.82 * L.day); _near.material.color.setScalar(0.15 + 0.85 * L.day);
-  if (Math.abs(TOD - skyT) > 0.04 || skyT < 0) { // redraw the 4x256 sky gradient now and then
-    skyT = TOD; const g = skyCtx, h = skyCanvas.height, gr = g.createLinearGradient(0, 0, 0, h), stops = [0, 0.55, 0.8, 1];
-    stops.forEach((s, i) => { const c = mixHex(SKY_C.night[i], SKY_C.day[i], L.day).lerp(new THREE.Color(SKY_C.dusk[i]), L.dusk * 0.75); gr.addColorStop(s, '#' + c.getHexString()); });
+  const skyW = WX.cloud + WX.fog * 2;
+  if (Math.abs(TOD - skyT) > 0.04 || skyT < 0 || Math.abs(skyW - (updDayNight.w ?? -1)) > 0.015) { // redraw the 4x256 sky gradient now and then
+    skyT = TOD; updDayNight.w = skyW; const g = skyCtx, h = skyCanvas.height, gr = g.createLinearGradient(0, 0, 0, h), stops = [0, 0.55, 0.8, 1];
+    stops.forEach((s, i) => { const c = mixHex(SKY_C.night[i], SKY_C.day[i], L.day).lerp(new THREE.Color(SKY_C.dusk[i]), L.dusk * 0.75); gr.addColorStop(s, '#' + skyWeather(c, i, L).getHexString()); });
     g.fillStyle = gr; g.fillRect(0, 0, skyCanvas.width, h); scene.background.needsUpdate = true;
   }
   // street lamps, windows, car lights
-  const lampsOn = clamp((3 - L.elDeg) / 7, 0, 1); WIN_LIT.value = litAt(TOD); LIGHTS.on = lampsOn;
+  const lampsOn = clamp((3 - L.elDeg) / 7 + 0.35 * Math.max(WX.rain, WX.fog) + 0.1 * WX.cloud, 0, 1); WIN_LIT.value = litAt(TOD); LIGHTS.on = lampsOn; // lights on early under a dark sky
   WIN_SKY.value.copy(mixHex(SKY_C.night[1], SKY_C.day[1], L.day)).lerp(new THREE.Color(SKY_C.dusk[2]), L.dusk * 0.5).multiplyScalar(0.12 + 0.3 * L.day);
   for (const m of SIGN_MATS) m.emissiveIntensity = 0.05 + 0.75 * lampsOn;
   for (const g of LM_GLOW) g.m.emissiveIntensity = g.a + g.b * lampsOn;
@@ -3177,7 +3205,7 @@ function updDayNight(dt) {
   const v = P.mode === 'car' ? P.car : null;
   headSpot.intensity = v && v.health > 0 ? 2.4 * lampsOn : 0;
   if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); }
-  const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0'); }
+  const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0') + ' ' + (WX.icon || ''); }
 }
 function skipTime(h) { TOD = (TOD + h) % 24; skyT = -1; updDayNight(0); toast('Ora: ' + String(TOD | 0).padStart(2, '0') + ':' + String(Math.floor((TOD % 1) * 60)).padStart(2, '0')); }
 
@@ -3541,6 +3569,126 @@ function updCaserme2(dt) {
   }
 }
 
+// ---------------------------------------------------------------- weather: sereno, nuvoloso, pioggia, temporale, nebbia
+// WX (in extras.js) holds the current mix; the targets change every few minutes. Wet asphalt grips less and turns dark,
+// clouds cover the sky and the stars, rain falls round the camera, thunder rolls, the Brianza fog swallows the town
+const WX_STATES = {
+  sereno: { cloud: 0.12, rain: 0, fog: 0, icon: '☀️', msg: 'Si apre il cielo' },
+  nuvoloso: { cloud: 0.72, rain: 0, fog: 0, icon: '⛅', msg: 'Si annuvola' },
+  pioggia: { cloud: 0.95, rain: 0.6, fog: 0, icon: '🌧', msg: 'Comincia a piovere: strada bagnata, frena prima' },
+  temporale: { cloud: 1, rain: 1, fog: 0, icon: '⛈', msg: 'Temporale sulla Brianza!' },
+  nebbia: { cloud: 0.5, rain: 0, fog: 1, icon: '🌫', msg: 'Nebbia in Brianza: non si vede a un palmo dal naso' },
+};
+const WX_NEXT = { // where the weather goes next, by weight
+  sereno: { sereno: 3, nuvoloso: 5, nebbia: 1.5 }, nuvoloso: { sereno: 4, nuvoloso: 1, pioggia: 4, temporale: 1 },
+  pioggia: { nuvoloso: 5, pioggia: 3, temporale: 2 }, temporale: { pioggia: 6, nuvoloso: 4 }, nebbia: { sereno: 5, nuvoloso: 5 },
+};
+Object.assign(WX, { state: 'sereno', icon: WX_STATES.sereno.icon, t: 300, drift: 0, thunderT: 15, sky: -1 });
+function setWeather(st, now_) {
+  WX.state = st; WX.t = 240 + rnd() * 360; const S = WX_STATES[st]; WX.icon = S.icon;
+  if (now_) { WX.cloud = S.cloud; WX.rain = S.rain; WX.fog = S.fog; WX.wet = S.rain ? 1 : 0; skyT = -1; }
+  if (running) toast(S.icon + ' ' + S.msg);
+}
+function updWeather(dt) {
+  if ((WX.t -= dt) <= 0) {
+    const opts = Object.entries(WX_NEXT[WX.state]).map(([k, w]) => [k, k === 'nebbia' && TOD > 11 && TOD < 19 ? 0 : w]); // fog comes at night and in the morning
+    let r = rnd() * opts.reduce((a, o) => a + o[1], 0), nx = opts[0][0]; for (const [k, w] of opts) { if ((r -= w) <= 0) { nx = k; break; } }
+    if (nx === WX.state) WX.t = 180 + rnd() * 240; else setWeather(nx);
+  }
+  const S = WX_STATES[WX.state], ap = (v, to, k) => v + (to - v) * (1 - Math.exp(-k * dt));
+  WX.cloud = ap(WX.cloud, S.cloud, 1 / 40);
+  WX.rain = ap(WX.rain, WX.cloud > 0.8 ? S.rain : 0, 1 / 25); // no rain before the sky is grey
+  WX.fog = ap(WX.fog, S.fog, 1 / 45);
+  WX.wet = WX.rain > 0.05 ? Math.min(1, WX.wet + dt / 50) : Math.max(0, WX.wet - dt / 200); // soaked in under a minute, dry in a few
+  WX.flash = Math.max(0, WX.flash - dt * 4);
+  if (WX.rain > 0.85 && (WX.thunderT -= dt) <= 0) { WX.thunderT = 12 + rnd() * 35; WX.flash = 1; const d = 0.8 + rnd() * 4; setTimeout(() => thunder(d), d * 1000); }
+  // light: a grey sky softens the sun and the shadows
+  const L = lightTones(), cov = WX.cloud * WX.cloud, grey = new THREE.Color(0x9aa0a8);
+  sun.intensity *= 1 - 0.8 * cov - 0.15 * WX.fog; sun.color.lerp(grey, cov * 0.6);
+  hemi.intensity *= 1 + 0.12 * cov - 0.25 * WX.rain * L.day; hemi.color.lerp(new THREE.Color(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
+  hemi.intensity += WX.flash * 2.2; sun.intensity += WX.flash * 0.8;
+  // fog: grey haze, rain curtain, then the real nebbia
+  const fogC = mixHex(0x262a33, 0xc3c7cb, L.day);
+  scene.fog.color.lerp(fogC, Math.max(cov * 0.6, WX.fog, WX.rain * 0.7));
+  scene.fog.far = lerp(lerp(scene.fog.far, 330, WX.rain), 95, WX.fog); scene.fog.near = lerp(lerp(160, 40, WX.rain), 2, WX.fog);
+  const hide = Math.max(WX.fog, WX.rain * 0.8, cov * 0.35); for (const m of [_far, _near]) { m.material.opacity = 1 - hide; m.visible = hide < 0.98; }
+  // wet streets: darker asphalt, brighter light pools
+  LAMPPOOL_MAT.opacity *= 1 + 0.8 * WX.wet; HEADPOOL_MAT.opacity *= 1 + 0.8 * WX.wet;
+  WX.wetT = (WX.wetT || 0) - dt;
+  if (Math.abs(WX.wet - (WX.wetShown ?? -1)) > 0.02 || (WX.wet > 0 && WX.wetT <= 0)) { WX.wetShown = WX.wet; WX.wetT = 3; wetPaint(WX.wet); } // again now and then for tiles built since
+}
+// every material painted with asphalt, porfido or sidewalk tiles darkens in the wet
+const WET_MAPS = new Set([asphaltTex, porfidoTex, sidewalkTex]);
+function wetPaint(w) {
+  const k = 1 - 0.4 * w;
+  scene.traverse(o => { const m = o.material; if (m && !Array.isArray(m) && (WET_MAPS.has(m.map) || m === MAT.kerb)) m.color.setScalar(k); });
+}
+for (const m of [_far, _near]) m.material.transparent = true; // the Prealpi fade out behind rain and fog
+
+// clouds: big soft sprites on the dome round the camera, more of them as the sky fills up, drifting with the wind
+const CLOUD_TEX = canvasTex(256, 128, (g, w, h) => {
+  for (let i = 0; i < 16; i++) {
+    const x = 40 + srnd() * 176, y = 52 + srnd() * 40 - Math.abs(x - 128) * 0.12, r = 18 + srnd() * 30, gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, 'rgba(255,255,255,0.75)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  }
+}, false);
+const CLOUDS = []; for (let i = 0; i < 34; i++) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: CLOUD_TEX, transparent: true, opacity: 0, depthWrite: false, fog: false })), k = 0.7 + srnd() * 0.8;
+  s.scale.set(2200 * k, 900 * k, 1); s.renderOrder = -2; s.frustumCulled = false; scene.add(s);
+  CLOUDS.push({ s, a: srnd() * Math.PI * 2, e: (0.1 + srnd() * 0.35), o: 0.6 + srnd() * 0.4 });
+}
+// rain: streaks in a box that travels with the camera
+const RAIN_N = 2200, RAIN_BOX = [70, 34, 70], RAIN_P = new Float32Array(RAIN_N * 3);
+for (let i = 0; i < RAIN_N; i++) { RAIN_P[i * 3] = (srnd() - 0.5) * RAIN_BOX[0]; RAIN_P[i * 3 + 1] = srnd() * RAIN_BOX[1]; RAIN_P[i * 3 + 2] = (srnd() - 0.5) * RAIN_BOX[2]; }
+const RAIN = (() => {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RAIN_N * 6), 3)); g.setDrawRange(0, 0);
+  const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xc4ccd6, transparent: true, opacity: 0, depthWrite: false })); l.frustumCulled = false; l.renderOrder = 13; scene.add(l); return l;
+})();
+function updSkyFx(dt) {
+  const L = lightTones(), cp = camera.position;
+  WX.drift += dt * 0.004;
+  const cov = 0.22 + 0.78 * WX.cloud, col = mixHex(0x2a3045, 0xffffff, L.day).lerp(new THREE.Color(0xffb48a), L.dusk * 0.6).lerp(new THREE.Color(L.day > 0.5 ? 0x9aa0a8 : 0x1c2028), WX.cloud * WX.cloud * 0.8);
+  CLOUDS.forEach((c, i) => {
+    const show = i / CLOUDS.length < cov, a = c.a + WX.drift, ce = Math.cos(c.e), R = SKY_R * 0.9;
+    c.s.visible = show && WX.fog < 0.95; if (!c.s.visible) return;
+    c.s.position.set(cp.x + Math.sin(a) * ce * R, cp.y + Math.sin(c.e) * R, cp.z + Math.cos(a) * ce * R);
+    c.s.material.opacity = c.o * (0.55 + 0.45 * WX.cloud) * (1 - WX.fog); c.s.material.color.copy(col).multiplyScalar(1 + WX.flash);
+  });
+  // rain streaks, slanted by the wind and stretched by the car's own speed
+  const n = Math.round(RAIN_N * Math.min(1, WX.rain * 1.4)); RAIN.geometry.setDrawRange(0, n * 2); RAIN.material.opacity = 0.32 + 0.2 * WX.rain;
+  RAIN.visible = n > 0; if (!n) return;
+  // drops live in world space, wrapped into the box round the camera; a streak points back along the drop's speed relative to the car
+  const v = P.mode === 'car' ? P.car : null, wx = (v ? v.vx : 0) - 2.2, wz = (v ? v.vz : 0) - 1.0, fall = 16 * dt, a = RAIN.geometry.attributes.position, A = a.array;
+  const wrap = (q, B) => ((q % B) + B) % B - B / 2;
+  for (let i = 0; i < n; i++) {
+    let y = RAIN_P[i * 3 + 1] - fall; if (y < 0) y += RAIN_BOX[1]; RAIN_P[i * 3 + 1] = y;
+    RAIN_P[i * 3] += 2.2 * dt; RAIN_P[i * 3 + 2] += 1.0 * dt; // wind
+    const x = cp.x + wrap(RAIN_P[i * 3] - cp.x, RAIN_BOX[0]), z = cp.z + wrap(RAIN_P[i * 3 + 2] - cp.z, RAIN_BOX[2]), yy = cp.y - 12 + y;
+    A[i * 6] = x; A[i * 6 + 1] = yy; A[i * 6 + 2] = z; A[i * 6 + 3] = x + wx * 0.05; A[i * 6 + 4] = yy + 0.85; A[i * 6 + 5] = z + wz * 0.05;
+  }
+  a.needsUpdate = true;
+  updRainSound();
+}
+// rain on the street and drumming on the roof; thunder far away
+const RS = { on: false };
+function updRainSound() {
+  if (!AU || !AU.on) return; const C = AU.ctx;
+  if (!RS.on) {
+    const sr = C.sampleRate, b = C.createBuffer(1, sr * 2, sr), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (Math.random() < 0.002 ? 3 : 1);
+    const mk = (type, f, q) => { const s = C.createBufferSource(), fl = C.createBiquadFilter(), g = C.createGain(); s.buffer = b; s.loop = true; fl.type = type; fl.frequency.value = f; fl.Q.value = q; g.gain.value = 0; s.connect(fl); fl.connect(g); g.connect(AU.master); s.start(0, Math.random() * 2); return g; };
+    RS.hiss = mk('highpass', 2600, 0.5); RS.patter = mk('bandpass', 900, 0.8); RS.roof = mk('lowpass', 520, 0.7); RS.on = true; RS.buf = b;
+  }
+  const t = C.currentTime, r = WX.rain, car = P.mode === 'car' && !isTwo(P.car);
+  RS.hiss.gain.setTargetAtTime(r * (car ? 0.05 : 0.16), t, 0.3); RS.patter.gain.setTargetAtTime(r * (car ? 0.05 : 0.12), t, 0.3); RS.roof.gain.setTargetAtTime(car ? r * 0.5 : 0, t, 0.3);
+}
+function thunder(dist) {
+  if (!AU || !AU.on || !RS.on) return; const C = AU.ctx, t = C.currentTime, s = C.createBufferSource(), fl = C.createBiquadFilter(), g = C.createGain();
+  s.buffer = RS.buf; s.playbackRate.value = 0.12; fl.type = 'lowpass'; fl.frequency.value = 260 / (0.6 + dist * 0.25); const v = 1.1 / (0.6 + dist * 0.3);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.08 + dist * 0.05); g.gain.setTargetAtTime(v * 0.5, t + 0.4, 0.5); g.gain.setTargetAtTime(0.0001, t + 1.6, 1.2);
+  s.connect(fl); fl.connect(g); g.connect(AU.master); s.start(t, 0, 7); s.stop(t + 7);
+}
+window.__setWeather = setWeather;
+
 function updVisuals(dt) {
   const cx = camera.position.x, cz = camera.position.z;
   for (const v of VEH) {
@@ -3669,7 +3817,7 @@ function cheatFerari() { // on foot: a Ferari right in front of you; driving: wh
   }
   toast('🏎 Ferari!');
 }
-const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };
+const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true) };
 let last = performance.now(), acc = 0;
 function frame(t) {
   requestAnimationFrame(frame);
@@ -3679,7 +3827,7 @@ function frame(t) {
   else if (!running) { now += dt; P.h += dt * 0.08; } // slow orbit behind the title
   { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);
-  updCamera(running ? dt : dt * 0.4); updGlow();
+  updCamera(running ? dt : dt * 0.4); updGlow(); updSkyFx(running && !paused ? dt : 0);
   if (running) { updHud(dt); updAudio(); updSfx(dt); }
   renderer.render(scene, camera);
 }

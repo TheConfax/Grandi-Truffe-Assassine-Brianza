@@ -1,5 +1,6 @@
 // ---------------------------------------------------------------- day & night
 let TOD = 17.2; // ore del giorno, 1 ora di gioco = 1 minuto reale
+const WX = { cloud: 0.12, rain: 0, fog: 0, wet: 0, flash: 0 }; // weather mix, driven by weather3.js
 const HEADPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,236,190,0.9)', 'rgba(255,236,190,0)'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const LAMPPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,214,150,0.85)', 'rgba(255,214,150,0)'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const WIN_EMI = (kind) => canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd890'; if (kind === 'old') g.fillRect(48, 32, 32, 54); else if (kind === 'modern') { g.fillRect(16, 28, 44, 52); g.fillStyle = '#c99a50'; g.fillRect(68, 28, 44, 52); } });
@@ -39,10 +40,10 @@ const LIGHTS = { on: 0 }, _gv = new THREE.Vector3();
 function skyAt(s, x, y, z) { s.position.set(camera.position.x + x * SKY_R * 0.97, camera.position.y + y * SKY_R * 0.97, camera.position.z + z * SKY_R * 0.97); }
 function updGlow() {
   const L = lightTones(), on = LIGHTS.on;
-  STARS.position.copy(camera.position); STARS.material.opacity = clamp((-L.elDeg - 3) / 9, 0, 1);
+  STARS.position.copy(camera.position); const clear = (1 - WX.cloud * 0.95) * (1 - WX.fog); STARS.material.opacity = clamp((-L.elDeg - 3) / 9, 0, 1) * clear;
   skyAt(MOON, -L.E, -L.U, L.Nn); skyAt(MOONHALO, -L.E, -L.U, L.Nn); // full moon: right across the sky from the sun
-  MOON.material.opacity = clamp(-L.U * 12 + 0.2, 0, 1) * clamp(0.25 + L.night, 0, 1); MOONHALO.material.opacity = MOON.material.opacity * 0.35 * L.night;
-  skyAt(SUNGLOW, L.E, L.U, -L.Nn); SUNGLOW.material.opacity = clamp(L.U * 10 + 0.3, 0, 1) * (0.32 + 0.4 * L.dusk); SUNGLOW.material.color.setRGB(1, 0.86 - 0.28 * L.dusk, 0.62 - 0.4 * L.dusk);
+  MOON.material.opacity = clamp(-L.U * 12 + 0.2, 0, 1) * clamp(0.25 + L.night, 0, 1); MOON.material.opacity *= clear; MOONHALO.material.opacity = MOON.material.opacity * 0.35 * L.night;
+  skyAt(SUNGLOW, L.E, L.U, -L.Nn); SUNGLOW.material.opacity = clamp(L.U * 10 + 0.3, 0, 1) * (0.32 + 0.4 * L.dusk) * clear; SUNGLOW.material.color.setRGB(1, 0.86 - 0.28 * L.dusk, 0.62 - 0.4 * L.dusk);
   LAMPGLOW_MAT.opacity = 0.85 * on;
   const [H, T] = CARGLOW, hp = H.geometry.attributes.position, hc = H.geometry.attributes.color, tp = T.geometry.attributes.position, tc = T.geometry.attributes.color; let nh = 0, nt = 0;
   for (const v of VEH) {
@@ -62,6 +63,11 @@ function updGlow() {
 const SKY_C = {
   day: ['#5e8fd0', '#a9c3e0', '#f1dcb6', '#f6d7a8'], dusk: ['#2c3e74', '#b0708a', '#f39a5a', '#ffb070'], night: ['#0a1022', '#16234a', '#2a3a66', '#3a4570'],
 };
+const SKY_OVC = { day: ['#7f8893', '#9aa2ac', '#b2b8be', '#bcc0c4'], night: ['#11141b', '#181c24', '#20242c', '#262a32'] }; // overcast
+function skyWeather(c, i, L) { // grey under cloud, white-grey in the fog
+  c.lerp(mixHex(SKY_OVC.night[i], SKY_OVC.day[i], L.day), clamp((WX.cloud - 0.3) / 0.6, 0, 1) * 0.92);
+  return c.lerp(mixHex(0x262a33, 0xc3c7cb, L.day), WX.fog * (0.55 + 0.15 * i));
+}
 const skyCanvas = scene.background.image, skyCtx = skyCanvas.getContext('2d');
 const mixHex = (a, b, t) => { const A = new THREE.Color(a), B = new THREE.Color(b); return A.lerp(B, t); };
 let skyT = -1, nightK = 0;
@@ -81,13 +87,14 @@ function updDayNight(dt) {
   hemi.intensity = 0.5 + 0.12 * L.day; hemi.color.copy(mixHex(0x5a6fa8, 0xdbe8ff, L.day)); hemi.groundColor.copy(mixHex(0x2a2a36, 0x8a7f6a, L.day));
   const fog = mixHex(0x1f2a44, 0xebd9ba, L.day).lerp(new THREE.Color(0xe39a72), L.dusk * 0.55); scene.fog.color.copy(fog); scene.fog.far = 560 + 160 * L.day;
   _far.material.color.setScalar(0.18 + 0.82 * L.day); _near.material.color.setScalar(0.15 + 0.85 * L.day);
-  if (Math.abs(TOD - skyT) > 0.04 || skyT < 0) { // redraw the 4x256 sky gradient now and then
-    skyT = TOD; const g = skyCtx, h = skyCanvas.height, gr = g.createLinearGradient(0, 0, 0, h), stops = [0, 0.55, 0.8, 1];
-    stops.forEach((s, i) => { const c = mixHex(SKY_C.night[i], SKY_C.day[i], L.day).lerp(new THREE.Color(SKY_C.dusk[i]), L.dusk * 0.75); gr.addColorStop(s, '#' + c.getHexString()); });
+  const skyW = WX.cloud + WX.fog * 2;
+  if (Math.abs(TOD - skyT) > 0.04 || skyT < 0 || Math.abs(skyW - (updDayNight.w ?? -1)) > 0.015) { // redraw the 4x256 sky gradient now and then
+    skyT = TOD; updDayNight.w = skyW; const g = skyCtx, h = skyCanvas.height, gr = g.createLinearGradient(0, 0, 0, h), stops = [0, 0.55, 0.8, 1];
+    stops.forEach((s, i) => { const c = mixHex(SKY_C.night[i], SKY_C.day[i], L.day).lerp(new THREE.Color(SKY_C.dusk[i]), L.dusk * 0.75); gr.addColorStop(s, '#' + skyWeather(c, i, L).getHexString()); });
     g.fillStyle = gr; g.fillRect(0, 0, skyCanvas.width, h); scene.background.needsUpdate = true;
   }
   // street lamps, windows, car lights
-  const lampsOn = clamp((3 - L.elDeg) / 7, 0, 1); WIN_LIT.value = litAt(TOD); LIGHTS.on = lampsOn;
+  const lampsOn = clamp((3 - L.elDeg) / 7 + 0.35 * Math.max(WX.rain, WX.fog) + 0.1 * WX.cloud, 0, 1); WIN_LIT.value = litAt(TOD); LIGHTS.on = lampsOn; // lights on early under a dark sky
   WIN_SKY.value.copy(mixHex(SKY_C.night[1], SKY_C.day[1], L.day)).lerp(new THREE.Color(SKY_C.dusk[2]), L.dusk * 0.5).multiplyScalar(0.12 + 0.3 * L.day);
   for (const m of SIGN_MATS) m.emissiveIntensity = 0.05 + 0.75 * lampsOn;
   for (const g of LM_GLOW) g.m.emissiveIntensity = g.a + g.b * lampsOn;
@@ -97,7 +104,7 @@ function updDayNight(dt) {
   const v = P.mode === 'car' ? P.car : null;
   headSpot.intensity = v && v.health > 0 ? 2.4 * lampsOn : 0;
   if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); }
-  const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0'); }
+  const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0') + ' ' + (WX.icon || ''); }
 }
 function skipTime(h) { TOD = (TOD + h) % 24; skyT = -1; updDayNight(0); toast('Ora: ' + String(TOD | 0).padStart(2, '0') + ':' + String(Math.floor((TOD % 1) * 60)).padStart(2, '0')); }
 
