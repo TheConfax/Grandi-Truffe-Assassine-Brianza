@@ -1,6 +1,18 @@
 // ---------------------------------------------------------------- terrain (TINITALY 10 m, INGV)
 const TER = D.terrain;
 const TH = (() => { const bin = atob(TER.h16), n = bin.length >> 1, f = new Float32Array(n); for (let i = 0; i < n; i++) f[i] = (bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8)) / 10; return f; })();
+// the bank the covered stair between the Diaz and the Anna Frank climbs: the 10 m model smooths it into a gentle slope, so the field at its
+// foot is dug a few metres lower, fading out within twenty metres and never across the road to the south
+{
+  const A = [-578.8, -718.1], B = [-549.3, -727.1], DROP = 3.2, ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez, Ln = Math.sqrt(L2);
+  for (let j = 0; j < TER.nz; j++) for (let i = 0; i < TER.nx; i++) {
+    const x = TER.x0 + i * TER.step, z = TER.z0 + j * TER.step; if (Math.abs(x - A[0]) > 60 || Math.abs(z - A[1]) > 60) continue;
+    const t = ((x - A[0]) * ex + (z - A[1]) * ez) / L2, side = ((x - A[0]) * ez - (z - A[1]) * ex) / Ln, tc = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(x - A[0] - ex * tc, z - A[1] - ez * tc), reach = side < 0 ? 8 : 22; // side < 0: towards the road
+    const k = Math.max(0, 1 - d / reach) * Math.max(0, 1 - Math.max(0, t) * 1.15);
+    TH[j * TER.nx + i] -= DROP * k * k * (3 - 2 * k);
+  }
+}
 function groundH(x, z) {
   const fx = clamp((x - TER.x0) / TER.step, 0, TER.nx - 1.001), fz = clamp((z - TER.z0) / TER.step, 0, TER.nz - 1.001), i = fx | 0, j = fz | 0, u = fx - i, v = fz - j, k = j * TER.nx + i;
   // same two triangles per cell as the terrain mesh, so cars, roads and the visible ground agree exactly
@@ -668,7 +680,7 @@ function buildTile(T) {
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   buildSignals(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G); buildCaserme(T, G);
-  buildCemetery(T, G); buildLandmarks(T, G); buildPlatforms(T, G); buildParkingLines(T, G); buildParkFurniture(T, G);
+  buildCemetery(T, G); buildLandmarks(T, G); buildPiazze(T, G); buildPlatforms(T, G); buildParkingLines(T, G); buildParkFurniture(T, G);
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {

@@ -378,6 +378,18 @@ function rayWalls(ax, az, bx, bz, solidOnly) {
 // ---------------------------------------------------------------- terrain (TINITALY 10 m, INGV)
 const TER = D.terrain;
 const TH = (() => { const bin = atob(TER.h16), n = bin.length >> 1, f = new Float32Array(n); for (let i = 0; i < n; i++) f[i] = (bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8)) / 10; return f; })();
+// the bank the covered stair between the Diaz and the Anna Frank climbs: the 10 m model smooths it into a gentle slope, so the field at its
+// foot is dug a few metres lower, fading out within twenty metres and never across the road to the south
+{
+  const A = [-578.8, -718.1], B = [-549.3, -727.1], DROP = 3.2, ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez, Ln = Math.sqrt(L2);
+  for (let j = 0; j < TER.nz; j++) for (let i = 0; i < TER.nx; i++) {
+    const x = TER.x0 + i * TER.step, z = TER.z0 + j * TER.step; if (Math.abs(x - A[0]) > 60 || Math.abs(z - A[1]) > 60) continue;
+    const t = ((x - A[0]) * ex + (z - A[1]) * ez) / L2, side = ((x - A[0]) * ez - (z - A[1]) * ex) / Ln, tc = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(x - A[0] - ex * tc, z - A[1] - ez * tc), reach = side < 0 ? 8 : 22; // side < 0: towards the road
+    const k = Math.max(0, 1 - d / reach) * Math.max(0, 1 - Math.max(0, t) * 1.15);
+    TH[j * TER.nx + i] -= DROP * k * k * (3 - 2 * k);
+  }
+}
 function groundH(x, z) {
   const fx = clamp((x - TER.x0) / TER.step, 0, TER.nx - 1.001), fz = clamp((z - TER.z0) / TER.step, 0, TER.nz - 1.001), i = fx | 0, j = fz | 0, u = fx - i, v = fz - j, k = j * TER.nx + i;
   // same two triangles per cell as the terrain mesh, so cars, roads and the visible ground agree exactly
@@ -1045,7 +1057,7 @@ function buildTile(T) {
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   buildSignals(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G); buildCaserme(T, G);
-  buildCemetery(T, G); buildLandmarks(T, G); buildPlatforms(T, G); buildParkingLines(T, G); buildParkFurniture(T, G);
+  buildCemetery(T, G); buildLandmarks(T, G); buildPiazze(T, G); buildPlatforms(T, G); buildParkingLines(T, G); buildParkFurniture(T, G);
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {
@@ -1598,6 +1610,62 @@ for (const L of LANDMARKS) {
     for (const [ax, az] of L.also || []) if (hyp(cx - ax, cz - az) < 2) b.lm = L; // extra footprints the model replaces, e.g. a bell tower mapped on its own
   }
   const p = D.pois.find(q => q.n === L.n); if (p) p.lm = L; // no generic shop sign on it
+}
+// collisions follow the model: the footprint's walls are swapped for the walls of its volumes (o.base and o.wings), pillars under the bridges, the
+// sides of the covered walkway
+function gridDrop(Gd, x0, z0, x1, z1, pred) { const c = Gd.cs; for (let i = Math.floor(Math.min(x0, x1) / c); i <= Math.floor(Math.max(x0, x1) / c); i++) for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) { const a = Gd.m.get(Gd.k(i, j)); if (a) Gd.m.set(Gd.k(i, j), a.filter(s => !pred(s))); } }
+function lmRingWalls(ring, y0, y1) {
+  const A = sArea(ring);
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
+    let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (A < 0) { nx = -nx; nz = -nz; }
+    WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0, y1 });
+  }
+}
+const bridgeCols = br => { const [[ax, az], [bx, bz]] = [br.a, br.b], Lb = hyp(bx - ax, bz - az), ux = (bx - ax) / Lb, uz = (bz - az) / Lb, o = []; for (const s of [1.2, Lb - 1.2]) for (const z of [0.2, -2.2]) o.push([ax + ux * s - uz * z, az + uz * s + ux * z]); return o; };
+for (const L of LANDMARKS) {
+  const o = L.o || {}, B = L.b; if (!B) continue;
+  const gy = Math.min(...B.pts.map(p => groundH(p[0], p[1])));
+  if (o.base) {
+    for (const ring of [B.pts, ...B.holes]) for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length]; gridDrop(WALLS, a[0], a[1], c[0], c[1], s => s.ax === a[0] && s.az === a[1] && s.bx === c[0] && s.bz === c[1]); }
+    for (const r of [o.base, ...(o.wings || []).map(w => w.pts)]) { lmRingWalls(r, gy - 3, gy + 15); const rec = { pts: r, holes: [], bb: bbox(r) }; BLD.add(rec.bb[0], rec.bb[1], rec.bb[2], rec.bb[3], rec); }
+  }
+  for (const br of o.bridges || []) for (const [x, z] of bridgeCols(br)) WALLS.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, { r: 0.25, x, z, y0: gy - 3, y1: gy + 3.4 });
+  if (o.walkway) for (let k = 1; k < o.walkway.length; k++) { // the two sides, posts and parapet: you walk in at the ends
+    const [ax, az] = o.walkway[k - 1], [bx, bz] = o.walkway[k], Lw = hyp(bx - ax, bz - az), nx = -(bz - az) / Lw * 1.25, nz = (bx - ax) / Lw * 1.25;
+    for (const sd of [-1, 1]) { const x0 = ax + nx * sd, z0 = az + nz * sd, x1 = bx + nx * sd, z1 = bz + nz * sd, y = Math.min(groundH(x0, z0), groundH(x1, z1));
+      WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: nx * sd / 1.25, nz: nz * sd / 1.25, two: true, y0: y - 3, y1: y + 2.6 }); }
+  }
+}
+// ---------------------------------------------------------------- piazze: paving drawn over the car park of the map, no stalls, no lamp posts
+// Piazza del mercato (piazza Aurelio Dozio, Meda): terracotta paving, a band of grey herringbone round an elongated octagon, a plain terracotta
+// rectangle in the middle, grey herringbone across the east end; a row of trees on the west side. p: SW, NW, NE, SE corners
+const PIAZZE = [{ n: 'Piazza del mercato', p: [[-450.4, -679.2], [-477.2, -732.9], [-406.4, -768.0], [-378.4, -715.0]], trees: 1 }];
+const inPiazza = (x, z) => PIAZZE.some(q => inPoly(x, z, q.p));
+const piazzaTex = canvasTex(1024, 768, (g, w, h) => { // u along SW -> SE... laid out as v: SW->NW (60 m), u: NW->NE (79 m)
+  const PINK = '#c58a72', GREY = '#8d8a86';
+  g.fillStyle = PINK; g.fillRect(0, 0, w, h); noise(g, w, h, 9000, 0.12, ['#b07460', '#d39c84', '#a8705c']);
+  const herring = (clip) => { g.save(); clip(); g.clip(); g.fillStyle = GREY; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(60,58,55,.55)'; g.lineWidth = 1.2;
+    for (let y = -h; y < 2 * h; y += 9) for (let x = 0; x < w; x += 18) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + 9, y + 9); g.lineTo(x + 18, y); g.stroke(); }
+    noise(g, w, h, 6000, 0.15, ['#76736f', '#a3a09b']); g.restore(); };
+  const oct = (x0, y0, x1, y1, c) => { g.beginPath(); g.moveTo(x0 + c, y0); g.lineTo(x1 - c, y0); g.lineTo(x1, y0 + c); g.lineTo(x1, y1 - c); g.lineTo(x1 - c, y1); g.lineTo(x0 + c, y1); g.lineTo(x0, y1 - c); g.lineTo(x0, y0 + c); g.closePath(); };
+  herring(() => { oct(70, 80, 900, 690, 150); g.rect(990, 0, 34, h); });
+  g.save(); g.beginPath(); g.rect(250, 230, 470, 310); g.clip(); g.fillStyle = PINK; g.fillRect(0, 0, w, h); noise(g, w, h, 4000, 0.12, ['#b07460', '#d39c84']);
+  g.strokeStyle = 'rgba(90,50,40,.35)'; g.lineWidth = 1; for (let x = 250; x < 720; x += 24) { g.beginPath(); g.moveTo(x, 230); g.lineTo(x, 540); g.stroke(); } for (let y = 230; y < 540; y += 24) { g.beginPath(); g.moveTo(250, y); g.lineTo(720, y); g.stroke(); } g.restore();
+  g.strokeStyle = '#e8e2d6'; g.lineWidth = 3; oct(70, 80, 900, 690, 150); g.stroke(); g.strokeRect(250, 230, 470, 310); // white stone kerbs round the patterns
+});
+function buildPiazze(T, G) {
+  for (const q of PIAZZE) {
+    const [sw, nw, ne, se] = q.p, [cx, cz] = centroid(q.p); if (Math.abs(cx - T.cx) > TS / 2 || Math.abs(cz - T.cz) > TS / 2) continue;
+    const b = VBuf(), NU = 40, NV = 30, P = (u, v) => [nw[0] + (ne[0] - nw[0]) * u + (sw[0] - nw[0]) * v + ((se[0] - sw[0]) - (ne[0] - nw[0])) * u * v, nw[1] + (ne[1] - nw[1]) * u + (sw[1] - nw[1]) * v + ((se[1] - sw[1]) - (ne[1] - nw[1])) * u * v];
+    for (let j = 0; j <= NV; j++) for (let i = 0; i <= NU; i++) { const [x, z] = P(i / NU, j / NV); vtx(b, x, 0.045, z, 0, 1, 0, i / NU, 1 - j / NV); }
+    for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) { const k = j * (NU + 1) + i; triUp(b, k, k + 1, k + NU + 2); triUp(b, k, k + NU + 2, k + NU + 1); }
+    LMAT.piazza = LMAT.piazza || new THREE.MeshLambertMaterial({ map: piazzaTex, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }); mkMesh(b, LMAT.piazza, 1, false, G);
+    if (q.trees) { const F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), L = hyp(nw[0] - sw[0], nw[1] - sw[1]); // the row of trees along the west side
+      for (let s = 4; s < L - 2; s += 7.5) { const t = s / L, x = sw[0] + (nw[0] - sw[0]) * t - (ne[0] - nw[0]) / 79 * 2, z = sw[1] + (nw[1] - sw[1]) * t - (ne[1] - nw[1]) / 79 * 2, y = groundH(x, z);
+        F.geo(Bs.trim, new THREE.CylinderGeometry(0.14, 0.2, 3.2, 6).translate(x, y + 1.6, z), null, COL('#5a4632')); F.geo(Bs.trim, new THREE.IcosahedronGeometry(2.0, 0).scale(1, 1.15, 1).translate(x, y + 4.6, z), null, COL(s % 15 < 7.5 ? '#5f8a44' : '#6b9450')); }
+      lmFlush(Bs, G); }
+  }
 }
 function buildLandmarks(T, G) { for (const L of LANDMARKS) if (L.t === T.t) L.build(L, L.b, G); }
 
@@ -2485,7 +2553,7 @@ function buildParkingLines(T, G) {
   T.stalls = [];
   const quad = (x, z, ux, uz, a0, a1, w0, w1, col) => { const nx = -uz, nz = ux, i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
   for (const a of T.d.a || []) {
-    if (a.t !== 4) continue; const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P);
+    if (a.t !== 4) continue; const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P); if (inPiazza(cx, cz)) continue;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
     const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
     const S0 = Math.min(...proj) + 1.0, S1 = Math.max(...proj) - 1.0, lot = [];
@@ -2646,33 +2714,32 @@ function buildModern(L, B, G) {
       F.face(Bs.trim, [[d[0], y, d[1]], [c[0], y, c[1]], [c[0], y - st.h / st.n, c[1]], [d[0], y - st.h / st.n, d[1]]], 2, COL('#a9a397'));
     }
   }
-  if (o.walkway) { // the covered path between the schools: a beige barrel on posts every couple of metres, red ribs, stepping with the slope
-    const W = o.walkway, CAN = COL('#e2cdb8'), RIB = COL('#a8322b');
+  if (o.walkway) { // the covered stair between the schools: landings and flights of steps under a beige barrel on red ribs, the canopy stepping down
+    // with them; at the top, on via Papa Giovanni XXIII, the red steel porch over the first flight, the low wall and the gate
+    const W = o.walkway, CAN = COL('#e2cdb8'), RIB = COL('#a8322b'), PAV = COL('#a8a296'), RISE = 0.17, TREAD = 0.32, segs = [];
     for (let k = 1; k < W.length; k++) {
-      const [ax, az] = W[k - 1], [bx, bz] = W[k], Ls = hyp(bx - ax, bz - az), ux = (bx - ax) / Ls, uz = (bz - az) / Ls, n = Math.max(1, Math.round(Ls / 2.2)), sl = Ls / n;
-      for (let i = 0; i < n; i++) {
-        const cx = ax + ux * (i + 0.5) * sl, cz = az + uz * (i + 0.5) * sl, y = groundH(cx, cz);
-        const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(uz, 0, -ux), new THREE.Vector3(0, 1, 0), new THREE.Vector3(ux, 0, uz)).setPosition(cx, y, cz));
-        T.geo(Bs.trim, new THREE.CylinderGeometry(1.25, 1.25, sl + 0.25, 10, 1, true, Math.PI / 2, Math.PI).rotateX(Math.PI / 2).scale(1, 0.6, 1).translate(0, 2.25, 0), null, CAN);
-        T.geo(Bs.trim, new THREE.TorusGeometry(1.27, 0.05, 4, 10, Math.PI).scale(1, 0.6, 1).translate(0, 2.25, -sl / 2), null, RIB);
-        for (const sd of [-1, 1]) T.geo(Bs.trim, lmBox(0.08, 2.3, 0.08, sd * 1.2, 1.15, -sl / 2), null, RIB);
-        T.geo(Bs.trim, lmBox(1.9, 0.12, sl + 0.1, 0, 0.06, 0), null, COL('#9d988e')); // the paving under it
+      const [ax, az] = W[k - 1], [bx, bz] = W[k], Ls = hyp(bx - ax, bz - az), n = Math.max(1, Math.round(Ls / 2.4));
+      for (let i = 0; i < n; i++) segs.push({ ax, az, ux: (bx - ax) / Ls, uz: (bz - az) / Ls, s0: i * Ls / n, sl: Ls / n });
+    }
+    let lv = groundH(W[0][0], W[0][1]);
+    for (const g of segs) { // each piece is a landing, or a flight when the ground has climbed more than a few steps above the last landing
+      const cx = g.ax + g.ux * (g.s0 + g.sl / 2), cz = g.az + g.uz * (g.s0 + g.sl / 2), want = groundH(cx, cz), k = Math.min(Math.floor(g.sl / TREAD) - 1, Math.round((want - lv) / RISE));
+      g.y0 = lv; g.steps = Math.abs(k) >= 3 ? k : 0; lv += g.steps * RISE; g.y1 = lv; g.cx = cx; g.cz = cz;
+    }
+    segs.forEach((g, i) => {
+      const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(g.uz, 0, -g.ux), new THREE.Vector3(0, 1, 0), new THREE.Vector3(g.ux, 0, g.uz)).setPosition(g.cx, 0, g.cz)), h = g.sl / 2;
+      const top = Math.max(g.y0, g.y1) + 2.3, last = i === segs.length - 1;
+      if (g.steps) { const n = Math.abs(g.steps), d = (g.sl - 0.4) / n; for (let k = 0; k < n; k++) { const y = g.y0 + Math.sign(g.steps) * RISE * (k + 1); T.geo(Bs.trim, lmBox(1.9, y - g.y0 + 0.6, d + 0.02, 0, (y + g.y0 - 0.6) / 2, -h + 0.2 + d * (k + 0.5)), null, PAV); } T.geo(Bs.trim, lmBox(1.9, 0.6, 0.22, 0, g.y0 - 0.3, -h + 0.1), null, PAV); T.geo(Bs.trim, lmBox(1.9, g.y1 - Math.min(g.y0, g.y1) + 0.6, 0.2, 0, (g.y1 + Math.min(g.y0, g.y1) - 0.6) / 2, h - 0.1), null, PAV); }
+      else T.geo(Bs.trim, lmBox(1.9, 0.7, g.sl + 0.05, 0, g.y0 - 0.33, 0), null, PAV);
+      for (const sd of [-1, 1]) T.geo(Bs.trim, lmBox(0.18, 0.95, g.sl, sd * 1.05, Math.max(g.y0, g.y1) - 0.2, 0), null, COL('#8f8a80')); // the low side walls
+      T.geo(Bs.trim, new THREE.CylinderGeometry(1.25, 1.25, g.sl + 0.25, 10, 1, true, Math.PI / 2, Math.PI).rotateX(Math.PI / 2).scale(1, 0.6, 1).translate(0, top, 0), null, last ? COL('#e9e6dc') : CAN);
+      for (const z of last ? [-h, 0, h] : [-h]) { T.geo(Bs.trim, new THREE.TorusGeometry(1.27, last ? 0.09 : 0.05, 4, 10, Math.PI).scale(1, 0.6, 1).translate(0, top, z), null, RIB);
+        for (const sd of [-1, 1]) T.geo(Bs.trim, lmBox(last ? 0.14 : 0.08, top - g.y0 + 0.5, last ? 0.14 : 0.08, sd * 1.2, (top + g.y0 - 0.5) / 2, z), null, RIB); }
+      if (last) { // the gate and the low wall along the road
+        T.geo(Bs.trim, lmBox(0.1, 1.9, 1.3, 1.35, g.y1 + 0.95, h - 0.7), null, COL('#2c2e30')); T.geo(Bs.trim, lmBox(0.1, 1.9, 1.3, -1.35, g.y1 + 0.95, h - 0.7), null, COL('#2c2e30'));
+        T.geo(Bs.trim, lmBox(0.35, 1.0, 9, 1.6, g.y1 + 0.2, -h - 3.5), null, COL('#9a958b'));
       }
-    }
-  }
-  if (o.spine) { // the glass barrel vault down the middle of the link, and the arched glazed bays it ends in over the courts
-    const [[ax, az], [bx, bz]] = o.spine, Ls = hyp(bx - ax, bz - az), ux = (bx - ax) / Ls, uz = (bz - az) / Ls, R = 2, H = o.h, P = 0.4;
-    const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(uz, 0, -ux), new THREE.Vector3(0, 1, 0), new THREE.Vector3(ux, 0, uz)).setPosition(ax, gy, az)), BAR = COL('#d9dcdf'), GL = COL('#5f8f96');
-    T.geo(Bs.trim, new THREE.CylinderGeometry(R, R, Ls + 2 * P, 16, 1, true, Math.PI / 2, Math.PI).rotateX(Math.PI / 2).translate(0, H + 0.4, Ls / 2), null, GL);
-    for (let z = -P; z <= Ls + P + 0.01; z += (Ls + 2 * P) / 10) T.geo(Bs.trim, new THREE.TorusGeometry(R + 0.02, 0.06, 4, 12, Math.PI).translate(0, H + 0.4, z), null, BAR);
-    for (const [z, ry] of [[-P, Math.PI], [Ls + P, 0]]) {
-      const bay = (g, col) => T.geo(Bs.trim, g.rotateY(ry).translate(0, 0, z), null, col);
-      bay(new THREE.ShapeGeometry(archShape(2 * R + 0.5, 3.4, H + 0.4 + R + 0.25), 12).translate(0, 0, -0.02), COL('#eceae4')); // white surround
-      bay(new THREE.ShapeGeometry(archShape(2 * R, 3.6, H + 0.4 + R), 12).translate(0, 0, 0.02), GL);
-      for (const x of [-R / 2, 0, R / 2]) bay(lmBox(0.08, H + 0.4 - 3.6 + Math.sqrt(R * R - x * x), 0.08, x, (3.6 + H + 0.4 + Math.sqrt(R * R - x * x)) / 2, 0.06), BAR);
-      for (let y = 4.6; y < H + 0.4; y += 1.0) bay(lmBox(2 * R, 0.07, 0.08, 0, y, 0.06), BAR);
-      bay(lmBox(2 * R + 0.5, H + 0.4 - 3.4, P + 0.1, 0, (H + 0.4 + 3.4) / 2, -P / 2 - 0.05), COL('#eceae4')); // the bay standing out of the wall
-    }
+    });
   }
   for (const [px, pz] of o.planters || []) { // a raised bed of shrubs with a little tree, as in the courts
     const ry = o.spine ? Math.atan2(o.spine[1][0] - o.spine[0][0], o.spine[1][1] - o.spine[0][1]) : 0, y = groundH(px, pz);
