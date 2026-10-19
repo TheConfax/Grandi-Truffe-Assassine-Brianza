@@ -830,6 +830,82 @@ for at, g in area_geoms:
     ok = shapely.contains(g, ptsg) & ~shapely.intersects(roadsU, ptsg) & ~shapely.intersects(bunion, ptsg) & ~shapely.intersects(_railbuf, ptsg) & (np.abs(xs_) <= HW) & (np.abs(zs_) <= HH)
     for x, z in list(zip(xs_[ok], zs_[ok]))[:n]: trees.append((x, z))
 log('pois', len(pois), 'places', len(places), 'trees', len(trees), 'crossings', len(crossings))
+# ---- street objects from OSM: [kind, x, z, angle, extra]. The angle follows the nearest street (a bench faces it, a bump lies across it);
+# extra is a height (pylons, poles, masts) or the street width (bumps). Kinds by index, same order as OGG_KINDS in oggetti3.js
+OGG = ['traliccio', 'palo', 'dosso', 'rallentatore', 'piattaforma', 'paletto', 'blocco', 'idrante', 'campana', 'ricarica', 'antenna',
+       'panchina', 'cestino', 'fontanella', 'giochi', 'telecamera', 'distributore', 'rastrelliera', 'cassetta']
+def ogg_kind(t):
+    tc = t.get('traffic_calming')
+    if tc: return {'table': 'piattaforma', 'hump': 'rallentatore', 'cushion': 'rallentatore', 'bump': 'dosso', 'yes': 'dosso', 'rumble_strip': None, 'chicane': None, 'choker': None, 'island': None}.get(tc, 'dosso')
+    pw, mm, am = t.get('power'), t.get('man_made'), t.get('amenity')
+    if pw == 'tower': return 'traliccio'
+    if pw == 'pole': return 'palo'
+    if mm in ('mast', 'antenna') or (mm == 'tower' and t.get('tower:type') == 'communication'): return 'antenna'
+    if mm == 'surveillance': return 'telecamera'
+    b = t.get('barrier')
+    if b == 'bollard': return 'paletto'
+    if b == 'block': return 'blocco'
+    if t.get('emergency') == 'fire_hydrant': return 'idrante'
+    if t.get('leisure') == 'playground': return 'giochi'
+    return {'recycling': 'campana' if t.get('recycling_type') != 'centre' else None, 'charging_station': 'ricarica', 'bench': 'panchina', 'waste_basket': 'cestino',
+            'drinking_water': 'fontanella', 'vending_machine': 'distributore', 'bicycle_parking': 'rastrelliera', 'post_box': 'cassetta'}.get(am)
+def num(v, d):
+    try: return float(str(v).replace('m', '').replace(',', '.').split(';')[0])
+    except (ValueError, TypeError): return d
+_segs = []
+for r in raw_roads:
+    if r['tunnel']: continue
+    for a_, b_ in zip(r['refs'], r['refs'][1:]): _segs.append((LineString([nodes[a_], nodes[b_]]), r))
+_segtree = STRtree([s[0] for s in _segs])
+def near_street(p, car=False, R=15, face=False):
+    best = None
+    for i in _segtree.query(Point(p).buffer(R)):
+        L, r = _segs[i]
+        if car and r['c'] > 5: continue
+        d = L.distance(Point(p))
+        if d < R and (best is None or d < best[0]): best = (d, L, r)
+    if best is None: return 0.0, None
+    if face:  # turned towards the street: from the object to its nearest point
+        np_ = best[1].interpolate(best[1].project(Point(p)))
+        if best[0] > 0.05: return math.atan2(np_.x - p[0], np_.y - p[1]), best[2]
+    (ax, az), (bx, bz) = best[1].coords
+    return math.atan2(bx - ax, bz - az), best[2]
+pw_dir = {}  # pylon or pole -> direction of its line: the cross arms stand square to the wires
+for wid, (refs, t) in ways.items():
+    if t.get('power') not in ('line', 'minor_line'): continue
+    for i, n_ in enumerate(refs):
+        a_, b_ = refs[max(0, i - 1)], refs[min(len(refs) - 1, i + 1)]
+        if a_ in nodes and b_ in nodes and a_ != b_: pw_dir[n_] = math.atan2(nodes[b_][0] - nodes[a_][0], nodes[b_][1] - nodes[a_][1])
+ogg = []
+def add_ogg(k, p, t, along=None):
+    if not inside(p, 0): return
+    car = k in ('dosso', 'rallentatore', 'piattaforma')
+    ang, r = (along, None) if along is not None else near_street(p, car, face=k in ('panchina', 'distributore', 'cassetta', 'ricarica', 'telecamera', 'fontanella', 'campana'))
+    if car and r is None and along is None: return  # a bump off the streets
+    extra = 0
+    if k == 'traliccio': extra = num(t.get('height'), 30)
+    elif k == 'palo': extra = num(t.get('height'), 9)
+    elif k == 'antenna': extra = num(t.get('height'), 25)
+    elif car: extra = (r['mh'] * 2) if r else 6
+    ogg.append([OGG.index(k), q(p[0]), q(p[1]), round(ang, 2), round(extra, 1)])
+for r_, t in ntags.items():
+    k = ogg_kind(t)
+    if k: add_ogg(k, nodes[r_], t, pw_dir.get(r_) if k in ('traliccio', 'palo') else None)
+for wid, (refs, t) in ways.items():
+    k = ogg_kind(t)
+    if not k or k in ('traliccio', 'palo') or t.get('highway') and k not in ('dosso', 'rallentatore', 'piattaforma'): continue
+    pts = [nodes[n_] for n_ in refs if n_ in nodes]
+    if len(pts) < 2: continue
+    if refs[0] == refs[-1] and len(pts) >= 4: c = Polygon(pts).centroid; add_ogg(k, (c.x, c.y), t)  # an area: its middle
+    else:  # a line (a table mapped along the street): its middle, lying along it
+        L = LineString(pts); m = L.interpolate(0.5, normalized=True); a = L.interpolate(max(0, L.length / 2 - 1)); b = L.interpolate(min(L.length, L.length / 2 + 1))
+        add_ogg(k, (m.x, m.y), t, math.atan2(b.x - a.x, b.y - a.y) if k in ('dosso', 'rallentatore', 'piattaforma') else None)
+power_lines = []  # wires from pylon to pylon: [points], height of the top
+for wid, (refs, t) in ways.items():
+    if t.get('power') not in ('line', 'minor_line'): continue
+    pts = [nodes[n_] for n_ in refs if n_ in nodes]
+    if len(pts) >= 2: power_lines.append((pts, 28 if t['power'] == 'line' else 8.5))
+log('oggetti', len(ogg), dict(Counter(OGG[o[0]] for o in ogg)), 'linee elettriche', len(power_lines))
 
 # ------------------------------------------------------------------ graph & tiles
 used_nodes = {}
@@ -930,6 +1006,8 @@ for ri, r in enumerate(raw_roads):  # road pieces per tile (for markings and dec
         push(t, 'rp', ri)
 for x, z, dx, dz, w in crossings: push(tid(x, z), 'cr', [q(x), q(z), round(dx, 3), round(dz, 3), round(w, 1)])
 for x, z in lamps: push(tid(x, z), 'lp', [q(x), q(z)])
+for o in ogg: push(tid(o[1] / 10, o[2] / 10), 'og', o)
+push_lines('pw', [p for p, h in power_lines], lambda i: {'h': power_lines[i][1]})
 # terrain as base64 uint16 decimetres
 TH16 = np.clip(np.round((TH - TBASE) * 10), 0, 65535).astype('<u2')
 out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 1), 'tile': TILE, 'ntx': ntx, 'ntz': ntz},

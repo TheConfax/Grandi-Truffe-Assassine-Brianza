@@ -8,15 +8,13 @@ Prima di tutto il resto: vedi la sezione **Parcheggi** in fondo. I dati sono gi�
 - [ ] Visuale in terza persona
 
 ## Altri oggetti OSM
-Conteggi in `data/maplarge.osm` (che è più grande dell'area di gioco). Oggi `build_data.py` usa solo sbarre (`lift_gate`), lampioni e alberi.
-- [ ] Tralicci (`power=tower`, 1049) con le linee elettriche (`power=line`/`minor_line`, 59) e i pali (`power=pole`, 144)
-- [ ] Dossi e piattaforme rialzate (`traffic_calming`, 122): da sentire anche in guida
-- [ ] Paletti (`barrier=bollard`, 385) e blocchi (`barrier=block`, 39); le sbarre (`lift_gate`, 53) ci sono già
-- [ ] Idranti (`emergency=fire_hydrant`, 98)
-- [ ] Campane del vetro (`amenity=recycling`, 69)
-- [ ] Colonnine di ricarica (`amenity=charging_station`, 39)
-- [ ] Antenne e ripetitori (`man_made=mast/tower/antenna`, 134)
-- [ ] Altri possibili: panchine (346), cestini (215), fontanelle (123), giochi dei parchi (88), telecamere (67), distributori automatici (47), rastrelliere (46), cassette postali (32)
+Fatti in `src/oggetti3.js` (dati: chiave `og` per tile, fili in `pw`): 464 oggetti nell'area di gioco. I piccoli si abbattono come i lampioni, i grandi sono solidi, i dossi alzano davvero la strada.
+- [x] Tralicci (83) con i fili delle 59 linee elettriche; pali (`power=pole`): nessuno nell'area
+- [x] Dossi (24), rallentatori (1) e piattaforme rialzate (7): profilo fisico in `surfAt`, scossone in auto
+- [x] Paletti (27) e blocchi (11)
+- [x] Idranti (10), campane del vetro (19), colonnine di ricarica (15), antenne e ripetitori (35)
+- [x] Panchine (56), cestini (25), fontanelle (50), giochi (23), telecamere (36), distributori (15), rastrelliere (17), cassette postali (10)
+- [ ] Da rifinire: distributori e telecamere mappati contro i muri finiscono a filo della facciata; i giochi mappati come area sono un solo gruppo al centro
 
 ## Segnaletica
 - [ ] Segnaletica orizzontale: linee di arresto e scritte STOP, frecce di corsia, piste ciclabili, strisce blu (oggi ci sono le strisce pedonali, 510 attraversamenti)
@@ -41,6 +39,7 @@ Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Stre
 - [x] Anna Frank e Diaz (via Giovanni XXIII, Meda), con la scalinata coperta tra le due, dalle viste 3D di Apple Maps
 - [x] Seminario di San Pietro Martire, Seveso (il complesso accanto al santuario)
 - [x] Liceo Frassati di Baruccana con la palestra (foto della perizia del Comune, 2025)
+- [ ] Asilo Garibaldi
 - [ ] Altre scuole di Seveso: servono foto (Collodi, Leonardo da Vinci / Milani, Bruno Munari, Toti, Don Aurelio Giussani, Frassati di via San Carlo)
 
 ## Piccoli monumenti

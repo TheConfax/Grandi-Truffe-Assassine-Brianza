@@ -235,7 +235,7 @@ for (const td of D.tiles) for (const r of td.rv || []) {
 }
 function surfAt(x, z, cy) { // ground or deck under (x,z), never more than a kerb above the current height
   const rc = riverCut(x, z);
-  let y = groundH(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + (onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : 0);
+  let y = groundH(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + (onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : bumpAt(x, z));
   if (cy === undefined) return y;
   let under;
   DECKG.each(x, z, x, z, s => {
@@ -712,7 +712,7 @@ function* buildTileGen(T) {
     }
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture]) {
+  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
