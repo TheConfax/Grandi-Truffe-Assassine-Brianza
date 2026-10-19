@@ -2607,7 +2607,7 @@ function updSfx(dt) {
   SFX.hum.g.gain.setTargetAtTime(0.05 + 0.1 * busyAt(TOD), t, 1);
   // the loudest moving car within 50 m
   let best = null, bs = 0;
-  for (const v of VEH) { if (v === car || v.speed < 1.5) continue; const d = hyp(v.x - lx, v.z - lz); if (d > 50) continue; const s = v.speed / Math.max(4, d); if (s > bs) { bs = s; best = v; } }
+  for (const v of VEH) { if (v === car || v.speed < 1.5 || v.spec.pedal) continue; // bicycles have no engine const d = hyp(v.x - lx, v.z - lz); if (d > 50) continue; const s = v.speed / Math.max(4, d); if (s > bs) { bs = s; best = v; } }
   if (best) {
     const dx = best.x - lx, dz = best.z - lz, d = hyp(dx, dz) || 1, lvx = car ? car.vx : P.vx || 0, lvz = car ? car.vz : P.vz || 0;
     const vr = ((best.vx - lvx) * dx + (best.vz - lvz) * dz) / d, dop = clamp(343 / (343 + vr), 0.8, 1.25), sp = best.speed;
