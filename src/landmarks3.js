@@ -891,22 +891,54 @@ function buildPlatforms(T, G) {
   for (const [n, b] of boards) mkMesh(b, stationSignMat(n), 10, false, G);
 }
 
-// parking stalls: white lines across the long side of every car park, one or two rows depending on its width
+// parking stalls: white lines across the long side of every car park, one or two rows depending on its width, never over the aisles (OSM service
+// roads) or a building; one yellow stall with the wheelchair per row of eight or more; T.stalls keeps every stall for the parked cars (parkTile);
+// on the bigger car parks lamp posts down the middle, a parking meter and the blue P sign
+const PSIGN_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#1f4fa8'; g.fillRect(0, 0, w, h); g.strokeStyle = '#fff'; g.lineWidth = 3; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = '#fff'; g.font = 'bold 46px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', w / 2, h / 2 + 3); }, false), side: THREE.DoubleSide });
 function buildParkingLines(T, G) {
-  const b = FBuf(), W = COL('#e9e7df');
+  const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), sign = Buf();
+  T.stalls = [];
+  const quad = (x, z, ux, uz, a0, a1, w0, w1, col) => { const nx = -uz, nz = ux, i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
   for (const a of T.d.a || []) {
     if (a.t !== 4) continue; const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P);
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
     const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
-    const line = (s, v0, v1) => { const i0 = b.p.length / 3; for (const [ds, v] of [[-0.06, v0], [0.06, v0], [0.06, v1], [-0.06, v1]]) vtx(b, cx + ux * (s + ds) + nx * v, 0.05, cz + uz * (s + ds) + nz * v, 0, 1, 0, 0, 0, W); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
-    for (let s = Math.min(...proj) + 1.0; s <= Math.max(...proj) - 1.0; s += 2.5) {
-      const sec = lmSection(P, cx, cz, ux, uz, s); if (!sec) continue; const w = sec[1] - sec[0]; if (w < 5) continue;
-      line(s, sec[0] + 0.2, sec[0] + 4.8); if (w >= 10.5) line(s, sec[1] - 4.8, sec[1] - 0.2);
+    const S0 = Math.min(...proj) + 1.0, S1 = Math.max(...proj) - 1.0, lot = [];
+    const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4); };
+    for (const row of [0, 1]) {
+      let run = [];
+      const flush = () => { // a run of free stalls side by side: the lines between them, the yellow one every eighth
+        if (run.length) { const yi = run.length >= 8 ? 1 : -1; run.forEach((st, k) => { const col = k === yi ? Y : W; quad(cx, cz, ux, uz, st.s - 1.31, st.s - 1.19, st.v0, st.v1, col); quad(cx, cz, ux, uz, st.s + 1.19, st.s + 1.31, st.v0, st.v1, col); if (k === yi) { quad(cx, cz, ux, uz, st.s - 0.5, st.s + 0.5, (st.v0 + st.v1) / 2 - 0.5, (st.v0 + st.v1) / 2 + 0.5, BLUE); st.dis = true; } lot.push(st); }); }
+        run = [];
+      };
+      for (let s = S0 + 1.25; s <= S1 - 1.25; s += 2.5) {
+        const sec = lmSection(P, cx, cz, ux, uz, s), sa = lmSection(P, cx, cz, ux, uz, s - 1.2), sb = lmSection(P, cx, cz, ux, uz, s + 1.2);
+        if (!sec || !sa || !sb) { flush(); continue; }
+        const lo = Math.max(sec[0], sa[0], sb[0]), hi = Math.min(sec[1], sa[1], sb[1]), w = hi - lo;
+        if (w < 5 || (row === 1 && w < 10.5)) { flush(); continue; }
+        const v0 = row ? hi - 4.8 : lo + 0.2, v1 = row ? hi - 0.2 : lo + 4.8, vm = (v0 + v1) / 2;
+        if (!ok(s, vm) || !ok(s - 0.9, vm) || !ok(s + 0.9, vm)) { flush(); continue; }
+        const x = cx + ux * s + nx * vm, z = cz + uz * s + nz * vm;
+        run.push({ s, v0, v1, x, z, h: Math.atan2(nx, nz) + (row ? 0 : Math.PI) }); // nose towards the aisle in the middle
+      }
+      flush();
+    }
+    T.stalls.push(...lot);
+    if (lot.length >= 10) { // furniture on the bigger lots: lamps along the middle, the meter and the P sign at one end
+      const mid = (S0 + S1) / 2, sec = lmSection(P, cx, cz, ux, uz, mid);
+      for (let s = S0 + 6; s < S1 - 3; s += 22) { const sc = lmSection(P, cx, cz, ux, uz, s); if (!sc) continue; const v = (sc[0] + sc[1]) / 2, x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; if (onAnyRoad(x, z, 0.5) && !onFoot(x, z) || inBuilding(x, z, 0.5)) continue; const gy = groundH(x, z); addBox(lamps, x, gy + 3.8, z, 0.15, 7.6, 0.15, null); addBox(heads, x + ux * 0.5, gy + 7.55, z + uz * 0.5, 1.2, 0.18, 0.35, null); addBox(heads, x - ux * 0.5, gy + 7.55, z - uz * 0.5, 1.2, 0.18, 0.35, null); }
+      const e = lmSection(P, cx, cz, ux, uz, S0 + 0.5);
+      if (e) { const x = cx + ux * (S0 + 0.3) + nx * e[0] - nx * -0.6, z = cz + uz * (S0 + 0.3) + nz * e[0] + nz * 0.6, gy = groundH(x, z), ry = Math.atan2(-uz, ux);
+        F.geo(Bs.trim, lmBox(0.08, 2.6, 0.08, x, gy + 1.3, z), null, COL('#8a8f95'));
+        const i0 = sign.p.length / 3; for (const [dx, dy, u, v] of [[-0.35, 2.2, 0, 0], [0.35, 2.2, 1, 0], [0.35, 2.9, 1, 1], [-0.35, 2.9, 0, 1]]) vtx(sign, x + nx * dx, gy + dy, z + nz * dx, ux, 0, uz, u, v); sign.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
+        const mx = x + nx * 1.5, mz = z + nz * 1.5; F.geo(Bs.trim, lmBox(0.3, 1.5, 0.25, 0, 0, 0).rotateY(ry).translate(mx, gy + 0.75, mz), null, COL('#3c4650')); F.geo(Bs.trim, lmBox(0.32, 0.25, 0.27, 0, 0, 0).rotateY(ry).translate(mx, gy + 1.5, mz), null, COL('#e2b436')); } // parking meter
     }
   }
   if (b.i.length) mkMesh(b, PLAT_MAT.line, 5, false, G);
+  if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
+  if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
+  if (sign.i.length) mkMesh(sign, PSIGN_MAT, 10, false, G);
 }
-
 // park furniture: along the footpaths inside parks and gardens, benches every so often (on alternate sides) and lamp posts, a bin by each bench;
 // a flower bed fills the middle of a small round plaza where paths meet
 function buildParkFurniture(T, G) {

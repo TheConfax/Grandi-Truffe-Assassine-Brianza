@@ -101,8 +101,16 @@ a = s.index("function spawnParked() {"); b = s.index("// -----------------------
 s = s[:a] + """function parkTile(T) {
   T.parked = []; srndT = 77 + T.t * 131;
   const add = (m, x, z, h) => { const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.y = surfAt(x, z); v.sync(); T.parked.push(v); };
+  // car parks with painted stalls: about half of them taken, a car in each and never in the yellow one; lots without stalls keep a few loose cars
+  let inStalls = 0;
+  for (const st of T.stalls || []) {
+    if (st.dis || inStalls >= 14 || tRnd() > 0.45 || VEH.some(v => hyp(v.x - st.x, v.z - st.z) < 2.2)) continue;
+    let m = pickModel(PARKED_MIX, tRnd); if (m === 'ape' || m === 'bici') m = 'hatch';
+    add(m, st.x + (tRnd() - 0.5) * 0.25, st.z + (tRnd() - 0.5) * 0.25, st.h + (tRnd() - 0.5) * 0.05); inStalls++;
+  }
   for (const a of T.d.a || []) if (a.t === 4) {
     const o = dec(a.p), ar = Math.abs(sArea(o)); if (ar < 120) continue;
+    if ((T.stalls || []).some(st => inPoly(st.x, st.z, o))) continue;
     let le = 0, ang = 0; for (let i = 0; i < o.length; i++) { const p = o[i], q = o[(i + 1) % o.length], l = hyp(q[0] - p[0], q[1] - p[1]); if (l > le) { le = l; ang = Math.atan2(q[0] - p[0], q[1] - p[1]); } }
     const n = Math.min(4, Math.floor(ar / 160)), [cx, cz] = centroid(o); let placed = 0;
     for (let k = 0; k < 30 && placed < n; k++) {
