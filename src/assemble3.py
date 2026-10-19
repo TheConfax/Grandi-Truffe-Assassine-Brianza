@@ -356,7 +356,9 @@ rep("<kbd>N</kbd> +2 ore · <kbd>U</kbd> audio</p>", "<kbd>N</kbd> +2 ore · <kb
 rep("const cands = D.pois.filter(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')), spot = cands.sort((a, b) => hyp(a.x - P.x, a.z - P.z) - hyp(b.x - P.x, b.z - P.z))[0] || STATION;",
     "const cands = D.pois.filter(p => kind === 'busted' ? p.k === 'polizia' : (p.k === 'ospedale' || p.k === 'chiesa')), spot = cands.sort((a, b) => hyp(a.x - P.x, a.z - P.z) - hyp(b.x - P.x, b.z - P.z))[0] || STATION; setTimeout(() => toast((kind === 'busted' ? 'Rilasciato: ' : 'Ti risvegli: ') + (spot.n || 'Meda')), 400);")
 # radio: R / d-pad up toggles; N is only the time skip now
-rep("KeyN: 'turbo', KeyH: 'horn' };", "KeyH: 'horn' };")
+rep("KeyN: 'turbo', KeyH: 'horn' };", "KeyH: 'horn', KeyQ: 'back', KeyE: 'fwdw' };")
+# two-wheelers: weight back (Q / left stick pulled) or forward (E / stick pushed) for wheelies and stoppies
+rep("v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false;", "v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; v.inp.lean = clamp((K.back ? 1 : 0) - (K.fwdw ? 1 : 0) - GP.fwd, -1, 1);")
 rep("  if (e.code === 'KeyN') skipTime(2);", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyR') toggleRadio();")
 rep("  if (edge(4)) skipTime(2);", "  if (edge(4)) skipTime(2);\n  if (edge(12)) toggleRadio();")
 
@@ -407,6 +409,9 @@ function updVisuals(dt) {""")
 # ---- sounds: footsteps, tyres, passing cars, ambience
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'sound3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("  if (running) { updHud(dt); updAudio(); }", "  if (running) { updHud(dt); updAudio(); updSfx(dt); }")
+# help for wheelies and stoppies
+rep("      <div><kbd>R</kbd> radio Discoradio on/off</div>", "      <div><kbd>R</kbd> radio Discoradio on/off</div>\n      <div><kbd>Q</kbd> / <kbd>E</kbd> in moto: peso indietro (impennata col gas) / avanti (stoppie in frenata)</div>")
+rep("<kbd>R</kbd> radio · ", "<kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · ")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')

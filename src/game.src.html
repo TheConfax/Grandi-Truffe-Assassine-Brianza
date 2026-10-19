@@ -782,9 +782,9 @@ const MODELS = {
   ape:    { name: 'Motocarro', L: 2.95, W: 1.45, ape: true, wr: 0.27, maxV: 17.5, acc: 2.24, grip: 7.5, snd: 1.9 },
   police: { name: 'Auto della Polizia Locale', L: 4.45, W: 1.84, bh: 0.6, cab: [1.58, 0.56, 2.15, -0.25], wr: 0.34, maxV: 63.9, acc: 4.67, grip: 10, snd: 1 },
   // two-wheelers: seat height/position for the rider, crouch = forward lean of the rider
-  scooter: { name: 'Scooter', L: 1.85, W: 0.7, two: true, noX: true, wr: 0.27, seatY: 0.8, seatZ: -0.25, crouch: 0.08, legA: -0.85, armA: -1.0, maxV: 25, acc: 2.6, grip: 8.5, snd: 2.1 },
-  moto:    { name: 'Moto', L: 2.1, W: 0.78, two: true, wr: 0.32, seatY: 0.86, seatZ: -0.22, crouch: 0.42, legA: -1.0, armA: -1.2, maxV: 61, acc: 7.6, grip: 10.5, snd: 1.7 },
-  bici:    { name: 'Bicicletta', L: 1.75, W: 0.6, two: true, pedal: true, noX: true, wr: 0.34, seatY: 0.98, seatZ: -0.2, crouch: 0.3, legA: -0.3, armA: -0.95, maxV: 8.3, acc: 1.5, grip: 8, snd: 0 },
+  scooter: { name: 'Scooter', L: 1.85, W: 0.7, two: true, noX: true, wr: 0.27, seatY: 0.8, seatZ: -0.25, crouch: 0.08, legA: -0.85, armA: -1.0, whMax: 0.35, maxV: 25, acc: 2.6, grip: 8.5, snd: 2.1 },
+  moto:    { name: 'Moto', L: 2.1, W: 0.78, two: true, wr: 0.32, seatY: 0.86, seatZ: -0.22, crouch: 0.42, legA: -1.0, armA: -1.2, whMax: 0.8, maxV: 61, acc: 7.6, grip: 10.5, snd: 1.7 },
+  bici:    { name: 'Bicicletta', L: 1.75, W: 0.6, two: true, pedal: true, noX: true, wr: 0.34, seatY: 0.98, seatZ: -0.2, crouch: 0.3, legA: -0.3, armA: -0.95, whMax: 0.55, maxV: 8.3, acc: 1.5, grip: 8, snd: 0 },
 };
 const TRAFFIC_MIX = [['panda', 22], ['hatch', 22], ['sedan', 13], ['wagon', 10], ['suv', 12], ['sport', 5], ['van', 9], ['ape', 6], ['scooter', 7], ['moto', 4], ['bici', 6]];
 const PARKED_MIX = [['panda', 25], ['hatch', 25], ['sedan', 15], ['wagon', 12], ['suv', 14], ['sport', 3], ['van', 6], ['ape', 3], ['scooter', 5], ['moto', 2], ['bici', 4]];
@@ -903,7 +903,7 @@ const VEH = [];
 class Vehicle {
   constructor(kind, color, x, z, h) {
     Object.assign(this, { kind, x, z, h, vx: 0, vz: 0, steer: 0, health: 100, driver: null, sleep: true, spin: 0, roll: 0, pitch: 0, boost: false, y: 0, slope: 0 });
-    this.spec = MODELS[kind]; this.color = color; this.m = makeCar(kind, color); if (this.spec.two) this.roll = 0.1; // parked on its stand
+    this.spec = MODELS[kind]; this.color = color; this.m = makeCar(kind, color); if (this.spec.two) { this.roll = 0.1; this.wh = this.whv = this.whHold = 0; } // parked on its stand; wh = wheelie (+) / stoppie (-) pitch
     this.rad = this.spec.W / 2 + 0.02; this.co = Math.max(0.2, this.spec.L / 2 - this.rad);
     this.inp = { thr: 0, brk: 0, steer: 0, hand: 0 }; this.ai = null; this.maxV = this.spec.maxV;
     VEH.push(this); this.sync();
@@ -924,9 +924,12 @@ class Vehicle {
     v += 9.81 * Math.sin(this.slope) * dt; // gravity on hills
     const drag = (0.15 + (thr ? 0 : 0.45 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);
     v -= Math.sign(v) * Math.min(Math.abs(v), drag);
-    this.steer = lerp(this.steer, i.steer, 1 - Math.exp(-10 * dt));
-    const sMax = 0.62 / (1 + Math.abs(v) * 0.045) * (S.two ? 0.72 : 1);
+    if (S.two) v = this.wheelie(dt, v, thr, i);
+    this.steer = lerp(this.steer, i.steer, 1 - Math.exp(-(S.two ? 4.5 : 10) * dt)); // a handlebar answers slower than a steering rack
+    // two-wheelers: the short wheelbase would turn twice as hard as a car, so their steering is scaled to car-like turns
+    const sMax = 0.62 / (1 + Math.abs(v) * 0.045) * (S.two ? 0.4 : 1);
     let yaw = this.steer * sMax * v / (S.L * 0.62); if (i.hand) yaw *= 1.55;
+    if (S.two && this.wh > 0.08) yaw *= 0.35; // front wheel in the air
     const yawMax = (i.hand ? 22 : 13 + S.grip * 0.4) / Math.max(4, Math.abs(v)); yaw = clamp(yaw, -yawMax, yawMax); // grip limit
     this.h = wrapA(this.h + yaw * dt);
     lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);
@@ -937,6 +940,19 @@ class Vehicle {
     if (S.two) this.roll = lerp(this.roll, clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85), 0.14); // lean into the bend
     else this.roll = lerp(this.roll, clamp(-yaw * v * 0.004, -0.08, 0.08), 0.1);
     this.pitch = lerp(this.pitch, clamp((thr - i.brk) * -0.025, -0.04, 0.04), 0.1);
+  }
+  wheelie(dt, v, thr, i) { // pitch on the rear wheel (gas + weight back) or on the front one (brake + weight forward), a damped spring towards the wanted angle
+    const S = this.spec, lb = clamp(i.lean || 0, -1, 1), was = this.wh; let tgt = 0;
+    if (thr > 0 && lb > 0.1 && v > 1) tgt = S.whMax * lb * Math.min(1, thr) * Math.min(1, v / 4);
+    else if (i.brk > 0 && lb < -0.1 && v > 4) tgt = -0.55 * S.whMax * -lb * i.brk;
+    this.whv += (28 * (tgt - this.wh) - 7 * this.whv) * dt; this.wh += this.whv * dt;
+    if ((was >= 0 && this.wh < 0 && tgt >= 0) || (was <= 0 && this.wh > 0 && tgt <= 0)) { this.wh = 0; this.whv = 0; } // the ground: back on both wheels, no bounce through it
+    if (was > 0.3 && this.wh === 0 && this === P.car) shake = Math.max(shake, 0.25); // the front wheel slams down
+    if (this.wh < -0.03) v -= 5 * dt; // all the braking on the front wheel
+    // past the balance point: holding it fully back too long loops it over; too much stoppie goes over the bars
+    if (this.wh > S.whMax * 0.9 && lb > 0.9 && thr > 0) this.whHold += dt; else this.whHold = Math.max(0, this.whHold - dt * 2);
+    if ((this.whHold > 2.2 || this.wh < -0.72) && this.driver) { this.wh = this.whv = this.whHold = 0; throwRider(this, Math.max(9, Math.abs(v))); }
+    return v;
   }
   collide() {
     let hitN = null;
@@ -964,6 +980,10 @@ class Vehicle {
   sync() {
     const m = this.m; m.g.position.set(this.x, this.y, this.z); m.g.rotation.y = this.h; m.g.rotation.x = this.slope;
     m.body.rotation.z = this.roll; m.body.rotation.x = this.pitch;
+    if (this.spec.two) { // wheelie / stoppie: rotate around the axle that stays on the ground
+      const S = this.spec, a = -this.wh, py = S.wr, pz = (this.wh > 0 ? -1 : 1) * (S.L / 2 - S.wr - 0.04), c = Math.cos(a), s = Math.sin(a);
+      m.body.rotation.x = a; m.body.position.set(0, py - (py * c - pz * s), pz - (py * s + pz * c));
+    }
     for (const w of m.wheels) { w.w.rotation.x = this.spin; if (w.front) w.piv.rotation.y = this.steer * 0.5; }
   }
   remove() { scene.remove(this.m.g); VEH.splice(VEH.indexOf(this), 1); }
