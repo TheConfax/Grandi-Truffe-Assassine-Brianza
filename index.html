@@ -1647,6 +1647,17 @@ const LANDMARKS = [
     o: [-1809, 1139], ua: [0.2172, 0.9761], pitch: [0, 110, -3, 62], curves: [16.5, 90.5, 28.5], rin: 37.5, rout: 47.5, sprint: 90.5, apron: [10, 50, '#a8503c'], mats: [[114, 32], [118, 45]], dugouts: [41, 61],
     towers: [[-36, -16], [140, -14], [-36, 76], [138, 78]],
     stands: [{ ab: [28, 78, -40, -21], h: 7.5, roof: 3.4, segs: 3 }, { ab: [8, 28, -36, -21], h: 4, roof: 2.4, segs: 1 }, { ab: [78, 100, -36, -21], h: 4, roof: 2.4, segs: 1 }] } },
+  // the oratorio of San Carlo on the Altopiano (via Sant'Ambrogio and via delle Groane): the church and its wings, light walls under light metal roofs with
+  // a teal trim, the little bell gable on the long wing; the court with the fountain, the basket court, the playground
+  { n: 'Chiesa di San Carlo Borromeo', x: -1975.4, z: 1550.8, build: buildCasa, o: { wall: '#e4dccb', h: 8.5, floors: 2, metal: '#e2e4e4', trim: '#4f9a8d', bell: [-1976.5, 1542] } },
+  { n: 'Oratorio San Carlo', x: -1985.7, z: 1564.9, build: buildCasa, o: { wall: '#e8e2d2', h: 7.0, floors: 2, metal: '#e2e4e4', trim: '#4f9a8d' } },
+  { n: 'Oratorio San Carlo, ala nord', x: -1995.6, z: 1532.1, build: buildCasa, o: { wall: '#e8e2d2', h: 7.0, floors: 2, metal: '#e2e4e4', trim: '#4f9a8d' } },
+  { n: 'Oratorio San Carlo, salone', x: -1994.3, z: 1524.5, build: buildCasa, o: { wall: '#d9d2c0', h: 6.0, floors: 1, metal: '#d8dada', trim: '#4f9a8d' } },
+  { n: 'Oratorio San Carlo, portico', x: -2013.9, z: 1532.1, build: buildCasa, o: { wall: '#d9d2c0', h: 4.5, floors: 1, metal: '#d8dada', trim: '#4f9a8d' } },
+  // the oratorio of San Pietro Martire, Seveso (via San Giovanni Bosco): long wings under coppi along the courts, the old block with the dark roof by the street
+  { n: 'Oratorio della parrocchia San Pietro Martire', x: -590.9, z: 961.1, build: buildCasa, o: { wall: '#e6dccb', h: 7.2, floors: 2 } },
+  { n: 'Oratorio San Pietro Martire, ala sud', x: -600.9, z: 998.6, build: buildCasa, o: { wall: '#e9dfcd', h: 7.6, floors: 2 } },
+  { n: 'Oratorio San Pietro Martire, casa vecchia', x: -606.4, z: 1012.5, build: buildCasa, o: { wall: '#cfc6b6', h: 7.6, floors: 2, metal: '#5c574f', trim: '#cfc6b6' } },
   { n: 'Palazzo Buzzi', x: 339.9, z: -446.4, build: buildPalazzo, o: { style: 'buzzi', h: 16.4, front: [344.2, -451.8], balcony: 'stone', balconyW: 9 } }, // ex S.A.L.D.A., Junior B and f.lli Buzzi on the ground floor
   { n: 'Kino', x: 407.0, z: -375.3, build: buildKino, o: { // the bistro at via Indipendenza 34 in the front of the white block
     kino: { front: [[411.3, -381.3], [422.6, -372.7]], d: 9, h: 8.4 }, rest: { pts: [[398.4, -379.3], [401.0, -382.7], [408.2, -377.2], [405.8, -374.1], [417.1, -365.5], [413.1, -359.6], [394.3, -374.0]], h: 12.8, floors: 4, wall: '#efece4', glass: '#3c4248', roof: '#bdbab3', balc: true, ribbon: 0.5 },
@@ -1718,6 +1729,7 @@ const piazzaTex = canvasTex(1024, 768, (g, w, h) => { // u along SW -> SE... lai
 // small squares in the parks: a round of beaten gravel, a stone basin in the middle with a pole and its weathervane, curved stone benches in a ring,
 // round shrubs on the street side; c, r, benches, shrubs (the angle from the centre they gather around), trees: a row of conifers [[x, z]...]
 const PLAZAS = [
+  { n: 'Oratorio San Carlo, la fontana', c: [-2010.0, 1552.0], r: 3.0, benches: 0, shrubs: 0, trees: [] },
   { n: 'Parco Fusetti', c: [565.2, -426.1], r: 6.6, benches: 5, shrubs: -0.9, trees: [[500.9, -386.4], [504.2, -390.8], [507.5, -395.2], [510.8, -399.6], [514.1, -404.0], [517.4, -408.4], [520.7, -412.8], [524.0, -417.2], [527.3, -421.6], [530.6, -426.0]] },
 ];
 const nearPlaza = (x, z, m = 2) => PLAZAS.some(q => hyp(x - q.c[0], z - q.c[1]) < q.r + m);
@@ -1749,6 +1761,8 @@ const YARDS = [
   { p: [[231.3, -205.3], [255.9, -235.6], [203.0, -278.3], [178.3, -248.0]], col: '#d8d2c4' }, { p: [[283.4, -266.1], [309.9, -298.6], [279.6, -323.1], [253.0, -290.6]], col: '#cfc6b2' }, // the oratorio's gravel fields
   { p: [[258.1, -235.1], [268.9, -248.3], [241.6, -270.2], [230.9, -257.1]], col: '#4f86c6', court: true }, { p: [[269.5, -249.0], [283.4, -266.1], [256.1, -288.1], [242.2, -271.0]], col: '#9a8370', court: true }, // basket court and the old tennis court
   { p: [[232.7, -300.5], [253.6, -326.1], [241.1, -336.1], [220.3, -310.6]], col: '#bdb8ae' }, // the court of the Milani
+  { p: [[-2012, 1500], [-1985, 1500], [-1985, 1518], [-2012, 1518]], col: '#a9aca8', court: true }, // the basket court of the Altopiano oratorio
+  { p: [[-598, 948], [-583, 945], [-581, 1000], [-596, 1002]], col: '#c49a86', court: true }, { p: [[-577, 966], [-534, 966], [-532, 1022], [-577, 1024]], col: '#c4bdb0' }, // San Pietro: the courts and the gravel field
   { p: [[538.4, -410.7], [515.6, -380.3], [536.4, -364.7], [559.2, -395.1]], col: '#4f8a6c' }, { p: [[536.2, -401.1], [524.2, -385.1], [535.4, -376.7], [547.4, -392.7]], col: '#b4553f', court: true }, // the Traversi court
   { p: [[1231.0, -555.6], [1236.1, -566.5], [1336.1, -520.5], [1330.6, -508.7]], col: '#a9a8a3' }, // the Curie drive from via Marie Curie, under the bridges
   { p: [[1258.9, -486.3], [1266.1, -502.5], [1279.7, -496.6], [1272.0, -480.5]], col: '#c2bdb2' }, { p: [[1280.8, -531.8], [1274.2, -518.7], [1288.0, -513.3], [1292.7, -525.7]], col: '#c2bdb2' }, // its two courts
@@ -2988,6 +3002,25 @@ function buildStadio(L, B, G) {
     box(Bs.trim, 0.6, st.roof + 1.2, 0.6, a1 - 0.3, H + st.roof / 2 - 0.2, b0 + 0.6, COL('#8d9094'));
     box(Bs.trim, a1 - a0, 1.0, 0.25, (a0 + a1) / 2, 0.5, b1, COL('#d9d6cf')); // the low wall in front
   }
+  lmFlush(Bs, G);
+}
+
+// plain buildings of the oratori: plastered walls with windows in light frames on every floor and a roof on the footprint, of coppi or of light
+// metal sheet with a coloured eaves trim; o: { wall, h, floors, metal (roof colour), trim, bell: [x, z] (a little bell gable on the ridge) }
+function buildCasa(L, B, G) {
+  const o = L.o, ring = lmSimplify(B.pts, 0.4), F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), H = gy + o.h, A = sArea(ring), fh = (o.h - 0.6) / o.floors;
+  const yr = lmBody(F, Bs, ring, gy - 1, H, { col: COL(o.wall), trim: COL(o.trim || '#efe9dc'), roof: o.metal ? 'trim' : 'coppi', roofCol: o.metal ? COL(o.metal) : undefined, slope: o.metal ? 0.18 : 0.45, over: 0.5 });
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 3) continue;
+    let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
+    const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, ry = Math.atan2(-ez, ex), n = Math.max(1, Math.floor((Ln - 1.2) / 3.2)), st = Ln / n;
+    for (let f = 0; f < o.floors; f++) for (let k = 0; k < n; k++) { const t = st * (k + 0.5), x = a[0] + ex * t, z = a[1] + ez * t, y = gy + 0.6 + f * fh + fh * 0.45;
+      F.geo(Bs.trim, lmBox(1.3, 1.6, 0.08, 0, 0, 0).rotateY(ry).translate(x + nx * 0.03, y, z + nz * 0.03), null, COL(o.frame || '#ece8de'));
+      F.geo(Bs.trim, lmBox(1.05, 1.35, 0.08, 0, 0, 0).rotateY(ry).translate(x + nx * 0.07, y, z + nz * 0.07), null, COL('#33393f')); }
+  }
+  if (o.bell) { const [bx, bz] = o.bell, y = groundH(bx, bz) - groundH(bx, bz) + yr; // a little bell gable: a pier with an arched opening and a cross
+    F.geo(Bs.plaster, lmBox(1.6, 2.6, 0.5, bx, y + 1.0, bz), null, COL(o.wall)); F.geo(Bs.trim, lmBox(0.7, 1.1, 0.55, bx, y + 1.3, bz), null, COL('#2b2a29'));
+    F.geo(Bs.trim, new THREE.ConeGeometry(1.05, 0.7, 4).rotateY(Math.PI / 4).translate(bx, y + 2.65, bz), null, COL(o.metal || '#8e4630')); lmCross(F, Bs.trim, bx, y + 3.0, bz, 0.6, COL('#3c3c40')); }
   lmFlush(Bs, G);
 }
 
