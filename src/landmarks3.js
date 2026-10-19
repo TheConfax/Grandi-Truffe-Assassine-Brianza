@@ -41,7 +41,7 @@ const LANDMARKS = [
         { pts: [[-509.6, -802.2], [-493.2, -808.2], [-486.6, -792.1], [-503.1, -785.3]], h: 8.4, floors: 2 }, { pts: [[-503.1, -785.3], [-486.6, -792.1], [-481.9, -778.1], [-498.4, -771.0]], h: 8.4, floors: 2 }],
       steps: [{ pts: [[-535.5, -807.6], [-528.7, -810.4], [-523.3, -797.8], [-532.7, -793.6]], n: 8, h: 2.4 }],
       walkway: [[-578.8, -718.1], [-549.3, -727.1], [-544.3, -722.0], [-515.0, -741.3]] } },
-  { n: 'Medateca', x: 501.6, z: -451.3, build: buildMedateca, o: { h: 14.9, front: [506.9, -458.5], side: [509.5, -445.5], gate: [518.4, -449.9, Math.atan2(-(-452.6 + 464.3), 514.9 - 498.9)] } }, // the civic library on via Yuri Gagarin
+  { n: 'Medateca', x: 501.6, z: -451.3, build: buildMedateca, o: { h: 14.9, front: [506.9, -458.5], side: [509.5, -445.5], gate: [520.8, -460.7, 0.919] } }, // the civic library on via Yuri Gagarin
   { n: 'Palazzo delle banche', x: 479.1, z: -438.3, build: buildModern, // on the roundabout: a podium in exposed-aggregate concrete, a ribbon of windows, the bank counters glazed behind round
     // columns; over it the block in reflecting glass; the Auxologico rehabilitation centre has the podium on via Gagarin
     o: { wall: '#a69d8d', glass: '#8fa6bb', roof: '#6d6f71', h: 7.2, floors: 2, portico: true, round: true, ribbon: 0.42, base: [[471.6, -462.3], [488.3, -450.0], [504.2, -438.3], [482.1, -408.6], [449.5, -432.5]],
@@ -1240,14 +1240,17 @@ function buildMedateca(L, B, G) {
   const [cx, cz] = centroid(ring), bx = cx + (o.side[0] - cx) * 0.35, bz = cz + (o.side[1] - cz) * 0.35, ry = Math.atan2(-(o.side[1] - cz), o.side[0] - cx);
   F.geo(Bs.trim, lmBox(7.5, 2.0, 6.5, 0, 0, 0).rotateY(ry).translate(bx, H + 1.0, bz), null, COL('#e2e0da')); // the lantern on the roof, glazed on top
   F.geo(Bs.trim, lmBox(5.5, 0.4, 4.5, 0, 0, 0).rotateY(ry).translate(bx, H + 2.15, bz), null, GL);
-  if (o.gate) { // the way down to the car park beside it: a little lodge in exposed-aggregate concrete under a dark slab, the railing along the garden
+  if (o.gate) { // next door, on the street, the gate of the flats at via Gagarin 15: two piers in exposed-aggregate concrete under a dark slab, the
+    // iron gates between them, a low wall with its railing along the garden towards the tower, a short wall on the other side
     const [gx, gz, gr] = o.gate, AG = COL('#a39a89'), y = groundH(gx, gz), ux = Math.cos(gr), uz = -Math.sin(gr);
     for (const sd of [-1, 1]) F.geo(Bs.trim, lmBox(0.8, 2.6, 3.2, 0, 0, 0).rotateY(gr).translate(gx + ux * sd * 1.7, y + 1.3, gz + uz * sd * 1.7), null, AG);
     F.geo(Bs.trim, lmBox(4.8, 0.35, 3.8, 0, 0, 0).rotateY(gr).translate(gx, y + 2.75, gz), null, COL('#3b3d40'));
     for (let k = -1.2; k <= 1.2; k += 0.15) F.geo(Bs.trim, lmBox(0.04, 2.0, 0.04, 0, 0, 0).translate(gx + ux * k, y + 1.0, gz + uz * k), null, COL('#4a4c4e'));
-    for (let k = 2.6; k < 16; k += 0.14) F.geo(Bs.trim, lmBox(0.04, 1.3, 0.04, 0, 0, 0).translate(gx + ux * k, y + 1.25, gz + uz * k), null, COL('#6c7074'));
-    F.geo(Bs.trim, lmBox(13.4, 0.6, 0.35, 0, 0, 0).rotateY(gr).translate(gx + ux * 9.3, y + 0.3, gz + uz * 9.3), null, AG);
-    F.geo(Bs.trim, lmBox(13.4, 0.06, 0.06, 0, 0, 0).rotateY(gr).translate(gx + ux * 9.3, y + 1.9, gz + uz * 9.3), null, COL('#6c7074'));
+    for (let k = 2.6; k < 9; k += 0.14) F.geo(Bs.trim, lmBox(0.04, 1.3, 0.04, 0, 0, 0).translate(gx + ux * k, y + 1.25, gz + uz * k), null, COL('#6c7074'));
+    F.geo(Bs.trim, lmBox(6.4, 0.6, 0.35, 0, 0, 0).rotateY(gr).translate(gx + ux * 5.8, y + 0.3, gz + uz * 5.8), null, AG);
+    F.geo(Bs.trim, lmBox(6.4, 0.06, 0.06, 0, 0, 0).rotateY(gr).translate(gx + ux * 5.8, y + 1.9, gz + uz * 5.8), null, COL('#6c7074'));
+    F.geo(Bs.trim, lmBox(3.0, 1.5, 0.35, 0, 0, 0).rotateY(gr).translate(gx - ux * 3.6, y + 0.75, gz - uz * 3.6), null, AG); // the wall on the Medateca side
+    F.geo(Bs.trim, lmBox(0.5, 0.6, 0.08, 0, 0, 0).rotateY(gr).translate(gx + ux * 1.25 + Math.sin(gr) * 0.45, y + 1.5, gz + uz * 1.25 + Math.cos(gr) * 0.45), null, COL('#c9c6bd')); // the doorbells
   }
   lmFlush(Bs, G);
   for (const [[x, y, z], ex, ez, nx, nz, w] of lettering) { // MEDATECA repeated on the glass of the ground floor
