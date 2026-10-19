@@ -294,7 +294,10 @@ function polyFill(b, outer, holes, y, vScale, col) {
     const stack = faces.map(f => [f[0], f[1], f[2]]); tris = [];
     while (stack.length) {
       const [a, c, d] = stack.pop(), la = L2(a, c), lb = L2(c, d), lc = L2(d, a), mx = Math.max(la, lb, lc);
-      if (mx <= 16 || tris.length > 60000) { tris.push([a, c, d]); continue; }
+      // a flat triangle (three points in a row, earcut leaves them where a hole touches the outline) draws nothing; split, its midpoints
+      // fall on vertices it already has under new numbers and the same triangle comes back for ever: 16 s and a crash south of Meda
+      if (Math.abs((all[c][0] - all[a][0]) * (all[d][1] - all[a][1]) - (all[c][1] - all[a][1]) * (all[d][0] - all[a][0])) < 0.01) continue;
+      if (mx <= 16 || tris.length + stack.length > 60000) { tris.push([a, c, d]); continue; }
       if (mx === la) { const m = M(a, c); stack.push([a, m, d], [m, c, d]); } else if (mx === lb) { const m = M(c, d); stack.push([a, c, m], [a, m, d]); } else { const m = M(d, a); stack.push([a, c, m], [m, c, d]); }
     }
   }
