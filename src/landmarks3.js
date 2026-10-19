@@ -51,6 +51,10 @@ const LANDMARKS = [
       wells: [[[548.95, -584.16], [546.45, -585.82], [553.05, -595.84], [555.55, -594.18]]] } },
   { n: 'Residenza di via Gagarin', x: 559.1, z: -544.7, build: buildModern, // the new block by the park: taupe walls, white balconies wrapping round every floor, panels on the roof
     o: { wall: '#8e7e6f', glass: '#3a4148', roof: '#d9d8d4', h: 19.5, floors: 6, balc: true, solar: 0.5, hvac: 2, ribbon: 0.62 } },
+  { n: 'Palazzo Buzzi', x: 339.9, z: -446.4, build: buildPalazzo, o: { style: 'buzzi', h: 16.4, front: [344.2, -451.8], balcony: 'stone', balconyW: 9 } }, // ex S.A.L.D.A., Junior B and f.lli Buzzi on the ground floor
+  { n: 'Kino', x: 407.0, z: -375.3, build: buildKino, o: { // the bistro at via Indipendenza 34 in the front of the white block
+    kino: { front: [[411.3, -381.3], [422.6, -372.7]], d: 9, h: 8.4 }, rest: { pts: [[398.4, -379.3], [401.0, -382.7], [408.2, -377.2], [405.8, -374.1], [417.1, -365.5], [413.1, -359.6], [394.3, -374.0]], h: 12.8, floors: 4, wall: '#efece4', glass: '#3c4248', roof: '#bdbab3', balc: true, ribbon: 0.5 },
+    yard: [[413.8, -383.8], [422.9, -373.0], [431.0, -383.6], [424.5, -392.0], [421.5, -393.3]], trees: [[417.5, -383.5], [423.0, -380.0], [427.5, -385.5], [421.0, -388.5]], tables: [[420.0, -385.5], [425.0, -383.0], [423.5, -389.0]], planters: [[415.8, -386.6], [417.6, -389.0], [419.4, -391.3]] } },
   { n: 'Portici di corso della Resistenza', x: 426.4, z: -486.9, build: buildPortici, o: { h: 10.4, floors: 2 } }, // with the Gala ice-cream parlour on the corner of via Pace
   // the towers of the seventies between the Medateca and the railway: bare grey concrete, a balcony slab round every floor
   { n: 'Torre di via Gagarin', x: 518.6, z: -480.3, build: buildModern, o: { wall: '#a8a49b', glass: '#3a3f44', roof: '#8d8a84', h: 28.8, floors: 9, balc: true, ribbon: 0.55, hvac: 2 } },
@@ -94,7 +98,8 @@ for (const L of LANDMARKS) {
   const gy = Math.min(...B.pts.map(p => groundH(p[0], p[1])));
   if (o.base) {
     for (const ring of [B.pts, ...B.holes]) for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length]; gridDrop(WALLS, a[0], a[1], c[0], c[1], s => s.ax === a[0] && s.az === a[1] && s.bx === c[0] && s.bz === c[1]); }
-    for (const r of [o.base, ...(o.wings || []).map(w => w.pts)].filter(Boolean)) { lmRingWalls(r, gy - 3, gy + 15); const rec = { pts: r, holes: [], bb: bbox(r) }; BLD.add(rec.bb[0], rec.bb[1], rec.bb[2], rec.bb[3], rec); }
+    B.noSign = true; // signs go on the walls of its volumes
+    for (const r of [o.base, ...(o.wings || []).map(w => w.pts)].filter(Boolean)) { lmRingWalls(r, gy - 3, gy + 15); const rec = { pts: r, holes: [], bb: bbox(r), lm: L, h: o.h }; BLD.add(rec.bb[0], rec.bb[1], rec.bb[2], rec.bb[3], rec); }
   }
 }
 // ---------------------------------------------------------------- piazze: paving drawn over the car park of the map, no stalls, no lamp posts
@@ -188,7 +193,13 @@ function buildPiazze(T, G) {
       lmFlush(Bs, G); q.coll = true; }
   }
 }
-function buildLandmarks(T, G) { for (const L of LANDMARKS) if (L.t === T.t) { const n0 = G.children.length; L.build(L, L.b, G); if (!L.coll) { L.coll = true; lmMeshColl(L, G.children.slice(n0)); } } }
+function buildLandmarks(T, G) {
+  for (const L of LANDMARKS) if (L.t === T.t) {
+    const n0 = G.children.length; L.build(L, L.b, G); const ms = G.children.slice(n0).filter(m => m.isMesh); for (const m of ms) m.updateMatrixWorld();
+    if (!L.coll) { L.coll = true; lmMeshColl(L, ms); }
+    drawSigns(signList().filter(s => s.b.lm === L), G, ms); // the shop signs on it, in front of the model
+  }
+}
 // the solid parts of a model outside its footprint, from its own triangles: the upright faces that cross the band a person walks in (0.4 to 1.9 m
 // above the ground) are marked on a 0.4 m grid, and every marked cell on the edge of a blob becomes a little round post. Floors, treads and
 // landings (meshes flagged walk) are left out, so steps can still be climbed
@@ -267,6 +278,7 @@ const PAL_STYLE = {
   scuolaocra: { wall: '#d4922c', trim: '#e6eae6', shut: '#d4922c', plinth: '#b38a4a', light: ['#c4852a', '#e0a23e'], H: 9.2, floors: 2, noShut: true, tapp: 0.55, basement: true },
   seminario: { wall: '#ece5d4', trim: '#f7f3ea', shut: '#ece5d4', plinth: '#b9b4a8', light: ['#ddd4c0', '#f6f0e2'], noShut: true },
   stazione: { wall: '#f1efe9', trim: '#dedad1', shut: '#2f5a3a', plinth: '#9d9b96', light: ['#dcd9d2', '#ffffff'], H: 8.8, floors: 2, arched: true },
+  buzzi: { wall: '#d9d8d3', trim: '#efeeea', shut: '#9a9890', plinth: '#b9b6ae', light: ['#c9c8c2', '#ecebe6'], H: 16.4, floors: 4, gShut: false, shops: true, ornate: true },
   ferrario: { wall: '#c23b2a', trim: '#e2b25a', shut: '#c23b2a', plinth: '#d9cfc0', light: ['#a83324', '#d4513c'], noShut: true },
 };
 const palTex = (st, lit) => canvasTex(128, 512, (g, w, h) => { // one bay, pavement to eaves; lit: the emissive map (lit windows only)
@@ -282,11 +294,19 @@ const palTex = (st, lit) => canvasTex(128, 512, (g, w, h) => { // one bay, pavem
   const archWin = (x0, m0, x1, m1) => { const r = (x1 - x0) / 2, cx = (x0 + x1) / 2, top = Y(m1) + r; g.fillStyle = CREAM; g.fillRect(x0 - 4, top, x1 - x0 + 8, Y(m0 - 0.15) - top); g.beginPath(); g.arc(cx, top, r + 4, Math.PI, 0); g.fill(); g.fillStyle = GLASS; g.fillRect(x0, top, x1 - x0, Y(m0) - top); g.beginPath(); g.arc(cx, top, r, Math.PI, 0); g.fill(); blinds(x0, m0, x1, m1 - r * HH / h); };
   if (st.lesene) for (const x of [0, w - 10]) { R(x, 0.5, x + 10, HH - 0.6, CREAM); R(x ? x : 9, 0.5, (x ? x : 9) + 1, HH - 0.6, 'rgba(0,0,0,.14)'); } // giant pilasters between the bays
   const shutters = (m0, m1) => { if (st.noShut) return; for (const x of [18, 88]) { R(x, m0, x + 22, m1, st.shut); for (let m = m0 + 0.08; m < m1; m += 0.12) R(x + 2, m, x + 20, m + 0.04, 'rgba(0,0,0,.25)'); } };
-  if (st.gShut) shutters(1.3, 3.5); win(46, 1.3, 82, 3.5, !st.gShut); if (st.bugnato) R(58, 3.65, 70, 3.95, CREAM); // ground floor: grated with a keystone, or shuttered
+  if (st.shops) { R(22, 0.35, 106, 3.9, '#3a2e26'); R(27, 0.45, 101, 3.0, '#2b3038'); R(27, 3.1, 101, 3.75, '#4a3a30'); R(62, 0.45, 66, 3.0, '#3a2e26'); } // a shop window under its fascia
+  else if (st.gShut) shutters(1.3, 3.5); if (!st.shops) win(46, 1.3, 82, 3.5, !st.gShut); if (st.bugnato) R(58, 3.65, 70, 3.95, CREAM); // ground floor: grated with a keystone, or shuttered
   if (st.basement) for (const x of [40, 70]) R(x, 0.12, x + 18, 0.5, '#3a3a38'); /* the little basement windows */
   shutters(5.45, 7.75); if (st.archedUp) archWin(44, 5.45, 84, 8.3); else win(46, 5.45, 82, 7.75); R(36, 5.1, 92, 5.3, '#e6d8bb'); R(34, 7.95, 94, 8.1, CREAM); // piano nobile: sill and cornice, a pediment on the municipio
   if (st.ped) { g.fillStyle = CREAM; g.beginPath(); g.moveTo(34, Y(8.1)); g.lineTo(94, Y(8.1)); g.lineTo(64, Y(8.62)); g.closePath(); g.fill(); g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(34, Y(8.1), 60, 2); }
   if (st.floors !== 2) { shutters(9.75, 11.45); win(46, 9.75, 82, 11.45); R(40, 9.5, 88, 9.62, '#e6d8bb'); }
+  if (st.floors === 4) { R(0, 12.3, w, 12.55, CREAM); shutters(13.1, 14.8); win(46, 13.1, 82, 14.8); R(40, 12.85, 88, 12.97, '#e6d8bb'); }
+  if (st.ornate) { // the eclectic dress: a little pediment or a cornice over every upper window, a balustrade under the piano nobile, brackets under the eaves
+    const ped = m => { g.fillStyle = CREAM; g.beginPath(); g.moveTo(38, Y(m)); g.lineTo(90, Y(m)); g.lineTo(64, Y(m + 0.55)); g.closePath(); g.fill(); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(38, Y(m), 52, 2); };
+    ped(7.95); R(36, 11.6, 92, 11.85, CREAM); if (st.floors === 4) ped(14.95);
+    R(30, 4.8, 98, 5.35, CREAM); for (let x = 33; x < 96; x += 6) R(x, 4.85, x + 3, 5.3, 'rgba(0,0,0,.22)');
+    for (let x = 6; x < w; x += 20) R(x, HH - 1.0, x + 6, HH - 0.6, CREAM);
+  }
   if (st.arched) { R(44, 1.0, 84, 3.6, st.wall); g.fillStyle = CREAM; g.beginPath(); g.moveTo(44, Y(0.1)); g.lineTo(44, Y(2.9)); g.arc(64, Y(2.9), 20, Math.PI, 0); g.lineTo(84, Y(0.1)); g.fill(); R(48, 0.1, 80, 2.9, '#2b3a33'); g.fillStyle = '#2b3a33'; g.beginPath(); g.arc(64, Y(2.9), 16, Math.PI, 0); g.fill(); } // arched doors on the ground floor
 });
 const plasterTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); noise(g, w, h, 2600, 0.16, ['#d8d8d8', '#c8c8c8', '#f0f0f0']); }); // tinted by vertex colour
@@ -1231,10 +1251,9 @@ function buildMedateca(L, B, G) {
   }
   lmFlush(Bs, G);
   for (const [[x, y, z], ex, ez, nx, nz, w] of lettering) { // MEDATECA repeated on the glass of the ground floor
-    const g = Buf(), T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(ex, 0, ez), new THREE.Vector3(0, 1, 0), new THREE.Vector3(nx, 0, nz)).setPosition(x, y, z));
-    for (const [px, py, u, v] of [[-w / 2, -0.35, 0, 0], [w / 2, -0.35, 1, 0], [w / 2, 0.35, 1, 1], [-w / 2, 0.35, 0, 1]]) T.v(g, px, py, 0, 0, 0, 1, u, v); g.i.push(0, 1, 2, 0, 2, 3);
+    const g = Buf(); lmLetters(g, x, y, z, nx, nz, w, 0.7);
     const tex = canvasTex(1024, 64, (cg, W, Hh) => { cg.clearRect(0, 0, W, Hh); cg.fillStyle = 'rgba(235,238,236,.85)'; cg.font = '600 40px Arial, sans-serif'; cg.textBaseline = 'middle'; for (let k = 0, x0 = 10; x0 < W; k++, x0 += cg.measureText('MEDATECA  ').width) cg.fillText('MEDATECA  ', x0, Hh / 2); }, false);
-    mkMesh(g, new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false }), 11, false, G);
+    mkMesh(g, new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }), 11, false, G);
   }
 }
 
@@ -1263,6 +1282,78 @@ function buildPortici(L, B, G) {
   }
   try { polyFill(Bs.trim, ring, [], H + 0.02, 2, COL('#7f7a74')); } catch (e) { }
   lmFlush(Bs, G); mkMesh(aw, new THREE.MeshLambertMaterial({ map: awningTex, side: THREE.DoubleSide }), 10, false, G);
+}
+
+// a quad of lettering in world space facing (nx, nz), its u running to the right of someone reading it
+function lmLetters(b, cx, cy, cz, nx, nz, w, h) {
+  const lx = nz, lz = -nx, i0 = b.p.length / 3;
+  for (const [s, t, u, v] of [[-1, -1, 0, 0], [1, -1, 1, 0], [1, 1, 1, 1], [-1, 1, 0, 1]]) vtx(b, cx + lx * w / 2 * s, cy + h / 2 * t, cz + lz * w / 2 * s, nx, 0, nz, u, v);
+  b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
+}
+// Kino on via Indipendenza: a dark grey frame round a glazed front two floors high, KINO in white letters across the glass, at the back of a paved
+// yard with trees in wine barrels, box planters and tables; the rest of the block behind it white with balconies. o.kino: the front [a, b] and the
+// depth; o.rest: the rest of the block for buildModern; o.yard: the yard's ring
+function buildKino(L, B, G) {
+  const o = L.o; buildModern({ x: L.x, z: L.z, o: o.rest }, { pts: o.rest.pts, holes: [], h: o.rest.h }, G);
+  const F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), [[ax, az], [bx, bz]] = o.kino.front, W = hyp(bx - ax, bz - az), ux = (bx - ax) / W, uz = (bz - az) / W;
+  let nx = -uz, nz = ux; if (!inPoly(ax + ux * W / 2 - nx * 2, az + uz * W / 2 - nz * 2, B.pts)) { nx = -nx; nz = -nz; } // out of the block, towards the yard
+  const gy = groundH((ax + bx) / 2 + nx * 3, (az + bz) / 2 + nz * 3), H = o.kino.h, D = o.kino.d, GREY = COL('#3e4144'), GL = COL('#5d6d78');
+  const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(ux, 0, uz), new THREE.Vector3(0, 1, 0), new THREE.Vector3(nx, 0, nz)).setPosition(ax + nx * 0.4, gy, az + nz * 0.4));
+  T.geo(Bs.trim, lmBox(W, H + 1, D, W / 2, (H - 1) / 2, -D / 2), null, GREY); // the box
+  T.geo(Bs.trim, lmBox(W - 2.6, H - 1.9, 0.08, W / 2, (H - 1.9) / 2 + 0.05, 0.02), null, GL); // the glass, set in the frame
+  for (let x = 1.3; x <= W - 1.29; x += (W - 2.6) / 6) T.geo(Bs.trim, lmBox(0.1, H - 1.9, 0.12, x, (H - 1.9) / 2 + 0.05, 0.08), null, COL('#2a2c2e'));
+  for (const y of [2.6, 4.3]) T.geo(Bs.trim, lmBox(W - 2.6, 0.1, 0.12, W / 2, y, 0.08), null, COL('#2a2c2e'));
+  T.geo(Bs.trim, lmBox(W + 0.3, 0.3, D + 0.3, W / 2, H, -D / 2), null, COL('#35383b')); // the flat top
+  try { polyFill(Bs.walk, o.yard, [], gy + 0.06, 1.2, COL('#8d8a85')); } catch (e) { }
+  const yr = o.yard, [cx, cz] = centroid(yr);
+  for (const [px, pz] of o.trees) { const y = groundH(px, pz); F.geo(Bs.trim, new THREE.CylinderGeometry(0.45, 0.4, 0.55, 10).translate(px, y + 0.27, pz), null, COL('#7a5434')); F.geo(Bs.trim, new THREE.CylinderGeometry(0.06, 0.08, 1.6, 6).translate(px, y + 1.2, pz), null, COL('#5a4632')); F.geo(Bs.trim, new THREE.IcosahedronGeometry(1.0, 0).scale(0.8, 1.4, 0.8).translate(px, y + 2.5, pz), null, COL('#9bbf3a')); }
+  for (const [px, pz] of o.tables) { const y = groundH(px, pz); F.geo(Bs.trim, lmBox(1.1, 0.05, 0.8, 0, 0, 0).rotateY(Math.atan2(-uz, ux)).translate(px, y + 0.75, pz), null, COL('#c9cacc')); for (const [dx, dz] of [[-0.45, -0.3], [0.45, -0.3], [-0.45, 0.3], [0.45, 0.3]]) F.geo(Bs.trim, lmBox(0.04, 0.75, 0.04, 0, 0, 0).translate(px + ux * dx + nx * dz, y + 0.37, pz + uz * dx + nz * dz), null, COL('#9a9c9e')); }
+  for (const [px, pz] of o.planters) { const y = groundH(px, pz); F.geo(Bs.trim, lmBox(0.7, 0.6, 0.7, px, y + 0.3, pz), null, COL('#3a3c3e')); F.geo(Bs.trim, new THREE.IcosahedronGeometry(0.42, 0).translate(px, y + 0.85, pz), null, COL('#3f6a34')); }
+  lmFlush(Bs, G);
+  const lt = Buf(); lmLetters(lt, (ax + bx) / 2 + nx * 0.55, gy + 3.55, (az + bz) / 2 + nz * 0.55, nx, nz, W * 0.6, 1.1);
+  const tex = canvasTex(512, 96, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#f4f4f2'; g.font = '600 88px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('K I N O', w / 2, h / 2 + 4); }, false);
+  const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.2 }); SIGN_MATS.push(mat); mkMesh(lt, mat, 11, false, G);
+}
+
+// stairs down to the underpasses: each flight runs from its top a to its bottom b, w wide; treads in porphyry going down, low concrete walls with a
+// grey railing and a red handrail, the dark mouth of the tunnel at the bottom (the ground itself stays whole: the flight is drawn on it)
+const STAIRWELLS = [
+  { n: 'Sottopasso della stazione, via Indipendenza', flights: [[[372.6, -465.8], [356.5, -475.0], 4.5], [[371.0, -478.3], [357.0, -476.8], 4.5], [[364.8, -461.7], [355.8, -474.2], 4.0]], mouth: [[354.0, -476.5], [328.6, -497.7]] },
+  { n: 'Sottopasso della stazione, via Umberto Pace', flights: [[[318.0, -506.9], [326.6, -499.4], 3.2]], mouth: [[328.6, -497.7], [354.0, -476.5]], box: true },
+];
+// the lamps of the square by the underpass: a grey pole with a ribbon twisting up round it and over into the head
+const RIBBON_LAMPS = [[376.5, -455.0], [383.0, -461.5], [361.0, -452.5]];
+function buildStairwells(T, G) {
+  const F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), CON = COL('#a9a59c'), RAIL = COL('#6c7074'), RED = COL('#a3343a'), POR = COL('#8f7f78');
+  for (const q of STAIRWELLS) {
+    const [cx, cz] = q.flights[0][0]; if (tileOf(cx, cz) !== T.t) continue;
+    for (const [a, b, w] of q.flights) {
+      const L = hyp(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, y0 = groundH(a[0], a[1]), n = Math.round(L / 0.45), ry = Math.atan2(-uz, ux);
+      const P = (s, t) => [a[0] + ux * s + nx * t, a[1] + uz * s + nz * t];
+      for (let i = 0; i < n; i++) { const s0 = i * L / n, s1 = (i + 0.6) * L / n, c = i / n; const [p0, p1, p2, p3] = [P(s0, -w / 2), P(s1, -w / 2), P(s1, w / 2), P(s0, w / 2)]; const sh = new THREE.Color().copy(POR).multiplyScalar(1 - c * 0.75);
+        F.face(Bs.walk, [[p0[0], y0 + 0.05, p0[1]], [p1[0], y0 + 0.05, p1[1]], [p2[0], y0 + 0.05, p2[1]], [p3[0], y0 + 0.05, p3[1]]], 2, sh);
+        const [r0, r1, r2, r3] = [P(s1, -w / 2), P((i + 1) * L / n, -w / 2), P((i + 1) * L / n, w / 2), P(s1, w / 2)]; F.face(Bs.walk, [[r0[0], y0 + 0.05, r0[1]], [r1[0], y0 + 0.05, r1[1]], [r2[0], y0 + 0.05, r2[1]], [r3[0], y0 + 0.05, r3[1]]], 2, new THREE.Color(0x1d1d1f).lerp(sh, 0.35)); }
+      for (const sd of [-1, 1]) { const [mx, mz] = P(L / 2, sd * (w / 2 + 0.15));
+        F.geo(Bs.trim, lmBox(L, 0.55, 0.3, 0, 0, 0).rotateY(ry).translate(mx, y0 + 0.27, mz), null, CON);
+        F.geo(Bs.trim, lmBox(L, 0.05, 0.05, 0, 0, 0).rotateY(ry).translate(mx, y0 + 1.5, mz), null, RAIL); F.geo(Bs.trim, lmBox(L, 0.06, 0.06, 0, 0, 0).rotateY(ry).translate(...[P(L / 2, sd * (w / 2 + 0.05))].map(p => [p[0], y0 + 1.05, p[1]])[0]), null, RED);
+        for (let s = 0; s <= L; s += 0.18) { const [px, pz] = P(s, sd * (w / 2 + 0.15)); F.geo(Bs.trim, lmBox(0.03, 0.95, 0.03, px, y0 + 1.02, pz), null, RAIL); }
+        if (!q.coll) { const [x0, z0] = P(0, sd * (w / 2 + 0.15)), [x1, z1] = P(L, sd * (w / 2 + 0.15)); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: nx * sd, nz: nz * sd, two: true, y0: y0 - 3, y1: y0 + 1.5 }); } }
+      { const [ex, ez] = P(L + 0.2, 0); F.geo(Bs.trim, lmBox(w + 0.6, 2.2, 0.4, 0, 0, 0).rotateY(ry + Math.PI / 2).translate(ex, y0 - 0.2, ez), null, CON); // the end wall, the mouth dark in it
+        F.geo(Bs.trim, lmBox(w - 0.6, 1.0, 0.1, 0, 0, 0).rotateY(ry + Math.PI / 2).translate(ex - ux * 0.22, y0 + 0.5, ez - uz * 0.22), null, COL('#141416'));
+        if (!q.coll) { const [x0, z0] = P(L + 0.2, -w / 2), [x1, z1] = P(L + 0.2, w / 2); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ux, nz: -uz, two: true, y0: y0 - 3, y1: y0 + 1.5 }); } }
+      if (q.box) { const [mx, mz] = P(L / 2, 0); F.geo(Bs.trim, lmBox(L + 1, 0.12, w + 0.9, 0, 0, 0).rotateY(ry).translate(mx, y0 + 1.6, mz), null, COL('#4d5a50')); } // the green net cover over the stair box
+    }
+    q.coll = true;
+  }
+  for (const [x, z] of RIBBON_LAMPS) {
+    if (tileOf(x, z) !== T.t) continue; const y = groundH(x, z), GR = COL('#4b4f54');
+    F.geo(Bs.trim, new THREE.CylinderGeometry(0.09, 0.11, 7.5, 8).translate(x, y + 3.75, z), null, GR);
+    for (let i = 0; i < 24; i++) { const t = i / 23, a = t * 4.2, r = 0.25 + 0.15 * Math.sin(t * 3); F.geo(Bs.trim, lmBox(0.06, 0.45, 0.22, 0, 0, 0).rotateY(-a).translate(x + Math.cos(a) * r, y + 1.5 + t * 6.2, z + Math.sin(a) * r), null, GR); }
+    for (let i = 0; i < 8; i++) { const t = i / 7; F.geo(Bs.trim, lmBox(0.32, 0.06, 0.2, 0, 0, 0).rotateZ(-0.4 + t * 0.6).translate(x + t * 2.2, y + 7.6 + Math.sin(t * Math.PI) * 0.5, z), null, GR); }
+    F.geo(Bs.trim, new THREE.CylinderGeometry(0.35, 0.3, 0.12, 12).translate(x + 2.4, y + 7.75, z), null, COL('#d9d9d4'));
+    WALLS.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, { r: 0.15, x, z, y0: y - 3, y1: y + 7 });
+  }
+  lmFlush(Bs, G);
 }
 
 // a school gym of the seventies: prefabricated panels in faded red, a band of windows under the eaves, a shallow metal roof

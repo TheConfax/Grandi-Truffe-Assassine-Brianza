@@ -686,7 +686,7 @@ function buildTile(T) {
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   buildSignals(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G); buildCaserme(T, G);
-  buildCemetery(T, G); buildLandmarks(T, G); buildPiazze(T, G); buildPlazas(T, G); buildPlatforms(T, G); buildParkingLines(T, G); buildParkFurniture(T, G);
+  buildCemetery(T, G); buildLandmarks(T, G); buildPiazze(T, G); buildPlazas(T, G); buildStairwells(T, G); buildPlatforms(T, G); buildParkingLines(T, G); buildParkFurniture(T, G);
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {
@@ -841,13 +841,16 @@ function updFountains() {
 // ---------------------------------------------------------------- shop signs (insegne) from the real shops, bars and restaurants
 const SIGN_MATS = [], SIGN_EDGES = new Map(); // how many signs already hang on each wall
 const SIGN_STYLE = { scuola: ['#1f4f9a', '#ffffff'], oratorio: ['#6b3a8c', '#ffffff'], municipio: ['#2f3b4c', '#f2d27e'], biblioteca: ['#5a3d22', '#f6e6c8'], ospedale: ['#c8102e', '#ffffff'], stazione: ['#1f6b3a', '#ffffff'], bar: ['#1f4d3a', '#f4e7c4'], ristorante: ['#7a1f1a', '#f6e6c8'], 'fast food': ['#c8331f', '#ffe08a'], gelateria: ['#e9a6b9', '#4a1f2c'], farmacia: ['#1d8f4e', '#ffffff'], banca: ['#183a6b', '#ffffff'], poste: ['#f2c230', '#163a7a'], benzinaio: ['#c8102e', '#ffffff'], negozio: ['#25303f', '#f2f2ee'] };
-function buildSigns(T, G) {
-  const list = [];
+// every sign is placed once, on the wall of the nearest building that faces a road; signs on a hand-made landmark are drawn with the landmark
+// (buildLandmarks), pushed out of whatever its model puts in front of the wall: pillars, awnings, fins, porches
+let SIGN_LIST = null;
+function signList() {
+  if (SIGN_LIST) return SIGN_LIST; SIGN_LIST = [];
   for (const p of D.pois) {
-    if (!p.n || p.lm || !SIGN_STYLE[p.k] || tileOf(p.x, p.z) !== T.t) continue;
+    if (!p.n || p.lm || !SIGN_STYLE[p.k]) continue;
     let best = null;
     BLD.each(p.x - 12, p.z - 12, p.x + 12, p.z + 12, b => {
-      const pts = b.pts;
+      if (b.noSign) return; const pts = b.pts;
       for (let i = 0; i < pts.length; i++) {
         const a = pts[i], c = pts[(i + 1) % pts.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 2.5) continue;
         const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, d = segDist(p.x, p.z, a[0], a[1], c[0], c[1]);
@@ -857,8 +860,15 @@ function buildSigns(T, G) {
         if (d < 12 && (!best || score < best.score)) best = { score, a, c, L, nx, nz, b, ux: dx / L, uz: dz / L };
       }
     });
-    if (best) { const key = best.a[0].toFixed(1) + ',' + best.a[1].toFixed(1) + ',' + best.c[0].toFixed(1); best.slot = SIGN_EDGES.get(key) || 0; SIGN_EDGES.set(key, best.slot + 1); list.push({ p, ...best }); }
+    if (best) { const key = best.a[0].toFixed(1) + ',' + best.a[1].toFixed(1) + ',' + best.c[0].toFixed(1); best.slot = SIGN_EDGES.get(key) || 0; SIGN_EDGES.set(key, best.slot + 1); SIGN_LIST.push({ p, ...best }); }
   }
+  return SIGN_LIST;
+}
+function buildSigns(T, G) { drawSigns(signList().filter(s => tileOf(s.p.x, s.p.z) === T.t && !s.b.lm), G); }
+const SIGN_RAY = new THREE.Raycaster();
+// fit: the landmark's meshes; each sign looks for what stands in front of its wall over its own width and height, tries a little lower (not under
+// 2.1 m) when something overhangs it, and is set just in front of the outermost surface left
+function drawSigns(list, G, fit) {
   if (!list.length) return;
   const rows = list.length, cv = document.createElement('canvas'); cv.width = 512; cv.height = 64 * rows; const g = cv.getContext('2d');
   const buf = Buf();
@@ -871,14 +881,27 @@ function buildSigns(T, G) {
     // several shops on one wall: side by side while there is room, then stacked below
     let along = 0, drop = 0;
     if (s.slot) { const per = Math.max(1, Math.floor(s.L * 0.9 / (w + 0.4))); if (s.slot < per) { const k = Math.ceil(s.slot / 2) * (s.slot % 2 ? 1 : -1); along = k * (w + 0.4); if (Math.abs(along) + w / 2 > s.L * 0.48) { along = 0; drop = s.slot * (h + 0.25); } } else drop = (s.slot - per + 1) * (h + 0.25); }
-    const cx = (s.a[0] + s.c[0]) / 2 + s.nx * 0.09 + s.ux * along, cz = (s.a[1] + s.c[1]) / 2 + s.nz * 0.09 + s.uz * along;
-    const gy = Math.min(groundH(s.a[0], s.a[1]), groundH(s.c[0], s.c[1])), y = gy + Math.min(3.3, Math.max(2.4, s.b.h - 1.2)) - drop;
+    const wx = (s.a[0] + s.c[0]) / 2 + s.ux * along, wz = (s.a[1] + s.c[1]) / 2 + s.uz * along;
+    const gy = Math.min(groundH(s.a[0], s.a[1]), groundH(s.c[0], s.c[1]));
+    let y = gy + Math.min(3.3, Math.max(2.4, s.b.h - 1.2)) - drop, out = 0.09;
+    if (fit && fit.length) {
+      const need = yc => { let m = -1; for (const fa of [-0.47, -0.2, 0.2, 0.47]) for (const fy of [-0.45, 0, 0.45]) {
+        SIGN_RAY.set(new THREE.Vector3(wx + s.ux * w * fa + s.nx * 4, yc + h * fy, wz + s.uz * w * fa + s.nz * 4), new THREE.Vector3(-s.nx, 0, -s.nz)); SIGN_RAY.far = 4.3;
+        const hit = SIGN_RAY.intersectObjects(fit, false)[0]; if (hit) m = Math.max(m, 4 - hit.distance); } return m; };
+      let bestY = y, bestN = need(y);
+      for (let yc = y - 0.3; bestN > 0.12 && yc - h / 2 >= gy + 2.1; yc -= 0.3) { const n = need(yc); if (n < bestN) { bestN = n; bestY = yc; } }
+      y = bestY; out = Math.max(0.09, bestN + 0.06);
+    }
+    const cx = wx + s.nx * out, cz = wz + s.nz * out;
     const v0 = 1 - (i * 64 + 2) / cv.height, v1 = 1 - (i * 64 + 62) / cv.height, i0 = buf.p.length / 3;
     // quad facing outward (nx, nz); u runs along the wall so the text reads left to right from the street
     const lx = s.nz, lz = -s.nx; // the viewer's right when facing the wall
     vtx(buf, cx - lx * w / 2, y - h / 2, cz - lz * w / 2, s.nx, 0, s.nz, 0, v1); vtx(buf, cx + lx * w / 2, y - h / 2, cz + lz * w / 2, s.nx, 0, s.nz, 1, v1);
     vtx(buf, cx + lx * w / 2, y + h / 2, cz + lz * w / 2, s.nx, 0, s.nz, 1, v0); vtx(buf, cx - lx * w / 2, y + h / 2, cz - lz * w / 2, s.nx, 0, s.nz, 0, v0);
     buf.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
+    if (out > 0.3) { // standing off the wall: a bracket at each end back to it
+      for (const e of [-0.45, 0.45]) { const bx = wx + s.ux * w * e + s.nx * out / 2, bz = wz + s.uz * w * e + s.nz * out / 2; const k0 = buf.uv.length; addBox(buf, bx, y + h / 2 - 0.05, bz, Math.abs(s.nx) * out + Math.abs(s.ux) * 0.06, 0.06, Math.abs(s.nz) * out + Math.abs(s.uz) * 0.06, null); for (let q = k0; q < buf.uv.length; q += 2) { buf.uv[q] = 0.01; buf.uv[q + 1] = v1 + 0.005; } } // coloured like the board's edge
+    }
   });
   const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
   const mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
