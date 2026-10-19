@@ -62,8 +62,9 @@ for (const L of LANDMARKS) {
   }
   const p = D.pois.find(q => q.n === L.n); if (p) p.lm = L; // no generic shop sign on it
 }
-// collisions follow the model: the footprint's walls are swapped for the walls of its volumes (o.base and o.wings), pillars under the bridges, the
-// sides of the covered walkway
+// collisions follow the model: where a landmark has its own plan (o.base and o.wings) the footprint's walls are swapped for the walls of its volumes;
+// everything else it stands on the ground outside them (towers, columns, porches, fences, canopies, steps) is found in its meshes the first time
+// it is built, see lmMeshColl
 function gridDrop(Gd, x0, z0, x1, z1, pred) { const c = Gd.cs; for (let i = Math.floor(Math.min(x0, x1) / c); i <= Math.floor(Math.max(x0, x1) / c); i++) for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) { const a = Gd.m.get(Gd.k(i, j)); if (a) Gd.m.set(Gd.k(i, j), a.filter(s => !pred(s))); } }
 function lmRingWalls(ring, y0, y1) {
   const A = sArea(ring);
@@ -73,19 +74,12 @@ function lmRingWalls(ring, y0, y1) {
     WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0, y1 });
   }
 }
-const bridgeCols = br => { const [[ax, az], [bx, bz]] = [br.a, br.b], Lb = hyp(bx - ax, bz - az), ux = (bx - ax) / Lb, uz = (bz - az) / Lb, o = []; for (const s of [1.2, Lb - 1.2]) for (const z of [0.2, -2.2]) o.push([ax + ux * s - uz * z, az + uz * s + ux * z]); return o; };
 for (const L of LANDMARKS) {
   const o = L.o || {}, B = L.b; if (!B) continue;
   const gy = Math.min(...B.pts.map(p => groundH(p[0], p[1])));
   if (o.base) {
     for (const ring of [B.pts, ...B.holes]) for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length]; gridDrop(WALLS, a[0], a[1], c[0], c[1], s => s.ax === a[0] && s.az === a[1] && s.bx === c[0] && s.bz === c[1]); }
     for (const r of [o.base, ...(o.wings || []).map(w => w.pts)]) { lmRingWalls(r, gy - 3, gy + 15); const rec = { pts: r, holes: [], bb: bbox(r) }; BLD.add(rec.bb[0], rec.bb[1], rec.bb[2], rec.bb[3], rec); }
-  }
-  for (const br of o.bridges || []) for (const [x, z] of bridgeCols(br)) WALLS.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, { r: 0.25, x, z, y0: gy - 3, y1: gy + 3.4 });
-  if (o.walkway) for (let k = 1; k < o.walkway.length; k++) { // the two sides, posts and parapet: you walk in at the ends
-    const [ax, az] = o.walkway[k - 1], [bx, bz] = o.walkway[k], Lw = hyp(bx - ax, bz - az), nx = -(bz - az) / Lw * 1.25, nz = (bx - ax) / Lw * 1.25;
-    for (const sd of [-1, 1]) { const x0 = ax + nx * sd, z0 = az + nz * sd, x1 = bx + nx * sd, z1 = bz + nz * sd, y = Math.min(groundH(x0, z0), groundH(x1, z1));
-      WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: nx * sd / 1.25, nz: nz * sd / 1.25, two: true, y0: y - 3, y1: y + 2.6 }); }
   }
 }
 // ---------------------------------------------------------------- piazze: paving drawn over the car park of the map, no stalls, no lamp posts
@@ -114,11 +108,38 @@ function buildPiazze(T, G) {
     LMAT.piazza = LMAT.piazza || new THREE.MeshLambertMaterial({ map: piazzaTex, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }); mkMesh(b, LMAT.piazza, 1, false, G);
     if (q.trees) { const F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), L = hyp(nw[0] - sw[0], nw[1] - sw[1]); // the row of trees along the west side
       for (let s = 4; s < L - 2; s += 7.5) { const t = s / L, x = sw[0] + (nw[0] - sw[0]) * t - (ne[0] - nw[0]) / 79 * 2, z = sw[1] + (nw[1] - sw[1]) * t - (ne[1] - nw[1]) / 79 * 2, y = groundH(x, z);
+        if (!q.coll) WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.3, x, z, y0: y - 3, y1: y + 5 }); // the trunk
         F.geo(Bs.trim, new THREE.CylinderGeometry(0.14, 0.2, 3.2, 6).translate(x, y + 1.6, z), null, COL('#5a4632')); F.geo(Bs.trim, new THREE.IcosahedronGeometry(2.0, 0).scale(1, 1.15, 1).translate(x, y + 4.6, z), null, COL(s % 15 < 7.5 ? '#5f8a44' : '#6b9450')); }
-      lmFlush(Bs, G); }
+      lmFlush(Bs, G); q.coll = true; }
   }
 }
-function buildLandmarks(T, G) { for (const L of LANDMARKS) if (L.t === T.t) L.build(L, L.b, G); }
+function buildLandmarks(T, G) { for (const L of LANDMARKS) if (L.t === T.t) { const n0 = G.children.length; L.build(L, L.b, G); if (!L.coll) { L.coll = true; lmMeshColl(L, G.children.slice(n0)); } } }
+// the solid parts of a model outside its footprint, from its own triangles: the upright faces that cross the band a person walks in (0.4 to 1.9 m
+// above the ground) are marked on a 0.4 m grid, and every marked cell on the edge of a blob becomes a little round post. Floors, treads and
+// landings (meshes flagged walk) are left out, so steps can still be climbed
+function lmMeshColl(L, meshes) {
+  const C = 0.4, cells = new Map(), key = (i, j) => i * 100000 + j, o = L.o || {};
+  const rings = o.base ? [o.base, ...(o.wings || []).map(w => w.pts)] : [L.b.pts];
+  for (const m of meshes) {
+    if (!m.isMesh || m.userData.walk) continue;
+    const P = m.geometry.attributes.position.array, I = m.geometry.index ? m.geometry.index.array : null, nT = (I ? I.length : P.length / 3) / 3, v = k => I ? I[k] : k;
+    for (let t = 0; t < nT; t++) {
+      const a = v(3 * t) * 3, b = v(3 * t + 1) * 3, c = v(3 * t + 2) * 3;
+      const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], wx = P[c] - P[a], wy = P[c + 1] - P[a + 1], wz = P[c + 2] - P[a + 2];
+      const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx, nl = Math.hypot(nx, ny, nz); if (nl < 1e-9 || Math.abs(ny) / nl > 0.5) continue; // upright faces only
+      const cx = (P[a] + P[b] + P[c]) / 3, cz = (P[a + 2] + P[b + 2] + P[c + 2]) / 3, g = groundH(cx, cz), y0 = Math.min(P[a + 1], P[b + 1], P[c + 1]) - g, y1 = Math.max(P[a + 1], P[b + 1], P[c + 1]) - g;
+      if (y1 < 0.4 || y0 > 1.9) continue;
+      for (const [p, q] of [[a, b], [b, c], [c, a]]) { const n = Math.ceil(hyp(P[q] - P[p], P[q + 2] - P[p + 2]) / (C / 2)) || 1; for (let k = 0; k <= n; k++) { const x = P[p] + (P[q] - P[p]) * k / n, z = P[p + 2] + (P[q + 2] - P[p + 2]) * k / n; cells.set(key(Math.floor(x / C), Math.floor(z / C)), 1); } }
+    }
+  }
+  const inside = (x, z) => rings.some(r => { if (inPoly(x, z, r)) return true; for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length]; if (segDist(x, z, p[0], p[1], q[0], q[1]) < 0.45) return true; } return false; });
+  const W = o.walkway || [], onWalk = (x, z) => W.some((p, k) => k && segDist(x, z, W[k - 1][0], W[k - 1][1], p[0], p[1]) < 0.8); // keep the way through the covered stair clear at its bends
+  for (const k of cells.keys()) {
+    const i = Math.round(k / 100000), j = k - i * 100000; if (cells.has(key(i - 1, j)) && cells.has(key(i + 1, j)) && cells.has(key(i, j - 1)) && cells.has(key(i, j + 1))) continue;
+    const x = (i + 0.5) * C, z = (j + 0.5) * C; if (inside(x, z) || onWalk(x, z)) continue; const g = groundH(x, z);
+    WALLS.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, { r: 0.3, x, z, y0: g - 3, y1: g + 2.2 });
+  }
+}
 
 const brickTexOf = (mortar, cs, dirt) => canvasTex(256, 256, (g, w, h) => { // 2 m x 2 m of running bond
   g.fillStyle = mortar; g.fillRect(0, 0, w, h);
@@ -792,9 +813,9 @@ function lmTower(T, Bs, o) {
   else { tw(new THREE.SphereGeometry(w * 0.5, 14, 7, 0, TAU, 0, Math.PI / 2).scale(1, 0.8, 1).translate(0, y, 0), COL('#5d6168')); y += w * 0.4; }
   tw(new THREE.SphereGeometry(0.22, 8, 6).translate(0, y + 0.15, 0), COL('#c9a54a')); lmCross(T, Bs.trim, 0, y + 0.3, 0, 1.0, COL('#3c3c40'));
 }
-const lmBuffers = () => ({ plaster: Buf(), coppi: Buf(), trim: Buf(), warm: Buf(), clock: Buf(), brick: Buf(), skel: Buf(), madonna: Buf() });
+const lmBuffers = () => ({ walk: Buf(), plaster: Buf(), coppi: Buf(), trim: Buf(), warm: Buf(), clock: Buf(), brick: Buf(), skel: Buf(), madonna: Buf() });
 function lmFlush(Bs, G) {
-  for (const [k, m, sh] of [['plaster', LMAT.plaster, 'cast'], ['coppi', LMAT.coppi, 'cast'], ['trim', LMAT.trim, 'cast'], ['brick', LMAT.brick, 'cast'], ['warm', LMAT.warm, false], ['clock', LMAT.clock, false], ['skel', LMAT.skel, false], ['madonna', LMAT.madonna, false]]) if (Bs[k].i.length) mkMesh(Bs[k], m, 10, sh, G);
+  for (const [k, m, sh] of [['walk', LMAT.trim, 'cast'], ['plaster', LMAT.plaster, 'cast'], ['coppi', LMAT.coppi, 'cast'], ['trim', LMAT.trim, 'cast'], ['brick', LMAT.brick, 'cast'], ['warm', LMAT.warm, false], ['clock', LMAT.clock, false], ['skel', LMAT.skel, false], ['madonna', LMAT.madonna, false]]) if (Bs[k] && Bs[k].i.length) { const me = mkMesh(Bs[k], m, 10, sh, G); if (k === 'walk') me.userData.walk = true; }
 }
 
 // neoclassical two-order facade of the Brianza parish churches: pilasters, portal, niches with saints, upper order with a window or a rose,
@@ -1160,9 +1181,9 @@ function buildModern(L, B, G) {
     const [p0, p1, p2, p3] = st.pts, sy = groundH((p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2), L2 = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
     for (let i = 0; i < st.n; i++) {
       const t0 = i / st.n, t1 = (i + 1) / st.n, y = sy + st.h * (st.n - i) / st.n, a = L2(p0, p3, t0), b = L2(p1, p2, t0), c = L2(p1, p2, t1), d = L2(p0, p3, t1);
-      F.face(Bs.trim, [[a[0], y, a[1]], [b[0], y, b[1]], [c[0], y, c[1]], [d[0], y, d[1]]], 2, COL('#c9c4b8'));
-      F.face(Bs.trim, [[c[0], y, c[1]], [b[0], y, b[1]], [b[0], sy - 0.5, b[1]], [c[0], sy - 0.5, c[1]]], 2, COL('#b5b0a5')); F.face(Bs.trim, [[a[0], y, a[1]], [d[0], y, d[1]], [d[0], sy - 0.5, d[1]], [a[0], sy - 0.5, a[1]]], 2, COL('#b5b0a5'));
-      F.face(Bs.trim, [[d[0], y, d[1]], [c[0], y, c[1]], [c[0], y - st.h / st.n, c[1]], [d[0], y - st.h / st.n, d[1]]], 2, COL('#a9a397'));
+      F.face(Bs.walk, [[a[0], y, a[1]], [b[0], y, b[1]], [c[0], y, c[1]], [d[0], y, d[1]]], 2, COL('#c9c4b8'));
+      F.face(Bs.walk, [[c[0], y, c[1]], [b[0], y, b[1]], [b[0], sy - 0.5, b[1]], [c[0], sy - 0.5, c[1]]], 2, COL('#b5b0a5')); F.face(Bs.walk, [[a[0], y, a[1]], [d[0], y, d[1]], [d[0], sy - 0.5, d[1]], [a[0], sy - 0.5, a[1]]], 2, COL('#b5b0a5'));
+      F.face(Bs.walk, [[d[0], y, d[1]], [c[0], y, c[1]], [c[0], y - st.h / st.n, c[1]], [d[0], y - st.h / st.n, d[1]]], 2, COL('#a9a397'));
     }
   }
   if (o.walkway) { // the covered stair between the schools: landings and flights of steps under a beige barrel on red ribs, the canopy stepping down
@@ -1180,8 +1201,8 @@ function buildModern(L, B, G) {
     segs.forEach((g, i) => {
       const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(g.uz, 0, -g.ux), new THREE.Vector3(0, 1, 0), new THREE.Vector3(g.ux, 0, g.uz)).setPosition(g.cx, 0, g.cz)), h = g.sl / 2;
       const top = Math.max(g.y0, g.y1) + 2.3, last = i === segs.length - 1;
-      if (g.steps) { const n = Math.abs(g.steps), d = (g.sl - 0.4) / n; for (let k = 0; k < n; k++) { const y = g.y0 + Math.sign(g.steps) * RISE * (k + 1); T.geo(Bs.trim, lmBox(1.9, y - g.y0 + 0.6, d + 0.02, 0, (y + g.y0 - 0.6) / 2, -h + 0.2 + d * (k + 0.5)), null, PAV); } T.geo(Bs.trim, lmBox(1.9, 0.6, 0.22, 0, g.y0 - 0.3, -h + 0.1), null, PAV); T.geo(Bs.trim, lmBox(1.9, g.y1 - Math.min(g.y0, g.y1) + 0.6, 0.2, 0, (g.y1 + Math.min(g.y0, g.y1) - 0.6) / 2, h - 0.1), null, PAV); }
-      else T.geo(Bs.trim, lmBox(1.9, 0.7, g.sl + 0.05, 0, g.y0 - 0.33, 0), null, PAV);
+      if (g.steps) { const n = Math.abs(g.steps), d = (g.sl - 0.4) / n; for (let k = 0; k < n; k++) { const y = g.y0 + Math.sign(g.steps) * RISE * (k + 1); T.geo(Bs.walk, lmBox(1.9, y - g.y0 + 0.6, d + 0.02, 0, (y + g.y0 - 0.6) / 2, -h + 0.2 + d * (k + 0.5)), null, PAV); } T.geo(Bs.walk, lmBox(1.9, 0.6, 0.22, 0, g.y0 - 0.3, -h + 0.1), null, PAV); T.geo(Bs.walk, lmBox(1.9, g.y1 - Math.min(g.y0, g.y1) + 0.6, 0.2, 0, (g.y1 + Math.min(g.y0, g.y1) - 0.6) / 2, h - 0.1), null, PAV); }
+      else T.geo(Bs.walk, lmBox(1.9, 0.7, g.sl + 0.05, 0, g.y0 - 0.33, 0), null, PAV);
       for (const sd of [-1, 1]) T.geo(Bs.trim, lmBox(0.18, 0.95, g.sl, sd * 1.05, Math.max(g.y0, g.y1) - 0.2, 0), null, COL('#8f8a80')); // the low side walls
       T.geo(Bs.trim, new THREE.CylinderGeometry(1.25, 1.25, g.sl + 0.25, 10, 1, true, Math.PI / 2, Math.PI).rotateX(Math.PI / 2).scale(1, 0.6, 1).translate(0, top, 0), null, last ? COL('#e9e6dc') : CAN);
       for (const z of last ? [-h, 0, h] : [-h]) { T.geo(Bs.trim, new THREE.TorusGeometry(1.27, last ? 0.09 : 0.05, 4, 10, Math.PI).scale(1, 0.6, 1).translate(0, top, z), null, RIB);
