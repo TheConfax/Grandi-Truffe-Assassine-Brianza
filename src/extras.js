@@ -39,7 +39,7 @@ const skySprite = (tex, size, extra) => { const s = new THREE.Sprite(new THREE.S
 const MOON = skySprite(canvasTex(64, 64, (g) => { g.fillStyle = '#000'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#eef0f4'; g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill(); g.fillStyle = '#b4bac6'; for (const [x, y, r] of [[22, 24, 7], [38, 20, 5], [40, 38, 9], [24, 42, 4], [30, 30, 3]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } }, false), 150, { blending: THREE.AdditiveBlending });
 const MOONHALO = skySprite(haloTex, 900, { blending: THREE.AdditiveBlending, color: 0x8ea4d8 });
 const SUNGLOW = skySprite(haloTex, 1800, { blending: THREE.AdditiveBlending });
-const LIGHTS = { on: 0 }, _gv = new THREE.Vector3();
+const LIGHTS = { on: 0 }, _gv = new THREE.Vector3(), M_BRAKE = M_TAIL.clone();
 function skyAt(s, x, y, z) { s.position.set(camera.position.x + x * SKY_R * 0.97, camera.position.y + y * SKY_R * 0.97, camera.position.z + z * SKY_R * 0.97); }
 function updGlow() {
   const L = lightTones(), on = LIGHTS.on;
@@ -48,11 +48,13 @@ function updGlow() {
   MOON.material.opacity = clamp(-L.U * 12 + 0.2, 0, 1) * clamp(0.25 + L.night, 0, 1); MOON.material.opacity *= clear; MOONHALO.material.opacity = MOON.material.opacity * 0.35 * L.night;
   skyAt(SUNGLOW, L.E, L.U, -L.Nn); SUNGLOW.material.opacity = clamp(L.U * 10 + 0.3, 0, 1) * (0.32 + 0.4 * L.dusk) * clear; SUNGLOW.material.color.setRGB(1, 0.86 - 0.28 * L.dusk, 0.62 - 0.4 * L.dusk);
   LAMPGLOW_MAT.opacity = 0.85 * on;
+  for (const m of [LAMPPOOL_MAT, HEADPOOL_MAT, LAMPGLOW_MAT, STARS.material, MOON.material, MOONHALO.material, SUNGLOW.material]) m.visible = m.opacity > 0.01; // an invisible quad still costs the GPU its pixels
+  M_BRAKE.emissiveIntensity = M_TAIL.emissiveIntensity + 2.2;
   const [H, T] = CARGLOW, hp = H.geometry.attributes.position, hc = H.geometry.attributes.color, tp = T.geometry.attributes.position, tc = T.geometry.attributes.color; let nh = 0, nt = 0;
   for (const v of VEH) {
     const ud = v.m.body.userData; if (!ud.tl) continue;
     const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen, fs = v.fwdSpeed, brk = live && v.inp.brk > 0, rev = brk && fs < -0.5, stop = brk && !rev;
-    ud.tail.emissiveIntensity = M_TAIL.emissiveIntensity + (stop ? 2.2 : 0);
+    const tm = stop ? M_BRAKE : M_TAIL; if (ud.tm !== tm) { ud.tm = tm; for (const m of ud.tails) m.material = tm; }
     if (!v.m.g.visible) continue;
     const kh = live ? on : 0, kt = live ? 0.45 * on + (stop ? 0.85 : 0) : 0; if (kh < 0.02 && kt < 0.02 && !rev) continue;
     v.m.g.updateMatrixWorld(true); const mw = v.m.body.matrixWorld;
@@ -72,7 +74,9 @@ function skyWeather(c, i, L) { // grey under cloud, white-grey in the fog
   return c.lerp(mixHex(0x262a33, 0xc3c7cb, L.day), WX.fog * (0.55 + 0.15 * i));
 }
 const skyCanvas = scene.background.image, skyCtx = skyCanvas.getContext('2d');
-const mixHex = (a, b, t) => { const A = new THREE.Color(a), B = new THREE.Color(b); return A.lerp(B, t); };
+const _hexC = new Map(), hexC = h => { let c = _hexC.get(h); if (!c) _hexC.set(h, c = new THREE.Color(h)); return c; }; // constant colours, never modified
+const _mixO = Array.from({ length: 24 }, () => new THREE.Color()); let _mixI = 0;
+const mixHex = (a, b, t) => _mixO[_mixI++ % 24].copy(hexC(a)).lerp(hexC(b), t); // scratch result: use it right away, no garbage every frame
 let skyT = -1, nightK = 0;
 const LATR = 45.66 * Math.PI / 180, SOLAR_NOON = 12.52;
 function lightTones() {
@@ -86,19 +90,19 @@ function updDayNight(dt) {
   // sun runs east -> south -> west, moon light when it is down
   if (L.U > 0) SUN_DIR.set(L.E, Math.max(0.12, L.U), -L.Nn).normalize(); else SUN_DIR.set(0.3, 0.8, 0.45).normalize(); // night: soft moonlight from high up
   sun.intensity = 0.3 + 0.8 * L.day;
-  sun.color.copy(mixHex(0x8fa6d8, 0xffdcae, L.day)).lerp(new THREE.Color(0xff9356), L.dusk * 0.6);
+  sun.color.copy(mixHex(0x8fa6d8, 0xffdcae, L.day)).lerp(hexC(0xff9356), L.dusk * 0.6);
   hemi.intensity = 0.5 + 0.12 * L.day; hemi.color.copy(mixHex(0x5a6fa8, 0xdbe8ff, L.day)); hemi.groundColor.copy(mixHex(0x2a2a36, 0x8a7f6a, L.day));
-  const fog = mixHex(0x1f2a44, 0xebd9ba, L.day).lerp(new THREE.Color(0xe39a72), L.dusk * 0.55); scene.fog.color.copy(fog); scene.fog.far = 560 + 160 * L.day;
+  const fog = mixHex(0x1f2a44, 0xebd9ba, L.day).lerp(hexC(0xe39a72), L.dusk * 0.55); scene.fog.color.copy(fog); scene.fog.far = 560 + 160 * L.day;
   _far.material.color.setScalar(0.18 + 0.82 * L.day); _near.material.color.setScalar(0.15 + 0.85 * L.day);
   const skyW = WX.cloud + WX.fog * 2;
   if (Math.abs(TOD - skyT) > 0.04 || skyT < 0 || Math.abs(skyW - (updDayNight.w ?? -1)) > 0.015) { // redraw the 4x256 sky gradient now and then
     skyT = TOD; updDayNight.w = skyW; const g = skyCtx, h = skyCanvas.height, gr = g.createLinearGradient(0, 0, 0, h), stops = [0, 0.55, 0.8, 1];
-    stops.forEach((s, i) => { const c = mixHex(SKY_C.night[i], SKY_C.day[i], L.day).lerp(new THREE.Color(SKY_C.dusk[i]), L.dusk * 0.75); gr.addColorStop(s, '#' + skyWeather(c, i, L).getHexString()); });
+    stops.forEach((s, i) => { const c = mixHex(SKY_C.night[i], SKY_C.day[i], L.day).lerp(hexC(SKY_C.dusk[i]), L.dusk * 0.75); gr.addColorStop(s, '#' + skyWeather(c, i, L).getHexString()); });
     g.fillStyle = gr; g.fillRect(0, 0, skyCanvas.width, h); scene.background.needsUpdate = true;
   }
   // street lamps, windows, car lights
   const lampsOn = clamp((3 - L.elDeg) / 7 + 0.35 * Math.max(WX.rain, WX.fog) + 0.1 * WX.cloud, 0, 1); WIN_LIT.value = litAt(TOD); LIGHTS.on = lampsOn; // lights on early under a dark sky
-  WIN_SKY.value.copy(mixHex(SKY_C.night[1], SKY_C.day[1], L.day)).lerp(new THREE.Color(SKY_C.dusk[2]), L.dusk * 0.5).multiplyScalar(0.12 + 0.3 * L.day);
+  WIN_SKY.value.copy(mixHex(SKY_C.night[1], SKY_C.day[1], L.day)).lerp(hexC(SKY_C.dusk[2]), L.dusk * 0.5).multiplyScalar(0.12 + 0.3 * L.day);
   for (const m of SIGN_MATS) m.emissiveIntensity = 0.05 + 0.75 * lampsOn;
   for (const g of LM_GLOW) g.m.emissiveIntensity = g.a + g.b * lampsOn;
   MAT.lampHead.emissiveIntensity = 0.3 + 2.4 * lampsOn; LAMPPOOL_MAT.opacity = 0.75 * lampsOn;
