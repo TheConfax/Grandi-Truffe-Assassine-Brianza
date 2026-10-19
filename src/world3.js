@@ -712,7 +712,7 @@ function* buildTileGen(T) {
     }
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
+  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
@@ -915,6 +915,7 @@ function signList() {
         if (d < 12 && (!best || score < best.score)) best = { score, a, c, L, nx, nz, b, ux: dx / L, uz: dz / L };
       }
     });
+    if (best && !best.b.lm && ngHas(p)) continue; // a shop with its own front (negozi3.js)
     if (best) { const key = best.a[0].toFixed(1) + ',' + best.a[1].toFixed(1) + ',' + best.c[0].toFixed(1); best.slot = SIGN_EDGES.get(key) || 0; SIGN_EDGES.set(key, best.slot + 1); SIGN_LIST.push({ p, ...best }); }
   }
   return SIGN_LIST;

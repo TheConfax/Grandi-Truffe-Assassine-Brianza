@@ -16,6 +16,20 @@ Fatti in `src/oggetti3.js` (dati: chiave `og` per tile, fili in `pw`): 464 ogget
 - [x] Panchine (56), cestini (25), fontanelle (50), giochi (23), telecamere (36), distributori (15), rastrelliere (17), cassette postali (10)
 - [ ] Da rifinire: distributori e telecamere mappati contro i muri finiscono a filo della facciata; i giochi mappati come area sono un solo gruppo al centro
 
+## Vetrine per classe
+Fatte in `src/negozi3.js` (dati: chiave `ng` in `brianza.json`, da `build_data.py`): 1301 attività OSM in 19 classi, 1245 vetrine nel gioco. Ogni classe ha 5 o 6 modelli (insegna, cornice, porta, tenda, cose sul marciapiede); il modello lo sceglie un hash del posto, l'interno della vetrina segue il sottotipo (macelleria, panetteria, ottica...). Le marche note (Esselunga, Eurospin, Intesa, ecc.) tengono i loro colori.
+- [ ] Orari (`opening_hours`, 185 attività): serranda abbassata quando il negozio è chiuso, insegna spenta
+- [ ] Le officine con la serranda aperta: niente spazio per gomme e bidoni quando il portone occupa tutta la facciata
+
+## Altre classi da ricavare dalla mappa
+- [ ] Fabbriche (`man_made=works`, 155; `office=company` nei capannoni, 129): ciminiere, cancelli con la targa, piazzali con i bancali, mobilifici di Meda con i camion
+- [ ] Scuole materne, oratori, palestre (`leisure=fitness_centre`, `sport=*`) con 5 modelli ciascuno
+- [ ] Campi sportivi per sport (`sport=soccer` 44, `basketball` 22, `tennis` 13, `boules`): porte, canestri, reti, bocce
+- [ ] Edicole votive (`historic=wayside_shrine`, 11) e monumenti piccoli (`historic=memorial`/`monument`, 13)
+- [ ] Colori e tetti veri dove OSM li ha (`building:colour`, `roof:shape`, `roof:material`)
+- [ ] Mercato (`amenity=marketplace`, 4): bancarelle nel giorno giusto
+- [ ] Armadietti dei pacchi (`amenity=parcel_locker`, 12) e bancomat isolati (`amenity=atm`, 10)
+
 ## Segnaletica
 - [ ] Segnaletica orizzontale: linee di arresto e scritte STOP, frecce di corsia, piste ciclabili, strisce blu (oggi ci sono le strisce pedonali, 510 attraversamenti)
 - [ ] Verticale: nel gioco c'è (901 cartelli in `src/segnaletica.json`, generati da `src/segnaletica_osm.py`), ma gli estratti OSM `t*.xml` usati per generarla non sono stati salvati. Rigenerarla da `data/maplarge.osm`, che ha 112 `traffic_sign` mappati, e salvare la sorgente in `data/`

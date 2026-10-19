@@ -793,6 +793,44 @@ for wid, (refs, t) in ways.items():
     elif t.get('leisure') == 'park': add_poi(t.get('name'), 'parco', centroid(pts))
     elif t.get('shop') and t.get('name'): add_poi(t['name'], 'negozio', centroid(pts))
     elif t.get('historic') or t.get('name', '').startswith('Villa '): add_poi(t.get('name'), 'monumento', centroid(pts))
+# ---- shops, offices, workshops, surgeries by class: every one gets a shop front picked among its class's models (negozi3.js).
+# [x dm, z dm, class, OSM subtype, name]; the name may be empty (the front then shows what it is: PARRUCCHIERE, AUTOFFICINA)
+NG = ['mobili', 'bellezza', 'officina', 'auto', 'bar', 'ristorante', 'pizzeria', 'gelateria', 'alimentari', 'supermercato', 'moda', 'farmacia', 'banca', 'ufficio',
+      'medico', 'tabacchi', 'bottega', 'artigiano', 'sfitto']
+NG_SHOP = {'mobili': 'furniture kitchen interior_decoration bathroom_furnishing curtain bed carpet lighting antiques houseware flooring tiles doors windows',
+           'bellezza': 'hairdresser beauty cosmetics massage tattoo perfumery nail_salon hairdresser_supply pet_grooming',
+           'officina': 'car_repair tyres motorcycle_repair car_parts', 'auto': 'car motorcycle caravan truck',
+           'alimentari': 'bakery pastry butcher greengrocer convenience deli cheese wine beverages seafood confectionery coffee tea chocolate farm frozen_food pasta alcohol general',
+           'supermercato': 'supermarket', 'moda': 'clothes shoes jewelry optician bag boutique fabric tailor watches leather gift toys sports baby_goods fashion_accessories second_hand',
+           'farmacia': 'chemist medical_supply herbalist', 'tabacchi': 'tobacco newsagent kiosk lottery e-cigarette books stationery',
+           'bottega': 'hardware florist pet bicycle dry_cleaning laundry mobile_phone computer electronics locksmith funeral_directors copyshop paint doityourself garden_centre trade yes variety_store photo hifi appliance travel_agency music department_store craft sewing frame games video_games outdoor model art',
+           'sfitto': 'vacant'}
+NG_SHOP = {s: c for c, v in NG_SHOP.items() for s in v.split()}
+NG_AMEN = {'cafe': 'bar', 'bar': 'bar', 'pub': 'bar', 'biergarten': 'bar', 'restaurant': 'ristorante', 'fast_food': 'pizzeria', 'ice_cream': 'gelateria', 'pharmacy': 'farmacia',
+           'bank': 'banca', 'doctors': 'medico', 'dentist': 'medico', 'clinic': 'medico', 'veterinary': 'medico', 'driving_school': 'ufficio', 'car_wash': 'officina', 'bureau_de_change': 'banca', 'money_transfer': 'banca'}
+def ng_class(t):
+    am, sh = t.get('amenity'), t.get('shop')
+    if am in NG_AMEN:
+        c = NG_AMEN[am]; cu = t.get('cuisine', '')
+        if c == 'ristorante' and 'pizza' in cu.split(';')[:1]: c = 'pizzeria'  # a pizzeria first and foremost
+        return c, (cu.split(';')[0] if cu and am in ('restaurant', 'fast_food') else am)
+    if sh: return NG_SHOP.get(sh, 'bottega'), sh
+    if t.get('healthcare') in ('doctor', 'dentist', 'physiotherapist', 'psychotherapist', 'clinic', 'centre', 'laboratory', 'optometrist', 'podiatrist', 'audiologist', 'rehabilitation'): return 'medico', t['healthcare']
+    if t.get('office'): return 'ufficio', t['office']
+    if t.get('craft'): return 'artigiano', t['craft']
+    return None, None
+negozi, ng_seen = [], []
+def add_ng(t, p):
+    c, s = ng_class(t)
+    if not c or not inside(p, -5): return
+    nm = (t.get('name') or '').strip()
+    if not nm and c in ('ufficio', 'artigiano') and s in ('company', 'yes', 'association', 'ngo', 'political_party'): return  # an unnamed company: nothing to put on the door
+    if any(c == c2 and nm == n2 and math.dist(p, p2) < 15 for c2, n2, p2 in ng_seen): return  # the same shop mapped twice (node and area)
+    ng_seen.append((c, nm, p)); negozi.append([q(p[0]), q(p[1]), NG.index(c), s[:24], nm[:40]])
+for r_, t in ntags.items(): add_ng(t, nodes[r_])
+for wid, (refs, t) in ways.items():
+    if refs[0] == refs[-1] and len(refs) >= 4: add_ng(t, centroid(ring(refs)))
+log('negozi', len(negozi), dict(Counter(NG[n[2]] for n in negozi)))
 places = [{'n': t['name'], 'k': t['place'], 'x': round(nodes[r][0], 1), 'z': round(nodes[r][1], 1)} for r, t in ntags.items()
           if t.get('place') in ('town', 'village', 'suburb', 'neighbourhood', 'hamlet', 'quarter') and t.get('name') and inside(nodes[r], 600)]
 car_nodes = defaultdict(list)
@@ -1014,7 +1052,7 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'terrain': {'x0': float(txs[0]), 'z0': float(tzs[0]), 'step': TSTEP, 'nx': len(txs), 'nz': len(tzs), 'base': round(TBASE, 1), 'h16': base64.b64encode(TH16.tobytes()).decode()},
        'nodes': [c for n_ in NODES for c in n_], 'roads': out_roads, 'names': names, 'tiles': tiles,
        'trains': [{'p': enc(t['pts']), 'st': t['st'], 'stn': t['stn'], 'h': [q(coordH[key(p_)]) if key(p_) in coordH else -32768 for p_ in t['pts']]} for t in trains],
-       'pois': pois, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index],
+       'pois': pois, 'ng': negozi, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index],
        'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0)]}
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
