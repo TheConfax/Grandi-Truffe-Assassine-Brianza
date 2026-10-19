@@ -11,7 +11,9 @@ Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Stre
 
 ## Scuole
 - [x] Scuole Traversi (Palazzo delle Scuole Professionali), con la zona della partenza: parcheggi a strisce, parco Fusetti arredato
-- [ ] Altre scuole di Meda: servono foto (Marie Curie, Anna Frank, Diaz, San Giorgio)
+- [x] Liceo Marie Curie (foto dell'ingresso dal sito del liceo)
+- [x] Primaria San Giorgio (Magistretti e Aulenti): fatta dalla descrizione, mattoni a vista e tetto piano; manca una foto per i dettagli
+- [ ] Anna Frank e Diaz: aspetto le foto
 - [x] Seminario di San Pietro Martire, Seveso (il complesso accanto al santuario)
 - [x] Liceo Frassati di Baruccana con la palestra (foto della perizia del Comune, 2025)
 - [ ] Altre scuole di Seveso: servono foto (Collodi, Leonardo da Vinci / Milani, Bruno Munari, Toti, Don Aurelio Giussani, Frassati di via San Carlo)

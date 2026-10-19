@@ -1560,6 +1560,9 @@ const LANDMARKS = [
   { n: 'Chiesa di San Giacomo', x: 1181.3, z: -451.7, f: [1186.7, -433.3, 1163.8, -443.5], len: 29.2, build: buildSanGiacomo },
   { n: 'Cappella di San Pietro da Verona Martire', x: -1707.0, z: 680.5, ry: 0.6, build: buildCappellaSPM },
   { n: 'Villa Bianca', x: -1611.1, z: 936.5, build: buildVillaBianca },
+  { n: 'Liceo Marie Curie', x: 1273.1, z: -500.1, build: buildModern, // the H of the Provincia (1988) on via Cialdini: white, ribbon windows, the glazed bridge with the name over the court
+    o: { wall: '#eeeeea', h: 12.4, floors: 3, bridge: { a: [1258.9, -486.3], b: [1272.0, -480.5], sign: 'Liceo Marie Curie  ·  Scientifico e Classico' } } },
+  { n: 'Scuola Statale Primaria San Giorgio', x: 1235.1, z: -398.8, build: buildModern, o: { brick: true, h: 7.6, floors: 2 } }, // Vico Magistretti and Gae Aulenti (1968-74): exposed brick, flat roof
   { n: 'Liceo paritario "Pier Giorgio Frassati"', x: 1152.1, z: 2092.8, build: buildPalazzo, o: { style: 'scuolaocra', h: 9.2, front: [1145.0, 2104.0] } }, // Baruccana, via Colombo: L-shaped, two floors on a basement
   { n: 'Palestra Frassati', x: 1155.1, z: 2049.8, build: buildPalestra, o: { h: 6.8 } }, // the prefabricated gym in red panels
   { n: 'Seminario di Seveso', x: -717.1, z: 837.0, build: buildPalazzo, // Seminario Arcivescovile, now Centro Pastorale Ambrosiano: Quadrio's convent, enlarged by the Pollacks
@@ -2564,6 +2567,42 @@ function buildPalestra(L, B, G) {
   }
   lmBody(F, Bs, ring, H - 0.2, H, { col: COL('#9c4a3a'), roof: 'trim', roofCol: COL('#5a5e62'), slope: 0.12, over: 0.5, d: 6 });
   mkMesh(gym, LMAT.gym, 10, 'cast', G); lmFlush(Bs, G);
+}
+
+// modern school blocks: flat roof behind a parapet, a ribbon of windows on every floor; o: { wall | brick, h, floors, bridge: { a, b, sign } }
+const bridgeSign = t => canvasTex(1024, 96, (g, w, h) => { g.fillStyle = '#f4f4f1'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f2a44'; g.font = 'bold 50px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, w / 2, h / 2 + 3); g.fillStyle = '#2a8f3a'; g.fillRect(24, 30, 36, 36); g.fillStyle = '#2a8f3a'; g.fillRect(w - 60, 30, 36, 36); }, false);
+function buildModern(L, B, G) {
+  const o = L.o, ring = lmSimplify(B.pts, 0.4), F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), top = gy + o.h, A = sArea(ring);
+  const WALL = COL(o.wall || '#ffffff'), GLASS = COL('#2f3a44'), FRAME = COL('#c9ccd0'), CAP = COL(o.brick ? '#e8e6e0' : '#f6f6f3'), fh = (o.h - 0.9) / o.floors;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.3) continue;
+    let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
+    const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln;
+    if (o.brick) F.face(Bs.brick, [[a[0], gy - 1, a[1]], [c[0], gy - 1, c[1]], [c[0], top, c[1]], [a[0], top, a[1]]]);
+    else F.face(Bs.plaster, [[a[0], gy - 1, a[1]], [c[0], gy - 1, c[1]], [c[0], top, c[1]], [a[0], top, a[1]]], 2, WALL);
+    F.geo(Bs.trim, lmBox(Ln + 0.2, 0.7, 0.3, 0, 0, 0).rotateY(Math.atan2(-ez, ex)).translate((a[0] + c[0]) / 2 + nx * 0.1, top + 0.35, (a[1] + c[1]) / 2 + nz * 0.1), null, CAP); // parapet
+    if (Ln < 3) continue;
+    for (let f = 0; f < o.floors; f++) { // ribbon window with mullions
+      const y0 = gy + 0.9 + f * fh + 0.25, y1 = y0 + fh * 0.5, m = 0.8, q = 0.05;
+      F.face(Bs.trim, [[a[0] + ex * m + nx * q, y0, a[1] + ez * m + nz * q], [c[0] - ex * m + nx * q, y0, c[1] - ez * m + nz * q], [c[0] - ex * m + nx * q, y1, c[1] - ez * m + nz * q], [a[0] + ex * m + nx * q, y1, a[1] + ez * m + nz * q]], 2, GLASS);
+      for (let s = m; s <= Ln - m + 0.01; s += 1.6) F.geo(Bs.trim, lmBox(0.09, y1 - y0, 0.08, 0, 0, 0).translate(a[0] + ex * s + nx * 0.08, (y0 + y1) / 2, a[1] + ez * s + nz * 0.08), null, FRAME);
+      F.geo(Bs.trim, lmBox(Ln - 2 * m, 0.08, 0.14, 0, 0, 0).rotateY(Math.atan2(-ez, ex)).translate((a[0] + c[0]) / 2 + nx * 0.1, y0 - 0.04, (a[1] + c[1]) / 2 + nz * 0.1), null, FRAME);
+    }
+  }
+  try { polyFill(Bs.trim, ring, [], top + 0.02, 2, COL('#8f8c86')); } catch (e) { }
+  let signMesh = null;
+  if (o.bridge) { // the glazed bridge across the mouth of the court, on four columns, with the school's name on its parapet
+    const [[ax, az], [bx, bz]] = [o.bridge.a, o.bridge.b], Lb = hyp(bx - ax, bz - az), ux = (bx - ax) / Lb, uz = (bz - az) / Lb;
+    let nx = -uz, nz = ux; if (inPoly((ax + bx) / 2 + nx * 3, (az + bz) / 2 + nz * 3, ring)) { nx = -nx; nz = -nz; } // out of the court, towards the street
+    const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(ux, 0, uz), new THREE.Vector3(0, 1, 0), new THREE.Vector3(nx, 0, nz)).setPosition(ax, gy, az)), D2 = 3.2, WH = COL('#f4f4f1');
+    T.geo(Bs.trim, lmBox(Lb, 1.6, D2, Lb / 2, 4.2, -D2 / 2 + 0.6), null, WH); T.geo(Bs.trim, lmBox(Lb, 0.5, D2 + 0.2, Lb / 2, 7.55, -D2 / 2 + 0.6), null, WH);
+    for (const z of [0.62, -D2 + 0.58]) { T.geo(Bs.trim, lmBox(Lb - 0.4, 2.3, 0.05, Lb / 2, 6.15, z), null, GLASS); for (let s = 0.4; s < Lb; s += 1.4) T.geo(Bs.trim, lmBox(0.1, 2.3, 0.08, s, 6.15, z + (z > 0 ? 0.03 : -0.03)), null, COL('#1d2125')); }
+    for (const s of [1.2, Lb - 1.2]) for (const z of [0.2, -D2 + 1]) T.geo(Bs.trim, new THREE.CylinderGeometry(0.22, 0.22, 3.4, 12).translate(s, 1.7, z), null, COL('#b5b8bc'));
+    const sg = Buf(), i0 = 0; for (const [x, y, u, v] of [[0.3, 3.55, 0, 0], [Lb - 0.3, 3.55, 1, 0], [Lb - 0.3, 4.85, 1, 1], [0.3, 4.85, 0, 1]]) T.v(sg, x, y, 0.62, 0, 0, 1, u, v); sg.i.push(0, 1, 2, 0, 2, 3);
+    T.geo(Bs.trim, new THREE.CircleGeometry(0.42, 16).translate(Lb / 2, 5.2, 0.66), null, COL('#e0e0dc'));
+    signMesh = [sg, new THREE.MeshLambertMaterial({ map: bridgeSign(o.bridge.sign), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })];
+  }
+  lmFlush(Bs, G); if (signMesh) mkMesh(signMesh[0], signMesh[1], 10, false, G);
 }
 
 // ---------------------------------------------------------------- audio
