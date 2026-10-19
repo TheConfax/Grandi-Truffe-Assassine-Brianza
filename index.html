@@ -1565,6 +1565,19 @@ const LANDMARKS = [
     o: { wall: '#eeeeea', h: 8.6, floors: 2, wings: [{ pts: [[1238.9, -491.0], [1250.3, -485.7], [1273.3, -535.1], [1262.0, -540.3]], h: 12.4, floors: 3 }, { pts: [[1276.4, -474.5], [1287.5, -469.3], [1310.8, -519.0], [1299.6, -524.2]], h: 12.4, floors: 3 }],
       courts: [[[1258.9, -486.3], [1266.1, -502.5], [1279.7, -496.6], [1272.0, -480.5]], [[1280.8, -531.8], [1274.2, -518.7], [1288.0, -513.3], [1292.7, -525.7]]], spine: [[1273.0, -499.3], [1280.8, -516.1]], planters: [[1269.0, -490.8], [1283.8, -522.5]],
       bridges: [{ a: [1276.3, -548.4], b: [1270.5, -536.1], sign: 'Liceo Marie Curie\nScientifico e Classico' }, { a: [1300.0, -537.7], b: [1293.9, -524.8] }] } },
+  { n: 'Scuola primaria "Armando Diaz"', x: -644.2, z: -801.8, build: buildModern, // the long two-floor block on via degli Angeli Custodi, the classrooms stepped out towards the street, skylights all over the dark roof
+    o: { wall: '#f0f0ec', h: 7.2, floors: 2, glass: '#3b4652', roof: '#6c6e70', sky: 28 } },
+  { n: 'Scuola secondaria di primo grado "Anna Frank"', x: -510.5, z: -815.3, build: buildModern, // white cubes round a lower hall: the gym on the west with the red court, the steps up between
+    // the blocks, ribbons of red blinds; the covered walkway from via Papa Giovanni XXIII comes down the slope towards the Diaz
+    o: { wall: '#f3f2ee', h: 4.4, floors: 1, glass: '#a9483a', roof: '#d8d5ce', sky: 60,
+      base: [[-534.9, -815.6], [-519.3, -824.2], [-503.1, -832.2], [-498.4, -828.9], [-489.9, -812.8], [-493.2, -808.2], [-509.6, -802.2], [-521.2, -798.6], [-528.2, -813.3]],
+      wings: [{ pts: [[-558.4, -832.2], [-545.6, -838.0], [-534.4, -815.9], [-547.3, -809.0]], h: 8.6, floors: 2, kind: 'gym' },
+        { pts: [[-539.3, -834.6], [-526.8, -840.5], [-519.3, -824.2], [-532.0, -818.3]], h: 8.4, floors: 2 }, { pts: [[-526.8, -840.5], [-510.9, -847.8], [-503.6, -832.8], [-519.3, -824.2]], h: 8.4, floors: 2 },
+        { pts: [[-528.2, -813.3], [-504.7, -825.0], [-496.8, -810.4], [-521.2, -798.6]], h: 7.0, floors: 2 },
+        { pts: [[-498.9, -828.9], [-483.3, -835.3], [-475.4, -819.0], [-490.3, -812.8]], h: 8.4, floors: 2 }, { pts: [[-483.3, -835.3], [-471.8, -841.5], [-463.4, -824.7], [-475.4, -819.0]], h: 8.4, floors: 2 },
+        { pts: [[-509.6, -802.2], [-493.2, -808.2], [-486.6, -792.1], [-503.1, -785.3]], h: 8.4, floors: 2 }, { pts: [[-503.1, -785.3], [-486.6, -792.1], [-481.9, -778.1], [-498.4, -771.0]], h: 8.4, floors: 2 }],
+      steps: [{ pts: [[-535.5, -807.6], [-528.7, -810.4], [-523.3, -797.8], [-532.7, -793.6]], n: 8, h: 2.4 }],
+      walkway: [[-578.8, -718.1], [-549.3, -727.1], [-544.3, -722.0], [-515.0, -741.3]] } },
   { n: 'Palestra del Curie', x: 1306.5, z: -552.4, build: buildPalestra, o: { h: 10.4, white: true } }, // white, a metal roof, little ochre windows along the bottom
   { n: 'Scuola Statale Primaria San Giorgio', x: 1235.1, z: -398.8, build: buildModern, o: { brick: true, h: 7.6, floors: 2 } }, // Vico Magistretti and Gae Aulenti (1968-74): exposed brick, flat roof
   { n: 'Liceo paritario "Pier Giorgio Frassati"', x: 1152.1, z: 2092.8, build: buildPalazzo, o: { style: 'scuolaocra', h: 9.2, front: [1145.0, 2104.0] } }, // Baruccana, via Colombo: L-shaped, two floors on a basement
@@ -2579,7 +2592,10 @@ function buildPalestra(L, B, G) { // o.white: white render instead of the panels
 
 // modern school blocks: flat roof behind a parapet, a ribbon of windows on every floor; o: { wall | brick, h, floors, bridges: [{ a, b, sign }],
 // wings: [{ pts, h, floors }] (taller blocks over the footprint), courts: [ring] (glazed ground floor under an ochre band on the walls round them),
-// spine: [a, b] (a glass barrel vault along the roof with arched glazed bays at both ends), planters: [[x, z]] (a bed with a little tree) }
+// spine: [a, b] (a glass barrel vault along the roof with arched glazed bays at both ends), planters: [[x, z]] (a bed with a little tree),
+// base (a ring for the lower block instead of the footprint), glass, roof (colours), sky (one skylight every so many m2 of roof), wings[].kind 'gym' (a row of
+// small windows along the top and the bottom instead of the ribbons), steps: [{ pts, n, h }] (an open-air flight from the first edge up to the third),
+// walkway: [[x, z]...] (a covered path on posts, its barrel canopy stepping down with the ground, red ribs) }
 const bridgeSign = t => canvasTex(1024, 128, (g, w, h) => {
   g.fillStyle = '#f4f4f1'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f2a44'; g.textAlign = 'center'; g.textBaseline = 'middle';
   const L = t.split('\n'); g.font = `${L.length > 1 ? 46 : 50}px Georgia, serif`; L.forEach((s, i) => g.fillText(s, w * 0.44, h / 2 + (i - (L.length - 1) / 2) * 50 + 3));
@@ -2588,8 +2604,9 @@ const bridgeSign = t => canvasTex(1024, 128, (g, w, h) => {
 }, false);
 function buildModern(L, B, G) {
   const o = L.o, ring = lmSimplify(B.pts, 0.4), F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), gy = Math.min(...ring.map(p => groundH(p[0], p[1])));
-  const WALL = COL(o.wall || '#ffffff'), GLASS = COL('#2f3a44'), FRAME = COL('#c9ccd0'), CAP = COL(o.brick ? '#e8e6e0' : '#f6f6f3'), OCRA = COL('#dcae63');
-  const block = (ring, h, floors, courts) => {
+  let seed = Math.abs(L.x * 7 + L.z * 13) % 1 || 0.37; const rand = () => (seed = (seed * 9301 + 0.49297) % 1); // the same skylights every time
+  const WALL = COL(o.wall || '#ffffff'), GLASS = COL(o.glass || '#2f3a44'), FRAME = COL('#c9ccd0'), CAP = COL(o.brick ? '#e8e6e0' : '#f6f6f3'), OCRA = COL('#dcae63');
+  const block = (ring, h, floors, courts, kind) => {
     const top = gy + h, A = sArea(ring), fh = (h - 0.9) / floors;
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.3) continue;
@@ -2600,6 +2617,10 @@ function buildModern(L, B, G) {
       else F.face(Bs.plaster, [[a[0], gy - 1, a[1]], [c[0], gy - 1, c[1]], [c[0], top, c[1]], [a[0], top, a[1]]], 2, WALL);
       F.geo(Bs.trim, lmBox(Ln + 0.2, 0.7, 0.3, 0, 0, 0).rotateY(ry).translate(mx + nx * 0.1, top + 0.35, mz + nz * 0.1), null, CAP); // parapet
       if (Ln < 3) continue;
+      if (kind === 'gym') { // the gym: blind walls, a row of little windows high up and one low down
+        for (let s = 1.0; s < Ln - 0.8; s += 1.6) for (const y of [h - 1.3, 1.1]) F.geo(Bs.trim, lmBox(0.7, 0.55, 0.1, 0, 0, 0).rotateY(ry).translate(a[0] + ex * s + nx * 0.06, gy + y, a[1] + ez * s + nz * 0.06), null, COL('#2f3a44'));
+        continue;
+      }
       if (court) { // round the courts: the ground floor all glass between steel posts, an ochre band above it
         band(gy + 0.15, gy + 3.2, 0.06, GLASS); band(gy + 3.2, gy + 4.0, 0.12, OCRA);
         for (let s = 0.4; s <= Ln - 0.3; s += 2.2) F.geo(Bs.trim, lmBox(0.12, 3.05, 0.1, 0, 0, 0).translate(a[0] + ex * s + nx * 0.1, gy + 1.68, a[1] + ez * s + nz * 0.1), null, COL('#33383d'));
@@ -2611,10 +2632,34 @@ function buildModern(L, B, G) {
         F.geo(Bs.trim, lmBox(Ln - 2 * m, 0.08, 0.14, 0, 0, 0).rotateY(ry).translate(mx + nx * 0.1, y0 - 0.04, mz + nz * 0.1), null, FRAME);
       }
     }
-    try { polyFill(Bs.trim, ring, [], top + 0.02, 2, COL('#8f8c86')); } catch (e) { }
+    try { polyFill(Bs.trim, ring, [], top + 0.02, 2, COL(o.roof || '#8f8c86')); } catch (e) { }
+    if (o.sky) { const [x0, z0, x1, z1] = bbox(ring); for (let k = Math.round(Math.abs(A) / o.sky); k > 0; k--) { const x = x0 + rand() * (x1 - x0), z = z0 + rand() * (z1 - z0); if (inPoly(x, z, lmOffset(ring, 1.2))) F.geo(Bs.trim, lmBox(0.9, 0.3, 0.9, x, top + 0.15, z), null, COL('#eef0f0')); } }
   };
-  block(ring, o.h, o.floors, o.courts);
-  for (const w of o.wings || []) block(lmOffset(w.pts, -0.15), w.h, w.floors); // a hair proud of the lower block, so the faces don't fight
+  block(o.base || ring, o.h, o.floors, o.courts);
+  for (const w of o.wings || []) block(lmOffset(w.pts, -0.15), w.h, w.floors, null, w.kind); // a hair proud of the lower block, so the faces don't fight
+  for (const st of o.steps || []) { // a flight of steps: n treads from the first edge to the third, each with its riser
+    const [p0, p1, p2, p3] = st.pts, sy = groundH((p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2), L2 = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    for (let i = 0; i < st.n; i++) {
+      const t0 = i / st.n, t1 = (i + 1) / st.n, y = sy + st.h * (st.n - i) / st.n, a = L2(p0, p3, t0), b = L2(p1, p2, t0), c = L2(p1, p2, t1), d = L2(p0, p3, t1);
+      F.face(Bs.trim, [[a[0], y, a[1]], [b[0], y, b[1]], [c[0], y, c[1]], [d[0], y, d[1]]], 2, COL('#c9c4b8'));
+      F.face(Bs.trim, [[c[0], y, c[1]], [b[0], y, b[1]], [b[0], sy - 0.5, b[1]], [c[0], sy - 0.5, c[1]]], 2, COL('#b5b0a5')); F.face(Bs.trim, [[a[0], y, a[1]], [d[0], y, d[1]], [d[0], sy - 0.5, d[1]], [a[0], sy - 0.5, a[1]]], 2, COL('#b5b0a5'));
+      F.face(Bs.trim, [[d[0], y, d[1]], [c[0], y, c[1]], [c[0], y - st.h / st.n, c[1]], [d[0], y - st.h / st.n, d[1]]], 2, COL('#a9a397'));
+    }
+  }
+  if (o.walkway) { // the covered path between the schools: a beige barrel on posts every couple of metres, red ribs, stepping with the slope
+    const W = o.walkway, CAN = COL('#e2cdb8'), RIB = COL('#a8322b');
+    for (let k = 1; k < W.length; k++) {
+      const [ax, az] = W[k - 1], [bx, bz] = W[k], Ls = hyp(bx - ax, bz - az), ux = (bx - ax) / Ls, uz = (bz - az) / Ls, n = Math.max(1, Math.round(Ls / 2.2)), sl = Ls / n;
+      for (let i = 0; i < n; i++) {
+        const cx = ax + ux * (i + 0.5) * sl, cz = az + uz * (i + 0.5) * sl, y = groundH(cx, cz);
+        const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(uz, 0, -ux), new THREE.Vector3(0, 1, 0), new THREE.Vector3(ux, 0, uz)).setPosition(cx, y, cz));
+        T.geo(Bs.trim, new THREE.CylinderGeometry(1.25, 1.25, sl + 0.25, 10, 1, true, Math.PI / 2, Math.PI).rotateX(Math.PI / 2).scale(1, 0.6, 1).translate(0, 2.25, 0), null, CAN);
+        T.geo(Bs.trim, new THREE.TorusGeometry(1.27, 0.05, 4, 10, Math.PI).scale(1, 0.6, 1).translate(0, 2.25, -sl / 2), null, RIB);
+        for (const sd of [-1, 1]) T.geo(Bs.trim, lmBox(0.08, 2.3, 0.08, sd * 1.2, 1.15, -sl / 2), null, RIB);
+        T.geo(Bs.trim, lmBox(1.9, 0.12, sl + 0.1, 0, 0.06, 0), null, COL('#9d988e')); // the paving under it
+      }
+    }
+  }
   if (o.spine) { // the glass barrel vault down the middle of the link, and the arched glazed bays it ends in over the courts
     const [[ax, az], [bx, bz]] = o.spine, Ls = hyp(bx - ax, bz - az), ux = (bx - ax) / Ls, uz = (bz - az) / Ls, R = 2, H = o.h, P = 0.4;
     const T = lmFrame(new THREE.Matrix4().makeBasis(new THREE.Vector3(uz, 0, -ux), new THREE.Vector3(0, 1, 0), new THREE.Vector3(ux, 0, uz)).setPosition(ax, gy, az)), BAR = COL('#d9dcdf'), GL = COL('#5f8f96');
