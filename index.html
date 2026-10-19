@@ -2825,7 +2825,7 @@ function updStatic(dt, want) {
   staticInit(); if (!STATIC.g) return; const C = AU.ctx, t = C.currentTime;
   STATIC.t -= dt; if (STATIC.tuning && STATIC.t < -6) { STATIC.tuning = false; STATIC.quiet = true; } // a stream that never answers stops hissing (until the radio is switched again)
   const on = want && !radioErr && (STATIC.tuning || STATIC.t > 0);
-  STATIC.g.gain.setTargetAtTime(on ? 0.11 : 0, t, on ? 0.03 : 0.12);
+  STATIC.g.gain.setTargetAtTime(on ? 0.6 : 0, t, on ? 0.03 : 0.12); // ~8 dB under a broadcast stream at radio volume 0.6: heard clearly before the music takes over
   if (on) { STATIC.w.frequency.setTargetAtTime(1500 + Math.sin(now * 2.3) * 700 + rnd() * 250, t, 0.08); STATIC.f.frequency.setTargetAtTime(1300 + rnd() * 900, t, 0.05); }
 }
 RADIO.addEventListener('playing', () => { STATIC.tuning = false; STATIC.quiet = false; });
