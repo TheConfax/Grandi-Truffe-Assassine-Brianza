@@ -13,7 +13,7 @@ Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Stre
 - [x] Scuole Traversi (Palazzo delle Scuole Professionali), con la zona della partenza: parcheggi a strisce, parco Fusetti arredato
 - [x] Liceo Marie Curie (foto dell'ingresso dal sito del liceo)
 - [x] Primaria San Giorgio (Magistretti e Aulenti): fatta dalla descrizione, mattoni a vista e tetto piano; manca una foto per i dettagli
-- [ ] Anna Frank e Diaz: aspetto le foto
+- [ ] Anna Frank e Diaz (via Giovanni XXIII, Meda): online ci sono solo volantini, servono foto delle facciate e dell'ingresso
 - [x] Seminario di San Pietro Martire, Seveso (il complesso accanto al santuario)
 - [x] Liceo Frassati di Baruccana con la palestra (foto della perizia del Comune, 2025)
 - [ ] Altre scuole di Seveso: servono foto (Collodi, Leonardo da Vinci / Milani, Bruno Munari, Toti, Don Aurelio Giussani, Frassati di via San Carlo)
@@ -24,6 +24,30 @@ Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Stre
 - [ ] Monumento ai Caduti di Seveso (Nardo Pajella)
 - [ ] Monumento al Falegname, Meda
 - [ ] Casa del Fascio, Seveso
+- [ ] Statua del Donatore di Sangue (piazza Cavour, Meda) e Statua dell'Intagliatore (giardino di Villa Besana)
+
+Le foto sono in Viaggiare in Brianza (guide di Meda e Seveso).
+
+## Ritocchi ai monumenti già fatti
+- [ ] Torretta con lanterna del Seminario di Seveso: posizione stimata, da verificare
+- [ ] Campanile del Santuario del Crocifisso di Meda: posizione approssimata
+- [ ] San Pietro Martire di Meda: la lanterna sul tetto è al centro a occhio, forse va sopra l'altare (più a est)
+- [ ] Casa Ferrario: tre piani bassi invece dei due della foto; torre merlata stimata sull'angolo
+- [ ] Villa Bianca di Terragni: più allungata della foto perché segue la pianta OSM
+- [ ] Santa Maria Nascente: campanile non trovato nelle fonti, copertura della cupola ipotizzata in rame
+- [ ] Municipio di Meda: colori e dettagli tipici, non da foto; mancano le bandiere dei quattro rioni
+- [ ] Pensiline delle banchine tutte uguali tra le stazioni; il sottopasso non si percorre
+- [ ] Parco Fusetti: aiuola e panchine generiche, da confrontare con una foto
+
+## Idee per dopo
+- [ ] "Scopri la Brianza": cartello con nome e due righe di storia avvicinandosi a un monumento, icone sulla mappa grande, contatore dei monumenti scoperti salvato
+- [ ] Missioni legate ai luoghi veri (fiori al Santuario prima delle campane, consegna in Municipio)
+- [ ] Vita intorno ai monumenti: fedeli all'uscita della messa, mercato in piazza Vittorio Veneto, bancarelle del Palio
+- [ ] Prestazioni: verificare su telefono il numero di auto parcheggiate nei posti (oggi fino a 14 per tile)
+
+## Come si lavora
+- Foto: Wikipedia ha foto vecchie; Wikimedia Commons limita le richieste (riprovare dopo qualche minuto); Street View non utilizzabile (chiave e termini); Mapillary va bene con un token.
+- I monumenti stanno in `src/landmarks3.js` (lista `LANDMARKS` in cima); `python src/assemble3.py` rigenera `index.html`.
 
 ## Parcheggi
 Oggi i posti sono generati (strisce a pettine dentro i 921 contorni OSM `amenity=parking`). Da fare quando Overpass risponde:
