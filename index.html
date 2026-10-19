@@ -2272,23 +2272,26 @@ function buildChiesaRom(L, B, G) {
   for (let k = 0; k < 2; k++) F.geo(Bs.trim, lmBox(aw + 2 - k, 0.15, 1.8 - 0.6 * k, 0, 0.07 + 0.15 * k - 0.05, 0.9 - 0.3 * k), null, COL('#bdb6a8'));
   lmFlush(Bs, G);
 }
-// San Giacomo, Meda: a long brick hall under a metal gable along via Emilia with a lower wing beside it, the big round window of louvres
-// on the south gable, small slit windows down the sides, the cross on its pole at the corner
+// San Giacomo, Meda: a long brick hall under one metal slope that climbs from the low wall on via Emilia to the high east corner, where the cross
+// stands; a lower wing leans the other way beside it; the big round window of louvres on the south end, tall slit windows down the low side
 function buildSanGiacomo(L, B, G) {
-  const { F, W2 } = lmChurchFrame(L), Bs = lmBuffers(), LEN = L.len, ROOF = COL('#4f5357'), GREY = COL('#d9d6cf');
-  const hall = [-W2, 1.5, 5.2, 8.2, 11.4, -1.6], wing = [1.5, W2, 4.4, 4.4, 7.2, (1.5 + W2) / 2]; // x0, x1, left and right eaves, ridge and where it runs
-  for (const [x0, x1, El, Er, R, xr] of [hall, wing]) {
-    F.face(Bs.brick, [[x0, -1, 0], [x0, -1, -LEN], [x0, El, -LEN], [x0, El, 0]]); F.face(Bs.brick, [[x1, -1, 0], [x1, -1, -LEN], [x1, Er, -LEN], [x1, Er, 0]]);
-    for (const z of [0, -LEN]) F.face(Bs.brick, [[x0, -1, z], [x1, -1, z], [x1, Er, z], [xr, R, z], [x0, El, z]]);
-    for (const [xa, ya, k] of [[x0, El, -1], [x1, Er, 1]]) { const dx = (xa - xr), sl = (R - ya) / Math.abs(dx); F.face(Bs.trim, [[xa + k * 0.5, ya - sl * 0.5, 0.5], [xr, R + 0.08, 0.5], [xr, R + 0.08, -LEN - 0.5], [xa + k * 0.5, ya - sl * 0.5, -LEN - 0.5]], 2, ROOF); }
-    for (let z = -3; z > -LEN + 2; z -= 3.6) F.geo(Bs.warm, new THREE.PlaneGeometry(0.5, Math.min(3.0, El - 2.0)).rotateY(-Math.PI / 2).translate(x0 - 0.05, 1.2 + Math.min(3.0, El - 2.0) / 2, z));
-  }
-  const cx = hall[5] - 2.4, wy = 6.9; // the round window of louvres on the hall's south gable, just left of the ridge
-  F.geo(Bs.trim, new THREE.CircleGeometry(2.1, 28).translate(cx, wy, 0.06), null, GREY); F.geo(Bs.trim, new THREE.RingGeometry(2.1, 2.35, 28).translate(cx, wy, 0.07), null, COL('#bcb8b0'));
-  for (let k = 0; k < 10; k++) F.geo(Bs.trim, lmBox(Math.sqrt(Math.max(0, 4.4 - (k * 0.4 - 1.8) ** 2)) * 2 - 0.3, 0.13, 0.08, cx, wy - 1.8 + k * 0.4, 0.1), null, COL('#6d7075'));
-  F.geo(Bs.trim, lmBox(1.8, 2.6, 0.1, cx - 4.5, 1.3, 0.06), null, COL('#8f9499')); F.geo(Bs.trim, lmBox(2.4, 0.2, 1.4, cx - 4.5, 2.8, 0.7), null, GREY); // door with its canopy
-  F.geo(Bs.trim, lmBox(1.4, 2.4, 0.1, (wing[0] + wing[1]) / 2, 1.2, 0.06), null, COL('#8f9499'));
-  F.geo(Bs.trim, lmBox(0.2, 6.0, 0.2, hall[5], 11.4 + 2.6, 0.1), null, COL('#3a3a3c')); F.geo(Bs.trim, lmBox(2.0, 0.18, 0.18, hall[5], 15.0, 0.1), null, COL('#3a3a3c')); // the cross on its pole
+  const { F, W2 } = lmChurchFrame(L), Bs = lmBuffers(), LEN = L.len, ROOF = COL('#55595e'), GREY = COL('#d9d6cf'), FRAME = COL('#e8e4dc');
+  const mono = (x0, x1, y0, y1) => { // walls and a single roof slope from height y0 at x0 to y1 at x1
+    F.face(Bs.brick, [[x0, -1, 0], [x0, -1, -LEN], [x0, y0, -LEN], [x0, y0, 0]]); F.face(Bs.brick, [[x1, -1, 0], [x1, -1, -LEN], [x1, y1, -LEN], [x1, y1, 0]]);
+    for (const z of [0, -LEN]) F.face(Bs.brick, [[x0, -1, z], [x1, -1, z], [x1, y1, z], [x0, y0, z]]);
+    const k = (y1 - y0) / (x1 - x0), e = Math.sign(x1 - x0) * 0.45;
+    F.face(Bs.trim, [[x0 - e, y0 - k * e + 0.05, 0.45], [x1 + e, y1 + k * e + 0.05, 0.45], [x1 + e, y1 + k * e + 0.05, -LEN - 0.45], [x0 - e, y0 - k * e + 0.05, -LEN - 0.45]], 2, ROOF);
+    for (const z of [0.47, -LEN - 0.47]) F.geo(Bs.trim, new THREE.BoxGeometry(hyp(x1 - x0, y1 - y0) + 1.0, 0.25, 0.1).rotateZ(Math.atan2(y1 - y0, x1 - x0)).translate((x0 + x1) / 2, (y0 + y1) / 2 + 0.12, z), null, FRAME);
+  };
+  const XH = 1.5; mono(-W2, XH, 4.8, 12.0); mono(XH, W2, 8.0, 4.6);
+  for (let z = -4; z > -LEN + 3; z -= 4.5) { F.geo(Bs.trim, lmBox(0.06, 3.1, 0.8, -W2 - 0.04, 2.3, z), null, FRAME); F.geo(Bs.warm, new THREE.PlaneGeometry(0.55, 2.8).rotateY(-Math.PI / 2).translate(-W2 - 0.08, 2.3, z)); } // slit windows on the low side
+  F.geo(Bs.trim, lmBox(0.08, 2.5, 1.5, -W2 - 0.05, 1.25, -LEN + 6), null, COL('#9aa0a6'));
+  const cx = -4.3, wy = 6.0; // the round window of louvres on the south end
+  F.geo(Bs.trim, new THREE.CircleGeometry(2.1, 28).translate(cx, wy, 0.06), null, GREY); F.geo(Bs.trim, new THREE.RingGeometry(2.1, 2.35, 28).translate(cx, wy, 0.07), null, FRAME);
+  for (let k = 0; k < 10; k++) { const y = -1.8 + k * 0.4; F.geo(Bs.trim, lmBox(2 * Math.sqrt(Math.max(0, 4.4 - y * y)) - 0.3, 0.13, 0.08, 0, 0, 0).rotateZ(0.5).translate(cx, wy + y, 0.1), null, COL('#6d7075')); }
+  F.geo(Bs.trim, lmBox(1.6, 2.5, 0.1, -W2 + 2.6, 1.25, 0.06), null, COL('#9aa0a6'));
+  F.geo(Bs.trim, lmBox(0.7, 4.8, 0.08, XH - 0.8, 3.0, 0.06), null, COL('#b9bdc1')); // glazed strip at the high corner
+  F.geo(Bs.trim, lmBox(0.18, 4.6, 0.18, XH - 0.3, 12.0 + 2.1, -0.3), null, COL('#3a3a3c')); F.geo(Bs.trim, lmBox(1.9, 0.16, 0.16, XH - 0.3, 15.2, -0.3), null, COL('#3a3a3c')); // the cross over the high corner
   lmFlush(Bs, G);
 }
 // the Cappella di San Pietro da Verona at the edge of Seveso: a white cube under a pyramid of coppi, a grated round window and door in stone frames
