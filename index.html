@@ -3016,7 +3016,7 @@ async function reportSpot() {
 (() => { document.body.classList.toggle('debug', DEBUG); updDbgMenu();
   const c = document.getElementById('dbgcode'); if (!c) return;
   ['keydown', 'keyup', 'keypress'].forEach(k => c.addEventListener(k, e => { e.stopPropagation(); if (k === 'keydown' && (e.key === 'Enter' || e.key === 'Escape')) c.blur(); }));
-  c.addEventListener('change', () => { const v = c.value.trim().toUpperCase(); c.value = ''; if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'); });
+  c.addEventListener('change', () => { const v = c.value.trim().toUpperCase(); c.value = ''; if (v === 'DEBUG') setDebug(!DEBUG); else if (CHEATS[v]) CHEATS[v](); else if (v) toast('Codice sconosciuto'); });
   document.getElementById('dbgdl').onclick = exportSpots; document.getElementById('dbgclr').onclick = clearSpots; })();
 // ---------------------------------------------------------------- sounds: footsteps, screeching tyres, passing cars, Meda ambience
 // all synthesised like the engine: wind, leaves, birds by day, crickets at night, the far hum of the Milano-Meda, church bells at 7, 12 and 19
@@ -3329,15 +3329,18 @@ function updHud(dt) {
 
 // ---------------------------------------------------------------- boot
 const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };
+function startSpot() { // the parking on via Yuri Gagarin in Meda, facing the fountain
+  const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
+  const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
+  return [sx, sz, Math.atan2(FO[0] - sx, FO[1] - sz)];
+}
 function setupWorld(saved) {
   tileTick(STATION.x + 190, STATION.z + 66, 0, 420);
   for (const T of TILES) T.dist = hyp(T.cx - STATION.x - 190, T.cz - STATION.z - 66);
   parkTick();
   for (let i = 0; i < 16; i++) spawnTraffic(false);
   // start next to the station with a red Ferari waiting
-  const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
-  const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
-  const h = Math.atan2(FO[0] - sx, FO[1] - sz);
+  const [sx, sz, h] = startSpot();
   const mine = new Vehicle('sport', '#d0141a', sx, sz, h); mine.moved = true;
   for (const v of VEH.slice()) if (v !== mine && hyp(v.x - mine.x, v.z - mine.z) < 7) v.remove();
   P.x = mine.x + Math.cos(h) * 2.4; P.z = mine.z - Math.sin(h) * 2.4; if (inBuilding(P.x, P.z, 0.5)) { P.x = mine.x - Math.cos(h) * 2.4; P.z = mine.z + Math.sin(h) * 2.4; }
@@ -3345,6 +3348,32 @@ function setupWorld(saved) {
   pedTgt = pedTarget(); for (let i = 0; i < pedTgt; i++) spawnPed(true); // the first crowd around the start, not scattered over the whole map
   for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePed(p);
 }
+// ---------------------------------------------------------------- cheat codes, typed in the pause menu
+function ferari(x, z, h) { // a red Ferari at (x,z), clearing whatever is parked on that spot
+  for (const o of VEH.slice()) if (o !== P.car && hyp(o.x - x, o.z - z) < 5) o.remove();
+  const v = new Vehicle('sport', '#d0141a', x, z, h); v.moved = true; v.y = surfAt(x, z); v.sync(); return v;
+}
+function cheatRespawn() { // back to the start: via Yuri Gagarin, on foot next to the Ferari, no stars
+  if (P.car) { P.car.driver = null; P.car.boost = false; P.car.inp = { thr: 0, brk: 0, steer: 0, hand: 1 }; P.car = null; }
+  const [sx, sz, h] = startSpot(); tileTick(sx, sz, 0, 420);
+  const mine = ferari(sx, sz, h);
+  P.x = mine.x + Math.cos(h) * 2.4; P.z = mine.z - Math.sin(h) * 2.4; if (inBuilding(P.x, P.z, 0.5)) { P.x = mine.x - Math.cos(h) * 2.4; P.z = mine.z + Math.sin(h) * 2.4; }
+  P.h = h; P.y = surfAt(P.x, P.z); P.mode = 'foot'; P.model.g.visible = true; P.hp = 100; P.knock = 0; P.vx = P.vz = P.vy = 0;
+  W.heat = 0; W.stars = 0; W.busted = 0; W.bustT = 0;
+  camInit = false; banner('Via Yuri Gagarin', 'MEDA');
+}
+function cheatFerari() { // on foot: a Ferari right in front of you; driving: whatever you are in turns into one
+  if (P.car) {
+    const o = P.car; o.driver = null; o.boost = false; P.car = null; o.remove();
+    const v = ferari(o.x, o.z, o.h); v.driver = 'player'; v.sleep = false; P.car = v;
+  } else {
+    const fx = Math.sin(P.h), fz = Math.cos(P.h); let x = P.x + fx * 4, z = P.z + fz * 4;
+    if (inBuilding(x, z, 1.2)) { x = P.x - fx * 4; z = P.z - fz * 4; }
+    ferari(x, z, P.h);
+  }
+  toast('🏎 Ferari!');
+}
+const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };
 let last = performance.now(), acc = 0;
 function frame(t) {
   requestAnimationFrame(frame);
