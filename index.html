@@ -1527,10 +1527,25 @@ const LANDMARKS = [
   { n: 'Chiesa di San Vittore', x: 99.9, z: -755.1, f: [83.9, -763.5, 94.0, -772.2], build: buildSanVittore },
   { n: 'Santuario del Santo Crocefisso', x: 93.3, z: -822.4, f: [89.0, -801.2, 71.6, -815.9], tower: [67.5, -825.0], build: buildCrocifisso },
   { n: 'Chiesa di San Pietro Martire', x: -736.7, z: 466.7, build: buildSanPietroMeda }, // via San Carlo, by the level crossing on the Seveso border
+  { n: 'Santi Nazaro e Celso', x: -755.6, z: 199.2, f: [-760.3, 202.5, -760.2, 195.8], build: buildNazaroCelso },
+  { n: 'Santuario di San Pietro Martire', x: -737.4, z: 743.4, f: [-761.6, 744.4, -756.9, 724.6], also: [[-758.8, 748.8]], build: buildChiesaNeo, // Seveso, with the seminary; the 41 m tower is its own footprint
+    o: { col: '#e3d9c6', trim: '#f3eee4', E: 15, E1: 9.5, UH: 6.5, uw: 5.5, niches: true, tower: { at: [-758.8, 748.8], w: 5.6, h: 32, clock: true, top: 'dome' } } },
+  { n: 'Chiesa dei Santi Gervaso e Protaso', x: -1246.5, z: 1553.4, f: [-1276.2, 1558.7, -1275.9, 1546.7], build: buildChiesaNeo,
+    o: { col: '#f2f0ea', trim: '#c9c4b8', E: 12, E1: 10, UH: 7, uw: 5.2, rose: true, obelisks: true, tower: { at: [-1236.0, 1561.0], w: 4.5, h: 24, clock: true, top: 'drum' } } },
+  { n: 'Chiesa della Beata Vergine Immacolata', x: 881.5, z: 1959.8, f: [878.5, 1942.5, 886.8, 1944.5], build: buildChiesaRom, o: { col: '#e2bf6a', trim: '#efe2c0', E: 11, recess: '#d6b05c' } }, // Baruccana
+  { n: 'Chiesa di San Giacomo', x: 1181.3, z: -451.7, f: [1163.8, -443.5, 1175.9, -470.2], len: 25.1, build: buildSanGiacomo },
+  { n: 'Cappella di San Pietro da Verona Martire', x: -1707.0, z: 680.5, ry: 0.6, build: buildCappellaSPM },
+  { n: 'Villa Bianca', x: -1611.1, z: 936.5, build: buildVillaBianca },
+  { n: 'Villa Dho', x: -1619.6, z: 1642.0, build: buildPalazzo, o: { style: 'dho', h: 11, front: [-1600.5, 1643.9], portal: 'portico', arches: 3, ped: { w: 9, h: 2.4 }, belv: { w: 4.6, d: 4.6, h: 6.5, flat: true } } },
+  { n: 'Villa Besana', x: 326.2, z: -551.4, build: buildPalazzo, o: { style: 'besana', portal: 'door', balcony: 'stone', balconyW: 11, flat: true } },
+  { n: 'Casa Ferrario', x: 475.7, z: -957.0, build: buildPalazzo, o: { style: 'ferrario', h: 8.2, portal: 'door', tower: { at: [479.6, -963.0], w: 4.2, h: 6.0 } } },
 ];
 const LM_GLOW = []; // { m, a, b }: emissive a by day, a + b once the street lamps are on
 for (const L of LANDMARKS) {
-  for (const T of TILES) for (const b of T.bld) { const [cx, cz] = centroid(b.pts); if (hyp(cx - L.x, cz - L.z) < 2) { b.lm = L; L.b = b; L.t = T.t; } }
+  for (const T of TILES) for (const b of T.bld) {
+    const [cx, cz] = centroid(b.pts); if (hyp(cx - L.x, cz - L.z) < 2) { b.lm = L; L.b = b; L.t = T.t; }
+    for (const [ax, az] of L.also || []) if (hyp(cx - ax, cz - az) < 2) b.lm = L; // extra footprints the model replaces, e.g. a bell tower mapped on its own
+  }
   const p = D.pois.find(q => q.n === L.n); if (p) p.lm = L; // no generic shop sign on it
 }
 function buildLandmarks(T, G) { for (const L of LANDMARKS) if (L.t === T.t) L.build(L, L.b, G); }
@@ -1580,6 +1595,9 @@ const MUN_H = 12.7; // the facade drawing is laid out for these metres to the ea
 const PAL_STYLE = {
   municipio: { wall: '#e3be78', trim: '#efe3c9', shut: '#4f6b4c', plinth: '#aaa397', light: ['#c9a462', '#f0d494'], bugnato: true, ped: true },
   villa: { wall: '#eee5cf', trim: '#fbf8ef', shut: '#5d7a55', plinth: '#c9c1b0', light: ['#d9cfb8', '#f8f2e4'], gShut: true },
+  dho: { wall: '#dfbb63', trim: '#f4ead2', shut: '#3f5a3c', plinth: '#b9b09c', light: ['#c9a654', '#ecd08a'], gShut: true },
+  besana: { wall: '#d8c391', trim: '#c4bfb2', shut: '#9c978c', plinth: '#a9a397', light: ['#bfa977', '#e6d4a4'], gShut: true, ped: true },
+  ferrario: { wall: '#c23b2a', trim: '#e2b25a', shut: '#c23b2a', plinth: '#d9cfc0', light: ['#a83324', '#d4513c'], noShut: true },
 };
 const palTex = (st, lit) => canvasTex(128, 512, (g, w, h) => { // one bay, pavement to eaves; lit: the emissive map (lit windows only)
   const Y = m => h - m / MUN_H * h, R = (x0, m0, x1, m1, col) => { g.fillStyle = col; g.fillRect(x0, Y(m1), x1 - x0, Y(m0) - Y(m1)); };
@@ -1590,7 +1608,7 @@ const palTex = (st, lit) => canvasTex(128, 512, (g, w, h) => { // one bay, pavem
   if (st.bugnato) for (let m = 1.2; m < 4.4; m += 0.5) { R(0, m - 0.04, w, m, 'rgba(110,75,35,.45)'); R(0, m, w, m + 0.03, 'rgba(255,240,200,.35)'); }
   R(0, 4.36, w, 4.4, 'rgba(0,0,0,.2)'); R(0, 4.4, w, 4.8, CREAM); R(0, 8.76, w, 8.8, 'rgba(0,0,0,.2)'); R(0, 8.8, w, 9.05, CREAM); R(0, 12.1, w, MUN_H, CREAM); R(0, 12.06, w, 12.1, 'rgba(0,0,0,.2)');
   const win = (x0, m0, x1, m1, bars) => { R(x0 - 4, m0 - 0.15, x1 + 4, m1 + 0.15, CREAM); R(x0, m0, x1, m1, GLASS); R(62, m0, 66, m1, CREAM); R(x0, (m0 + m1) / 2 + 0.3, x1, (m0 + m1) / 2 + 0.36, CREAM); if (bars) for (let x = x0 + 4; x < x1; x += 7) R(x, m0, x + 1.5, m1, '#15171a'); };
-  const shutters = (m0, m1) => { for (const x of [18, 88]) { R(x, m0, x + 22, m1, st.shut); for (let m = m0 + 0.08; m < m1; m += 0.12) R(x + 2, m, x + 20, m + 0.04, 'rgba(0,0,0,.25)'); } };
+  const shutters = (m0, m1) => { if (st.noShut) return; for (const x of [18, 88]) { R(x, m0, x + 22, m1, st.shut); for (let m = m0 + 0.08; m < m1; m += 0.12) R(x + 2, m, x + 20, m + 0.04, 'rgba(0,0,0,.25)'); } };
   if (st.gShut) shutters(1.3, 3.5); win(46, 1.3, 82, 3.5, !st.gShut); if (st.bugnato) R(58, 3.65, 70, 3.95, CREAM); // ground floor: grated with a keystone, or shuttered
   shutters(5.45, 7.75); win(46, 5.45, 82, 7.75); R(36, 5.1, 92, 5.3, '#e6d8bb'); R(34, 7.95, 94, 8.1, CREAM); // piano nobile: sill and cornice, a pediment on the municipio
   if (st.ped) { g.fillStyle = CREAM; g.beginPath(); g.moveTo(34, Y(8.1)); g.lineTo(94, Y(8.1)); g.lineTo(64, Y(8.62)); g.closePath(); g.fill(); g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(34, Y(8.1), 60, 2); }
@@ -1840,7 +1858,12 @@ function buildPalazzo(L, B, G) {
   };
   const rings = [[outer, false], ...holes.map(q => [q, true])];
   let d = 0.8; for (const t of [4.5, 3.5, 2.5, 1.5]) if (rings.every(([r, hole]) => lmInsetOK(r, lmOffset(r, hole ? -t : t)))) { d = t; break; }
-  walls(outer, false, bot, top, fi); for (const q of holes) walls(q, true, bot, top, -1); hip(rings, top, d);
+  walls(outer, false, bot, top, fi); for (const q of holes) walls(q, true, bot, top, -1);
+  const flatTop = (ring, y) => { // flat roof behind a parapet
+    try { polyFill(trim, ring, [], y + 0.02, 2, COL('#8d8a84')); } catch (e) { }
+    for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln > 0.1) addBox(trim, (a[0] + c[0]) / 2, y + 0.45, (a[1] + c[1]) / 2, Ln + 0.25, 0.9, 0.25, CREAM, Math.atan2(-(c[1] - a[1]) / Ln, (c[0] - a[0]) / Ln)); }
+  };
+  if (o.flat) flatTop(outer, top); else hip(rings, top, d);
   // the front, in its own frame: x to the right of someone facing it, z out of the wall, y up from the pavement; centred on the bay of the entrance
   const a = outer[fi], c = outer[(fi + 1) % n], Ln = hyp(c[0] - a[0], c[1] - a[1]), ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln;
   let nx = ez, nz = -ex; if (sArea(outer) < 0) { nx = -nx; nz = -nz; }
@@ -1862,7 +1885,7 @@ function buildPalazzo(L, B, G) {
     for (let i = 0; i <= na; i++) box((i - na / 2) * bw, yt / 2, 0.15, 0.55, yt, 0.3, CREAM);
     box(0, yt + 0.25, 0.18, na * bw + 0.6, 0.35, 0.36, CREAM); box(0, 0.06, 1.2, na * bw + 1.6, 0.16, 2.4, STONE);
   }
-  const by = 4.8 * k + 0.12, bwid = o.portal === 'portico' ? o.arches * bw + 0.4 : 4.4; // balcony on the piano nobile string course
+  const by = 4.8 * k + 0.12, bwid = o.balconyW || (o.portal === 'portico' ? o.arches * bw + 0.4 : 4.4); // balcony on the piano nobile string course
   if (o.balcony) {
     box(0, by, 0.6, bwid, 0.22, 1.2, STONE);
     for (let x = -bwid / 2 + 0.3; x <= bwid / 2 - 0.29; x += o.portal === 'portico' ? bw : 1.6) box(x, by - 0.35, 0.4, 0.3, 0.5, 0.8, STONE);
@@ -1887,7 +1910,16 @@ function buildPalazzo(L, B, G) {
   if (o.belv) { // belvedere: a room on the roof with the top-floor windows, its own hipped roof and brackets
     const { w, d: bd, h } = o.belv, sb = 1.0, P = (x, z) => { const v = new THREE.Vector3(x, 0, z).applyMatrix4(M); return [v.x, v.z]; };
     const ring = [P(-w / 2, -sb), P(w / 2, -sb), P(w / 2, -sb - bd), P(-w / 2, -sb - bd)];
-    walls(ring, false, top - 0.4, top + h, -1, 2.6); hip([[ring, false]], top + h, bd / 2 - 0.05);
+    walls(ring, false, top - 0.4, top + h, -1, 2.6); if (o.belv.flat) flatTop(ring, top + h); else hip([[ring, false]], top + h, bd / 2 - 0.05);
+  }
+  if (o.ped) { // pediment over the middle of the front, with an oculus
+    const { w, h } = o.ped; F.face(trim, [[-w / 2, H - 0.1, 0.06], [w / 2, H - 0.1, 0.06], [0, H + h, 0.06]], 2, COL(st.wall)); F.geo(trim, new THREE.CircleGeometry(0.55, 14).translate(0, H + h * 0.38, 0.1), null, COL('#2b3038'));
+    for (const sd of [-1, 1]) F.geo(trim, new THREE.BoxGeometry(hyp(w / 2, h) + 0.4, 0.3, 0.6).rotateZ(-sd * Math.atan2(h, w / 2)).translate(sd * w / 4, H + h / 2, 0.2), null, CREAM);
+  }
+  if (o.tower) { // a corner tower with battlements
+    const { at: [tx, tz], w, h } = o.tower, q = [[tx - w / 2, tz - w / 2], [tx + w / 2, tz - w / 2], [tx + w / 2, tz + w / 2], [tx - w / 2, tz + w / 2]];
+    walls(q, false, bot, top, -1, 2.0); walls(q, false, top, top + h, -1, 2.0); try { polyFill(trim, q, [], top + h + 0.02, 2, COL('#8d8a84')); } catch (e) { }
+    for (let i = 0; i < 4; i++) { const a = q[i], c = q[(i + 1) % 4]; for (let t = 0; t < 4; t++) { const u = (t + 0.5) / 4; addBox(trim, lerp(a[0], c[0], u), top + h + 0.45, lerp(a[1], c[1], u), 0.6, 0.9, 0.6, COL(st.wall)); } }
   }
   const flagTex = canvasTex(256, 64, (g, w, h) => {
     for (const [i, col] of [[0, '#009246'], [1, '#f1f2f1'], [2, '#ce2b37']]) { g.fillStyle = col; g.fillRect(i * w / 6, 0, w / 6 + 1, h); } // u runs from the pole (hoist) to the fly
@@ -2097,6 +2129,164 @@ function buildSanPietroMeda(L, B, G) {
   tt(lmBox(1.0, 0.35, 0.8, -(CW + PW / 2), 7.8, 0.75), WHITE); lmStatue(T, Bs.trim, -(CW + PW / 2), 7.95, 0.75, 1.15, BRONZE); // San Pietro Martire, Giancarlo Fontana
   for (let k = 0; k < 4; k++) tt(lmBox(14 - 2 * k, 0.15, 1.2 + 0.0 * k, 0, 0.15 * k - 0.05, 2.0 + 1.2 * (3 - k) / 2), COL('#cfc8b8')); // the sagrato steps
   mkMesh(Bs.buff, LMAT.buff, 10, 'cast', G); mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G); mkMesh(Bs.lattice, LMAT.lattice, 10, false, G); mkMesh(Bs.louvre, LMAT.louvre, 10, false, G);
+}
+
+// ---------------------------------------------------------------- generic pieces for the smaller churches: body on the footprint, facades, bell towers
+const skelTex = canvasTex(64, 128, (g, w, h) => { // the danse macabre panels of Santi Nazaro e Celso: a white skeleton on red ochre
+  g.fillStyle = '#c4785c'; g.fillRect(0, 0, w, h); g.strokeStyle = '#efe6d6'; g.fillStyle = '#efe6d6'; g.lineWidth = 3;
+  g.beginPath(); g.arc(32, 22, 8, 0, TAU); g.fill(); g.beginPath(); g.moveTo(32, 30); g.lineTo(32, 76); g.moveTo(20, 40); g.lineTo(44, 40); g.moveTo(22, 48); g.lineTo(42, 48); g.moveTo(24, 56); g.lineTo(40, 56);
+  g.moveTo(20, 40); g.lineTo(14, 70); g.moveTo(44, 40); g.lineTo(52, 66); g.moveTo(32, 76); g.lineTo(22, 116); g.moveTo(32, 76); g.lineTo(42, 116); g.moveTo(52, 30); g.lineTo(52, 100); g.stroke();
+  g.strokeStyle = '#8a3a2a'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
+}, false);
+const madonnaTex = canvasTex(128, 64, (g, w, h) => { g.fillStyle = '#d9c19a'; g.fillRect(0, 0, w, h); g.fillStyle = '#2f4f86'; g.beginPath(); g.moveTo(64, 14); g.lineTo(84, 64); g.lineTo(44, 64); g.fill(); g.fillStyle = '#e8c9a4'; g.beginPath(); g.arc(64, 14, 7, 0, TAU); g.fill(); g.strokeStyle = '#c9a54a'; g.lineWidth = 2; g.beginPath(); g.arc(64, 14, 10, 0, TAU); g.stroke(); g.fillStyle = '#7a2a2a'; g.fillRect(20, 30, 14, 34); g.fillRect(94, 30, 14, 34); }, false);
+LMAT.skel = new THREE.MeshLambertMaterial({ map: skelTex }); LMAT.madonna = new THREE.MeshLambertMaterial({ map: madonnaTex });
+// walls on the footprint ring (plaster or brick), cornice, hipped roof of coppi from the eaves to a crest; returns the crest height
+function lmBody(F, Bs, ring, y0, E, o = {}) {
+  const A = sArea(ring), wb = Bs[o.wall || 'plaster'];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.2) continue;
+    let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
+    F.face(wb, [[a[0], y0, a[1]], [c[0], y0, c[1]], [c[0], E, c[1]], [a[0], E, a[1]]], 2, o.col);
+    if (o.trim) F.geo(Bs.trim, lmBox(Ln + 0.3, 0.35, 0.4, 0, E - 0.18, 0).rotateY(Math.atan2(-(c[1] - a[1]) / Ln, (c[0] - a[0]) / Ln)).translate((a[0] + c[0]) / 2 + nx * 0.15, 0, (a[1] + c[1]) / 2 + nz * 0.15), null, o.trim);
+  }
+  let d = 0.6; for (const t of [o.d || 5, 4, 3, 2, 1.2]) if (lmInsetOK(ring, lmOffset(ring, t))) { d = t; break; }
+  const oo = lmOffset(ring, -(o.over || 0.6)), r = lmOffset(ring, d), yr = E + (o.slope || 0.45) * (d + (o.over || 0.6)), rb = Bs[o.roof || 'coppi'];
+  for (let i = 0; i < ring.length; i++) { const j = (i + 1) % ring.length; F.face(rb, [[oo[i][0], E, oo[i][1]], [oo[j][0], E, oo[j][1]], [r[j][0], yr, r[j][1]], [r[i][0], yr, r[i][1]]], 2, o.roofCol); }
+  try { F.face(rb, r.map(p => [p[0], yr, p[1]]), 2, o.roofCol); } catch (e) { }
+  return yr;
+}
+// a plastered bell tower in its own frame: lesene, string courses, clock faces, open belfry, cornice, then a lead dome, a drum with a little dome, or a spire
+function lmTower(T, Bs, o) {
+  const w = o.w, h = o.h, col = COL(o.col), tr = COL(o.trim), tw = (g, c) => T.geo(Bs.trim, g, null, c), BT = h + 4.2, CORN = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  T.geo(Bs.plaster, lmBox(w, h + 1.5, w, 0, (h - 1.5) / 2, 0), boxUV(2), col);
+  for (const [x, z] of CORN) tw(lmBox(0.55, h + 1.5, 0.55, x * (w / 2 - 0.15), (h - 1.5) / 2, z * (w / 2 - 0.15)), tr);
+  for (let y = h / 3; y < h; y += h / 3) tw(lmBox(w + 0.25, 0.3, w + 0.25, 0, y, 0), tr);
+  tw(lmBox(w + 0.6, 0.5, w + 0.6, 0, h + 0.25, 0), tr);
+  for (const [x, z] of CORN) tw(lmBox(1.0, BT - h - 0.5, 1.0, x * (w / 2 - 0.5), (h + 0.5 + BT) / 2, z * (w / 2 - 0.5)), col);
+  tw(lmBox(w - 1.6, BT - h - 0.5, w - 1.6, 0, (h + 0.5 + BT) / 2, 0), COL('#2a2826'));
+  for (let k = 0; k < 4; k++) {
+    const a = k * Math.PI / 2; tw(lmBox(w - 0.2, 0.8, 0.4, 0, BT - 0.4, w / 2 - 0.2).rotateY(a), col);
+    if (o.clock) { T.geo(Bs.clock, new THREE.CircleGeometry(w * 0.2, 20).translate(0, h - w * 0.35, w / 2 + 0.03).rotateY(a)); tw(new THREE.RingGeometry(w * 0.2, w * 0.24, 20).translate(0, h - w * 0.35, w / 2 + 0.02).rotateY(a), tr); }
+  }
+  tw(lmBox(w + 0.6, 0.5, w + 0.6, 0, BT + 0.25, 0), tr);
+  let y = BT + 0.5;
+  if (o.top === 'drum') { T.geo(Bs.plaster, new THREE.CylinderGeometry(w * 0.32, w * 0.34, 2.2, 12).translate(0, y + 1.1, 0), boxUV(2), col); y += 2.2; tw(new THREE.SphereGeometry(w * 0.36, 12, 6, 0, TAU, 0, Math.PI / 2).translate(0, y, 0), COL('#8b8d92')); y += w * 0.36; }
+  else if (o.top === 'spire') { tw(new THREE.ConeGeometry(w * 0.62, w * 1.4, 4).rotateY(Math.PI / 4).translate(0, y + w * 0.7, 0), COL(o.spire || '#a24a35')); y += w * 1.4; }
+  else { tw(new THREE.SphereGeometry(w * 0.5, 14, 7, 0, TAU, 0, Math.PI / 2).scale(1, 0.8, 1).translate(0, y, 0), COL('#5d6168')); y += w * 0.4; }
+  tw(new THREE.SphereGeometry(0.22, 8, 6).translate(0, y + 0.15, 0), COL('#c9a54a')); lmCross(T, Bs.trim, 0, y + 0.3, 0, 1.0, COL('#3c3c40'));
+}
+const lmBuffers = () => ({ plaster: Buf(), coppi: Buf(), trim: Buf(), warm: Buf(), clock: Buf(), brick: Buf(), skel: Buf(), madonna: Buf() });
+function lmFlush(Bs, G) {
+  for (const [k, m, sh] of [['plaster', LMAT.plaster, 'cast'], ['coppi', LMAT.coppi, 'cast'], ['trim', LMAT.trim, 'cast'], ['brick', LMAT.brick, 'cast'], ['warm', LMAT.warm, false], ['clock', LMAT.clock, false], ['skel', LMAT.skel, false], ['madonna', LMAT.madonna, false]]) if (Bs[k].i.length) mkMesh(Bs[k], m, 10, sh, G);
+}
+
+// neoclassical two-order facade of the Brianza parish churches: pilasters, portal, niches with saints, upper order with a window or a rose,
+// pediment with statues and urns; L.o: { col, trim, E1 (lower order top), UH (upper order height), uw (its half width), rose, niches, obelisks, tower }
+function buildChiesaNeo(L, B, G) {
+  const { F, W2, ry } = lmChurchFrame(L), o = L.o, Bs = lmBuffers(), F0 = lmFrame(new THREE.Matrix4());
+  const ring = lmSimplify(B.pts, 0.5), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), COLW = COL(o.col), TRIM = COL(o.trim), STAT = COL('#ece8e0'), DOOR = COL('#4a3426');
+  lmBody(F0, Bs, ring, gy - 1, gy + o.E, { col: COLW, trim: TRIM, d: 4 });
+  const box = (w, h, d, x, y, z, c = TRIM) => F.geo(Bs.trim, lmBox(w, h, d, x, y, z), null, c), wallP = pts => F.face(Bs.plaster, pts, 2, COLW);
+  const E1 = o.E1, U1 = E1 + 0.9, T0 = U1 + o.UH, T1 = T0 + 0.8, uw = o.uw, AP = T1 + uw * 0.5;
+  wallP([[-W2, -1.5, 0.02], [W2, -1.5, 0.02], [W2, E1, 0.02], [-W2, E1, 0.02]]); wallP([[-uw, U1 - 0.1, 0.02], [uw, U1 - 0.1, 0.02], [uw, T1, 0.02], [-uw, T1, 0.02]]); wallP([[-uw - 0.3, T1, 0.02], [uw + 0.3, T1, 0.02], [0, AP, 0.02]]);
+  const px = [-W2 + 0.4, -uw + 0.4, -1.9, 1.9, uw - 0.4, W2 - 0.4].filter((x, i, a) => a.findIndex(y => Math.abs(y - x) < 0.9) === i);
+  for (const x of px) { box(0.8, E1, 0.3, x, E1 / 2, 0.17); box(1.0, 0.45, 0.45, x, 0.22, 0.22); box(1.0, 0.4, 0.45, x, E1 - 0.2, 0.22); }
+  box(2 * W2 + 0.5, 0.9, 0.6, 0, E1 + 0.45, 0.3);
+  for (const x of [-uw + 0.35, -1.6, 1.6, uw - 0.35]) { box(0.7, T0 - U1, 0.28, x, (U1 + T0) / 2, 0.16); box(0.9, 0.35, 0.4, x, T0 - 0.18, 0.2); }
+  box(2 * uw + 0.5, 0.8, 0.6, 0, T0 + 0.4, 0.3); box(2 * uw + 0.9, 0.22, 0.85, 0, T1 - 0.05, 0.4);
+  // portal: arched door in a frame under a small pediment
+  F.geo(Bs.trim, new THREE.ShapeGeometry(archShape(3.1, 0, 6.0), 12).translate(0, 0, 0.05), null, TRIM); box(2.5, 4.6, 0.1, 0, 2.3, 0.08, DOOR);
+  F.geo(Bs.madonna, new THREE.CircleGeometry(1.15, 14, 0, Math.PI).translate(0, 4.65, 0.1)); box(3.8, 0.3, 0.5, 0, 6.3, 0.25);
+  if (o.niches) for (const sd of [-1, 1]) { const x = sd * (uw > 4.2 ? 3.6 : W2 - 1.6); F.geo(Bs.trim, new THREE.ShapeGeometry(archShape(1.1, 2.0, 5.2), 10).translate(x, 0, 0.04), null, COL('#cfc4ae')); lmStatue(F, Bs.trim, x, 2.1, 0.3, 1.3, STAT); }
+  if (o.rose) { F.geo(Bs.warm, new THREE.CircleGeometry(1.6, 20).translate(0, (U1 + T0) / 2, 0.06)); F.geo(Bs.trim, new THREE.RingGeometry(1.6, 2.1, 24).translate(0, (U1 + T0) / 2, 0.05), null, TRIM); for (let k = 0; k < 8; k++) F.geo(Bs.trim, lmBox(0.08, 3.2, 0.06, 0, 0, 0).rotateZ(k * Math.PI / 8).translate(0, (U1 + T0) / 2, 0.08), null, TRIM); }
+  else { F.geo(Bs.trim, new THREE.ShapeGeometry(archShape(1.9, U1 + 1.2, U1 + 4.6), 10).translate(0, 0, 0.04), null, TRIM); F.geo(Bs.warm, new THREE.ShapeGeometry(archShape(1.4, U1 + 1.45, U1 + 4.35), 10).translate(0, 0, 0.06)); }
+  for (const sd of [-1, 1]) {
+    if (W2 > uw + 0.6) { const v = new THREE.Shape(); v.moveTo(sd * uw, U1 - 0.1); v.lineTo(sd * (W2 - 0.2), U1 - 0.1); v.quadraticCurveTo(sd * (uw + 0.3), U1 + 0.4, sd * uw, U1 + Math.min(3.2, o.UH * 0.6)); v.lineTo(sd * uw, U1 - 0.1); F.geo(Bs.trim, new THREE.ShapeGeometry(v, 8).translate(0, 0, 0.03), null, COLW); lmUrn(F, Bs.trim, sd * (W2 - 0.4), U1 - 0.1, 0.3, 1.0, TRIM); }
+    const sl = hyp(uw + 0.3, AP - T1), ang = Math.atan2(AP - T1, uw + 0.3);
+    F.geo(Bs.trim, new THREE.BoxGeometry(sl + 0.4, 0.3, 0.7).rotateZ(-sd * ang).translate(sd * (uw + 0.3) / 2, (T1 + AP) / 2 + 0.15, 0.2), null, TRIM);
+    lmStatue(F, Bs.trim, sd * uw, T1, 0.25, 1.2, STAT);
+    if (o.obelisks) F.geo(Bs.trim, new THREE.ConeGeometry(0.45, 3.2, 4).rotateY(Math.PI / 4).translate(sd * (W2 - 0.5), E1 + 0.9 + 1.6, 0.3), null, TRIM);
+  }
+  F.geo(Bs.trim, new THREE.CircleGeometry(0.6, 14).translate(0, T1 + 1.0, 0.05), null, TRIM); box(0.5, 0.4, 0.5, 0, AP + 0.1, 0.1); lmCross(F, Bs.trim, 0, AP + 0.3, 0.1, 1.3, COL('#5b5c60'));
+  for (let k = 0; k < 3; k++) box(2 * W2 + 1.6 - k * 0.8, 0.15 * (k + 1) + 0.4, 2.6 - 0.8 * k, 0, (0.15 * (k + 1) - 0.4) / 2, 1.3 - 0.4 * k, COL('#cfc6b2'));
+  if (o.tower) { const [tx, tz] = o.tower.at; lmTower(lmFrame(new THREE.Matrix4().makeRotationY(ry).setPosition(tx, groundH(tx, tz), tz)), Bs, { col: o.col, trim: o.trim, ...o.tower }); }
+  lmFlush(Bs, G);
+}
+// Santi Nazaro e Celso: the little church of the old Farga, gable roof on wide wooden eaves, skeletons and the Madonna painted on the front, a glazed lantern for a bell
+function buildNazaroCelso(L, B, G) {
+  const { F, W2 } = lmChurchFrame(L), Bs = lmBuffers(), ring = lmSimplify(B.pts, 0.3), F0 = lmFrame(new THREE.Matrix4()), gy = Math.min(...ring.map(p => groundH(p[0], p[1])));
+  const W = COL('#ddb48e'), ED = COL('#c27a5a'), WOOD = COL('#4b3a2c'), E = 4.6, R = 6.9, LEN = 8.3;
+  lmBody(F0, Bs, ring, gy - 1, gy + E, { col: COL('#e8d7bd'), d: 3, over: 0.9, slope: 0.55 });
+  F.face(Bs.plaster, [[-W2, -1, 0.02], [W2, -1, 0.02], [W2, E, 0.02], [0, R, 0.02], [-W2, E, 0.02]], 2, W);
+  for (const sd of [-1, 1]) { // wide eaves over the front, rafters showing
+    F.face(Bs.coppi, [[sd * (W2 + 0.8), E - 0.35, 1.2], [0, R + 0.15, 1.2], [0, R + 0.15, -LEN], [sd * (W2 + 0.8), E - 0.35, -LEN]]);
+    F.geo(Bs.trim, new THREE.BoxGeometry(hyp(W2 + 0.8, R - E + 0.5) + 0.2, 0.35, 0.25).rotateZ(-sd * Math.atan2(R - E + 0.5, W2 + 0.8)).translate(sd * (W2 + 0.8) / 2, (R + E) / 2 - 0.15, 1.1), null, WOOD);
+    F.geo(Bs.skel, new THREE.PlaneGeometry(1.3, 2.6).translate(sd * 2.0, 2.6, 0.05)); F.geo(Bs.trim, lmBox(0.1, E, 0.06, sd * (W2 - 0.25), E / 2, 0.04), null, ED);
+  }
+  F.geo(Bs.trim, lmBox(1.6, 2.8, 0.1, 0, 1.4, 0.06), null, COL('#3c5654')); F.geo(Bs.trim, lmBox(2.0, 3.1, 0.06, 0, 1.55, 0.03), null, COL('#bcb3a2'));
+  F.geo(Bs.madonna, new THREE.CircleGeometry(1.0, 14, 0, Math.PI).translate(0, 3.35, 0.05)); F.geo(Bs.trim, lmBox(1.6, 0.5, 0.06, 0, 5.3, 0.04), null, COL('#e2c9a0'));
+  for (let k = 0; k < 2; k++) F.geo(Bs.trim, lmBox(4.0 - k, 0.15, 1.2 - 0.5 * k, 0, 0.07 + 0.15 * k - 0.05, 0.6 - 0.25 * k), null, COL('#a9a397'));
+  // the glazed bell lantern at the front of the ridge
+  F.geo(Bs.trim, lmBox(1.0, 0.25, 1.0, 0, R + 0.15, -1.0), null, WOOD); F.geo(Bs.warm, new THREE.CylinderGeometry(0.45, 0.45, 0.8, 6).translate(0, R + 0.7, -1.0));
+  F.geo(Bs.trim, new THREE.ConeGeometry(0.75, 0.55, 6).translate(0, R + 1.35, -1.0), null, COL('#2f3d38')); lmCross(F, Bs.trim, 0, R + 1.6, -1.0, 0.9, COL('#2b2b2e'));
+  lmFlush(Bs, G);
+}
+// a neo-romanesque front: plain gable with hanging arches, a great arch round the portal and the three lancets, a little bell spire on the apex
+function buildChiesaRom(L, B, G) {
+  const { F, W2 } = lmChurchFrame(L), o = L.o, Bs = lmBuffers(), ring = lmSimplify(B.pts, 0.5), F0 = lmFrame(new THREE.Matrix4()), gy = Math.min(...ring.map(p => groundH(p[0], p[1])));
+  const W = COL(o.col), TR = COL(o.trim), E = o.E, AP = o.E + W2 * 0.75;
+  lmBody(F0, Bs, ring, gy - 1, gy + E - 1.5, { col: W, trim: TR, d: 4 });
+  F.face(Bs.plaster, [[-W2, -1, 0.02], [W2, -1, 0.02], [W2, E, 0.02], [0, AP, 0.02], [-W2, E, 0.02]], 2, W);
+  for (const sd of [-1, 1]) {
+    F.geo(Bs.trim, lmBox(0.7, E, 0.35, sd * (W2 - 0.35), E / 2, 0.18), null, W);
+    const sl = hyp(W2, AP - E), ang = Math.atan2(AP - E, W2); F.geo(Bs.trim, new THREE.BoxGeometry(sl + 0.3, 0.3, 0.5).rotateZ(-sd * ang).translate(sd * W2 / 2, (E + AP) / 2 + 0.1, 0.2), null, TR);
+    for (let t = 0.08; t < 0.95; t += 0.09) F.geo(Bs.trim, new THREE.RingGeometry(0.22, 0.32, 8, 1, Math.PI, Math.PI).translate(sd * W2 * (1 - t), E + (AP - E) * t - 0.45, 0.05), null, TR); // archetti pensili
+  }
+  const aw = Math.min(5.2, W2 * 1.2), atop = E + 1.4;
+  F.geo(Bs.trim, new THREE.ShapeGeometry(archShape(aw + 0.6, 0, atop + 0.3), 14).translate(0, 0, 0.03), null, TR); F.geo(Bs.plaster, new THREE.ShapeGeometry(archShape(aw, 0, atop), 14).translate(0, 0, 0.06), null, COL(o.recess || o.col));
+  F.geo(Bs.trim, new THREE.ShapeGeometry(archShape(2.6, 0, 4.6), 10).translate(0, 0, 0.08), null, TR); F.geo(Bs.trim, lmBox(2.0, 3.6, 0.08, 0, 1.8, 0.12), null, COL('#4a3426'));
+  F.geo(Bs.madonna, new THREE.CircleGeometry(0.95, 12, 0, Math.PI).translate(0, 3.65, 0.12)); F.geo(Bs.trim, lmBox(aw - 0.4, 0.25, 0.3, 0, 5.4, 0.15), null, TR);
+  for (const x of [-0.85, 0, 0.85]) F.geo(Bs.warm, new THREE.ShapeGeometry(archShape(0.5, 6.0, x ? 8.4 : 8.9), 6).translate(x, 0, 0.1));
+  F.geo(Bs.trim, lmBox(0.8, 0.8, 0.8, 0, AP + 0.3, -0.2), null, TR); F.geo(Bs.trim, new THREE.ConeGeometry(0.5, 2.2, 6).translate(0, AP + 1.8, -0.2), null, COL('#8c8a86')); lmCross(F, Bs.trim, 0, AP + 2.8, -0.2, 0.8, COL('#2b2b2e'));
+  for (let k = 0; k < 2; k++) F.geo(Bs.trim, lmBox(aw + 2 - k, 0.15, 1.8 - 0.6 * k, 0, 0.07 + 0.15 * k - 0.05, 0.9 - 0.3 * k), null, COL('#bdb6a8'));
+  lmFlush(Bs, G);
+}
+// San Giacomo, Meda: the brick hall of the seventies under a metal gable, the big round window of louvres on the end, the cross on its pole
+function buildSanGiacomo(L, B, G) {
+  const { F, W2 } = lmChurchFrame(L), Bs = lmBuffers(), ring = lmSimplify(B.pts, 0.5), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), F0 = lmFrame(new THREE.Matrix4());
+  const E = 6.2, R = 9.6, LEN = L.len, ROOF = COL('#4f5357');
+  for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length]; F0.face(Bs.brick, [[a[0], gy - 1, a[1]], [c[0], gy - 1, c[1]], [c[0], gy + E, c[1]], [a[0], gy + E, a[1]]]); }
+  for (const z of [0, -LEN]) F.face(Bs.brick, [[-W2, E, z], [W2, E, z], [0, R, z]]);
+  for (const sd of [-1, 1]) F.face(Bs.trim, [[sd * (W2 + 0.5), E - 0.25, 0.4], [0, R + 0.1, 0.4], [0, R + 0.1, -LEN - 0.4], [sd * (W2 + 0.5), E - 0.25, -LEN - 0.4]], 2, ROOF);
+  F.geo(Bs.trim, new THREE.CircleGeometry(1.9, 24).translate(0, 4.6, 0.06), null, COL('#d9d6cf')); for (let k = 0; k < 9; k++) F.geo(Bs.trim, lmBox(3.2, 0.12, 0.08, 0, 4.6 - 1.4 + k * 0.35, 0.09), null, COL('#6d7075'));
+  F.geo(Bs.trim, lmBox(1.8, 2.6, 0.1, -W2 + 2.5, 1.3, 0.06), null, COL('#8f9499')); F.geo(Bs.trim, lmBox(2.2, 0.2, 1.4, -W2 + 2.5, 2.8, 0.7), null, COL('#cfcac0'));
+  F.geo(Bs.trim, lmBox(0.18, 6.0, 0.18, W2 - 1.0, R - 2.0, -1.5), null, COL('#3a3a3c')); F.geo(Bs.trim, lmBox(2.2, 0.16, 0.16, W2 - 1.0, R + 0.4, -1.5), null, COL('#3a3a3c'));
+  for (let z = -3; z > -LEN + 2; z -= 4.2) for (const sd of [-1, 1]) F.geo(Bs.warm, new THREE.PlaneGeometry(0.6, 3.2).rotateY(sd * Math.PI / 2).translate(sd * (W2 + 0.05), 2.6, z));
+  lmFlush(Bs, G);
+}
+// the Cappella di San Pietro da Verona at the edge of Seveso: a white cube under a pyramid of coppi, a grated round window and door in stone frames
+function buildCappellaSPM(L, B, G) {
+  const ring = lmSimplify(B.pts, 0.3), F0 = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), [cx, cz] = centroid(ring);
+  lmBody(F0, Bs, ring, gy - 1, gy + 4.4, { col: COL('#f0eee8'), trim: COL('#e6e2da'), d: 3.2, over: 0.5, slope: 0.62 });
+  const T = lmFrame(new THREE.Matrix4().makeRotationY(L.ry).setPosition(cx, gy, cz)), STONE = COL('#bdb6a8');
+  T.geo(Bs.trim, new THREE.ShapeGeometry(archShape(1.2, 1.9, 3.3), 10).translate(0, 0, 3.05), null, STONE); T.geo(Bs.trim, new THREE.ShapeGeometry(archShape(0.9, 2.05, 3.15), 10).translate(0, 0, 3.08), null, COL('#2c2a28'));
+  T.geo(Bs.trim, lmBox(1.3, 2.4, 0.1, 0, 1.2, 0).translate(3.05, 0, 0).rotateY(0), null, STONE); T.geo(Bs.trim, lmBox(0.1, 2.2, 1.0, 3.1, 1.1, 0), null, COL('#3a3027'));
+  lmFlush(Bs, G);
+}
+// Villa Bianca, Seveso (Giuseppe Terragni, 1937): white rationalist volumes, ribbon windows, the thin roof slab flying out over the terraces
+function buildVillaBianca(L, B, G) {
+  const ring = lmSimplify(B.pts, 0.4), F0 = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), A = sArea(ring);
+  const WHITE = COL('#f2f1ec'), GLASS = COL('#38424c'), TOP = gy + 7.6;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.3) continue;
+    let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
+    F0.face(Bs.plaster, [[a[0], gy - 1, a[1]], [c[0], gy - 1, c[1]], [c[0], TOP, c[1]], [a[0], TOP, a[1]]], 2, WHITE);
+    if (Ln > 3) for (const [y0, y1] of [[gy + 1.1, gy + 2.6], [gy + 4.6, gy + 6.4]]) { const m = 0.6, ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln; F0.face(Bs.trim, [[a[0] + ex * m + nx * 0.04, y0, a[1] + ez * m + nz * 0.04], [c[0] - ex * m + nx * 0.04, y0, c[1] - ez * m + nz * 0.04], [c[0] - ex * m + nx * 0.04, y1, c[1] - ez * m + nz * 0.04], [a[0] + ex * m + nx * 0.04, y1, a[1] + ez * m + nz * 0.04]], 2, GLASS); }
+  }
+  const o = lmOffset(ring, -1.8); F0.face(Bs.trim, o.map(p => [p[0], TOP + 0.6, p[1]]), 2, WHITE); F0.face(Bs.trim, o.map(p => [p[0], TOP + 0.3, p[1]]), 2, COL('#d8d6d0'));
+  for (let i = 0; i < o.length; i++) { const j = (i + 1) % o.length; F0.face(Bs.trim, [[o[i][0], TOP + 0.3, o[i][1]], [o[j][0], TOP + 0.3, o[j][1]], [o[j][0], TOP + 0.6, o[j][1]], [o[i][0], TOP + 0.6, o[i][1]]], 2, WHITE); }
+  for (const p of ring) F0.geo(Bs.trim, lmBox(0.3, 0.6, 0.3, p[0], TOP + 0.3, p[1]), null, WHITE);
+  lmFlush(Bs, G);
 }
 
 // ---------------------------------------------------------------- audio
