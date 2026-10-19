@@ -21,11 +21,14 @@ function sfxInit() {
   SFX.carRoar = loop(SFX.white, 'bandpass', 700, 0.8, SFX.car); SFX.carRoar.g.gain.value = 0.7;
   SFX.carEng = C.createOscillator(); SFX.carEng.type = 'sawtooth'; const el = C.createBiquadFilter(); el.type = 'lowpass'; el.frequency.value = 380; const eg = C.createGain(); eg.gain.value = 0.5;
   SFX.carEng.connect(el); el.connect(eg); eg.connect(SFX.car); SFX.carEng.start();
-  // tyre screech: a wobbling squeal over a hiss
+  // tyre screech: noise rung through two tread resonances (~720 and ~1300 Hz, the measured 500-1500 Hz squeal band),
+  // roughened by a ~45 Hz stick-slip chatter, plus a little hiss; no pure oscillator (a pure tone sounds like a voice)
   SFX.skid = C.createGain(); SFX.skid.gain.value = 0; SFX.skid.connect(AU.master);
-  SFX.skidO = C.createOscillator(); SFX.skidO.type = 'triangle'; SFX.skidO.frequency.value = 1050; const sb = C.createBiquadFilter(); sb.type = 'bandpass'; sb.frequency.value = 1200; sb.Q.value = 3;
-  SFX.skidO.connect(sb); sb.connect(SFX.skid); SFX.skidO.start();
-  SFX.skidN = loop(SFX.white, 'bandpass', 2600, 2.5, SFX.skid); SFX.skidN.g.gain.value = 0.9;
+  const chat = C.createGain(); chat.gain.value = 0.65; chat.connect(SFX.skid);
+  SFX.skidLfo = C.createOscillator(); SFX.skidLfo.type = 'triangle'; SFX.skidLfo.frequency.value = 45; const ld = C.createGain(); ld.gain.value = 0.35; SFX.skidLfo.connect(ld); ld.connect(chat.gain); SFX.skidLfo.start();
+  SFX.skidA = loop(SFX.white, 'bandpass', 720, 9, chat); SFX.skidA.g.gain.value = 8;
+  SFX.skidB = loop(SFX.white, 'bandpass', 1300, 11, chat); SFX.skidB.g.gain.value = 6; // narrow resonances keep little of the noise energy: gains measured offline to land at ~2/3 of the old tone's RMS
+  SFX.skidN = loop(SFX.white, 'bandpass', 2400, 1.2, SFX.skid); SFX.skidN.g.gain.value = 0.6;
   SFX.on = true;
 }
 // listener = the player, ears turned like the camera
@@ -112,7 +115,8 @@ function updSfx(dt) {
     if (car.inp.brk > 0 && car.fwdSpeed > 9) sk = Math.max(sk, clamp((car.fwdSpeed - 9) / 20, 0, 0.6));
     if (sk > 0 && !onAnyRoad(car.x, car.z, 2)) sk *= 0.15;
   }
-  SFX.skid.gain.setTargetAtTime(m * sk * 0.13, t, 0.05); SFX.skidO.frequency.setTargetAtTime(900 + sk * 300 + (Math.random() - 0.5) * 120, t, 0.03);
+  SFX.skid.gain.setTargetAtTime(m * sk * 0.13, t, 0.05);
+  if (sk > 0) { const j = () => 1 + (Math.random() - 0.5) * 0.12; SFX.skidA.f.frequency.setTargetAtTime((680 + sk * 90) * j(), t, 0.06); SFX.skidB.f.frequency.setTargetAtTime((1230 + sk * 140) * j(), t, 0.06); SFX.skidLfo.frequency.setTargetAtTime(38 + Math.random() * 16, t, 0.05); } // the resonances wander, the chatter is uneven
   if (!live) return;
   // footsteps: one per stride half, when the swinging leg comes down
   if (!car && P.knock <= 0) { const k = Math.floor(P.phase / Math.PI); if (k !== SFX.stepK) { SFX.stepK = k; if (Math.abs(P.speedNow || 0) > 0.5) sfxStep(Math.abs(P.speedNow) > 5); } }
