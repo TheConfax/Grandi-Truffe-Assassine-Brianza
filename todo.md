@@ -10,7 +10,8 @@ Le banchine (rialzate, pensiline, sottopasso, cartelli) ci sono in tutte e cinqu
 Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Street View mandati da chi gioca, o Mapillary con un token).
 
 ## Scuole
-- [ ] Scuole di Meda
+- [x] Scuole Traversi (Palazzo delle Scuole Professionali), con la zona della partenza: parcheggi a strisce, parco Fusetti arredato
+- [ ] Altre scuole di Meda: servono foto (Marie Curie, Anna Frank, Diaz, San Giorgio)
 - [ ] Seminario di San Pietro Martire, Seveso (il complesso accanto al santuario)
 - [ ] Scuole di Seveso
 
