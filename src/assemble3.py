@@ -126,6 +126,7 @@ s = s[:a] + """function parkTile(T) {
       add(m, x, z, Math.atan2(ux, uz) + (side < 0 ? Math.PI : 0)); kerb++;
     }
   }
+  parkCaserme(T);
 }
 function parkTick() {
   for (const T of TILES) {
@@ -209,7 +210,7 @@ rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode =
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
 rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { tileTick, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO };")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -432,6 +433,64 @@ fetch('https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza/co
 }).catch(() => { }); // offline or inside claude.ai: no version line
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>""")
+# ---- caserme: parked volanti and agents on foot at the Carabinieri stations and Polizia Locale headquarters
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'police3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("updWrecks(dt); updFuel(dt);", "updWrecks(dt); updFuel(dt); updCaserme(dt);")
+rep("  missionStep(dt);\n}", "  updCaserme2(dt); missionStep(dt);\n}")
+rep("    if (p.state === 'flee') { p.t -= dt; spd = 5;", "    if (p.cop) { spd = copStep(p, dt); if (spd < 0) continue; }\n    else if (p.state === 'flee') { p.t -= dt; spd = 5;")
+rep("if (v === P.car) { crime(1, W.stars === 0 ? 'Pirata della strada! La Polizia Locale ti cerca.' : null);", "if (v === P.car) { crime(p.cop ? 2.5 : 1, p.cop ? 'Hai investito un agente!' : W.stars === 0 ? 'Pirata della strada! La Polizia Locale ti cerca.' : null);")
+rep("let close = false; for (const c of cs) if (hyp(c.x - P.x, c.z - P.z) < 6.5 && c.speed < 4) close = true;", "let close = footCopClose(); for (const c of cs) if (hyp(c.x - P.x, c.z - P.z) < 6.5 && c.speed < 4) close = true;")
+rep("if (wasCop) crime(2.5, 'Hai rubato un\\'auto della Polizia Locale!');", "if (wasCop) crime(2.5, 'Hai rubato ' + (best.color === CC_COL ? CC_NAME : PL_NAME) + '!');")
+rep("else if (cops().some(c => hyp(c.x - P.x, c.z - P.z) < 50)) crime(", "else if (cops().some(c => hyp(c.x - P.x, c.z - P.z) < 50) || footCopNear(40)) crime(")
+rep("    if (best.fallen) {", "    if (best.caserma && !best.taken && best.driver !== 'ai') { best.taken = true; crime(2, null); const msg = 'Hai rubato ' + (best.caserma.cc ? CC_NAME : PL_NAME) + ' davanti alla caserma!'; setTimeout(() => toast(msg), 1800); }\n    if (best.fallen) {")
+rep("near.kind === 'police' ? 'ruba l\\'auto della Polizia' :", "near.kind === 'police' ? 'ruba ' + (near.color === CC_COL ? 'la gazzella dei Carabinieri' : 'l\\'auto della Polizia') :")
+rep("${near.driver === 'ai' ? (", "${near.caserma && !near.taken && near.driver !== 'ai' ? 'ruba ' + (near.caserma.cc ? 'la gazzella dei Carabinieri' : 'l\\'auto della Polizia Locale') : near.driver === 'ai' ? (")
+rep("}${best.spec.name} · fino a", "}${best.color === CC_COL ? 'Gazzella dei Carabinieri' : best.spec.name} · fino a")
+# busted: you walk out of the door of the caserma
+rep("const n = nearestNode(WALK_NODES, spot.x, spot.z); P.x = N[n][0]; P.z = N[n][1];", "const n = nearestNode(WALK_NODES, spot.x, spot.z); P.x = N[n][0]; P.z = N[n][1]; const cz = kind === 'busted' && CASERME.find(c => c.p === spot); if (cz) { [P.x, P.z] = cz.at(0, 2.4); P.h = Math.atan2(cz.nx, cz.nz); cz.force = true; }")
+
+# ---- cheat codes in the pause menu: RESPAWN back to the start in Meda with the Ferari, FERARI spawns one
+rep("""function setupWorld(saved) {""", """function startSpot() { // the parking on via Yuri Gagarin in Meda, facing the fountain
+  const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
+  const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
+  return [sx, sz, Math.atan2(FO[0] - sx, FO[1] - sz)];
+}
+function setupWorld(saved) {""")
+rep("""  const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
+  const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
+  const h = Math.atan2(FO[0] - sx, FO[1] - sz);
+  const mine""", """  const [sx, sz, h] = startSpot();
+  const mine""")
+rep("""let last = performance.now(), acc = 0;
+function frame(t) {""", """// ---------------------------------------------------------------- cheat codes, typed in the pause menu
+function ferari(x, z, h) { // a red Ferari at (x,z), clearing whatever is parked on that spot
+  for (const o of VEH.slice()) if (o !== P.car && hyp(o.x - x, o.z - z) < 5) o.remove();
+  const v = new Vehicle('sport', '#d0141a', x, z, h); v.moved = true; v.y = surfAt(x, z); v.sync(); return v;
+}
+function cheatRespawn() { // back to the start: via Yuri Gagarin, on foot next to the Ferari, no stars
+  if (P.car) { P.car.driver = null; P.car.boost = false; P.car.inp = { thr: 0, brk: 0, steer: 0, hand: 1 }; P.car = null; }
+  const [sx, sz, h] = startSpot(); tileTick(sx, sz, 0, 420);
+  const mine = ferari(sx, sz, h);
+  P.x = mine.x + Math.cos(h) * 2.4; P.z = mine.z - Math.sin(h) * 2.4; if (inBuilding(P.x, P.z, 0.5)) { P.x = mine.x - Math.cos(h) * 2.4; P.z = mine.z + Math.sin(h) * 2.4; }
+  P.h = h; P.y = surfAt(P.x, P.z); P.mode = 'foot'; P.model.g.visible = true; P.hp = 100; P.knock = 0; P.vx = P.vz = P.vy = 0;
+  W.heat = 0; W.stars = 0; W.busted = 0; W.bustT = 0;
+  camInit = false; banner('Via Yuri Gagarin', 'MEDA');
+}
+function cheatFerari() { // on foot: a Ferari right in front of you; driving: whatever you are in turns into one
+  if (P.car) {
+    const o = P.car; o.driver = null; o.boost = false; P.car = null; o.remove();
+    const v = ferari(o.x, o.z, o.h); v.driver = 'player'; v.sleep = false; P.car = v;
+  } else {
+    const fx = Math.sin(P.h), fz = Math.cos(P.h); let x = P.x + fx * 4, z = P.z + fz * 4;
+    if (inBuilding(x, z, 1.2)) { x = P.x - fx * 4; z = P.z - fz * 4; }
+    ferari(x, z, P.h);
+  }
+  toast('🏎 Ferari!');
+}
+const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };
+let last = performance.now(), acc = 0;
+function frame(t) {""")
+rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto');", "if (v === 'DEBUG') setDebug(!DEBUG); else if (CHEATS[v]) CHEATS[v](); else if (v) toast('Codice sconosciuto');")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')

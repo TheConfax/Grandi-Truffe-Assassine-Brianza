@@ -791,6 +791,7 @@ const PARKED_MIX = [['panda', 25], ['hatch', 25], ['sedan', 15], ['wagon', 12], 
 function pickModel(mix, r = rnd) { let t = r() * mix.reduce((s, m) => s + m[1], 0); for (const [m, w] of mix) if ((t -= w) < 0) return m; return mix[0][0]; }
 const M_GLASS = lam(0x2e3d4e), M_TYRE = lam(0x1b1b1d), M_HEAD = lam(0xfff6d8, { emissive: 0xfff2c0, emissiveIntensity: 0.6 }), M_TAIL = lam(0xa01818, { emissive: 0xa01010, emissiveIntensity: 0.5 }), M_DARK = lam(0x2a2b2f), M_TRIM = lam(0x16181c);
 const M_GLASS_SEE = new THREE.MeshLambertMaterial({ color: 0x2e3d4e, transparent: true, opacity: 0.42, depthWrite: false }); // police cab: the crew shows through
+const CC_COL = '#16213b'; // Carabinieri: dark blue body, red stripe, white roof
 const M_SIR_A = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 }), M_SIR_B = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 });
 const CAR_COLS = ['#c8332b', '#f2f2ee', '#2f3540', '#9aa3ad', '#2c4f8f', '#e0b23b', '#3f6b4a', '#7b2d3a', '#d8d0c0', '#16181c', '#5b8fb8', '#b85d2a'];
 const MODEL_COLS = { scooter: ['#9cc8b4', '#e8e2d2', '#c8332b', '#2c4f8f', '#f2c230', '#16181c'], moto: ['#c8102e', '#1f5fbf', '#16181c', '#f2f2ee', '#e2562a', '#3f6b4a'], bici: ['#2c4f8f', '#c8332b', '#16181c', '#e8e2d2', '#3f6b4a', '#e0b23b'], sport: ['#c8102e', '#f2c230', '#16181c', '#e8e6e0', '#1f5fbf', '#e2562a'], van: ['#f2f2ee', '#d8d0c0', '#9aa3ad', '#c9cdd2'], ape: ['#7fb3c8', '#e8e4d8', '#9dbb6a', '#d9cf9a', '#c94f3d'], suv: ['#2f3540', '#9aa3ad', '#f2f2ee', '#16181c', '#5a6b4e', '#7b2d3a'] };
@@ -862,10 +863,12 @@ function makeCar(model, color) {
     if (S.spoiler) { add(boxG(S.W - 0.1, 0.06, 0.34), M_TRIM, 0, bot + S.bh + 0.3, -hl + 0.2); for (const x of [-0.6, 0.6]) add(boxG(0.08, 0.28, 0.1), M_TRIM, x, bot + S.bh + 0.14, -hl + 0.25, false); add(boxG(0.7, 0.06, 1.1), M_TRIM, 0, bot + S.bh + 0.005, hl - 0.75, false); }
     if (S.rails) for (const x of [-1, 1]) add(boxG(0.06, 0.07, cl - 0.2), M_TRIM, x * (cw / 2 - 0.12), cy + ch / 2 + 0.1, cz, false);
     if (model === 'police') {
-      add(boxG(S.W + 0.02, 0.16, S.L + 0.02), lam(0x1d4fb8), 0, by + 0.04, 0, false);
-      add(boxG(cw + 0.06, 0.1, 0.5), lam(0x1d4fb8), 0, cy + ch / 2 + 0.09, cz + 0.2, false);
+      const cc = color === CC_COL;
+      add(boxG(S.W + 0.02, 0.16, S.L + 0.02), lam(cc ? 0xc8102e : 0x1d4fb8), 0, by + 0.04, 0, false);
+      if (cc) add(boxG(cw + 0.05, 0.075, cl - 0.1), lam(0xf2f2ee), 0, cy + ch / 2 + 0.035, cz, false);
+      else add(boxG(cw + 0.06, 0.1, 0.5), lam(0x1d4fb8), 0, cy + ch / 2 + 0.09, cz + 0.2, false);
       add(boxG(0.5, 0.16, 0.34), M_SIR_A, -0.3, cy + ch / 2 + 0.2, cz, false); add(boxG(0.5, 0.16, 0.34), M_SIR_B, 0.3, cy + ch / 2 + 0.2, cz, false);
-      crew = [-1, 1].map(sd => { const c = makeCop(); body.add(c.g); copSeat(c, sd * 0.38, bot + S.bh * 0.45, cz + 0.1); return c; }); // two officers up front, shown while the AI drives
+      crew = [-1, 1].map(sd => { const c = cc ? makeAgent(true) : makeCop(); body.add(c.g); copSeat(c, sd * 0.38, bot + S.bh * 0.45, cz + 0.1); return c; }); // two officers up front, shown while the AI drives
     }
     wheelPos = [[-S.W / 2 + 0.05, hl - 0.78, 1], [S.W / 2 - 0.05, hl - 0.78, 1], [-S.W / 2 + 0.05, -hl + 0.78, 0], [S.W / 2 - 0.05, -hl + 0.78, 0]];
     lightY = bot + S.bh * 0.68;
