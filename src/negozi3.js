@@ -36,7 +36,8 @@ const NG_CLASS_LABEL = { mobili: 'ARREDAMENTI', bellezza: 'ESTETICA', officina: 
 // real chains keep their colours on the sign
 const NG_BRANDS = [[/esselunga/i, ['#1a5aa6', '#ffffff']], [/carrefour/i, ['#1e4fa3', '#ffffff']], [/eurospin/i, ['#1d3f8f', '#f5c400']], [/famila/i, ['#e30613', '#ffffff']], [/migross/i, ['#e2001a', '#ffffff']],
   [/^md\b/i, ['#ffde00', '#c8102e']], [/lidl/i, ['#0050aa', '#fff000']], [/conad/i, ['#e2001a', '#ffffff']], [/\bcoop\b/i, ['#e2001a', '#ffffff']], [/sigma/i, ['#e2001a', '#ffffff']], [/crai/i, ['#e2001a', '#ffffff']],
-  [/prix/i, ['#e30613', '#ffffff']], [/aldi/i, ['#00005f', '#ffffff']], [/tigros/i, ['#e2001a', '#ffffff']], [/intesa/i, ['#00843d', '#ffffff']], [/unicredit/i, ['#e2001a', '#ffffff']], [/bpm/i, ['#0a3f8a', '#ffffff']],
+  [/prix/i, ['#e30613', '#ffffff']], [/unes|^u2\b/i, ['#d7001d', '#ffffff']], [/iperal/i, ['#c8102e', '#ffffff']], [/in's/i, ['#e30613', '#ffffff']], [/di per d/i, ['#e2001a', '#ffffff']],
+  [/maxigross|c\+c/i, ['#00553a', '#ffffff']], [/aldi/i, ['#00005f', '#ffffff']], [/tigros/i, ['#e2001a', '#ffffff']], [/intesa/i, ['#00843d', '#ffffff']], [/unicredit/i, ['#e2001a', '#ffffff']], [/bpm/i, ['#0a3f8a', '#ffffff']],
   [/agricole/i, ['#007a6e', '#ffffff']], [/sondrio/i, ['#0b4b8a', '#ffffff']], [/desio/i, ['#1d3a6b', '#ffffff']], [/\bbcc\b|credito cooperativo/i, ['#00835b', '#ffffff']], [/tecnocasa/i, ['#1d4f9a', '#ffffff']],
   [/unipol/i, ['#003a70', '#ffffff']], [/generali/i, ['#c8102e', '#ffffff']], [/acqua & sapone/i, ['#e5007e', '#ffffff']], [/unieuro/i, ['#00529b', '#ffffff']], [/poste/i, ['#f2c230', '#163a7a']]];
 
@@ -435,9 +436,9 @@ function ngPropGeo(key) {
 
 // ---- where each front goes: the wall of the building the shop is in (or the nearest one) that looks onto a street; shops sharing a wall split it
 function ngRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !s.r.d && s.r.c <= 5 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
-function ngWall(x, z) {
-  let host = null, best = null;
-  BLD.each(x, z, x, z, b => { if (!host && b.h >= 2.6 && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) host = b; });
+function ngWall(x, z, only) {
+  let host = only, best = null;
+  if (!host) BLD.each(x, z, x, z, b => { if (!host && b.h >= 2.6 && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) host = b; });
   const scan = b => {
     if (b.h < 2.6 || b.noSign) return; const pts = b.pts;
     for (let i = 0; i < pts.length; i++) {
@@ -457,11 +458,33 @@ let NG_LIST = null;
 const NG_NAMED = new Map(); // name -> shops, so the plain signs (signList) leave these to their fronts
 for (const e of D.ng || []) if (e[4]) { const k = e[4].toLowerCase(); if (!NG_NAMED.has(k)) NG_NAMED.set(k, []); NG_NAMED.get(k).push([e[0] / 10, e[1] / 10]); }
 const ngHas = p => (NG_NAMED.get((p.n || '').toLowerCase()) || []).some(([x, z]) => hyp(x - p.x, z - p.z) < 40);
+// ---- big supermarkets: a low building of their own (Unes, Carrefour, Iperal...) becomes a whole supermarket, built like the fuel stations,
+// instead of a shop front on a generic block. The supermarket in a block of flats keeps its front
+const NG_SUPER_PAL = [['#c8102e', '#ffffff'], ['#1d5aa8', '#ffffff'], ['#2a7a3a', '#ffffff'], ['#ff7a1e', '#ffffff'], ['#f2c230', '#1d3a8a']];
+for (const e of D.ng || []) {
+  if (NG_CLASSES[e[2]] !== 'supermercato') continue;
+  const x = e[0] / 10, z = e[1] / 10, ok = b => !b.lm && !b.big && !b.noSign && Math.abs(sArea(b.pts)) >= 700 && b.h <= (b.t === 3 ? 14 : 10.5);
+  let host = null, inside = null, bd = 25;
+  BLD.each(x, z, x, z, b => { if (!inside && inPoly(x, z, b.pts)) inside = b; });
+  if (inside) host = ok(inside) ? inside : null;
+  else BLD.each(x - 25, z - 25, x + 25, z + 25, b => { if (!ok(b)) return; for (let i = 0; i < b.pts.length; i++) { const p = b.pts[i], q = b.pts[(i + 1) % b.pts.length], d = segDist(x, z, p[0], p[1], q[0], q[1]); if (d < bd) { bd = d; host = b; } } });
+  if (!host) continue;
+  const name = e[4] || 'Supermercato', h0 = NG_HASH('super|' + name + '|' + e[0]);
+  let pal = NG_SUPER_PAL[Math.floor(h0 * NG_SUPER_PAL.length)]; for (const [re, c] of NG_BRANDS) if (re.test(name)) { pal = c; break; }
+  host.big = { e, x, z, name, pal, h0, v: Math.floor(h0 * 997) % 4 }; host.h = clamp(host.h, 6.8, 10);
+}
 function ngList() {
   if (NG_LIST) return NG_LIST; NG_LIST = []; const walls = new Map();
   for (const e of D.ng || []) {
     const x = e[0] / 10, z = e[1] / 10, cls = NG_CLASSES[e[2]], sub = e[3] || '', name = e[4] || '', ms = NG_MODELS[cls]; if (!ms) continue;
-    const W = ngWall(x, z); if (!W || W.b.lm) continue;
+    let big = null; BLD.each(x - 25, z - 25, x + 25, z + 25, b => { if (b.big && b.big.e === e) big = b; });
+    const W = ngWall(x, z, big); if (!W || W.b.lm) continue;
+    if (big) { // the supermarket's own glass front: it takes its share of the wall, the other shops on it move aside
+      const w = clamp(W.L * 0.6, Math.min(8, W.L - 1), Math.min(28, W.L - 1)), along = (x - W.a[0]) * W.ux + (z - W.a[1]) * W.uz;
+      const rec = { big: big.big, name, ...W, t: clamp(inPoly(x, z, big.pts) ? W.L / 2 : along, w / 2 + 0.5, W.L - w / 2 - 0.5), w };
+      const key = W.a[0].toFixed(1) + ',' + W.a[1].toFixed(1) + ',' + W.c[0].toFixed(1) + ',' + W.c[1].toFixed(1);
+      if (!walls.has(key)) walls.set(key, []); walls.get(key).push(rec); continue;
+    }
     const h0 = NG_HASH(cls + '|' + sub + '|' + name + '|' + e[0] + ',' + e[1]), fit = ms.filter(m => m.w * 0.55 <= W.L - 0.4); if (!fit.length) continue;
     const m = fit[Math.floor(h0 * fit.length)], mi = ms.indexOf(m), along = (x - W.a[0]) * W.ux + (z - W.a[1]) * W.uz, w = Math.min(m.w, W.L - 0.4);
     let pal = m.c; for (const [re, c] of NG_BRANDS) if (re.test(name)) { pal = m.c && m.c[0] ? c : [null, c[0]]; break; }
@@ -475,9 +498,25 @@ function ngList() {
     if (k < 1) for (const r of list) r.w *= k;
     let end = 0.2; for (const r of list) { r.t = Math.max(r.t, end + r.w / 2); end = r.t + r.w / 2 + 0.3; }
     let st = L - 0.2; for (let i = n - 1; i >= 0; i--) { const r = list[i]; r.t = Math.min(r.t, st - r.w / 2); st = r.t - r.w / 2 - 0.3; }
+    // then each front widens into the free wall beside it, so a ground floor of shops reads as one: up to the middle of the gap to the next
+    // front (all of it if that one stays as it is), and right to the end of the wall when it gets close; never round an inner corner
+    const grows = r => !r.big && r.m.d !== 'p' && r.w >= 2.2;
+    const wallEnd = (r, side) => { const s0 = side ? L - 0.35 : 0.35, x = r.a[0] + r.ux * s0 + r.nx * 1.7, z = r.a[1] + r.uz * s0 + r.nz * 1.7; return inBuilding(x, z) ? (side ? L - 1.9 : 1.9) : s0; };
+    const span = list.map((r, i) => {
+      let a = r.t - r.w / 2, b = r.t + r.w / 2; if (!grows(r)) return [a, b];
+      const p = list[i - 1], q = list[i + 1];
+      const lo = !p ? wallEnd(r, 0) : grows(p) ? (p.t + p.w / 2 + a) / 2 + 0.15 : p.t + p.w / 2 + 0.3, hi = !q ? wallEnd(r, 1) : grows(q) ? (b + q.t - q.w / 2) / 2 - 0.15 : q.t - q.w / 2 - 0.3;
+      if (hi - lo <= r.w) return [a, b];
+      const maxW = Math.min(18, Math.max(r.m.w * 2.2, 8)), g = Math.min(maxW, hi - lo) - r.w;
+      a -= g / 2; b += g / 2; if (a < lo) { b += lo - a; a = lo; } if (b > hi) { a -= b - hi; b = hi; } a = Math.max(a, lo);
+      if (a - lo < 2 && b - lo <= maxW + 2) a = lo; if (hi - b < 2 && hi - a <= maxW + 2) b = hi;
+      return [a, b];
+    });
+    list.forEach((r, i) => { r.t = (span[i][0] + span[i][1]) / 2; r.w = span[i][1] - span[i][0]; });
     for (const r of list) {
       if (r.w < 2.2) continue;
       r.cx = r.a[0] + r.ux * r.t; r.cz = r.a[1] + r.uz * r.t; r.tile = tileOf(r.cx, r.cz);
+      if (r.big) { r.big.front = r; continue; }
       if (ngDepth(r) < 1.5 && r.bdist < 1.5) continue; // another building right in front: no shop window there
       if (r.b.gtop === undefined) r.b.gtop = Math.max(...r.b.pts.map(p => groundH(p[0], p[1]))) + r.b.h;
       NG_LIST.push(r);
@@ -486,7 +525,23 @@ function ngList() {
   return NG_LIST;
 }
 
-// ---- one front, modelled in its own frame: x along the wall, y up from the pavement, z out of the wall
+// ---- modelling in a wall's own frame: x along the wall, y up from the pavement, z out of the wall
+function ngKit(C, cx, gy, cz, nx, nz) {
+  const F = lmFrame(new THREE.Matrix4().makeRotationY(Math.atan2(nx, nz)).setPosition(cx, gy, cz));
+  const lx = (x, z) => [cx + nz * x + nx * z, cz - nx * x + nz * z]; // local (x, z) -> world
+  const box = (w, h, d, x, y, z, col) => F.geo(C.solid, lmBox(w, h, d, x, y, z), null, COL(col));
+  const neon = (k, w, h, d, x, y, z) => F.geo(C.neon[k] || (C.neon[k] = Buf()), lmBox(w, h, d, x, y, z), null, null);
+  // a quad facing +z (or +x / -x for signs sticking out), uv 0..1 in its cell; cells are packed into the tile's sign texture afterwards
+  const quad = (b, P, n, uvs = [[0, 0], [1, 0], [1, 1], [0, 1]]) => { const i0 = b.p.length / 3; P.forEach((p, i) => F.v(b, p[0], p[1], p[2], n[0], n[1], n[2], uvs[i][0], uvs[i][1])); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); return i0; };
+  const qz = (b, x0, y0, x1, y1, z) => quad(b, [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], [0, 0, 1]);
+  const qx = (b, z0, y0, z1, y1, x, sgn) => sgn > 0 ? quad(b, [[x, y0, z1], [x, y0, z0], [x, y1, z0], [x, y1, z1]], [1, 0, 0]) : quad(b, [[x, y0, z0], [x, y0, z1], [x, y1, z1], [x, y1, z0]], [-1, 0, 0]);
+  const cell = (wm, hm, draw) => { const pw = Math.min(1000, Math.max(48, Math.round(wm * 180))), ph = Math.min(512, Math.max(16, Math.round(hm * pw / wm))); const c = { pw, ph, draw }; C.cells.push(c); return c; };
+  const sign = (c, i0) => C.sq.push([i0, c]);
+  // a pane of shop window showing theme th of its class
+  const pane = (cls, th, x0, y0, x1, y1, z) => { const b = C.glass[cls] || (C.glass[cls] = Buf()), wc = NG_WIN.cell(th), i0 = qz(b, x0, y0, x1, y1, z); for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2; b.uv[q] = b.uv[q] ? wc[2] : wc[0]; b.uv[q + 1] = b.uv[q + 1] ? wc[3] : wc[1]; } };
+  return { F, lx, box, neon, quad, qz, qx, cell, sign, pane };
+}
+// ---- one front
 function ngText(g, txt, cx, cy, maxW, maxH, font, col) {
   let fs = Math.max(6, Math.floor(maxH)); const f = s => font.replace('%', s); g.font = f(fs);
   while (g.measureText(txt).width > maxW && fs > 6) { fs = Math.floor(fs * 0.92); g.font = f(fs); }
@@ -496,17 +551,8 @@ function ngFront(s, C) {
   const m = s.m, cls = s.cls, W = s.w, hw = W / 2, gy = groundH(s.cx + s.nx * 0.6, s.cz + s.nz * 0.6), top = s.b.gtop - gy;
   if (top < 2.7) return;
   const gl = Math.min(groundH(s.cx - s.ux * hw, s.cz - s.uz * hw), groundH(s.cx + s.ux * hw, s.cz + s.uz * hw)) - gy - 0.35;
-  const Mx = new THREE.Matrix4().makeRotationY(Math.atan2(s.nx, s.nz)).setPosition(s.cx, gy, s.cz), F = lmFrame(Mx);
-  const lx = (x, z) => [s.cx + s.nz * x + s.nx * z, s.cz - s.nx * x + s.nz * z]; // local (x, z) -> world
+  const { F, lx, box, neon, qz, qx, cell, sign } = ngKit(C, s.cx, gy, s.cz, s.nx, s.nz);
   const pal = s.pal || ['#25303f', '#f2f2ee'], bg = pal[0], fg = pal[1], kc = m.k, font = NG_FONT[m.f || 'sans'];
-  const box = (w, h, d, x, y, z, col) => F.geo(C.solid, lmBox(w, h, d, x, y, z), null, COL(col));
-  const neon = (k, w, h, d, x, y, z) => F.geo(C.neon[k] || (C.neon[k] = Buf()), lmBox(w, h, d, x, y, z), null, null);
-  // a quad facing +z (or +x / -x for signs sticking out), uv 0..1 in its cell; cells are packed into the tile's sign texture afterwards
-  const quad = (b, P, n, uvs = [[0, 0], [1, 0], [1, 1], [0, 1]]) => { const i0 = b.p.length / 3; P.forEach((p, i) => F.v(b, p[0], p[1], p[2], n[0], n[1], n[2], uvs[i][0], uvs[i][1])); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); return i0; };
-  const qz = (b, x0, y0, x1, y1, z) => quad(b, [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], [0, 0, 1]);
-  const qx = (b, z0, y0, z1, y1, x, sgn) => sgn > 0 ? quad(b, [[x, y0, z1], [x, y0, z0], [x, y1, z0], [x, y1, z1]], [1, 0, 0]) : quad(b, [[x, y0, z0], [x, y0, z1], [x, y1, z1], [x, y1, z0]], [-1, 0, 0]);
-  const cell = (wm, hm, draw) => { const pw = Math.min(1000, Math.max(48, Math.round(wm * 180))), ph = Math.min(512, Math.max(16, Math.round(hm * pw / wm))); const c = { pw, ph, draw }; C.cells.push(c); return c; };
-  const sign = (c, i0) => C.sq.push([i0, c]);
   const caseOf = t => (m.f === 'script' || m.f === 'serif') && s.name ? t : t.toUpperCase();
   const main = caseOf(s.name || s.label), sub = s.name && m.sub ? s.label : '';
   const drawSign = (g, w, h, bgc, fgc, opt = {}) => {
@@ -696,9 +742,106 @@ function ngDepth(s) { // free pavement in front: up to the carriageway, a buildi
 const NG_PARK = new Grid(24);
 for (const T of TILES) for (const a of T.d.a || []) if (a.t === 4) { const o = dec(a.p); if (o.length < 3) continue; const bb = bbox(o); NG_PARK.add(bb[0], bb[1], bb[2], bb[3], { o, bb }); }
 const ngInPark = (x, z, r) => { let f = false; NG_PARK.each(x - r, z - r, x + r, z + r, q => { if (!f && x >= q.bb[0] - r && x <= q.bb[2] + r && z >= q.bb[1] - r && z <= q.bb[3] + r && (inPoly(x, z, q.o) || q.o.some(p => hyp(p[0] - x, p[1] - z) < r))) f = true; }); return f; };
+// ---- the whole supermarket: clad walls with a band in the chain's colour all round, the name big on it, a glass front with sliding doors under
+// a canopy, a loading bay at the back, plant on the roof, a trolley shelter by the door and the pylon by the road
+const NG_PANEL = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, map: canvasTex(64, 128, (g, w, h) => {
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 32) { g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(0, y, w, 2); g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(0, y + 2, w, 1); }
+  g.fillStyle = 'rgba(0,0,0,.1)'; g.fillRect(0, 0, 2, h); }) });
+function ngLogo(g, w, h, name, bg, fg, badge = true) {
+  g.fillStyle = bg; g.fillRect(0, 0, w, h); let x0 = 0;
+  if (badge && w > h * 2.5) { const s = h * 0.7, x = h * 0.2, y = (h - s) / 2; g.fillStyle = fg; g.beginPath(); g.moveTo(x + s * 0.2, y); g.arcTo(x + s, y, x + s, y + s, s * 0.2); g.arcTo(x + s, y + s, x, y + s, s * 0.2); g.arcTo(x, y + s, x, y, s * 0.2); g.arcTo(x, y, x + s, y, s * 0.2); g.fill(); ngText(g, name[0].toUpperCase(), x + s / 2, y + s * 0.54, s * 0.8, s * 0.8, NG_FONT.black, bg); x0 = h; }
+  ngText(g, name.toUpperCase(), (x0 + w) / 2, h * 0.54, (w - x0) * 0.9, h * 0.62, NG_FONT.black, fg);
+}
+function ngBig(B, C) {
+  const S = B.big, f = S.front, pts = B.pts, A = sArea(pts), gys = pts.map(p => groundH(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys), top = gmax + B.h, bot = gmin - 0.6;
+  const v = S.v, wallCol = COL(['#eceae4', '#d9dbdd', '#e3d9c6', '#e8e6e0'][v]), fasc = S.pal[0], fg = S.pal[1], fcol = COL(fasc), fh = [1.4, 1.1, 1.6, 1.25][v], low = COL(v === 3 ? '#3a3d40' : '#5a5c5e');
+  const pb = C.panel || (C.panel = Buf()), off = 0.12, n = pts.length;
+  const nrm = i => { const a = pts[i], c = pts[(i + 1) % n], L = hyp(c[0] - a[0], c[1] - a[1]) || 1; let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (A < 0) { nx = -nx; nz = -nz; } return [nx, nz, L]; };
+  const N_ = pts.map((_, i) => nrm(i)), O = pts.map((p, i) => { // the band stands out of the wall, mitred at the corners
+    const [ax, az] = N_[(i - 1 + n) % n], [bx, bz] = N_[i]; let mx = ax + bx, mz = az + bz; const l = hyp(mx, mz) || 1; mx /= l; mz /= l; const k = Math.min(3, 1 / Math.max(0.3, mx * bx + mz * bz)); return [p[0] + mx * off * k, p[1] + mz * off * k]; });
+  const wq = (a, c, nx, nz, y0, y1, col, u0, u1) => { const i = pb.p.length / 3; vtx(pb, a[0], y0, a[1], nx, 0, nz, u0, y0 / 2, col); vtx(pb, c[0], y0, c[1], nx, 0, nz, u1, y0 / 2, col); vtx(pb, c[0], y1, c[1], nx, 0, nz, u1, y1 / 2, col); vtx(pb, a[0], y1, a[1], nx, 0, nz, u0, y1 / 2, col); pb.i.push(i, i + 1, i + 2, i, i + 2, i + 3); };
+  const hq = (p0, p1, p2, p3, y, ny, col) => { const i = pb.p.length / 3; for (const p of [p0, p1, p2, p3]) vtx(pb, p[0], y, p[1], 0, ny, 0, p[0] / 4, p[1] / 4, col); pb.i.push(i, i + 1, i + 2, i, i + 2, i + 3); };
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    const a = pts[i], c = pts[(i + 1) % n], [nx, nz, L] = N_[i], u0 = acc / 4, u1 = (acc + L) / 4; acc += L;
+    wq(a, c, nx, nz, bot, gmax + 0.9, low, u0, u1); wq(a, c, nx, nz, gmax + 0.9, top - fh, wallCol, u0, u1); wq(a, c, nx, nz, top - fh, top + 0.35, wallCol, u0, u1);
+    const oa = O[i], oc = O[(i + 1) % n];
+    wq(oa, oc, nx, nz, top - fh, top + 0.35, fcol, u0, u1); hq(a, c, oc, oa, top - fh, -1, fcol); hq(oa, oc, [c[0] - nx * 0.25, c[1] - nz * 0.25], [a[0] - nx * 0.25, a[1] - nz * 0.25], top + 0.35, 1, fcol);
+  }
+  try { polyFill(C.roof || (C.roof = Buf()), pts, B.holes, top, 10, COL('#8d8a84')); } catch (e) { }
+  // plant on the roof
+  const F0 = lmFrame(new THREE.Matrix4()), [ccx, ccz] = centroid(pts), R = Math.sqrt(Math.abs(A)) * 0.35;
+  for (let k = 0; k < 5; k++) { const x = ccx + (NG_HASH(S.name + k) - 0.5) * R * 2, z = ccz + (NG_HASH(k + S.name) - 0.5) * R * 2; if (!inPoly(x, z, pts) || pts.some((p, i) => segDist(x, z, p[0], p[1], pts[(i + 1) % n][0], pts[(i + 1) % n][1]) < 3)) continue;
+    F0.geo(C.solid, lmBox(2.4, 1.2, 1.5, x, top + 0.6, z), null, COL('#c9ccd1')); F0.geo(C.solid, new THREE.CylinderGeometry(0.45, 0.45, 0.06, 12).translate(x - 0.55, top + 1.23, z), null, COL('#2b2f33')); F0.geo(C.solid, new THREE.CylinderGeometry(0.45, 0.45, 0.06, 12).translate(x + 0.55, top + 1.23, z), null, COL('#2b2f33')); }
+  if (!f) return;
+  // the glass front with its doors
+  const gy = groundH(f.cx + f.nx * 0.6, f.cz + f.nz * 0.6), K = ngKit(C, f.cx, gy, f.cz, f.nx, f.nz), topL = top - gy, w = f.w, hw = w / 2, gl = gmin - gy - 0.3;
+  const Hg = clamp(topL - fh - 0.9, 3.0, 4.2), doors = w >= 16 ? [-w * 0.22, w * 0.22] : [0], dw = 2.4, th = Math.floor(S.h0 * 6), dark = '#3a3d40';
+  K.box(w + 0.2, 0.3 - gl, 0.14, 0, (0.3 + gl) / 2, 0.07, dark); K.box(w + 0.2, 0.25, 0.2, 0, Hg + 0.08, 0.1, dark);
+  for (const sx of [-1, 1]) K.box(0.14, Hg - gl, 0.16, sx * (hw + 0.03), (Hg + gl) / 2, 0.08, dark);
+  const cuts = [-hw, ...doors.flatMap(d => [d - dw / 2, d + dw / 2]), hw];
+  for (let i = 0; i < cuts.length; i += 2) { const a = cuts[i], b = cuts[i + 1], np = Math.max(1, Math.round((b - a) / 1.6)), pw = (b - a) / np; for (let k = 0; k < np; k++) { K.pane('supermercato', th, a + k * pw + 0.04, 0.3, a + (k + 1) * pw - 0.04, Hg - 0.05, 0.04); K.box(0.08, Hg - 0.3, 0.12, a + k * pw, (Hg + 0.3) / 2, 0.06, dark); } }
+  for (const d of doors) { K.box(dw - 0.1, 2.5, 0.04, d, 1.25, 0.05, '#28303a'); K.box(0.05, 2.5, 0.07, d, 1.25, 0.07, '#c9ccd1'); K.box(dw, 0.12, 0.12, d, 2.56, 0.07, dark); K.box(dw - 0.1, Hg - 2.62, 0.04, d, (Hg + 2.62) / 2, 0.05, '#2b3238'); K.box(dw + 1.2, 0.08 - gl, 1.6, d, (0.08 + gl) / 2, 0.8, '#b8b3a8'); }
+  // the canopy over the doors, its edge lettered, lights under it
+  const depth = ngDepth(f), Dc = clamp(depth - 0.6, 1.8, 4), Wc = Math.min(w + 0.4, doors.length > 1 ? doors[1] - doors[0] + 5 : 6.5), yc = Hg + 0.45, ccol = v % 2 ? fasc : '#e8e6e0';
+  K.box(Wc, 0.35, Dc, 0, yc, Dc / 2, ccol); K.box(Wc + 0.04, 0.7, 0.1, 0, yc, Dc, fasc);
+  const cl = K.cell(Wc - 0.2, 0.62, (g, W2, H2) => ngLogo(g, W2, H2, S.name, fasc, fg, false)); K.sign(cl, K.qz(C.sign, -Wc / 2 + 0.1, yc - 0.31, Wc / 2 - 0.1, yc + 0.31, Dc + 0.052));
+  for (let x = -Wc / 2 + 1; x < Wc / 2 - 0.5; x += 1.6) for (let z = 0.8; z < Dc - 0.3; z += 1.4) K.neon('warm', 0.5, 0.04, 0.5, x, yc - 0.19, z);
+  if (yc + 1.9 < topL - fh) for (const sx of [-1, 1]) { const a = new THREE.Vector3(sx * (Wc / 2 - 0.4), yc + 1.9, 0.05), b = new THREE.Vector3(sx * (Wc / 2 - 0.4), yc + 0.15, Dc - 0.1), dv = b.clone().sub(a), Ln = dv.length(); K.F.geo(C.solid, new THREE.CylinderGeometry(0.03, 0.03, 1, 5).translate(0, 0.5, 0).scale(1, Ln, 1).applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dv.normalize()))).translate(a.x, a.y, a.z), null, COL('#8f949a')); }
+  // the name, big on the band over the front, and again on a long side that looks onto a street
+  const logo = (Kk, L0, t0, yTop) => { const lw = Math.min(L0 - 1.5, Math.max(5, (S.name.length * 0.62 + 1.8) * (fh + 0.1))), xc = clamp(0, -t0 + lw / 2 + 0.6, L0 - t0 - lw / 2 - 0.6), c = Kk.cell(lw, fh + 0.15, (g, W2, H2) => ngLogo(g, W2, H2, S.name, fasc, fg)); Kk.sign(c, Kk.qz(C.sign, xc - lw / 2, yTop - fh + 0.1, xc + lw / 2, yTop + 0.25, off + 0.006)); };
+  if (f.L > 5) logo(K, f.L, f.t, topL);
+  let side = null; for (let i = 0; i < n; i++) { const a = pts[i], c = pts[(i + 1) % n], [nx, nz, L] = N_[i]; if (L < 15 || (Math.abs(a[0] - f.a[0]) < 0.01 && Math.abs(a[1] - f.a[1]) < 0.01) || nx * f.nx + nz * f.nz > 0.7) continue; const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (ngRoad(mx + nx * 12, mz + nz * 12, 6) && (!side || L > side.L)) side = { a, c, mx, mz, nx, nz, L }; }
+  if (side) { const g2 = groundH(side.mx, side.mz), K2 = ngKit(C, side.mx, g2, side.mz, side.nx, side.nz); logo(K2, side.L, side.L / 2, top - g2); }
+  // the loading bay round the back
+  let back = null; for (let i = 0; i < n; i++) { const a = pts[i], c = pts[(i + 1) % n], [nx, nz, L] = N_[i], mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (L >= 8 && nx * f.nx + nz * f.nz < -0.6 && !inBuilding(mx + nx * 1.5, mz + nz * 1.5) && (!back || L > back.L)) back = { mx, mz, nx, nz, L }; }
+  if (back) {
+    const g3 = groundH(back.mx, back.mz), K3 = ngKit(C, back.mx, g3, back.mz, back.nx, back.nz), dh = Math.min(3.3, top - g3 - fh - 0.4);
+    for (const x of back.L >= 16 ? [-2.3, 2.3] : [0]) {
+      for (let y = 0, k = 0; y < dh; y += 0.12, k++) K3.box(3.0, Math.min(0.12, dh - y), 0.04, x, y + 0.06, 0.04, k % 2 ? '#9da1a6' : '#b4b8bd');
+      for (const sx of [-1, 1]) { K3.box(0.25, dh + 0.25, 0.3, x + sx * 1.62, (dh + 0.25) / 2, 0.15, '#1d1d1f'); K3.box(0.28, 0.35, 0.22, x + sx * 1.3, 1.15, 0.12, '#e8b520'); }
+      K3.box(3.5, 0.25, 0.3, x, dh + 0.12, 0.15, '#1d1d1f'); K3.box(3.9, 0.12, 1.4, x, dh + 0.5, 0.7, '#8f949a');
+    }
+  }
+  // the trolley shelter by the front and the pylon by the road: chosen once, where it is free (not on the street, not on the car park)
+  if (!S.items) {
+    S.items = [];
+    const freeAt = (x, z, r) => { const [wx, wz] = K.lx(x, z); if (ngRoad(wx, wz, r) || ngInPark(wx, wz, r) || inBuilding(wx, wz, r) || nearRail(wx, wz, 3)) return null; let hit = false; WALLS.each(wx - r - 1, wz - r - 1, wx + r + 1, wz + r + 1, q => { if (!hit && q.r && hyp(q.x - wx, q.z - wz) < q.r + r) hit = true; }); NG_PG.each(wx - 3, wz - 3, wx + 3, wz + 3, p => { if (!hit && hyp(p[0] - wx, p[1] - wz) < p[2] + r) hit = true; }); return hit ? null : [wx, wz]; };
+    for (const x of [hw + 3.2, -hw - 3.2, Wc / 2 + 3, -Wc / 2 - 3]) {
+      if (x - 2.4 < -f.t + 0.4 || x + 2.4 > f.L - f.t - 0.4) continue;
+      const corners = [[-2.3, 0.4], [2.3, 0.4], [-2.3, 2.6], [2.3, 2.6], [0, 1.5]].map(([dx, dz]) => freeAt(x + dx, dz, 0.3));
+      if (corners.every(Boolean)) { S.items.push({ k: 'shelter', x, z: 1.5 }); for (const p of corners) NG_PG.add(p[0] - 1.2, p[1] - 1.2, p[0] + 1.2, p[1] + 1.2, [p[0], p[1], 1.2]); break; }
+    }
+    pylon: for (const s0 of [0, -10, 10, -18, 18]) {
+      let prev = null;
+      for (let d = 4; d < 45; d += 1) { const [wx, wz] = K.lx(s0, d); if (inBuilding(wx, wz)) break; if (ngRoad(wx, wz, 1.8)) { if (prev) { const p = freeAt(s0, prev, 1.2); if (p) { S.items.push({ k: 'pylon', x: s0, z: prev, wx: p[0], wz: p[1] }); NG_PG.add(p[0] - 1.2, p[1] - 1.2, p[0] + 1.2, p[1] + 1.2, [p[0], p[1], 1.2]); break pylon; } } break; } prev = d - 0.5; }
+    }
+    S.walls = false;
+  }
+  for (const it of S.items) {
+    if (it.k === 'shelter') {
+      const { x, z } = it; for (const [dx, dz] of [[-2.2, -1], [2.2, -1], [-2.2, 1], [2.2, 1]]) K.box(0.1, dz < 0 ? 2.5 : 2.2, 0.1, x + dx, dz < 0 ? 1.25 : 1.1, z + dz, '#8f949a');
+      K.F.face(C.solid, [[x - 2.35, 2.55, z - 1.1], [x + 2.35, 2.55, z - 1.1], [x + 2.35, 2.25, z + 1.1], [x - 2.35, 2.25, z + 1.1]], 2, COL(v % 2 ? fasc : '#c9d6dc'));
+      K.box(4.6, 0.25, 0.04, x, 2.35, z + 1.12, fasc);
+      for (let k = 0; k < 7; k++) { K.box(0.52, 0.5, 0.95, x - 1.8 + k * 0.6, 0.75, z, '#c9ccd1'); K.box(0.5, 0.04, 0.04, x - 1.8 + k * 0.6, 1.0, z + 0.48, fasc); }
+      if (!S.walls) for (const dx of [-1.5, 0, 1.5]) { const [wx, wz] = K.lx(x + dx, z); WALLS.add(wx - 1, wz - 1, wx + 1, wz + 1, { r: 0.9, x: wx, z: wz, y0: gy - 3, y1: gy + 3 }); }
+    } else {
+      const { x, z } = it, py = groundH(it.wx, it.wz) - gy;
+      K.box(0.6, 0.6, 2.2, x, py + 0.3, z, '#8a857c'); K.box(0.45, 6.4, 1.9, x, py + 3.4, z, fasc); K.box(0.5, 0.15, 2.0, x, py + 6.65, z, '#3a3d40');
+      const c1 = K.cell(1.8, 1.8, (g, W2, H2) => { g.fillStyle = fasc; g.fillRect(0, 0, W2, H2); g.fillStyle = fg; const s = W2 * 0.5; g.fillRect(W2 / 2 - s / 2, H2 * 0.08, s, s); ngText(g, S.name[0].toUpperCase(), W2 / 2, H2 * 0.08 + s * 0.54, s * 0.8, s * 0.8, NG_FONT.black, fasc); const words = S.name.toUpperCase().split(' ').slice(0, 2); words.forEach((wd, i) => ngText(g, wd, W2 / 2, H2 * (0.7 + i * 0.17), W2 * 0.9, H2 * 0.15, NG_FONT.black, fg)); });
+      const c2 = K.cell(1.8, 0.9, (g, W2, H2) => { g.fillStyle = '#f2f2ee'; g.fillRect(0, 0, W2, H2); ngText(g, 'APERTO 8-21', W2 / 2, H2 * 0.33, W2 * 0.85, H2 * 0.3, NG_FONT.black, '#1a1a1a'); ngText(g, 'PARCHEGGIO CLIENTI', W2 / 2, H2 * 0.72, W2 * 0.85, H2 * 0.2, NG_FONT.sans, fasc); });
+      for (const sg of [1, -1]) { K.sign(c1, K.qx(C.sign, z - 0.9, py + 4.4, z + 0.9, py + 6.3, x + sg * 0.228, sg)); K.sign(c2, K.qx(C.sign, z - 0.9, py + 3.2, z + 0.9, py + 4.1, x + sg * 0.228, sg)); }
+      if (!S.walls) WALLS.add(it.wx - 1.2, it.wz - 1.2, it.wx + 1.2, it.wz + 1.2, { r: 1.1, x: it.wx, z: it.wz, y0: gy + py - 3, y1: gy + py + 7 });
+    }
+  }
+  S.walls = true;
+}
 function* buildNegozi(T, G) { // a generator: the tile builder yields between slices, so a street of shops never stalls a frame
-  const list = ngList().filter(s => s.tile === T.t); if (!list.length) return;
+  const list = ngList().filter(s => s.tile === T.t), bigs = T.bld.filter(B => B.big); if (!list.length && !bigs.length) return;
   const C = { solid: Buf(), sign: Buf(), sq: [], cells: [], glass: {}, neon: {}, props: [], solids: [], depth: ngDepth };
+  for (const B of bigs) { try { ngBig(B, C); } catch (e) { console.warn('supermercato', B.big.name, e); } yield 'negozi'; }
+  if (C.panel) mkMesh(C.panel, NG_PANEL, 10, 'cast', G);
+  if (C.roof) mkMesh(C.roof, MAT.roof, 10, 'cast', G);
   let n = 0;
   for (const s of list) { try { ngFront(s, C); } catch (e) { console.warn('negozio', s.name, e); } if (++n % 3 === 0) yield 'negozi'; }
   yield 'negozi';

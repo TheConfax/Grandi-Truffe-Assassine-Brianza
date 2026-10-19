@@ -18,6 +18,9 @@ Fatti in `src/oggetti3.js` (dati: chiave `og` per tile, fili in `pw`): 464 ogget
 
 ## Vetrine per classe
 Fatte in `src/negozi3.js` (dati: chiave `ng` in `brianza.json`, da `build_data.py`): 1301 attività OSM in 19 classi, 1245 vetrine nel gioco. Ogni classe ha 5 o 6 modelli (insegna, cornice, porta, tenda, cose sul marciapiede); il modello lo sceglie un hash del posto, l'interno della vetrina segue il sottotipo (macelleria, panetteria, ottica...). Le marche note (Esselunga, Eurospin, Intesa, ecc.) tengono i loro colori.
+- [x] Vetrine più larghe: ognuna si allarga nella parete libera accanto (fino a 18 m), senza sovrapporsi alle vicine e senza girare gli angoli interni
+- [x] Supermercati grandi in un edificio tutto loro (12: Unes, Carrefour, Iperal, famila, MD, Prix...): edificio su misura con pannelli, fascia del colore della catena, insegna grande, vetrata con pensilina, baie di carico, impianti sul tetto, pensilina dei carrelli e totem sulla strada dove c'è posto
+- [ ] Lo stesso per i mobilifici grandi e i concessionari nei capannoni
 - [ ] Orari (`opening_hours`, 185 attività): serranda abbassata quando il negozio è chiuso, insegna spenta
 - [ ] Le officine con la serranda aperta: niente spazio per gomme e bidoni quando il portone occupa tutta la facciata
 
