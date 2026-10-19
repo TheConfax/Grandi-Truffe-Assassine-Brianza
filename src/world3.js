@@ -41,7 +41,7 @@ const visH = (x, z) => groundH(x, z) - riverCut(x, z);
   for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { const k = j * nx + i; triUp(b, k, k + 1, k + nx + 1); triUp(b, k, k + nx + 1, k + nx); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(b.i); g.computeVertexNormals();
   const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false })); m.renderOrder = -3; m.receiveShadow = true; scene.add(m);
-  const dm = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ colorWrite: false })); dm.position.y = -3.2; dm.renderOrder = -1; scene.add(dm);
+  const dm = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ colorWrite: false, stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc })); dm.position.y = -3.2; // not where a pit is dug (stencil 1) dm.renderOrder = -1; scene.add(dm);
 }
 
 // ---------------------------------------------------------------- tiles & static data

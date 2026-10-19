@@ -282,8 +282,20 @@ function polyFill(b, outer, holes, y, vScale, col) {
   const V = v => new THREE.Vector2(v[0], v[1]);
   const faces = THREE.ShapeUtils.triangulateShape(outer.map(V), holes.map(h => h.map(V)));
   const all = outer.concat(...holes), base = b.p.length / 3;
+  let tris = faces;
+  if (b.drape) { // draped on the ground: split every edge longer than 4 m at its midpoint (shared, so neighbours stay joined), so the surface follows the
+    // terrain between the outline points instead of cutting a chord under a hump (asphalt sinking under the grass)
+    const mid = new Map(), L2 = (i, j) => (all[i][0] - all[j][0]) ** 2 + (all[i][1] - all[j][1]) ** 2;
+    const M = (i, j) => { const k = i < j ? i * 1e6 + j : j * 1e6 + i; let m = mid.get(k); if (m === undefined) { m = all.length; all.push([(all[i][0] + all[j][0]) / 2, (all[i][1] + all[j][1]) / 2]); mid.set(k, m); } return m; };
+    const stack = faces.map(f => [f[0], f[1], f[2]]); tris = [];
+    while (stack.length) {
+      const [a, c, d] = stack.pop(), la = L2(a, c), lb = L2(c, d), lc = L2(d, a), mx = Math.max(la, lb, lc);
+      if (mx <= 16 || tris.length > 60000) { tris.push([a, c, d]); continue; }
+      if (mx === la) { const m = M(a, c); stack.push([a, m, d], [m, c, d]); } else if (mx === lb) { const m = M(c, d); stack.push([a, c, m], [a, m, d]); } else { const m = M(d, a); stack.push([a, c, m], [m, c, d]); }
+    }
+  }
   for (const p of all) vtx(b, p[0], y, p[1], 0, 1, 0, p[0] / vScale, p[1] / vScale, col);
-  for (const f of faces) triUp(b, base + f[0], base + f[1], base + f[2]);
+  for (const f of tris) triUp(b, base + f[0], base + f[1], base + f[2]);
 }
 
 // ---------------------------------------------------------------- textures

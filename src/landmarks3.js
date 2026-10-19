@@ -1540,36 +1540,77 @@ function buildKino(L, B, G) {
   const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.2 }); SIGN_MATS.push(mat); mkMesh(lt, mat, 11, false, G);
 }
 
-// stairs down to the underpasses: each flight runs from its top a to its bottom b, w wide; treads in porphyry going down, low concrete walls with a
-// grey railing and a red handrail, the dark mouth of the tunnel at the bottom (the ground itself stays whole: the flight is drawn on it)
+// stairs down to the underpasses, really dug into the ground: a pit (the hull of the flights and of the landing at the bottom) where the terrain's
+// depth mask is switched off through the stencil, so what is drawn below ground shows; concrete walls lining it, flights of porphyry steps going
+// down D metres from each top a to the landing at b, the dark mouth of the tunnel in the wall the tunnel leaves from, a parapet with a grey railing
+// and a red handrail round the opening except where a flight starts
 const STAIRWELLS = [
-  { n: 'Sottopasso della stazione, via Indipendenza', flights: [[[372.6, -465.8], [356.5, -475.0], 4.5], [[371.0, -478.3], [357.0, -476.8], 4.5], [[364.8, -461.7], [355.8, -474.2], 4.0]], mouth: [[354.0, -476.5], [328.6, -497.7]] },
-  { n: 'Sottopasso della stazione, via Umberto Pace', flights: [[[318.0, -506.9], [326.6, -499.4], 3.2]], mouth: [[328.6, -497.7], [354.0, -476.5]], box: true },
+  { n: 'Sottopasso della stazione, via Indipendenza', D: 3.6, flights: [[[372.6, -465.8], [358.5, -473.9], 4.5], [[371.0, -478.3], [359.0, -477.0], 4.0], [[364.8, -461.7], [357.2, -472.2], 4.0]],
+    landing: [354.0, -476.5], lw: 7, tunnel: [328.6, -497.7] },
+  { n: 'Sottopasso della stazione, via Umberto Pace', D: 3.6, flights: [[[318.0, -506.9], [325.6, -500.3], 3.2]], landing: [328.0, -498.2], lw: 4.5, tunnel: [354.0, -476.5], box: true },
 ];
+const CURTAIN_MAT = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
+const HOLE_MAT = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
+for (const m of [MAT.depth]) { m.stencilWrite = true; m.stencilRef = 1; m.stencilFunc = THREE.NotEqualStencilFunc; m.stencilZPass = THREE.KeepStencilOp; }
+function hull(pts) {
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (const q of p.reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+for (const q of STAIRWELLS) { // the pit outline and the walls round it, once
+  const pts = [], [lx, lz] = q.landing, h = q.lw / 2;
+  for (const [a, b, w] of q.flights) { const L = hyp(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / L * w / 2, nz = (b[0] - a[0]) / L * w / 2; pts.push([a[0] + nx, a[1] + nz], [a[0] - nx, a[1] - nz], [b[0] + nx, b[1] + nz], [b[0] - nx, b[1] - nz]); }
+  const tl = hyp(q.tunnel[0] - lx, q.tunnel[1] - lz), tx = (q.tunnel[0] - lx) / tl, tz = (q.tunnel[1] - lz) / tl; q.tx = tx; q.tz = tz;
+  for (const [u, v] of [[-h, -h], [h, -h], [h, h], [-h, h]]) pts.push([lx + tx * u - tz * v, lz + tz * u + tx * v]);
+  q.ring = hull(pts); q.y0 = Math.min(...q.ring.map(p => groundH(p[0], p[1])));
+  const A = sArea(q.ring);
+  for (let i = 0; i < q.ring.length; i++) { const a = q.ring[i], c = q.ring[(i + 1) % q.ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
+    let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (A > 0) { nx = -nx; nz = -nz; } // facing into the pit
+    WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, two: true, y0: q.y0 - 6, y1: q.y0 + 1.1 }); }
+  for (let i = 0; i < WALK.length; i++) WALK[i] = WALK[i].filter(e => !inPoly((N[i][0] + N[e.to][0]) / 2, (N[i][1] + N[e.to][1]) / 2, q.ring)); // people don't walk across the pit at street level
+}
 // the lamps of the square by the underpass: a grey pole with a ribbon twisting up round it and over into the head
 const RIBBON_LAMPS = [[376.5, -455.0], [383.0, -461.5], [361.0, -452.5]];
 function buildStairwells(T, G) {
-  const F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), CON = COL('#a9a59c'), RAIL = COL('#6c7074'), RED = COL('#a3343a'), POR = COL('#8f7f78');
+  const F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), CON = COL('#a9a59c'), RAIL = COL('#6c7074'), RED = COL('#a3343a'), POR = COL('#8f7f78'), DARK = COL('#141416');
+  const pit = Buf(); LMAT.pit = LMAT.pit || new THREE.MeshLambertMaterial({ map: LMAT.plaster.map, vertexColors: true });
   for (const q of STAIRWELLS) {
-    const [cx, cz] = q.flights[0][0]; if (tileOf(cx, cz) !== T.t) continue;
-    for (const [a, b, w] of q.flights) {
-      const L = hyp(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, y0 = groundH(a[0], a[1]), n = Math.round(L / 0.45), ry = Math.atan2(-uz, ux);
-      const P = (s, t) => [a[0] + ux * s + nx * t, a[1] + uz * s + nz * t];
-      for (let i = 0; i < n; i++) { const s0 = i * L / n, s1 = (i + 0.6) * L / n, c = i / n; const [p0, p1, p2, p3] = [P(s0, -w / 2), P(s1, -w / 2), P(s1, w / 2), P(s0, w / 2)]; const sh = new THREE.Color().copy(POR).multiplyScalar(1 - c * 0.75);
-        F.face(Bs.walk, [[p0[0], y0 + 0.05, p0[1]], [p1[0], y0 + 0.05, p1[1]], [p2[0], y0 + 0.05, p2[1]], [p3[0], y0 + 0.05, p3[1]]], 2, sh);
-        const [r0, r1, r2, r3] = [P(s1, -w / 2), P((i + 1) * L / n, -w / 2), P((i + 1) * L / n, w / 2), P(s1, w / 2)]; F.face(Bs.walk, [[r0[0], y0 + 0.05, r0[1]], [r1[0], y0 + 0.05, r1[1]], [r2[0], y0 + 0.05, r2[1]], [r3[0], y0 + 0.05, r3[1]]], 2, new THREE.Color(0x1d1d1f).lerp(sh, 0.35)); }
-      for (const sd of [-1, 1]) { const [mx, mz] = P(L / 2, sd * (w / 2 + 0.15));
-        F.geo(Bs.trim, lmBox(L, 0.55, 0.3, 0, 0, 0).rotateY(ry).translate(mx, y0 + 0.27, mz), null, CON);
-        F.geo(Bs.trim, lmBox(L, 0.05, 0.05, 0, 0, 0).rotateY(ry).translate(mx, y0 + 1.5, mz), null, RAIL); F.geo(Bs.trim, lmBox(L, 0.06, 0.06, 0, 0, 0).rotateY(ry).translate(...[P(L / 2, sd * (w / 2 + 0.05))].map(p => [p[0], y0 + 1.05, p[1]])[0]), null, RED);
-        for (let s = 0; s <= L; s += 0.18) { const [px, pz] = P(s, sd * (w / 2 + 0.15)); F.geo(Bs.trim, lmBox(0.03, 0.95, 0.03, px, y0 + 1.02, pz), null, RAIL); }
-        if (!q.coll) { const [x0, z0] = P(0, sd * (w / 2 + 0.15)), [x1, z1] = P(L, sd * (w / 2 + 0.15)); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: nx * sd, nz: nz * sd, two: true, y0: y0 - 3, y1: y0 + 1.5 }); } }
-      { const [ex, ez] = P(L + 0.2, 0); F.geo(Bs.trim, lmBox(w + 0.6, 2.2, 0.4, 0, 0, 0).rotateY(ry + Math.PI / 2).translate(ex, y0 - 0.2, ez), null, CON); // the end wall, the mouth dark in it
-        F.geo(Bs.trim, lmBox(w - 0.6, 1.0, 0.1, 0, 0, 0).rotateY(ry + Math.PI / 2).translate(ex - ux * 0.22, y0 + 0.5, ez - uz * 0.22), null, COL('#141416'));
-        if (!q.coll) { const [x0, z0] = P(L + 0.2, -w / 2), [x1, z1] = P(L + 0.2, w / 2); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ux, nz: -uz, two: true, y0: y0 - 3, y1: y0 + 1.5 }); } }
-      if (q.box) { const [mx, mz] = P(L / 2, 0); F.geo(Bs.trim, lmBox(L + 1, 0.12, w + 0.9, 0, 0, 0).rotateY(ry).translate(mx, y0 + 1.6, mz), null, COL('#4d5a50')); } // the green net cover over the stair box
+    const [lx, lz] = q.landing; if (tileOf(lx, lz) !== T.t) continue;
+    const y0 = q.y0, yb = y0 - q.D, ring = q.ring, A = sArea(ring);
+    { const hb = Buf(); for (const [x, z] of ring) vtx(hb, x, 0, z, 0, 1, 0, 0, 0); for (let i = 1; i < ring.length - 1; i++) hb.i.push(0, i, i + 1, 0, i + 1, i);
+      for (let i = 0; i < hb.p.length; i += 3) hb.p[i + 1] = groundH(hb.p[i], hb.p[i + 2]) + 0.02; mkMesh(hb, HOLE_MAT, -3, false, G); } // the opening, before the depth mask
+    { const cb = Buf(), off = lmOffset(ring, -0.35); // the soil round the pit: a depth-only curtain just outside its walls, so from outside you never see them through the ground
+      for (let i = 0; i < off.length; i++) { const a = off[i], c = off[(i + 1) % off.length], k = cb.p.length / 3; for (const [p, y] of [[a, yb - 1], [c, yb - 1], [c, null], [a, null]]) vtx(cb, p[0], y === null ? groundH(p[0], p[1]) - 0.05 : y, p[1], 0, 1, 0, 0, 0); cb.i.push(k, k + 1, k + 2, k, k + 2, k + 3); }
+      const cm = mkMesh(cb, CURTAIN_MAT, -1, false, G); }
+    for (let i = 0; i < ring.length; i++) { // the walls of the pit, inner faces, from the floor up to the parapet
+      const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
+      let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (A > 0) { nx = -nx; nz = -nz; }
+      const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]);
+      { const quad = [[a[0], yb - 0.3, a[1]], [c[0], yb - 0.3, c[1]], [c[0], gc + 0.55, c[1]], [a[0], ga + 0.55, a[1]]]; if (-(c[1] - a[1]) * nx + (c[0] - a[0]) * nz < 0) quad.reverse(); F.face(pit, quad, 2, CON); } // the inner face, one-sided: from outside you see the ground, not the wall under it
+      F.face(Bs.plaster, [[c[0] - nx * 0.3, ga - 0.05, c[1] - nz * 0.3], [a[0] - nx * 0.3, ga - 0.05, a[1] - nz * 0.3], [a[0] - nx * 0.3, ga + 0.55, a[1] - nz * 0.3], [c[0] - nx * 0.3, gc + 0.55, c[1] - nz * 0.3]].map((v, k) => k < 2 ? [v[0], groundH(v[0], v[2]) - 0.05, v[2]] : v), 2, CON); // the outer face, only above the ground
+      F.geo(Bs.trim, lmBox(L, 0.12, 0.34, 0, 0, 0).rotateY(Math.atan2(-(c[1] - a[1]), c[0] - a[0])).translate((a[0] + c[0]) / 2 - nx * 0.15, (ga + gc) / 2 + 0.6, (a[1] + c[1]) / 2 - nz * 0.15), null, COL('#bdb8ad')); // the coping
+      const open = s => q.flights.some(([fa, , w]) => hyp(a[0] + (c[0] - a[0]) * s / L - fa[0], a[1] + (c[1] - a[1]) * s / L - fa[1]) < w / 2 + 0.3); // the top of a flight: no railing
+      for (let s = 0.1; s < L; s += 0.18) if (!open(s)) { const x = a[0] + (c[0] - a[0]) * s / L - nx * 0.15, z = a[1] + (c[1] - a[1]) * s / L - nz * 0.15, g = groundH(x, z); F.geo(Bs.trim, lmBox(0.03, 0.95, 0.03, x, g + 1.12, z), null, RAIL); }
+      let s0 = null; for (let s = 0; s <= L + 0.01; s += 0.25) { const op = s > L || open(s); if (!op && s0 === null) s0 = s; if ((op || s >= L) && s0 !== null) { const s1 = Math.min(s, L); if (s1 - s0 > 0.3) { const P = t => [a[0] + (c[0] - a[0]) * t / L - nx * 0.15, a[1] + (c[1] - a[1]) * t / L - nz * 0.15], [x0, z0] = P(s0), [x1, z1] = P(s1), g = (groundH(x0, z0) + groundH(x1, z1)) / 2, ry = Math.atan2(-(z1 - z0), x1 - x0), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+        F.geo(Bs.trim, lmBox(s1 - s0, 0.05, 0.05, 0, 0, 0).rotateY(ry).translate(mx, g + 1.62, mz), null, RAIL); F.geo(Bs.trim, lmBox(s1 - s0, 0.07, 0.07, 0, 0, 0).rotateY(ry).translate(mx - nx * 0.1, g + 1.2, mz - nz * 0.1), null, RED); } s0 = null; } }
     }
-    q.coll = true;
+    for (const [a, b, w] of q.flights) { // the steps
+      const L = hyp(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, ga = groundH(a[0], a[1]), n = Math.max(4, Math.round((ga - yb) / 0.16)), run = L / n, ry = Math.atan2(-uz, ux);
+      for (let i = 0; i < n; i++) { const top = ga - (i + 1) * (ga - yb) / n, cx = a[0] + ux * run * (i + 0.5), cz = a[1] + uz * run * (i + 0.5);
+        F.geo(Bs.walk, lmBox(run + 0.02, top - yb + 0.3, w, 0, 0, 0).rotateY(ry).translate(cx, (top + yb - 0.3) / 2, cz), null, new THREE.Color().copy(POR).multiplyScalar(i % 2 ? 0.92 : 1)); }
+      for (const sd of [-1, 1]) { const nx = -uz * sd, nz = ux * sd; // a handrail down each side of the flight
+        F.geo(Bs.trim, lmBox(Math.hypot(L, ga - yb), 0.06, 0.06, 0, 0, 0).rotateZ(-Math.atan2(ga - yb, L)).rotateY(ry).translate((a[0] + b[0]) / 2 + nx * (w / 2 - 0.15), (ga + yb) / 2 + 0.95, (a[1] + b[1]) / 2 + nz * (w / 2 - 0.15)), null, RED); }
+    }
+    { const lw = q.lw / 2, P = (u, v) => [lx + q.tx * u - q.tz * v, yb + 0.02, lz + q.tz * u + q.tx * v]; // the landing, and the mouth of the tunnel in the far wall
+      try { polyFill(Bs.walk, ring, [], yb + 0.01, 2, COL('#7d7570')); } catch (e) { } // the floor of the whole pit
+      const ex = lx + q.tx * (lw - 0.05), ez = lz + q.tz * (lw - 0.05), mw = 3.4;
+      F.geo(Bs.trim, lmBox(0.1, 2.6, mw, 0, 0, 0).rotateY(Math.atan2(-q.tz, q.tx)).translate(ex, yb + 1.3, ez), null, DARK);
+      F.geo(Bs.trim, lmBox(0.2, 0.25, mw + 0.6, 0, 0, 0).rotateY(Math.atan2(-q.tz, q.tx)).translate(ex - q.tx * 0.05, yb + 2.75, ez - q.tz * 0.05), null, COL('#e7e3da'));
+      F.geo(Bs.warm, lmBox(0.12, 0.08, 1.2, 0, 0, 0).rotateY(Math.atan2(-q.tz, q.tx)).translate(ex - q.tx * 0.1, yb + 2.55, ez - q.tz * 0.1)); }
+    if (q.box) { const [cx, cz] = centroid(ring); F.geo(Bs.trim, new THREE.BoxGeometry(1, 1, 1).scale(9, 0.12, 6).rotateY(Math.atan2(-q.tz, q.tx)).translate(cx, y0 + 2.3, cz), null, COL('#4d5a50')); } // the green net cover over the box
   }
+  if (pit.i.length) mkMesh(pit, LMAT.pit, 10, 'cast', G);
   for (const [x, z] of RIBBON_LAMPS) {
     if (tileOf(x, z) !== T.t) continue; const y = groundH(x, z), GR = COL('#4b4f54');
     F.geo(Bs.trim, new THREE.CylinderGeometry(0.09, 0.11, 7.5, 8).translate(x, y + 3.75, z), null, GR);
