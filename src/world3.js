@@ -601,6 +601,7 @@ function buildTile(T) {
   {
     const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf();
     for (const B of T.bld) {
+      if (B.lm) continue; // modelled by hand in landmarks3.js
       const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t;
       const gys = outer.map(p => groundH(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys), top = gmax + h, bot = gmin - 0.6;
       if (t === 9) {
@@ -646,7 +647,7 @@ function buildTile(T) {
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   buildSignals(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G);
-  buildCemetery(T, G);
+  buildCemetery(T, G); buildLandmarks(T, G);
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {
@@ -798,7 +799,7 @@ const SIGN_STYLE = { scuola: ['#1f4f9a', '#ffffff'], oratorio: ['#6b3a8c', '#fff
 function buildSigns(T, G) {
   const list = [];
   for (const p of D.pois) {
-    if (!p.n || !SIGN_STYLE[p.k] || tileOf(p.x, p.z) !== T.t) continue;
+    if (!p.n || p.lm || !SIGN_STYLE[p.k] || tileOf(p.x, p.z) !== T.t) continue;
     let best = null;
     BLD.each(p.x - 12, p.z - 12, p.x + 12, p.z + 12, b => {
       const pts = b.pts;
