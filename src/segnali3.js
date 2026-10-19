@@ -5,7 +5,7 @@
 // facing the drivers, on a post you can knock down; stop and give way get their line across the lane and STOP painted on the asphalt.
 const SEGN = /*__SEGN__*/[];
 const SEGN_DONE = new Set();
-const segTex = {};
+const segTex = {}; const segTexIs = t => Object.values(segTex).some(p => p.some(m => m.map === t)); // shared across tiles: never freed
 function segTexOf(kind, extra) {
   const key = kind + '|' + (extra || ''); if (segTex[key]) return segTex[key];
   const wide = kind === 'paese' || kind === 'via' || kind === 'unico', W = wide ? 256 : 128, H = wide ? (kind === 'unico' ? 128 : 96) : 128;

@@ -409,9 +409,13 @@ function genLamps(T, d, osm) {
   }
   return out;
 }
-function buildTile(T) {
-  if (T.built) return; T.built = true; srndT = 1000 + T.t * 7919;
-  const G = new THREE.Group(); scene.add(G); T.group = G;
+// a tile is built a slice at a time (a generator that yields between its parts), so driving into new ground never freezes the game for the
+// tenth of a second a whole tile takes; it stays hidden until it is complete. buildTile runs one to the end in one go (start, respawn)
+function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!g.next().done); }
+function* buildTileGen(T) {
+  if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.t * 7919;
+  T.tex0 = new THREE.Texture().id; // textures newer than this were made for this tile: freed with it
+  const G = new THREE.Group(); G.visible = false; scene.add(G); T.group = G;
   const put = (b, mat, ro, shadow) => { if (b.i.length) mkMesh(b, mat, ro, shadow, G); };
   const pc = a => COL(a[Math.floor(tRnd() * a.length)]), d = T.d, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
   // terrain patch
@@ -423,6 +427,7 @@ function buildTile(T) {
     const m = new THREE.Mesh(g, MAT.terrain); m.renderOrder = -2; m.receiveShadow = true; G.add(m);
     const dm = new THREE.Mesh(g, MAT.depth); dm.position.y = -0.5; dm.renderOrder = -1; G.add(dm); // just under the ground: hides what is buried (walls go a metre down), roads now follow the terrain
   }
+  yield 'landuse';
   // land use
   {
     const gB = VBuf(), pB = VBuf(), zB = FBuf(), wB = VBuf();
@@ -473,6 +478,7 @@ function buildTile(T) {
     put(head, lam(0x8f8a80, { side: THREE.DoubleSide }), 10, 'cast'); put(mouth, lam(0x0c0d0e, { side: THREE.DoubleSide }), 11); put(apron, lam(0x9a958b), 4);
     put(rv, MAT.water, 2); put(wallsR, MAT.deckSide, 10, 'cast'); put(rail, MAT.rail, 10);
   }
+  yield 'streets';
   // street surfaces
   {
     const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6');
@@ -566,6 +572,7 @@ function buildTile(T) {
     put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9);
     put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10); put(dmark, MAT.deckMark, 10); put(pil, MAT.deckSide, 10, 'cast');
   }
+  yield 'walls';
   // walls, fences, hedges and the expressway median
   {
     const wl = Buf(), ft = Buf(), hd = Buf(), md = Buf(), posts = [];
@@ -601,6 +608,7 @@ function buildTile(T) {
       posts.forEach(([x, z, y, h], i) => { mtx.compose(pp.set(x, y + 0.5, z), qq, sc.set(1, h - 0.5, 1)); pm.setMatrixAt(i, mtx); }); G.add(pm);
     }
   }
+  yield 'railway';
   // railway & fences
   {
     const bal = FBuf(), steel = FBuf();
@@ -652,11 +660,14 @@ function buildTile(T) {
       posts.forEach(([x, z], i) => { mtx.makeTranslation(x, groundH(x, z), z); pm.setMatrixAt(i, mtx); }); pm.castShadow = true; G.add(pm);
     }
   }
+  yield 'buildings';
   // buildings
   {
     const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf();
+    let nb = 0;
     for (const B of T.bld) {
       if (B.lm) continue; // modelled by hand in landmarks3.js
+      if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
       const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t;
       const gys = outer.map(p => groundH(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys), top = gmax + h, bot = gmin - 0.6;
       if (t === 9) {
@@ -701,8 +712,11 @@ function buildTile(T) {
     }
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  buildSignals(T, G); buildSegnali(T, G); buildGates(T, G); buildFountains(T, G); buildSigns(T, G); buildFuel(T, G); buildCaserme(T, G);
-  buildCemetery(T, G); buildLandmarks(T, G); buildPiazze(T, G); buildPlazas(T, G); buildStairwells(T, G); buildPlatforms(T, G); buildParkingLines(T, G); buildParkFurniture(T, G);
+  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture]) {
+    const s = srndT; yield f.name; srndT = s; const r = f(T, G);
+    if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
+  }
+  { const s = srndT; yield 'trees'; srndT = s; }
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {
@@ -729,6 +743,7 @@ function buildTile(T) {
       vtx(pool, hx - R, py, hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, py, hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, py, hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, py, hz + R, 0, 1, 0, 0, 1); triUp(pool, k, k + 1, k + 2); triUp(pool, k, k + 2, k + 3);
       gp.push(hx, gy + 6.82, hz); // glare under the lamp head
       if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
+      else for (const p of PROPS) if (p.tile === T && p.li === i) { p.inst.meshes = [pm, hm]; if (p.broken) { o.scale.set(0, 0, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix); o.scale.set(1, 1, 1); } } // built again: the lamps knocked down stay down
     });
     G.add(pm, hm); const poolM = pool.i.length ? mkMesh(pool, LAMPPOOL_MAT, 12, false, G) : null;
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
@@ -736,14 +751,30 @@ function buildTile(T) {
     for (const p of PROPS) if (p.tile === T) p.onBreak = () => { // the lamp goes dark: its pool and its glare drop out of sight
       if (poolM) { const a = poolM.geometry.attributes.position; for (let q = p.li * 4; q < p.li * 4 + 4; q++) a.setY(q, -9999); a.needsUpdate = true; }
       pg.attributes.position.setY(p.li, -9999); pg.attributes.position.needsUpdate = true; };
+    for (const p of PROPS) if (p.tile === T && p.broken && p.onBreak) p.onBreak(); // and dark
     T.lampsDone = true;
   }
+  T.ready = true; G.visible = T.dist < 860;
+}
+// tiles far behind are taken apart (their geometry and their sign textures freed) and built again if you come back
+function freeTile(T) {
+  const G = T.group; if (!G) return; scene.remove(G);
+  const own = t => t && t.id > T.tex0 && !segTexIs(t);
+  G.traverse(m => { if (m.geometry) m.geometry.dispose(); const mt = m.material; if (!mt || Array.isArray(mt)) return;
+    if (own(mt.map) || own(mt.emissiveMap)) { const k = SIGN_MATS.indexOf(mt); if (k >= 0) SIGN_MATS.splice(k, 1); for (const t of [mt.map, mt.emissiveMap]) if (own(t)) t.dispose(); mt.dispose(); } });
+  T.group = null; T.built = false; T.ready = false; T.gen = null;
 }
 function tileTick(px, pz, budgetMs, force) {
   const t0 = performance.now(), cand = [];
-  for (const T of TILES) { const dd = hyp(T.cx - px, T.cz - pz); T.dist = dd; if (!T.built && dd < 760) cand.push(T); if (T.group) T.group.visible = dd < 860; }
+  for (const T of TILES) { const dd = hyp(T.cx - px, T.cz - pz); T.dist = dd; if (!T.built && dd < 760) cand.push(T); if (T.group) T.group.visible = T.ready && dd < 860; if (T.ready && dd > 1150 && !force) freeTile(T); }
   cand.sort((a, b) => a.dist - b.dist);
-  for (const T of cand) { if (!force && performance.now() - t0 > budgetMs) break; buildTile(T); if (force && T.dist > force) break; }
+  if (force) { for (const T of cand) { buildTile(T); if (T.dist > force) break; } if (tileTick.cur) { buildTile(tileTick.cur); tileTick.cur = null; } return; }
+  // a slice at a time within the budget, the nearest tile first
+  while (performance.now() - t0 < budgetMs) {
+    let T = tileTick.cur;
+    if (!T || !T.gen) { T = cand.shift(); if (!T) break; T.gen = buildTileGen(T); tileTick.cur = T; }
+    if (T.gen.next().done) { T.gen = null; tileTick.cur = null; }
+  }
 }
 
 // ---------------------------------------------------------------- gates (cancelli): closed ones can be rammed open
@@ -908,13 +939,14 @@ function drawSigns(list, G, fit) {
     const wx = (s.a[0] + s.c[0]) / 2 + s.ux * along, wz = (s.a[1] + s.c[1]) / 2 + s.uz * along;
     const gy = Math.min(groundH(s.a[0], s.a[1]), groundH(s.c[0], s.c[1]));
     let y = gy + Math.min(3.3, Math.max(2.4, s.b.h - 1.2)) - drop, out = 0.09;
-    if (fit && fit.length) {
+    if (s.fit) [y, out] = s.fit; // worked out the first time the tile was built
+    else if (fit && fit.length) {
       const need = yc => { let m = -1; for (const fa of [-0.47, -0.2, 0.2, 0.47]) for (const fy of [-0.45, 0, 0.45]) {
         SIGN_RAY.set(new THREE.Vector3(wx + s.ux * w * fa + s.nx * 4, yc + h * fy, wz + s.uz * w * fa + s.nz * 4), new THREE.Vector3(-s.nx, 0, -s.nz)); SIGN_RAY.far = 4.3;
         const hit = SIGN_RAY.intersectObjects(fit, false)[0]; if (hit) m = Math.max(m, 4 - hit.distance); } return m; };
       let bestY = y, bestN = need(y);
       for (let yc = y - 0.3; bestN > 0.12 && yc - h / 2 >= gy + 2.1; yc -= 0.3) { const n = need(yc); if (n < bestN) { bestN = n; bestY = yc; } }
-      y = bestY; out = Math.max(0.09, bestN + 0.06);
+      y = bestY; out = Math.max(0.09, bestN + 0.06); s.fit = [y, out];
     }
     const cx = wx + s.nx * out, cz = wz + s.nz * out;
     const v0 = 1 - (i * 64 + 2) / cv.height, v1 = 1 - (i * 64 + 62) / cv.height, i0 = buf.p.length / 3;

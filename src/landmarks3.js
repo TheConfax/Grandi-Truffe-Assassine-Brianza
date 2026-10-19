@@ -258,12 +258,27 @@ function lmCloister(L) {
   const trees = []; for (const [fu, fv] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const M = ([u, v]) => P(fu ? 1 - u : u, fv ? 1 - v : v); hedges.push(bed.map(M)); beds.push(lawn.map(M)); trees.push(M([0.22, 0.22])); } // a tree in the middle of each lawn
   return (L._cl = { court: C, passages, hedges, beds, trees });
 }
-function buildLandmarks(T, G) {
+function* buildLandmarks(T, G) { // one landmark per slice: the big ones take a while
   for (const L of LANDMARKS) if (L.t === T.t) {
+    yield 'lm ' + L.build.name;
     const n0 = G.children.length; L.build(L, L.b, G); const ms = G.children.slice(n0).filter(m => m.isMesh); for (const m of ms) m.updateMatrixWorld();
-    if (!L.coll) { L.coll = true; lmMeshColl(L, ms); }
-    drawSigns(signList().filter(s => s.b.lm === L), G, ms); // the shop signs on it, in front of the model
+    if (!L.coll) { yield 'lm coll'; L.coll = true; lmMeshColl(L, ms); }
+    const sl = signList().filter(s => s.b.lm === L); if (!sl.length) continue;
+    yield 'lm signs'; drawSigns(sl, G, sl.every(s => s.fit) ? null : lmNear(ms, sl)); // the shop signs on it, in front of the model
   }
+}
+// just the triangles of the model near its shop signs, so fitting the signs takes a few rays through a few triangles
+function lmNear(meshes, signs, R = 7) {
+  const out = [], v = new THREE.Vector3(), near = (x, z) => signs.some(s => hyp(x - (s.a[0] + s.c[0]) / 2, z - (s.a[1] + s.c[1]) / 2) < R + s.L / 2);
+  for (const m of meshes) {
+    const P = m.geometry.attributes.position, I = m.geometry.index, nT = (I ? I.count : P.count) / 3, keep = [];
+    for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) { v.fromBufferAttribute(P, I ? I.getX(3 * t + k) : 3 * t + k).applyMatrix4(m.matrixWorld); if (near(v.x, v.z)) { keep.push(t); break; } }
+    if (!keep.length) continue;
+    const pos = new Float32Array(keep.length * 9); keep.forEach((t, j) => { for (let k = 0; k < 3; k++) { v.fromBufferAttribute(P, I ? I.getX(3 * t + k) : 3 * t + k).applyMatrix4(m.matrixWorld); pos.set([v.x, v.y, v.z], j * 9 + k * 3); } });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const n = new THREE.Mesh(g, Array.isArray(m.material) ? m.material[0] : m.material); n.updateMatrixWorld(); out.push(n);
+  }
+  return out;
 }
 // the solid parts of a model outside its footprint, from its own triangles: the upright faces that cross the band a person walks in (0.4 to 1.9 m
 // above the ground) are marked on a 0.4 m grid, and every marked cell on the edge of a blob becomes a little round post. Floors, treads and
@@ -1611,13 +1626,14 @@ function buildStairwells(T, G) {
     if (q.box) { const [cx, cz] = centroid(ring); F.geo(Bs.trim, new THREE.BoxGeometry(1, 1, 1).scale(9, 0.12, 6).rotateY(Math.atan2(-q.tz, q.tx)).translate(cx, y0 + 2.3, cz), null, COL('#4d5a50')); } // the green net cover over the box
   }
   if (pit.i.length) mkMesh(pit, LMAT.pit, 10, 'cast', G);
+  if (RIBBON_LAMPS.some(([x, z]) => tileOf(x, z) === T.t)) setTimeout(() => { RIBBON_LAMPS.coll = true; }, 0);
   for (const [x, z] of RIBBON_LAMPS) {
     if (tileOf(x, z) !== T.t) continue; const y = groundH(x, z), GR = COL('#4b4f54');
     F.geo(Bs.trim, new THREE.CylinderGeometry(0.09, 0.11, 7.5, 8).translate(x, y + 3.75, z), null, GR);
     for (let i = 0; i < 24; i++) { const t = i / 23, a = t * 4.2, r = 0.25 + 0.15 * Math.sin(t * 3); F.geo(Bs.trim, lmBox(0.06, 0.45, 0.22, 0, 0, 0).rotateY(-a).translate(x + Math.cos(a) * r, y + 1.5 + t * 6.2, z + Math.sin(a) * r), null, GR); }
     for (let i = 0; i < 8; i++) { const t = i / 7; F.geo(Bs.trim, lmBox(0.32, 0.06, 0.2, 0, 0, 0).rotateZ(-0.4 + t * 0.6).translate(x + t * 2.2, y + 7.6 + Math.sin(t * Math.PI) * 0.5, z), null, GR); }
     F.geo(Bs.trim, new THREE.CylinderGeometry(0.35, 0.3, 0.12, 12).translate(x + 2.4, y + 7.75, z), null, COL('#d9d9d4'));
-    WALLS.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, { r: 0.15, x, z, y0: y - 3, y1: y + 7 });
+    if (!RIBBON_LAMPS.coll) WALLS.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, { r: 0.15, x, z, y0: y - 3, y1: y + 7 });
   }
   lmFlush(Bs, G);
 }
