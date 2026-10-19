@@ -2,24 +2,29 @@
 // The physics runs at a fixed 60 steps a second, the screen at whatever the phone manages (120, 50, 26...): some frames get two steps, some none,
 // and drawn as they are the cars jerk back and forth against the smoothly following camera, the more the faster they go. So before every step the
 // state of what moves is kept, and each frame is drawn at the point between the last two steps that the leftover time asks for (a = 0..1), then
-// the true state is put back for the next step.
-const INTERP_KEYS = ['x', 'y', 'z', 'h'], INTERP_ANG = { h: true };
+// the true state is put back for the next step. The arrays are reused: garbage made 60 times a second makes the phone stop now and then to sweep it
+const INTERP_VEH = ['x', 'y', 'z', 'h', 'slope', 'roll', 'pitch'], INTERP_KEYS = ['x', 'y', 'z', 'h'], INTERP_DONE = [];
+function snapOf(o, keys) { const p = o._p || (o._p = new Array(keys.length)); for (let i = 0; i < keys.length; i++) p[i] = o[keys[i]]; o._pk = keys; }
 function interpSnap() {
-  for (const v of VEH) v._p = [v.x, v.y, v.z, v.h, v.slope, v.roll, v.pitch];
-  for (const p of PEDS) p._p = [p.x, p.y, p.z, p.h];
-  P._p = [P.x, P.y, P.z, P.h];
+  for (const v of VEH) snapOf(v, INTERP_VEH);
+  for (const p of PEDS) snapOf(p, INTERP_KEYS);
+  snapOf(P, INTERP_KEYS);
+}
+function interpMix(o, a) {
+  const p = o._p, keys = o._pk; if (!p) return;
+  if (hyp(o.x - p[0], o.z - p[2]) > 8) return; // a teleport (respawn, a new car): no in-between
+  const c = o._c || (o._c = new Array(keys.length));
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i], cur = o[k]; c[i] = cur; if (p[i] === undefined || cur === undefined) continue;
+    o[k] = k === 'h' ? p[i] + wrapA(cur - p[i]) * a : p[i] + (cur - p[i]) * a;
+  }
+  INTERP_DONE.push(o);
 }
 function interpBegin(a) {
-  const done = [];
-  const mix = (o, keys) => {
-    if (!o._p) return; const cur = keys.map(k => o[k]);
-    if (hyp(cur[0] - o._p[0], cur[2] - o._p[2]) > 8) return; // a teleport (respawn, a new car): no in-between
-    o._c = cur; keys.forEach((k, i) => { const p = o._p[i], c = cur[i]; if (p === undefined || c === undefined) return; o[k] = INTERP_ANG[k] ? p + wrapA(c - p) * a : p + (c - p) * a; });
-    done.push([o, keys]);
-  };
-  for (const v of VEH) mix(v, ['x', 'y', 'z', 'h', 'slope', 'roll', 'pitch']);
-  for (const p of PEDS) mix(p, INTERP_KEYS);
-  mix(P, INTERP_KEYS);
-  return done;
+  INTERP_DONE.length = 0;
+  for (const v of VEH) interpMix(v, a);
+  for (const p of PEDS) interpMix(p, a);
+  interpMix(P, a);
+  return INTERP_DONE;
 }
-function interpEnd(done) { for (const [o, keys] of done) { keys.forEach((k, i) => { o[k] = o._c[i]; }); o._c = null; } }
+function interpEnd(done) { for (const o of done) { const c = o._c, keys = o._pk; for (let i = 0; i < keys.length; i++) o[keys[i]] = c[i]; } done.length = 0; }

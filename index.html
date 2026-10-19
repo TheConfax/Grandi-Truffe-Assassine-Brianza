@@ -395,27 +395,32 @@ function rayWalls(ax, az, bx, bz, solidOnly) {
 // The physics runs at a fixed 60 steps a second, the screen at whatever the phone manages (120, 50, 26...): some frames get two steps, some none,
 // and drawn as they are the cars jerk back and forth against the smoothly following camera, the more the faster they go. So before every step the
 // state of what moves is kept, and each frame is drawn at the point between the last two steps that the leftover time asks for (a = 0..1), then
-// the true state is put back for the next step.
-const INTERP_KEYS = ['x', 'y', 'z', 'h'], INTERP_ANG = { h: true };
+// the true state is put back for the next step. The arrays are reused: garbage made 60 times a second makes the phone stop now and then to sweep it
+const INTERP_VEH = ['x', 'y', 'z', 'h', 'slope', 'roll', 'pitch'], INTERP_KEYS = ['x', 'y', 'z', 'h'], INTERP_DONE = [];
+function snapOf(o, keys) { const p = o._p || (o._p = new Array(keys.length)); for (let i = 0; i < keys.length; i++) p[i] = o[keys[i]]; o._pk = keys; }
 function interpSnap() {
-  for (const v of VEH) v._p = [v.x, v.y, v.z, v.h, v.slope, v.roll, v.pitch];
-  for (const p of PEDS) p._p = [p.x, p.y, p.z, p.h];
-  P._p = [P.x, P.y, P.z, P.h];
+  for (const v of VEH) snapOf(v, INTERP_VEH);
+  for (const p of PEDS) snapOf(p, INTERP_KEYS);
+  snapOf(P, INTERP_KEYS);
+}
+function interpMix(o, a) {
+  const p = o._p, keys = o._pk; if (!p) return;
+  if (hyp(o.x - p[0], o.z - p[2]) > 8) return; // a teleport (respawn, a new car): no in-between
+  const c = o._c || (o._c = new Array(keys.length));
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i], cur = o[k]; c[i] = cur; if (p[i] === undefined || cur === undefined) continue;
+    o[k] = k === 'h' ? p[i] + wrapA(cur - p[i]) * a : p[i] + (cur - p[i]) * a;
+  }
+  INTERP_DONE.push(o);
 }
 function interpBegin(a) {
-  const done = [];
-  const mix = (o, keys) => {
-    if (!o._p) return; const cur = keys.map(k => o[k]);
-    if (hyp(cur[0] - o._p[0], cur[2] - o._p[2]) > 8) return; // a teleport (respawn, a new car): no in-between
-    o._c = cur; keys.forEach((k, i) => { const p = o._p[i], c = cur[i]; if (p === undefined || c === undefined) return; o[k] = INTERP_ANG[k] ? p + wrapA(c - p) * a : p + (c - p) * a; });
-    done.push([o, keys]);
-  };
-  for (const v of VEH) mix(v, ['x', 'y', 'z', 'h', 'slope', 'roll', 'pitch']);
-  for (const p of PEDS) mix(p, INTERP_KEYS);
-  mix(P, INTERP_KEYS);
-  return done;
+  INTERP_DONE.length = 0;
+  for (const v of VEH) interpMix(v, a);
+  for (const p of PEDS) interpMix(p, a);
+  interpMix(P, a);
+  return INTERP_DONE;
 }
-function interpEnd(done) { for (const [o, keys] of done) { keys.forEach((k, i) => { o[k] = o._c[i]; }); o._c = null; } }
+function interpEnd(done) { for (const o of done) { const c = o._c, keys = o._pk; for (let i = 0; i < keys.length; i++) o[keys[i]] = c[i]; } done.length = 0; }
 
 // ---------------------------------------------------------------- street furniture you can knock down: street lamps, traffic lights, level-crossing barriers
 // Each prop is a post in the collision grid (dyn, so it can be switched off) plus a way to draw it falling: an Object3D whose origin is at its foot,
@@ -4628,7 +4633,7 @@ function endRun(kind) {
 }
 
 // ---------------------------------------------------------------- camera & visuals
-const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _camD = new THREE.Vector3();
 let camInit = false;
 function updCamera(dt) {
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
@@ -4644,6 +4649,11 @@ function updCamera(dt) {
     const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
   }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
+  // the camera rides along with what it follows and the smoothing below only softens turns and walls: chasing the car itself, a frame that
+  // comes late (the phone busy for a moment) let the camera catch up a metre at once and the car looked shoved back
+  const subj = inCar ? P.car : P, suby = inCar ? P.car.y : P.y, C = updCamera;
+  if (C.s === subj && hyp(px - C.x, pz - C.z) < 20) { const d = _camD.set(px - C.x, suby - C.y, pz - C.z); camPos.add(d); camLook.add(d); }
+  C.s = subj; C.x = px; C.y = suby; C.z = pz;
   const k = 1 - Math.exp(-(camMode === 1 ? 5 : 7.5) * dt);
   camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));
   camera.position.copy(camPos);
@@ -5405,5 +5415,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { tileTick, buildTileGen, LANDMARKS, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
+window.__G = { tileTick, buildTileGen, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
 </script>

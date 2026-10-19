@@ -1658,7 +1658,7 @@ function endRun(kind) {
 }
 
 // ---------------------------------------------------------------- camera & visuals
-const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _camD = new THREE.Vector3();
 let camInit = false;
 function updCamera(dt) {
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
@@ -1674,6 +1674,11 @@ function updCamera(dt) {
     const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
   }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
+  // the camera rides along with what it follows and the smoothing below only softens turns and walls: chasing the car itself, a frame that
+  // comes late (the phone busy for a moment) let the camera catch up a metre at once and the car looked shoved back
+  const subj = inCar ? P.car : P, suby = inCar ? P.car.y : P.y, C = updCamera;
+  if (C.s === subj && hyp(px - C.x, pz - C.z) < 20) { const d = _camD.set(px - C.x, suby - C.y, pz - C.z); camPos.add(d); camLook.add(d); }
+  C.s = subj; C.x = px; C.y = suby; C.z = pz;
   const k = 1 - Math.exp(-(camMode === 1 ? 5 : 7.5) * dt);
   camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));
   camera.position.copy(camPos);
