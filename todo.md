@@ -12,8 +12,9 @@ Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Stre
 ## Scuole
 - [x] Scuole Traversi (Palazzo delle Scuole Professionali), con la zona della partenza: parcheggi a strisce, parco Fusetti arredato
 - [ ] Altre scuole di Meda: servono foto (Marie Curie, Anna Frank, Diaz, San Giorgio)
-- [ ] Seminario di San Pietro Martire, Seveso (il complesso accanto al santuario)
-- [ ] Scuole di Seveso
+- [x] Seminario di San Pietro Martire, Seveso (il complesso accanto al santuario)
+- [x] Liceo Frassati di Baruccana con la palestra (foto della perizia del Comune, 2025)
+- [ ] Altre scuole di Seveso: servono foto (Collodi, Leonardo da Vinci / Milani, Bruno Munari, Toti, Don Aurelio Giussani, Frassati di via San Carlo)
 
 ## Monumenti con le foto già trovate, manca la posizione esatta
 - [ ] Muro dell'ICMESA (via Icmesa, Meda) con il pannello sul 1976

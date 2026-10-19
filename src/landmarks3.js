@@ -23,6 +23,8 @@ const LANDMARKS = [
   { n: 'Chiesa di San Giacomo', x: 1181.3, z: -451.7, f: [1186.7, -433.3, 1163.8, -443.5], len: 29.2, build: buildSanGiacomo },
   { n: 'Cappella di San Pietro da Verona Martire', x: -1707.0, z: 680.5, ry: 0.6, build: buildCappellaSPM },
   { n: 'Villa Bianca', x: -1611.1, z: 936.5, build: buildVillaBianca },
+  { n: 'Liceo paritario "Pier Giorgio Frassati"', x: 1152.1, z: 2092.8, build: buildPalazzo, o: { style: 'scuolaocra', h: 9.2, front: [1145.0, 2104.0] } }, // Baruccana, via Colombo: L-shaped, two floors on a basement
+  { n: 'Palestra Frassati', x: 1155.1, z: 2049.8, build: buildPalestra, o: { h: 6.8 } }, // the prefabricated gym in red panels
   { n: 'Seminario di Seveso', x: -717.1, z: 837.0, build: buildPalazzo, // Seminario Arcivescovile, now Centro Pastorale Ambrosiano: Quadrio's convent, enlarged by the Pollacks
     o: { style: 'seminario', h: 12.7, front: [-780.7, 832.5], portal: 'arch', sign: 'SEMINARIO ARCIVESCOVILE DI MILANO', signW: 8.6, signCol: '#55524b', signY: 8.15, fence: 7, lantern: { at: [-763.0, 818.0], w: 5.6, h: 4.5 } } },
   { n: 'Secondaria I grado “Traversi”', x: 544.4, z: -384.8, build: buildPalazzo, // the Palazzo delle Scuole Professionali (Aldo Vicini, 1932) on via Indipendenza
@@ -90,6 +92,7 @@ const PAL_STYLE = {
   dho: { wall: '#dfbb63', trim: '#f4ead2', shut: '#3f5a3c', plinth: '#b9b09c', light: ['#c9a654', '#ecd08a'], gShut: true },
   besana: { wall: '#d8c391', trim: '#c4bfb2', shut: '#9c978c', plinth: '#a9a397', light: ['#bfa977', '#e6d4a4'], gShut: true, ped: true },
   traversi: { wall: '#d3d2cc', trim: '#e9e8e3', shut: '#ddd8cc', plinth: '#b8b2a5', light: ['#cfcabd', '#eeeae2'], H: 11.1, floors: 2, noShut: true, blinds: true, lesene: true, archedUp: true },
+  scuolaocra: { wall: '#d4922c', trim: '#e6eae6', shut: '#d4922c', plinth: '#b38a4a', light: ['#c4852a', '#e0a23e'], H: 9.2, floors: 2, noShut: true, tapp: 0.55, basement: true },
   seminario: { wall: '#ece5d4', trim: '#f7f3ea', shut: '#ece5d4', plinth: '#b9b4a8', light: ['#ddd4c0', '#f6f0e2'], noShut: true },
   stazione: { wall: '#f1efe9', trim: '#dedad1', shut: '#2f5a3a', plinth: '#9d9b96', light: ['#dcd9d2', '#ffffff'], H: 8.8, floors: 2, arched: true },
   ferrario: { wall: '#c23b2a', trim: '#e2b25a', shut: '#c23b2a', plinth: '#d9cfc0', light: ['#a83324', '#d4513c'], noShut: true },
@@ -103,11 +106,12 @@ const palTex = (st, lit) => canvasTex(128, 512, (g, w, h) => { // one bay, pavem
   if (st.bugnato) for (let m = 1.2; m < 4.4; m += 0.5) { R(0, m - 0.04, w, m, 'rgba(110,75,35,.45)'); R(0, m, w, m + 0.03, 'rgba(255,240,200,.35)'); }
   R(0, 4.36, w, 4.4, 'rgba(0,0,0,.2)'); R(0, 4.4, w, 4.8, CREAM); R(0, 8.76, w, 8.8, 'rgba(0,0,0,.2)'); if (st.floors !== 2) R(0, 8.8, w, 9.05, CREAM); R(0, HH - 0.6, w, HH, CREAM); R(0, HH - 0.64, w, HH - 0.6, 'rgba(0,0,0,.2)');
   const blinds = (x0, m0, x1, m1) => { if (st.blinds) for (let m = m0 + 0.1; m < m1; m += 0.14) R(x0, m, x1, m + 0.04, 'rgba(255,255,255,.22)'); };
-  const win = (x0, m0, x1, m1, bars) => { R(x0 - 4, m0 - 0.15, x1 + 4, m1 + 0.15, CREAM); R(x0, m0, x1, m1, GLASS); blinds(x0, m0, x1, m1); if (!st.blinds) { R(62, m0, 66, m1, CREAM); R(x0, (m0 + m1) / 2 + 0.3, x1, (m0 + m1) / 2 + 0.36, CREAM); } if (bars) for (let x = x0 + 4; x < x1; x += 7) R(x, m0, x + 1.5, m1, '#15171a'); };
+  const win = (x0, m0, x1, m1, bars) => { R(x0 - 4, m0 - 0.15, x1 + 4, m1 + 0.15, CREAM); R(x0, m0, x1, m1, GLASS); blinds(x0, m0, x1, m1); if (st.tapp) { const mt = m1 - (m1 - m0) * st.tapp; R(x0, mt, x1, m1, '#d8cdb4'); for (let m = mt + 0.06; m < m1; m += 0.09) R(x0, m, x1, m + 0.02, 'rgba(0,0,0,.12)'); } /* roller blinds half down */ if (!st.blinds) { R(62, m0, 66, m1, CREAM); R(x0, (m0 + m1) / 2 + 0.3, x1, (m0 + m1) / 2 + 0.36, CREAM); } if (bars) for (let x = x0 + 4; x < x1; x += 7) R(x, m0, x + 1.5, m1, '#15171a'); };
   const archWin = (x0, m0, x1, m1) => { const r = (x1 - x0) / 2, cx = (x0 + x1) / 2, top = Y(m1) + r; g.fillStyle = CREAM; g.fillRect(x0 - 4, top, x1 - x0 + 8, Y(m0 - 0.15) - top); g.beginPath(); g.arc(cx, top, r + 4, Math.PI, 0); g.fill(); g.fillStyle = GLASS; g.fillRect(x0, top, x1 - x0, Y(m0) - top); g.beginPath(); g.arc(cx, top, r, Math.PI, 0); g.fill(); blinds(x0, m0, x1, m1 - r * HH / h); };
   if (st.lesene) for (const x of [0, w - 10]) { R(x, 0.5, x + 10, HH - 0.6, CREAM); R(x ? x : 9, 0.5, (x ? x : 9) + 1, HH - 0.6, 'rgba(0,0,0,.14)'); } // giant pilasters between the bays
   const shutters = (m0, m1) => { if (st.noShut) return; for (const x of [18, 88]) { R(x, m0, x + 22, m1, st.shut); for (let m = m0 + 0.08; m < m1; m += 0.12) R(x + 2, m, x + 20, m + 0.04, 'rgba(0,0,0,.25)'); } };
   if (st.gShut) shutters(1.3, 3.5); win(46, 1.3, 82, 3.5, !st.gShut); if (st.bugnato) R(58, 3.65, 70, 3.95, CREAM); // ground floor: grated with a keystone, or shuttered
+  if (st.basement) for (const x of [40, 70]) R(x, 0.12, x + 18, 0.5, '#3a3a38'); /* the little basement windows */
   shutters(5.45, 7.75); if (st.archedUp) archWin(44, 5.45, 84, 8.3); else win(46, 5.45, 82, 7.75); R(36, 5.1, 92, 5.3, '#e6d8bb'); R(34, 7.95, 94, 8.1, CREAM); // piano nobile: sill and cornice, a pediment on the municipio
   if (st.ped) { g.fillStyle = CREAM; g.beginPath(); g.moveTo(34, Y(8.1)); g.lineTo(94, Y(8.1)); g.lineTo(64, Y(8.62)); g.closePath(); g.fill(); g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(34, Y(8.1), 60, 2); }
   if (st.floors !== 2) { shutters(9.75, 11.45); win(46, 9.75, 82, 11.45); R(40, 9.5, 88, 9.62, '#e6d8bb'); }
@@ -1006,4 +1010,21 @@ function buildParkFurniture(T, G) {
   }
   if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
   if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
+}
+
+// a school gym of the seventies: prefabricated panels in faded red, a band of windows under the eaves, a shallow metal roof
+const gymTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#9c4a3a'; g.fillRect(0, 0, w, h); for (let x = 0; x < w; x += 8) { g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x, 0, 2, h); g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(x + 2, 0, 1, h); } noise(g, w, h, 300, 0.15, ['#7d3a2c', '#b8604c']); });
+LMAT.gym = new THREE.MeshLambertMaterial({ map: gymTex });
+function buildPalestra(L, B, G) {
+  const ring = lmSimplify(B.pts, 0.4), F = lmFrame(new THREE.Matrix4()), Bs = lmBuffers(), gym = Buf(), gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), H = gy + L.o.h, A = sArea(ring);
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.3) continue;
+    let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
+    F.face(gym, [[a[0], gy - 1, a[1]], [c[0], gy - 1, c[1]], [c[0], H, c[1]], [a[0], H, a[1]]]);
+    const ex = (c[0] - a[0]) / Ln, ez = (c[1] - a[1]) / Ln, m = 0.4, o = 0.04;
+    F.face(Bs.trim, [[a[0] + ex * m + nx * o, H - 1.6, a[1] + ez * m + nz * o], [c[0] - ex * m + nx * o, H - 1.6, c[1] - ez * m + nz * o], [c[0] - ex * m + nx * o, H - 0.5, c[1] - ez * m + nz * o], [a[0] + ex * m + nx * o, H - 0.5, a[1] + ez * m + nz * o]], 2, COL('#2e3236'));
+    for (let s = 1.2; s < Ln - 0.5; s += 1.5) F.geo(Bs.trim, lmBox(0.08, 1.1, 0.06, 0, 0, 0).translate(a[0] + ex * s + nx * 0.07, H - 1.05, a[1] + ez * s + nz * 0.07), null, COL('#6b6f73'));
+  }
+  lmBody(F, Bs, ring, H - 0.2, H, { col: COL('#9c4a3a'), roof: 'trim', roofCol: COL('#5a5e62'), slope: 0.12, over: 0.5, d: 6 });
+  mkMesh(gym, LMAT.gym, 10, 'cast', G); lmFlush(Bs, G);
 }
