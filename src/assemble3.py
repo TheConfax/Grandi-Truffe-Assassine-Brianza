@@ -433,6 +433,49 @@ fetch('https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza/co
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>""")
 
+# ---- cheat codes in the pause menu: RESPAWN back to the start in Meda with the Ferari, FERARI spawns one
+rep("""function setupWorld(saved) {""", """function startSpot() { // the parking on via Yuri Gagarin in Meda, facing the fountain
+  const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
+  const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
+  return [sx, sz, Math.atan2(FO[0] - sx, FO[1] - sz)];
+}
+function setupWorld(saved) {""")
+rep("""  const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
+  const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
+  const h = Math.atan2(FO[0] - sx, FO[1] - sz);
+  const mine""", """  const [sx, sz, h] = startSpot();
+  const mine""")
+rep("""let last = performance.now(), acc = 0;
+function frame(t) {""", """// ---------------------------------------------------------------- cheat codes, typed in the pause menu
+function ferari(x, z, h) { // a red Ferari at (x,z), clearing whatever is parked on that spot
+  for (const o of VEH.slice()) if (o !== P.car && hyp(o.x - x, o.z - z) < 5) o.remove();
+  const v = new Vehicle('sport', '#d0141a', x, z, h); v.moved = true; v.y = surfAt(x, z); v.sync(); return v;
+}
+function cheatRespawn() { // back to the start: via Yuri Gagarin, on foot next to the Ferari, no stars
+  if (P.car) { P.car.driver = null; P.car.boost = false; P.car.inp = { thr: 0, brk: 0, steer: 0, hand: 1 }; P.car = null; }
+  const [sx, sz, h] = startSpot(); tileTick(sx, sz, 0, 420);
+  const mine = ferari(sx, sz, h);
+  P.x = mine.x + Math.cos(h) * 2.4; P.z = mine.z - Math.sin(h) * 2.4; if (inBuilding(P.x, P.z, 0.5)) { P.x = mine.x - Math.cos(h) * 2.4; P.z = mine.z + Math.sin(h) * 2.4; }
+  P.h = h; P.y = surfAt(P.x, P.z); P.mode = 'foot'; P.model.g.visible = true; P.hp = 100; P.knock = 0; P.vx = P.vz = P.vy = 0;
+  W.heat = 0; W.stars = 0; W.busted = 0; W.bustT = 0;
+  camInit = false; banner('Via Yuri Gagarin', 'MEDA');
+}
+function cheatFerari() { // on foot: a Ferari right in front of you; driving: whatever you are in turns into one
+  if (P.car) {
+    const o = P.car; o.driver = null; o.boost = false; P.car = null; o.remove();
+    const v = ferari(o.x, o.z, o.h); v.driver = 'player'; v.sleep = false; P.car = v;
+  } else {
+    const fx = Math.sin(P.h), fz = Math.cos(P.h); let x = P.x + fx * 4, z = P.z + fz * 4;
+    if (inBuilding(x, z, 1.2)) { x = P.x - fx * 4; z = P.z - fz * 4; }
+    ferari(x, z, P.h);
+  }
+  toast('🏎 Ferari!');
+}
+const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };
+let last = performance.now(), acc = 0;
+function frame(t) {""")
+rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto');", "if (v === 'DEBUG') setDebug(!DEBUG); else if (CHEATS[v]) CHEATS[v](); else if (v) toast('Codice sconosciuto');")
+
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')
 left = [m.start() for m in re.finditer(r'surfY\(|TR\.circ|D\.(areas|rails|rivers|train|trees|surf|fences|crossings|buildings|hw|hh)\b|MAPC|MOX', s)]
