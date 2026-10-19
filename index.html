@@ -2050,7 +2050,7 @@ function buildCrocifisso(L, B, G) {
 function buildSanPietroMeda(L, B, G) {
   const ring = lmSimplify(B.pts, 0.6), F = lmFrame(new THREE.Matrix4()), Bs = { buff: Buf(), trim: Buf(), lattice: Buf(), louvre: Buf() };
   const xs = ring.map(p => p[0]), xW = Math.min(...xs), w = ring[xs.indexOf(xW)], gy = Math.min(...ring.map(p => groundH(p[0], p[1]))), bot = gy - 0.8, top = gy + 10.0, A = sArea(ring);
-  const WHITE = COL('#ece7dc'), COPPER = COL('#6f9a86'), BRONZE = COL('#4e3d2c'), DARK = COL('#2c2b2d'), PIPE = COL('#b8b1a3');
+  const WHITE = COL('#ece7dc'), COPPER = COL('#6f9a86'), BRONZE = COL('#4e3d2c'), DARK = COL('#2c2b2d');
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i], c = ring[(i + 1) % ring.length], Ln = hyp(c[0] - a[0], c[1] - a[1]); if (Ln < 0.3) continue;
     let nx = (c[1] - a[1]) / Ln, nz = -(c[0] - a[0]) / Ln; if (A < 0) { nx = -nx; nz = -nz; }
@@ -2058,13 +2058,19 @@ function buildSanPietroMeda(L, B, G) {
     F.face(Bs.buff, [[a[0], bot, a[1]], [c[0], bot, c[1]], [c[0], top, c[1]], [a[0], top, a[1]]]);
     for (let y = gy + 1.6; y < top - 0.5; y += 1.65) F.geo(Bs.trim, lmBox(Ln, 0.16, 0.06, 0, y, 0).rotateY(ry).translate(mx + nx * 0.03, 0, mz + nz * 0.03), null, WHITE); // white bands
     F.geo(Bs.trim, lmBox(Ln + 0.6, 0.45, 0.5, 0, top - 0.1, 0).rotateY(ry).translate(mx + nx * 0.2, 0, mz + nz * 0.2), null, WHITE);
-    for (let s0 = 2.5; s0 < Ln - 1.5; s0 += 5) F.geo(Bs.trim, lmBox(0.12, top - gy, 0.12, 0, (gy + top) / 2, 0).translate(a[0] + ex * s0 + nx * 0.12, 0, a[1] + ez * s0 + nz * 0.12), null, PIPE); // downpipes
+    const nb = Math.max(1, Math.round(Ln / 4.2)), bw = Ln / nb; // white concrete fins, a tall strip of concrete screen in every bay
+    for (let k = 0; k <= nb; k++) F.geo(Bs.trim, lmBox(0.35, top - gy, 0.3, 0, (gy + top) / 2, 0).rotateY(ry).translate(a[0] + ex * k * bw + nx * 0.15, 0, a[1] + ez * k * bw + nz * 0.15), null, WHITE);
+    for (let k = 0; k < nb; k++) { const cx = a[0] + ex * (k + 0.5) * bw + nx * 0.07, cz = a[1] + ez * (k + 0.5) * bw + nz * 0.07; F.face(Bs.lattice, [[cx - ex * 0.45, gy + 1.0, cz - ez * 0.45], [cx + ex * 0.45, gy + 1.0, cz + ez * 0.45], [cx + ex * 0.45, top - 0.9, cz + ez * 0.45], [cx - ex * 0.45, top - 0.9, cz - ez * 0.45]]); }
   }
   { // low copper roof, hipped up from the eaves
     let d = 1; for (const t of [6, 4.5, 3, 2]) if (lmInsetOK(ring, lmOffset(ring, t))) { d = t; break; }
     const o = lmOffset(ring, -0.5), r = lmOffset(ring, d), yr = top + 0.22 * (d + 0.5);
     for (let i = 0; i < ring.length; i++) { const j = (i + 1) % ring.length; F.face(Bs.trim, [[o[i][0], top + 0.1, o[i][1]], [o[j][0], top + 0.1, o[j][1]], [r[j][0], yr, r[j][1]], [r[i][0], yr, r[i][1]]], 2, COPPER); }
     F.face(Bs.trim, r.map(p => [p[0], yr, p[1]]), 2, COPPER);
+    const cx = ring.reduce((t, p) => t + p[0], 0) / ring.length, cz = ring.reduce((t, p) => t + p[1], 0) / ring.length; // the copper lantern with flared sides over the hall
+    const prof = [[5.2, 0], [3.6, 0.8], [2.4, 1.9], [1.5, 3.2], [1.0, 4.6], [0.9, 5.4]].map(([r0, h]) => new THREE.Vector2(r0, h));
+    F.geo(Bs.trim, new THREE.LatheGeometry(prof, 4).translate(cx, yr - 0.1, cz), null, COPPER);
+    F.geo(Bs.trim, lmBox(1.3, 1.1, 1.3, cx, yr + 5.95, cz).rotateY(Math.PI / 4), null, WHITE); F.geo(Bs.trim, new THREE.ConeGeometry(1.0, 0.9, 4).translate(cx, yr + 6.95, cz), null, COPPER);
   }
   // the entrance tower at the west tip, in its own frame: x across its front, +z out towards via San Carlo
   const gw = groundH(w[0] - 2, w[1]), T = lmFrame(new THREE.Matrix4().makeRotationY(-Math.PI / 2).setPosition(w[0] - 1.0, gw, w[1]));
@@ -2082,6 +2088,12 @@ function buildSanPietroMeda(L, B, G) {
   T.geo(Bs.louvre, new THREE.PlaneGeometry(3.0, 3.4).translate(0, H - 1.6, 0.05)); T.geo(Bs.louvre, new THREE.PlaneGeometry(3.0, 3.4).rotateY(Math.PI).translate(0, H - 1.6, -D - 0.05));
   tt(lmBox(3.4, 0.25, 0.3, 0, H - 3.4, 0.15), WHITE); tt(lmBox(2 * CW + 0.1, 0.3, D + 0.1, 0, H + 0.95, -D / 2), WHITE);
   tt(new THREE.ConeGeometry(1.1, 3.4, 4).rotateY(Math.PI / 4).translate(0, H + 2.8, -1.4), COPPER); tt(new THREE.SphereGeometry(0.2, 8, 6).translate(0, H + 4.6, -1.4), COPPER);
+  for (const sd of [-1, 1]) { // louvres and a column of small windows on the flanks, green canopies at the foot
+    const xf = sd * (CW + PW + 0.06);
+    T.geo(Bs.louvre, new THREE.PlaneGeometry(2.6, 4.2).rotateY(sd * Math.PI / 2).translate(xf, H - 2.4, -D / 2 - 0.4));
+    for (let y = 7.5; y < H - 5; y += 2.0) tt(lmBox(0.06, 0.55, 0.55, xf, y, -1.2), DARK);
+    tt(lmBox(3.4, 0.18, 1.6, sd * (CW + PW + 1.7), 3.4, -D + 1.2), COPPER);
+  }
   tt(lmBox(1.0, 0.35, 0.8, -(CW + PW / 2), 7.8, 0.75), WHITE); lmStatue(T, Bs.trim, -(CW + PW / 2), 7.95, 0.75, 1.15, BRONZE); // San Pietro Martire, Giancarlo Fontana
   for (let k = 0; k < 4; k++) tt(lmBox(14 - 2 * k, 0.15, 1.2 + 0.0 * k, 0, 0.15 * k - 0.05, 2.0 + 1.2 * (3 - k) / 2), COL('#cfc8b8')); // the sagrato steps
   mkMesh(Bs.buff, LMAT.buff, 10, 'cast', G); mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G); mkMesh(Bs.lattice, LMAT.lattice, 10, false, G); mkMesh(Bs.louvre, LMAT.louvre, 10, false, G);
