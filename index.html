@@ -89,6 +89,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 #go:active { transform: translateY(3px); box-shadow: 0 2px 0 #a8731b; }
 #go:focus-visible, .tb:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 #start .credit { font-size: 15px; color: var(--ink-dim); margin: 0; }
+.ver { font: 13px ui-monospace, monospace !important; color: var(--ink-dim); margin: 0; opacity: .75; } #pause .ver { margin-top: 14px; }
 #start a, #osm a { color: var(--ocra); pointer-events: auto; }
 #pause { position: fixed; inset: 0; z-index: 9; background: rgba(14,15,20,.8); display: grid; place-items: center; text-align: center; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 #pause h2 { font-family: var(--display); font-size: clamp(36px, 7vw, 64px); margin: 0 0 10px; color: var(--ocra); }
@@ -125,7 +126,7 @@ body:not(.debug) .dbg { display: none !important; }
 <div id="touch" hidden></div>
 <div id="fx"><h2 id="fxt"></h2></div>
 <div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span>Premi M per tornare in strada</span></div></div>
-<div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>G</kbd> guida arcade/realistica · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p></div></div>
+<div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>G</kbd> guida arcade/realistica · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p><p class="ver" id="pver" hidden></p></div></div>
 
 <div id="start">
   <div class="wrap">
@@ -148,9 +149,18 @@ body:not(.debug) .dbg { display: none !important; }
     </div>
     <button id="go" type="button">ACCENDI IL MOTORE</button>
     <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale; <a href="https://www.radiomaria.it" target="_blank" rel="noopener">Radio Maria</a>.</p>
+    <p class="ver" id="ver" hidden></p>
   </div>
 </div>
 
+<script>
+fetch('https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza/commits/main').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(c => {
+  const d = new Date(c.commit.committer.date), p = n => String(n).padStart(2, '0');
+  const txt = 'versione ' + c.sha.slice(0, 7) + ' · ' + p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  const v = document.getElementById('ver'), a = document.createElement('a'); a.href = c.html_url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = txt; v.append(a); v.hidden = false;
+  const pv = document.getElementById('pver'); pv.textContent = txt; pv.hidden = false;
+}).catch(() => { }); // offline or inside claude.ai: no version line
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script type="module">
 // =====================================================================

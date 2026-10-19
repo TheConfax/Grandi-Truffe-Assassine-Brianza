@@ -412,6 +412,26 @@ rep("  if (running) { updHud(dt); updAudio(); }", "  if (running) { updHud(dt); 
 # help for wheelies and stoppies
 rep("      <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>", "      <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>\n      <div><kbd>Q</kbd> / <kbd>E</kbd> in moto: peso indietro (impennata col gas) / avanti (stoppie in frenata)</div>")
 rep("<kbd>R</kbd> radio · ", "<kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · ")
+# ---- version: hash and date of the last commit on main, in the start screen and the pause menu
+# read from the GitHub API at load: the commit that ships this index.html doesn't exist yet when it's assembled
+rep("#start .credit { font-size: 15px; color: var(--ink-dim); margin: 0; }", "#start .credit { font-size: 15px; color: var(--ink-dim); margin: 0; }\n.ver { font: 13px ui-monospace, monospace !important; color: var(--ink-dim); margin: 0; opacity: .75; } #pause .ver { margin-top: 14px; }")
+rep("<p>Premi <kbd>P</kbd> per riprendere</p></div></div>", "<p>Premi <kbd>P</kbd> per riprendere</p><p class=\"ver\" id=\"pver\" hidden></p></div></div>")
+rep("""  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>""", """    <p class="ver" id="ver" hidden></p>
+  </div>
+</div>
+
+<script>
+fetch('https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza/commits/main').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(c => {
+  const d = new Date(c.commit.committer.date), p = n => String(n).padStart(2, '0');
+  const txt = 'versione ' + c.sha.slice(0, 7) + ' · ' + p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  const v = document.getElementById('ver'), a = document.createElement('a'); a.href = c.html_url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = txt; v.append(a); v.hidden = false;
+  const pv = document.getElementById('pver'); pv.textContent = txt; pv.hidden = false;
+}).catch(() => { }); // offline or inside claude.ai: no version line
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>""")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')
