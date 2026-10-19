@@ -1,4 +1,4 @@
-# Builds src/segnaletica.json from OSM API extracts of the game area (t*.xml in the working directory): stop, give way, speed limits, no entry, roundabout islands, signs mapped one by one
+# Builds src/segnaletica.json from OSM API extracts of the game area (t*.xml in the working directory): stop, give way, speed limits, no entry, roundabouts and their islands, signs mapped one by one
 import xml.etree.ElementTree as ET, glob, math, json, re, collections
 lat0,lon0=45.6575,9.154;k=111320*math.cos(math.radians(lat0)); HW,HH=2878.8-30,2542.4-30
 XY=lambda la,lo:((lo-lon0)*k, -(la-lat0)*110540)
@@ -148,6 +148,20 @@ for wid,(t,nd) in ways.items():
     add('isola',(nx_+bx*0.9,nz_+bz*0.9),(bx,bz),poly); isl+=1
     break
 print('islands',isl)
+# ---- before each roundabout: the blue roundabout sign at every entry, under the give way when there is one there
+rot=0
+for wid,(t,nd) in ways.items():
+  if t.get('junction') or len(nd)<2: continue
+  ow=oneway(t)
+  for end,inner,ok in ((len(nd)-1,len(nd)-2,ow!=-1),(0,1,ow!=1)):
+    if not ok or nd[end] not in ring: continue
+    a_=nodes[nd[end]]; b_=nodes[nd[inner]]; L=math.hypot(b_[0]-a_[0],b_[1]-a_[1])
+    if L<4: continue
+    d=unit(b_,a_); s_=min(6,L*0.6); p=(a_[0]-d[0]*s_,a_[1]-d[1]*s_)
+    near=[o for o in out if o[0]=='dare' and math.hypot(o[1]-p[0],o[2]-p[1])<12 and o[3]*d[0]+o[4]*d[1]>0.5]
+    for o in near: out.remove(o)
+    add('rotatoria',p,d,'dare' if near else None); rot+=1
+print('roundabout entries',rot)
 noses=[o for o in out if o[0]=='isola']
 out=[o for o in out if not (o[0]=='vietato' and any(math.hypot(o[1]-n[1],o[2]-n[2])<9 for n in noses))] # the island post carries the no entry for the exit lane
 c=collections.Counter(o[0] for o in out); print(c, len(out))
