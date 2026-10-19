@@ -355,6 +355,24 @@ function addBox(b, x, y, z, w, h, d, col, ry = 0) { // axis box rotated about y,
 }
 let srndT = 1;
 const tRnd = () => { srndT = (srndT * 16807) % 2147483647; return srndT / 2147483647; };
+// street lamps every ~30 m along the streets of the towns (OSM maps only a handful): one side on narrow streets, staggered on wide ones
+function genLamps(T, d, osm) {
+  const out = [];
+  for (const ri of d.rp || []) {
+    const r = D.roads[ri]; if (r.c > 3 || r.x || r.d || r.t || r.w < 5) continue;
+    if (!r.cum) { r.cum = [0]; for (let k = 1; k < r.g.length; k++) { const a = N[r.g[k - 1]], b = N[r.g[k]]; r.cum.push(r.cum[k - 1] + hyp(b[0] - a[0], b[1] - a[1])); } }
+    const len = r.cum[r.cum.length - 1], wide = r.w >= 9.5, SP = wide ? 24 : 30, side = ri % 2 ? 1 : -1;
+    for (let s = 6 + ((ri * 7919) % 97) / 97 * SP, n = 0; s < len - 6; s += SP, n++) {
+      let k = 1; while (k < r.cum.length - 1 && r.cum[k] < s) k++;
+      const a = N[r.g[k - 1]], b = N[r.g[k]], L = r.cum[k] - r.cum[k - 1] || 1, f = (s - r.cum[k - 1]) / L, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+      const sd = wide ? (n % 2 ? 1 : -1) : side, off = r.w / 2 + 0.9, x = a[0] + (b[0] - a[0]) * f - uz * off * sd, z = a[1] + (b[1] - a[1]) * f + ux * off * sd;
+      if (tileOf(x, z) !== T.t || onAnyRoad(x, z, 0.3) || inBuilding(x, z, 0.4) || nearRail(x, z, 4) || osm.some(o => hyp(o[0] - x, o[1] - z) < 14)) continue;
+      let town = 0; BLD.each(x - 30, z - 30, x + 30, z + 30, () => { town++; }); if (town < 2) continue; // only where there are houses
+      out.push([x, z, Math.atan2(ux * sd, uz * sd)]); // arm towards the middle of the road
+    }
+  }
+  return out;
+}
 function buildTile(T) {
   if (T.built) return; T.built = true; srndT = 1000 + T.t * 7919;
   const G = new THREE.Group(); scene.add(G); T.group = G;
@@ -661,14 +679,17 @@ function buildTile(T) {
     });
     trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; G.add(trunks, crowns);
   }
-  if ((d.lp || []).length) {
-    const lb = Buf(), hb = Buf();
-    for (const [X, Z] of d.lp) { const x = X / 10, z = Z / 10, gy = surfAt(x, z, 1e4); addBox(lb, x, gy + 3.6, z, 0.14, 7.2, 0.14, null); addBox(lb, x + 0.6, gy + 7.15, z, 1.3, 0.1, 0.12, null); addBox(hb, x + 1.15, gy + 7.0, z, 0.5, 0.14, 0.3, null); }
-    put(lb, MAT.lamp, 10, 'cast'); put(hb, MAT.lampHead, 10);
-    const pool = Buf(); // warm light pools on the street at night
-    for (const [X, Z] of d.lp) { const x = X / 10 + 1.15, z = Z / 10, gy = surfAt(x, z, 1e4) + 0.14, i = pool.p.length / 3, R = 7; vtx(pool, x - R, gy, z - R, 0, 1, 0, 0, 0); vtx(pool, x + R, gy, z - R, 0, 1, 0, 1, 0); vtx(pool, x + R, gy, z + R, 0, 1, 0, 1, 1); vtx(pool, x - R, gy, z + R, 0, 1, 0, 0, 1); triUp(pool, i, i + 1, i + 2); triUp(pool, i, i + 2, i + 3); }
-    put(pool, LAMPPOOL_MAT, 12);
-    const gp = []; for (const [X, Z] of d.lp) { const x = X / 10, z = Z / 10; gp.push(x + 1.15, surfAt(x, z, 1e4) + 6.82, z); } // glare under each lamp head
+  const LPS = (d.lp || []).map(([X, Z]) => [X / 10, Z / 10, 0]); LPS.push(...genLamps(T, d, LPS)); // [x, z, arm direction]
+  if (LPS.length) {
+    const lb = Buf(), hb = Buf(), pool = Buf(), gp = [];
+    for (const [x, z, ry] of LPS) {
+      const gy = surfAt(x, z, 1e4), c = Math.cos(ry), s = Math.sin(ry), hx = x + c * 1.15, hz = z - s * 1.15; // the arm reaches out along local +x
+      addBox(lb, x, gy + 3.6, z, 0.14, 7.2, 0.14, null); addBox(lb, x + c * 0.6, gy + 7.15, z - s * 0.6, 1.3, 0.1, 0.12, null, ry); addBox(hb, hx, gy + 7.0, hz, 0.5, 0.14, 0.3, null, ry);
+      const py = surfAt(hx, hz, 1e4) + 0.14, i = pool.p.length / 3, R = 7; // warm light pool on the street at night
+      vtx(pool, hx - R, py, hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, py, hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, py, hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, py, hz + R, 0, 1, 0, 0, 1); triUp(pool, i, i + 1, i + 2); triUp(pool, i, i + 2, i + 3);
+      gp.push(hx, gy + 6.82, hz); // glare under the lamp head
+    }
+    put(lb, MAT.lamp, 10, 'cast'); put(hb, MAT.lampHead, 10); put(pool, LAMPPOOL_MAT, 12);
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
     const glare = new THREE.Points(pg, LAMPGLOW_MAT); glare.renderOrder = 14; G.add(glare);
   }
