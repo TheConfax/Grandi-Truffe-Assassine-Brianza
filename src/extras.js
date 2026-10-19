@@ -1,0 +1,124 @@
+// ---------------------------------------------------------------- day & night
+let TOD = 17.2; // ore del giorno, 1 ora di gioco = 1 minuto reale
+const HEADPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,236,190,0.9)', 'rgba(255,236,190,0)'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+const LAMPPOOL_MAT = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,214,150,0.85)', 'rgba(255,214,150,0)'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+const WIN_EMI = (kind) => canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd890'; if (kind === 'old') g.fillRect(48, 32, 32, 54); else if (kind === 'modern') { g.fillRect(16, 28, 44, 52); g.fillStyle = '#c99a50'; g.fillRect(68, 28, 44, 52); } });
+const WIN_LIT = { value: 0 }; // share of windows lit, each window decides by its own hash
+for (const [k, kind] of [['old', 'old'], ['mod', 'modern']]) {
+  MAT[k].emissiveMap = WIN_EMI(kind); MAT[k].emissive = new THREE.Color(0xffc870); MAT[k].emissiveIntensity = 0;
+  MAT[k].onBeforeCompile = sh => {
+    sh.uniforms.uLit = WIN_LIT;
+    sh.fragmentShader = 'uniform float uLit;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float wh = fract(sin(dot(floor(vUv) + 0.37, vec2(12.9898, 78.233))) * 43758.5453);\n  totalEmissiveRadiance *= step(wh, uLit) * (0.7 + 0.6 * fract(wh * 7.13));');
+  };
+  MAT[k].needsUpdate = true;
+}
+// share of lit windows through a Brianza evening: people come home, dinner, then lights go off one by one
+const LIT_KEYS = [[0, 0.3], [1, 0.16], [3, 0.06], [5.5, 0.05], [6.5, 0.18], [7.5, 0.22], [8.5, 0.04], [17, 0.04], [18.5, 0.25], [20, 0.55], [21.5, 0.6], [23, 0.45], [24, 0.3]];
+const litAt = h => { for (let i = 1; i < LIT_KEYS.length; i++) if (h <= LIT_KEYS[i][0]) { const [a, va] = LIT_KEYS[i - 1], [b, vb] = LIT_KEYS[i]; return va + (vb - va) * (h - a) / (b - a); } return 0.3; };
+MAT.lampHead.emissive = new THREE.Color(0xffd890);
+const headSpot = new THREE.SpotLight(0xfff0d0, 0, 70, 0.55, 0.6, 1.2); headSpot.castShadow = false; scene.add(headSpot, headSpot.target);
+const SKY_C = {
+  day: ['#5e8fd0', '#a9c3e0', '#f1dcb6', '#f6d7a8'], dusk: ['#2c3e74', '#b0708a', '#f39a5a', '#ffb070'], night: ['#0a1022', '#16234a', '#2a3a66', '#3a4570'],
+};
+const skyCanvas = scene.background.image, skyCtx = skyCanvas.getContext('2d');
+const mixHex = (a, b, t) => { const A = new THREE.Color(a), B = new THREE.Color(b); return A.lerp(B, t); };
+let skyT = -1, nightK = 0;
+const LATR = 45.66 * Math.PI / 180, SOLAR_NOON = 12.52;
+function lightTones() {
+  const H = (TOD - SOLAR_NOON) * 15 * Math.PI / 180, E = -Math.sin(H), Nn = -Math.sin(LATR) * Math.cos(H), U = Math.cos(LATR) * Math.cos(H);
+  const elDeg = Math.asin(U) * 180 / Math.PI, day = clamp((elDeg + 4) / 12, 0, 1), dusk = Math.exp(-(((elDeg - 1) / 6) ** 2));
+  return { E, Nn, U, elDeg, elev: U, day, night: 1 - day, dusk };
+}
+function updDayNight(dt) {
+  TOD = (TOD + dt / 60) % 24;
+  const L = lightTones(); nightK = L.night;
+  // sun runs east -> south -> west, moon light when it is down
+  if (L.U > 0) SUN_DIR.set(L.E, Math.max(0.12, L.U), -L.Nn).normalize(); else SUN_DIR.set(0.3, 0.8, 0.45).normalize(); // night: soft moonlight from high up
+  sun.intensity = 0.3 + 0.6 * L.day;
+  sun.color.copy(mixHex(0x8fa6d8, 0xffdcae, L.day)).lerp(new THREE.Color(0xff9356), L.dusk * 0.6);
+  hemi.intensity = 0.5 + 0.28 * L.day; hemi.color.copy(mixHex(0x5a6fa8, 0xdbe8ff, L.day)); hemi.groundColor.copy(mixHex(0x2a2a36, 0x8a7f6a, L.day));
+  const fog = mixHex(0x1f2a44, 0xebd9ba, L.day).lerp(new THREE.Color(0xe39a72), L.dusk * 0.55); scene.fog.color.copy(fog); scene.fog.far = 560 + 160 * L.day;
+  _far.material.color.setScalar(0.18 + 0.82 * L.day); _near.material.color.setScalar(0.15 + 0.85 * L.day);
+  if (Math.abs(TOD - skyT) > 0.04 || skyT < 0) { // redraw the 4x256 sky gradient now and then
+    skyT = TOD; const g = skyCtx, h = skyCanvas.height, gr = g.createLinearGradient(0, 0, 0, h), stops = [0, 0.55, 0.8, 1];
+    stops.forEach((s, i) => { const c = mixHex(SKY_C.night[i], SKY_C.day[i], L.day).lerp(new THREE.Color(SKY_C.dusk[i]), L.dusk * 0.75); gr.addColorStop(s, '#' + c.getHexString()); });
+    g.fillStyle = gr; g.fillRect(0, 0, skyCanvas.width, h); scene.background.needsUpdate = true;
+  }
+  // street lamps, windows, car lights
+  const lampsOn = clamp((3 - L.elDeg) / 7, 0, 1); WIN_LIT.value = litAt(TOD);
+  for (const m of SIGN_MATS) m.emissiveIntensity = 0.05 + 0.75 * lampsOn;
+  MAT.lampHead.emissiveIntensity = 0.3 + 2.4 * lampsOn; LAMPPOOL_MAT.opacity = 0.75 * lampsOn;
+  MAT.old.emissiveIntensity = MAT.mod.emissiveIntensity = 0.55 * lampsOn;
+  M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn;
+  const v = P.mode === 'car' ? P.car : null;
+  headSpot.intensity = v && v.health > 0 ? 2.4 * lampsOn : 0;
+  if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); }
+  const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0'); }
+}
+function skipTime(h) { TOD = (TOD + h) % 24; skyT = -1; updDayNight(0); toast('Ora: ' + String(TOD | 0).padStart(2, '0') + ':' + String(Math.floor((TOD % 1) * 60)).padStart(2, '0')); }
+
+// ---------------------------------------------------------------- damage: dents, scorched paint, fire and explosion
+const CHAR = new THREE.Color(0x1d1b19);
+function dentCar(v, sev, nx, nz) {
+  const m = v.m; if (!m.bm || sev <= 0) return;
+  if (!m.own) { // own paint so that only this car gets scorched
+    const pm = m.paint.clone(); m.body.traverse(o => { if (o.material === m.paint) o.material = pm; }); m.paint = pm; m.own = true; m.base = pm.color.clone();
+  }
+  // contact point in the car's frame: opposite to the push normal
+  const c = Math.cos(v.h), s = Math.sin(v.h), lx = -nx * c + nz * s, lz = -nx * s - nz * c; // world -> local (x right, z forward)
+  const geo = m.bm.geometry, pos = geo.attributes.position, org = m.org || (m.org = pos.array.slice()), S = v.spec;
+  const cx = lx * S.W / 2 * 1.2, cz = lz * S.L / 2 * 1.2, R = 1.25;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), d = hyp(x - cx, z - cz), w = Math.max(0, 1 - d / R); if (!w) continue;
+    const ox = org[i * 3], oz = org[i * 3 + 2], k = sev * w * w;
+    let nx2 = x - lx * k, nz2 = z - lz * k;
+    if (Math.abs(nx2) < Math.abs(ox) * 0.55) nx2 = Math.sign(ox) * Math.abs(ox) * 0.55; if (Math.abs(nz2) < Math.abs(oz) * 0.6) nz2 = Math.sign(oz) * Math.abs(oz) * 0.6;
+    pos.setXYZ(i, nx2, y - k * 0.25 * (y > 0 ? 1 : 0), nz2);
+  }
+  pos.needsUpdate = true; geo.computeVertexNormals();
+}
+function scorch(v) { const m = v.m; if (!m.own || !m.base) return; m.paint.color.copy(m.base).lerp(CHAR, v.exploded ? 0.9 : clamp((100 - v.health) / 100, 0, 1) * 0.55); }
+function updWrecks(dt) {
+  for (const v of VEH) {
+    if (v.exploded) { v.roll = lerp(v.roll, v.flip * 0.45, 0.08); continue; }
+    if (v.health > 0) continue;
+    v.burn = (v.burn || 0) + dt;
+    if (rnd() < 0.7) { const hl = v.spec.L / 2 - 0.5; puff(v.x + Math.sin(v.h) * hl + (rnd() - 0.5), v.y + 1.0, v.z + Math.cos(v.h) * hl + (rnd() - 0.5), rnd() < 0.5 ? '#ff7a1e' : '#ffc23a', 0.8 + rnd() * 0.6, 0.45, 2.2); }
+    if (v === P.car && !v.warned) { v.warned = true; toast('L\'auto va a fuoco! Scendi subito!'); }
+    if (v.burn > 6) explodeCar(v);
+  }
+}
+function boom(x, y, z, k = 1, src = null) {
+  for (let i = 0; i < 26 * k; i++) puff(x + (rnd() - 0.5) * 3 * k, y + rnd() * 2, z + (rnd() - 0.5) * 3 * k, i % 3 ? '#ff9a2e' : '#ffd25a', (2.4 + rnd() * 2) * k, 0.9 + rnd() * 0.6, 3 + rnd() * 3);
+  for (let i = 0; i < 14 * k; i++) puff(x + (rnd() - 0.5) * 4 * k, y + 0.5 + rnd() * 2, z + (rnd() - 0.5) * 4 * k, '#2a2624', (3 + rnd() * 2) * k, 3 + rnd() * 2, 2.5);
+  try { sfxCrash(30); } catch (e) { } const dp = hyp(x - P.x, z - P.z), R = 9 * k; shake = Math.max(shake, clamp(1.2 - dp / 40, 0, 1));
+  if (P.mode === 'foot' && dp < R * 0.9 && P.knock <= 0) { P.knock = 1.8; P.vx = (P.x - x) / (dp || 1) * 9; P.vz = (P.z - z) / (dp || 1) * 9; P.vy = 5; P.hp -= 45 * (1 - dp / R); }
+  for (const o of VEH) { if (o === src) continue; const d = hyp(o.x - x, o.z - z); if (d < R) { o.vx += (o.x - x) / (d || 1) * (R - d) * 1.5; o.vz += (o.z - z) / (d || 1) * (R - d) * 1.5; o.sleep = false; o.health = Math.max(0, o.health - (R - d) * 6); scorch(o); } }
+  for (const p of PEDS) { const d = hyp(p.x - x, p.z - z); if (d < R && p.state !== 'dead') { p.state = 'flee'; p.t = 5; } }
+  if (W.stars || cops().some(c => hyp(c.x - x, c.z - z) < 80)) crime(1, 'Esplosione in pieno centro!');
+}
+function explodeCar(v) {
+  v.exploded = true; scorch(v);
+  v.vy = 7; v.flip = (rnd() < 0.5 ? -1 : 1) * (1.5 + rnd());
+  if (P.car === v) { P.hp = 0; }
+  boom(v.x, v.y + 0.5, v.z, 1, v);
+}
+
+updDayNight(0);
+window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); };
+
+// ---------------------------------------------------------------- car radio: Discoradio live (official stream), only while driving
+// claude.ai artifacts allow no external audio (media-src/connect-src 'self'): there the radio stays off with a note
+const RADIO_URL = 'https://icstream.rds.radio/disco';
+const RADIO = new Audio(); RADIO.preload = 'none';
+const IN_CLAUDE = /claudeusercontent\.com|claude\.ai/.test(location.hostname);
+let radioOn = true, radioVol = 0, radioErr = false, radioShown = false;
+RADIO.addEventListener('error', () => { if (radioOn && RADIO.getAttribute('src') && !radioErr) { radioErr = true; toast(IN_CLAUDE ? '📻 Su claude.ai la radio è bloccata: gioca dalla versione su GitHub Pages' : '📻 Discoradio non raggiungibile'); toastT = 6; } });
+RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown) { radioShown = true; toast('📻 Discoradio · il ritmo della tua città'); } });
+function updRadio(dt) {
+  const want = radioOn && running && !paused && P.mode === 'car' && !(AU && AU.muted);
+  if (want && RADIO.paused && !radioErr) { RADIO.src = RADIO_URL; RADIO.volume = radioVol; RADIO.play().catch(() => { }); } // fresh src = back to live, not to a stale buffer
+  radioVol = lerp(radioVol, want ? 0.6 : 0, 1 - Math.exp(-3 * dt)); try { RADIO.volume = clamp(radioVol, 0, 1); } catch (e) { }
+  if (!want && !RADIO.paused && radioVol < 0.02) { RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
+}
+function toggleRadio() { radioOn = !radioOn; radioErr = false; toast(radioOn ? '📻 Radio accesa' : '📻 Radio spenta'); }
