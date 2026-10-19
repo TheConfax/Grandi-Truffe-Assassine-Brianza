@@ -23,6 +23,8 @@ const LANDMARKS = [
   { n: 'Chiesa di San Giacomo', x: 1181.3, z: -451.7, f: [1186.7, -433.3, 1163.8, -443.5], len: 29.2, build: buildSanGiacomo },
   { n: 'Cappella di San Pietro da Verona Martire', x: -1707.0, z: 680.5, ry: 0.6, build: buildCappellaSPM },
   { n: 'Villa Bianca', x: -1611.1, z: 936.5, build: buildVillaBianca },
+  { n: 'Secondaria I grado “Traversi”', x: 544.4, z: -384.8, build: buildPalazzo, // the Palazzo delle Scuole Professionali (Aldo Vicini, 1932) on via Indipendenza
+    o: { style: 'traversi', front: [516.1, -360.2], portal: 'door', balcony: 'stone', porch: true, attic: { w: 15, h: 1.9 }, sign: 'S C V O L E    P R O F E S S I O N A L I', signW: 13, signCol: '#6a655b', fence: 6.5 } },
   { n: 'Stazione di Meda', x: 377.5, z: -540.5, build: buildPalazzo, o: { style: 'stazione', h: 8.8, front: [375.9, -545.1], sign: 'M E D A', signW: 3.2, signCol: '#5f6266', canopy: [[388.6, -548.6], [403.5, -563.2], 7.5] } }, // the 2023 makeover: white, green shutters, the steel-tree canopy
   { n: 'Villa Dho', x: -1619.6, z: 1642.0, build: buildPalazzo, o: { style: 'dho', h: 11, front: [-1600.5, 1643.9], portal: 'portico', arches: 3, ped: { w: 9, h: 2.4 }, belv: { w: 4.6, d: 4.6, h: 6.5, flat: true } } },
   { n: 'Villa Besana', x: 326.2, z: -551.4, build: buildPalazzo, o: { style: 'besana', portal: 'door', balcony: 'stone', balconyW: 11, flat: true } },
@@ -85,21 +87,25 @@ const PAL_STYLE = {
   villa: { wall: '#eee5cf', trim: '#fbf8ef', shut: '#5d7a55', plinth: '#c9c1b0', light: ['#d9cfb8', '#f8f2e4'], gShut: true },
   dho: { wall: '#dfbb63', trim: '#f4ead2', shut: '#3f5a3c', plinth: '#b9b09c', light: ['#c9a654', '#ecd08a'], gShut: true },
   besana: { wall: '#d8c391', trim: '#c4bfb2', shut: '#9c978c', plinth: '#a9a397', light: ['#bfa977', '#e6d4a4'], gShut: true, ped: true },
+  traversi: { wall: '#d3d2cc', trim: '#e9e8e3', shut: '#ddd8cc', plinth: '#b8b2a5', light: ['#cfcabd', '#eeeae2'], H: 11.1, floors: 2, noShut: true, blinds: true, lesene: true, archedUp: true },
   stazione: { wall: '#f1efe9', trim: '#dedad1', shut: '#2f5a3a', plinth: '#9d9b96', light: ['#dcd9d2', '#ffffff'], H: 8.8, floors: 2, arched: true },
   ferrario: { wall: '#c23b2a', trim: '#e2b25a', shut: '#c23b2a', plinth: '#d9cfc0', light: ['#a83324', '#d4513c'], noShut: true },
 };
 const palTex = (st, lit) => canvasTex(128, 512, (g, w, h) => { // one bay, pavement to eaves; lit: the emissive map (lit windows only)
   const HH = st.H || MUN_H, Y = m => h - m / HH * h, R = (x0, m0, x1, m1, col) => { g.fillStyle = col; g.fillRect(x0, Y(m1), x1 - x0, Y(m0) - Y(m1)); };
-  const CREAM = st.trim, GLASS = '#2b3038';
+  const CREAM = st.trim, GLASS = st.blinds ? '#7d7a73' : '#2b3038';
   if (lit) { R(0, 0, w, HH, '#000'); R(46, 5.45, 82, 7.75, '#ffd890'); return; } // at night only the piano nobile
   R(0, 0, w, HH, st.wall); noise(g, w, h, 2500, 0.12, st.light);
   R(0, 0, w, 0.5, st.plinth); // stone plinth
   if (st.bugnato) for (let m = 1.2; m < 4.4; m += 0.5) { R(0, m - 0.04, w, m, 'rgba(110,75,35,.45)'); R(0, m, w, m + 0.03, 'rgba(255,240,200,.35)'); }
   R(0, 4.36, w, 4.4, 'rgba(0,0,0,.2)'); R(0, 4.4, w, 4.8, CREAM); R(0, 8.76, w, 8.8, 'rgba(0,0,0,.2)'); if (st.floors !== 2) R(0, 8.8, w, 9.05, CREAM); R(0, HH - 0.6, w, HH, CREAM); R(0, HH - 0.64, w, HH - 0.6, 'rgba(0,0,0,.2)');
-  const win = (x0, m0, x1, m1, bars) => { R(x0 - 4, m0 - 0.15, x1 + 4, m1 + 0.15, CREAM); R(x0, m0, x1, m1, GLASS); R(62, m0, 66, m1, CREAM); R(x0, (m0 + m1) / 2 + 0.3, x1, (m0 + m1) / 2 + 0.36, CREAM); if (bars) for (let x = x0 + 4; x < x1; x += 7) R(x, m0, x + 1.5, m1, '#15171a'); };
+  const blinds = (x0, m0, x1, m1) => { if (st.blinds) for (let m = m0 + 0.1; m < m1; m += 0.14) R(x0, m, x1, m + 0.04, 'rgba(255,255,255,.22)'); };
+  const win = (x0, m0, x1, m1, bars) => { R(x0 - 4, m0 - 0.15, x1 + 4, m1 + 0.15, CREAM); R(x0, m0, x1, m1, GLASS); blinds(x0, m0, x1, m1); if (!st.blinds) { R(62, m0, 66, m1, CREAM); R(x0, (m0 + m1) / 2 + 0.3, x1, (m0 + m1) / 2 + 0.36, CREAM); } if (bars) for (let x = x0 + 4; x < x1; x += 7) R(x, m0, x + 1.5, m1, '#15171a'); };
+  const archWin = (x0, m0, x1, m1) => { const r = (x1 - x0) / 2, cx = (x0 + x1) / 2, top = Y(m1) + r; g.fillStyle = CREAM; g.fillRect(x0 - 4, top, x1 - x0 + 8, Y(m0 - 0.15) - top); g.beginPath(); g.arc(cx, top, r + 4, Math.PI, 0); g.fill(); g.fillStyle = GLASS; g.fillRect(x0, top, x1 - x0, Y(m0) - top); g.beginPath(); g.arc(cx, top, r, Math.PI, 0); g.fill(); blinds(x0, m0, x1, m1 - r * HH / h); };
+  if (st.lesene) for (const x of [0, w - 10]) { R(x, 0.5, x + 10, HH - 0.6, CREAM); R(x ? x : 9, 0.5, (x ? x : 9) + 1, HH - 0.6, 'rgba(0,0,0,.14)'); } // giant pilasters between the bays
   const shutters = (m0, m1) => { if (st.noShut) return; for (const x of [18, 88]) { R(x, m0, x + 22, m1, st.shut); for (let m = m0 + 0.08; m < m1; m += 0.12) R(x + 2, m, x + 20, m + 0.04, 'rgba(0,0,0,.25)'); } };
   if (st.gShut) shutters(1.3, 3.5); win(46, 1.3, 82, 3.5, !st.gShut); if (st.bugnato) R(58, 3.65, 70, 3.95, CREAM); // ground floor: grated with a keystone, or shuttered
-  shutters(5.45, 7.75); win(46, 5.45, 82, 7.75); R(36, 5.1, 92, 5.3, '#e6d8bb'); R(34, 7.95, 94, 8.1, CREAM); // piano nobile: sill and cornice, a pediment on the municipio
+  shutters(5.45, 7.75); if (st.archedUp) archWin(44, 5.45, 84, 8.3); else win(46, 5.45, 82, 7.75); R(36, 5.1, 92, 5.3, '#e6d8bb'); R(34, 7.95, 94, 8.1, CREAM); // piano nobile: sill and cornice, a pediment on the municipio
   if (st.ped) { g.fillStyle = CREAM; g.beginPath(); g.moveTo(34, Y(8.1)); g.lineTo(94, Y(8.1)); g.lineTo(64, Y(8.62)); g.closePath(); g.fill(); g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(34, Y(8.1), 60, 2); }
   if (st.floors !== 2) { shutters(9.75, 11.45); win(46, 9.75, 82, 11.45); R(40, 9.5, 88, 9.62, '#e6d8bb'); }
   if (st.arched) { R(44, 1.0, 84, 3.6, st.wall); g.fillStyle = CREAM; g.beginPath(); g.moveTo(44, Y(0.1)); g.lineTo(44, Y(2.9)); g.arc(64, Y(2.9), 20, Math.PI, 0); g.lineTo(84, Y(0.1)); g.fill(); R(48, 0.1, 80, 2.9, '#2b3a33'); g.fillStyle = '#2b3a33'; g.beginPath(); g.arc(64, Y(2.9), 16, Math.PI, 0); g.fill(); } // arched doors on the ground floor
@@ -375,7 +381,8 @@ function buildPalazzo(L, B, G) {
     for (let i = 0; i <= na; i++) box((i - na / 2) * bw, yt / 2, 0.15, 0.55, yt, 0.3, CREAM);
     box(0, yt + 0.25, 0.18, na * bw + 0.6, 0.35, 0.36, CREAM); box(0, 0.06, 1.2, na * bw + 1.6, 0.16, 2.4, STONE);
   }
-  const by = 4.8 * k + 0.12, bwid = o.balconyW || (o.portal === 'portico' ? o.arches * bw + 0.4 : 4.4); // balcony on the piano nobile string course
+  const by = 4.8 * k + 0.12, bwid0 = o.balconyW || (o.portal === 'portico' ? o.arches * bw + 0.4 : 4.4), bwid = bwid0; // balcony on the piano nobile string course
+  if (o.porch) for (const x of [-1.9, 1.9]) { F.geo(trim, new THREE.CylinderGeometry(0.24, 0.27, by - 0.1, 14).translate(x, (by - 0.1) / 2, 1.0), null, CREAM); box(x, 0.12, 1.0, 0.7, 0.24, 0.7, STONE); box(x, by - 0.25, 1.0, 0.65, 0.25, 0.65, CREAM); }
   if (o.balcony) {
     box(0, by, 0.6, bwid, 0.22, 1.2, STONE);
     for (let x = -bwid / 2 + 0.3; x <= bwid / 2 - 0.29; x += o.portal === 'portico' ? bw : 1.6) box(x, by - 0.35, 0.4, 0.3, 0.5, 0.8, STONE);
@@ -396,7 +403,15 @@ function buildPalazzo(L, B, G) {
     for (let i = 0; i <= NI; i++) for (let j = 0; j <= NJ; j++) { const q = tip(1.0 + 1.5 * i / NI), w = Math.sin(i * 1.3 + j * 0.9) * 0.07 * j / NJ; F.v(flag, q[0] + w, q[1] - 1.45 * j / NJ, q[2], 0, 0, 1, off + 0.5 * j / NJ, i / NI); }
     for (let i = 0; i < NI; i++) for (let j = 0; j < NJ; j++) { const q = base + i * (NJ + 1) + j; flag.i.push(q, q + 1, q + NJ + 2, q, q + NJ + 2, q + NJ + 1); }
   }
-  if (o.sign) { const w = o.signW || 6.4, hh = 0.4, y = ((st.H || MUN_H) - 0.5) * k, i0 = sign.p.length / 3; for (const [x, yy, u, v] of [[-w / 2, y - hh / 2, 0, 0], [w / 2, y - hh / 2, 1, 0], [w / 2, y + hh / 2, 1, 1], [-w / 2, y + hh / 2, 0, 1]]) F.v(sign, x, yy, 0.05, 0, 0, 1, u, v); sign.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
+  if (o.attic) { const { w, h } = o.attic; box(0, H + h / 2 - 0.1, 0.2, w, h, 0.5, CREAM); box(0, H + h + 0.05, 0.25, w + 0.5, 0.22, 0.75, CREAM); for (const sd of [-1, 1]) lmUrn(F, trim, sd * (w / 2 - 0.3), H + h + 0.15, 0.25, 1.2, CREAM); }
+  if (o.sign) { const w = o.signW || 6.4, hh = o.attic ? 0.75 : 0.4, y = o.attic ? H + o.attic.h / 2 - 0.1 : ((st.H || MUN_H) - 0.5) * k, sz = o.attic ? 0.47 : 0.05, i0 = sign.p.length / 3; for (const [x, yy, u, v] of [[-w / 2, y - hh / 2, 0, 0], [w / 2, y - hh / 2, 1, 0], [w / 2, y + hh / 2, 1, 1], [-w / 2, y + hh / 2, 0, 1]]) F.v(sign, x, yy, sz, 0, 0, 1, u, v); sign.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
+  if (o.fence) { // garden railing along the front: low wall, pillars with stone vases, iron bars, the gate on the entrance
+    const zf = o.fence, xa = -(Ln - s0) - 2, xb = s0 + 2, IRONF = COL('#2f3133'), PIL = COL('#cfc9bc');
+    box((xa + xb) / 2, 0.3, zf, xb - xa, 0.6, 0.4, PIL);
+    for (let x = xa; x <= xb + 0.01; x += (xb - xa) / Math.round((xb - xa) / 3.4)) { box(x, 0.95, zf, 0.5, 1.9, 0.5, PIL); lmUrn(F, trim, x, 1.9, zf, 0.75, PIL); }
+    for (let x = xa + 0.3; x < xb - 0.2; x += 0.16) if (Math.abs(x) > 1.6) box(x, 1.15, zf, 0.03, 1.1, 0.03, IRONF);
+    box((xa + xb) / 2, 1.68, zf, xb - xa, 0.05, 0.05, IRONF); for (let x = -1.5; x <= 1.5; x += 0.2) box(x, 1.0, zf, 0.03, 2.0, 0.03, IRONF); box(0, 2.0, zf, 3.0, 0.06, 0.06, IRONF);
+  }
   if (o.belv) { // belvedere: a room on the roof with the top-floor windows, its own hipped roof and brackets
     const { w, d: bd, h } = o.belv, sb = 1.0, P = (x, z) => { const v = new THREE.Vector3(x, 0, z).applyMatrix4(M); return [v.x, v.z]; };
     const ring = [P(-w / 2, -sb), P(w / 2, -sb), P(w / 2, -sb - bd), P(-w / 2, -sb - bd)];
@@ -874,4 +889,20 @@ function buildPlatforms(T, G) {
   mkMesh(top, PLAT_MAT.top, 9, false, G); mkMesh(side, PLAT_MAT.side, 9, false, G); mkMesh(line, PLAT_MAT.line, 10, false, G);
   mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G); if (Bs.warm.i.length) mkMesh(Bs.warm, LMAT.warm, 10, false, G);
   for (const [n, b] of boards) mkMesh(b, stationSignMat(n), 10, false, G);
+}
+
+// parking stalls: white lines across the long side of every car park, one or two rows depending on its width
+function buildParkingLines(T, G) {
+  const b = FBuf(), W = COL('#e9e7df');
+  for (const a of T.d.a || []) {
+    if (a.t !== 4) continue; const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P);
+    let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
+    const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
+    const line = (s, v0, v1) => { const i0 = b.p.length / 3; for (const [ds, v] of [[-0.06, v0], [0.06, v0], [0.06, v1], [-0.06, v1]]) vtx(b, cx + ux * (s + ds) + nx * v, 0.05, cz + uz * (s + ds) + nz * v, 0, 1, 0, 0, 0, W); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
+    for (let s = Math.min(...proj) + 1.0; s <= Math.max(...proj) - 1.0; s += 2.5) {
+      const sec = lmSection(P, cx, cz, ux, uz, s); if (!sec) continue; const w = sec[1] - sec[0]; if (w < 5) continue;
+      line(s, sec[0] + 0.2, sec[0] + 4.8); if (w >= 10.5) line(s, sec[1] - 4.8, sec[1] - 0.2);
+    }
+  }
+  if (b.i.length) mkMesh(b, PLAT_MAT.line, 5, false, G);
 }
