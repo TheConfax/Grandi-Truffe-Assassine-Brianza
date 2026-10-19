@@ -140,7 +140,7 @@ DATA = os.environ.get('GTA_DATA', os.path.join(os.path.dirname(os.path.dirname(o
 OVT = os.path.join(DATA, 'edifici_overture.geojson')
 ms_h, ms_only = {}, []
 if os.path.exists(OVT):
-    for f_ in json.load(open(OVT))['features']:
+    for f_ in json.load(open(OVT, encoding='utf-8'))['features']:
         pr_ = f_['properties']; srcs = pr_.get('sources') or []; ds = {x.get('dataset') for x in srcs}
         if pr_.get('is_underground'): continue
         hh_ = pr_.get('height')
@@ -345,14 +345,14 @@ for r in raw_roads:
 log('overpasses', sum(1 for r in raw_roads if r['bridge']))
 # ---- road elevation: bridges are sources; the height carries on along the straight continuation (ramps), side streets drop fast
 adj = defaultdict(list)  # node -> (other, length, grade, way_is_car)
-edge_fam = {}  # (a, b) -> (name id, expressway?) of the road using that edge
+edge_fam = {}  # (a, b) -> (name id, expressway?, way index, bridge?) of the road using that edge
 src_car, src_foot, src_dir = {}, {}, defaultdict(set)
-for r in raw_roads:
+for wi, r in enumerate(raw_roads):
     car = r['c'] <= 5
     if r['tunnel']: continue
     for a_, b_ in zip(r['refs'], r['refs'][1:]):
         L = math.dist(nodes[a_], nodes[b_]); g = 0 if (r['bridge'] or r['emb']) else (0.055 if car else 0.09)
-        adj[a_].append((b_, L, g, car)); adj[b_].append((a_, L, g, car)); edge_fam[(a_, b_)] = edge_fam[(b_, a_)] = (r['n'], r['x'])
+        adj[a_].append((b_, L, g, car)); adj[b_].append((a_, L, g, car)); edge_fam[(a_, b_)] = edge_fam[(b_, a_)] = (r['n'], r['x'], wi, bool(r['bridge']))
     if r['bridge']:
         H = 6.6 * min(max(r['layer'], 1), 2.3)
         for i, n_ in enumerate(r['refs']):
@@ -360,7 +360,7 @@ for r in raw_roads:
             d[n_] = max(d.get(n_, 0), H)
             if i > 0: src_dir[n_].add(r['refs'][i - 1])
             if i < len(r['refs']) - 1: src_dir[n_].add(r['refs'][i + 1])
-def propagate(srcs, car_only):
+def propagate(srcs, car_only, cap=None, drops=None):
     val = dict(srcs); pq = []
     for n_, v in srcs.items():
         for pv in src_dir.get(n_) or ['']: pq.append((-v, n_, pv))
@@ -376,14 +376,45 @@ def propagate(srcs, car_only):
                 d0 = tang(nodes[pv], nodes[n_]); d1 = tang(nodes[n_], nodes[m])
                 if d0[0] * d1[0] + d0[1] * d1[1] < 0.82: g = 0.3  # turning off the ramp: drop within a few metres
                 fp, fc = edge_fam.get((pv, n_)), edge_fam.get((n_, m))
-                if fp and fc and not fc[1] and (fc[0] != fp[0] or fc[0] == -1): g = 0.3  # a ramp never lifts a different local street
+                # a ramp never lifts a different local street. Unnamed car ways (roundabouts, service roads) always drop; an unnamed
+                # foot/cycle path is "the same street" along its own way or as the straight approach right off a bridge
+                # (footbridges are split from their unnamed ramps in OSM: without this the Meredo ramp fell 6.6 m in 22 m)
+                if fp and fc and not fc[1] and (fc[0] != fp[0] or (fc[0] == -1 and (car or (fc[2] != fp[2] and not fp[3])))): g = 0.3
+                if g == 0.3 and drops is not None: drops.append((n_, m, L, v))
             nv = v - g * L
+            if cap: nv = min(nv, cap.get(m, 1e9))
             if nv > 0.05:
                 if nv > val.get(m, 0) + 1e-6: val[m] = nv
                 if best.get((m, n_), -1) < nv: heapq.heappush(pq, (-nv, m, n_))
     return val
 def tang(a, b): L = math.dist(a, b) or 1; return ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
-off_car = propagate(src_car, True)
+# a shared node is one height: where a low street joins a raised ramp (a merge, a diverge, a side road) the ramp comes down
+# to it instead of the street jumping up 30% grades. The junction caps the height, the cap grows at RAMP_G along the roads
+# and the bridges keep theirs, so the ramp spreads the climb between the deck and the junction (Meda: 2.6 m steps in 10 m)
+RAMP_G = 0.07
+drops = []; off_car = propagate(src_car, True, drops=drops); pin = {}
+for _ in range(3):
+    new = 0
+    for n_, m, L, v in drops:
+        base = off_car.get(m, 0); base = 0 if base <= max(0, v - 0.3 * L) + 1e-6 else base  # the street's own height, not the lift it got here
+        if off_car.get(n_, 0) - (base + RAMP_G * L) > 0.3 and base + RAMP_G * L < pin.get(n_, 1e9) - 0.05: pin[n_] = base + RAMP_G * L; new += 1
+    if not new: break
+    cap = {}
+    for p_, pv_ in list(pin.items()):  # each junction alone, a steeper ramp when a deck is close; too close and the street drops as before
+        for rg in (RAMP_G, 0.1, 0.14):
+            c = {p_: pv_}; pq = [(pv_, p_)]; ok = True
+            while pq and ok:
+                v, n_ = heapq.heappop(pq)
+                if v > c.get(n_, 1e9) or v > 6.6 * 2.3: continue
+                if src_car.get(n_, 0) > v + 0.5: ok = False
+                for m, L, g, car in adj[n_]:
+                    nv = v + rg * L
+                    if car and nv < c.get(m, 1e9): c[m] = nv; heapq.heappush(pq, (nv, m))
+            if ok: break
+        if not ok: del pin[p_]; continue
+        for n_, v in c.items(): cap[n_] = min(cap.get(n_, 1e9), v)
+    log('ramp caps', len(pin), 'junctions')
+    drops = []; off_car = propagate(src_car, True, cap=cap, drops=drops)
 off_foot = propagate({**src_foot, **{k: v for k, v in off_car.items()}}, False)
 # absolute deck heights: terrain + offset, smoothed linearly across each bridge span
 deckH = {}
@@ -908,5 +939,5 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'pois': pois, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index],
        'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0)]}
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
-open(dst, 'w').write(s)
+open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
 log('written', dst, len(s) // 1024, 'KB', 'tiles', ntx, 'x', ntz, 'roads', len(out_roads), 'nodes', len(NODES))
