@@ -1229,8 +1229,13 @@ function buildSignals(T, G) {
     const bench = new THREE.Mesh(boxG(0.4, 0.08, 2.4), lam(0x7a5a3a)); bench.position.set(-0.5, 0.5, 0); root.add(bench);
     const sign = new THREE.Mesh(boxG(0.06, 0.5, 0.5), lam(0xf0b23c)); sign.position.set(0.7, 2.7, 1.9); root.add(sign);
     const sp = new THREE.Mesh(boxG(0.06, 2.7, 0.06), lam(0x5a6068)); sp.position.set(0.7, 1.35, 1.9); root.add(sp);
+    // the shelter goes over when rammed, like the street lamps; built again, a fallen one stays down
+    const key = X + ',' + Z, old = BUS_PROPS.get(key);
+    if (!old) BUS_PROPS.set(key, addProp({ x: x - Math.cos(root.rotation.y) * 0.3, z: z + Math.sin(root.rotation.y) * 0.3, y: gy, r: 1.1, h: 2.6, obj: root }));
+    else { old.obj = root; if (old.broken) root.visible = false; }
   }
 }
+const BUS_PROPS = new Map();
 
 // ---------------------------------------------------------------- barriers (sbarre)
 const armTex = canvasTex(256, 16, (g, w, h) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f3f1ea' : '#d22c22'; g.fillRect(i * 32, 0, 32, h); } }, false);

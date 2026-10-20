@@ -47,13 +47,17 @@ const LS_DOOR_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, polygonO
 const LS_DOOR_COLS = ['#c9ccd1', '#9da1a6', '#b8ad95', '#6b7a6b', '#8a6a52', '#d9d6cf', '#7d8ea0'];
 const LS_GLASS = new THREE.MeshLambertMaterial({ color: 0xe4f0ee, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
 const LS_BALE_G = (() => { const g = new THREE.CylinderGeometry(0.75, 0.75, 1.2, 12); g.rotateZ(Math.PI / 2); g.translate(0, 0.75, 0); return g; })(), LS_BALE_M = lam(0xc9ab62);
+// a hoarding panel 1 m long (stretched to its length along x), 2 m high, with its post at one end; the colour comes per instance
+const LS_PANEL_G = (() => { const b = Buf(), F = lmFrame(new THREE.Matrix4()); F.geo(b, lmBox(1, 2, 0.05, 0, 1, 0), null, COL('#ffffff')); F.geo(b, lmBox(0.05, 2.1, 0.07, -0.5, 1.05, 0), null, COL('#8f949a'));
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(b.c, 3)); g.setIndex(b.i); return g; })();
+const LS_PANEL_M = new THREE.MeshLambertMaterial({ vertexColors: true }), LS_PANEL_PROPS = new Map();
 const LS_POT_G = (() => { const g = new THREE.IcosahedronGeometry(0.32, 0); g.translate(0, 0.45, 0); return g; })();
 
 function* buildPaesaggio(T, G) {
   const d = T.d, solid = Buf(), drape = VBuf(), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), F0 = lmFrame(new THREE.Matrix4());
   const box = (w, h, dd, x, y, z, col, ry = 0) => F0.geo(solid, lmBox(w, h, dd, x, y, z, ry), null, COL(col));
   const cyl = (r, h, x, y, z, col, seg = 10) => F0.geo(solid, new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z), null, COL(col));
-  const solids = [], bales = [], trees = [], pots = [];
+  const solids = [], bales = [], trees = [], pots = [], panels = [];
   const solidAt = (x, z, r, h) => solids.push([x, z, r, h]);
   // ---- garages: doors on the open side, one per box
   for (const B of T.bld) {
@@ -142,9 +146,8 @@ function* buildPaesaggio(T, G) {
         for (let t = 0; t < L; t += 2.5) {
           const t1 = Math.min(L, t + 2.5), x0 = a[0] + (c[0] - a[0]) * t / L, z0 = a[1] + (c[1] - a[1]) * t / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
           if (onAnyRoad(mx, mz, 0.6) || inBuilding(mx, mz, 0.3)) continue;
-          const g0 = groundH(x0, z0), g1 = groundH(x1, z1), j = solid.p.length / 3, col = COL(h > 0.5 ? '#3d6a4a' : '#b8bcc0'), nx = (z1 - z0) / (t1 - t || 1), nz = -(x1 - x0) / (t1 - t || 1);
-          vtx(solid, x0, g0, z0, nx, 0, nz, 0, 0, col); vtx(solid, x1, g1, z1, nx, 0, nz, 0, 0, col); vtx(solid, x1, g1 + 2, z1, nx, 0, nz, 0, 0, col); vtx(solid, x0, g0 + 2, z0, nx, 0, nz, 0, 0, col); solid.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
-          box(0.06, 2.1, 0.06, x0, g0 + 1.05, z0, '#8f949a'); box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8');
+          const g0 = groundH(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); // a panel of its own: it goes over when rammed
+          box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8');
         }
       }
       const spots = [];
@@ -302,6 +305,17 @@ function* buildPaesaggio(T, G) {
     G.add(im); return im;
   };
   inst(LS_BALE_G, LS_BALE_M, bales);
+  if (panels.length) { // building-site hoarding: one instance per panel, each knocked over on its own like the street lamps
+    const im = new THREE.InstancedMesh(LS_PANEL_G, LS_PANEL_M, panels.length); im.castShadow = true;
+    panels.forEach(([x0, z0, x1, z1, col], i) => {
+      const L = hyp(x1 - x0, z1 - z0), x = (x0 + x1) / 2, z = (z0 + z1) / 2, gy = groundH(x, z), ry = Math.atan2(x1 - x0, z1 - z0) - Math.PI / 2;
+      o3.position.set(x, gy, z); o3.rotation.set(0, ry, 0); o3.scale.set(L, 1, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); im.setColorAt(i, COL(col));
+      const id = T.t + ':' + i, p = LS_PANEL_PROPS.get(id);
+      if (!p) LS_PANEL_PROPS.set(id, addProp({ x, z, y: gy, r: Math.min(1.1, L / 2), h: 2.1, inst: { meshes: [im], i, ry, base: gy, sx: L } }));
+      else { p.inst.meshes = [im]; if (p.broken) { o3.scale.set(0, 0, 0); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); } }
+    });
+    G.add(im);
+  }
   inst(TREE_G.trunk, MAT.trunk, trees, () => 0.55);
   const crowns = inst(TREE_G.crown, MAT.crown, trees); // small fruit trees: the crown low on a short trunk
   if (crowns) trees.forEach(([x, z], i) => { o3.position.set(x, groundH(x, z) + 3.4 * 0.55 + 0.6, z); o3.rotation.set(0, 0, 0); o3.scale.set(0.6, 0.6, 0.6); o3.updateMatrix(); crowns.setMatrixAt(i, o3.matrix); crowns.setColorAt(i, COL(GREENS[Math.floor(LS_HASH(x, z, 'f') * 3)])); });

@@ -12,7 +12,7 @@ function breakProp(p, v) {
   let dx = v ? v.vx : 1, dz = v ? v.vz : 0; const l = hyp(dx, dz) || 1; dx /= l; dz /= l;
   const axis = new THREE.Vector3(dz, 0, -dx); // tips over along the car's way
   let o = p.obj;
-  if (!o && p.inst) { o = new THREE.Object3D(); o.position.set(p.x, p.inst.base, p.z); o.rotation.y = p.inst.ry; o.updateMatrix(); }
+  if (!o && p.inst) { o = new THREE.Object3D(); o.position.set(p.x, p.inst.base, p.z); o.rotation.y = p.inst.ry; if (p.inst.sx) o.scale.set(p.inst.sx, 1, 1); o.updateMatrix(); } // sx: a panel stretched to its length
   if (o) PROP_FALL.push({ o, p, axis, a: 0, w: 0.6 + (v ? Math.min(2.5, v.speed * 0.08) : 0), max: 1.42 + Math.random() * 0.12 });
   if (p.onBreak) p.onBreak();
   if (v) { const sp = v.speed; v.vx *= 0.86; v.vz *= 0.86; v.health = Math.max(0, v.health - 2); if (v === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
