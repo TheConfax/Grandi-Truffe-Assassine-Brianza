@@ -139,6 +139,45 @@ for members, t in rels:
         for o in join_rings(outers): add_building(o, ir, t, outers[0] if outers else 'r')
 import os
 DATA = os.environ.get('GTA_DATA', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data'))
+# ------------------------------------------------------------------ DBGT, the second source (Regione Lombardia, Database GeoTopografico)
+# data/dbt/<Comune>/dbgt.gpkg, as the Geoportale gives it. Inside each comune's boundary (data/confini_comuni.json) it is the reference for
+# walls and fences (EL_DIV) and for the height of buildings (UN_VOL); OSM stays the base everywhere else
+import sqlite3
+from shapely import wkb as _wkb
+from shapely.ops import polygonize
+CONF = os.path.join(DATA, 'confini_comuni.json'); DBT_DIR = os.path.join(DATA, 'dbt')
+_t7791 = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True)
+def _gpkg_geom(blob): f_ = blob[3]; return _wkb.loads(bytes(blob[8 + [0, 32, 48, 48, 64][(f_ >> 1) & 7]:]))
+def _xy(coords):  # RDN2008 UTM 32N (x, y, z, m) -> game metres
+    a_ = np.asarray([(c_[0], c_[1]) for c_ in coords]); lon_, lat_ = _t7791.transform(a_[:, 0], a_[:, 1]); return list(zip((lon_ - lon0) * KX, -(lat_ - lat0) * KZ))
+_comuni = {}
+if os.path.exists(CONF):
+    for e_ in json.load(open(CONF, encoding='utf-8'))['elements']:
+        ls_ = [LineString([proj(p['lat'], p['lon']) for p in m['geometry']]) for m in e_.get('members', []) if m.get('type') == 'way' and len(m.get('geometry') or []) > 1]
+        if ls_ and e_.get('tags', {}).get('name'): _comuni[e_['tags']['name'].lower()] = unary_union(list(polygonize(unary_union(ls_))))
+dbt_walls, dbt_vols, _cov = [], [], []
+for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
+    f_ = os.path.join(DBT_DIR, d_, 'dbgt.gpkg')
+    if not os.path.exists(f_): continue
+    if d_.lower() not in _comuni: log('dbgt: no boundary for', d_); continue
+    con_ = sqlite3.connect(f_)
+    # dividers: 13 fences, 18 low wall with railings, 95 'other' (mostly fences); 02 and 17 are left out until someone has seen what they are
+    for blob, ty in con_.execute('select Shape, EL_DIV_TY from EL_DIV'):
+        if blob is None or ty not in ('13', '18', '95'): continue
+        g_ = _gpkg_geom(blob)
+        for part in getattr(g_, 'geoms', [g_]):
+            pts_ = _xy(part.coords)
+            if len(pts_) >= 2: dbt_walls.append(pts_)
+    for blob, av in con_.execute('select Shape, UN_VOL_AV from UN_VOL'):
+        if blob is None or not av or float(av) <= 1: continue
+        g_ = _gpkg_geom(blob)
+        for part in getattr(g_, 'geoms', [g_]):
+            ext_ = _xy(part.exterior.coords)
+            if len(ext_) >= 4: dbt_vols.append((ext_[:-1], float(av)))
+    _cov.append(_comuni[d_.lower()]); log('dbgt', d_)
+dbt_cover = unary_union(_cov).buffer(-3) if _cov else GeometryCollection()  # a few metres inside the boundary: the neighbour's data meets it
+prepare(dbt_cover)
+log('dbgt: muri e recinzioni', len(dbt_walls), 'volumi', len(dbt_vols), 'comuni', len(_cov))
 OVT = os.path.join(DATA, 'edifici_overture.geojson')
 ms_h, ms_only = {}, []
 if os.path.exists(OVT):
@@ -169,6 +208,26 @@ for k_, (o_, hs_, hh_, st_) in enumerate(ms_only):
     n0 = len(buildings); add_building(o_, hs_, tt, 'ms%d' % k_); nms += len(buildings) - n0
     if len(buildings) > n0: buildings[-1]['ml'] = True
 log('overture: ML heights for', len(ms_h), 'OSM buildings, ML-only footprints added', nms)
+if dbt_vols:  # where the Comune's map covers: its heights, no footprints only the ML model saw, its buildings OSM lacks
+    _vg = [_Pp(p_) for p_, h_ in dbt_vols]; _vok = [i for i, g_ in enumerate(_vg) if g_ is not None]; _vt = STRtree([_vg[i] for i in _vok])
+    keep_, nh_, nd_ = [], 0, 0
+    for b in buildings:
+        g_ = _Pp(b['p'], b.get('k', []))
+        if g_ is None or not dbt_cover.contains(g_.centroid): keep_.append(b); continue
+        hit = [(_vg[_vok[j]].intersection(g_).area, dbt_vols[_vok[j]][1]) for j in _vt.query(g_)]; tot = sum(a_ for a_, h_ in hit)
+        if tot < 0.3 * g_.area:
+            if b.get('ml'): nd_ += 1; continue  # a ghost
+            keep_.append(b); continue
+        if not b['ht']: b['h'] = round(sum(a_ * h_ for a_, h_ in hit) / tot, 1); b['ht'] = True; nh_ += 1
+        keep_.append(b)
+    buildings[:] = keep_
+    _bg = [g_ for g_ in (_Pp(b['p'], b.get('k', [])) for b in buildings) if g_ is not None]; _bt = STRtree(_bg); na_ = 0
+    for i in _vok:
+        g_ = _vg[i]
+        if g_.area < 6 or not dbt_cover.contains(g_.centroid) or any(_bg[j].intersection(g_).area > 0.3 * g_.area for j in _bt.query(g_)): continue
+        n0_ = len(buildings); add_building(dbt_vols[i][0], [], {'building': 'yes', 'height': str(dbt_vols[i][1])}, 'dbt%d' % i)
+        if len(buildings) > n0_: buildings[-1]['dbt'] = True; na_ += 1
+    log('dbgt edifici: altezze vere', nh_, 'fantasmi tolti', nd_, 'aggiunti', na_)
 log('buildings', len(buildings))
 
 # ------------------------------------------------------------------ areas
@@ -505,7 +564,7 @@ _res = unary_union([g for at, g in area_geoms if at == 16] + ([WC_BUILT] if WC_B
 _occ = unary_union([g.buffer(8) for g in _hb])
 _band = unary_union([r['line'].buffer(r['w'] / 2 + 2.6, cap_style=2) for r in raw_roads if r['c'] <= 6 and not r['tunnel'] and r['line'].length > 0.5])
 _other = unary_union([g for at, g in area_geoms if at != 16] + [g_ for g_ in (P(pts) for k, pts in land) if g_ is not None])  # pitches, parks, car parks, fields...: never a made-up house on them
-_free = _res.difference(_occ).difference(_band).difference(_other.buffer(2)).buffer(-0.5)
+_free = _res.difference(_occ).difference(_band).difference(_other.buffer(2)).difference(dbt_cover).buffer(-0.5)  # the DBGT has every real house: none made up there
 prepare(_free); prepare(_band)
 _placed, nproc = [], 0
 _pg = {}
@@ -615,6 +674,13 @@ log('fences', len(fences))
 gates = [Point(nodes[r_]) for r_, t in ntags.items() if t.get('barrier') in ('gate', 'lift_gate', 'swing_gate', 'sliding_gate', 'entrance', 'kissing_gate')]
 bar_cut = unary_union([rbuf(lambda r: r['c'] <= 5 and flat(r), 0.5), rbuf(lambda r: r['c'] == 6 and flat(r), 0.25), bunion.buffer(0.15)] + [g.buffer(1.8) for g in gates])
 prepare(bar_cut)
+# where the DBGT covers, its dividers replace OSM's (emptied in place: the gates below index this list by position)
+if dbt_walls:
+    nrep_ = 0
+    for i_, (pts, k_, h_) in enumerate(barriers):
+        if len(pts) >= 2 and dbt_cover.contains(LineString(pts).centroid): barriers[i_] = ([], k_, h_); nrep_ += 1
+    for pts in dbt_walls: barriers.append((pts, 2, 1.6))
+    log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', len(dbt_walls))
 # cemeteries are walled: perimeter wall wherever OSM has not drawn one (gates/paths open it like any other wall)
 _osm_bar_all = unary_union([LineString(pts).buffer(1.5) for pts, k, h in barriers if len(pts) >= 2]) if barriers else GeometryCollection()
 ncw = 0
@@ -627,10 +693,15 @@ for at, g in area_geoms:
             if isinstance(part, LineString) and part.length > 2: barriers.append((list(part.coords), 1, 2.4)); ncw += 1
 log('cemetery walls', ncw)
 bar_out = []
-for pts, kind, hgt in barriers:
+# cut each line only against the pieces of bar_cut it touches, not the whole union: this was most of the build's time
+# (the same pieces bar_cut is the union of, kept apart: united, the street buffers are one polygon as big as the whole network)
+_bc_parts = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1] + [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates]
+_bc_tree = STRtree(_bc_parts)
+for bi_, (pts, kind, hgt) in enumerate(barriers):
+    if bi_ % max(1, len(barriers) // 10) == 0: log('muri %d%%' % (bi_ * 100 // max(1, len(barriers))))  # progress: this used to be the slow step
     if len(pts) < 2: continue
-    L = LineString(pts)
-    c = L.difference(bar_cut).intersection(RECT)
+    L = LineString(pts); near_ = _bc_tree.query(L)
+    c = (L.difference(unary_union([_bc_parts[j] for j in near_])) if len(near_) else L).intersection(RECT)
     for part in (list(c.geoms) if hasattr(c, 'geoms') else [c]):
         if isinstance(part, LineString) and part.length > 1.0: bar_out.append((list(part.simplify(0.1).coords), kind, hgt))
 log('barriers', len(bar_out), 'of', len(barriers), 'gates', len(gates))
@@ -678,7 +749,7 @@ _streets = [r for r in raw_roads if r['c'] <= 3 and flat(r) and not r['x'] and r
 _stt = STRtree([r['line'] for r in _streets])
 _osm_bar = unary_union([LineString(pts).buffer(2.0) for pts, k, h in barriers if len(pts) >= 2]) if barriers else GeometryCollection()
 _cut_f = unary_union([rbuf(lambda r: r['c'] <= 5 and flat(r), 0.6), rbuf(lambda r: r['c'] == 6 and flat(r), 0.2), bunion.buffer(0.6), parking, platforms, pedz, _osm_bar,
-                      corridor.buffer(0.5) if not corridor.is_empty else GeometryCollection()] + [LineString(p).buffer(w + 1.5) for p, w in rivers if len(p) >= 2])
+                      corridor.buffer(0.5) if not corridor.is_empty else GeometryCollection(), dbt_cover] + [LineString(p).buffer(w + 1.5) for p, w in rivers if len(p) >= 2])  # no made-up frontages where the DBGT has the real ones
 prepare(_cut_f)
 _drive = [r for r in raw_roads if r['c'] in (4, 5) and flat(r) and r['line'].length > 1]
 _dt = STRtree([r['line'] for r in _drive]) if _drive else None
