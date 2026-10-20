@@ -447,7 +447,12 @@ function ngWall(x, z, only) {
       let nx = dz / L, nz = -dx / L; if (inPoly(mx + nx * 0.3, mz + nz * 0.3, b.pts)) { nx = -nx; nz = -nz; }
       if (inPoly(mx + nx * 0.3, mz + nz * 0.3, b.pts) || inBuilding(mx + nx * 0.7, mz + nz * 0.7)) continue; // a party wall
       const road = ngRoad(mx + nx * 7, mz + nz * 7, 3);
-      const score = host ? d * 0.3 + (road ? 0 : 10) - Math.min(L, 20) * 0.15 : d + (road ? 0 : 6);
+      let score = host ? d * 0.3 + (road ? 0 : 10) - Math.min(L, 20) * 0.15 : d + (road ? 0 : 6);
+      if (b.big && L < 10) continue;
+      if (b.big) { // a supermarket opens onto its car park: how much of the 20 m in front is parking counts first, then the street, then length
+        let park = 0; for (let t = 2; t <= 20; t += 2) if (ngInPark(mx + nx * t, mz + nz * t, 0)) park++;
+        score = d * 0.3 - park * 2 - (road ? 6 : 0) - Math.min(L, 40) * 0.1; // the OSM point is often at the door
+      }
       if ((host || d < 12) && (!best || score < best.score)) best = { score, a, c, L, nx, nz, b, ux: dx / L, uz: dz / L };
     }
   };
