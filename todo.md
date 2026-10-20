@@ -1,5 +1,16 @@
 # Da fare
 
+## Scaletta (ottobre 2026)
+Regola per tutto: niente stili, scritte o dettagli inventati. Quello che non viene da OSM, da foto recenti o da chi gioca resta neutro.
+1. **Storia**: una traccia di una pagina (Carlo). Dice quali luoghi vanno curati per primi
+2. **Zona di gioco**: verificare che dati OSM e quote coprano Seregno, allargare la mappa a est, disegnare un confine lungo strade e ferrovie (non il rettangolo), uscite chiuse con transenne, fuori solo il paesaggio
+3. **Pulizia** dentro il confine definitivo, una zona alla volta: quote e rampe, edifici fantasma, incroci, marciapiedi, sponde del Seveso
+4. **Varietà**:
+   - [ ] Orari dei negozi: quelli mappati (`opening_hours`, 185) usano i loro; gli altri prendono quelli del vicino più simile che li ha, spostati a caso di scatti da 15 minuti. Chiuso: serranda giù, insegna e vetrina spente
+   - [ ] Cancelli dedotti: dove un passo carraio (`service=driveway`) attraversa una recinzione, e davanti ai vialetti delle villette
+   - [ ] Fabbriche e mobilifici, campi sportivi per sport, oratori, asili, edicole votive (sezione qui sotto)
+   - [ ] Classi di edifici (villette, condomini, capannoni, cascine) solo con i dati OSM (`building:colour`, `roof:shape`, `building:levels`) o con foto
+
 ## Priorità: parcheggi veri da OSM
 Prima di tutto il resto: vedi la sezione **Parcheggi** in fondo. I dati sono già in `data/maplarge.osm`, non serve aspettare Overpass.
 
@@ -21,10 +32,9 @@ Fatte in `src/negozi3.js` (dati: chiave `ng` in `brianza.json`, da `build_data.p
 - [x] Vetrine più larghe: ognuna si allarga nella parete libera accanto (fino a 18 m), senza sovrapporsi alle vicine e senza girare gli angoli interni
 - [x] Supermercati grandi in un edificio tutto loro (12: Unes, Carrefour, Iperal, famila, MD, Prix...): edificio su misura con pannelli, fascia del colore della catena, insegna grande, vetrata con pensilina, baie di carico, impianti sul tetto, pensilina dei carrelli e totem sulla strada dove c'è posto
 - [ ] Lo stesso per i mobilifici grandi e i concessionari nei capannoni
-- [ ] Orari (`opening_hours`, 185 attività): serranda abbassata quando il negozio è chiuso, insegna spenta
 - [ ] Le officine con la serranda aperta: niente spazio per gomme e bidoni quando il portone occupa tutta la facciata
 
-## Altre classi da ricavare dalla mappa
+## Altre classi da ricavare dalla mappa (punto 4 della scaletta)
 - [ ] Fabbriche (`man_made=works`, 155; `office=company` nei capannoni, 129): ciminiere, cancelli con la targa, piazzali con i bancali, mobilifici di Meda con i camion
 - [ ] Scuole materne, oratori, palestre (`leisure=fitness_centre`, `sport=*`) con 5 modelli ciascuno
 - [ ] Campi sportivi per sport (`sport=soccer` 44, `basketball` 22, `tennis` 13, `boules`): porte, canestri, reti, bocce

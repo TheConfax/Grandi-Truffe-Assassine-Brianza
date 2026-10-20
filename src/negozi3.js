@@ -374,7 +374,6 @@ const NG_WIN = (() => {
       else if (th === 2 || th === 4) { room(g, '#8a857c', '#6b6862', 0.25); F(g, 'rgba(0,0,0,.35)', 0, 0, 128, 128); }
       else { F(g, '#dcd8d0', 0, 0, 128, 128); for (let i = 0; i < 40; i++) { g.strokeStyle = `rgba(255,255,255,${0.3 + R() * 0.4})`; g.lineWidth = 4 + R() * 6; g.beginPath(); const x = R() * 128, y = R() * 128; g.moveTo(x, y); g.quadraticCurveTo(x + 20, y - 15, x + 40, y + 5); g.stroke(); } }
       if (th !== 5) poster(g, 24, 38, 80, 36, '#f2c230', '#c8102e', th === 2 ? 'VENDESI' : th === 3 ? 'CEDESI' : 'AFFITTASI', 13);
-      if (th !== 5) poster(g, 24, 66, 80, 10, '#f2c230', '#1a1a1a', '338 ' + (1000000 + Math.floor(R() * 8999999)), 8);
     },
   };
   const tex = {}, mat = {};
@@ -619,9 +618,7 @@ function ngFront(s, C) {
     } else if (t === 'shut') {
       for (let y = 0, k = 0; y < H - 0.3; y += 0.09, k++) box(w, Math.min(0.09, H - 0.3 - y), 0.03, c, y + 0.045, 0.045, k % 2 ? '#9da1a6' : '#b4b8bd');
       box(w + 0.1, 0.3, 0.3, c, H - 0.15, 0.15, '#8f949a'); box(w, 0.03 - gl, 0.09, c, (0.03 + gl) / 2, 0.045, '#55575b');
-      const tag = cell(1.6, 0.5, (g, w2, h2) => { g.clearRect(0, 0, w2, h2); ngText(g, ['ZEB', 'MDA 76', 'SVS', 'BRZ', 'KAOS'][Math.floor(s.h0 * 5)], w2 / 2, h2 / 2, w2 * 0.95, h2 * 0.9, 'italic 900 %px Impact, "Arial Black", sans-serif', ['#2a6fb0', '#c8331f', '#1a1a1a', '#e5007e', '#2a9a4a'][Math.floor(s.h0 * 25) % 5]); });
-      sign(tag, qz(C.sign, c - Math.min(0.8, w * 0.35), 0.5, c + Math.min(0.8, w * 0.35), 1.0, 0.065));
-      if (m.k !== '#3a3d40') { const pc = cell(0.8, 0.5, (g, w2, h2) => { g.fillStyle = '#f2c230'; g.fillRect(0, 0, w2, h2); ngText(g, 'AFFITTASI', w2 / 2, h2 * 0.4, w2 * 0.9, h2 * 0.4, NG_FONT.black, '#c8102e'); ngText(g, '338 ' + Math.floor(1e6 + s.h0 * 8e6), w2 / 2, h2 * 0.78, w2 * 0.8, h2 * 0.22, NG_FONT.sans, '#1a1a1a'); }); sign(pc, qz(C.sign, c - 0.4, 1.3, c + 0.4, 1.8, 0.065)); }
+      if (m.k !== '#3a3d40') { const pc = cell(0.8, 0.4, (g, w2, h2) => { g.fillStyle = '#f2c230'; g.fillRect(0, 0, w2, h2); ngText(g, 'AFFITTASI', w2 / 2, h2 / 2, w2 * 0.9, h2 * 0.55, NG_FONT.black, '#c8102e'); }); sign(pc, qz(C.sign, c - 0.4, 1.35, c + 0.4, 1.75, 0.065)); }
     } else if (t === 'wall') {
       box(w, 0.25 - gl, 0.05, c, (0.25 + gl) / 2, 0.025, '#8a857c');
     } else if (t === 'atm') {
@@ -834,7 +831,7 @@ function ngBig(B, C) {
       const { x, z } = it, py = groundH(it.wx, it.wz) - gy;
       K.box(0.6, 0.6, 2.2, x, py + 0.3, z, '#8a857c'); K.box(0.45, 6.4, 1.9, x, py + 3.4, z, fasc); K.box(0.5, 0.15, 2.0, x, py + 6.65, z, '#3a3d40');
       const c1 = K.cell(1.8, 1.8, (g, W2, H2) => { g.fillStyle = fasc; g.fillRect(0, 0, W2, H2); g.fillStyle = fg; const s = W2 * 0.5; g.fillRect(W2 / 2 - s / 2, H2 * 0.08, s, s); ngText(g, S.name[0].toUpperCase(), W2 / 2, H2 * 0.08 + s * 0.54, s * 0.8, s * 0.8, NG_FONT.black, fasc); const words = S.name.toUpperCase().split(' ').slice(0, 2); words.forEach((wd, i) => ngText(g, wd, W2 / 2, H2 * (0.7 + i * 0.17), W2 * 0.9, H2 * 0.15, NG_FONT.black, fg)); });
-      const c2 = K.cell(1.8, 0.9, (g, W2, H2) => { g.fillStyle = '#f2f2ee'; g.fillRect(0, 0, W2, H2); ngText(g, 'APERTO 8-21', W2 / 2, H2 * 0.33, W2 * 0.85, H2 * 0.3, NG_FONT.black, '#1a1a1a'); ngText(g, 'PARCHEGGIO CLIENTI', W2 / 2, H2 * 0.72, W2 * 0.85, H2 * 0.2, NG_FONT.sans, fasc); });
+      const c2 = K.cell(1.8, 0.9, (g, W2, H2) => { g.fillStyle = '#f2f2ee'; g.fillRect(0, 0, W2, H2); ngText(g, 'P', W2 * 0.2, H2 / 2, W2 * 0.3, H2 * 0.7, NG_FONT.black, '#1d4f9a'); ngText(g, 'PARCHEGGIO CLIENTI', W2 * 0.62, H2 / 2, W2 * 0.68, H2 * 0.25, NG_FONT.sans, '#1a1a1a'); });
       for (const sg of [1, -1]) { K.sign(c1, K.qx(C.sign, z - 0.9, py + 4.4, z + 0.9, py + 6.3, x + sg * 0.228, sg)); K.sign(c2, K.qx(C.sign, z - 0.9, py + 3.2, z + 0.9, py + 4.1, x + sg * 0.228, sg)); }
       if (!S.walls) WALLS.add(it.wx - 1.2, it.wz - 1.2, it.wx + 1.2, it.wz + 1.2, { r: 1.1, x: it.wx, z: it.wz, y0: gy + py - 3, y1: gy + py + 7 });
     }
