@@ -70,6 +70,10 @@ Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Stre
 - [ ] Asilo Garibaldi
 - [ ] Altre scuole di Seveso: servono foto (Collodi, Leonardo da Vinci / Milani, Bruno Munari, Toti, Don Aurelio Giussani, Frassati di via San Carlo)
 
+## Sala del Regno e la sua zona
+- [ ] Sala del Regno dei Testimoni di Geova (punto OSM a x -534.6, z 6.3, ovest di Meda): modello fotorealistico come i monumenti, da foto recenti
+- [ ] La zona intorno con un'atmosfera cupa e un po' losca (luci, lotti, capannoni), da foto: è l'ambiente a essere losco, non la comunità che ci si riunisce
+
 ## Piscine da fare bene
 Modelli su misura come i monumenti (vasche, edificio, tribune, parcheggio), solo da foto recenti.
 - [ ] Meda: SportVillage, via Icmesa (OSM way 1216938842, centro sportivo con piscina e calcio)
