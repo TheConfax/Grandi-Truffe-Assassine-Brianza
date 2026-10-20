@@ -50,7 +50,7 @@ const LS_BALE_G = (() => { const g = new THREE.CylinderGeometry(0.75, 0.75, 1.2,
 const LS_POT_G = (() => { const g = new THREE.IcosahedronGeometry(0.32, 0); g.translate(0, 0.45, 0); return g; })();
 
 function* buildPaesaggio(T, G) {
-  const d = T.d, solid = Buf(), drape = VBuf(), lines = VBuf(), doors = Buf(), glass = Buf(), F0 = lmFrame(new THREE.Matrix4());
+  const d = T.d, solid = Buf(), drape = VBuf(), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), F0 = lmFrame(new THREE.Matrix4());
   const box = (w, h, dd, x, y, z, col, ry = 0) => F0.geo(solid, lmBox(w, h, dd, x, y, z, ry), null, COL(col));
   const cyl = (r, h, x, y, z, col, seg = 10) => F0.geo(solid, new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z), null, COL(col));
   const solids = [], bales = [], trees = [], pots = [];
@@ -153,7 +153,8 @@ function* buildPaesaggio(T, G) {
       spots.forEach(([x, z], k) => {
         const gy = groundH(x, z);
         if (k === 0 && area > 1200) { // tower crane: lattice mast as a yellow column, jib and counter-jib, cab, counterweight
-          const H = 22 + LS_HASH(x, z, 'gru') * 10, a = LS_HASH(x, z, 'brac') * TAU;
+          // as tall as 22-32 m at most, most of them lower; the one seen from the spawn past Junior B and Amplifon stays as it is
+          const Hmax = 22 + LS_HASH(x, z, 'gru') * 10, H = hyp(cx - 384.6, cz + 359.9) < 10 ? Hmax : 12 + (Hmax - 12) * LS_HASH(x, z, 'altezza'), a = LS_HASH(x, z, 'brac') * TAU;
           box(1.6, H, 1.6, x, gy + H / 2, z, '#e8b520'); for (let y = 2; y < H; y += 2.5) box(1.7, 0.12, 1.7, x, gy + y, z, '#c99a10');
           box(42, 1.1, 1.1, x + Math.sin(a) * 12, gy + H + 0.6, z + Math.cos(a) * 12, '#e8b520', a + Math.PI / 2); box(2.4, 2.2, 2, x - Math.sin(a) * 9, gy + H - 0.2, z - Math.cos(a) * 9, '#8f949a', a);
           box(1.6, 1.6, 1.6, x + Math.sin(a) * 1.6, gy + H - 0.4, z + Math.cos(a) * 1.6, '#f2efe6', a); box(0.12, 0.12, 0.12, x, gy + H + 1.5, z, '#c8102e');
@@ -190,9 +191,95 @@ function* buildPaesaggio(T, G) {
       }
       const [lx0, lz0] = P[0], [lx1, lz1] = P[1], lm = [(lx0 + lx1) / 2, (lz0 + lz1) / 2];
       for (const o of [-0.25, 0.25]) { const ux = (lx1 - lx0) / (hyp(lx1 - lx0, lz1 - lz0) || 1), uz = (lz1 - lz0) / (hyp(lx1 - lx0, lz1 - lz0) || 1); cyl(0.025, 1.0, lm[0] + ux * o, gy + 0.6, lm[1] + uz * o, '#d9dcde', 6); }
+    } else if (kind === 'cani') { // a dog run: a mesh fence with a way in on the side nearest a street, a bench and a bin inside
+      let gate = 0, gd = 1e9; P.forEach((p, i) => { const q = P[(i + 1) % P.length], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let d = 1e9; ROADSEG.each(mx - 30, mz - 30, mx + 30, mz + 30, s => { d = Math.min(d, segDist(mx, mz, s.a[0], s.a[1], s.b[0], s.b[1])); }); if (d < gd && hyp(q[0] - p[0], q[1] - p[1]) > 3) { gd = d; gate = i; } });
+      lsFence(net, solid, P, 1.2, gate, '#3e4a42');
+      const [bx, bz] = A.at(A.s0 * 0.4, A.v0 * 0.4); if (inPoly(bx, bz, P)) { const gy = groundH(bx, bz), ry = Math.atan2(A.ux, A.uz); box(1.8, 0.07, 0.42, bx, gy + 0.45, bz, '#7a5a3c', ry); box(1.8, 0.36, 0.06, bx - Math.cos(ry) * 0.2 * 0, gy + 0.78, bz, '#7a5a3c', ry); cyl(0.22, 0.6, bx + Math.sin(ry) * 1.4, gy + 0.6, bz + Math.cos(ry) * 1.4, '#3d5a3a'); }
+    } else if (kind.startsWith('pista')) { // an athletics track: six red lanes inside the oval, white lines between them
+      if (area < 1500 || !isConvex(P)) continue;
+      const ring = k => P.map(([x, z]) => { const dx = cx - x, dz = cz - z, l = hyp(dx, dz) || 1; return [x + dx / l * k * 1.22, z + dz / l * k * 1.22]; }), outer = ring(0), inner = ring(6), RED = COL(kind.endsWith('grass') ? '#6b8f3e' : '#b5543f');
+      for (let i = 0; i < P.length; i++) { const j = (i + 1) % P.length, q = drape.p.length / 3; for (const p of [outer[i], outer[j], inner[j], inner[i]]) vtx(drape, p[0], 0.05, p[1], 0, 1, 0, 0, 0, RED); drape.i.push(q, q + 1, q + 2, q, q + 2, q + 3, q, q + 2, q + 1, q, q + 3, q + 2); }
+      for (let k = 0; k <= 6; k++) { const R_ = ring(k); for (let i = 0; i < R_.length; i++) { const a = R_[i], c = R_[(i + 1) % R_.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, q = lines.p.length / 3, Wc = COL('#f4f2ea'); for (const [s, o] of [[0, -0.04], [L, -0.04], [L, 0.04], [0, 0.04]]) vtx(lines, a[0] + ux * s - uz * o, 0.07, a[1] + uz * s + ux * o, 0, 1, 0, 0, 0, Wc); triUp(lines, q, q + 1, q + 2); triUp(lines, q, q + 2, q + 3); } }
+    } else if (kind === 'aiuola') { // a flower bed: dark soil, flowers in the colours of a garden centre
+      try { polyFill(drape, P, [], 0.06, 10, COL('#5a4030')); } catch (e) { }
+      const n = Math.min(140, Math.floor(area * 1.5));
+      for (let k = 0; k < n * 2 && k < 400; k++) { const x = A.cx + (LS_HASH(cx + k, cz, 'fl') - 0.5) * (A.s1 - A.s0 + A.v1 - A.v0), z = A.cz + (LS_HASH(cx, cz + k, 'fl') - 0.5) * (A.s1 - A.s0 + A.v1 - A.v0); if (!inPoly(x, z, P)) continue; const gy = groundH(x, z); F0.geo(solid, new THREE.IcosahedronGeometry(0.13, 0).translate(x, gy + 0.22, z), null, COL(['#c8331f', '#f2c230', '#f4a6b8', '#ffffff', '#8c6bb1', '#ff7a1e', '#3d6a2a'][Math.floor(LS_HASH(x, z, 'c') * 7)])); }
+    } else if (kind === 'lavaggio') { // a self-service car wash: bays under one roof, walls between them, the coin box at the back of each
+      if (area > 1500 || onAnyRoad(cx, cz, 0)) continue;
+      const n = clamp(Math.floor((A.s1 - A.s0) / 4.5), 1, 6), w = n * 4.5, s0 = (A.s0 + A.s1) / 2 - w / 2, dp = Math.min(6, A.v1 - A.v0), vm = (A.v0 + A.v1) / 2, ry = Math.atan2(A.ux, A.uz), gy = groundH(cx, cz);
+      const [rcx, rcz] = A.at(s0 + w / 2, vm); box(w + 0.4, 0.3, dp + 0.6, rcx, gy + 3.6, rcz, '#1d4f9a', ry - Math.PI / 2); box(w + 0.42, 0.12, dp + 0.62, rcx, gy + 3.4, rcz, '#e8e6e0', ry - Math.PI / 2);
+      for (let k = 0; k <= n; k++) { const [x, z] = A.at(s0 + k * 4.5, vm); box(0.15, 2.4, dp * 0.85, x, gy + 1.2, z, '#d9dcde', ry - Math.PI / 2); box(0.2, 3.5, 0.2, ...(() => { const [px, pz] = A.at(s0 + k * 4.5, vm + dp / 2); return [px, gy + 1.75, pz]; })(), '#8f949a'); solidAt(x, z, 0.3, 2.4); }
+      for (let k = 0; k < n; k++) { const [x, z] = A.at(s0 + k * 4.5 + 2.25, vm - dp / 2 + 0.4); box(0.6, 1.5, 0.4, x, gy + 0.75, z, '#3a3d40', ry); }
+    } else if (kind.startsWith('torre_acqua')) { lsTower(solid, cx, cz, Math.sqrt(area / Math.PI), +kind.split(':')[1] || 28, solidAt);
+    } else if (kind.startsWith('sport:skateboard') || kind.startsWith('sport:roller')) { // concrete, a quarter pipe at each end, a fun box in the middle
+      try { polyFill(drape, P, [], 0.05, 10, COL('#a9a8a2')); } catch (e) { }
+      const ry = Math.atan2(A.ux, A.uz), wv = Math.min(8, A.v1 - A.v0 - 1);
+      for (const e of [-1, 1]) for (let k = 0; k < 4; k++) { const [x, z] = A.at((e > 0 ? A.s1 : A.s0) - e * (0.6 + k * 0.5), (A.v0 + A.v1) / 2), gy = groundH(x, z), h = [1.6, 1.0, 0.55, 0.22][k]; box(0.5, h, wv, x, gy + h / 2, z, '#b8b6ae', ry - Math.PI / 2); }
+      const [fx, fz] = A.at((A.s0 + A.s1) / 2, (A.v0 + A.v1) / 2), fy = groundH(fx, fz); box(2.4, 0.5, 2.4, fx, fy + 0.25, fz, '#b8b6ae', ry); for (const e of [-1, 1]) { const g = new THREE.BoxGeometry(1.6, 0.06, 2.4).rotateZ(e * 0.3).rotateY(ry - Math.PI / 2).translate(fx + Math.sin(ry) * e * 2, fy + 0.24, fz + Math.cos(ry) * e * 2); F0.geo(solid, g, null, COL('#b8b6ae')); }
+    } else if (kind.startsWith('sport:equestrian')) { // a riding arena: sand, a wooden fence with a gate, two jumps
+      try { polyFill(drape, P, [], 0.05, 10, COL('#d2bd8f')); } catch (e) { }
+      lsRail(solid, P, 0, box);
+      const ry = Math.atan2(A.ux, A.uz);
+      for (const f of [-0.25, 0.25]) { const [x, z] = A.at((A.s0 + A.s1) / 2 + (A.s1 - A.s0) * f, (A.v0 + A.v1) / 2), gy = groundH(x, z); for (const o of [-1.5, 1.5]) box(0.12, 1.3, 0.12, x + Math.cos(ry) * o, gy + 0.65, z - Math.sin(ry) * o, '#f4f2ea'); for (const y of [0.5, 0.9]) box(3, 0.08, 0.08, x, gy + y, z, y > 0.7 ? '#c8331f' : '#f4f2ea', ry + Math.PI / 2); }
     } else if (kind.startsWith('sport:')) lsPitch(A, P, kind.split(':')[1], kind.split(':')[2], lines, solid, box, cyl, G, solidAt);
   }
+  // stands by the pitches: rows of steps up to a back wall, seats on them, a roof reaching out over the front
+  for (const B of T.bld) {
+    if (B.g !== 3 || B.lm) continue; const Ax = lsAxis(B.pts), gy = Math.min(...B.pts.map(p => groundH(p[0], p[1])));
+    let pitch = null, pd = 1e9; for (const L0 of d.ls || []) if (L0.s.startsWith('sport')) { const Q = dec(L0.p), [qx, qz] = centroid(Q), dd = hyp(qx - Ax.cx, qz - Ax.cz); if (dd < pd) { pd = dd; pitch = [qx, qz]; } }
+    const face = pitch && ((pitch[0] - Ax.cx) * Ax.nx + (pitch[1] - Ax.cz) * Ax.nz) < 0 ? -1 : 1, D_ = Ax.v1 - Ax.v0, rows = clamp(Math.floor(D_ / 0.85), 2, 14), Ls = Ax.s1 - Ax.s0, sm = (Ax.s0 + Ax.s1) / 2, ry = Math.atan2(Ax.ux, Ax.uz) - Math.PI / 2;
+    const seat = ['#c8102e', '#1d4f9a', '#2a7a3a', '#e8b520', '#8f949a'][Math.floor(LS_HASH(Ax.cx, Ax.cz, 'seat') * 5)];
+    for (let k = 0; k < rows; k++) { const v = face > 0 ? Ax.v1 - (k + 0.5) * D_ / rows : Ax.v0 + (k + 0.5) * D_ / rows, [x, z] = Ax.at(sm, v), hh = (k + 1) * 0.42; box(Ls, hh, D_ / rows, x, gy + hh / 2, z, '#b8b3a8', ry); box(Ls - 0.4, 0.12, 0.35, x, gy + hh + 0.06, z, seat, ry); }
+    const top = rows * 0.42 + 2.6, vb = face > 0 ? Ax.v0 + 0.15 : Ax.v1 - 0.15, [wx, wz] = Ax.at(sm, vb); box(Ls, top, 0.3, wx, gy + top / 2, wz, '#a9a398', ry);
+    const [rx_, rz_] = Ax.at(sm, (Ax.v0 + Ax.v1) / 2 + face * 0.6); box(Ls + 0.4, 0.2, D_ + 1.4, rx_, gy + top, rz_, '#8f949a', ry);
+  }
+  // water towers mapped as buildings
+  for (const B of T.bld) if (B.g === 4 && !B.lm) { const [x, z] = centroid(B.pts); lsTower(solid, x, z, Math.sqrt(Math.abs(sArea(B.pts)) / Math.PI), B.h, solidAt); }
+  // information boards: a map of the place on the board (the funny ones are in PANNELLI, to be written)
+  const OI = OGG_KINDS.indexOf('pannello'), boards = (d.og || []).filter(o => o[0] === OI);
+  if (boards.length) {
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 192 * Math.ceil(boards.length / 2); const g = cv.getContext('2d'), sb = Buf();
+    boards.forEach((o, i) => {
+      const x = o[1] / 10, z = o[2] / 10, a = o[3], col = i % 2, row = Math.floor(i / 2), X0 = col * 256, Y0 = row * 192, town = lsTown(x, z), txt = PANNELLI.length ? PANNELLI[Math.floor(LS_HASH(x, z, 'pan') * PANNELLI.length)] : null;
+      g.save(); g.translate(X0, Y0); g.fillStyle = '#f2efe6'; g.fillRect(0, 0, 256, 192); g.fillStyle = '#2f4a3a'; g.fillRect(0, 0, 256, 34);
+      ngText(g, town ? town.toUpperCase() : 'INFORMAZIONI', 128, 18, 236, 24, NG_FONT.sans, '#f2efe6');
+      if (txt) { g.fillStyle = '#1a1a1a'; g.font = '15px Georgia, serif'; g.textAlign = 'left'; g.textBaseline = 'top'; const words = txt.split(' '); let line = '', y = 44; for (const w of words) { if (g.measureText(line + w).width > 230) { g.fillText(line, 12, y); y += 19; line = ''; } line += w + ' '; } g.fillText(line, 12, y); }
+      else { g.fillStyle = '#d9e2c8'; g.fillRect(12, 44, 232, 136); g.strokeStyle = '#ffffff'; g.lineWidth = 5; for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(12, 60 + LS_HASH(x + k, z, 'm') * 110); g.lineTo(244, 60 + LS_HASH(x, z + k, 'm') * 110); g.stroke(); } g.fillStyle = '#9ab8d0'; g.fillRect(150, 50, 60, 30); g.fillStyle = '#c8331f'; g.beginPath(); g.arc(128, 112, 7, 0, TAU); g.fill(); g.fillStyle = '#1a1a1a'; g.font = 'bold 13px Arial'; g.textAlign = 'center'; g.fillText('VOI SIETE QUI', 128, 134); }
+      g.restore();
+      const ux = Math.cos(a), uz = -Math.sin(a), fx = Math.sin(a), fz = Math.cos(a), cx0 = x + fx * 0.035, cz0 = z + fz * 0.035, gy = surfAt(x, z), u0 = col / 2 + 0.002, u1 = (col + 1) / 2 - 0.002, v1 = 1 - row * 192 / cv.height - 0.002, v0 = 1 - (row + 1) * 192 / cv.height + 0.002, j = sb.p.length / 3;
+      vtx(sb, cx0 - ux * 0.62, gy + 1.1, cz0 - uz * 0.62, fx, 0, fz, u0, v0); vtx(sb, cx0 + ux * 0.62, gy + 1.1, cz0 + uz * 0.62, fx, 0, fz, u1, v0); vtx(sb, cx0 + ux * 0.62, gy + 2.0, cz0 + uz * 0.62, fx, 0, fz, u1, v1); vtx(sb, cx0 - ux * 0.62, gy + 2.0, cz0 - uz * 0.62, fx, 0, fz, u0, v1); sb.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
+    });
+    const tex = new THREE.CanvasTexture(cv), mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    SIGN_MATS.push(mat); mkMesh(sb, mat, 10, false, G);
+  }
+  // town signs where a road crosses into the next comune: on the right of whoever arrives, the white sign with the name of the town ahead;
+  // on its back, for those going the other way and leaving it, the same name struck through in red
+  if ((d.cl || []).length) {
+    const faces = []; // [centre x, y, z, normal x, z, name, end?]
+    for (const [X, Z, ux, uz, w, fwd, back] of d.cl) {
+      const x = X / 10, z = Z / 10, rx = -uz, rz = ux, off = w / 2 + 1.2;
+      for (const [sx, sz, nx, nz, name] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back]]) {
+        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5)) continue; const gy = surfAt(sx, sz);
+        box(0.07, 2.8, 0.07, sx - nx * 0.06, gy + 1.4, sz - nz * 0.06, '#8f949a'); box(1.56, 0.8, 0.04, sx, gy + 2.4, sz, '#e8e6e0', Math.atan2(nx, nz)); solidAt(sx, sz, 0.12, 2.8);
+        faces.push([sx + nx * 0.025, gy + 2.4, sz + nz * 0.025, nx, nz, name, false], [sx - nx * 0.025, gy + 2.4, sz - nz * 0.025, -nx, -nz, name, true]);
+      }
+    }
+    if (faces.length) {
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128 * Math.ceil(faces.length / 2); const g = cv.getContext('2d'), sb = Buf();
+      faces.forEach(([cx, cy, cz, nx, nz, name, end], i) => {
+        const col = i % 2, row = Math.floor(i / 2), X0 = col * 256, Y0 = row * 128;
+        g.save(); g.translate(X0, Y0); g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 128); g.strokeStyle = '#111111'; g.lineWidth = 7; g.strokeRect(9, 9, 238, 110);
+        ngText(g, name.toUpperCase(), 128, 66, 210, 46, NG_FONT.black, '#111111');
+        if (end) { g.strokeStyle = '#c8102e'; g.lineWidth = 12; g.beginPath(); g.moveTo(18, 112); g.lineTo(238, 16); g.stroke(); }
+        g.restore();
+        const ex = nz, ez = -nx, u0 = col / 2 + 0.003, u1 = (col + 1) / 2 - 0.003, v1 = 1 - Y0 / cv.height - 0.003, v0 = 1 - (Y0 + 128) / cv.height + 0.003, j = sb.p.length / 3;
+        vtx(sb, cx - ex * 0.75, cy - 0.375, cz - ez * 0.75, nx, 0, nz, u0, v0); vtx(sb, cx + ex * 0.75, cy - 0.375, cz + ez * 0.75, nx, 0, nz, u1, v0); vtx(sb, cx + ex * 0.75, cy + 0.375, cz + ez * 0.75, nx, 0, nz, u1, v1); vtx(sb, cx - ex * 0.75, cy + 0.375, cz - ez * 0.75, nx, 0, nz, u0, v1); sb.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
+      });
+      const tex = new THREE.CanvasTexture(cv), mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(mat); mkMesh(sb, mat, 10, false, G);
+    }
+  }
   yield 'terreni';
+  if (net.i.length) mkMesh(net, MAT.net, 10, false, G);
   if (drape.i.length) mkMesh(drape, MAT.mark, 2, false, G);
   if (lines.i.length) mkMesh(lines, MAT.mark, 3, false, G);
   if (solid.i.length) mkMesh(solid, LMAT.trim, 10, 'cast', G);
@@ -255,6 +342,43 @@ function lsPitch(A, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
     for (const [a0, b0, a1, b1] of [[-hl, -hw, hl, -hw], [-hl, hw, hl, hw], [-hl, -hw, -hl, hw], [hl, -hw, hl, hw]]) { const [x0, y0, z0] = gyAt(a0, b0), [x1, , z1] = gyAt(a1, b1); box(hyp(x1 - x0, z1 - z0) + 0.2, 0.3, 0.12, (x0 + x1) / 2, y0 + 0.15, (z0 + z1) / 2, '#8a6a4a', Math.atan2(x1 - x0, z1 - z0) - Math.PI / 2); }
   }
   function F0geo(b, g, col) { lmFrame(new THREE.Matrix4()).geo(b, g, null, COL(col)); }
+}
+// what the information boards say: write the lines here (one string per board, picked by place); empty, they show a map of the town
+const PANNELLI = [];
+function lsTown(x, z) { let best = null, bd = 1e18; for (const p of PLACES) if (p.k === 'town' || p.k === 'village') { const d = hyp(p.x - x, p.z - z); if (d < bd) { bd = d; best = p.n; } } return best; }
+// a mesh fence round a polygon, a 1.4 m way in on edge `gate`, posts every 2.5 m (net: the fence texture, both sides)
+function lsFence(net, solid, P, h, gate, postCol) {
+  const F0 = lmFrame(new THREE.Matrix4()); let acc = 0;
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.1) continue;
+    const parts = i === gate ? [[0, L / 2 - 0.7], [L / 2 + 0.7, L]] : [[0, L]];
+    for (const [t0, t1] of parts) {
+      if (t1 - t0 < 0.1) continue; const x0 = a[0] + (c[0] - a[0]) * t0 / L, z0 = a[1] + (c[1] - a[1]) * t0 / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, g0 = groundH(x0, z0), g1 = groundH(x1, z1), j = net.p.length / 3, nx = (z1 - z0) / (t1 - t0), nz = -(x1 - x0) / (t1 - t0);
+      vtx(net, x0, g0, z0, nx, 0, nz, (acc + t0) / 2.6, 0); vtx(net, x1, g1, z1, nx, 0, nz, (acc + t1) / 2.6, 0); vtx(net, x1, g1 + h, z1, nx, 0, nz, (acc + t1) / 2.6, 1); vtx(net, x0, g0 + h, z0, nx, 0, nz, (acc + t0) / 2.6, 1); net.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
+      for (let t = t0; t <= t1 + 0.01; t += 2.5) { const x = a[0] + (c[0] - a[0]) * Math.min(t, t1) / L, z = a[1] + (c[1] - a[1]) * Math.min(t, t1) / L; F0.geo(solid, lmBox(0.06, h + 0.05, 0.06, x, groundH(x, z) + h / 2, z), null, COL(postCol)); }
+    }
+    acc += L;
+  }
+}
+// a wooden post-and-rail fence round a polygon, open on edge `gate`
+function lsRail(solid, P, gate, box) {
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5 || i === gate && L < 4) continue; const ry = Math.atan2(c[0] - a[0], c[1] - a[1]) - Math.PI / 2;
+    for (const [t0, t1] of i === gate ? [[0, L / 2 - 1.5], [L / 2 + 1.5, L]] : [[0, L]]) {
+      const x0 = a[0] + (c[0] - a[0]) * t0 / L, z0 = a[1] + (c[1] - a[1]) * t0 / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, gy = groundH(mx, mz);
+      for (const y of [0.55, 1.1]) box(t1 - t0, 0.1, 0.06, mx, gy + y, mz, '#8a6a4a', ry);
+      for (let t = t0; t <= t1; t += 2.5) { const x = a[0] + (c[0] - a[0]) * t / L, z = a[1] + (c[1] - a[1]) * t / L; box(0.12, 1.3, 0.12, x, groundH(x, z) + 0.65, z, '#6b4f3a'); }
+    }
+  }
+}
+// a water tower: shaft, a cone up to the tank, the tank, its roof; r is the radius of the tank, h the height
+function lsTower(solid, x, z, r, h, solidAt) {
+  const F0 = lmFrame(new THREE.Matrix4()), gy = groundH(x, z), R = clamp(r, 2.5, 9), Hs = h * 0.72;
+  F0.geo(solid, new THREE.CylinderGeometry(R * 0.3, R * 0.36, Hs, 14).translate(x, gy + Hs / 2, z), null, COL('#c9c4b8'));
+  F0.geo(solid, new THREE.CylinderGeometry(R, R * 0.3, h * 0.1, 18).translate(x, gy + Hs + h * 0.05, z), null, COL('#bdb7a9'));
+  F0.geo(solid, new THREE.CylinderGeometry(R, R, h * 0.14, 18).translate(x, gy + Hs + h * 0.17, z), null, COL('#d4cfc3'));
+  F0.geo(solid, new THREE.CylinderGeometry(R * 0.2, R * 1.02, h * 0.05, 18).translate(x, gy + h * 0.985, z), null, COL('#8f8b84'));
+  solidAt(x, z, R * 0.36, h);
 }
 function lsNet(A, sm, vm, half, postH, netH, G, box, y0 = 0) { // posts at the sides, the net across the middle
   const ry = Math.atan2(A.ux, A.uz), [ax, az] = A.at(sm, vm - half), [bx, bz] = A.at(sm, vm + half), ga = groundH(ax, az), gb = groundH(bx, bz);

@@ -5,6 +5,7 @@ Regola per tutto: niente stili, scritte o dettagli inventati. Quello che non vie
 1. **Storia**: una traccia di una pagina (Carlo). Dice quali luoghi vanno curati per primi
 2. **Zona di gioco**: verificare che dati OSM e quote coprano Seregno, allargare la mappa a est, disegnare un confine lungo strade e ferrovie (non il rettangolo), uscite chiuse con transenne, fuori solo il paesaggio
 3. **Pulizia** dentro il confine definitivo, una zona alla volta: quote e rampe, edifici fantasma, incroci, marciapiedi, sponde del Seveso
+   - [ ] Muri e recinzioni: spesso sbagliati (Carlo, 20/10). È anche il passo più lento della build (`barriers`, circa 300 s su 450): rifarlo per correttezza e velocità insieme
 4. **Varietà**:
    - [ ] Orari dei negozi: quelli mappati (`opening_hours`, 185) usano i loro; gli altri prendono quelli del vicino più simile che li ha, spostati a caso di scatti da 15 minuti. Chiuso: serranda giù, insegna e vetrina spente
    - [ ] Cancelli dedotti: dove un passo carraio (`service=driveway`) attraversa una recinzione, e davanti ai vialetti delle villette

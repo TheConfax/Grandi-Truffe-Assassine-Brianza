@@ -1234,20 +1234,48 @@ function buildPlatforms(T, G) {
 const PSIGN_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#1f4fa8'; g.fillRect(0, 0, w, h); g.strokeStyle = '#fff'; g.lineWidth = 3; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = '#fff'; g.font = 'bold 46px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', w / 2, h / 2 + 3); }, false), side: THREE.DoubleSide });
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), sign = Buf();
-  T.stalls = [];
+  T.stalls = []; T.streetStalls = [];
   const quad = (x, z, ux, uz, a0, a1, w0, w1, col) => { const nx = -uz, nz = ux, i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
+  const outline = (x, z, ux, uz, l, w, col) => { quad(x, z, ux, uz, -l / 2, l / 2, -w / 2 - 0.06, -w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2, l / 2, w / 2 - 0.06, w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2 - 0.06, -l / 2 + 0.06, -w / 2, w / 2, col); quad(x, z, ux, uz, l / 2 - 0.06, l / 2 + 0.06, -w / 2, w / 2, col); };
+  // the spaces OSM maps one by one: white lines, yellow with the blue square for the disabled
+  const real = (T.d.ps || []).map(([X, Z, ang, L, Wd, kind]) => ({ x: X / 10, z: Z / 10, ang, L: clamp(L, 4, 7), W: clamp(Wd, 1.8, 3.5), kind }));
+  for (const sp of real) {
+    const ux = Math.sin(sp.ang), uz = Math.cos(sp.ang), col = sp.kind === 1 ? Y : W;
+    quad(sp.x, sp.z, ux, uz, -sp.L / 2, sp.L / 2, -sp.W / 2 - 0.06, -sp.W / 2 + 0.06, col); quad(sp.x, sp.z, ux, uz, -sp.L / 2, sp.L / 2, sp.W / 2 - 0.06, sp.W / 2 + 0.06, col);
+    if (sp.kind === 1) quad(sp.x, sp.z, ux, uz, -0.5, 0.5, -0.5, 0.5, BLUE);
+    T.stalls.push({ x: sp.x, z: sp.z, h: sp.ang + ((Math.round(sp.x * 3 + sp.z * 7) & 1) ? Math.PI : 0), dis: sp.kind === 1, real: true });
+  }
+  // parking along the streets where OSM says so: parallel, angled or nose-in, just off the carriageway; blue lines where you pay
+  for (const ri of T.d.rp || []) {
+    const r = D.roads[ri]; if (!r.pk || r.d || r.b || r.t) continue;
+    for (let k = 1; k < r.g.length; k++) {
+      const A = N[r.g[k - 1]], C = N[r.g[k]], L = hyp(C[0] - A[0], C[1] - A[1]); if (L < 10 || tileOf((A[0] + C[0]) / 2, (A[1] + C[1]) / 2) !== T.t) continue;
+      const ux = (C[0] - A[0]) / L, uz = (C[1] - A[1]) / L, rx = -uz, rz = ux;
+      for (const [si, side] of [[0, -1], [1, 1]]) {
+        const v = r.pk[si]; if (!v) continue; const kind = v & 3 || 1, paid = v >= 4, step = kind === 1 ? 6 : kind === 2 ? 3.4 : 2.6, depth = kind === 1 ? 2.1 : 4.8;
+        for (let s = 4 + step / 2; s < L - 4; s += step) {
+          const cx0 = A[0] + ux * s, cz0 = A[1] + uz * s, free = clearance(cx0, cz0, rx * side, rz * side, 14), half = Math.min(r.w / 2, free - 0.3), off = half + depth / 2 + 0.1;
+          if (free < half + depth + 0.2 || half < r.lane + 0.8) continue;
+          const x = cx0 + rx * off * side, z = cz0 + rz * off * side; if (inBuilding(x, z, 0.4) || nearJunction(x, z, 10)) continue;
+          outline(x, z, ux, uz, step - 0.25, depth, paid ? BLUE : W);
+          const h = kind === 1 ? Math.atan2(ux, uz) + (side < 0 ? Math.PI : 0) : kind === 3 ? Math.atan2(rx * side, rz * side) : Math.atan2(rx * side + ux, rz * side + uz);
+          T.streetStalls.push({ x, z, h, kind, paid });
+        }
+      }
+    }
+  }
   for (const a of T.d.a || []) {
     if (a.t !== 4) continue; const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P); if (inPiazza(cx, cz)) continue;
+    // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
+    const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
     const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
     const S0 = Math.min(...proj) + 1.0, S1 = Math.max(...proj) - 1.0, lot = [];
-    const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4); };
+    const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3); };
+    const runs = [];
     for (const row of [0, 1]) {
       let run = [];
-      const flush = () => { // a run of free stalls side by side: the lines between them, the yellow one every eighth
-        if (run.length) { const yi = run.length >= 8 ? 1 : -1; run.forEach((st, k) => { const col = k === yi ? Y : W; quad(cx, cz, ux, uz, st.s - 1.31, st.s - 1.19, st.v0, st.v1, col); quad(cx, cz, ux, uz, st.s + 1.19, st.s + 1.31, st.v0, st.v1, col); if (k === yi) { quad(cx, cz, ux, uz, st.s - 0.5, st.s + 0.5, (st.v0 + st.v1) / 2 - 0.5, (st.v0 + st.v1) / 2 + 0.5, BLUE); st.dis = true; } lot.push(st); }); }
-        run = [];
-      };
+      const flush = () => { if (run.length) runs.push(run); run = []; };
       for (let s = S0 + 1.25; s <= S1 - 1.25; s += 2.5) {
         const sec = lmSection(P, cx, cz, ux, uz, s), sa = lmSection(P, cx, cz, ux, uz, s - 1.2), sb = lmSection(P, cx, cz, ux, uz, s + 1.2);
         if (!sec || !sa || !sb) { flush(); continue; }
@@ -1260,7 +1288,13 @@ function buildParkingLines(T, G) {
       }
       flush();
     }
+    let left = budget; // runs of free stalls side by side, up to the capacity: the lines between them, the yellow one every eighth
+    for (const run0 of runs) {
+      if (left <= 0) break; const run = run0.slice(0, left); left -= run.length; const yi = run.length >= 8 ? 1 : -1;
+      run.forEach((st, k) => { const col = k === yi ? Y : W; quad(cx, cz, ux, uz, st.s - 1.31, st.s - 1.19, st.v0, st.v1, col); quad(cx, cz, ux, uz, st.s + 1.19, st.s + 1.31, st.v0, st.v1, col); if (k === yi) { quad(cx, cz, ux, uz, st.s - 0.5, st.s + 0.5, (st.v0 + st.v1) / 2 - 0.5, (st.v0 + st.v1) / 2 + 0.5, BLUE); st.dis = true; } lot.push(st); });
+    }
     T.stalls.push(...lot);
+    if (inLot.length >= 10) lot.push(...inLot); // the furniture below goes on the lots mapped space by space too
     if (lot.length >= 10) { // furniture on the bigger lots: lamps along the middle, the meter and the P sign at one end
       const mid = (S0 + S1) / 2, sec = lmSection(P, cx, cz, ux, uz, mid);
       for (let s = S0 + 6; s < S1 - 3; s += 22) { const sc = lmSection(P, cx, cz, ux, uz, s); if (!sc) continue; const v = (sc[0] + sc[1]) / 2, x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; if (onAnyRoad(x, z, 0.5) && !onFoot(x, z) || inBuilding(x, z, 0.5)) continue; const gy = groundH(x, z); addBox(lamps, x, gy + 3.8, z, 0.15, 7.6, 0.15, null); addBox(heads, x + ux * 0.5, gy + 7.55, z + uz * 0.5, 1.2, 0.18, 0.35, null); addBox(heads, x - ux * 0.5, gy + 7.55, z - uz * 0.5, 1.2, 0.18, 0.35, null); }

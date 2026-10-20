@@ -65,7 +65,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 #hint { left: 50%; bottom: calc(18% + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel); padding: 7px 14px; font-size: 18px; font-weight: 600; text-shadow: none; white-space: nowrap; }
 #hint kbd { font-family: var(--display); color: var(--ocra); font-size: 14px; }
 #big { position: fixed; inset: 0; z-index: 8; background: rgba(12,13,18,.82); }
-#bigmap { position: absolute; inset: 0; width: 100%; height: 100%; }
+#bigmap { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
 #big .cap { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(14px + env(safe-area-inset-top, 0px)); font-family: var(--display); font-size: 20px; }
 #big .cap span { display: block; font-family: var(--body); font-size: 16px; font-weight: 600; color: var(--ink-dim); letter-spacing: .04em; }
 #fx { position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; pointer-events: none; background: rgba(0,0,0,0); transition: background .8s; }
@@ -118,7 +118,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 <div id="osm">Mappa © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · Quote: <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">TINITALY/INGV</a></div>
 <div id="touch" hidden></div>
 <div id="fx"><h2 id="fxt"></h2></div>
-<div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">MEDA<span>Premi M per tornare in strada</span></div></div>
+<div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">MEDA<span>Rotella o due dita: zoom · trascina: sposta · clic: segnaposto · M: torna in strada</span></div></div>
 <div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>U</kbd> audio</p><p>Premi <kbd>P</kbd> per riprendere</p></div></div>
 
 <div id="start">
@@ -1323,10 +1323,16 @@ function drawMinimap() {
   mg.translate(0, -(R - 20)); mg.rotate(-(h - Math.PI)); mg.fillText('N', 0, 0); mg.restore();
 }
 function drawBig() {
-  const c = $('bigmap'), dpr = Math.min(2, devicePixelRatio || 1); c.width = innerWidth * dpr; c.height = innerHeight * dpr;
-  const g = c.getContext('2d'), sc = Math.min(c.width / (LIM_X * 2), c.height / (LIM_Z * 2)) * 0.94;
-  g.fillStyle = '#16181e'; g.fillRect(0, 0, c.width, c.height); g.save(); g.translate(c.width / 2, c.height / 2); g.scale(sc, sc);
-  g.drawImage(MAPC, -MOX, -MOZ);
+  const c = $('bigmap'), dpr = Math.min(2, devicePixelRatio || 1); if (c.width !== Math.round(innerWidth * dpr) || c.height !== Math.round(innerHeight * dpr)) { c.width = innerWidth * dpr; c.height = innerHeight * dpr; }
+  const g = c.getContext('2d'); BIGV.fit = Math.min(c.width / (META.hw * 2), c.height / (META.hh * 2)) * 0.96; if (!BIGV.z) BIGV.z = BIGV.fit; const sc = BIGV.z;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#16181e'; g.fillRect(0, 0, c.width, c.height); g.save(); g.translate(c.width / 2, c.height / 2); g.scale(sc, sc); g.translate(-BIGV.cx, -BIGV.cz);
+  g.drawImage(BIGC, -META.hw, -META.hh, META.hw * 2, META.hh * 2);
+  if (sc > 0.7) { // close up: buildings and streets drawn sharp from the map data, only what is on screen
+    const hx = c.width / 2 / sc, hz = c.height / 2 / sc, x0 = BIGV.cx - hx, x1 = BIGV.cx + hx, z0 = BIGV.cz - hz, z1 = BIGV.cz + hz;
+    g.fillStyle = '#3a3e49'; BLD.each(x0, z0, x1, z1, b => { g.beginPath(); b.pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fill(); });
+    g.lineCap = 'round'; const segs = []; ROADSEG.each(x0, z0, x1, z1, sg => segs.push(sg));
+    for (const pass of [0, 1]) for (const sg of segs) { const r = sg.r; if (pass === 0 ? r.c !== 6 : r.c === 6) continue; g.strokeStyle = r.c === 6 ? '#4b4f58' : r.d ? '#f0c27a' : r.c <= 1 ? '#d8cfbd' : r.c === 5 ? '#9b8676' : '#a7a49c'; g.lineWidth = r.c === 6 ? 1.6 : r.w + (r.c <= 1 ? 2 : 0.5); g.beginPath(); g.moveTo(sg.a[0], sg.a[1]); g.lineTo(sg.b[0], sg.b[1]); g.stroke(); }
+  }
   const lab = (p, col, r) => { g.fillStyle = col; g.strokeStyle = '#0f1116'; g.lineWidth = 3 * dpr / sc; g.beginPath(); g.arc(p.x, p.z, r / sc, 0, TAU); g.fill(); g.stroke(); };
   const placed = []; g.font = `600 ${15 * dpr / sc}px "Barlow Condensed", sans-serif`;
   for (const p of D.pois) if (['stazione', 'chiesa', 'polizia', 'parco', 'monumento'].includes(p.k) && p.n.length < 30 && !p.n.startsWith('Grotta')) {
@@ -1335,8 +1341,34 @@ function drawBig() {
     lab(p, '#c9bfa8', 5 * dpr); g.fillStyle = '#e8e0cc'; g.fillText(p.n, p.x + 8 * dpr / sc, p.z + 5 * dpr / sc);
   }
   if (MS.state === 'pickup') lab(MS.from, '#f0b23c', 10 * dpr); if (MS.state === 'deliver') lab(MS.to, '#7fd18b', 10 * dpr);
-  const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; lab({ x: px, z: pz }, '#fbf5e6', 9 * dpr);
+  if (WAYPT) { const q = 11 * dpr / sc; g.lineCap = 'round'; for (const [col, w] of [['#0f1116', 7], ['#e05adc', 4]]) { g.strokeStyle = col; g.lineWidth = w * dpr / sc; g.beginPath(); g.moveTo(WAYPT.x - q, WAYPT.z - q); g.lineTo(WAYPT.x + q, WAYPT.z + q); g.moveTo(WAYPT.x + q, WAYPT.z - q); g.lineTo(WAYPT.x - q, WAYPT.z + q); g.stroke(); } }
+  // you: an arrow pointing where you are heading, as on the minimap
+  const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z, hd = P.mode === 'car' ? P.car.h : P.h, k = 1.5 * dpr / sc;
+  g.save(); g.translate(px, pz); g.rotate(Math.PI - hd); g.fillStyle = '#fbf5e6'; g.strokeStyle = '#0f1116'; g.lineWidth = 3 * k; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(0, -14 * k); g.lineTo(10 * k, 11 * k); g.lineTo(0, 5 * k); g.lineTo(-10 * k, 11 * k); g.closePath(); g.stroke(); g.fill(); g.restore();
   g.restore();
+}
+// the big map: wheel or two fingers to zoom, drag to move, a click (or a tap) drops a waypoint, a click on it takes it away
+// (declared after drawBig: assemble3.py replaces everything between the minimap and drawBig)
+var BIGV = { cx: 0, cz: 0, z: 0, fit: 1 }, WAYPT = null;
+{
+  const c = $('bigmap'), pts = new Map(); let pinch = null, moved = 0;
+  const px2 = () => c.width / c.getBoundingClientRect().width;
+  const toWorld = (ex, ey) => { const r = c.getBoundingClientRect(), k = px2(); return [BIGV.cx + ((ex - r.left) * k - c.width / 2) / BIGV.z, BIGV.cz + ((ey - r.top) * k - c.height / 2) / BIGV.z]; };
+  const keepIn = () => { BIGV.cx = clamp(BIGV.cx, -META.hw, META.hw); BIGV.cz = clamp(BIGV.cz, -META.hh, META.hh); if (BIGV.z <= BIGV.fit * 1.001) BIGV.cx = BIGV.cz = 0; };
+  const zoomAt = (ex, ey, f) => { const [wx, wz] = toWorld(ex, ey); BIGV.z = clamp(BIGV.z * f, BIGV.fit, 14); const [wx2, wz2] = toWorld(ex, ey); BIGV.cx += wx - wx2; BIGV.cz += wz - wz2; keepIn(); drawBig(); };
+  c.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+  c.addEventListener('pointerdown', e => { c.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) moved = 0; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: hyp(a[0] - b[0], a[1] - b[1]) || 1, z: BIGV.z }; moved = 99; } });
+  c.addEventListener('pointermove', e => {
+    const p = pts.get(e.pointerId); if (!p) return; const dx = e.clientX - p[0], dy = e.clientY - p[1]; pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 2 && pinch) { const [a, b] = [...pts.values()]; zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, pinch.z * hyp(a[0] - b[0], a[1] - b[1]) / pinch.d / BIGV.z); return; }
+    moved += Math.abs(dx) + Math.abs(dy); if (moved < 6) return; const k = px2(); BIGV.cx -= dx * k / BIGV.z; BIGV.cz -= dy * k / BIGV.z; keepIn(); drawBig();
+  });
+  c.addEventListener('pointerup', e => {
+    const had = pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!had || pts.size || moved >= 6) return;
+    const [wx, wz] = toWorld(e.clientX, e.clientY); WAYPT = WAYPT && hyp(WAYPT.x - wx, WAYPT.z - wz) * BIGV.z < 26 * px2() ? null : { x: wx, z: wz }; drawBig();
+  });
+  c.addEventListener('pointercancel', e => { pts.delete(e.pointerId); pinch = null; });
 }
 
 // ---------------------------------------------------------------- input

@@ -3,7 +3,8 @@
 // fountains, playgrounds, cameras, vending machines, bike racks, post boxes. One InstancedMesh per kind per tile; the small ones fall over when
 // rammed (like the street lamps), the big ones are solid. Bumps are part of the street: surfAt rises over them, so the car pitches and jolts
 const OGG_KINDS = ['traliccio', 'palo', 'dosso', 'rallentatore', 'piattaforma', 'paletto', 'blocco', 'idrante', 'campana', 'ricarica', 'antenna',
-  'panchina', 'cestino', 'fontanella', 'giochi', 'telecamera', 'distributore', 'rastrelliera', 'cassetta'];
+  'panchina', 'cestino', 'fontanella', 'giochi', 'telecamera', 'distributore', 'rastrelliera', 'cassetta',
+  'armadietti', 'pannello', 'picnic', 'fitness', 'torre_acqua', 'lavaggio'];
 const OGG_MAT = new THREE.MeshLambertMaterial({ vertexColors: true }), WIRE_MAT = new THREE.LineBasicMaterial({ color: 0x2b2d30 });
 // collision: r radius, h height, knock (falls over) or solid; tall ones are scaled from their modelled height to the mapped one
 const OGG_SPEC = {
@@ -11,6 +12,7 @@ const OGG_SPEC = {
   idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
   panchina: { r: 0.8, h: 0.9, knock: true }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: {},
   telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true }, rastrelliera: {}, cassetta: { r: 0.22, h: 1.2, knock: true },
+  armadietti: { r: 1.0, h: 2.1 }, pannello: { r: 0.4, h: 2.3 }, picnic: { r: 0.9, h: 0.8, knock: true }, fitness: { r: 0.8, h: 2.3 }, torre_acqua: { r: 3.2, h: 28, scale: 28 }, lavaggio: {},
 };
 const OGG_GEO = (() => {
   const F = lmFrame(new THREE.Matrix4()), up = new THREE.Vector3(0, 1, 0);
@@ -64,6 +66,26 @@ const OGG_GEO = (() => {
     telecamera(b) { cyl(b, 0.06, 0.08, 4, 0, 2, 0, '#7d8389', 6); box(b, 0.06, 0.06, 0.3, 0, 3.9, 0.12, '#7d8389'); box(b, 0.16, 0.15, 0.36, 0, 3.85, 0.35, '#ececec'); box(b, 0.12, 0.1, 0.02, 0, 3.85, 0.54, '#1b1d20'); },
     distributore(b) { box(b, 0.9, 1.8, 0.75, 0, 0.9, 0, '#b8322a'); box(b, 0.55, 1.15, 0.02, -0.1, 1.05, 0.38, '#20262c'); box(b, 0.16, 0.5, 0.03, 0.3, 1.2, 0.38, '#cfd3d6'); box(b, 0.5, 0.15, 0.03, -0.1, 0.3, 0.38, '#111'); },
     rastrelliera(b) { for (let i = -2; i <= 2; i++) { const x = i * 0.7; rod(b, [x, 0, -0.35], [x, 0.75, -0.35], 0.025, '#8f969c'); rod(b, [x, 0, 0.35], [x, 0.75, 0.35], 0.025, '#8f969c'); rod(b, [x, 0.75, -0.35], [x, 0.75, 0.35], 0.025, '#8f969c'); } },
+    armadietti(b) { // a wall of parcel lockers, the screen in the middle column
+      box(b, 2.4, 2.0, 0.6, 0, 1.0, 0, '#5a5f66'); box(b, 2.5, 0.1, 0.7, 0, 2.05, 0, '#3e4248');
+      for (let c = 0; c < 5; c++) for (let r = 0; r < 5; r++) { if (c === 2 && r >= 2 && r <= 3) continue; box(b, 0.44, 0.36, 0.02, -0.96 + c * 0.48, 0.26 + r * 0.39, 0.31, r % 2 ? '#c9ccd1' : '#d9dcde'); }
+      box(b, 0.36, 0.5, 0.03, 0, 1.2, 0.32, '#1b2a33');
+    },
+    pannello(b) { box(b, 0.08, 2.2, 0.08, -0.62, 1.1, 0, '#3e4248'); box(b, 0.08, 2.2, 0.08, 0.62, 1.1, 0, '#3e4248'); box(b, 1.3, 0.95, 0.06, 0, 1.55, 0, '#2f4a3a'); box(b, 1.4, 0.08, 0.3, 0, 2.08, 0.05, '#3e4248'); },
+    picnic(b) { box(b, 1.8, 0.05, 0.75, 0, 0.74, 0, '#8a6a4a'); for (const z of [-0.6, 0.6]) box(b, 1.8, 0.05, 0.28, 0, 0.44, z, '#8a6a4a'); for (const x of [-0.7, 0.7]) { box(b, 0.08, 0.74, 0.08, x, 0.37, 0, '#6b4f3a'); box(b, 0.08, 0.08, 1.5, x, 0.4, 0, '#6b4f3a'); } },
+    fitness(b) { // a pull-up bar and parallel bars
+      for (const x of [-0.6, 0.6]) cyl(b, 0.05, 0.05, 2.3, x, 1.15, -0.4, '#2f6b3a', 6); rod(b, [-0.6, 2.2, -0.4], [0.6, 2.2, -0.4], 0.03, '#c9ccd1');
+      for (const [x, z] of [[-0.3, 0.3], [0.3, 0.3], [-0.3, 0.9], [0.3, 0.9]]) cyl(b, 0.04, 0.04, 1.1, x, 0.55, z, '#2f6b3a', 6);
+      rod(b, [-0.3, 1.1, 0.3], [-0.3, 1.1, 0.9], 0.03, '#c9ccd1'); rod(b, [0.3, 1.1, 0.3], [0.3, 1.1, 0.9], 0.03, '#c9ccd1');
+    },
+    torre_acqua(b) { // a concrete shaft carrying a wide tank, 28 m modelled, scaled to the mapped height
+      cyl(b, 1.6, 2.0, 20, 0, 10, 0, '#c9c4b8', 12); F.geo(b, new THREE.CylinderGeometry(5.5, 1.6, 3, 16).translate(0, 21.5, 0), null, COL('#bdb7a9')); cyl(b, 5.5, 5.5, 3.5, 0, 24.75, 0, '#d4cfc3', 16);
+      F.geo(b, new THREE.CylinderGeometry(1.2, 5.6, 1.2, 16).translate(0, 27.1, 0), null, COL('#8f8b84')); box(b, 0.9, 2.2, 0.1, 0, 1.1, 2.0, '#4a4d52');
+    },
+    lavaggio(b) { // a car wash gantry with its two brushes: drive through it
+      for (const x of [-1.9, 1.9]) box(b, 0.3, 3.2, 1.2, x, 1.6, 0, '#e8e6e0'); box(b, 4.1, 0.5, 1.4, 0, 3.25, 0, '#1d4f9a');
+      for (const x of [-1.2, 1.2]) cyl(b, 0.42, 0.42, 2.6, x, 1.6, 0, x < 0 ? '#e86a2a' : '#2a6fb0', 10);
+    },
     cassetta(b) { cyl(b, 0.05, 0.05, 0.85, 0, 0.42, 0, '#2e3236', 6); box(b, 0.38, 0.5, 0.26, 0, 1.08, 0, '#c8102e'); box(b, 0.4, 0.06, 0.28, 0, 1.36, 0, '#a50d26'); box(b, 0.2, 0.025, 0.02, 0, 1.2, 0.14, '#1a1a1a'); },
   };
   const out = {};

@@ -120,9 +120,16 @@ s = s[:a] + """function parkTile(T) {
       add(pickModel(PARKED_MIX, tRnd), x, z, ang + Math.PI / 2 + (tRnd() < 0.5 ? Math.PI : 0)); placed++;
     }
   }
+  // along the streets where OSM maps the parking: about half the spaces taken
+  let inStreet = 0;
+  for (const st of T.streetStalls || []) {
+    if (inStreet >= 16 || tRnd() > 0.5 || VEH.some(v => hyp(v.x - st.x, v.z - st.z) < 2.5)) continue;
+    let m = pickModel(PARKED_MIX, tRnd); if (m === 'ape' || m === 'bici' || (st.kind === 1 && (m === 'van' || m === 'suv'))) m = 'hatch';
+    add(m, st.x, st.z, st.h + (tRnd() - 0.5) * 0.04); inStreet++;
+  }
   let kerb = 0;
   for (const ri of T.d.rp || []) {
-    const r = D.roads[ri]; if (r.c !== 2 || r.d || r.b) continue;
+    const r = D.roads[ri]; if (r.c !== 2 || r.d || r.b || r.pk) continue; // streets with mapped parking are done above
     for (let k = 1; k < r.g.length && kerb < 8; k++) {
       const a = N[r.g[k - 1]], b = N[r.g[k]], L = hyp(b[0] - a[0], b[1] - a[1]); if (L < 22 || tRnd() > 0.22) continue;
       if (tileOf((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) !== T.t) continue;
@@ -187,6 +194,12 @@ s = s[:a] + """function drawMinimap() {
   for (const v of VEH) if (v.kind === 'police' && v.driver === 'ai' && W.stars > 0) { const [x, y] = tr(v.x, v.z); if (hyp(x, y) < R + 30) drawBlip(mg, x, y, (now * 4 | 0) % 2 ? '#4d86ff' : '#e0453a', 7, true, R); }
   const tgt = MS.state === 'pickup' ? MS.from : MS.state === 'deliver' ? MS.to : null;
   if (tgt) { const [x, y] = tr(tgt.x, tgt.z); drawBlip(mg, x, y, MS.state === 'pickup' ? '#f0b23c' : '#7fd18b', 10, true, R); }
+  if (WAYPT) { /* the waypoint: a cross, or a blip on the rim when it is off the minimap; gone once you get there */
+    const [x, y] = tr(WAYPT.x, WAYPT.z);
+    if (hyp(x, y) < R - 14) { mg.lineCap = 'round'; for (const [col, w] of [['#0f1116', 7], ['#e05adc', 4]]) { mg.strokeStyle = col; mg.lineWidth = w; mg.beginPath(); mg.moveTo(x - 8, y - 8); mg.lineTo(x + 8, y + 8); mg.moveTo(x + 8, y - 8); mg.lineTo(x - 8, y + 8); mg.stroke(); } }
+    else drawBlip(mg, x, y, '#e05adc', 8, true, R);
+    if (hyp(px - WAYPT.x, pz - WAYPT.z) < 12) { WAYPT = null; toast('Sei arrivato'); }
+  }
   const ah = camMode === 1 ? (P.mode === 'car' ? P.car.h : P.h) - Math.PI : 0;
   mg.rotate(ah); mg.fillStyle = '#fbf5e6'; mg.strokeStyle = '#0f1116'; mg.lineWidth = 3; mg.beginPath(); mg.moveTo(0, -14); mg.lineTo(10, 11); mg.lineTo(0, 5); mg.lineTo(-10, 11); mg.closePath(); mg.stroke(); mg.fill();
   mg.restore();
@@ -194,13 +207,11 @@ s = s[:a] + """function drawMinimap() {
   mg.translate(0, -(R - 20)); mg.rotate(-(h - Math.PI)); mg.fillText('N', 0, 0); mg.restore();
 }
 """ + s[b:]
-rep("const g = c.getContext('2d'), sc = Math.min(c.width / (LIM_X * 2), c.height / (LIM_Z * 2)) * 0.94;", "const g = c.getContext('2d'), sc = Math.min(c.width / (META.hw * 2), c.height / (META.hh * 2)) * 0.96;")
-rep("g.drawImage(MAPC, -MOX, -MOZ);", "g.drawImage(BIGC, -META.hw, -META.hh, META.hw * 2, META.hh * 2);")
 rep("for (const p of D.pois) if (['stazione', 'chiesa', 'polizia', 'parco', 'monumento'].includes(p.k) && p.n.length < 30 && !p.n.startsWith('Grotta')) {",
     "for (const p of [...PLACES.filter(p => (p.k === 'town' || p.k === 'village') && Math.abs(p.x) < META.hw - 150 && Math.abs(p.z) < META.hh - 60).map(p => ({ ...p, big: 1 })), ...D.pois.filter(p => ['stazione', 'chiesa', 'parco'].includes(p.k))]) if (p.n.length < 30 && !p.n.startsWith('Grotta')) {")
 rep("lab(p, '#c9bfa8', 5 * dpr); g.fillStyle = '#e8e0cc'; g.fillText(p.n, p.x + 8 * dpr / sc, p.z + 5 * dpr / sc);",
     "if (p.big) { g.save(); g.font = `400 ${20 * dpr / sc}px Bungee, Impact, sans-serif`; g.fillStyle = '#f0b23c'; g.fillText(p.n.toUpperCase(), p.x, p.z); g.restore(); } else { lab(p, '#c9bfa8', 5 * dpr); g.fillStyle = '#e8e0cc'; g.fillText(p.n, p.x + 8 * dpr / sc, p.z + 5 * dpr / sc); }")
-rep("<div class=\"cap\">MEDA<span>Premi M per tornare in strada</span></div>", "<div class=\"cap\">BRIANZA<span>Premi M per tornare in strada</span></div>")
+rep("<div class=\"cap\">MEDA<span>", "<div class=\"cap\">BRIANZA<span>")
 
 # ---- HUD place name, respawn spots, start
 rep("$('street').textContent = (st || 'Meda') + (TER ? ` · ${Math.round(TER.base + groundH(P.x, P.z))} m` : '');",

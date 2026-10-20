@@ -66,7 +66,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 #hint { left: 50%; bottom: calc(18% + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel); padding: 7px 14px; font-size: 18px; font-weight: 600; text-shadow: none; white-space: nowrap; }
 #hint kbd { font-family: var(--display); color: var(--ocra); font-size: 14px; }
 #big { position: fixed; inset: 0; z-index: 8; background: rgba(12,13,18,.82); }
-#bigmap { position: absolute; inset: 0; width: 100%; height: 100%; }
+#bigmap { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
 #big .cap { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(14px + env(safe-area-inset-top, 0px)); font-family: var(--display); font-size: 20px; }
 #big .cap span { display: block; font-family: var(--body); font-size: 16px; font-weight: 600; color: var(--ink-dim); letter-spacing: .04em; }
 #fx { position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; pointer-events: none; background: rgba(0,0,0,0); transition: background .8s; }
@@ -125,7 +125,7 @@ body:not(.debug) .dbg { display: none !important; }
 <div id="osm">Mappa © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · Quote: <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">TINITALY/INGV</a></div>
 <div id="touch" hidden></div>
 <div id="fx"><h2 id="fxt"></h2></div>
-<div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span>Premi M per tornare in strada</span></div></div>
+<div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span>Rotella o due dita: zoom · trascina: sposta · clic: segnaposto · M: torna in strada</span></div></div>
 <div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>G</kbd> guida arcade/realistica · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p><p class="ver" id="pver" hidden></p></div></div>
 
 <div id="start">
@@ -1248,7 +1248,7 @@ function* buildTileGen(T) {
     const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf();
     let nb = 0;
     for (const B of T.bld) {
-      if (B.lm || B.big || B.g === 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), a greenhouse (paesaggio3.js)
+      if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower (paesaggio3.js)
       if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
       const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t;
       const gys = outer.map(p => groundH(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys), top = gmax + h, bot = gmin - 0.6;
@@ -3076,20 +3076,48 @@ function buildPlatforms(T, G) {
 const PSIGN_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#1f4fa8'; g.fillRect(0, 0, w, h); g.strokeStyle = '#fff'; g.lineWidth = 3; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = '#fff'; g.font = 'bold 46px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', w / 2, h / 2 + 3); }, false), side: THREE.DoubleSide });
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), sign = Buf();
-  T.stalls = [];
+  T.stalls = []; T.streetStalls = [];
   const quad = (x, z, ux, uz, a0, a1, w0, w1, col) => { const nx = -uz, nz = ux, i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
+  const outline = (x, z, ux, uz, l, w, col) => { quad(x, z, ux, uz, -l / 2, l / 2, -w / 2 - 0.06, -w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2, l / 2, w / 2 - 0.06, w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2 - 0.06, -l / 2 + 0.06, -w / 2, w / 2, col); quad(x, z, ux, uz, l / 2 - 0.06, l / 2 + 0.06, -w / 2, w / 2, col); };
+  // the spaces OSM maps one by one: white lines, yellow with the blue square for the disabled
+  const real = (T.d.ps || []).map(([X, Z, ang, L, Wd, kind]) => ({ x: X / 10, z: Z / 10, ang, L: clamp(L, 4, 7), W: clamp(Wd, 1.8, 3.5), kind }));
+  for (const sp of real) {
+    const ux = Math.sin(sp.ang), uz = Math.cos(sp.ang), col = sp.kind === 1 ? Y : W;
+    quad(sp.x, sp.z, ux, uz, -sp.L / 2, sp.L / 2, -sp.W / 2 - 0.06, -sp.W / 2 + 0.06, col); quad(sp.x, sp.z, ux, uz, -sp.L / 2, sp.L / 2, sp.W / 2 - 0.06, sp.W / 2 + 0.06, col);
+    if (sp.kind === 1) quad(sp.x, sp.z, ux, uz, -0.5, 0.5, -0.5, 0.5, BLUE);
+    T.stalls.push({ x: sp.x, z: sp.z, h: sp.ang + ((Math.round(sp.x * 3 + sp.z * 7) & 1) ? Math.PI : 0), dis: sp.kind === 1, real: true });
+  }
+  // parking along the streets where OSM says so: parallel, angled or nose-in, just off the carriageway; blue lines where you pay
+  for (const ri of T.d.rp || []) {
+    const r = D.roads[ri]; if (!r.pk || r.d || r.b || r.t) continue;
+    for (let k = 1; k < r.g.length; k++) {
+      const A = N[r.g[k - 1]], C = N[r.g[k]], L = hyp(C[0] - A[0], C[1] - A[1]); if (L < 10 || tileOf((A[0] + C[0]) / 2, (A[1] + C[1]) / 2) !== T.t) continue;
+      const ux = (C[0] - A[0]) / L, uz = (C[1] - A[1]) / L, rx = -uz, rz = ux;
+      for (const [si, side] of [[0, -1], [1, 1]]) {
+        const v = r.pk[si]; if (!v) continue; const kind = v & 3 || 1, paid = v >= 4, step = kind === 1 ? 6 : kind === 2 ? 3.4 : 2.6, depth = kind === 1 ? 2.1 : 4.8;
+        for (let s = 4 + step / 2; s < L - 4; s += step) {
+          const cx0 = A[0] + ux * s, cz0 = A[1] + uz * s, free = clearance(cx0, cz0, rx * side, rz * side, 14), half = Math.min(r.w / 2, free - 0.3), off = half + depth / 2 + 0.1;
+          if (free < half + depth + 0.2 || half < r.lane + 0.8) continue;
+          const x = cx0 + rx * off * side, z = cz0 + rz * off * side; if (inBuilding(x, z, 0.4) || nearJunction(x, z, 10)) continue;
+          outline(x, z, ux, uz, step - 0.25, depth, paid ? BLUE : W);
+          const h = kind === 1 ? Math.atan2(ux, uz) + (side < 0 ? Math.PI : 0) : kind === 3 ? Math.atan2(rx * side, rz * side) : Math.atan2(rx * side + ux, rz * side + uz);
+          T.streetStalls.push({ x, z, h, kind, paid });
+        }
+      }
+    }
+  }
   for (const a of T.d.a || []) {
     if (a.t !== 4) continue; const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P); if (inPiazza(cx, cz)) continue;
+    // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
+    const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
     const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
     const S0 = Math.min(...proj) + 1.0, S1 = Math.max(...proj) - 1.0, lot = [];
-    const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4); };
+    const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3); };
+    const runs = [];
     for (const row of [0, 1]) {
       let run = [];
-      const flush = () => { // a run of free stalls side by side: the lines between them, the yellow one every eighth
-        if (run.length) { const yi = run.length >= 8 ? 1 : -1; run.forEach((st, k) => { const col = k === yi ? Y : W; quad(cx, cz, ux, uz, st.s - 1.31, st.s - 1.19, st.v0, st.v1, col); quad(cx, cz, ux, uz, st.s + 1.19, st.s + 1.31, st.v0, st.v1, col); if (k === yi) { quad(cx, cz, ux, uz, st.s - 0.5, st.s + 0.5, (st.v0 + st.v1) / 2 - 0.5, (st.v0 + st.v1) / 2 + 0.5, BLUE); st.dis = true; } lot.push(st); }); }
-        run = [];
-      };
+      const flush = () => { if (run.length) runs.push(run); run = []; };
       for (let s = S0 + 1.25; s <= S1 - 1.25; s += 2.5) {
         const sec = lmSection(P, cx, cz, ux, uz, s), sa = lmSection(P, cx, cz, ux, uz, s - 1.2), sb = lmSection(P, cx, cz, ux, uz, s + 1.2);
         if (!sec || !sa || !sb) { flush(); continue; }
@@ -3102,7 +3130,13 @@ function buildParkingLines(T, G) {
       }
       flush();
     }
+    let left = budget; // runs of free stalls side by side, up to the capacity: the lines between them, the yellow one every eighth
+    for (const run0 of runs) {
+      if (left <= 0) break; const run = run0.slice(0, left); left -= run.length; const yi = run.length >= 8 ? 1 : -1;
+      run.forEach((st, k) => { const col = k === yi ? Y : W; quad(cx, cz, ux, uz, st.s - 1.31, st.s - 1.19, st.v0, st.v1, col); quad(cx, cz, ux, uz, st.s + 1.19, st.s + 1.31, st.v0, st.v1, col); if (k === yi) { quad(cx, cz, ux, uz, st.s - 0.5, st.s + 0.5, (st.v0 + st.v1) / 2 - 0.5, (st.v0 + st.v1) / 2 + 0.5, BLUE); st.dis = true; } lot.push(st); });
+    }
     T.stalls.push(...lot);
+    if (inLot.length >= 10) lot.push(...inLot); // the furniture below goes on the lots mapped space by space too
     if (lot.length >= 10) { // furniture on the bigger lots: lamps along the middle, the meter and the P sign at one end
       const mid = (S0 + S1) / 2, sec = lmSection(P, cx, cz, ux, uz, mid);
       for (let s = S0 + 6; s < S1 - 3; s += 22) { const sc = lmSection(P, cx, cz, ux, uz, s); if (!sc) continue; const v = (sc[0] + sc[1]) / 2, x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; if (onAnyRoad(x, z, 0.5) && !onFoot(x, z) || inBuilding(x, z, 0.5)) continue; const gy = groundH(x, z); addBox(lamps, x, gy + 3.8, z, 0.15, 7.6, 0.15, null); addBox(heads, x + ux * 0.5, gy + 7.55, z + uz * 0.5, 1.2, 0.18, 0.35, null); addBox(heads, x - ux * 0.5, gy + 7.55, z - uz * 0.5, 1.2, 0.18, 0.35, null); }
@@ -3660,7 +3694,8 @@ function buildModern(L, B, G) {
 // fountains, playgrounds, cameras, vending machines, bike racks, post boxes. One InstancedMesh per kind per tile; the small ones fall over when
 // rammed (like the street lamps), the big ones are solid. Bumps are part of the street: surfAt rises over them, so the car pitches and jolts
 const OGG_KINDS = ['traliccio', 'palo', 'dosso', 'rallentatore', 'piattaforma', 'paletto', 'blocco', 'idrante', 'campana', 'ricarica', 'antenna',
-  'panchina', 'cestino', 'fontanella', 'giochi', 'telecamera', 'distributore', 'rastrelliera', 'cassetta'];
+  'panchina', 'cestino', 'fontanella', 'giochi', 'telecamera', 'distributore', 'rastrelliera', 'cassetta',
+  'armadietti', 'pannello', 'picnic', 'fitness', 'torre_acqua', 'lavaggio'];
 const OGG_MAT = new THREE.MeshLambertMaterial({ vertexColors: true }), WIRE_MAT = new THREE.LineBasicMaterial({ color: 0x2b2d30 });
 // collision: r radius, h height, knock (falls over) or solid; tall ones are scaled from their modelled height to the mapped one
 const OGG_SPEC = {
@@ -3668,6 +3703,7 @@ const OGG_SPEC = {
   idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
   panchina: { r: 0.8, h: 0.9, knock: true }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: {},
   telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true }, rastrelliera: {}, cassetta: { r: 0.22, h: 1.2, knock: true },
+  armadietti: { r: 1.0, h: 2.1 }, pannello: { r: 0.4, h: 2.3 }, picnic: { r: 0.9, h: 0.8, knock: true }, fitness: { r: 0.8, h: 2.3 }, torre_acqua: { r: 3.2, h: 28, scale: 28 }, lavaggio: {},
 };
 const OGG_GEO = (() => {
   const F = lmFrame(new THREE.Matrix4()), up = new THREE.Vector3(0, 1, 0);
@@ -3721,6 +3757,26 @@ const OGG_GEO = (() => {
     telecamera(b) { cyl(b, 0.06, 0.08, 4, 0, 2, 0, '#7d8389', 6); box(b, 0.06, 0.06, 0.3, 0, 3.9, 0.12, '#7d8389'); box(b, 0.16, 0.15, 0.36, 0, 3.85, 0.35, '#ececec'); box(b, 0.12, 0.1, 0.02, 0, 3.85, 0.54, '#1b1d20'); },
     distributore(b) { box(b, 0.9, 1.8, 0.75, 0, 0.9, 0, '#b8322a'); box(b, 0.55, 1.15, 0.02, -0.1, 1.05, 0.38, '#20262c'); box(b, 0.16, 0.5, 0.03, 0.3, 1.2, 0.38, '#cfd3d6'); box(b, 0.5, 0.15, 0.03, -0.1, 0.3, 0.38, '#111'); },
     rastrelliera(b) { for (let i = -2; i <= 2; i++) { const x = i * 0.7; rod(b, [x, 0, -0.35], [x, 0.75, -0.35], 0.025, '#8f969c'); rod(b, [x, 0, 0.35], [x, 0.75, 0.35], 0.025, '#8f969c'); rod(b, [x, 0.75, -0.35], [x, 0.75, 0.35], 0.025, '#8f969c'); } },
+    armadietti(b) { // a wall of parcel lockers, the screen in the middle column
+      box(b, 2.4, 2.0, 0.6, 0, 1.0, 0, '#5a5f66'); box(b, 2.5, 0.1, 0.7, 0, 2.05, 0, '#3e4248');
+      for (let c = 0; c < 5; c++) for (let r = 0; r < 5; r++) { if (c === 2 && r >= 2 && r <= 3) continue; box(b, 0.44, 0.36, 0.02, -0.96 + c * 0.48, 0.26 + r * 0.39, 0.31, r % 2 ? '#c9ccd1' : '#d9dcde'); }
+      box(b, 0.36, 0.5, 0.03, 0, 1.2, 0.32, '#1b2a33');
+    },
+    pannello(b) { box(b, 0.08, 2.2, 0.08, -0.62, 1.1, 0, '#3e4248'); box(b, 0.08, 2.2, 0.08, 0.62, 1.1, 0, '#3e4248'); box(b, 1.3, 0.95, 0.06, 0, 1.55, 0, '#2f4a3a'); box(b, 1.4, 0.08, 0.3, 0, 2.08, 0.05, '#3e4248'); },
+    picnic(b) { box(b, 1.8, 0.05, 0.75, 0, 0.74, 0, '#8a6a4a'); for (const z of [-0.6, 0.6]) box(b, 1.8, 0.05, 0.28, 0, 0.44, z, '#8a6a4a'); for (const x of [-0.7, 0.7]) { box(b, 0.08, 0.74, 0.08, x, 0.37, 0, '#6b4f3a'); box(b, 0.08, 0.08, 1.5, x, 0.4, 0, '#6b4f3a'); } },
+    fitness(b) { // a pull-up bar and parallel bars
+      for (const x of [-0.6, 0.6]) cyl(b, 0.05, 0.05, 2.3, x, 1.15, -0.4, '#2f6b3a', 6); rod(b, [-0.6, 2.2, -0.4], [0.6, 2.2, -0.4], 0.03, '#c9ccd1');
+      for (const [x, z] of [[-0.3, 0.3], [0.3, 0.3], [-0.3, 0.9], [0.3, 0.9]]) cyl(b, 0.04, 0.04, 1.1, x, 0.55, z, '#2f6b3a', 6);
+      rod(b, [-0.3, 1.1, 0.3], [-0.3, 1.1, 0.9], 0.03, '#c9ccd1'); rod(b, [0.3, 1.1, 0.3], [0.3, 1.1, 0.9], 0.03, '#c9ccd1');
+    },
+    torre_acqua(b) { // a concrete shaft carrying a wide tank, 28 m modelled, scaled to the mapped height
+      cyl(b, 1.6, 2.0, 20, 0, 10, 0, '#c9c4b8', 12); F.geo(b, new THREE.CylinderGeometry(5.5, 1.6, 3, 16).translate(0, 21.5, 0), null, COL('#bdb7a9')); cyl(b, 5.5, 5.5, 3.5, 0, 24.75, 0, '#d4cfc3', 16);
+      F.geo(b, new THREE.CylinderGeometry(1.2, 5.6, 1.2, 16).translate(0, 27.1, 0), null, COL('#8f8b84')); box(b, 0.9, 2.2, 0.1, 0, 1.1, 2.0, '#4a4d52');
+    },
+    lavaggio(b) { // a car wash gantry with its two brushes: drive through it
+      for (const x of [-1.9, 1.9]) box(b, 0.3, 3.2, 1.2, x, 1.6, 0, '#e8e6e0'); box(b, 4.1, 0.5, 1.4, 0, 3.25, 0, '#1d4f9a');
+      for (const x of [-1.2, 1.2]) cyl(b, 0.42, 0.42, 2.6, x, 1.6, 0, x < 0 ? '#e86a2a' : '#2a6fb0', 10);
+    },
     cassetta(b) { cyl(b, 0.05, 0.05, 0.85, 0, 0.42, 0, '#2e3236', 6); box(b, 0.38, 0.5, 0.26, 0, 1.08, 0, '#c8102e'); box(b, 0.4, 0.06, 0.28, 0, 1.36, 0, '#a50d26'); box(b, 0.2, 0.025, 0.02, 0, 1.2, 0.14, '#1a1a1a'); },
   };
   const out = {};
@@ -4808,7 +4864,7 @@ const LS_BALE_G = (() => { const g = new THREE.CylinderGeometry(0.75, 0.75, 1.2,
 const LS_POT_G = (() => { const g = new THREE.IcosahedronGeometry(0.32, 0); g.translate(0, 0.45, 0); return g; })();
 
 function* buildPaesaggio(T, G) {
-  const d = T.d, solid = Buf(), drape = VBuf(), lines = VBuf(), doors = Buf(), glass = Buf(), F0 = lmFrame(new THREE.Matrix4());
+  const d = T.d, solid = Buf(), drape = VBuf(), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), F0 = lmFrame(new THREE.Matrix4());
   const box = (w, h, dd, x, y, z, col, ry = 0) => F0.geo(solid, lmBox(w, h, dd, x, y, z, ry), null, COL(col));
   const cyl = (r, h, x, y, z, col, seg = 10) => F0.geo(solid, new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z), null, COL(col));
   const solids = [], bales = [], trees = [], pots = [];
@@ -4911,7 +4967,8 @@ function* buildPaesaggio(T, G) {
       spots.forEach(([x, z], k) => {
         const gy = groundH(x, z);
         if (k === 0 && area > 1200) { // tower crane: lattice mast as a yellow column, jib and counter-jib, cab, counterweight
-          const H = 22 + LS_HASH(x, z, 'gru') * 10, a = LS_HASH(x, z, 'brac') * TAU;
+          // as tall as 22-32 m at most, most of them lower; the one seen from the spawn past Junior B and Amplifon stays as it is
+          const Hmax = 22 + LS_HASH(x, z, 'gru') * 10, H = hyp(cx - 384.6, cz + 359.9) < 10 ? Hmax : 12 + (Hmax - 12) * LS_HASH(x, z, 'altezza'), a = LS_HASH(x, z, 'brac') * TAU;
           box(1.6, H, 1.6, x, gy + H / 2, z, '#e8b520'); for (let y = 2; y < H; y += 2.5) box(1.7, 0.12, 1.7, x, gy + y, z, '#c99a10');
           box(42, 1.1, 1.1, x + Math.sin(a) * 12, gy + H + 0.6, z + Math.cos(a) * 12, '#e8b520', a + Math.PI / 2); box(2.4, 2.2, 2, x - Math.sin(a) * 9, gy + H - 0.2, z - Math.cos(a) * 9, '#8f949a', a);
           box(1.6, 1.6, 1.6, x + Math.sin(a) * 1.6, gy + H - 0.4, z + Math.cos(a) * 1.6, '#f2efe6', a); box(0.12, 0.12, 0.12, x, gy + H + 1.5, z, '#c8102e');
@@ -4948,9 +5005,95 @@ function* buildPaesaggio(T, G) {
       }
       const [lx0, lz0] = P[0], [lx1, lz1] = P[1], lm = [(lx0 + lx1) / 2, (lz0 + lz1) / 2];
       for (const o of [-0.25, 0.25]) { const ux = (lx1 - lx0) / (hyp(lx1 - lx0, lz1 - lz0) || 1), uz = (lz1 - lz0) / (hyp(lx1 - lx0, lz1 - lz0) || 1); cyl(0.025, 1.0, lm[0] + ux * o, gy + 0.6, lm[1] + uz * o, '#d9dcde', 6); }
+    } else if (kind === 'cani') { // a dog run: a mesh fence with a way in on the side nearest a street, a bench and a bin inside
+      let gate = 0, gd = 1e9; P.forEach((p, i) => { const q = P[(i + 1) % P.length], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let d = 1e9; ROADSEG.each(mx - 30, mz - 30, mx + 30, mz + 30, s => { d = Math.min(d, segDist(mx, mz, s.a[0], s.a[1], s.b[0], s.b[1])); }); if (d < gd && hyp(q[0] - p[0], q[1] - p[1]) > 3) { gd = d; gate = i; } });
+      lsFence(net, solid, P, 1.2, gate, '#3e4a42');
+      const [bx, bz] = A.at(A.s0 * 0.4, A.v0 * 0.4); if (inPoly(bx, bz, P)) { const gy = groundH(bx, bz), ry = Math.atan2(A.ux, A.uz); box(1.8, 0.07, 0.42, bx, gy + 0.45, bz, '#7a5a3c', ry); box(1.8, 0.36, 0.06, bx - Math.cos(ry) * 0.2 * 0, gy + 0.78, bz, '#7a5a3c', ry); cyl(0.22, 0.6, bx + Math.sin(ry) * 1.4, gy + 0.6, bz + Math.cos(ry) * 1.4, '#3d5a3a'); }
+    } else if (kind.startsWith('pista')) { // an athletics track: six red lanes inside the oval, white lines between them
+      if (area < 1500 || !isConvex(P)) continue;
+      const ring = k => P.map(([x, z]) => { const dx = cx - x, dz = cz - z, l = hyp(dx, dz) || 1; return [x + dx / l * k * 1.22, z + dz / l * k * 1.22]; }), outer = ring(0), inner = ring(6), RED = COL(kind.endsWith('grass') ? '#6b8f3e' : '#b5543f');
+      for (let i = 0; i < P.length; i++) { const j = (i + 1) % P.length, q = drape.p.length / 3; for (const p of [outer[i], outer[j], inner[j], inner[i]]) vtx(drape, p[0], 0.05, p[1], 0, 1, 0, 0, 0, RED); drape.i.push(q, q + 1, q + 2, q, q + 2, q + 3, q, q + 2, q + 1, q, q + 3, q + 2); }
+      for (let k = 0; k <= 6; k++) { const R_ = ring(k); for (let i = 0; i < R_.length; i++) { const a = R_[i], c = R_[(i + 1) % R_.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, q = lines.p.length / 3, Wc = COL('#f4f2ea'); for (const [s, o] of [[0, -0.04], [L, -0.04], [L, 0.04], [0, 0.04]]) vtx(lines, a[0] + ux * s - uz * o, 0.07, a[1] + uz * s + ux * o, 0, 1, 0, 0, 0, Wc); triUp(lines, q, q + 1, q + 2); triUp(lines, q, q + 2, q + 3); } }
+    } else if (kind === 'aiuola') { // a flower bed: dark soil, flowers in the colours of a garden centre
+      try { polyFill(drape, P, [], 0.06, 10, COL('#5a4030')); } catch (e) { }
+      const n = Math.min(140, Math.floor(area * 1.5));
+      for (let k = 0; k < n * 2 && k < 400; k++) { const x = A.cx + (LS_HASH(cx + k, cz, 'fl') - 0.5) * (A.s1 - A.s0 + A.v1 - A.v0), z = A.cz + (LS_HASH(cx, cz + k, 'fl') - 0.5) * (A.s1 - A.s0 + A.v1 - A.v0); if (!inPoly(x, z, P)) continue; const gy = groundH(x, z); F0.geo(solid, new THREE.IcosahedronGeometry(0.13, 0).translate(x, gy + 0.22, z), null, COL(['#c8331f', '#f2c230', '#f4a6b8', '#ffffff', '#8c6bb1', '#ff7a1e', '#3d6a2a'][Math.floor(LS_HASH(x, z, 'c') * 7)])); }
+    } else if (kind === 'lavaggio') { // a self-service car wash: bays under one roof, walls between them, the coin box at the back of each
+      if (area > 1500 || onAnyRoad(cx, cz, 0)) continue;
+      const n = clamp(Math.floor((A.s1 - A.s0) / 4.5), 1, 6), w = n * 4.5, s0 = (A.s0 + A.s1) / 2 - w / 2, dp = Math.min(6, A.v1 - A.v0), vm = (A.v0 + A.v1) / 2, ry = Math.atan2(A.ux, A.uz), gy = groundH(cx, cz);
+      const [rcx, rcz] = A.at(s0 + w / 2, vm); box(w + 0.4, 0.3, dp + 0.6, rcx, gy + 3.6, rcz, '#1d4f9a', ry - Math.PI / 2); box(w + 0.42, 0.12, dp + 0.62, rcx, gy + 3.4, rcz, '#e8e6e0', ry - Math.PI / 2);
+      for (let k = 0; k <= n; k++) { const [x, z] = A.at(s0 + k * 4.5, vm); box(0.15, 2.4, dp * 0.85, x, gy + 1.2, z, '#d9dcde', ry - Math.PI / 2); box(0.2, 3.5, 0.2, ...(() => { const [px, pz] = A.at(s0 + k * 4.5, vm + dp / 2); return [px, gy + 1.75, pz]; })(), '#8f949a'); solidAt(x, z, 0.3, 2.4); }
+      for (let k = 0; k < n; k++) { const [x, z] = A.at(s0 + k * 4.5 + 2.25, vm - dp / 2 + 0.4); box(0.6, 1.5, 0.4, x, gy + 0.75, z, '#3a3d40', ry); }
+    } else if (kind.startsWith('torre_acqua')) { lsTower(solid, cx, cz, Math.sqrt(area / Math.PI), +kind.split(':')[1] || 28, solidAt);
+    } else if (kind.startsWith('sport:skateboard') || kind.startsWith('sport:roller')) { // concrete, a quarter pipe at each end, a fun box in the middle
+      try { polyFill(drape, P, [], 0.05, 10, COL('#a9a8a2')); } catch (e) { }
+      const ry = Math.atan2(A.ux, A.uz), wv = Math.min(8, A.v1 - A.v0 - 1);
+      for (const e of [-1, 1]) for (let k = 0; k < 4; k++) { const [x, z] = A.at((e > 0 ? A.s1 : A.s0) - e * (0.6 + k * 0.5), (A.v0 + A.v1) / 2), gy = groundH(x, z), h = [1.6, 1.0, 0.55, 0.22][k]; box(0.5, h, wv, x, gy + h / 2, z, '#b8b6ae', ry - Math.PI / 2); }
+      const [fx, fz] = A.at((A.s0 + A.s1) / 2, (A.v0 + A.v1) / 2), fy = groundH(fx, fz); box(2.4, 0.5, 2.4, fx, fy + 0.25, fz, '#b8b6ae', ry); for (const e of [-1, 1]) { const g = new THREE.BoxGeometry(1.6, 0.06, 2.4).rotateZ(e * 0.3).rotateY(ry - Math.PI / 2).translate(fx + Math.sin(ry) * e * 2, fy + 0.24, fz + Math.cos(ry) * e * 2); F0.geo(solid, g, null, COL('#b8b6ae')); }
+    } else if (kind.startsWith('sport:equestrian')) { // a riding arena: sand, a wooden fence with a gate, two jumps
+      try { polyFill(drape, P, [], 0.05, 10, COL('#d2bd8f')); } catch (e) { }
+      lsRail(solid, P, 0, box);
+      const ry = Math.atan2(A.ux, A.uz);
+      for (const f of [-0.25, 0.25]) { const [x, z] = A.at((A.s0 + A.s1) / 2 + (A.s1 - A.s0) * f, (A.v0 + A.v1) / 2), gy = groundH(x, z); for (const o of [-1.5, 1.5]) box(0.12, 1.3, 0.12, x + Math.cos(ry) * o, gy + 0.65, z - Math.sin(ry) * o, '#f4f2ea'); for (const y of [0.5, 0.9]) box(3, 0.08, 0.08, x, gy + y, z, y > 0.7 ? '#c8331f' : '#f4f2ea', ry + Math.PI / 2); }
     } else if (kind.startsWith('sport:')) lsPitch(A, P, kind.split(':')[1], kind.split(':')[2], lines, solid, box, cyl, G, solidAt);
   }
+  // stands by the pitches: rows of steps up to a back wall, seats on them, a roof reaching out over the front
+  for (const B of T.bld) {
+    if (B.g !== 3 || B.lm) continue; const Ax = lsAxis(B.pts), gy = Math.min(...B.pts.map(p => groundH(p[0], p[1])));
+    let pitch = null, pd = 1e9; for (const L0 of d.ls || []) if (L0.s.startsWith('sport')) { const Q = dec(L0.p), [qx, qz] = centroid(Q), dd = hyp(qx - Ax.cx, qz - Ax.cz); if (dd < pd) { pd = dd; pitch = [qx, qz]; } }
+    const face = pitch && ((pitch[0] - Ax.cx) * Ax.nx + (pitch[1] - Ax.cz) * Ax.nz) < 0 ? -1 : 1, D_ = Ax.v1 - Ax.v0, rows = clamp(Math.floor(D_ / 0.85), 2, 14), Ls = Ax.s1 - Ax.s0, sm = (Ax.s0 + Ax.s1) / 2, ry = Math.atan2(Ax.ux, Ax.uz) - Math.PI / 2;
+    const seat = ['#c8102e', '#1d4f9a', '#2a7a3a', '#e8b520', '#8f949a'][Math.floor(LS_HASH(Ax.cx, Ax.cz, 'seat') * 5)];
+    for (let k = 0; k < rows; k++) { const v = face > 0 ? Ax.v1 - (k + 0.5) * D_ / rows : Ax.v0 + (k + 0.5) * D_ / rows, [x, z] = Ax.at(sm, v), hh = (k + 1) * 0.42; box(Ls, hh, D_ / rows, x, gy + hh / 2, z, '#b8b3a8', ry); box(Ls - 0.4, 0.12, 0.35, x, gy + hh + 0.06, z, seat, ry); }
+    const top = rows * 0.42 + 2.6, vb = face > 0 ? Ax.v0 + 0.15 : Ax.v1 - 0.15, [wx, wz] = Ax.at(sm, vb); box(Ls, top, 0.3, wx, gy + top / 2, wz, '#a9a398', ry);
+    const [rx_, rz_] = Ax.at(sm, (Ax.v0 + Ax.v1) / 2 + face * 0.6); box(Ls + 0.4, 0.2, D_ + 1.4, rx_, gy + top, rz_, '#8f949a', ry);
+  }
+  // water towers mapped as buildings
+  for (const B of T.bld) if (B.g === 4 && !B.lm) { const [x, z] = centroid(B.pts); lsTower(solid, x, z, Math.sqrt(Math.abs(sArea(B.pts)) / Math.PI), B.h, solidAt); }
+  // information boards: a map of the place on the board (the funny ones are in PANNELLI, to be written)
+  const OI = OGG_KINDS.indexOf('pannello'), boards = (d.og || []).filter(o => o[0] === OI);
+  if (boards.length) {
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 192 * Math.ceil(boards.length / 2); const g = cv.getContext('2d'), sb = Buf();
+    boards.forEach((o, i) => {
+      const x = o[1] / 10, z = o[2] / 10, a = o[3], col = i % 2, row = Math.floor(i / 2), X0 = col * 256, Y0 = row * 192, town = lsTown(x, z), txt = PANNELLI.length ? PANNELLI[Math.floor(LS_HASH(x, z, 'pan') * PANNELLI.length)] : null;
+      g.save(); g.translate(X0, Y0); g.fillStyle = '#f2efe6'; g.fillRect(0, 0, 256, 192); g.fillStyle = '#2f4a3a'; g.fillRect(0, 0, 256, 34);
+      ngText(g, town ? town.toUpperCase() : 'INFORMAZIONI', 128, 18, 236, 24, NG_FONT.sans, '#f2efe6');
+      if (txt) { g.fillStyle = '#1a1a1a'; g.font = '15px Georgia, serif'; g.textAlign = 'left'; g.textBaseline = 'top'; const words = txt.split(' '); let line = '', y = 44; for (const w of words) { if (g.measureText(line + w).width > 230) { g.fillText(line, 12, y); y += 19; line = ''; } line += w + ' '; } g.fillText(line, 12, y); }
+      else { g.fillStyle = '#d9e2c8'; g.fillRect(12, 44, 232, 136); g.strokeStyle = '#ffffff'; g.lineWidth = 5; for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(12, 60 + LS_HASH(x + k, z, 'm') * 110); g.lineTo(244, 60 + LS_HASH(x, z + k, 'm') * 110); g.stroke(); } g.fillStyle = '#9ab8d0'; g.fillRect(150, 50, 60, 30); g.fillStyle = '#c8331f'; g.beginPath(); g.arc(128, 112, 7, 0, TAU); g.fill(); g.fillStyle = '#1a1a1a'; g.font = 'bold 13px Arial'; g.textAlign = 'center'; g.fillText('VOI SIETE QUI', 128, 134); }
+      g.restore();
+      const ux = Math.cos(a), uz = -Math.sin(a), fx = Math.sin(a), fz = Math.cos(a), cx0 = x + fx * 0.035, cz0 = z + fz * 0.035, gy = surfAt(x, z), u0 = col / 2 + 0.002, u1 = (col + 1) / 2 - 0.002, v1 = 1 - row * 192 / cv.height - 0.002, v0 = 1 - (row + 1) * 192 / cv.height + 0.002, j = sb.p.length / 3;
+      vtx(sb, cx0 - ux * 0.62, gy + 1.1, cz0 - uz * 0.62, fx, 0, fz, u0, v0); vtx(sb, cx0 + ux * 0.62, gy + 1.1, cz0 + uz * 0.62, fx, 0, fz, u1, v0); vtx(sb, cx0 + ux * 0.62, gy + 2.0, cz0 + uz * 0.62, fx, 0, fz, u1, v1); vtx(sb, cx0 - ux * 0.62, gy + 2.0, cz0 - uz * 0.62, fx, 0, fz, u0, v1); sb.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
+    });
+    const tex = new THREE.CanvasTexture(cv), mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    SIGN_MATS.push(mat); mkMesh(sb, mat, 10, false, G);
+  }
+  // town signs where a road crosses into the next comune: on the right of whoever arrives, the white sign with the name of the town ahead;
+  // on its back, for those going the other way and leaving it, the same name struck through in red
+  if ((d.cl || []).length) {
+    const faces = []; // [centre x, y, z, normal x, z, name, end?]
+    for (const [X, Z, ux, uz, w, fwd, back] of d.cl) {
+      const x = X / 10, z = Z / 10, rx = -uz, rz = ux, off = w / 2 + 1.2;
+      for (const [sx, sz, nx, nz, name] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back]]) {
+        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5)) continue; const gy = surfAt(sx, sz);
+        box(0.07, 2.8, 0.07, sx - nx * 0.06, gy + 1.4, sz - nz * 0.06, '#8f949a'); box(1.56, 0.8, 0.04, sx, gy + 2.4, sz, '#e8e6e0', Math.atan2(nx, nz)); solidAt(sx, sz, 0.12, 2.8);
+        faces.push([sx + nx * 0.025, gy + 2.4, sz + nz * 0.025, nx, nz, name, false], [sx - nx * 0.025, gy + 2.4, sz - nz * 0.025, -nx, -nz, name, true]);
+      }
+    }
+    if (faces.length) {
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128 * Math.ceil(faces.length / 2); const g = cv.getContext('2d'), sb = Buf();
+      faces.forEach(([cx, cy, cz, nx, nz, name, end], i) => {
+        const col = i % 2, row = Math.floor(i / 2), X0 = col * 256, Y0 = row * 128;
+        g.save(); g.translate(X0, Y0); g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 128); g.strokeStyle = '#111111'; g.lineWidth = 7; g.strokeRect(9, 9, 238, 110);
+        ngText(g, name.toUpperCase(), 128, 66, 210, 46, NG_FONT.black, '#111111');
+        if (end) { g.strokeStyle = '#c8102e'; g.lineWidth = 12; g.beginPath(); g.moveTo(18, 112); g.lineTo(238, 16); g.stroke(); }
+        g.restore();
+        const ex = nz, ez = -nx, u0 = col / 2 + 0.003, u1 = (col + 1) / 2 - 0.003, v1 = 1 - Y0 / cv.height - 0.003, v0 = 1 - (Y0 + 128) / cv.height + 0.003, j = sb.p.length / 3;
+        vtx(sb, cx - ex * 0.75, cy - 0.375, cz - ez * 0.75, nx, 0, nz, u0, v0); vtx(sb, cx + ex * 0.75, cy - 0.375, cz + ez * 0.75, nx, 0, nz, u1, v0); vtx(sb, cx + ex * 0.75, cy + 0.375, cz + ez * 0.75, nx, 0, nz, u1, v1); vtx(sb, cx - ex * 0.75, cy + 0.375, cz - ez * 0.75, nx, 0, nz, u0, v1); sb.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
+      });
+      const tex = new THREE.CanvasTexture(cv), mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(mat); mkMesh(sb, mat, 10, false, G);
+    }
+  }
   yield 'terreni';
+  if (net.i.length) mkMesh(net, MAT.net, 10, false, G);
   if (drape.i.length) mkMesh(drape, MAT.mark, 2, false, G);
   if (lines.i.length) mkMesh(lines, MAT.mark, 3, false, G);
   if (solid.i.length) mkMesh(solid, LMAT.trim, 10, 'cast', G);
@@ -5013,6 +5156,43 @@ function lsPitch(A, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
     for (const [a0, b0, a1, b1] of [[-hl, -hw, hl, -hw], [-hl, hw, hl, hw], [-hl, -hw, -hl, hw], [hl, -hw, hl, hw]]) { const [x0, y0, z0] = gyAt(a0, b0), [x1, , z1] = gyAt(a1, b1); box(hyp(x1 - x0, z1 - z0) + 0.2, 0.3, 0.12, (x0 + x1) / 2, y0 + 0.15, (z0 + z1) / 2, '#8a6a4a', Math.atan2(x1 - x0, z1 - z0) - Math.PI / 2); }
   }
   function F0geo(b, g, col) { lmFrame(new THREE.Matrix4()).geo(b, g, null, COL(col)); }
+}
+// what the information boards say: write the lines here (one string per board, picked by place); empty, they show a map of the town
+const PANNELLI = [];
+function lsTown(x, z) { let best = null, bd = 1e18; for (const p of PLACES) if (p.k === 'town' || p.k === 'village') { const d = hyp(p.x - x, p.z - z); if (d < bd) { bd = d; best = p.n; } } return best; }
+// a mesh fence round a polygon, a 1.4 m way in on edge `gate`, posts every 2.5 m (net: the fence texture, both sides)
+function lsFence(net, solid, P, h, gate, postCol) {
+  const F0 = lmFrame(new THREE.Matrix4()); let acc = 0;
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.1) continue;
+    const parts = i === gate ? [[0, L / 2 - 0.7], [L / 2 + 0.7, L]] : [[0, L]];
+    for (const [t0, t1] of parts) {
+      if (t1 - t0 < 0.1) continue; const x0 = a[0] + (c[0] - a[0]) * t0 / L, z0 = a[1] + (c[1] - a[1]) * t0 / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, g0 = groundH(x0, z0), g1 = groundH(x1, z1), j = net.p.length / 3, nx = (z1 - z0) / (t1 - t0), nz = -(x1 - x0) / (t1 - t0);
+      vtx(net, x0, g0, z0, nx, 0, nz, (acc + t0) / 2.6, 0); vtx(net, x1, g1, z1, nx, 0, nz, (acc + t1) / 2.6, 0); vtx(net, x1, g1 + h, z1, nx, 0, nz, (acc + t1) / 2.6, 1); vtx(net, x0, g0 + h, z0, nx, 0, nz, (acc + t0) / 2.6, 1); net.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
+      for (let t = t0; t <= t1 + 0.01; t += 2.5) { const x = a[0] + (c[0] - a[0]) * Math.min(t, t1) / L, z = a[1] + (c[1] - a[1]) * Math.min(t, t1) / L; F0.geo(solid, lmBox(0.06, h + 0.05, 0.06, x, groundH(x, z) + h / 2, z), null, COL(postCol)); }
+    }
+    acc += L;
+  }
+}
+// a wooden post-and-rail fence round a polygon, open on edge `gate`
+function lsRail(solid, P, gate, box) {
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5 || i === gate && L < 4) continue; const ry = Math.atan2(c[0] - a[0], c[1] - a[1]) - Math.PI / 2;
+    for (const [t0, t1] of i === gate ? [[0, L / 2 - 1.5], [L / 2 + 1.5, L]] : [[0, L]]) {
+      const x0 = a[0] + (c[0] - a[0]) * t0 / L, z0 = a[1] + (c[1] - a[1]) * t0 / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, gy = groundH(mx, mz);
+      for (const y of [0.55, 1.1]) box(t1 - t0, 0.1, 0.06, mx, gy + y, mz, '#8a6a4a', ry);
+      for (let t = t0; t <= t1; t += 2.5) { const x = a[0] + (c[0] - a[0]) * t / L, z = a[1] + (c[1] - a[1]) * t / L; box(0.12, 1.3, 0.12, x, groundH(x, z) + 0.65, z, '#6b4f3a'); }
+    }
+  }
+}
+// a water tower: shaft, a cone up to the tank, the tank, its roof; r is the radius of the tank, h the height
+function lsTower(solid, x, z, r, h, solidAt) {
+  const F0 = lmFrame(new THREE.Matrix4()), gy = groundH(x, z), R = clamp(r, 2.5, 9), Hs = h * 0.72;
+  F0.geo(solid, new THREE.CylinderGeometry(R * 0.3, R * 0.36, Hs, 14).translate(x, gy + Hs / 2, z), null, COL('#c9c4b8'));
+  F0.geo(solid, new THREE.CylinderGeometry(R, R * 0.3, h * 0.1, 18).translate(x, gy + Hs + h * 0.05, z), null, COL('#bdb7a9'));
+  F0.geo(solid, new THREE.CylinderGeometry(R, R, h * 0.14, 18).translate(x, gy + Hs + h * 0.17, z), null, COL('#d4cfc3'));
+  F0.geo(solid, new THREE.CylinderGeometry(R * 0.2, R * 1.02, h * 0.05, 18).translate(x, gy + h * 0.985, z), null, COL('#8f8b84'));
+  solidAt(x, z, R * 0.36, h);
 }
 function lsNet(A, sm, vm, half, postH, netH, G, box, y0 = 0) { // posts at the sides, the net across the middle
   const ry = Math.atan2(A.ux, A.uz), [ax, az] = A.at(sm, vm - half), [bx, bz] = A.at(sm, vm + half), ga = groundH(ax, az), gb = groundH(bx, bz);
@@ -5442,9 +5622,16 @@ function parkTile(T) {
       add(pickModel(PARKED_MIX, tRnd), x, z, ang + Math.PI / 2 + (tRnd() < 0.5 ? Math.PI : 0)); placed++;
     }
   }
+  // along the streets where OSM maps the parking: about half the spaces taken
+  let inStreet = 0;
+  for (const st of T.streetStalls || []) {
+    if (inStreet >= 16 || tRnd() > 0.5 || VEH.some(v => hyp(v.x - st.x, v.z - st.z) < 2.5)) continue;
+    let m = pickModel(PARKED_MIX, tRnd); if (m === 'ape' || m === 'bici' || (st.kind === 1 && (m === 'van' || m === 'suv'))) m = 'hatch';
+    add(m, st.x, st.z, st.h + (tRnd() - 0.5) * 0.04); inStreet++;
+  }
   let kerb = 0;
   for (const ri of T.d.rp || []) {
-    const r = D.roads[ri]; if (r.c !== 2 || r.d || r.b) continue;
+    const r = D.roads[ri]; if (r.c !== 2 || r.d || r.b || r.pk) continue; // streets with mapped parking are done above
     for (let k = 1; k < r.g.length && kerb < 8; k++) {
       const a = N[r.g[k - 1]], b = N[r.g[k]], L = hyp(b[0] - a[0], b[1] - a[1]); if (L < 22 || tRnd() > 0.22) continue;
       if (tileOf((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) !== T.t) continue;
@@ -5632,6 +5819,12 @@ function drawMinimap() {
   for (const v of VEH) if (v.kind === 'police' && v.driver === 'ai' && W.stars > 0) { const [x, y] = tr(v.x, v.z); if (hyp(x, y) < R + 30) drawBlip(mg, x, y, (now * 4 | 0) % 2 ? '#4d86ff' : '#e0453a', 7, true, R); }
   const tgt = MS.state === 'pickup' ? MS.from : MS.state === 'deliver' ? MS.to : null;
   if (tgt) { const [x, y] = tr(tgt.x, tgt.z); drawBlip(mg, x, y, MS.state === 'pickup' ? '#f0b23c' : '#7fd18b', 10, true, R); }
+  if (WAYPT) { /* the waypoint: a cross, or a blip on the rim when it is off the minimap; gone once you get there */
+    const [x, y] = tr(WAYPT.x, WAYPT.z);
+    if (hyp(x, y) < R - 14) { mg.lineCap = 'round'; for (const [col, w] of [['#0f1116', 7], ['#e05adc', 4]]) { mg.strokeStyle = col; mg.lineWidth = w; mg.beginPath(); mg.moveTo(x - 8, y - 8); mg.lineTo(x + 8, y + 8); mg.moveTo(x + 8, y - 8); mg.lineTo(x - 8, y + 8); mg.stroke(); } }
+    else drawBlip(mg, x, y, '#e05adc', 8, true, R);
+    if (hyp(px - WAYPT.x, pz - WAYPT.z) < 12) { WAYPT = null; toast('Sei arrivato'); }
+  }
   const ah = camMode === 1 ? (P.mode === 'car' ? P.car.h : P.h) - Math.PI : 0;
   mg.rotate(ah); mg.fillStyle = '#fbf5e6'; mg.strokeStyle = '#0f1116'; mg.lineWidth = 3; mg.beginPath(); mg.moveTo(0, -14); mg.lineTo(10, 11); mg.lineTo(0, 5); mg.lineTo(-10, 11); mg.closePath(); mg.stroke(); mg.fill();
   mg.restore();
@@ -5639,10 +5832,16 @@ function drawMinimap() {
   mg.translate(0, -(R - 20)); mg.rotate(-(h - Math.PI)); mg.fillText('N', 0, 0); mg.restore();
 }
 function drawBig() {
-  const c = $('bigmap'), dpr = Math.min(2, devicePixelRatio || 1); c.width = innerWidth * dpr; c.height = innerHeight * dpr;
-  const g = c.getContext('2d'), sc = Math.min(c.width / (META.hw * 2), c.height / (META.hh * 2)) * 0.96;
-  g.fillStyle = '#16181e'; g.fillRect(0, 0, c.width, c.height); g.save(); g.translate(c.width / 2, c.height / 2); g.scale(sc, sc);
+  const c = $('bigmap'), dpr = Math.min(2, devicePixelRatio || 1); if (c.width !== Math.round(innerWidth * dpr) || c.height !== Math.round(innerHeight * dpr)) { c.width = innerWidth * dpr; c.height = innerHeight * dpr; }
+  const g = c.getContext('2d'); BIGV.fit = Math.min(c.width / (META.hw * 2), c.height / (META.hh * 2)) * 0.96; if (!BIGV.z) BIGV.z = BIGV.fit; const sc = BIGV.z;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#16181e'; g.fillRect(0, 0, c.width, c.height); g.save(); g.translate(c.width / 2, c.height / 2); g.scale(sc, sc); g.translate(-BIGV.cx, -BIGV.cz);
   g.drawImage(BIGC, -META.hw, -META.hh, META.hw * 2, META.hh * 2);
+  if (sc > 0.7) { // close up: buildings and streets drawn sharp from the map data, only what is on screen
+    const hx = c.width / 2 / sc, hz = c.height / 2 / sc, x0 = BIGV.cx - hx, x1 = BIGV.cx + hx, z0 = BIGV.cz - hz, z1 = BIGV.cz + hz;
+    g.fillStyle = '#3a3e49'; BLD.each(x0, z0, x1, z1, b => { g.beginPath(); b.pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fill(); });
+    g.lineCap = 'round'; const segs = []; ROADSEG.each(x0, z0, x1, z1, sg => segs.push(sg));
+    for (const pass of [0, 1]) for (const sg of segs) { const r = sg.r; if (pass === 0 ? r.c !== 6 : r.c === 6) continue; g.strokeStyle = r.c === 6 ? '#4b4f58' : r.d ? '#f0c27a' : r.c <= 1 ? '#d8cfbd' : r.c === 5 ? '#9b8676' : '#a7a49c'; g.lineWidth = r.c === 6 ? 1.6 : r.w + (r.c <= 1 ? 2 : 0.5); g.beginPath(); g.moveTo(sg.a[0], sg.a[1]); g.lineTo(sg.b[0], sg.b[1]); g.stroke(); }
+  }
   const lab = (p, col, r) => { g.fillStyle = col; g.strokeStyle = '#0f1116'; g.lineWidth = 3 * dpr / sc; g.beginPath(); g.arc(p.x, p.z, r / sc, 0, TAU); g.fill(); g.stroke(); };
   const placed = []; g.font = `600 ${15 * dpr / sc}px "Barlow Condensed", sans-serif`;
   for (const p of [...PLACES.filter(p => (p.k === 'town' || p.k === 'village') && Math.abs(p.x) < META.hw - 150 && Math.abs(p.z) < META.hh - 60).map(p => ({ ...p, big: 1 })), ...D.pois.filter(p => ['stazione', 'chiesa', 'parco'].includes(p.k))]) if (p.n.length < 30 && !p.n.startsWith('Grotta')) {
@@ -5651,8 +5850,34 @@ function drawBig() {
     if (p.big) { g.save(); g.font = `400 ${20 * dpr / sc}px Bungee, Impact, sans-serif`; g.fillStyle = '#f0b23c'; g.fillText(p.n.toUpperCase(), p.x, p.z); g.restore(); } else { lab(p, '#c9bfa8', 5 * dpr); g.fillStyle = '#e8e0cc'; g.fillText(p.n, p.x + 8 * dpr / sc, p.z + 5 * dpr / sc); }
   }
   if (MS.state === 'pickup') lab(MS.from, '#f0b23c', 10 * dpr); if (MS.state === 'deliver') lab(MS.to, '#7fd18b', 10 * dpr);
-  const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; lab({ x: px, z: pz }, '#fbf5e6', 9 * dpr);
+  if (WAYPT) { const q = 11 * dpr / sc; g.lineCap = 'round'; for (const [col, w] of [['#0f1116', 7], ['#e05adc', 4]]) { g.strokeStyle = col; g.lineWidth = w * dpr / sc; g.beginPath(); g.moveTo(WAYPT.x - q, WAYPT.z - q); g.lineTo(WAYPT.x + q, WAYPT.z + q); g.moveTo(WAYPT.x + q, WAYPT.z - q); g.lineTo(WAYPT.x - q, WAYPT.z + q); g.stroke(); } }
+  // you: an arrow pointing where you are heading, as on the minimap
+  const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z, hd = P.mode === 'car' ? P.car.h : P.h, k = 1.5 * dpr / sc;
+  g.save(); g.translate(px, pz); g.rotate(Math.PI - hd); g.fillStyle = '#fbf5e6'; g.strokeStyle = '#0f1116'; g.lineWidth = 3 * k; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(0, -14 * k); g.lineTo(10 * k, 11 * k); g.lineTo(0, 5 * k); g.lineTo(-10 * k, 11 * k); g.closePath(); g.stroke(); g.fill(); g.restore();
   g.restore();
+}
+// the big map: wheel or two fingers to zoom, drag to move, a click (or a tap) drops a waypoint, a click on it takes it away
+// (declared after drawBig: assemble3.py replaces everything between the minimap and drawBig)
+var BIGV = { cx: 0, cz: 0, z: 0, fit: 1 }, WAYPT = null;
+{
+  const c = $('bigmap'), pts = new Map(); let pinch = null, moved = 0;
+  const px2 = () => c.width / c.getBoundingClientRect().width;
+  const toWorld = (ex, ey) => { const r = c.getBoundingClientRect(), k = px2(); return [BIGV.cx + ((ex - r.left) * k - c.width / 2) / BIGV.z, BIGV.cz + ((ey - r.top) * k - c.height / 2) / BIGV.z]; };
+  const keepIn = () => { BIGV.cx = clamp(BIGV.cx, -META.hw, META.hw); BIGV.cz = clamp(BIGV.cz, -META.hh, META.hh); if (BIGV.z <= BIGV.fit * 1.001) BIGV.cx = BIGV.cz = 0; };
+  const zoomAt = (ex, ey, f) => { const [wx, wz] = toWorld(ex, ey); BIGV.z = clamp(BIGV.z * f, BIGV.fit, 14); const [wx2, wz2] = toWorld(ex, ey); BIGV.cx += wx - wx2; BIGV.cz += wz - wz2; keepIn(); drawBig(); };
+  c.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+  c.addEventListener('pointerdown', e => { c.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) moved = 0; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: hyp(a[0] - b[0], a[1] - b[1]) || 1, z: BIGV.z }; moved = 99; } });
+  c.addEventListener('pointermove', e => {
+    const p = pts.get(e.pointerId); if (!p) return; const dx = e.clientX - p[0], dy = e.clientY - p[1]; pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 2 && pinch) { const [a, b] = [...pts.values()]; zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, pinch.z * hyp(a[0] - b[0], a[1] - b[1]) / pinch.d / BIGV.z); return; }
+    moved += Math.abs(dx) + Math.abs(dy); if (moved < 6) return; const k = px2(); BIGV.cx -= dx * k / BIGV.z; BIGV.cz -= dy * k / BIGV.z; keepIn(); drawBig();
+  });
+  c.addEventListener('pointerup', e => {
+    const had = pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!had || pts.size || moved >= 6) return;
+    const [wx, wz] = toWorld(e.clientX, e.clientY); WAYPT = WAYPT && hyp(WAYPT.x - wx, WAYPT.z - wz) * BIGV.z < 26 * px2() ? null : { x: wx, z: wz }; drawBig();
+  });
+  c.addEventListener('pointercancel', e => { pts.delete(e.pointerId); pinch = null; });
 }
 
 // ---------------------------------------------------------------- input
@@ -6246,7 +6471,7 @@ RADIO.addEventListener('error', () => {
 RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown[radioSt]) { radioShown[radioSt] = true; toast(STATIONS[radioSt].hello); } });
 function stopRadio() { RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
 function updRadio(dt) {
-  const want = radioOn && running && !paused && P.mode === 'car' && !P.car.spec.two && !(AU && AU.muted); // no radio on bikes, scooters and motorbikes
+  const want = radioOn && running && (!paused || bigOpen) && P.mode === 'car' && !P.car.spec.two && !(AU && AU.muted); // no radio on bikes, scooters and motorbikes
   if (P.mode === 'car' && stationFor(P.car) !== radioSt) { radioSt = stationFor(P.car); radioUrl = 0; radioErr = false; STATIC.quiet = false; if (!RADIO.paused) stopRadio(); } // another car, another station: retune
   if (want && RADIO.paused && !radioErr) { RADIO.src = STATIONS[radioSt].urls[radioUrl]; RADIO.volume = radioVol; RADIO.play().catch(() => { }); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } // fresh src = back to live, not to a stale buffer
   if (AU && AU.on) updStatic(dt, want);

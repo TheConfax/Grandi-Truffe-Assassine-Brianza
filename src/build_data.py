@@ -22,7 +22,8 @@ q = lambda v: int(round(v * 10))
 RECT = box(-HW, -HH, HW, HH)
 inside = lambda p, m=0: abs(p[0]) <= HW + m and abs(p[1]) <= HH + m
 TILE = 250.0
-log = lambda *a: print(*a, flush=True)
+import time; _T0 = time.time()
+log = lambda *a: print('%4.0fs' % (time.time() - _T0), *a, flush=True)  # seconds since the start: where the build spends its time
 
 # ------------------------------------------------------------------ parse
 nodes, ntags, ways, rels, wrefs = {}, {}, {}, [], {}
@@ -125,6 +126,7 @@ def add_building(outer, holes, t, key):
     bt = t.get('building', 'yes')
     if t.get('amenity') == 'place_of_worship' and a > 120: bt = 'church'
     rec = {'p': outer, 'h': round(bheight(t, a, key), 1), 't': BTYPE.get(bt, 0), 'ht': bool(num(t.get('height')) or num(t.get('building:levels'))), 'lv': num(t.get('building:levels')), 'bt': bt}
+    if t.get('man_made') == 'water_tower': rec['wt'] = True; rec['h'] = num(t.get('height')) or max(rec['h'], 25)
     if holes: rec['k'] = [h for h in holes if len(h) >= 3]
     buildings.append(rec)
 mp_ways = set()
@@ -206,6 +208,33 @@ for at, o, ir in areas:
     if g is not None:
         g = g.intersection(RECT.buffer(60))
         if not g.is_empty: area_geoms.append((at, g))
+# ---- land the game dresses by kind (paesaggio3.js): fields, meadows, orchards, allotments, building sites, industrial yards, nurseries,
+# pitches by sport (and surface), pools. One polygon each, given to the tile of its middle
+LS = {'farmland': 'campo', 'meadow': 'prato', 'orchard': 'frutteto', 'vineyard': 'frutteto', 'allotments': 'orti', 'construction': 'cantiere',
+      'industrial': 'industria', 'greenhouse_horticulture': 'vivaio', 'plant_nursery': 'vivaio', 'flowerbed': 'aiuola'}
+def ls_kind(t):
+    if t.get('leisure') == 'swimming_pool' or t.get('amenity') == 'swimming_pool': return 'piscina'
+    if t.get('leisure') == 'pitch': return 'sport:' + (t.get('sport') or '').split(';')[0] + ':' + (t.get('surface') or '')
+    if t.get('leisure') == 'horse_riding': return 'sport:equestrian:' + (t.get('surface') or '')
+    if t.get('leisure') == 'track': return 'pista:' + (t.get('surface') or '')
+    if t.get('leisure') == 'dog_park': return 'cani'
+    if t.get('amenity') == 'car_wash': return 'lavaggio'
+    if t.get('man_made') == 'water_tower': return 'torre_acqua:' + str(num(t.get('height')) or '')
+    return LS.get(t.get('landuse'))
+land = []
+for members, t in rels:
+    if t.get('type') != 'multipolygon' or 'building' in t: continue
+    k_ = ls_kind(t)
+    if not k_: continue
+    for o in join_rings([m[1] for m in members if m[0] == 'way' and m[2] == 'outer']):
+        if len(o) >= 3: land.append((k_, o))
+for wid, (refs, t) in ways.items():
+    if wid in mp_ways or refs[0] != refs[-1] or 'building' in t: continue
+    k_ = ls_kind(t)
+    if k_:
+        pts = ring(refs)
+        if len(pts) >= 3: land.append((k_, pts))
+log('terreni', len(land), dict(Counter(k.split(':')[0] + (':' + k.split(':')[1] if k.startswith('sport') else '') for k, _ in land)))
 WCF = os.path.join(DATA, 'wc', 'wc.npy')
 WC = None; WC_BUILT = None
 if os.path.exists(WCF):
@@ -262,6 +291,20 @@ def clip_runs(refs, m):
             cur = []
     if len(cur) > 1: runs.append(cur)
     return runs
+PK_OR = {'parallel': 1, 'diagonal': 2, 'perpendicular': 3}
+def street_parking(t):  # [left, right] of the way: 0 none, 1 parallel, 2 diagonal, 3 perpendicular, +4 paid (strisce blu); None if not mapped
+    out = []
+    for sd in ('left', 'right'):
+        v = t.get('parking:' + sd) or t.get('parking:both'); o = t.get('parking:%s:orientation' % sd) or t.get('parking:both:orientation')
+        if v is None:  # the old scheme: parking:lane:left=parallel
+            ol = t.get('parking:lane:' + sd) or t.get('parking:lane:both')
+            v, o = (ol, ol) if ol in PK_OR else (None, None)
+        k = PK_OR.get(o, 1) if v in ('lane', 'street_side', 'on_kerb', 'half_on_kerb', 'parallel', 'diagonal', 'perpendicular') else 0
+        fee = t.get('parking:%s:fee' % sd) or t.get('parking:both:fee') or t.get('parking:fee')
+        cond = t.get('parking:condition:' + sd) or t.get('parking:condition:both')
+        if k and (fee == 'yes' or cond == 'ticket'): k += 4
+        out.append(k)
+    return out if any(out) else None
 roads, raw_roads = [], []
 rails, rivers, rows, rail_raw, barriers = [], [], [], [], []
 bar_runs, gate_ways = [], []
@@ -280,7 +323,7 @@ for wid, (refs, t) in ways.items():
             raw_roads.append({'refs': run, 'w': round(w, 1), 'wx': bool(num(t.get('width'))) and num(t.get('width')) <= 30, 'c': RCLASS[hw], 'hw': hw, 'n': nid(t.get('name') or t.get('ref')),
                               'o': t.get('oneway') in ('yes', '1') or hw in ('motorway', 'motorway_link') or t.get('junction') == 'roundabout',
                               'bridge': bridge, 'layer': layer, 'emb': t.get('embankment') == 'yes', 'tunnel': t.get('tunnel') in ('yes', 'covered') or layer < 0, 'under': t.get('tunnel') in ('yes', 'covered', 'building_passage') or layer < 0,
-                              'x': hw in ('motorway', 'trunk', 'motorway_link', 'trunk_link'), 'ms': num(t.get('maxspeed')) if str(t.get('maxspeed', '')).replace('.', '').isdigit() else None})
+                              'x': hw in ('motorway', 'trunk', 'motorway_link', 'trunk_link'), 'ms': num(t.get('maxspeed')) if str(t.get('maxspeed', '')).replace('.', '').isdigit() else None, 'pk': street_parking(t)})
     elif t.get('railway') == 'rail' and (t.get('tunnel') != 'yes' or sum(math.dist(nodes[a], nodes[b]) for a, b in zip(refs, refs[1:]) if a in nodes and b in nodes) < 200) and t.get('service') not in ('yard', 'siding', 'spur'):  # short rail tunnels (underpasses) stay as track at grade
         lay = num(t.get('layer')) or 0
         for run in clip_runs(refs, 300): rails.append([nodes[r] for r in run]); rail_raw.append({'refs': run, 'bridge': t.get('bridge') in ('yes', 'viaduct') or lay >= 1, 'emb': t.get('embankment') == 'yes', 'layer': lay})
@@ -461,7 +504,8 @@ coordH = {key(nodes[n_]): h for n_, h in railH.items()}
 _res = unary_union([g for at, g in area_geoms if at == 16] + ([WC_BUILT] if WC_BUILT is not None else [])).intersection(RECT.buffer(-10))
 _occ = unary_union([g.buffer(8) for g in _hb])
 _band = unary_union([r['line'].buffer(r['w'] / 2 + 2.6, cap_style=2) for r in raw_roads if r['c'] <= 6 and not r['tunnel'] and r['line'].length > 0.5])
-_free = _res.difference(_occ).difference(_band).buffer(-0.5)
+_other = unary_union([g for at, g in area_geoms if at != 16] + [g_ for g_ in (P(pts) for k, pts in land) if g_ is not None])  # pitches, parks, car parks, fields...: never a made-up house on them
+_free = _res.difference(_occ).difference(_band).difference(_other.buffer(2)).buffer(-0.5)
 prepare(_free); prepare(_band)
 _placed, nproc = [], 0
 _pg = {}
@@ -871,7 +915,8 @@ log('pois', len(pois), 'places', len(places), 'trees', len(trees), 'crossings', 
 # ---- street objects from OSM: [kind, x, z, angle, extra]. The angle follows the nearest street (a bench faces it, a bump lies across it);
 # extra is a height (pylons, poles, masts) or the street width (bumps). Kinds by index, same order as OGG_KINDS in oggetti3.js
 OGG = ['traliccio', 'palo', 'dosso', 'rallentatore', 'piattaforma', 'paletto', 'blocco', 'idrante', 'campana', 'ricarica', 'antenna',
-       'panchina', 'cestino', 'fontanella', 'giochi', 'telecamera', 'distributore', 'rastrelliera', 'cassetta']
+       'panchina', 'cestino', 'fontanella', 'giochi', 'telecamera', 'distributore', 'rastrelliera', 'cassetta',
+       'armadietti', 'pannello', 'picnic', 'fitness', 'torre_acqua', 'lavaggio']
 def ogg_kind(t):
     tc = t.get('traffic_calming')
     if tc: return {'table': 'piattaforma', 'hump': 'rallentatore', 'cushion': 'rallentatore', 'bump': 'dosso', 'yes': 'dosso', 'rumble_strip': None, 'chicane': None, 'choker': None, 'island': None}.get(tc, 'dosso')
@@ -885,8 +930,12 @@ def ogg_kind(t):
     if b == 'block': return 'blocco'
     if t.get('emergency') == 'fire_hydrant': return 'idrante'
     if t.get('leisure') == 'playground': return 'giochi'
+    if t.get('leisure') == 'picnic_table': return 'picnic'
+    if t.get('leisure') == 'fitness_station': return 'fitness'
+    if mm == 'water_tower': return 'torre_acqua'
+    if t.get('tourism') == 'information' and t.get('information') in (None, 'board', 'map', 'terminal'): return 'pannello'
     return {'recycling': 'campana' if t.get('recycling_type') != 'centre' else None, 'charging_station': 'ricarica', 'bench': 'panchina', 'waste_basket': 'cestino',
-            'drinking_water': 'fontanella', 'vending_machine': 'distributore', 'bicycle_parking': 'rastrelliera', 'post_box': 'cassetta'}.get(am)
+            'drinking_water': 'fontanella', 'vending_machine': 'distributore', 'bicycle_parking': 'rastrelliera', 'post_box': 'cassetta', 'parcel_locker': 'armadietti', 'car_wash': 'lavaggio'}.get(am)
 def num(v, d):
     try: return float(str(v).replace('m', '').replace(',', '.').split(';')[0])
     except (ValueError, TypeError): return d
@@ -918,12 +967,13 @@ ogg = []
 def add_ogg(k, p, t, along=None):
     if not inside(p, 0): return
     car = k in ('dosso', 'rallentatore', 'piattaforma')
-    ang, r = (along, None) if along is not None else near_street(p, car, face=k in ('panchina', 'distributore', 'cassetta', 'ricarica', 'telecamera', 'fontanella', 'campana'))
+    ang, r = (along, None) if along is not None else near_street(p, car, face=k in ('panchina', 'distributore', 'cassetta', 'ricarica', 'telecamera', 'fontanella', 'campana', 'armadietti', 'pannello', 'lavaggio'))
     if car and r is None and along is None: return  # a bump off the streets
     extra = 0
     if k == 'traliccio': extra = num(t.get('height'), 30)
     elif k == 'palo': extra = num(t.get('height'), 9)
     elif k == 'antenna': extra = num(t.get('height'), 25)
+    elif k == 'torre_acqua': extra = num(t.get('height'), 28)
     elif car: extra = (r['mh'] * 2) if r else 6
     ogg.append([OGG.index(k), q(p[0]), q(p[1]), round(ang, 2), round(extra, 1)])
 for r_, t in ntags.items():
@@ -931,7 +981,8 @@ for r_, t in ntags.items():
     if k: add_ogg(k, nodes[r_], t, pw_dir.get(r_) if k in ('traliccio', 'palo') else None)
 for wid, (refs, t) in ways.items():
     k = ogg_kind(t)
-    if not k or k in ('traliccio', 'palo') or t.get('highway') and k not in ('dosso', 'rallentatore', 'piattaforma'): continue
+    # water towers and car washes mapped as areas are drawn as land (paesaggio3.js)
+    if not k or k in ('traliccio', 'palo', 'torre_acqua', 'lavaggio') or t.get('highway') and k not in ('dosso', 'rallentatore', 'piattaforma'): continue
     pts = [nodes[n_] for n_ in refs if n_ in nodes]
     if len(pts) < 2: continue
     if refs[0] == refs[-1] and len(pts) >= 4: c = Polygon(pts).centroid; add_ogg(k, (c.x, c.y), t)  # an area: its middle
@@ -945,6 +996,58 @@ for wid, (refs, t) in ways.items():
     if len(pts) >= 2: power_lines.append((pts, 28 if t['power'] == 'line' else 8.5))
 log('oggetti', len(ogg), dict(Counter(OGG[o[0]] for o in ogg)), 'linee elettriche', len(power_lines))
 
+# ---- real parking: the spaces mapped one by one (a rectangle each, split when it says capacity > 1) and the capacity of the car parks
+pspaces, plots = [], []  # [x, z, angle of the long side, length, width, kind 0 normal / 1 disabled / 2 charging]; [x, z, capacity]
+def add_space(pts, t):
+    g = Polygon(pts).buffer(0)
+    if g.is_empty or g.area < 4 or g.area > 400: return
+    c = g.centroid
+    if not inside((c.x, c.y), 0): return
+    r = list(g.minimum_rotated_rectangle.exterior.coords)[:4]; e1, e2 = math.dist(r[0], r[1]), math.dist(r[1], r[2])
+    a_, b_ = (r[0], r[1]) if e1 >= e2 else (r[1], r[2]); L, W = max(e1, e2), min(e1, e2); ang = math.atan2(b_[0] - a_[0], b_[1] - a_[1])
+    kind = 1 if t.get('parking_space') == 'disabled' or num(t.get('capacity:disabled'), None) else 2 if t.get('parking_space') == 'charging' else 0
+    cap = int(num(t.get('capacity'), None) or 1)
+    if cap <= 1 or cap > 40: pspaces.append([q(c.x), q(c.y), round(ang, 3), round(L, 1), round(W, 1), kind]); return
+    # a row of spaces mapped as one: split it along its long side (side by side if each is wider than deep)
+    ux, uz = math.sin(ang), math.cos(ang); step = L / cap
+    for i in range(cap):
+        o_ = -L / 2 + step * (i + 0.5); pspaces.append([q(c.x + ux * o_), q(c.y + uz * o_), round(ang + math.pi / 2, 3), round(W, 1), round(step, 1), kind])
+for wid, (refs, t) in ways.items():
+    if refs[0] != refs[-1] or len(refs) < 4: continue
+    if t.get('amenity') == 'parking_space': add_space(ring(refs), t)
+    elif t.get('amenity') == 'parking' and num(t.get('capacity'), None):
+        c_ = centroid(ring(refs))
+        if inside(c_, 0): plots.append([q(c_[0]), q(c_[1]), int(num(t['capacity'], 0))])
+# ---- comune boundaries: where a road crosses from one comune into the next, the town signs. [x, z, ux, uz, road width, comune ahead, comune behind]
+# the boundaries come from data/confini_comuni.json (Overpass, admin_level 8 with geometry): the map extract has none
+bway, bgeo = defaultdict(set), {}
+CONF = os.path.join(DATA, 'confini_comuni.json')
+if os.path.exists(CONF):
+    for e_ in json.load(open(CONF, encoding='utf-8'))['elements']:
+        nm_ = e_.get('tags', {}).get('name')
+        if not nm_: continue
+        for m in e_.get('members', []):
+            if m.get('type') == 'way' and m.get('geometry'): bway[m['ref']].add(nm_); bgeo[m['ref']] = [proj(p['lat'], p['lon']) for p in m['geometry']]
+pl_by = {t['name']: nodes[r_] for r_, t in ntags.items() if t.get('place') in ('city', 'town', 'village') and t.get('name')}
+blines = [(LineString(bgeo[w_]), sorted(n_)) for w_, n_ in bway.items() if len(n_) == 2 and len(bgeo[w_]) >= 2]
+cartelli = []
+if blines:
+    _bt = STRtree([b_[0] for b_ in blines])
+    for r in raw_roads:
+        if r['c'] > 3 or r['tunnel'] or r.get('bridge'): continue
+        L_ = r['line']
+        for i_ in _bt.query(L_):
+            bl, (na, nb) = blines[i_]
+            if na not in pl_by or nb not in pl_by: continue
+            x_ = L_.intersection(bl)
+            for p_ in (list(x_.geoms) if hasattr(x_, 'geoms') else [x_]):
+                if p_.geom_type != 'Point' or not inside((p_.x, p_.y), 0) or any(math.dist((c_[0] / 10, c_[1] / 10), (p_.x, p_.y)) < 25 for c_ in cartelli): continue
+                d_ = L_.project(p_); a_ = L_.interpolate(max(0, d_ - 2)); b_ = L_.interpolate(min(L_.length, d_ + 2)); ux, uz = b_.x - a_.x, b_.y - a_.y; l_ = math.hypot(ux, uz) or 1; ux /= l_; uz /= l_
+                ahead, behind = (p_.x + ux * 40, p_.y + uz * 40), (p_.x - ux * 40, p_.y - uz * 40)
+                fwd, back = (na, nb) if math.dist(ahead, pl_by[na]) + math.dist(behind, pl_by[nb]) <= math.dist(ahead, pl_by[nb]) + math.dist(behind, pl_by[na]) else (nb, na)
+                cartelli.append([q(p_.x), q(p_.y), round(ux, 3), round(uz, 3), r['w'], fwd, back])
+log('cartelli di paese', len(cartelli), 'confini', len(blines))
+log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1), 'parcheggi con capienza', len(plots), 'strade con sosta', sum(1 for r in raw_roads if r.get('pk')))
 # ------------------------------------------------------------------ graph & tiles
 used_nodes = {}
 out_roads = []
@@ -956,6 +1059,7 @@ for r in raw_roads:
     if r['tunnel']: rec['t'] = 1
     if r['x']: rec['x'] = 1
     if r.get('under'): rec['u'] = 1
+    if r.get('pk'): rec['pk'] = r['pk']
     out_roads.append(rec)
 q = lambda v: int(round(v * 10))
 NODES = [[q(nodes[ref][0]), q(nodes[ref][1]), q(deckH[ref]) if ref in deckH else -32768] for ref in node_list]
@@ -972,7 +1076,16 @@ def push(t, k, v): tiles[t].setdefault(k, []).append(v)
 for b in buildings:
     c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b['t']}
     if b.get('k'): rec['k'] = [enc(h) for h in b['k']]
+    if b.get('bt') in ('garage', 'garages'): rec['g'] = 1  # rows of up-and-over doors
+    elif b.get('bt') == 'greenhouse': rec['g'] = 2  # glass
+    elif b.get('bt') == 'grandstand': rec['g'] = 3  # stepped seats under a roof
+    elif b.get('wt'): rec['g'] = 4  # a water tower mapped as a building
     push(tid(*c), 'b', rec)
+for k_, pts in land:  # one polygon per piece of land, simplified, in the tile of its middle
+    try: g_ = Polygon(pts).buffer(0).simplify(0.3, preserve_topology=True)
+    except Exception: continue
+    if g_.is_empty or g_.geom_type != 'Polygon' or g_.area < 8 or not inside((g_.centroid.x, g_.centroid.y), 0): continue
+    push(tid(g_.centroid.x, g_.centroid.y), 'ls', {'p': enc(list(g_.exterior.coords)[:-1]), 's': k_})
 def polys_of(g, tol=0.15, min_area=0.5):
     g = g.simplify(tol, preserve_topology=True)
     out = []
@@ -1045,6 +1158,9 @@ for ri, r in enumerate(raw_roads):  # road pieces per tile (for markings and dec
 for x, z, dx, dz, w in crossings: push(tid(x, z), 'cr', [q(x), q(z), round(dx, 3), round(dz, 3), round(w, 1)])
 for x, z in lamps: push(tid(x, z), 'lp', [q(x), q(z)])
 for o in ogg: push(tid(o[1] / 10, o[2] / 10), 'og', o)
+for s_ in pspaces: push(tid(s_[0] / 10, s_[1] / 10), 'ps', s_)
+for p_ in plots: push(tid(p_[0] / 10, p_[1] / 10), 'pc', p_)
+for c_ in cartelli: push(tid(c_[0] / 10, c_[1] / 10), 'cl', c_)
 push_lines('pw', [p for p, h in power_lines], lambda i: {'h': power_lines[i][1]})
 # terrain as base64 uint16 decimetres
 TH16 = np.clip(np.round((TH - TBASE) * 10), 0, 65535).astype('<u2')
