@@ -161,9 +161,10 @@ for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
     if not os.path.exists(f_): continue
     if d_.lower() not in _comuni: log('dbgt: no boundary for', d_); continue
     con_ = sqlite3.connect(f_)
-    # dividers: 13 fences, 18 low wall with railings, 95 'other' (mostly fences); 02 and 17 are left out until someone has seen what they are
+    # dividers, EL_DIV_TY (Specifiche di contenuto regionali, p. 173): 02 railings, 04 barbed wire, 13 wire mesh, 17 fence (posts with boards,
+    # mesh or bars, also on a low wall), 18 post-and-rail, 19 hedge, 95 other
     for blob, ty in con_.execute('select Shape, EL_DIV_TY from EL_DIV'):
-        if blob is None or ty not in ('13', '18', '95'): continue
+        if blob is None or ty not in ('02', '04', '13', '17', '18', '19', '95'): continue
         g_ = _gpkg_geom(blob)
         for part in getattr(g_, 'geoms', [g_]):
             pts_ = _xy(part.coords)
@@ -670,7 +671,14 @@ if not corridor.is_empty:
     merged = linemerge(cut) if not cut.is_empty and cut.geom_type in ('MultiLineString', 'LineString') else cut
     for l in (list(merged.geoms) if hasattr(merged, 'geoms') else [merged]):
         if isinstance(l, LineString) and l.length > 2: fences.append(list(l.simplify(0.15).coords))
-fences = [f_ for f_ in fences if not dbt_cover.contains(LineString(f_).centroid)]  # where the DBGT covers, its own railway fences are drawn instead
+if dbt_walls:  # the railway fences stay where the DBGT has none of its own within 3 m (it does not map them all along the line)
+    _dw = [LineString(p_) for p_, t_ in dbt_walls]; _dwt = STRtree(_dw); _fk = []
+    for f_ in fences:
+        L_ = LineString(f_); near_ = [_dw[j] for j in _dwt.query(L_.buffer(3))]
+        rest_ = L_.difference(unary_union([n_.buffer(3) for n_ in near_])) if near_ else L_
+        for part in (list(rest_.geoms) if hasattr(rest_, 'geoms') else [rest_]):
+            if isinstance(part, LineString) and part.length > 2: _fk.append(list(part.coords))
+    fences = _fk
 log('fences', len(fences))
 gates = [Point(nodes[r_]) for r_, t in ntags.items() if t.get('barrier') in ('gate', 'lift_gate', 'swing_gate', 'sliding_gate', 'entrance', 'kissing_gate')]
 bar_cut = unary_union([rbuf(lambda r: r['c'] <= 5 and flat(r), 0.5), rbuf(lambda r: r['c'] == 6 and flat(r), 0.25), bunion.buffer(0.15)] + [g.buffer(1.8) for g in gates])
@@ -695,12 +703,16 @@ if dbt_walls:
         if _ot is not None:
             for j in _ot.query(L):
                 if L.intersection(osm_in[j][0]).length > 0.5 * L.length: kind, hgt = osm_in[j][1], osm_in[j][2]; break
+        if ty != '95': kind = None  # the DBGT says what it is: that wins
+        if ty == '18': kind, hgt = 7, 1.2
+        elif ty in ('13', '04'): kind, hgt = (6, 2.0) if _rail_z.contains(m) else (5, 1.7)
+        elif ty in ('17', '02'): kind, hgt = 2, 1.5 + r_ * 0.4
+        elif ty == '19': kind, hgt = 3, 1.7
         if kind is None:
             if _rail_z.contains(m): kind, hgt = 6, 2.0
-            elif ty == '18' or _street_z.contains(m): kind, hgt = 2, 1.5 + r_ * 0.4
+            elif _street_z.contains(m): kind, hgt = 2, 1.5 + r_ * 0.4
             elif _ind_z.contains(m): kind, hgt = (5, 2.2) if r_ < 0.6 else (1, 2.4)
             elif _farm_z.contains(m): kind, hgt = 7, 1.2
-            elif ty == '13': kind, hgt = 5, 1.7
             else: kind, hgt = (5, 1.8) if r_ < 0.5 else (3, 1.7) if r_ < 0.8 else (2, 1.6)
         barriers.append((pts, kind, round(hgt, 1))); kinds_[kind] += 1
     log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', len(dbt_walls), 'per tipo', dict(kinds_))
