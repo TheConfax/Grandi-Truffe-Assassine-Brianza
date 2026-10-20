@@ -167,7 +167,7 @@ for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
         g_ = _gpkg_geom(blob)
         for part in getattr(g_, 'geoms', [g_]):
             pts_ = _xy(part.coords)
-            if len(pts_) >= 2: dbt_walls.append(pts_)
+            if len(pts_) >= 2: dbt_walls.append((pts_, ty))
     for blob, av in con_.execute('select Shape, UN_VOL_AV from UN_VOL'):
         if blob is None or not av or float(av) <= 1: continue
         g_ = _gpkg_geom(blob)
@@ -670,17 +670,40 @@ if not corridor.is_empty:
     merged = linemerge(cut) if not cut.is_empty and cut.geom_type in ('MultiLineString', 'LineString') else cut
     for l in (list(merged.geoms) if hasattr(merged, 'geoms') else [merged]):
         if isinstance(l, LineString) and l.length > 2: fences.append(list(l.simplify(0.15).coords))
+fences = [f_ for f_ in fences if not dbt_cover.contains(LineString(f_).centroid)]  # where the DBGT covers, its own railway fences are drawn instead
 log('fences', len(fences))
 gates = [Point(nodes[r_]) for r_, t in ntags.items() if t.get('barrier') in ('gate', 'lift_gate', 'swing_gate', 'sliding_gate', 'entrance', 'kissing_gate')]
 bar_cut = unary_union([rbuf(lambda r: r['c'] <= 5 and flat(r), 0.5), rbuf(lambda r: r['c'] == 6 and flat(r), 0.25), bunion.buffer(0.15)] + [g.buffer(1.8) for g in gates])
 prepare(bar_cut)
 # where the DBGT covers, its dividers replace OSM's (emptied in place: the gates below index this list by position)
+# Kinds: 1 wall, 2 low wall with railings, 3 hedge, 4 retaining wall, 5 wire mesh, 6 railway fence, 7 wooden post-and-rail. What each DBGT line
+# is comes from the map first (OSM's type where it drew the same line), then from where it stands: by the tracks, along a street, in an
+# industrial zone, in the fields; between houses it is a mix (wire mesh, hedge, low wall), the one choice not taken from the data
 if dbt_walls:
-    nrep_ = 0
+    nrep_, osm_in = 0, []
     for i_, (pts, k_, h_) in enumerate(barriers):
-        if len(pts) >= 2 and dbt_cover.contains(LineString(pts).centroid): barriers[i_] = ([], k_, h_); nrep_ += 1
-    for pts in dbt_walls: barriers.append((pts, 2, 1.6))
-    log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', len(dbt_walls))
+        if len(pts) >= 2 and dbt_cover.contains(LineString(pts).centroid): osm_in.append((LineString(pts).buffer(1.5), k_, h_)); barriers[i_] = ([], k_, h_); nrep_ += 1
+    _ot = STRtree([o[0] for o in osm_in]) if osm_in else None
+    _rail_z = unary_union([l.buffer(12) for l in railL]) if railL else GeometryCollection()
+    _street_z = unary_union([r['line'].buffer(r['w'] / 2 + 4, quad_segs=2) for r in raw_roads if r['c'] <= 4 and flat(r) and r['line'].length > 0.1]).intersection(dbt_cover)
+    _ind_z = unary_union([g for at, g in area_geoms if at in (8, 9)]).intersection(dbt_cover)
+    _farm_z = unary_union([g for at, g in area_geoms if at in (11, 12, 13)]).intersection(dbt_cover)
+    for z_ in (_rail_z, _street_z, _ind_z, _farm_z): prepare(z_)
+    kinds_ = Counter()
+    for pts, ty in dbt_walls:
+        L = LineString(pts); m = L.interpolate(0.5, normalized=True); r_ = h01(str(pts[0])); kind = None
+        if _ot is not None:
+            for j in _ot.query(L):
+                if L.intersection(osm_in[j][0]).length > 0.5 * L.length: kind, hgt = osm_in[j][1], osm_in[j][2]; break
+        if kind is None:
+            if _rail_z.contains(m): kind, hgt = 6, 2.0
+            elif ty == '18' or _street_z.contains(m): kind, hgt = 2, 1.5 + r_ * 0.4
+            elif _ind_z.contains(m): kind, hgt = (5, 2.2) if r_ < 0.6 else (1, 2.4)
+            elif _farm_z.contains(m): kind, hgt = 7, 1.2
+            elif ty == '13': kind, hgt = 5, 1.7
+            else: kind, hgt = (5, 1.8) if r_ < 0.5 else (3, 1.7) if r_ < 0.8 else (2, 1.6)
+        barriers.append((pts, kind, round(hgt, 1))); kinds_[kind] += 1
+    log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', len(dbt_walls), 'per tipo', dict(kinds_))
 # cemeteries are walled: perimeter wall wherever OSM has not drawn one (gates/paths open it like any other wall)
 _osm_bar_all = unary_union([LineString(pts).buffer(1.5) for pts, k, h in barriers if len(pts) >= 2]) if barriers else GeometryCollection()
 ncw = 0

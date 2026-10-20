@@ -377,6 +377,13 @@ const MAT = {
   railing: new THREE.MeshLambertMaterial({ map: fenceTex, alphaTest: 0.35, side: THREE.DoubleSide, color: 0x2a2d30 }), hedge: new THREE.MeshLambertMaterial({ map: grassTex, color: 0x4f7a3a }), median: new THREE.MeshLambertMaterial({ map: concreteTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
   trunk: new THREE.MeshLambertMaterial({ color: 0x5a4636 }), crown: new THREE.MeshLambertMaterial({ color: 0xffffff }), lamp: lam(0x4a4d52), lampHead: lam(0xf4f1e6, { emissive: 0x6a6040, emissiveIntensity: 0.4 }),
 };
+// the kinds of divider the DBGT adds (build_data.py): plastered low walls, railings with vertical bars, green wire mesh, railway panels, wood
+const barsTex = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#26292c'; for (let x = 4; x < w; x += 10) g.fillRect(x, 0, 3, h); g.fillRect(0, 0, w, 5); g.fillRect(0, h - 6, w, 6); });
+Object.assign(MAT, {
+  wallPlaster: new THREE.MeshLambertMaterial({ map: concreteTex, color: 0xf2e6cc }), wallOchre: new THREE.MeshLambertMaterial({ map: concreteTex, color: 0xe6c48e }),
+  bars: new THREE.MeshLambertMaterial({ map: barsTex, alphaTest: 0.4, side: THREE.DoubleSide }), mesh: new THREE.MeshLambertMaterial({ map: fenceTex, alphaTest: 0.35, side: THREE.DoubleSide, color: 0x6fa86f }),
+  railPanel: new THREE.MeshLambertMaterial({ map: fenceTex, alphaTest: 0.35, side: THREE.DoubleSide, color: 0xb8bcc0 }), wood: new THREE.MeshLambertMaterial({ color: 0x8a6a4a }),
+});
 const TREE_G = (() => { const t = new THREE.CylinderGeometry(0.17, 0.26, 2.8, 6); t.translate(0, 1.4, 0); return { trunk: t, crown: new THREE.IcosahedronGeometry(2.1, 0) }; })();
 const GREENS = ['#4f7a35', '#5d8a3b', '#6b8f3e', '#47703a', '#7f9a45', '#a08d3c'];
 function addBox(b, x, y, z, w, h, d, col, ry = 0) { // axis box rotated about y, into a buffer
@@ -575,9 +582,12 @@ function* buildTileGen(T) {
   yield 'walls';
   // walls, fences, hedges and the expressway median
   {
-    const wl = Buf(), ft = Buf(), hd = Buf(), md = Buf(), posts = [];
+    const wl = Buf(), ft = Buf(), hd = Buf(), md = Buf(), posts = [], wlP = [Buf(), Buf()], bars = Buf(), mesh = Buf(), rly = Buf(), wood = Buf();
     for (const br of T.ba || []) {
       const pts = br.pts; let acc = 0;
+      // the same divider keeps one look along its length: plaster or concrete, a higher or lower base, bars or mesh on top
+      const hv = (Math.sin(pts[0][0] * 12.9898 + pts[0][1] * 78.233) * 43758.5453) % 1, hh = Math.abs(hv), base = br.t === 2 ? 0.35 + (hh * 7 % 1) * 0.6 : 0.5;
+      const wallB = br.t === 2 && hh < 0.6 ? wlP[hh < 0.3 ? 0 : 1] : wl, railB = br.t === 2 && (hh * 13 % 1) < 0.55 ? bars : ft;
       for (let k = 1; k < pts.length; k++) {
         const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
         const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux;
@@ -585,12 +595,17 @@ function* buildTileGen(T) {
           for (const sd of [1, -1]) { const b0 = b.p.length / 3, ox = nx * th * sd, oz = nz * th * sd; vtx(b, a[0] + ox, y0a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 0); vtx(b, c[0] + ox, y0c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 0); vtx(b, c[0] + ox, y1c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 1); vtx(b, a[0] + ox, y1a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3, b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); }
           const b0 = b.p.length / 3; vtx(b, a[0] + nx * th, y1a, a[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] + nx * th, y1c, c[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] - nx * th, y1c, c[1] - nz * th, 0, 1, 0, 0, 1); vtx(b, a[0] - nx * th, y1a, a[1] - nz * th, 0, 1, 0, 0, 1); triUp(b, b0, b0 + 1, b0 + 2); triUp(b, b0, b0 + 2, b0 + 3);
         };
+        const panel = (b, y0, y1, rep) => { const b0 = b.p.length / 3; vtx(b, a[0], ga + y0, a[1], nx, 0, nz, acc / rep, 0); vtx(b, c[0], gc + y0, c[1], nx, 0, nz, (acc + L) / rep, 0); vtx(b, c[0], gc + y1, c[1], nx, 0, nz, (acc + L) / rep, 1); vtx(b, a[0], ga + y1, a[1], nx, 0, nz, acc / rep, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
+        const postsEvery = (step, y0) => { for (let s0 = 0; s0 < L; s0 += step) posts.push([a[0] + ux * s0, a[1] + uz * s0, ga + (gc - ga) * s0 / L + y0, br.h - y0]); };
         if (br.t === 1 || br.t === 4) slab(wl, 0.14, ga - 0.3, gc - 0.3, ga + br.h, gc + br.h);
         else if (br.t === 3) slab(hd, 0.45, ga - 0.2, gc - 0.2, ga + br.h, gc + br.h);
+        else if (br.t === 5) { panel(mesh, 0, br.h, 2.6); postsEvery(2.5, 0); } // wire mesh on posts, from the ground
+        else if (br.t === 6) { slab(wl, 0.1, ga - 0.3, gc - 0.3, ga + 0.3, gc + 0.3); panel(rly, 0.3, br.h, 2.6); postsEvery(2.5, 0.3); } // by the railway: a concrete kerb, tall panels
+        else if (br.t === 7) { for (const y of [0.45, 0.95]) slab(wood, 0.04, ga + y, gc + y, ga + y + 0.12, gc + y + 0.12); for (let s0 = 0; s0 < L; s0 += 2.5) { const x = a[0] + ux * s0, z = a[1] + uz * s0, gy = ga + (gc - ga) * s0 / L; addBox(wood, x, gy + 0.6, z, 0.12, 1.2, 0.12, null); } } // post and rail
         else { // muretto + cancellata, the Brianza classic
-          slab(wl, 0.12, ga - 0.3, gc - 0.3, ga + 0.5, gc + 0.5);
-          const b0 = ft.p.length / 3; vtx(ft, a[0], ga + 0.5, a[1], nx, 0, nz, acc / 2.6, 0); vtx(ft, c[0], gc + 0.5, c[1], nx, 0, nz, (acc + L) / 2.6, 0); vtx(ft, c[0], gc + br.h, c[1], nx, 0, nz, (acc + L) / 2.6, 1); vtx(ft, a[0], ga + br.h, a[1], nx, 0, nz, acc / 2.6, 1); ft.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
-          for (let s0 = 0; s0 < L; s0 += 2.6) posts.push([a[0] + ux * s0, a[1] + uz * s0, ga + (gc - ga) * s0 / L, br.h]);
+          slab(wallB, 0.12, ga - 0.3, gc - 0.3, ga + base, gc + base);
+          panel(railB, base, br.h, railB === bars ? 1.2 : 2.6);
+          postsEvery(2.6, base);
         }
         acc += L;
       }
@@ -602,10 +617,11 @@ function* buildTileGen(T) {
       try { const base = md.p.length / 3; polyFill(md, densify(o, 4), k.map(h => densify(h, 4)), 0, 4); for (let i = base * 3; i < md.p.length; i += 3) md.p[i + 1] = yAt(md.p[i], md.p[i + 2]) + 0.12; } catch (e) { }
     }
     put(wl, MAT.wall, 10, 'cast'); put(ft, MAT.railing, 10); put(hd, MAT.hedge, 10, 'cast'); put(md, MAT.median, 9);
-    if (posts.length) {
+    put(wlP[0], MAT.wallPlaster, 10, 'cast'); put(wlP[1], MAT.wallOchre, 10, 'cast'); put(bars, MAT.bars, 10); put(mesh, MAT.mesh, 10); put(rly, MAT.railPanel, 10); put(wood, MAT.wood, 10, 'cast');
+    if (posts.length) { // [x, z, foot, length]
       const pg = new THREE.BoxGeometry(0.06, 1, 0.06); pg.translate(0, 0.5, 0);
       const pm = new THREE.InstancedMesh(pg, MAT.post, posts.length), mtx = new THREE.Matrix4(), sc = new THREE.Vector3(), qq = new THREE.Quaternion(), pp = new THREE.Vector3();
-      posts.forEach(([x, z, y, h], i) => { mtx.compose(pp.set(x, y + 0.5, z), qq, sc.set(1, h - 0.5, 1)); pm.setMatrixAt(i, mtx); }); G.add(pm);
+      posts.forEach(([x, z, y, h], i) => { mtx.compose(pp.set(x, y, z), qq, sc.set(1, Math.max(0.1, h), 1)); pm.setMatrixAt(i, mtx); }); G.add(pm);
     }
   }
   yield 'railway';
