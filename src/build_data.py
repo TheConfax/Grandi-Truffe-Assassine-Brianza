@@ -155,7 +155,7 @@ if os.path.exists(CONF):
     for e_ in json.load(open(CONF, encoding='utf-8'))['elements']:
         ls_ = [LineString([proj(p['lat'], p['lon']) for p in m['geometry']]) for m in e_.get('members', []) if m.get('type') == 'way' and len(m.get('geometry') or []) > 1]
         if ls_ and e_.get('tags', {}).get('name'): _comuni[e_['tags']['name'].lower()] = unary_union(list(polygonize(unary_union(ls_))))
-dbt_walls, dbt_vols, _cov = [], [], []
+dbt_walls, dbt_vols, dbt_roads, _cov = [], [], [], []
 for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
     f_ = os.path.join(DBT_DIR, d_, 'dbgt.gpkg')
     if not os.path.exists(f_): continue
@@ -175,6 +175,12 @@ for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
         for part in getattr(g_, 'geoms', [g_]):
             ext_ = _xy(part.exterior.coords)
             if len(ext_) >= 4: dbt_vols.append((ext_[:-1], float(av)))
+    for (blob,) in con_.execute('select Shape from EL_STR_EL_STR_TRA_SG'):  # road axes in 3D: the real height of every street, bridges included
+        if blob is None: continue
+        g_ = _gpkg_geom(blob)
+        for part in getattr(g_, 'geoms', [g_]):
+            cs_ = list(part.coords)
+            if len(cs_) >= 2: dbt_roads.append((_xy(cs_), [c_[2] for c_ in cs_]))
     _cov.append(_comuni[d_.lower()]); log('dbgt', d_)
 dbt_cover = unary_union(_cov).buffer(-3) if _cov else GeometryCollection()  # a few metres inside the boundary: the neighbour's data meets it
 prepare(dbt_cover)
@@ -532,6 +538,42 @@ for r in raw_roads:
     for n_, hh in zip(r['refs'], hs): deckH[n_] = max(deckH.get(n_, -1e9), hh) if r['bridge'] else deckH.get(n_, hh)
     r['deck'] = True
 log('elevated nodes', len(deckH), 'decks', sum(1 for r in raw_roads if r.get('deck')))
+# ---- where the DBGT covers, the heights above are replaced by the real ones: each node of a car road takes the height of the DBGT road axis
+# under it running the same way (so at a crossing on two levels the street above never takes the one below), the DBGT calibrated on the
+# terrain model by the median over the streets at grade. Raised more than 0.8 m: a deck at that height; at grade: no deck, whatever was guessed
+if dbt_roads:
+    _ds = []
+    for xy_, zs_ in dbt_roads:
+        for i in range(1, len(xy_)):
+            if math.dist(xy_[i - 1], xy_[i]) > 0.2: _ds.append((xy_[i - 1], xy_[i], zs_[i - 1], zs_[i]))
+    _dst = STRtree([LineString([a_, b_]) for a_, b_, za, zb in _ds])
+    clamp01 = lambda v: max(0.0, min(1.0, v))
+    def _zdbt(p_, d0):
+        best = None
+        for j in _dst.query(Point(p_).buffer(5)):
+            a_, b_, za, zb = _ds[j]; l_ = math.dist(a_, b_); ux, uz = (b_[0] - a_[0]) / l_, (b_[1] - a_[1]) / l_
+            if abs(ux * d0[0] + uz * d0[1]) < 0.85: continue
+            t_ = clamp01(((p_[0] - a_[0]) * ux + (p_[1] - a_[1]) * uz) / l_); qx, qz = a_[0] + ux * l_ * t_, a_[1] + uz * l_ * t_; dd = math.dist(p_, (qx, qz))
+            if dd < 5 and (best is None or dd < best[0]): best = (dd, za + (zb - za) * t_)
+        return None if best is None else best[1]
+    zn = defaultdict(list)
+    for r in raw_roads:
+        if r['c'] > 5 or r['tunnel']: continue
+        refs = r['refs']
+        for i, n_ in enumerate(refs):
+            if not dbt_cover.contains(Point(nodes[n_])): continue
+            z_ = _zdbt(nodes[n_], tang(nodes[refs[max(0, i - 1)]], nodes[refs[min(len(refs) - 1, i + 1)]]))
+            if z_ is not None: zn[n_].append(z_)
+    _df = sorted(z_ - TBASE - ground(*nodes[n_]) for n_, zs_ in zn.items() for z_ in zs_); _near = [d_ for d_ in _df if abs(d_) < 4]
+    _off = _near[len(_near) // 2] if _near else 0
+    nup = ndown = 0
+    for n_, zs_ in zn.items():
+        h_ = sorted(zs_)[len(zs_) // 2] - _off - TBASE
+        if h_ - ground(*nodes[n_]) > 0.8: deckH[n_] = h_; nup += 1
+        elif n_ in deckH: del deckH[n_]; ndown += 1
+    for r in raw_roads:
+        if r['c'] <= 5 and any(n_ in zn for n_ in r['refs']): r['deck'] = any(n_ in deckH for n_ in r['refs'])
+    log('dbgt quote strade: nodi', len(zn), 'scarto mediano col terreno %.2f m' % _off, 'impalcati', nup, 'tolti', ndown, 'decks', sum(1 for r in raw_roads if r.get('deck')))
 
 # ---- railway elevation
 radj = defaultdict(list); rsrc = {}; rdir = defaultdict(set)
@@ -716,6 +758,25 @@ if dbt_walls:
             else: kind, hgt = (5, 1.8) if r_ < 0.5 else (3, 1.7) if r_ < 0.8 else (2, 1.6)
         barriers.append((pts, kind, round(hgt, 1))); kinds_[kind] += 1
     log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', len(dbt_walls), 'per tipo', dict(kinds_))
+# railway fill-in: along every track, wherever no fence or wall stands within 12 m on that side, a fence 4.2 m out from the outer track; open at
+# level crossings, platforms, buildings and the ends of the line (the corridor fences above only exist where OSM maps the railway land)
+if railL:
+    _have = unary_union([LineString(f_).buffer(12) for f_ in fences] + [LineString(p_).buffer(12) for p_, k_, h_ in barriers if len(p_) >= 2])
+    _xs = []
+    for r in raw_roads:
+        if not flat(r) or r['c'] > 6: continue
+        for l in railL:
+            if r['line'].distance(l) > 0.01: continue
+            x_ = r['line'].intersection(l)
+            for g_ in ([x_] if x_.geom_type == 'Point' else [g for g in getattr(x_, 'geoms', []) if g.geom_type == 'Point']): _xs.append(g_.buffer(r['w'] / 2 + 3.5))
+    _tips = [c_ for i, l in enumerate(railL) for c_ in (l.coords[0], l.coords[-1]) if not any(l2.distance(Point(c_)) < 1.0 for j, l2 in enumerate(railL) if j != i)]
+    _open = unary_union(_xs + [platforms.buffer(0.6), bunion.buffer(0.3), _have] + [Point(c_).buffer(9) for c_ in _tips])
+    _edge = unary_union([l.buffer(4.2, cap_style=2) for l in railL]).boundary.difference(_open).intersection(RECT.buffer(20))
+    _edge = linemerge(_edge) if not _edge.is_empty and _edge.geom_type in ('MultiLineString', 'LineString') else _edge
+    nfill = 0
+    for l in (list(_edge.geoms) if hasattr(_edge, 'geoms') else [_edge]):
+        if isinstance(l, LineString) and l.length > 6: fences.append(list(l.simplify(0.15).coords)); nfill += 1
+    log('ferrovia: recinzioni aggiunte dove mancavano', nfill)
 # cemeteries are walled: perimeter wall wherever OSM has not drawn one (gates/paths open it like any other wall)
 _osm_bar_all = unary_union([LineString(pts).buffer(1.5) for pts, k, h in barriers if len(pts) >= 2]) if barriers else GeometryCollection()
 ncw = 0
