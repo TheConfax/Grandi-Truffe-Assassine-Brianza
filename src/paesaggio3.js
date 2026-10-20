@@ -259,21 +259,32 @@ function* buildPaesaggio(T, G) {
     for (const [X, Z, ux, uz, w, fwd, back] of d.cl) {
       const x = X / 10, z = Z / 10, rx = -uz, rz = ux, off = w / 2 + 1.2;
       for (const [sx, sz, nx, nz, name] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back]]) {
-        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5)) continue; const gy = surfAt(sx, sz);
-        box(0.07, 2.8, 0.07, sx - nx * 0.06, gy + 1.4, sz - nz * 0.06, '#8f949a'); box(1.56, 0.8, 0.04, sx, gy + 2.4, sz, '#e8e6e0', Math.atan2(nx, nz)); solidAt(sx, sz, 0.12, 2.8);
-        faces.push([sx + nx * 0.025, gy + 2.4, sz + nz * 0.025, nx, nz, name, false], [sx - nx * 0.025, gy + 2.4, sz - nz * 0.025, -nx, -nz, name, true]);
+        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5)) continue; const gy = surfAt(sx, sz), ex = nz, ez = -nx;
+        for (const o of [-0.68, 0.68]) { box(0.06, 2.55, 0.06, sx + ex * o - nx * 0.05, gy + 1.27, sz + ez * o - nz * 0.05, '#8f949a'); solidAt(sx + ex * o, sz + ez * o, 0.08, 2.5); } // two legs, one at each side
+        box(1.52, 1.02, 0.04, sx, gy + 2.0, sz, '#e8e6e0', Math.atan2(nx, nz));
+        faces.push([sx + nx * 0.025, gy + 2.0, sz + nz * 0.025, nx, nz, name, false], [sx - nx * 0.025, gy + 2.0, sz - nz * 0.025, -nx, -nz, name, true]);
       }
     }
     if (faces.length) {
-      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128 * Math.ceil(faces.length / 2); const g = cv.getContext('2d'), sb = Buf();
+      const CW = 300, CH = 200, cv = document.createElement('canvas'); cv.width = CW * 2; cv.height = CH * Math.ceil(faces.length / 2); const g = cv.getContext('2d'), sb = Buf();
+      // the name in a plain sans, as big as it fits, broken between words over two or three lines when it is long
+      const signLines = name => {
+        const words = name.toUpperCase().split(/\s+/), F_ = s => `bold ${s}px Arial, Helvetica, sans-serif`; let best = null;
+        for (let n = 1; n <= Math.min(3, words.length); n++) { // balanced breaks: every split, the one whose widest line is narrowest wins
+          const splits = n === 1 ? [[]] : n === 2 ? words.slice(1).map((_, i) => [i + 1]) : words.slice(1).flatMap((_, i) => words.slice(i + 2).map((__, j) => [i + 1, i + 2 + j]));
+          for (const sp of splits) { const b = [0, ...sp, words.length], ls = b.slice(1).map((e, k) => words.slice(b[k], e).join(' ')); g.font = F_(100); const w = Math.max(...ls.map(l => g.measureText(l).width)), size = Math.min(100 * (CW - 56) / w, (CH - 60) / (n * 1.15)); if (!best || size > best.size * 1.12) best = { size, ls }; }
+        }
+        return best;
+      };
       faces.forEach(([cx, cy, cz, nx, nz, name, end], i) => {
-        const col = i % 2, row = Math.floor(i / 2), X0 = col * 256, Y0 = row * 128;
-        g.save(); g.translate(X0, Y0); g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 128); g.strokeStyle = '#111111'; g.lineWidth = 7; g.strokeRect(9, 9, 238, 110);
-        ngText(g, name.toUpperCase(), 128, 66, 210, 46, NG_FONT.black, '#111111');
-        if (end) { g.strokeStyle = '#c8102e'; g.lineWidth = 12; g.beginPath(); g.moveTo(18, 112); g.lineTo(238, 16); g.stroke(); }
+        const col = i % 2, row = Math.floor(i / 2), X0 = col * CW, Y0 = row * CH, L = signLines(name);
+        g.save(); g.translate(X0, Y0); g.fillStyle = '#ffffff'; g.fillRect(0, 0, CW, CH); g.strokeStyle = '#111111'; g.lineWidth = 8; g.strokeRect(12, 12, CW - 24, CH - 24);
+        g.fillStyle = '#111111'; g.font = `bold ${Math.floor(L.size)}px Arial, Helvetica, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+        L.ls.forEach((ln, k) => g.fillText(ln, CW / 2, CH / 2 + (k - (L.ls.length - 1) / 2) * L.size * 1.15 + L.size * 0.04));
+        if (end) { g.strokeStyle = '#c8102e'; g.lineWidth = 14; g.beginPath(); g.moveTo(24, CH - 24); g.lineTo(CW - 24, 24); g.stroke(); }
         g.restore();
-        const ex = nz, ez = -nx, u0 = col / 2 + 0.003, u1 = (col + 1) / 2 - 0.003, v1 = 1 - Y0 / cv.height - 0.003, v0 = 1 - (Y0 + 128) / cv.height + 0.003, j = sb.p.length / 3;
-        vtx(sb, cx - ex * 0.75, cy - 0.375, cz - ez * 0.75, nx, 0, nz, u0, v0); vtx(sb, cx + ex * 0.75, cy - 0.375, cz + ez * 0.75, nx, 0, nz, u1, v0); vtx(sb, cx + ex * 0.75, cy + 0.375, cz + ez * 0.75, nx, 0, nz, u1, v1); vtx(sb, cx - ex * 0.75, cy + 0.375, cz - ez * 0.75, nx, 0, nz, u0, v1); sb.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
+        const ex = nz, ez = -nx, u0 = col / 2 + 0.003, u1 = (col + 1) / 2 - 0.003, v1 = 1 - Y0 / cv.height - 0.003, v0 = 1 - (Y0 + CH) / cv.height + 0.003, j = sb.p.length / 3;
+        vtx(sb, cx - ex * 0.75, cy - 0.5, cz - ez * 0.75, nx, 0, nz, u0, v0); vtx(sb, cx + ex * 0.75, cy - 0.5, cz + ez * 0.75, nx, 0, nz, u1, v0); vtx(sb, cx + ex * 0.75, cy + 0.5, cz + ez * 0.75, nx, 0, nz, u1, v1); vtx(sb, cx - ex * 0.75, cy + 0.5, cz - ez * 0.75, nx, 0, nz, u0, v1); sb.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
       });
       const tex = new THREE.CanvasTexture(cv), mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(mat); mkMesh(sb, mat, 10, false, G);
     }
