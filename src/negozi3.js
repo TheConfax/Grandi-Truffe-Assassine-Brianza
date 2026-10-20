@@ -543,7 +543,7 @@ const NG_DAYK = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 // these trades have no shutters: when shut, about half of them (never the banks) leave the window lit to show the goods, the others switch it off.
 // Everyone else pulls the shutter down
 const NG_NOSHUT = new Set(['moda', 'mobili', 'auto', 'supermercato', 'banca']), NG_LIT = new Set(['moda', 'mobili', 'auto', 'supermercato']);
-const NG_DARK_MAT = new THREE.MeshBasicMaterial({ color: 0x0b0d10, transparent: true, opacity: 0.78, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+const NG_DARK_MAT = new THREE.MeshBasicMaterial({ color: 0x0b0d10, transparent: true, opacity: 0.78, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
 function ngHours(str) {
   const s = (str || '').trim(); if (!s) return null; if (/^24\/7/.test(s)) return { all: true };
   const D_ = '(?:Mo|Tu|We|Th|Fr|Sa|Su)', week = [[], [], [], [], [], [], []]; let any = false;
@@ -567,7 +567,8 @@ function ngIsOpen(s, day, min) {
 // the game's clock: the hour is TOD (extras.js), the day starts from today's and moves on at midnight
 const NG_CLOCK = { day: (new Date().getDay() + 6) % 7, last: -1 };
 const ngTOD = () => { try { return TOD; } catch (e) { return 12; } };
-const NG_SHUT_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(32, 64, (g, w, h) => { g.fillStyle = '#b4b8bd'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 6) { g.fillStyle = 'rgba(40,44,48,.45)'; g.fillRect(0, y, w, 1); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, y + 1, w, 1); } }), side: THREE.DoubleSide });
+const NG_SHUT_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(32, 64, (g, w, h) => { g.fillStyle = '#b4b8bd'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 6) { g.fillStyle = 'rgba(40,44,48,.45)'; g.fillRect(0, y, w, 1); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, y + 1, w, 1); } }), side: THREE.DoubleSide,
+  polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }); // stronger than the glass (-1) and the signs (-2) it covers: from far off they would win
 function ngShutters(T) { // each shutter (or dark veil) is down or rolled up to nothing: its two bottom corners go up to the top
   const min = ngTOD() * 60;
   for (const S of T.ngShut || []) {

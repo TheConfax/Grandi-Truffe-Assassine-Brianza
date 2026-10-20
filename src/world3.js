@@ -85,7 +85,7 @@ for (const T of TILES) {
     const outer = dec(B.p); if (outer.length < 3) continue;
     { const [gx, gz] = centroid(outer); if (GHOSTS.some(([x, z]) => hyp(gx - x, gz - z) < 1.5)) continue; }
     const holes = (B.k || []).map(dec).filter(h => h.length >= 3), bb = bbox(outer);
-    const rec = { pts: outer, holes, h: B.h, t: B.t, bb };
+    const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g }; // g: 1 garages, 2 greenhouse (paesaggio3.js)
     T.bld.push(rec);
     if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = groundH(x, z); WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }); } continue; }
     BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
@@ -666,7 +666,7 @@ function* buildTileGen(T) {
     const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf();
     let nb = 0;
     for (const B of T.bld) {
-      if (B.lm || B.big) continue; // modelled by hand in landmarks3.js, or a whole supermarket (negozi3.js)
+      if (B.lm || B.big || B.g === 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), a greenhouse (paesaggio3.js)
       if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
       const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t;
       const gys = outer.map(p => groundH(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys), top = gmax + h, bot = gmin - 0.6;
@@ -712,7 +712,7 @@ function* buildTileGen(T) {
     }
     put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
+  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }

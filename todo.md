@@ -69,6 +69,12 @@ Le foto di Wikipedia sono vecchie: usare solo foto recenti (o screenshot di Stre
 - [ ] Asilo Garibaldi
 - [ ] Altre scuole di Seveso: servono foto (Collodi, Leonardo da Vinci / Milani, Bruno Munari, Toti, Don Aurelio Giussani, Frassati di via San Carlo)
 
+## Piscine da fare bene
+Modelli su misura come i monumenti (vasche, edificio, tribune, parcheggio), solo da foto recenti.
+- [ ] Meda: SportVillage, via Icmesa (OSM way 1216938842, centro sportivo con piscina e calcio)
+- [ ] Seregno: Nuoto Club Seregno (OSM way 422227820, al bordo est della mappa attuale)
+- [ ] Seveso: da individuare, in OSM non c'è una piscina con nome o indirizzo a Seveso
+
 ## Piccoli monumenti
 - [ ] Lapidi, cippi, edicole, piccoli monumenti sparsi nei quartieri (oltre a quelli qui sotto)
 
