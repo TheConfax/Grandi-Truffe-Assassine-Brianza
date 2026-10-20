@@ -4300,7 +4300,7 @@ function ngList() {
     const m = fit[Math.floor(h0 * fit.length)], mi = ms.indexOf(m), along = (x - W.a[0]) * W.ux + (z - W.a[1]) * W.uz, w = Math.min(m.w, W.L - 0.4);
     let pal = m.c; for (const [re, c] of NG_BRANDS) if (re.test(name)) { pal = m.c && m.c[0] ? c : [null, c[0]]; break; }
     const th = (NG_SUBTHEME[cls] || {})[sub] ?? (NG_DEFTHEME[cls] ? NG_DEFTHEME[cls](mi) : mi % 6);
-    const rec = { x, z, cls, sub, name, label: NG_LABEL[sub] || NG_CLASS_LABEL[cls], m, mi, th, pal, h0, ...W, t: clamp(along, w / 2 + 0.2, W.L - w / 2 - 0.2), w };
+    const rec = { x, z, cls, sub, name, label: NG_LABEL[sub] || NG_CLASS_LABEL[cls], m, mi, th, pal, h0, ohs: e[5] || '', ...W, t: clamp(along, w / 2 + 0.2, W.L - w / 2 - 0.2), w };
     const key = W.a[0].toFixed(1) + ',' + W.a[1].toFixed(1) + ',' + W.c[0].toFixed(1) + ',' + W.c[1].toFixed(1);
     if (!walls.has(key)) walls.set(key, []); walls.get(key).push(rec);
   }
@@ -4333,7 +4333,61 @@ function ngList() {
       NG_LIST.push(r);
     }
   }
+  // opening hours: mapped ones as they are; the others copy the nearest shop of the same class that has them (any class if none),
+  // moved by up to half an hour in steps of a quarter, so a street does not shut all at the same minute
+  for (const r of NG_LIST) { r.oh = ngHours(r.ohs); r.noShut = NG_NOSHUT.has(r.cls); r.litNight =NG_LIT.has(r.cls) && NG_HASH('luci' + r.h0) < 0.5; }
+  const known = NG_LIST.filter(r => r.oh);
+  for (const r of NG_LIST) if (!r.oh && r.cls !== 'sfitto' && known.length) {
+    let best = null, bd = 1e18;
+    for (const q of known) { const d = (q.x - r.x) ** 2 + (q.z - r.z) ** 2 + (q.cls === r.cls ? 0 : 4e6); if (d < bd) { bd = d; best = q; } }
+    r.oh = best.oh; r.ohA = (Math.floor(r.h0 * 5) - 2) * 15; r.ohB = (Math.floor(NG_HASH('chiude' + r.h0) * 5) - 2) * 15; // opens and shuts each up to half an hour off, by quarters
+  }
   return NG_LIST;
+}
+// opening_hours, the part that shops use: "Mo-Fr 08:30-12:30,15:00-19:30; Sa 09:00-12:00; Su off", "24/7", nights past midnight.
+// Holidays, months and anything rarer are skipped. A week is seven lists of [from, to] in minutes, Monday first
+const NG_DAYK = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+// these trades have no shutters: when shut, about half of them (never the banks) leave the window lit to show the goods, the others switch it off.
+// Everyone else pulls the shutter down
+const NG_NOSHUT = new Set(['moda', 'mobili', 'auto', 'supermercato', 'banca']), NG_LIT = new Set(['moda', 'mobili', 'auto', 'supermercato']);
+const NG_DARK_MAT = new THREE.MeshBasicMaterial({ color: 0x0b0d10, transparent: true, opacity: 0.78, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+function ngHours(str) {
+  const s = (str || '').trim(); if (!s) return null; if (/^24\/7/.test(s)) return { all: true };
+  const D_ = '(?:Mo|Tu|We|Th|Fr|Sa|Su)', week = [[], [], [], [], [], [], []]; let any = false;
+  for (let rule of s.split(new RegExp(`;|\\|\\||,\\s*(?=${D_}(?:-${D_})?\\s+\\d)`))) {
+    rule = rule.trim(); if (!rule) continue;
+    const m = rule.match(new RegExp(`^(${D_}(?:-${D_})?(?:\\s*,\\s*${D_}(?:-${D_})?)*)?\\s*(.*)$`)), ds = m[1], rest = m[2].trim();
+    if (!ds && /^[A-Za-z]/.test(rest) && !/^(off|closed)$/i.test(rest)) continue; // PH, SH, months, weeks
+    let days = [0, 1, 2, 3, 4, 5, 6];
+    if (ds) { days = []; for (const part of ds.split(/\s*,\s*/)) { const [a, b] = part.split('-').map(d => NG_DAYK.indexOf(d)); if (b === undefined) days.push(a); else for (let d = a; ; d = (d + 1) % 7) { days.push(d); if (d === b) break; } } }
+    if (/^(off|closed)$/i.test(rest)) { for (const d of days) week[d] = []; any = true; continue; }
+    const rs = [...rest.matchAll(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/g)].map(t => [+t[1] * 60 + +t[2], +t[3] * 60 + +t[4]]); if (!rs.length) continue;
+    for (const d of days) { week[d] = []; for (const [a, b] of rs) { if (b > a) week[d].push([a, b]); else { week[d].push([a, 1440]); week[(d + 1) % 7].push([0, b]); } } }
+    any = true;
+  }
+  return any ? { week } : null;
+}
+function ngIsOpen(s, day, min) {
+  const o = s.oh; if (!o) return true; if (o.all) return true; const ka = s.ohA || 0, kb = s.ohB || 0;
+  return o.week[day].some(([a, b]) => min >= (a === 0 ? 0 : a + ka) && min < (b === 1440 ? 1440 : b + kb));
+}
+// the game's clock: the hour is TOD (extras.js), the day starts from today's and moves on at midnight
+const NG_CLOCK = { day: (new Date().getDay() + 6) % 7, last: -1 };
+const ngTOD = () => { try { return TOD; } catch (e) { return 12; } };
+const NG_SHUT_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(32, 64, (g, w, h) => { g.fillStyle = '#b4b8bd'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 6) { g.fillStyle = 'rgba(40,44,48,.45)'; g.fillRect(0, y, w, 1); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, y + 1, w, 1); } }), side: THREE.DoubleSide });
+function ngShutters(T) { // each shutter (or dark veil) is down or rolled up to nothing: its two bottom corners go up to the top
+  const min = ngTOD() * 60;
+  for (const S of T.ngShut || []) {
+    if (!S.mesh.parent) continue; const pos = S.mesh.geometry.attributes.position; let ch = false;
+    for (const it of S.items) { const shut = !ngIsOpen(it.s, NG_CLOCK.day, min), down = it.dark ? shut && !it.s.litNight : shut; if (down === it.down) continue; it.down = down; for (const k of [0, 1]) pos.setY(it.i0 + k, down ? it.y0 : it.y1); ch = true; }
+    if (ch) pos.needsUpdate = true;
+  }
+}
+let ngTick = 0;
+function updNegozi(dt) {
+  ngTick -= dt; if (ngTick > 0) return; ngTick = 1;
+  const h = ngTOD(); if (NG_CLOCK.last >= 0 && h < NG_CLOCK.last - 12) NG_CLOCK.day = (NG_CLOCK.day + 1) % 7; NG_CLOCK.last = h;
+  for (const T of TILES) if (T.ngShut && T.group) ngShutters(T);
 }
 
 // ---- modelling in a wall's own frame: x along the wall, y up from the pavement, z out of the wall
@@ -4433,6 +4487,17 @@ function ngFront(s, C) {
       const hc = cell(0.8, 0.2, (g, w2, h2) => { g.fillStyle = '#1d6fb8'; g.fillRect(0, 0, w2, h2); ngText(g, 'BANCOMAT', w2 / 2, h2 / 2, w2 * 0.9, h2 * 0.75, NG_FONT.sans, '#fff'); });
       sign(hc, qz(C.sign, c - 0.38, 1.85, c + 0.38, 2.04, 0.105));
     }
+  }
+  // the rolling shutters over windows, doors and the workshop bay: down when the shop is shut (ngShutters), rolled into their box when open
+  // (or, in the trades without shutters, a dark veil over the glass when the shop is shut with its lights off)
+  if (s.oh && m.d !== 'x' && m.d !== 'p') for (const [t, a, b] of segs) {
+    if (!['glass', 'door', 'slide', 'bay'].includes(t)) continue;
+    const yT = t === 'bay' ? H - 0.37 : H - 0.06;
+    if (s.noShut) { if (t === 'bay') continue; const i0 = qz(C.dark, a, 0.02, b, yT, 0.1); C.darks.push({ s, i0, dark: true, y0: C.dark.p[i0 * 3 + 1], y1: C.dark.p[(i0 + 3) * 3 + 1] }); continue; }
+    const i0 = qz(C.shut, a, 0, b, yT, 0.12), U = C.shut.uv;
+    U[i0 * 2] = 0; U[i0 * 2 + 1] = 0; U[i0 * 2 + 2] = b - a; U[i0 * 2 + 3] = 0; U[i0 * 2 + 4] = b - a; U[i0 * 2 + 5] = yT; U[i0 * 2 + 6] = 0; U[i0 * 2 + 7] = yT;
+    C.shuts.push({ s, i0, y0: C.shut.p[i0 * 3 + 1], y1: C.shut.p[(i0 + 3) * 3 + 1] });
+    if (t !== 'bay') box(b - a, 0.18, 0.16, (a + b) / 2, H - 0.13, 0.1, '#9da1a6');
   }
   // the frame (a street door has its own stone surround)
   if (m.d !== 'p') {
@@ -4647,7 +4712,8 @@ function ngBig(B, C) {
 }
 function* buildNegozi(T, G) { // a generator: the tile builder yields between slices, so a street of shops never stalls a frame
   const list = ngList().filter(s => s.tile === T.t), bigs = T.bld.filter(B => B.big); if (!list.length && !bigs.length) return;
-  const C = { solid: Buf(), sign: Buf(), sq: [], cells: [], glass: {}, neon: {}, props: [], solids: [], depth: ngDepth };
+  const C = { solid: Buf(), sign: Buf(), shut: Buf(), shuts: [], dark: Buf(), darks: [], sq: [], cells: [], glass: {}, neon: {}, props: [], solids: [], depth: ngDepth };
+  T.ngShut = null;
   for (const B of bigs) { try { ngBig(B, C); } catch (e) { console.warn('supermercato', B.big.name, e); } yield 'negozi'; }
   if (C.panel) mkMesh(C.panel, NG_PANEL, 10, 'cast', G);
   if (C.roof) mkMesh(C.roof, MAT.roof, 10, 'cast', G);
@@ -4655,6 +4721,10 @@ function* buildNegozi(T, G) { // a generator: the tile builder yields between sl
   for (const s of list) { try { ngFront(s, C); } catch (e) { console.warn('negozio', s.name, e); } if (++n % 3 === 0) yield 'negozi'; }
   yield 'negozi';
   if (C.solid.i.length) mkMesh(C.solid, LMAT.trim, 10, 'cast', G);
+  T.ngShut = [];
+  if (C.shut.i.length) T.ngShut.push({ mesh: mkMesh(C.shut, NG_SHUT_MAT, 10, 'cast', G), items: C.shuts });
+  if (C.dark.i.length) T.ngShut.push({ mesh: mkMesh(C.dark, NG_DARK_MAT, 11, false, G), items: C.darks });
+  ngShutters(T);
   for (const k in C.glass) if (C.glass[k].i.length) mkMesh(C.glass[k], NG_WIN.mat[k], 10, false, G);
   for (const k in C.neon) if (C.neon[k].i.length) mkMesh(C.neon[k], NG_NEON[k], 10, false, G);
   // the signs: one texture per tile, cells packed in shelves 1024 px wide
@@ -5562,7 +5632,7 @@ function step(dt) {
     }
   }
   // ----- train
-  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWeather(dt); updWrecks(dt); updFuel(dt); updCaserme(dt); updProps(dt); updOggetti(dt);
+  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWeather(dt); updWrecks(dt); updFuel(dt); updCaserme(dt); updProps(dt); updOggetti(dt); updNegozi(dt);
   for (const [cx, cz, tvx, tvz] of TRAIN_CIRC) {
     for (const v of VEH) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad; if (d < RT && d > 1e-5) { const nx = dx / d, nz = dz / d; v.x += nx * (RT - d); v.z += nz * (RT - d); v.vx = tvx + nx * 6; v.vz = tvz + nz * 6; v.sleep = false; v.impact(12 + hyp(tvx, tvz)); } }
   }
@@ -6455,5 +6525,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { tileTick, buildTileGen, ngList, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
+window.__G = { tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
 </script>
