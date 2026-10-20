@@ -55,6 +55,7 @@ Fatte in `src/negozi3.js` (dati: chiave `ng` in `brianza.json`, da `build_data.p
 Le banchine (rialzate, pensiline, sottopasso, cartelli) ci sono in tutte e cinque le stazioni e il fabbricato di Meda è già quello del 2023. Da sistemare i fabbricati di:
 
 - [ ] Stazione di Seveso: ci sono lavori in corso sul nodo, servono foto recenti
+  - [ ] Il cantiere della stazione va fatto come cantiere vero (recinzioni da cantiere, mezzi, gru se ci sono, percorsi provvisori), non con le recinzioni ferroviarie normali: lì binari, banchine e passaggi sono provvisori
 - [ ] Stazione di Cabiate
 - [ ] Stazione di Camnago-Lentate
 
