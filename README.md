@@ -14,12 +14,12 @@ La radio in macchina (Discoradio, stream ufficiale; Radio Maria sulle auto della
 - `index.html`: il gioco completo
 - `brianza.json`: mappa generata dalla pipeline
 - `src/`: sorgenti; `python src/assemble3.py` rigenera `index.html` dopo ogni modifica
-- `data/`: dati grezzi (OSM, TINITALY, DBGT, Overture, WorldCover), esclusi da git perché troppo grandi; fonti e licenze in [docs/dati.md](docs/dati.md), `python src/build.py` controlla che ci siano e rigenera `brianza.json`
+- `data/`: dati grezzi (OSM, LiDAR, TINITALY, DBGT, Overture, WorldCover), esclusi da git perché troppo grandi; fonti e licenze in [docs/dati.md](docs/dati.md), `python src/build.py` controlla che ci siano e rigenera `brianza.json`
 
 ## Crediti dei dati
 
 - Strade, edifici, luoghi: © OpenStreetMap contributors, ODbL
-- Quote del terreno: Tarquini S. et al. (2023), TINITALY 1.1, INGV, doi:10.13127/tinitaly/1.1, CC BY 4.0
+- Quote del terreno: Ministero dell'Ambiente e della Sicurezza Energetica, Piano Straordinario di Telerilevamento Ambientale, DTM LiDAR 1 m (Geoportale Nazionale), CC BY 4.0; ai bordi Tarquini S. et al. (2023), TINITALY 1.1, INGV, doi:10.13127/tinitaly/1.1, CC BY 4.0
 - Muri, recinzioni, altezze degli edifici e quote delle strade: Regione Lombardia, Database GeoTopografico (DBGT), CC BY 4.0
 - Edifici aggiuntivi e altezze: Overture Maps Foundation, ODbL
 - Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0

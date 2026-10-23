@@ -111,6 +111,7 @@ def lidar_tiles(d_):
                 x0_, y0_ = tp[3] - tp[0] * sx_, tp[4] + tp[1] * sy_
                 gk = tg['GeoKeyDirectoryTag'].value if 'GeoKeyDirectoryTag' in tg else (); gk = {gk[i]: gk[i + 3] for i in range(4, len(gk) - 3, 4)}
                 epsg = gk.get(3072) if gk.get(3072) not in (None, 32767) else (gk.get(2048) if gk.get(2048) not in (None, 32767) else (4326 if sx_ < 0.01 else 32632))
+                if gk.get(1025) == 2: x0_, y0_ = x0_ - sx_ / 2, y0_ + sy_ / 2  # PixelIsPoint (the PST tiles): the tie point is the centre of the first cell
                 nd_ = float(tg['GDALNoDataTag'].value) if 'GDALNoDataTag' in tg else None
         if nd_ is not None: arr[arr == nd_] = np.nan
         arr[(arr < -100) | (arr > 5000)] = np.nan
@@ -644,8 +645,10 @@ if dbt_roads:
     # Each piece of it is a segment with the depth at its ends (none at an end that is not deep enough) and the road's half width; the
     # game lowers the ground by ground_cut's formula (trenchCut in world3.js: keep them equal), so the streets crossing above come out
     # as decks at their own height below
-    CUT_MIN = 1.2
-    _dep = {n_: ground(*nodes[n_]) - h_ for n_, h_ in zh.items() if ground(*nodes[n_]) - h_ > CUT_MIN}
+    # On the LiDAR the cutting is already in the terrain and what is left is the 10 m grid smoothing it (all under 2.5 m at Meda): a node
+    # deeper than CUT_MAX there took the height of another road under it (an underpass the DTM fills over), so it gets no trench
+    CUT_MIN, CUT_MAX = 1.2, (3.0 if _nlid else 1e9)
+    _dep = {n_: ground(*nodes[n_]) - h_ for n_, h_ in zh.items() if CUT_MIN < ground(*nodes[n_]) - h_ <= CUT_MAX}
     for r in raw_roads:
         if r['c'] > 5 or r['tunnel']: continue
         for a_, b_ in zip(r['refs'], r['refs'][1:]):
