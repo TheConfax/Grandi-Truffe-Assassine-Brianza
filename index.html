@@ -6045,7 +6045,7 @@ function missionStep(dt) {
 
 // ---------------------------------------------------------------- HUD
 const $ = id => document.getElementById(id);
-let toastT = 0, bannerT = 0, hintT = 0, lastStreet = '', shake = 0, camMode = 0, paused = false, running = false, bigOpen = false, now = 0;
+let camYaw = 0, camPitch = 0, toastT = 0, bannerT = 0, hintT = 0, lastStreet = '', shake = 0, camMode = 0, paused = false, running = false, bigOpen = false, now = 0;
 function toast(t) { $('toast').textContent = t; $('toast').classList.add('on'); toastT = 3.2; }
 function banner(t, sub) { $('banner').innerHTML = (sub ? `<small>${sub}</small>` : '') + escapeHtml(t); $('banner').classList.add('on'); bannerT = 3; }
 function hint(t) { $('hint').innerHTML = t; $('hint').hidden = false; hintT = 0.25; }
@@ -6203,10 +6203,10 @@ function pollPad() {
   const dz = v => Math.abs(v) < 0.15 ? 0 : v, b = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0;
   const edge = i => { const now = b(i) > 0.5, was = GP.prev[i]; GP.prev[i] = now; return now && !was; };
   // cross/A handbrake, circle/B turbo, square/X horn, triangle/Y get in-out, R1/RB or R3 camera
-  GP.steer = dz(g.axes[0] || 0); GP.fwd = -dz(g.axes[1] || 0); GP.thr = b(7); GP.brk = b(6); GP.hand = b(0); GP.turbo = b(1); GP.horn = b(2);
+  GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0); GP.thr = b(7); GP.brk = b(6); GP.hand = b(0); GP.turbo = b(1); GP.horn = b(2);
   if (edge(3)) K.use = true;
   if (edge(5)) camMode = (camMode + 1) % 2;
-  if (edge(11)) reportSpot();
+  if (edge(13)) reportSpot();
   if (edge(8)) toggleBig();
   if (edge(4)) skipTime(2);
   if (edge(12)) toggleRadio();
@@ -6517,10 +6517,13 @@ function updCamera(dt) {
   } else {
     // follow travel direction in reverse, otherwise heading
     let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }
+    { const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0; if (s_) camYaw = clamp(camYaw + s_ * 2.6 * dt, -Math.PI, Math.PI); else camYaw *= Math.exp(-2.5 * dt); /* heading grows towards the left */
+      const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; if (GP.back > 0.5) { hx = -hx; hz = -hz; } }
     const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
     let cx = px - hx * dist, cz = pz - hz * dist;
     const f = rayWalls(px, pz, cx, cz); let lift = 0; if (f < 1) { const k = Math.max(0.12, f - 0.08); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3; }
-    const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
+    const gy = inCar ? P.car.y : P.y; { const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 1.6 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }
+    want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
   }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
   // the camera rides along with what it follows and the smoothing below only softens turns and walls: chasing the car itself, a frame that

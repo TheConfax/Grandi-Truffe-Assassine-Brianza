@@ -1447,7 +1447,10 @@ def push_lines(key_, lines, extra=None):
     for i, pts in enumerate(lines):
         L = LineString(pts)
         if L.length < 0.5: continue
-        for t in set(tid(*p) for p in L.buffer(1).exterior.coords) | {tid(*pts[0])}:
+        # every tile the line crosses: sampled along it every 50 m (the corners of its buffer alone sit by its vertices, and a 300 m span of
+        # wire crossing a tile with no pylon in it lost that piece: a hole in the middle of the span)
+        on_ = [L.interpolate(d_) for d_ in range(0, int(L.length) + 1, 50)] + [Point(pts[-1])]
+        for t in set(tid(*p) for p in L.buffer(1).exterior.coords) | {tid(*pts[0])} | {tid(p_.x, p_.y) for p_ in on_}:
             c = L.intersection(tbox(t))
             for part in (list(c.geoms) if hasattr(c, 'geoms') else [c]):
                 if isinstance(part, LineString) and part.length > 0.3:

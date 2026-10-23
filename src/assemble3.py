@@ -540,6 +540,19 @@ print('leftover refs', [s[i:i + 40] for i in left])
 
 # ---- draw each frame between the last two physics steps (interp3.js)
 rep("while (acc >= 1 / 60 && n < 5) { step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }", "while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }")
+# right stick: the chase camera swings round the car (or the walker) to look about; let go and it eases back behind (Carlo, 24/10)
+rep("let toastT = 0, bannerT = 0,", "let camYaw = 0, camPitch = 0, toastT = 0, bannerT = 0,")
+rep("GP.steer = dz(g.axes[0] || 0);", "GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11);")
+# holding the right stick down looks behind, as in GTA: the bug report moves from R3 to the d-pad down (B on the keyboard stays)
+rep("  if (edge(11)) reportSpot();", "  if (edge(13)) reportSpot();")
+# up and down: the camera drops to look up or rises to look down from above, and settles back the same way
+rep("want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz);",
+    "{ const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 1.6 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }\n"
+    "    want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz);")
+rep("    let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }",
+    "    let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }\n"
+    "    { const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0; if (s_) camYaw = clamp(camYaw + s_ * 2.6 * dt, -Math.PI, Math.PI); else camYaw *= Math.exp(-2.5 * dt); /* heading grows towards the left */\n"
+    "      const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; if (GP.back > 0.5) { hx = -hx; hz = -hz; } }")
 # debug mode: cars never break (health back to full after every physics step, so nothing reaches zero and burns)
 rep("interpSnap(); step(1 / 60);", "interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100;")
 rep("  updVisuals(running && !paused ? dt : 0); updRadio(dt);", "  const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  updVisuals(running && !paused ? dt : 0); updRadio(dt);")
