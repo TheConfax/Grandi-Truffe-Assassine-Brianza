@@ -67,6 +67,14 @@ class Lidar:
                 h, w = p.shape[:2]
             self.t.append(dict(f=f, cx=cx, cy=cy, sx=sx, sy=sy, w=w, h=h, nd=nd, a=None,
                                bb=(cx - sx / 2, cy - (h - 0.5) * sy, cx + (w - 0.5) * sx, cy + sy / 2)))
+        # all tiles sit on one lattice of pixel centres: bilinear on that lattice, so the 4 corners may come from different tiles.
+        # (Interpolating inside each tile alone clamped the last half pixel and left steps up to 3.8 m along the tile edges.)
+        sc = {(t['sx'], t['sy']) for t in self.t}
+        if len(sc) > 1: raise ValueError('LiDAR tiles with different pixel sizes: %s' % sc)
+        if self.t:
+            self.sx, self.sy = self.t[0]['sx'], self.t[0]['sy']
+            self.lon0, self.lat0 = min(t['cx'] for t in self.t), max(t['cy'] for t in self.t)
+            for t in self.t: t['c0'], t['r0'] = int(round((t['cx'] - self.lon0) / self.sx)), int(round((self.lat0 - t['cy']) / self.sy))
 
     def _arr(self, t):
         if t['a'] is None:
@@ -77,18 +85,17 @@ class Lidar:
 
     def at(self, x, z):  # game metres -> m, NaN outside the LiDAR
         x, z = np.asarray(x, float), np.asarray(z, float); lon, lat = game_to_lonlat(x, z)
-        out = np.full(x.shape, np.nan)
-        for t in self.t:
-            x0, y0, x1, y1 = t['bb']; sel = (lon >= x0) & (lon < x1) & (lat > y0) & (lat <= y1) & np.isnan(out)
-            if not sel.any(): continue
-            a = self._arr(t); c = (lon[sel] - t['cx']) / t['sx']; r = (t['cy'] - lat[sel]) / t['sy']
-            c0 = np.clip(np.floor(c).astype(int), 0, t['w'] - 2); r0 = np.clip(np.floor(r).astype(int), 0, t['h'] - 2)
-            fc, fr = np.clip(c - c0, 0, 1), np.clip(r - r0, 0, 1)
-            vs = [a[r0, c0], a[r0, c0 + 1], a[r0 + 1, c0], a[r0 + 1, c0 + 1]]
-            ws = [(1 - fc) * (1 - fr), fc * (1 - fr), (1 - fc) * fr, fc * fr]
-            num = sum(np.where(np.isnan(v), 0, v * w_) for v, w_ in zip(vs, ws)); den = sum(np.where(np.isnan(v), 0, w_) for v, w_ in zip(vs, ws))
-            out[sel] = np.where(den > 1e-6, num / np.maximum(den, 1e-6), np.nan)
-        return out
+        if not self.t: return np.full(x.shape, np.nan)
+        c = (lon - self.lon0) / self.sx; r = (self.lat0 - lat) / self.sy
+        c0, r0 = np.floor(c).astype(np.int64), np.floor(r).astype(np.int64); fc, fr = c - c0, r - r0
+        num, den = np.zeros(x.shape), np.zeros(x.shape)
+        for dc, dr, w_ in ((0, 0, (1 - fc) * (1 - fr)), (1, 0, fc * (1 - fr)), (0, 1, (1 - fc) * fr), (1, 1, fc * fr)):
+            cc, rr = c0 + dc, r0 + dr; v = np.full(x.shape, np.nan)
+            for t in self.t:
+                sel = (cc >= t['c0']) & (cc < t['c0'] + t['w']) & (rr >= t['r0']) & (rr < t['r0'] + t['h'])
+                if sel.any(): v[sel] = self._arr(t)[rr[sel] - t['r0'], cc[sel] - t['c0']]
+            ok = ~np.isnan(v); num[ok] += v[ok] * w_[ok]; den[ok] += w_[ok]
+        return np.where(den > 1e-6, num / np.maximum(den, 1e-6), np.nan)
 
 
 # ---------- boundary of a comune (OSM relation), in game metres ----------
@@ -363,7 +370,7 @@ def kerb_step(D, tol=0.3, side_h=0.15):
 
 
 # ---------- C1 and the report ----------
-def conta(name, L):
+def conta(name, L, lidar=None):
     sc, ft = L['scarto'], L['fonte']; pz = pezzo_di(L); npz = len(L['off']) - 1
     raw = ft == FT_RAW
     withz = np.bincount(pz[raw], minlength=npz) > 0 if npz else np.zeros(0, bool)
@@ -379,6 +386,10 @@ def conta(name, L):
     bad = np.where((sc == SC_LOW) | (sc == SC_OUT))[0]
     if len(bad):
         r['quote_scartate'] = _pct(L['z0'][bad])
+    if lidar is not None and len(sc):  # kept raw Z far from the LiDAR (not on decks): what the phase 2 cap will have to decide
+        m = raw & ~is_deck(name, L)[pz]
+        dz = np.abs(L['z'][m] - lidar.at(L['xy'][m, 0], L['xy'][m, 1]))
+        r['tenuti_lontani_dal_lidar'] = {'oltre_1_5m': int((dz > 1.5).sum()), 'oltre_3m': int((dz > 3).sum())}
     return r
 
 
@@ -396,7 +407,7 @@ def main(argv=None):
     lid = Lidar(a.lidar); conf = confine_comune(nome)
     D = load_dbgt(a.gpkg, lid, conf, a.outl, not a.no_offset); info = D.pop('_info')
     t1 = time.time()
-    C1 = {n: conta(n, L) for n, L in D.items()}
+    C1 = {n: conta(n, L, lid) for n, L in D.items()}
     off = info['offset']; p50 = off['vertici']['banda'].get('p50', 0.0)
     C2 = {nome: dict(off, soglia='|p50| < 0.3 m', ok=bool(abs(p50) < 0.3))}
     C3 = kerb_step(D)
