@@ -555,7 +555,20 @@ rep("    let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz 
     "      const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } } /* looking back and forward again is a cut, not a swing round */")
 # while the stick turns it the camera goes where it is pushed at once: the follow smoothing is for the car's turns, on the stick it felt like butter
 rep("  const k = 1 - Math.exp(-(camMode === 1 ? 5 : 7.5) * dt);",
-    "  const k = 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);")
+    "  const k = camMode === 2 ? 1 : 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);")
+rep("camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));", "camPos.lerp(want, k); camLook.lerp(look, camMode === 2 ? 1 : 1 - Math.exp(-12 * dt));")
+# a third view, first person (Carlo, 24/10): the walker's eyes, or just above the bonnet; the right stick looks about, R3 behind
+rep("camMode = (camMode + 1) % 2", "camMode = (camMode + 1) % 3", 3)
+rep("  if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,",
+    "  if (!inCar) P.model.g.visible = camMode !== 2;\n"
+    "  if (camMode === 2) {\n"
+    "    let hx = fx, hz = fz; const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0;\n"
+    "    if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -2.3, 2.3); else camYaw *= Math.exp(-4 * dt);\n"
+    "    if (p_) camPitch = clamp(camPitch + p_ * 2 * dt, -0.7, 0.7); else camPitch *= Math.exp(-4 * dt);\n"
+    "    const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; if (GP.back > 0.5) { hx = -hx; hz = -hz; }\n"
+    "    const ey = inCar ? P.car.y + 1.25 : P.y + 1.62, fo = inCar ? 1.1 : 0.15;\n"
+    "    want = new THREE.Vector3(px + fx * fo, ey, pz + fz * fo); look = new THREE.Vector3(want.x + hx * 10, ey - camPitch * 7, want.z + hz * 10);\n"
+    "  } else if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,")
 # debug mode: cars never break (health back to full after every physics step, so nothing reaches zero and burns)
 rep("interpSnap(); step(1 / 60);", "interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100;")
 rep("  updVisuals(running && !paused ? dt : 0); updRadio(dt);", "  const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  updVisuals(running && !paused ? dt : 0); updRadio(dt);")

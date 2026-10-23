@@ -6160,7 +6160,7 @@ addEventListener('keydown', e => {
   const k = KEYMAP[e.code]; if (k) { K[k] = true; e.preventDefault(); }
   if (e.repeat) return;
   if (e.code === 'KeyF' || e.code === 'Enter') K.use = true;
-  if (e.code === 'KeyC') camMode = (camMode + 1) % 2;
+  if (e.code === 'KeyC') camMode = (camMode + 1) % 3;
   if (e.code === 'KeyM') toggleBig();
   if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
   if (e.code === 'KeyN') skipTime(2);
@@ -6181,7 +6181,7 @@ if (isTouch) {
   const sb = 'env(safe-area-inset-bottom, 0px)', sl = 'env(safe-area-inset-left, 0px)', sr = 'env(safe-area-inset-right, 0px)';
   const btn = (label, css, key, cls = '') => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'tb ' + cls; b.textContent = label; b.setAttribute('aria-label', key); Object.assign(b.style, css); T.appendChild(b);
-    const on = e => { e.preventDefault(); if (key === 'use') K.use = true; else if (key === 'cam') camMode = (camMode + 1) % 2; else if (key === 'map') toggleBig(); else K[key] = true; b.classList.add('on'); };
+    const on = e => { e.preventDefault(); if (key === 'use') K.use = true; else if (key === 'cam') camMode = (camMode + 1) % 3; else if (key === 'map') toggleBig(); else K[key] = true; b.classList.add('on'); };
     const off = e => { e.preventDefault(); if (!['use', 'cam', 'map'].includes(key)) K[key] = false; b.classList.remove('on'); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
   };
@@ -6205,7 +6205,7 @@ function pollPad() {
   // cross/A handbrake, circle/B turbo, square/X horn, triangle/Y get in-out, R1/RB or R3 camera
   GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0); GP.thr = b(7); GP.brk = b(6); GP.hand = b(0); GP.turbo = b(1); GP.horn = b(2);
   if (edge(3)) K.use = true;
-  if (edge(5)) camMode = (camMode + 1) % 2;
+  if (edge(5)) camMode = (camMode + 1) % 3;
   if (edge(13)) reportSpot();
   if (edge(8)) toggleBig();
   if (edge(4)) skipTime(2);
@@ -6512,7 +6512,15 @@ let camInit = false;
 function updCamera(dt) {
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
   const fx = Math.sin(h), fz = Math.cos(h); let want, look;
-  if (camMode === 1) {
+  if (!inCar) P.model.g.visible = camMode !== 2;
+  if (camMode === 2) {
+    let hx = fx, hz = fz; const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0;
+    if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -2.3, 2.3); else camYaw *= Math.exp(-4 * dt);
+    if (p_) camPitch = clamp(camPitch + p_ * 2 * dt, -0.7, 0.7); else camPitch *= Math.exp(-4 * dt);
+    const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; if (GP.back > 0.5) { hx = -hx; hz = -hz; }
+    const ey = inCar ? P.car.y + 1.25 : P.y + 1.62, fo = inCar ? 1.1 : 0.15;
+    want = new THREE.Vector3(px + fx * fo, ey, pz + fz * fo); look = new THREE.Vector3(want.x + hx * 10, ey - camPitch * 7, want.z + hz * 10);
+  } else if (camMode === 1) {
     const ht = inCar ? 58 + sp * 0.9 : 36, gy = groundH(px, pz); want = new THREE.Vector3(px, gy + ht, pz + ht * 0.28); look = new THREE.Vector3(px, gy, pz);
   } else {
     // follow travel direction in reverse, otherwise heading
@@ -6531,8 +6539,8 @@ function updCamera(dt) {
   const subj = inCar ? P.car : P, suby = inCar ? P.car.y : P.y, C = updCamera;
   if (C.s === subj && hyp(px - C.x, pz - C.z) < 20) { const d = _camD.set(px - C.x, suby - C.y, pz - C.z); camPos.add(d); camLook.add(d); }
   C.s = subj; C.x = px; C.y = suby; C.z = pz;
-  const k = 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);
-  camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));
+  const k = camMode === 2 ? 1 : 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);
+  camPos.lerp(want, k); camLook.lerp(look, camMode === 2 ? 1 : 1 - Math.exp(-12 * dt));
   camera.position.copy(camPos);
   if (shake > 0) { camera.position.x += (rnd() - 0.5) * shake * 0.6; camera.position.y += (rnd() - 0.5) * shake * 0.4; shake = Math.max(0, shake - dt * 1.8); }
   camera.lookAt(camLook);
