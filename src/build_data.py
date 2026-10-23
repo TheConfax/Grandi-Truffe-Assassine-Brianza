@@ -1030,6 +1030,12 @@ for r_, t in ntags.items():
     if t.get('amenity') == 'fountain' and inside(nodes[r_], 0) and t.get('drinking_water') != 'yes' and not any(math.dist(nodes[r_], (f[0] / 10, f[1] / 10)) < f[2] + 3 for f in fountains):
         fountains.append([q(nodes[r_][0]), q(nodes[r_][1]), 1.6])
 log('fountains', len(fountains))
+# a divider on a fountain's basin (the DBGT draws the rim of the one at the end of via Gagarin as a 37 m ring of "staccionata") is the basin's
+# own edge: the fountain draws it, so the barrier goes
+_fz = unary_union([Point(f[0] / 10, f[1] / 10).buffer(f[2] + 1.0) for f in fountains]) if fountains else GeometryCollection()
+if not _fz.is_empty:
+    _nb = len(bar_out); bar_out = [b for b in bar_out if LineString(b[0]).difference(_fz).length > 0.5 * LineString(b[0]).length]
+    log('divisori sul bordo delle fontane tolti', _nb - len(bar_out))
 
 # ---- rivers: merge the OSM pieces, then cut them where a road / railway / building passes over (a bridge or culvert mouth)
 from shapely.ops import linemerge
