@@ -538,6 +538,8 @@ for r in raw_roads:
     for n_, hh in zip(r['refs'], hs): deckH[n_] = max(deckH.get(n_, -1e9), hh) if r['bridge'] else deckH.get(n_, hh)
     r['deck'] = True
 log('elevated nodes', len(deckH), 'decks', sum(1 for r in raw_roads if r.get('deck')))
+cuts, CUT_S = [], 1.2  # trenches dug where the DBGT has a road below the terrain (filled below); the ground with them dug
+ground_cut = ground
 # ---- where the DBGT covers, the heights above are replaced by the real ones: each node of a car road takes the height of the DBGT road axis
 # under it running the same way (so at a crossing on two levels the street above never takes the one below), the DBGT calibrated on the
 # terrain model by the median over the streets at grade. Raised more than 0.8 m: a deck at that height; at grade: no deck, whatever was guessed
@@ -556,24 +558,65 @@ if dbt_roads:
             t_ = clamp01(((p_[0] - a_[0]) * ux + (p_[1] - a_[1]) * uz) / l_); qx, qz = a_[0] + ux * l_ * t_, a_[1] + uz * l_ * t_; dd = math.dist(p_, (qx, qz))
             if dd < 5 and (best is None or dd < best[0]): best = (dd, za + (zb - za) * t_)
         return None if best is None else best[1]
-    zn = defaultdict(list)
+    zn = defaultdict(list); incov = set()
     for r in raw_roads:
         if r['c'] > 5 or r['tunnel']: continue
         refs = r['refs']
         for i, n_ in enumerate(refs):
             if not dbt_cover.contains(Point(nodes[n_])): continue
+            incov.add(n_)
             z_ = _zdbt(nodes[n_], tang(nodes[refs[max(0, i - 1)]], nodes[refs[min(len(refs) - 1, i + 1)]]))
             if z_ is not None: zn[n_].append(z_)
     _df = sorted(z_ - TBASE - ground(*nodes[n_]) for n_, zs_ in zn.items() for z_ in zs_); _near = [d_ for d_ in _df if abs(d_) < 4]
     _off = _near[len(_near) // 2] if _near else 0
+    zh = {n_: sorted(zs_)[len(zs_) // 2] - _off - TBASE for n_, zs_ in zn.items()}
+    # a node the DBGT has no axis for (none within 5 m running the same way) takes its height from its neighbours along the streets, as a
+    # weighted mean that settles into a straight line along a chain (it used to keep the guess: a 6.6 m spike between nodes at 1 m). A bridge
+    # the DBGT has no point of at all keeps the guess, or it would come down onto the street it crosses
+    cadj = defaultdict(list); _nobr = set()
+    for r in raw_roads:
+        if r['c'] > 5 or r['tunnel']: continue
+        for a_, b_ in zip(r['refs'], r['refs'][1:]):
+            L = max(0.5, math.dist(nodes[a_], nodes[b_])); cadj[a_].append((b_, L)); cadj[b_].append((a_, L))
+        if r['bridge'] and not any(n_ in zh for n_ in r['refs']): _nobr.update(r['refs'])
+    _miss = [n_ for n_ in incov if n_ not in zh and n_ not in _nobr]; _fill = {}
+    for _ in range(300):
+        for n_ in _miss:
+            sw = sv = 0.0
+            for m, L in cadj[n_]:
+                v = zh.get(m, _fill.get(m))
+                if v is not None: sw += 1 / L; sv += v / L
+            if sw: _fill[n_] = sv / sw
+    zh.update(_fill)
+    # trenches: a car road the DBGT has more than CUT_MIN below the terrain model runs in a cutting dug into it (the Milano-Meda at Meda).
+    # Each piece of it is a segment with the depth at its ends (none at an end that is not deep enough) and the road's half width; the
+    # game lowers the ground by ground_cut's formula (trenchCut in world3.js: keep them equal), so the streets crossing above come out
+    # as decks at their own height below
+    CUT_MIN = 1.2
+    _dep = {n_: ground(*nodes[n_]) - h_ for n_, h_ in zh.items() if ground(*nodes[n_]) - h_ > CUT_MIN}
+    for r in raw_roads:
+        if r['c'] > 5 or r['tunnel']: continue
+        for a_, b_ in zip(r['refs'], r['refs'][1:]):
+            if (a_ in _dep or b_ in _dep) and math.dist(nodes[a_], nodes[b_]) > 0.1:
+                cuts.append((*nodes[a_], *nodes[b_], _dep.get(a_, 0.0), _dep.get(b_, 0.0), r['w'] / 2 + 1.0))
+    if cuts:
+        _cutt = STRtree([LineString([(c_[0], c_[1]), (c_[2], c_[3])]).buffer(c_[6] + max(c_[4], c_[5]) * CUT_S) for c_ in cuts])
+        def trench_cut(x, z):
+            c = 0.0
+            for j in _cutt.query(Point(x, z)):
+                ax, az, bx, bz, da, db, hw = cuts[j]; ex, ez = bx - ax, bz - az; L2 = ex * ex + ez * ez or 1
+                t_ = clamp01(((x - ax) * ex + (z - az) * ez) / L2); d_ = math.hypot(x - ax - ex * t_, z - az - ez * t_); D_ = da + (db - da) * t_
+                c = max(c, min(D_, D_ - (d_ - hw) / CUT_S))
+            return c
+        ground_cut = lambda x, z: ground(x, z) - trench_cut(x, z)
     nup = ndown = 0
-    for n_, zs_ in zn.items():
-        h_ = sorted(zs_)[len(zs_) // 2] - _off - TBASE
-        if h_ - ground(*nodes[n_]) > 0.8: deckH[n_] = h_; nup += 1
+    for n_, h_ in zh.items():
+        if h_ - ground_cut(*nodes[n_]) > 0.8: deckH[n_] = h_; nup += 1
         elif n_ in deckH: del deckH[n_]; ndown += 1
     for r in raw_roads:
-        if r['c'] <= 5 and any(n_ in zn for n_ in r['refs']): r['deck'] = any(n_ in deckH for n_ in r['refs'])
-    log('dbgt quote strade: nodi', len(zn), 'scarto mediano col terreno %.2f m' % _off, 'impalcati', nup, 'tolti', ndown, 'decks', sum(1 for r in raw_roads if r.get('deck')))
+        if r['c'] <= 5 and any(n_ in zh for n_ in r['refs']): r['deck'] = any(n_ in deckH for n_ in r['refs'])
+    log('dbgt quote strade: nodi', len(zn), 'riempiti dai vicini', len(_fill), 'scarto mediano col terreno %.2f m' % _off, 'impalcati', nup, 'tolti', ndown,
+        'decks', sum(1 for r in raw_roads if r.get('deck')), 'trincee: nodi', len(_dep), 'pezzi', len(cuts), 'fondo max %.1f m' % max(_dep.values(), default=0))
 
 # ---- railway elevation
 radj = defaultdict(list); rsrc = {}; rdir = defaultdict(set)
@@ -594,10 +637,10 @@ _adj_backup, _dir_backup = adj, src_dir
 adj, src_dir = radj, rdir
 rail_off = propagate(rsrc, False)
 adj, src_dir = _adj_backup, _dir_backup
-railH = {n_: ground(*nodes[n_]) + o for n_, o in rail_off.items() if o > 0.3}
+railH = {n_: ground_cut(*nodes[n_]) + o for n_, o in rail_off.items() if o > 0.3}
 for rr in rail_raw:
     rr['h'] = [railH.get(n_) for n_ in rr['refs']]
-    rr['elev'] = [h is not None and h - ground(*nodes[n_]) > 1.0 for n_, h in zip(rr['refs'], rr['h'])]
+    rr['elev'] = [h is not None and h - ground_cut(*nodes[n_]) > 1.0 for n_, h in zip(rr['refs'], rr['h'])]
 log('elevated rail nodes', len(railH), 'rail bridges', sum(1 for rr in rail_raw if rr['bridge']))
 coordH = {key(nodes[n_]): h for n_, h in railH.items()}
 
@@ -1333,6 +1376,7 @@ push_lines('pw', [p for p, h in power_lines], lambda i: {'h': power_lines[i][1]}
 TH16 = np.clip(np.round((TH - TBASE) * 10), 0, 65535).astype('<u2')
 out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 1), 'tile': TILE, 'ntx': ntx, 'ntz': ntz},
        'terrain': {'x0': float(txs[0]), 'z0': float(tzs[0]), 'step': TSTEP, 'nx': len(txs), 'nz': len(tzs), 'base': round(TBASE, 1), 'h16': base64.b64encode(TH16.tobytes()).decode()},
+       'cut': [[q(v) for v in c_] for c_ in cuts],
        'nodes': [c for n_ in NODES for c in n_], 'roads': out_roads, 'names': names, 'tiles': tiles,
        'trains': [{'p': enc(t['pts']), 'st': t['st'], 'stn': t['stn'], 'h': [q(coordH[key(p_)]) if key(p_) in coordH else -32768 for p_ in t['pts']]} for t in trains],
        'pois': pois, 'ng': negozi, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index],

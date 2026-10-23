@@ -324,7 +324,7 @@ function polyFill(b, outer, holes, y, vScale, col) {
     // in big triangles. The decision depends on the edge alone, so both triangles on it split it the same way
     const mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = groundH(all[i][0], all[i][1]));
     const memo = new Map(), L2 = (i, j) => { const l = (all[i][0] - all[j][0]) ** 2 + (all[i][1] - all[j][1]) ** 2; if (l <= 16) return 0; const k = i < j ? i * 1e6 + j : j * 1e6 + i; let r = memo.get(k); if (r !== undefined) return r; r = 0; const a = G(i), c = G(j);
-      for (const t of [0.25, 0.5, 0.75]) { const e = groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t) - (a + (c - a) * t); if (e > 0.25 || e < -0.4) { r = l; break; } } /* a hump the chord would sink under, or a dip it would bridge in the air (the car drives down in the dip, under the asphalt); a
+      if (cutTouches(all[i][0], all[i][1], all[j][0], all[j][1])) r = l; else for (const t of [0.25, 0.5, 0.75]) { const e = groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t) - (a + (c - a) * t); if (e > 0.25 || e < -0.4) { r = l; break; } } /* a hump the chord would sink under, or a dip it would bridge in the air (the car drives down in the dip, under the asphalt); a
       shallow dip is let go: a wheel a little in the asphalt costs less than three times the triangles */ memo.set(k, r); return r; };
     const M = (i, j) => { const k = i < j ? i * 1e6 + j : j * 1e6 + i; let m = mid.get(k); if (m === undefined) { m = all.length; all.push([(all[i][0] + all[j][0]) / 2, (all[i][1] + all[j][1]) / 2]); mid.set(k, m); } return m; };
     const stack = faces.map(f => [f[0], f[1], f[2]]); tris = [];
@@ -595,11 +595,44 @@ const TH = (() => { const bin = atob(TER.h16), n = bin.length >> 1, f = new Floa
     TH[j * TER.nx + i] -= DROP * k * k * (3 - 2 * k);
   }
 }
+// trenches (trincee): where the DBGT has a road below the terrain model, the ground is dug down to it. Each piece of road is a segment
+// [ax, az, bx, bz, depth at a, depth at b, half width] in decimetres: full depth across the carriageway, then a grassy bank at 1 : CUT_S
+// up to the field. Everything standing on groundH (roads, cars, people, trees, the tiles' terrain) follows; the streets crossing above
+// are decks at their own height, from the build. The same formula is in build_data.py (ground_cut): keep them equal
+const CUTG = new Grid(24), CUT_S = 1.2, CUTS = (D.cut || []).map(c => c.map(v => v / 10)), CUTB = [1e9, 1e9, -1e9, -1e9];
+for (const [ax, az, bx, bz, da, db, hw] of CUTS) {
+  const m = hw + Math.max(da, db) * CUT_S, s = { ax, az, bx, bz, da, db, hw, m };
+  CUTG.add(Math.min(ax, bx) - m, Math.min(az, bz) - m, Math.max(ax, bx) + m, Math.max(az, bz) + m, s);
+  CUTB[0] = Math.min(CUTB[0], ax - m, bx - m); CUTB[1] = Math.min(CUTB[1], az - m, bz - m); CUTB[2] = Math.max(CUTB[2], ax + m, bx + m); CUTB[3] = Math.max(CUTB[3], az + m, bz + m);
+}
+function trenchCut(x, z) {
+  if (x < CUTB[0] || z < CUTB[1] || x > CUTB[2] || z > CUTB[3]) return 0;
+  let c = 0;
+  CUTG.each(x, z, x, z, s => {
+    const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.ax) * ex + (z - s.az) * ez) / L2, 0, 1), d = hyp(x - s.ax - ex * t, z - s.az - ez * t);
+    const D = s.da + (s.db - s.da) * t; c = Math.max(c, Math.min(D, D - (d - s.hw) / CUT_S));
+  });
+  return c;
+}
+// the deepest trench within r of (x, z): how far down the coarse depth mask has to go there
+function trenchNear(x, z, r) { let c = 0; CUTG.each(x - r, z - r, x + r, z + r, s => { if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < r + s.m) c = Math.max(c, s.da, s.db); }); return c; }
+// does the edge a-b come within reach of a trench? (draped surfaces split such edges down to 4 m, or they bridge the hollow)
+function cutTouches(ax, az, bx, bz) {
+  if (!CUTS.length || Math.max(ax, bx) < CUTB[0] || Math.max(az, bz) < CUTB[1] || Math.min(ax, bx) > CUTB[2] || Math.min(az, bz) > CUTB[3]) return false;
+  let f = false;
+  CUTG.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => { if (!f && segSegDist(ax, az, bx, bz, s.ax, s.az, s.bx, s.bz) < s.m) f = true; });
+  return f;
+}
+function segSegDist(ax, az, bx, bz, cx, cz, dx, dz) {
+  const o = (px, pz, qx, qz, rx, rz) => Math.sign((qx - px) * (rz - pz) - (qz - pz) * (rx - px));
+  if (o(ax, az, bx, bz, cx, cz) * o(ax, az, bx, bz, dx, dz) < 0 && o(cx, cz, dx, dz, ax, az) * o(cx, cz, dx, dz, bx, bz) < 0) return 0;
+  return Math.min(segDist(ax, az, cx, cz, dx, dz), segDist(bx, bz, cx, cz, dx, dz), segDist(cx, cz, ax, az, bx, bz), segDist(dx, dz, ax, az, bx, bz));
+}
 function groundH(x, z) {
   const fx = clamp((x - TER.x0) / TER.step, 0, TER.nx - 1.001), fz = clamp((z - TER.z0) / TER.step, 0, TER.nz - 1.001), i = fx | 0, j = fz | 0, u = fx - i, v = fz - j, k = j * TER.nx + i;
   // same two triangles per cell as the terrain mesh, so cars, roads and the visible ground agree exactly
   const h00 = TH[k], h10 = TH[k + 1], h01 = TH[k + TER.nx], h11 = TH[k + TER.nx + 1];
-  return u >= v ? h00 + u * (h10 - h00) + v * (h11 - h10) : h00 + v * (h01 - h00) + u * (h11 - h01);
+  return (u >= v ? h00 + u * (h10 - h00) + v * (h11 - h10) : h00 + v * (h01 - h00) + u * (h11 - h01)) - (CUTS.length ? trenchCut(x, z) : 0);
 }
 const FBuf = () => Object.assign(Buf(), { drape: true });
 const VBuf = () => Object.assign(Buf(), { drape: true, vis: true }); // drapes on the visible (river-carved) terrain
@@ -623,7 +656,9 @@ const visH = (x, z) => groundH(x, z) - riverCut(x, z);
   for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { const k = j * nx + i; triUp(b, k, k + 1, k + nx + 1); triUp(b, k, k + nx + 1, k + nx); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(b.i); g.computeVertexNormals();
   const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false })); m.renderOrder = -3; m.receiveShadow = true; scene.add(m);
-  const dm = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ colorWrite: false, stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc })); dm.position.y = -3.2; // not where a pit is dug (stencil 1) dm.renderOrder = -1; scene.add(dm);
+  let gd = g; // the depth mask goes under the trenches too, or it would hide their floor
+  if (CUTS.length) { gd = g.clone(); const P = gd.attributes.position; for (let i = 0; i < P.count; i++) P.setY(i, P.getY(i) - trenchNear(P.getX(i), P.getZ(i), S * TER.step)); }
+  const dm = new THREE.Mesh(gd, new THREE.MeshBasicMaterial({ colorWrite: false, stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc })); dm.position.y = -3.2; // not where a pit is dug (stencil 1) dm.renderOrder = -1; scene.add(dm);
 }
 
 // ---------------------------------------------------------------- tiles & static data
@@ -1012,7 +1047,8 @@ function* buildTileGen(T) {
   const pc = a => COL(a[Math.floor(tRnd() * a.length)]), d = T.d, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
   // terrain patch
   {
-    const st = (d.rv || []).length ? 2 : TER.step, nn = Math.round(TS / st), b = Buf(), w = nn + 1;
+    let cut = false; CUTG.each(x0, z0, x0 + TS, z0 + TS, () => { cut = true; });
+    const st = (d.rv || []).length || cut ? 2 : TER.step, nn = Math.round(TS / st), b = Buf(), w = nn + 1;
     for (let j = 0; j <= nn; j++) for (let i = 0; i <= nn; i++) { const x = x0 + i * st, z = z0 + j * st; vtx(b, x, visH(x, z), z, 0, 1, 0, x / 10, z / 10); }
     for (let j = 0; j < nn; j++) for (let i = 0; i < nn; i++) { const k = j * w + i; triUp(b, k, k + 1, k + w + 1); triUp(b, k, k + w + 1, k + w); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(b.i); g.computeVertexNormals();
