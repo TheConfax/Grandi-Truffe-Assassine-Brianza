@@ -262,8 +262,10 @@ function* buildPaesaggio(T, G) {
     const signs = []; // [x, y, z, normal x, z, name]
     for (const [X, Z, ux, uz, w, fwd, back] of d.cl) {
       const x = X / 10, z = Z / 10, rx = -uz, rz = ux, off = w / 2 + 1.2;
-      for (const [sx, sz, nx, nz, name] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back]]) {
-        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5)) continue;
+      for (let [sx, sz, nx, nz, name, sd] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd, 1], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back, -1]]) {
+        // the street can be drawn wider than its width in the data (via Padova: 13 m of asphalt for 7.2): out of the asphalt, half a metre at a time
+        for (let k = 0; k < 12 && onAnyRoad(sx, sz, 0.4); k++) { sx += rx * sd * 0.5; sz += rz * sd * 0.5; }
+        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5) || onAnyRoad(sx, sz, 0.4)) continue;
         signs.push([sx, surfAt(sx, sz), sz, nx, nz, name]);
       }
     }

@@ -840,26 +840,26 @@ if dbt_walls:
     _street_z = unary_union([r['line'].buffer(r['w'] / 2 + 4, quad_segs=2) for r in raw_roads if r['c'] <= 4 and flat(r) and r['line'].length > 0.1]).intersection(dbt_cover)
     _ind_z = unary_union([g for at, g in area_geoms if at in (8, 9)]).intersection(dbt_cover)
     _farm_z = unary_union([g for at, g in area_geoms if at in (11, 12, 13)]).intersection(dbt_cover)
-    for z_ in (_rail_z, _street_z, _ind_z, _farm_z): prepare(z_)
-    kinds_ = Counter()
+    _park_z = unary_union([g for at, g in area_geoms if at in (2, 3, 14)]).intersection(dbt_cover)  # parks, gardens, pitches, cemeteries
+    for z_ in (_rail_z, _street_z, _ind_z, _farm_z, _park_z): prepare(z_)
+    from barriere import classify  # one rule for every comune: src/barriere.py
+    _bld_t = STRtree(btree_geoms) if btree_geoms else None
+    kinds_, nring = Counter(), 0
     for pts, ty in dbt_walls:
-        L = LineString(pts); m = L.interpolate(0.5, normalized=True); r_ = h01(str(pts[0])); kind = None
+        L = LineString(pts); m = L.interpolate(0.5, normalized=True); osm_ = None
         if _ot is not None:
             for j in _ot.query(L):
-                if L.intersection(osm_in[j][0]).length > 0.5 * L.length: kind, hgt = osm_in[j][1], osm_in[j][2]; break
-        if ty != '95': kind = None  # the DBGT says what it is: that wins
-        if ty == '18': kind, hgt = 7, 1.2
-        elif ty in ('13', '04'): kind, hgt = (6, 2.0) if _rail_z.contains(m) else (5, 1.7)
-        elif ty in ('17', '02'): kind, hgt = 2, 1.5 + r_ * 0.4
-        elif ty == '19': kind, hgt = 3, 1.7
-        if kind is None:
-            if _rail_z.contains(m): kind, hgt = 6, 2.0
-            elif _street_z.contains(m): kind, hgt = 2, 1.5 + r_ * 0.4
-            elif _ind_z.contains(m): kind, hgt = (5, 2.2) if r_ < 0.6 else (1, 2.4)
-            elif _farm_z.contains(m): kind, hgt = 7, 1.2
-            else: kind, hgt = (5, 1.8) if r_ < 0.5 else (3, 1.7) if r_ < 0.8 else (2, 1.6)
-        barriers.append((pts, kind, round(hgt, 1))); kinds_[kind] += 1
-    log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', len(dbt_walls), 'per tipo', dict(kinds_))
+                if L.intersection(osm_in[j][0]).length > 0.5 * L.length: osm_ = (osm_in[j][1], osm_in[j][2]); break
+        zone = 'rail' if _rail_z.contains(m) else 'street' if _street_z.contains(m) else 'industrial' if _ind_z.contains(m) else 'park' if _park_z.contains(m) else 'farm' if _farm_z.contains(m) else None
+        lot_ = None
+        if _bld_t is not None:
+            j = _bld_t.nearest(m)
+            if btree_geoms[j].distance(m) < 30: c_ = btree_geoms[j].centroid; lot_ = h01('%.1f,%.1f' % (c_.x, c_.y))
+        closed = len(pts) > 3 and math.dist(pts[0], pts[-1]) < 0.3
+        kh = classify(ty, osm_, zone, lot_ if lot_ is not None else h01(str(pts[0])), L.length if closed else None)
+        if kh is None: nring += 1; continue
+        barriers.append((pts, kh[0], round(kh[1], 1))); kinds_[kh[0]] += 1
+    log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', sum(kinds_.values()), 'per tipo', dict(kinds_), 'bordi di aiuole e vasche', nring)
 # passi carrai: each DBGT driveway point within PC_D of a divider opens it PC_W wide and closes it with a gate as tall as the wall;
 # where a street (class 3 or more) already crosses there the gap stays open. Two points closer than PC_W are one gate
 PC_D, PC_W = 1.5, 3.6
@@ -1168,7 +1168,7 @@ def add_ng(t, p):
     nm = (t.get('name') or '').strip()
     if not nm and c in ('ufficio', 'artigiano') and s in ('company', 'yes', 'association', 'ngo', 'political_party'): return  # an unnamed company: nothing to put on the door
     if any(c == c2 and nm == n2 and math.dist(p, p2) < 15 for c2, n2, p2 in ng_seen): return  # the same shop mapped twice (node and area)
-    ng_seen.append((c, nm, p)); negozi.append([q(p[0]), q(p[1]), NG.index(c), s[:24], nm[:40], (t.get('opening_hours') or '').strip()[:160]])
+    ng_seen.append((c, nm, p)); negozi.append([q(p[0]), q(p[1]), NG.index(c), s[:24], nm[:40], (t.get('opening_hours') or '').strip()[:160], (t.get('addr:street') or '').strip()[:60]])  # the street of its address: the front looks onto it
 for r_, t in ntags.items(): add_ng(t, nodes[r_])
 for wid, (refs, t) in ways.items():
     if refs[0] == refs[-1] and len(refs) >= 4: add_ng(t, centroid(ring(refs)))
@@ -1262,8 +1262,25 @@ for wid, (refs, t) in ways.items():
         a_, b_ = refs[max(0, i - 1)], refs[min(len(refs) - 1, i + 1)]
         if a_ in nodes and b_ in nodes and a_ != b_: pw_dir[n_] = math.atan2(nodes[b_][0] - nodes[a_][0], nodes[b_][1] - nodes[a_][1])
 ogg = []
+OGG_ON_ROAD = ('dosso', 'rallentatore', 'piattaforma', 'traliccio', 'antenna', 'torre_acqua', 'lavaggio')
+def off_carriageway(p):
+    """Street furniture OSM maps on the carriageway (a glass bell on the parking lane of via Seveso, Carlo 24/10): moved square to the road,
+    0.9 m past its edge, on the side it stood"""
+    for i in _segtree.query(Point(p).buffer(12)):
+        L, r = _segs[i]
+        if r['c'] > 5 or not flat(r): continue
+        P_ = Point(p); d = L.distance(P_)
+        if d < r['w'] / 2 + 0.3:
+            c_ = L.interpolate(L.project(P_)); (ax, az), (bx, bz) = L.coords[0], L.coords[-1]; l_ = math.hypot(bx - ax, bz - az) or 1
+            nx, nz = -(bz - az) / l_, (bx - ax) / l_; sd = 1 if (p[0] - c_.x) * nx + (p[1] - c_.y) * nz >= 0 else -1
+            return (c_.x + nx * sd * (r['w'] / 2 + 0.9), c_.y + nz * sd * (r['w'] / 2 + 0.9)), True
+    return p, False
+n_off_road = 0
 def add_ogg(k, p, t, along=None):
+    global n_off_road
     if not inside(p, 0): return
+    if k not in OGG_ON_ROAD and along is None:
+        p, moved_ = off_carriageway(p); n_off_road += moved_
     car = k in ('dosso', 'rallentatore', 'piattaforma')
     ang, r = (along, None) if along is not None else near_street(p, car, face=k in ('panchina', 'distributore', 'cassetta', 'ricarica', 'telecamera', 'fontanella', 'campana', 'armadietti', 'pannello', 'lavaggio'))
     if car and r is None and along is None: return  # a bump off the streets
@@ -1292,7 +1309,7 @@ for wid, (refs, t) in ways.items():
     if t.get('power') not in ('line', 'minor_line'): continue
     pts = [nodes[n_] for n_ in refs if n_ in nodes]
     if len(pts) >= 2: power_lines.append((pts, 28 if t['power'] == 'line' else 8.5))
-log('oggetti', len(ogg), dict(Counter(OGG[o[0]] for o in ogg)), 'linee elettriche', len(power_lines))
+log('oggetti', len(ogg), dict(Counter(OGG[o[0]] for o in ogg)), 'linee elettriche', len(power_lines), 'spostati fuori dalla carreggiata', n_off_road)
 
 # ---- real parking: the spaces mapped one by one (a rectangle each, split when it says capacity > 1) and the capacity of the car parks
 pspaces, plots = [], []  # [x, z, angle of the long side, length, width, kind 0 normal / 1 disabled / 2 charging]; [x, z, capacity]
@@ -1331,14 +1348,14 @@ blines = [(LineString(bgeo[w_]), sorted(n_)) for w_, n_ in bway.items() if len(n
 cartelli = []
 # the two posts stand 3 m before and after the crossing, w/2 + 1.2 m to the right of each driver (as paesaggio3.js draws them). Where the
 # boundary runs along another street (via Vignazzola) the side street crosses it at the junction and the posts would land on that street:
-# the pair slides along its own road, away from the junction, up to CL_SLIDE m, or is left out
+# the pair slides along its own road, away from the junction, up to CL_SLIDE m, or is left out; 2 m clear of any other street, as the asphalt widens at the corners of a junction (via Padova, Carlo 24/10)
 CL_SLIDE = 30
 _clr = [r for r in raw_roads if r['c'] <= 5 and flat(r) and r['line'].length > 0.1]; _clt = STRtree([r['line'] for r in _clr])
 def _cl_free(r0, x, z, ux, uz, w):
     rx, rz, off = -uz, ux, w / 2 + 1.2
     for sx, sz in ((x - ux * 3 + rx * off, z - uz * 3 + rz * off), (x + ux * 3 - rx * off, z + uz * 3 - rz * off)):
         P_ = Point(sx, sz)
-        if any(_clr[k] is not r0 and _clr[k]['line'].distance(P_) < _clr[k]['w'] / 2 + 0.6 for k in _clt.query(P_.buffer(8))): return False
+        if any(_clr[k] is not r0 and _clr[k]['line'].distance(P_) < _clr[k]['w'] / 2 + 2.0 for k in _clt.query(P_.buffer(10))): return False
     return True
 nmoved = ndrop = nside = nrep = nminor = 0
 CL_MAXC = 1  # only main streets and through roads get them: between towns grown into each other the residential streets have none (Carlo, 23/10)
@@ -1447,7 +1464,10 @@ def push_lines(key_, lines, extra=None):
     for i, pts in enumerate(lines):
         L = LineString(pts)
         if L.length < 0.5: continue
-        for t in set(tid(*p) for p in L.buffer(1).exterior.coords) | {tid(*pts[0])}:
+        # every tile the line crosses: sampled along it every 50 m (the corners of its buffer alone sit by its vertices, and a 300 m span of
+        # wire crossing a tile with no pylon in it lost that piece: a hole in the middle of the span)
+        on_ = [L.interpolate(d_) for d_ in range(0, int(L.length) + 1, 50)] + [Point(pts[-1])]
+        for t in set(tid(*p) for p in L.buffer(1).exterior.coords) | {tid(*pts[0])} | {tid(p_.x, p_.y) for p_ in on_}:
             c = L.intersection(tbox(t))
             for part in (list(c.geoms) if hasattr(c, 'geoms') else [c]):
                 if isinstance(part, LineString) and part.length > 0.3:
@@ -1464,8 +1484,15 @@ for rr in rail_raw:  # rail pieces per tile with heights where elevated
         seg = list(range(i0, i1 + 1)); rec = {'p': enc([pts[k] for k in seg])}
         if any(hs[k] is not None for k in seg): rec['h'] = [q(hs[k]) if hs[k] is not None else -32768 for k in seg]
         push(t_, 'rl', rec)
+# v: one look per property (the hash of the building the divider belongs to), so a garden's low wall does not change colour and railing
+# at every piece the DBGT cuts it into
+_bvt = STRtree(btree_geoms) if btree_geoms else None
 for pts, kind, hgt in bar_out:
-    c = LineString(pts).centroid; push(tid(c.x, c.y), 'ba', {'p': enc(pts), 't': kind, 'h': hgt})
+    c = LineString(pts).centroid; v_ = None
+    if _bvt is not None:
+        j = _bvt.nearest(c)
+        if btree_geoms[j].distance(c) < 30: b_ = btree_geoms[j].centroid; v_ = round(h01('%.1f,%.1f' % (b_.x, b_.y)), 3)
+    push(tid(c.x, c.y), 'ba', {'p': enc(pts), 't': kind, 'h': hgt, **({'v': v_} if v_ is not None else {})})
 for t in range(ntx * ntz):
     if median.is_empty: break
     bx = tbox(t)

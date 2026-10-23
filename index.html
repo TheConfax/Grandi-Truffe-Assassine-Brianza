@@ -735,7 +735,7 @@ for (const T of TILES) {
   for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = groundH(x, z); if (NO_TREES.some(q => inPoly(x, z, q))) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5 }); }
   for (const br of d.ba || []) {
     if (br.t === 3 && NO_HEDGES.some(q => dec(br.p).every(([x, z]) => inPoly(x, z, q)))) continue; // drawn by the landmark, symmetrical
-    const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h }); // follow the ground, not long chords
+    const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h, v: br.v }); // follow the ground, not long chords
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = groundH((a[0] + c[0]) / 2, (a[1] + c[1]) / 2); WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }); }
   }
   for (const q of d.sd || []) {
@@ -1362,8 +1362,9 @@ function* buildTileGen(T) {
     const wl = Buf(), ft = Buf(), hd = Buf(), md = Buf(), posts = [], wlP = [Buf(), Buf()], bars = Buf(), mesh = Buf(), rly = Buf(), wood = Buf();
     for (const br of T.ba || []) {
       const pts = br.pts; let acc = 0;
-      // the same divider keeps one look along its length: plaster or concrete, a higher or lower base, bars or mesh on top
-      const hv = (Math.sin(pts[0][0] * 12.9898 + pts[0][1] * 78.233) * 43758.5453) % 1, hh = Math.abs(hv), base = br.t === 2 ? 0.35 + (hh * 7 % 1) * 0.6 : 0.5;
+      // one look per property (br.v, from the build: the building the divider belongs to), else per divider: plaster or concrete, a
+      // higher or lower base, bars or mesh on top
+      const hv = br.v != null ? br.v : (Math.sin(pts[0][0] * 12.9898 + pts[0][1] * 78.233) * 43758.5453) % 1, hh = Math.abs(hv), base = br.t === 2 ? 0.35 + (hh * 7 % 1) * 0.6 : 0.5;
       const wallB = br.t === 2 && hh < 0.6 ? wlP[hh < 0.3 ? 0 : 1] : wl, railB = br.t === 2 && (hh * 13 % 1) < 0.55 ? bars : ft;
       for (let k = 1; k < pts.length; k++) {
         const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
@@ -4530,8 +4531,15 @@ function ngPropGeo(key) {
 
 // ---- where each front goes: the wall of the building the shop is in (or the nearest one) that looks onto a street; shops sharing a wall split it
 function ngRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !s.r.d && s.r.c <= 5 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
-function ngWall(x, z, only) {
-  let host = only, best = null;
+// how far in front of a wall the first real street is (not a service road or a driveway), up to 26 m: a shop set back behind its front
+// garden opens onto the street, not onto the yard behind (Billy's in via Vespucci faced its back lane)
+// returns how far it is, the road's class and whether it is the street of the shop's address (Mikka, via Indipendenza 174, faced a side street)
+function ngStreetAhead(mx, mz, nx, nz, street) {
+  for (let t = 2; t <= 26; t += 2) { const x = mx + nx * t, z = mz + nz * t; let f = null; ROADSEG.each(x - 10, z - 10, x + 10, z + 10, s => { if (!s.r.d && s.r.c <= 3 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5 && (!f || s.r.c < f.c)) f = { t, c: s.r.c, own: !!street && (D.names[s.r.n] || '').toLowerCase() === street }; }); if (f) return f; }
+  return null;
+}
+function ngWall(x, z, only, street) {
+  let host = only, best = null; street = (street || '').toLowerCase();
   if (!host) BLD.each(x, z, x, z, b => { if (!host && b.h >= 2.6 && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) host = b; });
   const scan = b => {
     if (b.h < 2.6 || b.noSign) return; const pts = b.pts;
@@ -4540,8 +4548,9 @@ function ngWall(x, z, only) {
       const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, d = segDist(x, z, a[0], a[1], c[0], c[1]);
       let nx = dz / L, nz = -dx / L; if (inPoly(mx + nx * 0.3, mz + nz * 0.3, b.pts)) { nx = -nx; nz = -nz; }
       if (inPoly(mx + nx * 0.3, mz + nz * 0.3, b.pts) || inBuilding(mx + nx * 0.7, mz + nz * 0.7)) continue; // a party wall
-      const road = ngRoad(mx + nx * 7, mz + nz * 7, 3);
-      let score = host ? d * 0.3 + (road ? 0 : 10) - Math.min(L, 20) * 0.15 : d + (road ? 0 : 6);
+      const road = ngRoad(mx + nx * 7, mz + nz * 7, 3), sa = ngStreetAhead(mx, mz, nx, nz, street);
+      const sv = sa ? sa.t * 0.3 - (sa.own ? 8 : 0) - (sa.c === 0 ? 2 : sa.c === 1 ? 1 : 0) : null; // its own street first, then the more important one
+      let score = host ? d * 0.3 + (sv != null ? sv : road ? 6 : 12) - Math.min(L, 20) * 0.15 : d + (sv != null ? sv * 0.7 : road ? 4 : 8);
       if (b.big && L < 10) continue;
       if (b.big) { // a supermarket opens onto its car park: how much of the 20 m in front is parking counts first, then the street, then length
         let park = 0; for (let t = 2; t <= 20; t += 2) if (ngInPark(mx + nx * t, mz + nz * t, 0)) park++;
@@ -4577,7 +4586,7 @@ function ngList() {
   for (const e of D.ng || []) {
     const x = e[0] / 10, z = e[1] / 10, cls = NG_CLASSES[e[2]], sub = e[3] || '', name = e[4] || '', ms = NG_MODELS[cls]; if (!ms) continue;
     let big = null; BLD.each(x - 25, z - 25, x + 25, z + 25, b => { if (b.big && b.big.e === e) big = b; });
-    const W = ngWall(x, z, big); if (!W || W.b.lm) continue;
+    const W = ngWall(x, z, big, e[6]); if (!W || W.b.lm) continue;
     if (big) { // the supermarket's own glass front: it takes its share of the wall, the other shops on it move aside
       const w = clamp(W.L * 0.6, Math.min(8, W.L - 1), Math.min(28, W.L - 1)), along = (x - W.a[0]) * W.ux + (z - W.a[1]) * W.uz;
       const rec = { big: big.big, name, ...W, t: clamp(inPoly(x, z, big.pts) ? W.L / 2 : along, w / 2 + 0.5, W.L - w / 2 - 0.5), w };
@@ -5308,8 +5317,10 @@ function* buildPaesaggio(T, G) {
     const signs = []; // [x, y, z, normal x, z, name]
     for (const [X, Z, ux, uz, w, fwd, back] of d.cl) {
       const x = X / 10, z = Z / 10, rx = -uz, rz = ux, off = w / 2 + 1.2;
-      for (const [sx, sz, nx, nz, name] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back]]) {
-        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5)) continue;
+      for (let [sx, sz, nx, nz, name, sd] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd, 1], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back, -1]]) {
+        // the street can be drawn wider than its width in the data (via Padova: 13 m of asphalt for 7.2): out of the asphalt, half a metre at a time
+        for (let k = 0; k < 12 && onAnyRoad(sx, sz, 0.4); k++) { sx += rx * sd * 0.5; sz += rz * sd * 0.5; }
+        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5) || onAnyRoad(sx, sz, 0.4)) continue;
         signs.push([sx, surfAt(sx, sz), sz, nx, nz, name]);
       }
     }
@@ -6044,7 +6055,7 @@ function missionStep(dt) {
 
 // ---------------------------------------------------------------- HUD
 const $ = id => document.getElementById(id);
-let toastT = 0, bannerT = 0, hintT = 0, lastStreet = '', shake = 0, camMode = 0, paused = false, running = false, bigOpen = false, now = 0;
+let camYaw = 0, camPitch = 0, camBack = false, toastT = 0, bannerT = 0, hintT = 0, lastStreet = '', shake = 0, camMode = 0, paused = false, running = false, bigOpen = false, now = 0;
 function toast(t) { $('toast').textContent = t; $('toast').classList.add('on'); toastT = 3.2; }
 function banner(t, sub) { $('banner').innerHTML = (sub ? `<small>${sub}</small>` : '') + escapeHtml(t); $('banner').classList.add('on'); bannerT = 3; }
 function hint(t) { $('hint').innerHTML = t; $('hint').hidden = false; hintT = 0.25; }
@@ -6159,7 +6170,7 @@ addEventListener('keydown', e => {
   const k = KEYMAP[e.code]; if (k) { K[k] = true; e.preventDefault(); }
   if (e.repeat) return;
   if (e.code === 'KeyF' || e.code === 'Enter') K.use = true;
-  if (e.code === 'KeyC') camMode = (camMode + 1) % 2;
+  if (e.code === 'KeyC') camMode = (camMode + 1) % 3;
   if (e.code === 'KeyM') toggleBig();
   if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
   if (e.code === 'KeyN') skipTime(2);
@@ -6180,7 +6191,7 @@ if (isTouch) {
   const sb = 'env(safe-area-inset-bottom, 0px)', sl = 'env(safe-area-inset-left, 0px)', sr = 'env(safe-area-inset-right, 0px)';
   const btn = (label, css, key, cls = '') => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'tb ' + cls; b.textContent = label; b.setAttribute('aria-label', key); Object.assign(b.style, css); T.appendChild(b);
-    const on = e => { e.preventDefault(); if (key === 'use') K.use = true; else if (key === 'cam') camMode = (camMode + 1) % 2; else if (key === 'map') toggleBig(); else K[key] = true; b.classList.add('on'); };
+    const on = e => { e.preventDefault(); if (key === 'use') K.use = true; else if (key === 'cam') camMode = (camMode + 1) % 3; else if (key === 'map') toggleBig(); else K[key] = true; b.classList.add('on'); };
     const off = e => { e.preventDefault(); if (!['use', 'cam', 'map'].includes(key)) K[key] = false; b.classList.remove('on'); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
   };
@@ -6202,10 +6213,10 @@ function pollPad() {
   const dz = v => Math.abs(v) < 0.15 ? 0 : v, b = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0;
   const edge = i => { const now = b(i) > 0.5, was = GP.prev[i]; GP.prev[i] = now; return now && !was; };
   // cross/A handbrake, circle/B turbo, square/X horn, triangle/Y get in-out, R1/RB or R3 camera
-  GP.steer = dz(g.axes[0] || 0); GP.fwd = -dz(g.axes[1] || 0); GP.thr = b(7); GP.brk = b(6); GP.hand = b(0); GP.turbo = b(1); GP.horn = b(2);
+  GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0); GP.thr = b(7); GP.brk = b(6); GP.hand = b(0); GP.turbo = b(1); GP.horn = b(2);
   if (edge(3)) K.use = true;
-  if (edge(5)) camMode = (camMode + 1) % 2;
-  if (edge(11)) reportSpot();
+  if (edge(5)) camMode = (camMode + 1) % 3;
+  if (edge(13)) reportSpot();
   if (edge(8)) toggleBig();
   if (edge(4)) skipTime(2);
   if (edge(12)) toggleRadio();
@@ -6511,15 +6522,26 @@ let camInit = false;
 function updCamera(dt) {
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
   const fx = Math.sin(h), fz = Math.cos(h); let want, look;
-  if (camMode === 1) {
+  if (!inCar) P.model.g.visible = camMode !== 2;
+  if (camMode === 2) {
+    let hx = fx, hz = fz; const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0;
+    if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -2.3, 2.3); else camYaw *= Math.exp(-4 * dt);
+    if (p_) camPitch = clamp(camPitch + p_ * 2 * dt, -0.7, 0.7); else camPitch *= Math.exp(-4 * dt);
+    const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; if (GP.back > 0.5) { hx = -hx; hz = -hz; }
+    const ey = inCar ? P.car.y + 1.25 : P.y + 1.62, fo = inCar ? 1.1 : 0.15;
+    want = new THREE.Vector3(px + fx * fo, ey, pz + fz * fo); look = new THREE.Vector3(want.x + hx * 10, ey - camPitch * 7, want.z + hz * 10);
+  } else if (camMode === 1) {
     const ht = inCar ? 58 + sp * 0.9 : 36, gy = groundH(px, pz); want = new THREE.Vector3(px, gy + ht, pz + ht * 0.28); look = new THREE.Vector3(px, gy, pz);
   } else {
     // follow travel direction in reverse, otherwise heading
     let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }
+    { const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0; if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -Math.PI, Math.PI); else camYaw *= Math.exp(-2.5 * dt); /* heading grows towards the left */
+      const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } } /* looking back and forward again is a cut, not a swing round */
     const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
     let cx = px - hx * dist, cz = pz - hz * dist;
     const f = rayWalls(px, pz, cx, cz); let lift = 0; if (f < 1) { const k = Math.max(0.12, f - 0.08); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3; }
-    const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
+    const gy = inCar ? P.car.y : P.y; { const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 3 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }
+    want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
   }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
   // the camera rides along with what it follows and the smoothing below only softens turns and walls: chasing the car itself, a frame that
@@ -6527,8 +6549,8 @@ function updCamera(dt) {
   const subj = inCar ? P.car : P, suby = inCar ? P.car.y : P.y, C = updCamera;
   if (C.s === subj && hyp(px - C.x, pz - C.z) < 20) { const d = _camD.set(px - C.x, suby - C.y, pz - C.z); camPos.add(d); camLook.add(d); }
   C.s = subj; C.x = px; C.y = suby; C.z = pz;
-  const k = 1 - Math.exp(-(camMode === 1 ? 5 : 7.5) * dt);
-  camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));
+  const k = camMode === 2 ? 1 : 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);
+  camPos.lerp(want, k); camLook.lerp(look, camMode === 2 ? 1 : 1 - Math.exp(-12 * dt));
   camera.position.copy(camPos);
   if (shake > 0) { camera.position.x += (rnd() - 0.5) * shake * 0.6; camera.position.y += (rnd() - 0.5) * shake * 0.4; shake = Math.max(0, shake - dt * 1.8); }
   camera.lookAt(camLook);
