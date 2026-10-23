@@ -474,7 +474,7 @@ class Superficie:
         s.AIR = ndimage.binary_propagation(RT & (dbr <= NEAR_BR) & (dz > DZ_CAP), structure=st8, mask=RT & (dz > DZ_WARN))
         s.CAP = ndimage.binary_propagation(RT & (np.abs(dz) > DZ_CAP) & ~s.AIR, structure=st8, mask=RT & (np.abs(dz) > DZ_WARN) & ~s.AIR)
         # a capped patch over the river is a culvert (tombino) the LiDAR sees through: the road keeps the DBGT
-        s.TOMB = np.zeros(s.CAP.shape, bool)
+        s.TOMB = np.zeros(s.CAP.shape, bool); s.PNS = np.zeros(s.CAP.shape, bool)
         if s.CAP.any():
             alv = np.zeros(s.CAP.shape, bool)
             for nm in ('ALVEO', 'ALVEO_A'):
@@ -486,6 +486,10 @@ class Superficie:
             if nl:
                 hit = np.unique(lab[s.CAP & alv]); hit = hit[hit > 0]
                 s.TOMB = np.isin(lab, hit); s.CAP &= ~s.TOMB
+                # a road over the river standing above the LiDAR is a bridge the DTM removed, not a culvert (the Milano-Meda over the Taro:
+                # OSM bridge=yes, walls of 6.7 m in the DTM): its nodes are a deck like AIR (phase 3), the river stays under it
+                up = [k for k in hit if np.median(s.DZ[lab == k]) > 0]
+                if up: s.PNS = np.isin(lab, up); s.TOMB &= ~s.PNS; s.AIR |= s.PNS
         s.WARN = RT & (np.abs(dz) > DZ_WARN)
         s.ZRAW = s.ZF.copy(); s.NEARCAP = np.zeros(s.CAP.shape, bool)
         if s.CAP.any():
@@ -498,7 +502,8 @@ class Superficie:
         AL = np.isin(s.CLS, (C_ALV, C_ARG)) & FIX & ~s.BR; da = np.where(AL, s.L - np.nan_to_num(s.ZF), 0)
         s.ALVCOP = ndimage.binary_propagation(AL & (da > DZ_CAP), structure=st8, mask=AL & (da > DZ_WARN))
         s.RANK[s.ALVCOP] = 0
-        s.log('tetto: nodi oltre %.1f m %d, al LiDAR %d, parti di impalcato %d, alveo coperto o sponda al LiDAR %d' % (DZ_WARN, int(s.WARN.sum()), int(s.CAP.sum()), int(s.AIR.sum()), int(s.ALVCOP.sum())))
+        s.log('tetto: nodi oltre %.1f m %d, al LiDAR %d, parti di impalcato %d (di ponti non segnati %d), tombini %d, alveo coperto o sponda al LiDAR %d' % (
+            DZ_WARN, int(s.WARN.sum()), int(s.CAP.sum()), int(s.AIR.sum()), int(s.PNS.sum()), int(s.TOMB.sum()), int(s.ALVCOP.sum())))
 
     # ----- 5. ritocchi (src/ritocchi.json): the highest priority, only for proven errors
     def ritocchi(s):
