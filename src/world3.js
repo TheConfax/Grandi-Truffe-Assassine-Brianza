@@ -149,11 +149,13 @@ function nearRail(x, z, m) { let f = false; RAILG.each(x - m, z - m, x + m, z + 
 const RAILG = new Grid(24), LOWRAILG = new Grid(24);
 for (const td of D.tiles) for (const f of td.rl || []) { if (f.h) continue; const pts = dec(f.p); for (let k = 1; k < pts.length; k++) LOWRAILG.add(Math.min(pts[k - 1][0], pts[k][0]), Math.min(pts[k - 1][1], pts[k][1]), Math.max(pts[k - 1][0], pts[k][0]), Math.max(pts[k - 1][1], pts[k][1]), { a: pts[k - 1], b: pts[k] }); }
 for (const td of D.tiles) for (const f of td.rl || []) { const pts = dec(f.p); for (let k = 1; k < pts.length; k++) RAILG.add(Math.min(pts[k - 1][0], pts[k][0]), Math.min(pts[k - 1][1], pts[k][1]), Math.max(pts[k - 1][0], pts[k][0]), Math.max(pts[k - 1][1], pts[k][1]), { a: pts[k - 1], b: pts[k] }); }
-// guardrails along ground-level expressways (both sides; links and junctions stay open)
+// guardrails along ground-level expressways (both sides; links and junctions stay open). A way with a deck somewhere along it
+// gets them on its stretches less than 1.4 m up, at the road's height: the deck rails below only start there
 const FLAT_RAILS = [];
-for (const r of D.roads) if (r.x && !r.d && !r.t && r.c === 0) {
+for (const r of D.roads) if (r.x && !r.t && r.c === 0) {
   for (let k = 1; k < r.g.length; k++) {
     const a = N[r.g[k - 1]], b = N[r.g[k]], L = hyp(b[0] - a[0], b[1] - a[1]); if (L < 1) continue;
+    const ya = r.d ? nodeY(r.g[k - 1]) : 0, yb = r.d ? nodeY(r.g[k]) : 0;
     if (NODE_DEG[r.g[k - 1]] >= 3 && NODE_DEG[r.g[k]] >= 3 && L < 30) continue;
     const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, rx = -uz, rz = ux;
     for (let s0 = 0; s0 < L; s0 += 4) {
@@ -163,7 +165,8 @@ for (const r of D.roads) if (r.x && !r.d && !r.t && r.c === 0) {
         const w = r.w / 2 + 0.4, gx = (x0 + x1) / 2 + rx * sd * w, gz = (z0 + z1) / 2 + rz * sd * w;
         let other = false; ROADSEG.each(gx - 4, gz - 4, gx + 4, gz + 4, o => { if (!other && o.r !== r && o.r.c <= 5 && segDist(gx, gz, o.a[0], o.a[1], o.b[0], o.b[1]) < o.r.w / 2 + 0.3) other = true; });
         if (other) continue;
-        const y0 = groundH(x0 + rx * sd * w, z0 + rz * sd * w), y1 = groundH(x1 + rx * sd * w, z1 + rz * sd * w);
+        let y0 = groundH(x0 + rx * sd * w, z0 + rz * sd * w), y1 = groundH(x1 + rx * sd * w, z1 + rz * sd * w);
+        if (r.d) { const r0 = lerp(ya, yb, s0 / L), r1 = lerp(ya, yb, s1 / L); if ((r0 + r1) / 2 - groundH((x0 + x1) / 2, (z0 + z1) / 2) >= 1.4) continue; y0 = Math.max(y0, r0); y1 = Math.max(y1, r1); }
         const seg = { ax: x0 + rx * sd * w, az: z0 + rz * sd * w, bx: x1 + rx * sd * w, bz: z1 + rz * sd * w, nx: -rx * sd, nz: -rz * sd, two: true, y0: Math.min(y0, y1) - 2, y1: Math.max(y0, y1) + 2.5, deckw: true };
         WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, seg); FLAT_RAILS.push({ x0: seg.ax, z0: seg.az, x1: seg.bx, z1: seg.bz, y0, y1 });
       }
