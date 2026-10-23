@@ -21,6 +21,19 @@ Le quote vere del DBGT ci sono solo a Meda; altrove i ponti sono stimati (+6,6 m
 - [ ] A Meda il DBGT alza a impalcato ogni strada più di 0,8 m sopra il modello del terreno, anche dove sotto non passa niente: Manzoni/Rosmini/Cattaneo verso Colombera fino a 11,3 m (x -726 z -1331), Borromeo/Mameli/Molino 8,2 m, Monte Bianco/Cervino 8,1 m, Carso/Monte Rosa 7,7 m, Perlasca/delle Cave 6,9 m, piazza Dozio/Giovanni XXIII 6 m. Lì è il terreno a 10 m che sbaglia: alzare il terreno sotto la strada, e fare impalcati solo dove sotto passa una strada, la ferrovia o il Seveso
 - [ ] Svincolo di Meda, incroci a raso e punte: scritto il 23/10, da provare con la build a casa. La build ora scava le trincee dove il DBGT ha una strada più di 1,2 m sotto il terreno (`cut` in `brianza.json`, il gioco abbassa il terreno con `trenchCut` in `world3.js`), così i ponti delle rampe tornano ponti. I nodi senza un asse del DBGT prendono la quota dai vicini invece di tenere la stima. Nel log della build guardare la riga `dbgt quote strade` (trincee: nodi, pezzi, fondo max) e poi lo svincolo in gioco: carreggiate sul fondo, scarpate erbose, rampe sopra. Provato solo con una trincea finta di 6 m sullo svincolo
 
+## Ramo fotorealismo (23/10)
+Prova di grafica realistica su un ramo a parte; `main` resta com'era.
+Fatto (primo giro, piaciuto a Carlo):
+- [x] Texture fotografiche per asfalto, prato, terreno, marciapiedi e porfido (`tex/*.jpg`, Poly Haven CC0, ricolorate sul colore medio delle texture disegnate di prima), applicate da `src/foto3.js`
+- [x] Luce in spazio lineare con curva filmica ACES (`src/foto3_colori.js` converte i colori esadecimali; `src/foto3.js` alza la luce nelle ombre e ingrigisce la foschia di giorno). Controllato anche di notte
+Prossimi giri, in ordine di effetto:
+- [ ] Alberi veri: chiome fatte di ciuffi di foglie invece degli icosaedri (`TREE_G` in `src/world3.js`)
+- [ ] Occlusione ambientale: angoli, grondaie, base dei muri
+- [ ] Cielo vero con il sole (`Sky.js` di three r128 da jsdelivr) e foschia che ne prende il colore
+- [ ] Facciate: intonaco con grana vera, davanzali, finestre che riflettono il cielo
+- [ ] Impostazione qualità alta/bassa per i telefoni
+Per provarlo: `python -m http.server` nella cartella del repo e apri `http://localhost:8000` (da `file://` il browser blocca `brianza.json`). Per i confronti si fotografano le stesse inquadrature su `main` e sul ramo, con l'ora fissata (`window.__setTOD(15.5)`) e la telecamera messa a mano.
+
 ## Telecamera
 - [ ] Telecamera più vicina all'auto
 - [ ] Visuale in terza persona
