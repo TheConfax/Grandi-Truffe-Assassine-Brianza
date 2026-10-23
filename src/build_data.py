@@ -840,26 +840,26 @@ if dbt_walls:
     _street_z = unary_union([r['line'].buffer(r['w'] / 2 + 4, quad_segs=2) for r in raw_roads if r['c'] <= 4 and flat(r) and r['line'].length > 0.1]).intersection(dbt_cover)
     _ind_z = unary_union([g for at, g in area_geoms if at in (8, 9)]).intersection(dbt_cover)
     _farm_z = unary_union([g for at, g in area_geoms if at in (11, 12, 13)]).intersection(dbt_cover)
-    for z_ in (_rail_z, _street_z, _ind_z, _farm_z): prepare(z_)
-    kinds_ = Counter()
+    _park_z = unary_union([g for at, g in area_geoms if at in (2, 3, 14)]).intersection(dbt_cover)  # parks, gardens, pitches, cemeteries
+    for z_ in (_rail_z, _street_z, _ind_z, _farm_z, _park_z): prepare(z_)
+    from barriere import classify  # one rule for every comune: src/barriere.py
+    _bld_t = STRtree(btree_geoms) if btree_geoms else None
+    kinds_, nring = Counter(), 0
     for pts, ty in dbt_walls:
-        L = LineString(pts); m = L.interpolate(0.5, normalized=True); r_ = h01(str(pts[0])); kind = None
+        L = LineString(pts); m = L.interpolate(0.5, normalized=True); osm_ = None
         if _ot is not None:
             for j in _ot.query(L):
-                if L.intersection(osm_in[j][0]).length > 0.5 * L.length: kind, hgt = osm_in[j][1], osm_in[j][2]; break
-        if ty != '95': kind = None  # the DBGT says what it is: that wins
-        if ty == '18': kind, hgt = 7, 1.2
-        elif ty in ('13', '04'): kind, hgt = (6, 2.0) if _rail_z.contains(m) else (5, 1.7)
-        elif ty in ('17', '02'): kind, hgt = 2, 1.5 + r_ * 0.4
-        elif ty == '19': kind, hgt = 3, 1.7
-        if kind is None:
-            if _rail_z.contains(m): kind, hgt = 6, 2.0
-            elif _street_z.contains(m): kind, hgt = 2, 1.5 + r_ * 0.4
-            elif _ind_z.contains(m): kind, hgt = (5, 2.2) if r_ < 0.6 else (1, 2.4)
-            elif _farm_z.contains(m): kind, hgt = 7, 1.2
-            else: kind, hgt = (5, 1.8) if r_ < 0.5 else (3, 1.7) if r_ < 0.8 else (2, 1.6)
-        barriers.append((pts, kind, round(hgt, 1))); kinds_[kind] += 1
-    log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', len(dbt_walls), 'per tipo', dict(kinds_))
+                if L.intersection(osm_in[j][0]).length > 0.5 * L.length: osm_ = (osm_in[j][1], osm_in[j][2]); break
+        zone = 'rail' if _rail_z.contains(m) else 'street' if _street_z.contains(m) else 'industrial' if _ind_z.contains(m) else 'park' if _park_z.contains(m) else 'farm' if _farm_z.contains(m) else None
+        lot_ = None
+        if _bld_t is not None:
+            j = _bld_t.nearest(m)
+            if btree_geoms[j].distance(m) < 30: c_ = btree_geoms[j].centroid; lot_ = h01('%.1f,%.1f' % (c_.x, c_.y))
+        closed = len(pts) > 3 and math.dist(pts[0], pts[-1]) < 0.3
+        kh = classify(ty, osm_, zone, lot_ if lot_ is not None else h01(str(pts[0])), L.length if closed else None)
+        if kh is None: nring += 1; continue
+        barriers.append((pts, kh[0], round(kh[1], 1))); kinds_[kh[0]] += 1
+    log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', sum(kinds_.values()), 'per tipo', dict(kinds_), 'bordi di aiuole e vasche', nring)
 # passi carrai: each DBGT driveway point within PC_D of a divider opens it PC_W wide and closes it with a gate as tall as the wall;
 # where a street (class 3 or more) already crosses there the gap stays open. Two points closer than PC_W are one gate
 PC_D, PC_W = 1.5, 3.6
@@ -1464,8 +1464,15 @@ for rr in rail_raw:  # rail pieces per tile with heights where elevated
         seg = list(range(i0, i1 + 1)); rec = {'p': enc([pts[k] for k in seg])}
         if any(hs[k] is not None for k in seg): rec['h'] = [q(hs[k]) if hs[k] is not None else -32768 for k in seg]
         push(t_, 'rl', rec)
+# v: one look per property (the hash of the building the divider belongs to), so a garden's low wall does not change colour and railing
+# at every piece the DBGT cuts it into
+_bvt = STRtree(btree_geoms) if btree_geoms else None
 for pts, kind, hgt in bar_out:
-    c = LineString(pts).centroid; push(tid(c.x, c.y), 'ba', {'p': enc(pts), 't': kind, 'h': hgt})
+    c = LineString(pts).centroid; v_ = None
+    if _bvt is not None:
+        j = _bvt.nearest(c)
+        if btree_geoms[j].distance(c) < 30: b_ = btree_geoms[j].centroid; v_ = round(h01('%.1f,%.1f' % (b_.x, b_.y)), 3)
+    push(tid(c.x, c.y), 'ba', {'p': enc(pts), 't': kind, 'h': hgt, **({'v': v_} if v_ is not None else {})})
 for t in range(ntx * ntz):
     if median.is_empty: break
     bx = tbox(t)
