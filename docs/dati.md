@@ -48,6 +48,12 @@ Sono in `data/dbt/<Comune>/<COMUNE>.zip`, ancora da estrarre: la build legge sol
   - Vanno estratte in `data/terreno/lidar/` (anche in sottocartelle). La build legge GeoTIFF o ASCII grid, in gradi o in UTM 32N. `python src/build.py` dice quante tessere trova e quali mancano. Ogni nodo della griglia di 10 m prende la media delle celle da 1 m intorno, e al bordo della copertura il LiDAR sfuma in TINITALY su 200 m.
   - Per controllare un punto senza scaricare niente c'è l'identify del servizio ArcGIS: <http://www.pcn.minambiente.it/arcgis/rest/services/dtm/LiDAR_Lombardia/MapServer/identify> (layer 8, `Grid 1x1 DTM`).
 
+## Mapillary (scaricato, non ancora usato)
+
+- `mapillary/oggetti.json` (1 MB): 3 469 oggetti riconosciuti nelle foto sul riquadro della mappa, di cui 1 100 cartelli (626 di obbligo e divieto, 126 di pericolo, 339 di indicazione, 9 complementari), più lampioni, semafori, pali, cestini (1 960), segni a terra (218) e cose da cantiere (87). Per ognuno: tipo, posizione, direzione, prima e ultima foto in cui compare.
+- `mapillary/foto.json` (3 MB): l'elenco delle 12 163 foto (posizione, data, direzione, autore). Sono vecchie: l'80% del 2018-2019, dal 2023 solo 350. Per i cartelli vuol dire la situazione di 6-7 anni fa: vanno incrociati con OSM.
+- Scaricato il 23/10/2026 dalla Graph API v4 (`map_features` e `images`, a tessere da 0,01°) con lo script nella scratchpad della sessione; il token è in `mapillary_token.txt` (non va in git). Licenza CC BY-SA 4.0, © Mapillary e i suoi contributori.
+
 ## Non usati da nessuno script
 
 - `_vecchi/map.osm` (2,5 MB): primo estratto OSM dal sito di openstreetmap.org (17/10/2026), un riquadro di circa 1,3 × 0,7 km sul centro di Meda. Sostituito da `osm/maplarge.osm`.
