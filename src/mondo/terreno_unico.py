@@ -106,10 +106,11 @@ def raster(P):  # maschera dei nodi dentro P (solo nel suo riquadro)
     sub = shapely.contains_xy(P, GX[r0:r1 + 1, c0:c1 + 1], GZ[r0:r1 + 1, c0:c1 + 1]); m[r0:r1 + 1, c0:c1 + 1] = sub
     return m, (slice(r0, r1 + 1), slice(c0, c1 + 1))
 
-def clean(V):  # vertici con quota vera e vicini alla mediana del poligono
-    ok = V[:, 2] > ZMIN
-    if ok.sum() == 0: return V[:0]
-    med = np.median(V[ok, 2]); ok &= np.abs(V[:, 2] - med) < OUTL; return V[ok]
+def clean(V):  # vertici con quota vera e vicini alla mediana LOCALE (entro 20 m): la mediana di tutto il poligono scartava i vertici buoni
+    V = V[V[:, 2] > ZMIN]  # delle rampe lunghe (pendenza 5% su 200 m = 10 m di dislivello)
+    if len(V) < 3: return V
+    nb = cKDTree(V[:, :2]).query_ball_point(V[:, :2], 20.0)
+    med = np.array([np.median(V[i, 2]) for i in nb]); return V[np.abs(V[:, 2] - med) < OUTL]
 
 def tin(V, px, pz):  # TIN dei vertici, il vertice piu' vicino fuori dall'inviluppo
     u, ix = np.unique(np.round(V[:, :2], 2), axis=0, return_index=True); V = V[ix]
@@ -127,6 +128,8 @@ BR = np.zeros(GX.shape, bool)
 for P, V, at in pon: BR |= raster(P)[0]
 for P, V, at in vei:
     if at[0] == '02': BR |= raster(P)[0]
+for P, V, at in ped:  # anche i marciapiedi su ponte (nessuno nell'area di prova, ma in Meda si')
+    if at[0] == '02': BR |= raster(P)[0]
 
 # ---------- 4. carreggiate: quota dell'asse EL_STR piu' vicino fra quelli del poligono, piatta in sezione ----------
 ZB = np.full(GX.shape, np.nan); ROAD = np.zeros(GX.shape, bool); ZSRC = np.zeros(GX.shape, np.int8)  # 1 asse, 2 vertici
@@ -138,11 +141,12 @@ for P, V, at in vei:
     m, sl = raster(P); m &= ~BR
     if not m.any(): continue
     px, pz = GX[m], GZ[m]; Vc = clean(V)
-    cand = AXr[treeAX.query_ball_point(np.array(P.centroid.coords[0]), np.hypot(P.bounds[2] - P.bounds[0], P.bounds[3] - P.bounds[1]) / 2 + 2)]
+    bx0, bz0, bx1, bz1 = P.bounds  # centro del riquadro, non il centroide: per i poligoni a L o curvi (70 su 203) il raggio non copriva tutto
+    cand = AXr[treeAX.query_ball_point(np.array([(bx0 + bx1) / 2, (bz0 + bz1) / 2]), np.hypot(bx1 - bx0, bz1 - bz0) / 2 + 2)]
     if len(cand):
         Pb = P.buffer(1.5); cand = cand[shapely.contains_xy(Pb, cand[:, 0], cand[:, 1])]
-    if len(cand) and len(Vc):  # assi di un'altra quota che attraversano l'area (sottopassi, gallerie): fuori
-        cand = cand[np.abs(cand[:, 2] - np.median(Vc[:, 2])) < OUTL]
+    if len(cand) and len(Vc):  # assi di un'altra quota che attraversano l'area (sottopassi, gallerie): fuori. Confronto con il TIN dei
+        cand = cand[np.abs(cand[:, 2] - tin(Vc, cand[:, 0], cand[:, 1])) < OUTL]  # vertici nello stesso punto, non con la mediana del poligono
     if len(cand):
         h = cand[cKDTree(cand[:, :2]).query(np.column_stack((px, pz)))[1], 2]; ZSRC[m] = 1
     elif len(Vc):
@@ -170,9 +174,10 @@ if APPLY_OFF: ZB = ZB - OFF
 # ---------- 6b. carreggiate SED=01 sospese accanto ai ponti: la sede ponte del DBGT non copre tutto l'impalcato (spalle, ultime campate).
 # Un nodo a meno di 30 m da un ponte e piu' di 3 m sopra il LiDAR non ha terreno sotto: passa all'impalcato (oggetto), non entra in S
 dbr = ndimage.distance_transform_edt(~BR, sampling=STEP) if BR.any() else np.full(GX.shape, 1e9)
-AIR = ROAD & (dbr <= 30) & (ZB - L > 3.0)
-AIR = ndimage.binary_propagation(AIR, mask=ROAD & (ZB - L > 1.5))  # fino a dove la carreggiata torna sul terreno
-nair = int(AIR.sum()); ROAD &= ~AIR; BR |= AIR; FIX = ROAD | PED
+FX0 = ROAD | PED  # anche i marciapiedi: quello lungo la rampa del ponte nord (x 88, z 240) saliva a +8,5 m sul LiDAR
+AIR = FX0 & (dbr <= 30) & (ZB - L > 3.0)
+AIR = ndimage.binary_propagation(AIR, mask=FX0 & (ZB - L > 1.5))  # fino a dove la carreggiata torna sul terreno
+nair = int(AIR.sum()); ROAD &= ~AIR; PED &= ~AIR; BR |= AIR; FIX = ROAD | PED
 print('carreggiate sospese accanto ai ponti passate all impalcato: nodi %d' % nair)
 
 # ---------- 7. raccordi: S = clamp(L, Zb - d/K, Zb + d/K) dal nodo fisso piu' vicino ----------
