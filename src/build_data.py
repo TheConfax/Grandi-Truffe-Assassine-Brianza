@@ -1262,8 +1262,25 @@ for wid, (refs, t) in ways.items():
         a_, b_ = refs[max(0, i - 1)], refs[min(len(refs) - 1, i + 1)]
         if a_ in nodes and b_ in nodes and a_ != b_: pw_dir[n_] = math.atan2(nodes[b_][0] - nodes[a_][0], nodes[b_][1] - nodes[a_][1])
 ogg = []
+OGG_ON_ROAD = ('dosso', 'rallentatore', 'piattaforma', 'traliccio', 'antenna', 'torre_acqua', 'lavaggio')
+def off_carriageway(p):
+    """Street furniture OSM maps on the carriageway (a glass bell on the parking lane of via Seveso, Carlo 24/10): moved square to the road,
+    0.9 m past its edge, on the side it stood"""
+    for i in _segtree.query(Point(p).buffer(12)):
+        L, r = _segs[i]
+        if r['c'] > 5 or not flat(r): continue
+        P_ = Point(p); d = L.distance(P_)
+        if d < r['w'] / 2 + 0.3:
+            c_ = L.interpolate(L.project(P_)); (ax, az), (bx, bz) = L.coords[0], L.coords[-1]; l_ = math.hypot(bx - ax, bz - az) or 1
+            nx, nz = -(bz - az) / l_, (bx - ax) / l_; sd = 1 if (p[0] - c_.x) * nx + (p[1] - c_.y) * nz >= 0 else -1
+            return (c_.x + nx * sd * (r['w'] / 2 + 0.9), c_.y + nz * sd * (r['w'] / 2 + 0.9)), True
+    return p, False
+n_off_road = 0
 def add_ogg(k, p, t, along=None):
+    global n_off_road
     if not inside(p, 0): return
+    if k not in OGG_ON_ROAD and along is None:
+        p, moved_ = off_carriageway(p); n_off_road += moved_
     car = k in ('dosso', 'rallentatore', 'piattaforma')
     ang, r = (along, None) if along is not None else near_street(p, car, face=k in ('panchina', 'distributore', 'cassetta', 'ricarica', 'telecamera', 'fontanella', 'campana', 'armadietti', 'pannello', 'lavaggio'))
     if car and r is None and along is None: return  # a bump off the streets
@@ -1292,7 +1309,7 @@ for wid, (refs, t) in ways.items():
     if t.get('power') not in ('line', 'minor_line'): continue
     pts = [nodes[n_] for n_ in refs if n_ in nodes]
     if len(pts) >= 2: power_lines.append((pts, 28 if t['power'] == 'line' else 8.5))
-log('oggetti', len(ogg), dict(Counter(OGG[o[0]] for o in ogg)), 'linee elettriche', len(power_lines))
+log('oggetti', len(ogg), dict(Counter(OGG[o[0]] for o in ogg)), 'linee elettriche', len(power_lines), 'spostati fuori dalla carreggiata', n_off_road)
 
 # ---- real parking: the spaces mapped one by one (a rectangle each, split when it says capacity > 1) and the capacity of the car parks
 pspaces, plots = [], []  # [x, z, angle of the long side, length, width, kind 0 normal / 1 disabled / 2 charging]; [x, z, capacity]
