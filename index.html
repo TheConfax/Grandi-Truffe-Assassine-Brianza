@@ -4531,6 +4531,12 @@ function ngPropGeo(key) {
 
 // ---- where each front goes: the wall of the building the shop is in (or the nearest one) that looks onto a street; shops sharing a wall split it
 function ngRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !s.r.d && s.r.c <= 5 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
+// how far in front of a wall the first real street is (not a service road or a driveway), up to 26 m: a shop set back behind its front
+// garden opens onto the street, not onto the yard behind (Billy's in via Vespucci faced its back lane)
+function ngStreetAhead(mx, mz, nx, nz) {
+  for (let t = 2; t <= 26; t += 2) { const x = mx + nx * t, z = mz + nz * t; let f = false; ROADSEG.each(x - 10, z - 10, x + 10, z + 10, s => { if (!f && !s.r.d && s.r.c <= 3 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5) f = true; }); if (f) return t; }
+  return null;
+}
 function ngWall(x, z, only) {
   let host = only, best = null;
   if (!host) BLD.each(x, z, x, z, b => { if (!host && b.h >= 2.6 && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) host = b; });
@@ -4541,8 +4547,8 @@ function ngWall(x, z, only) {
       const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, d = segDist(x, z, a[0], a[1], c[0], c[1]);
       let nx = dz / L, nz = -dx / L; if (inPoly(mx + nx * 0.3, mz + nz * 0.3, b.pts)) { nx = -nx; nz = -nz; }
       if (inPoly(mx + nx * 0.3, mz + nz * 0.3, b.pts) || inBuilding(mx + nx * 0.7, mz + nz * 0.7)) continue; // a party wall
-      const road = ngRoad(mx + nx * 7, mz + nz * 7, 3);
-      let score = host ? d * 0.3 + (road ? 0 : 10) - Math.min(L, 20) * 0.15 : d + (road ? 0 : 6);
+      const road = ngRoad(mx + nx * 7, mz + nz * 7, 3), sa = ngStreetAhead(mx, mz, nx, nz);
+      let score = host ? d * 0.3 + (sa != null ? sa * 0.3 : road ? 6 : 12) - Math.min(L, 20) * 0.15 : d + (sa != null ? sa * 0.2 : road ? 4 : 8);
       if (b.big && L < 10) continue;
       if (b.big) { // a supermarket opens onto its car park: how much of the 20 m in front is parking counts first, then the street, then length
         let park = 0; for (let t = 2; t <= 20; t += 2) if (ngInPark(mx + nx * t, mz + nz * t, 0)) park++;
