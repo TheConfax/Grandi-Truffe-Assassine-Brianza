@@ -12,6 +12,15 @@ Regola per tutto: niente stili, scritte o dettagli inventati. Quello che non vie
    - [ ] Fabbriche e mobilifici, campi sportivi per sport, oratori, asili, edicole votive (sezione qui sotto)
    - [ ] Classi di edifici (villette, condomini, capannoni, cascine) solo con i dati OSM (`building:colour`, `roof:shape`, `building:levels`) o con foto
 
+## Motore nuovo (ramo `motore`, deciso il 23/10)
+Oggi terreno, strade, ponti, acqua e trincee sono strati separati, ognuno con la sua regola per l'altezza, e i glitch nascono dove non sono d'accordo. Il motore nuovo ne fa un modello unico, calcolato nella build: un terreno fine dove strade, trincee, argini e letto del Seveso sono già alla quota vera, con ponti, gallerie e muri di sostegno come oggetti sopra o dentro. Il gioco ha una sola funzione dell'altezza per grafica, auto e pedoni. Auto, pedoni, polizia, missioni, negozi e monumenti restano come sono.
+Ordine: prima il motore (in locale), poi la mappa allargata ai comuni interi, poi gli edifici fatti a mano.
+- [ ] Fase 0, decisioni di Carlo: confine della zona di gioco (confini dei comuni o linea lungo strade e ferrovie), margine visibile ma chiuso (500 m o 1 km), transenne alle uscite
+- [ ] Fase 1, dati per gli otto comuni interi più il margine: LiDAR 1 m, OSM, Overture, confini, DBGT dei comuni del margine, reticolo idrico e uso del suolo della Regione, numeri civici, cartelli (Mapillary, serve il token di Carlo). Per ogni fonte: cosa contiene davvero, licenza, data, dove non va d'accordo con le altre. Le regole su chi vince si scrivono una volta sola
+- [ ] Fase 2, la build del modello unico: terreno a 2 m vicino a strade, fiumi e paesi, più grosso lontano, a pezzi da 250 m; rapporto automatico dei controlli (punte, rotonde rialzate, incroci a raso, ponti senza niente sotto, trincee non confermate dal LiDAR) e screenshot da punti fissi prima/dopo
+- [ ] Fase 3, il gioco legge il formato nuovo, a zone caricate quando ti avvicini; misurare il telefono prima di fissare la risoluzione
+- [ ] Fase 4, una zona per volta partendo da Meda, finché controlli e screenshot sono puliti; poi entra in `main`
+
 ## Priorità: parcheggi veri da OSM
 Prima di tutto il resto: vedi la sezione **Parcheggi** in fondo. I dati sono già in `data/osm/maplarge.osm`, non serve aspettare Overpass.
 
