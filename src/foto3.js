@@ -20,3 +20,7 @@ const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
     _far.material.color.convertSRGBToLinear(); _near.material.color.convertSRGBToLinear(); // the mountains' shade is set as a plain number
   };
 }
+// ambient occlusion on the walls (AO_WALL in world3.js), after the patch that lights the windows
+for (const [k, m] of Object.entries({ old: MAT.old, mod: MAT.mod, plain: MAT.plain })) {
+  const before = m.onBeforeCompile; m.onBeforeCompile = s => { before.call(m, s); AO_WALL(s); }; m.customProgramCacheKey = () => 'ao-' + k; m.needsUpdate = true;
+}

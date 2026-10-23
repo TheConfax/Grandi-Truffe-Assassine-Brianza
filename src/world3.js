@@ -520,6 +520,41 @@ const TREE_G = (() => {
   crown.computeBoundingSphere();
   return { trunk: merge(parts), crown };
 })();
+// ambient occlusion (ramo fotorealismo). Walls darken near the ground, under the eaves of pitched roofs and into inside corners:
+// each wall vertex carries its height over the ground, its depth under the eaves and its distance from the corners at either
+// end (aoD), all linear along the wall, so the shader works the shade out per pixel. Most of it takes off the sky's light, a
+// little the sun's. And on the ground round the buildings a dark band fades out over 1.6 m (multiplied onto what is under it)
+const AO_WALL = s => { // chained after the lit windows' patch of extras.js, in foto3.js
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aoD;\nvarying vec4 vAoD;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvAoD = aoD;');
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec4 vAoD;').replace('#include <aomap_fragment>', `#include <aomap_fragment>
+  float aoW = mix(0.45, 1.0, smoothstep(0.0, 2.0, vAoD.x)) * mix(0.72, 1.0, smoothstep(0.0, 0.9, vAoD.y)) * mix(0.5, 1.0, smoothstep(0.0, 1.8, min(vAoD.z, vAoD.w)));
+  reflectedLight.indirectDiffuse *= aoW; reflectedLight.directDiffuse *= mix(1.0, aoW, 0.35);`);
+};
+const AO_GROUND_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n float fogF = smoothstep( fogNear, fogFar, fogDepth );\n gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 1.0 ), fogF );\n#endif'); }; // fades to nothing in the haze
+const AO_K = [[0, 0.2], [0.45, 0.5], [1.6, 1]]; // distance from the wall, shade (linear: multiplied on the screen, 0.2 darkens by half)
+function aoGround(b, ring, E, i, innerA) {
+  const nr = ring.length, a = ring[i], [dx, dz, L, nx, nz] = E[i]; if (L < 0.05) return;
+  const put = (x, z, k) => { const s = surfAt(x, z), y = (onSide(x, z) ? s : Math.min(s, terrDrawnH(x, z))) + 0.03; vtx(b, x, y, z, 0, 1, 0, 0, 0, _aoC.setScalar(k)); };
+  const n = Math.max(1, Math.ceil(L / 5)), w = AO_K.length;
+  for (let s = 0; s <= n; s++) { const f = s / n, x = a[0] + dx * f, z = a[1] + dz * f; for (const [d, k] of AO_K) put(x + nx * (d + 0.02), z + nz * (d + 0.02), k); }
+  const b0 = b.p.length / 3 - (n + 1) * w;
+  for (let s = 0; s < n; s++) for (let r = 0; r < w - 1; r++) { const q = b0 + s * w + r; triUp(b, q, q + w, q + w + 1); triUp(b, q, q + w + 1, q + 1); }
+  if (!innerA) { // outside corner: a fan round it from the wall before to this one
+    const p = E[(i - 1 + nr) % nr], a0 = Math.atan2(p[4], p[3]); let a1 = Math.atan2(nz, nx), da = a1 - a0; while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
+    if (Math.abs(da) > 0.05) { const m = Math.max(1, Math.ceil(Math.abs(da) / 0.5)), c0 = b.p.length / 3; put(a[0], a[1], AO_K[0][1]);
+      for (let s = 0; s <= m; s++) { const t = a0 + da * s / m; for (const [d, k] of AO_K.slice(1)) put(a[0] + Math.cos(t) * d, a[1] + Math.sin(t) * d, k); }
+      for (let s = 0; s < m; s++) { const q = c0 + 1 + s * 2; triUp(b, c0, q, q + 2); triUp(b, q, q + 2, q + 3); triUp(b, q, q + 3, q + 1); }
+    }
+  }
+}
+const _aoC = new THREE.Color();
+function terrDrawnH(x, z) { // the terrain patch as drawn: visH on its tile's grid, flat in between (the band must not float over a hump between nodes)
+  const T = TILES[tileOf(x, z)]; if (!T || !T.st) return visH(x, z);
+  const st = T.st, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2, i = Math.floor((x - x0) / st), j = Math.floor((z - z0) / st), fx = (x - x0) / st - i, fz = (z - z0) / st - j;
+  const X = x0 + i * st, Z = z0 + j * st, h00 = visH(X, Z), h11 = visH(X + st, Z + st);
+  return fx >= fz ? h00 + fx * (visH(X + st, Z) - h00) + fz * (h11 - visH(X + st, Z)) : h00 + fz * (visH(X, Z + st) - h00) + fx * (h11 - visH(X, Z + st));
+}
 const GREENS = ['#4f7a35', '#5d8a3b', '#6b8f3e', '#47703a', '#7f9a45', '#a08d3c'];
 function addBox(b, x, y, z, w, h, d, col, ry = 0) { // axis box rotated about y, into a buffer
   const c = Math.cos(ry), s = Math.sin(ry), P = (dx, dy, dz) => [x + dx * c + dz * s, y + dy, z - dx * s + dz * c];
@@ -563,7 +598,7 @@ function* buildTileGen(T) {
   // terrain patch
   {
     let cut = false; CUTG.each(x0, z0, x0 + TS, z0 + TS, () => { cut = true; });
-    const st = (d.rv || []).length || cut ? 2 : TER.step, nn = Math.round(TS / st), b = Buf(), w = nn + 1;
+    const st = (d.rv || []).length || cut ? 2 : TER.step, nn = Math.round(TS / st), b = Buf(), w = nn + 1; T.st = st;
     for (let j = 0; j <= nn; j++) for (let i = 0; i <= nn; i++) { const x = x0 + i * st, z = z0 + j * st; vtx(b, x, visH(x, z), z, 0, 1, 0, x / 10, z / 10); }
     for (let j = 0; j < nn; j++) for (let i = 0; i < nn; i++) { const k = j * w + i; triUp(b, k, k + 1, k + w + 1); triUp(b, k, k + w + 1, k + w); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(b.i); g.computeVertexNormals();
@@ -815,7 +850,7 @@ function* buildTileGen(T) {
   yield 'buildings';
   // buildings
   {
-    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf();
+    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf();
     let nb = 0;
     for (const B of T.bld) {
       if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower (paesaggio3.js)
@@ -837,19 +872,25 @@ function* buildTileGen(T) {
       else { kind = 'old'; wallCol = pc(PAL_OLD); }
       if (h < 4.2) kind = 'plain';
       const b = wb[kind], tile = kind === 'old' ? 3.4 : kind === 'mod' ? 4.2 : 4;
+      const pitched = !holes.length && outer.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(outer) || (t === 10 && outer.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && h >= 5;
+      if (!b.ao) b.ao = [];
       for (const [ring, isHole] of [[outer, false], ...holes.map(hh => [hh, true])]) {
-        const A = sArea(ring); let acc = 0;
-        for (let i = 0; i < ring.length; i++) {
-          const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue;
-          let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; }
+        const A = sArea(ring), nr = ring.length; let acc = 0;
+        const E = ring.map((a, i) => { const c = ring[(i + 1) % nr], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1e-6; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } return [dx, dz, L, nx, nz]; });
+        const inner = i => { const p = E[(i - 1 + nr) % nr], e = E[i]; return p[3] * e[0] + p[4] * e[1] > 0.05 * e[2]; }; // the wall before turns towards this one: an inside corner
+        for (let i = 0; i < nr; i++) {
+          const a = ring[i], c = ring[(i + 1) % nr], [dx, dz, L, nx, nz] = E[i]; if (L < 0.05) continue;
           const u0 = acc / tile, u1 = (acc + L) / tile; acc += L;
           const v1 = h / 3.1, v0 = (bot - gmax) / 3.1, base = b.p.length / 3;
           vtx(b, a[0], bot, a[1], nx, 0, nz, u0, v0, wallCol); vtx(b, c[0], bot, c[1], nx, 0, nz, u1, v0, wallCol);
           vtx(b, c[0], top, c[1], nx, 0, nz, u1, v1, wallCol); vtx(b, a[0], top, a[1], nx, 0, nz, u0, v1, wallCol);
+          // occlusion: height over the ground, depth under the eaves, distance from the inside corners at either end (linear along the wall, so exact per pixel)
+          const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), ht = pitched ? top - bot : 99, ia = inner(i) ? 0 : 99, ic = inner((i + 1) % nr) ? 0 : 99;
+          b.ao.push(bot - ga, ht, ia, ic + L, bot - gc, ht, ia + L, ic, top - gc, pitched ? 0 : 99, ia + L, ic, top - ga, pitched ? 0 : 99, ia, ic + L);
           if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
         }
+        for (let i = 0; i < nr; i++) aoGround(aoB, ring, E, i, inner(i));
       }
-      const pitched = !holes.length && outer.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(outer) || (t === 10 && outer.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && h >= 5;
       if (pitched) {
         const [cx, cz] = centroid(outer), rh = Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12), col = pc(ROOF_COTTO);
         for (let i = 0; i < outer.length; i++) {
@@ -862,7 +903,9 @@ function* buildTileGen(T) {
         }
       } else { try { polyFill(roofB, outer, holes, top, 10, pc(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT)); } catch (e) { } }
     }
-    put(wb.old, MAT.old, 10, 'cast'); put(wb.mod, MAT.mod, 10, 'cast'); put(wb.plain, MAT.plain, 10, 'cast'); put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
+    for (const k of ['old', 'mod', 'plain']) if (wb[k].i.length) mkMesh(wb[k], MAT[k], 10, 'cast', G).geometry.setAttribute('aoD', new THREE.Float32BufferAttribute(wb[k].ao, 4));
+    if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
+    put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
