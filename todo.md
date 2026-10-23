@@ -26,8 +26,9 @@ Prova di grafica realistica su un ramo a parte; `main` resta com'era.
 Fatto (primo giro, piaciuto a Carlo):
 - [x] Texture fotografiche per asfalto, prato, terreno, marciapiedi e porfido (`tex/*.jpg`, Poly Haven CC0, ricolorate sul colore medio delle texture disegnate di prima), applicate da `src/foto3.js`
 - [x] Luce in spazio lineare con curva filmica ACES (`src/foto3_colori.js` converte i colori esadecimali; `src/foto3.js` alza la luce nelle ombre e ingrigisce la foschia di giorno). Controllato anche di notte
+- [x] Alberi veri (secondo giro): chioma di 14 ciuffi di foglie (due carte incrociate ciascuno) intorno a un nucleo pieno, tronco con tre rami che salgono dentro la chioma, corteccia (`TREE_G`, `TREE_LEAF` in `src/world3.js`). 76 triangoli a chioma invece di 20: nei parchi più fitti la scena passa da circa 370 000 a 600 000 triangoli, nelle strade alberate +20%. Le foglie sono disegnate al caricamento in un atlante 512×512 (niente file da scaricare), con le mipmap fatte a mano perché le chiome lontane non si sfaldino. Normali sferiche (la chioma si illumina come una palla), ombra finta dentro e sotto la chioma nei colori dei vertici, ombre con i buchi tra le foglie. I colori restano quelli di prima (`GREENS`), anche per i frutteti di `paesaggio3.js`
+  - [ ] Da tenere d'occhio sui telefoni: le carte con `alphaTest` costano in riempimento. Se pesa, nella qualità bassa: meno ciuffi o chiome lontane più semplici
 Prossimi giri, in ordine di effetto:
-- [ ] Alberi veri: chiome fatte di ciuffi di foglie invece degli icosaedri (`TREE_G` in `src/world3.js`)
 - [ ] Occlusione ambientale: angoli, grondaie, base dei muri
 - [ ] Cielo vero con il sole (`Sky.js` di three r128 da jsdelivr) e foschia che ne prende il colore
 - [ ] Facciate: intonaco con grana vera, davanzali, finestre che riflettono il cielo

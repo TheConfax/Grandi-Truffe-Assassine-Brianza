@@ -402,6 +402,57 @@ const fenceTex = canvasTex(128, 64, (g, w, h) => {
   g.fillStyle = '#3e4a42'; g.fillRect(0, 0, w, 5);
 });
 const concreteTex = canvasTex(128, 64, (g, w, h) => { g.fillStyle = '#b3aea4'; g.fillRect(0, 0, w, h); noise(g, w, h, 1400, 0.3, ['#8f8a80', '#cbc6bb', '#9d988d']); g.fillStyle = 'rgba(60,55,50,.35)'; g.fillRect(0, 0, 2, h); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(0, 0, w, 4); });
+// leaves: an atlas drawn once, three tufts and a dense patch for the crown's core, in light greys the instance colour tints.
+// Colour and cut-out are drawn apart and joined with straight alpha (canvas alpha would blacken the edges), and every mip level
+// keeps the share of leaf of the full-size image, so far crowns stay full instead of melting away
+const TREE_LEAF = (() => {
+  const S = 512, C = S / 2; let seed = 7; const r = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; return c.getContext('2d'); };
+  const col = mk(), msk = mk(); col.fillStyle = 'rgb(128,134,120)'; col.fillRect(0, 0, S, S); msk.fillStyle = '#000'; msk.fillRect(0, 0, S, S);
+  const leaf = (x, y, a, L, lum, tint) => {
+    const W = L * (0.32 + r() * 0.12), path = g => { g.save(); g.translate(x, y); g.rotate(a); g.beginPath(); g.moveTo(-L / 2, 0); g.quadraticCurveTo(0, -W, L / 2, 0); g.quadraticCurveTo(0, W, -L / 2, 0); g.restore(); };
+    const c = [lum * tint[0], lum * tint[1], lum * tint[2]].map(v => Math.min(255, v | 0));
+    path(col); col.fillStyle = `rgb(${c})`; col.fill(); path(msk); msk.fillStyle = '#fff'; msk.fill();
+    col.save(); col.translate(x, y); col.rotate(a); col.beginPath(); col.moveTo(-L / 2, 0); col.quadraticCurveTo(0, W, L / 2, 0); col.closePath(); col.fillStyle = 'rgba(0,0,0,0.16)'; col.fill(); col.restore(); // the half in the shade of the vein
+  };
+  const TINTS = [[1, 1, 1], [1, 1, 1], [1.04, 1.02, 0.84], [0.92, 1, 0.97]];
+  for (let cell = 0; cell < 4; cell++) {
+    const ox = (cell % 2) * C, oy = (cell >> 1) * C, cx = ox + C / 2, cy = oy + C / 2;
+    if (cell === 3) { // the core: leaves all over, darker inside
+      msk.fillStyle = '#fff'; msk.fillRect(ox, oy, C, C); col.fillStyle = 'rgb(96,100,90)'; col.fillRect(ox, oy, C, C);
+      for (let i = 0; i < 2000; i++) leaf(ox + r() * C, oy + r() * C, r() * TAU, 8 + r() * 6, 120 + 110 * (i / 2000) + r() * 25, TINTS[i % 4]);
+      continue;
+    }
+    col.strokeStyle = 'rgb(70,64,56)'; col.lineWidth = 1.6; const R = C * 0.43, twigs = [];
+    for (let k = 0; k < 5; k++) { const a = k / 5 * TAU + r() * 0.8, l = R * (0.55 + r() * 0.3); twigs.push([a, l]); col.beginPath(); col.moveTo(cx, cy); col.lineTo(cx + Math.cos(a) * l, cy + Math.sin(a) * l); col.stroke(); }
+    const n = 1500;
+    for (let i = 0; i < n; i++) {
+      let x, y, d;
+      if (i % 3 === 0) { const [a, l] = twigs[i % 5], t = r(); x = cx + Math.cos(a) * l * t + (r() - 0.5) * 14; y = cy + Math.sin(a) * l * t + (r() - 0.5) * 14; d = Math.hypot(x - cx, y - cy) / R; } // along a twig
+      else { do { x = cx + (r() * 2 - 1) * R; y = cy + (r() * 2 - 1) * R; d = Math.hypot(x - cx, y - cy) / R; } while (d > 1 || r() < d * d * d); }
+      if (d > 0.97) continue;
+      const a = Math.atan2(y - cy, x - cx) + (r() - 0.5) * 1.6; // leaves point outward, more or less
+      leaf(x, y, a, 9 + r() * 6, 125 + 115 * (i / n) + r() * 20, TINTS[(i * 7 + cell) % 4]); // drawn back to front: the last ones are the lit ones
+    }
+  }
+  const cd = col.getImageData(0, 0, S, S).data, md = msk.getImageData(0, 0, S, S).data, d0 = new Uint8Array(S * S * 4);
+  for (let i = 0; i < S * S; i++) { d0[i * 4] = cd[i * 4]; d0[i * 4 + 1] = cd[i * 4 + 1]; d0[i * 4 + 2] = cd[i * 4 + 2]; d0[i * 4 + 3] = md[i * 4]; }
+  const cover = (d, k = 1) => { let c = 0; for (let i = 3; i < d.length; i += 4) if (d[i] * k >= 128) c++; return c / (d.length / 4); };
+  const c0 = cover(d0), mips = [{ data: d0, width: S, height: S }];
+  for (let w = S / 2; w >= 1; w /= 2) {
+    const p = mips[mips.length - 1].data, W2 = w * 2, d = new Uint8Array(w * w * 4);
+    for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) for (let ch = 0; ch < 4; ch++) {
+      const i = ((y * 2) * W2 + x * 2) * 4 + ch; d[(y * w + x) * 4 + ch] = (p[i] + p[i + 4] + p[i + W2 * 4] + p[i + W2 * 4 + 4] + 2) >> 2;
+    }
+    let lo = 1, hi = 4; for (let it = 0; it < 12; it++) { const m = (lo + hi) / 2; if (cover(d, m) < c0) lo = m; else hi = m; } // the scale that keeps the coverage
+    for (let i = 3; i < d.length; i += 4) d[i] = Math.min(255, d[i] * hi);
+    mips.push({ data: d, width: w, height: w });
+  }
+  const t = new THREE.DataTexture(d0, S, S, THREE.RGBAFormat); t.mipmaps = mips; t.generateMipmaps = false;
+  t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.encoding = THREE.sRGBEncoding; t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); t.needsUpdate = true;
+  return t;
+})();
+const barkTex = canvasTex(64, 128, (g, w, h) => { g.fillStyle = '#e0dad0'; g.fillRect(0, 0, w, h); for (let i = 0; i < 260; i++) { const v = 170 + rnd() * 85 | 0; g.fillStyle = `rgb(${v},${v - 6},${v - 14})`; g.fillRect(rnd() * w, rnd() * h, 1, 6 + rnd() * 22); } });
 const MAT = {
   terrain: new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false }), depth: new THREE.MeshBasicMaterial({ colorWrite: false }),
   grass: flatMat({ map: grassTex, vertexColors: true }), paved: flatMat({ vertexColors: true, map: asphaltTex }), piazza: flatMat({ map: porfidoTex }), water: flatMat({ color: 0x45738c }), bank: flatMat({ color: 0x6d7d55 }),
@@ -413,7 +464,7 @@ const MAT = {
   deck: new THREE.MeshLambertMaterial({ map: asphaltTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), deckSide: new THREE.MeshLambertMaterial({ map: concreteTex, side: THREE.DoubleSide }),
   embank: new THREE.MeshLambertMaterial({ map: grassTex, side: THREE.DoubleSide }), rail: new THREE.MeshLambertMaterial({ color: 0xb9bec4, side: THREE.DoubleSide }), deckMark: new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
   railing: new THREE.MeshLambertMaterial({ map: fenceTex, alphaTest: 0.35, side: THREE.DoubleSide, color: 0x2a2d30 }), hedge: new THREE.MeshLambertMaterial({ map: grassTex, color: 0x4f7a3a }), median: new THREE.MeshLambertMaterial({ map: concreteTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
-  trunk: new THREE.MeshLambertMaterial({ color: 0x5a4636 }), crown: new THREE.MeshLambertMaterial({ color: 0xffffff }), lamp: lam(0x4a4d52), lampHead: lam(0xf4f1e6, { emissive: 0x6a6040, emissiveIntensity: 0.4 }),
+  trunk: new THREE.MeshLambertMaterial({ color: 0x5a4636, map: barkTex }), crown: new THREE.MeshLambertMaterial({ map: TREE_LEAF, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true }), lamp: lam(0x4a4d52), lampHead: lam(0xf4f1e6, { emissive: 0x6a6040, emissiveIntensity: 0.4 }),
 };
 // the kinds of divider the DBGT adds (build_data.py): plastered low walls, railings with vertical bars, green wire mesh, railway panels, wood
 const barsTex = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#26292c'; for (let x = 4; x < w; x += 10) g.fillRect(x, 0, 3, h); g.fillRect(0, 0, w, 5); g.fillRect(0, h - 6, w, 6); });
@@ -422,7 +473,53 @@ Object.assign(MAT, {
   bars: new THREE.MeshLambertMaterial({ map: barsTex, alphaTest: 0.4, side: THREE.DoubleSide }), mesh: new THREE.MeshLambertMaterial({ map: fenceTex, alphaTest: 0.35, side: THREE.DoubleSide, color: 0x6fa86f }),
   railPanel: new THREE.MeshLambertMaterial({ map: fenceTex, alphaTest: 0.35, side: THREE.DoubleSide, color: 0xb8bcc0 }), wood: new THREE.MeshLambertMaterial({ color: 0x8a6a4a }),
 });
-const TREE_G = (() => { const t = new THREE.CylinderGeometry(0.17, 0.26, 2.8, 6); t.translate(0, 1.4, 0); return { trunk: t, crown: new THREE.IcosahedronGeometry(2.1, 0) }; })();
+// a tree: trunk and three branches up into the crown; the crown is 14 tufts of leaves (two crossed cards each) on a shell round a
+// solid leafy core, 76 triangles in all. The normals point out from the crown's middle, so it lights up as one round mass, on both
+// faces of a card alike (the back face of a card would otherwise light as if facing inwards). The shadows keep the holes of the leaves
+MAT.crown.color.setScalar(1.8); // the leaves (a light grey in linear light) and the shade inside would darken the palette's greens to a third
+MAT.crown.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('( gl_FrontFacing ) ? vLightFront : vLightBack', 'vLightFront').replace('( gl_FrontFacing ) ? vIndirectFront : vIndirectBack', 'vIndirectFront'); };
+const TREE_DEPTH = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: TREE_LEAF, alphaTest: 0.5, side: THREE.DoubleSide });
+const TREE_G = (() => {
+  const merge = gs => { // non-indexed geometries with position, normal, uv into one
+    const out = {}; for (const k of ['position', 'normal', 'uv']) out[k] = []; for (const g of gs) { const n = g.index ? g.toNonIndexed() : g; for (const k in out) out[k].push(...n.attributes[k].array); }
+    const m = new THREE.BufferGeometry(); m.setAttribute('position', new THREE.Float32BufferAttribute(out.position, 3)); m.setAttribute('normal', new THREE.Float32BufferAttribute(out.normal, 3)); m.setAttribute('uv', new THREE.Float32BufferAttribute(out.uv, 2)); return m;
+  };
+  const trunk = new THREE.CylinderGeometry(0.13, 0.25, 4.4, 7, 1, true); trunk.translate(0, 2.2, 0);
+  const parts = [trunk];
+  for (let k = 0; k < 3; k++) { // branches from 2.6 m out to 1.2 m from the axis, a little under the crown's middle
+    const a = k * TAU / 3 + 0.4, b = new THREE.CylinderGeometry(0.05, 0.09, 2.1, 4, 1, true); b.translate(0, 1.05, 0); b.rotateZ(-0.62); b.rotateY(a); b.translate(0, 2.6, 0); parts.push(b);
+  }
+  let seed = 11; const r = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const RX = 2.25, RY = 2.05, p = [], n = [], uv = [], co = [];
+  const nrm = (x, y, z) => { // a touch upwards: the sky lights the crown more than the ground. And the inside and the underside in the shade of the leaves (vertex colour)
+    const a = x / RX, b = y / RY, c = z / RX, q = Math.hypot(a, b, c), l = Math.hypot(a, b + 0.12, c) || 1, k = Math.min(1, 0.4 + 0.6 * q) * (0.74 + 0.13 * (b + 1)); co.push(k, k, k);
+    return [a / l, (b + 0.12) / l, c / l];
+  };
+  const cellUV = (cell, s, t) => [(cell % 2) * 0.5 + 0.006 + 0.488 * s, (cell >> 1) * 0.5 + 0.006 + 0.488 * t];
+  const quad = (c, A, B, cell) => { // centre, half sides: two triangles, normals from the crown's middle
+    const v = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => [c[0] + A[0] * s + B[0] * t, c[1] + A[1] * s + B[1] * t, c[2] + A[2] * s + B[2] * t, (s + 1) / 2, (t + 1) / 2]);
+    for (const i of [0, 1, 2, 0, 2, 3]) { const [x, y, z, s, t] = v[i]; p.push(x, y, z); n.push(...nrm(x, y, z)); uv.push(...cellUV(cell, s, t)); }
+  };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], unit = a => { const l = Math.hypot(...a) || 1; return a.map(v => v / l); }, mul = (a, k) => a.map(v => v * k);
+  const NT = 14;
+  for (let i = 0; i < NT; i++) {
+    const y = 0.92 - 1.6 * (i + 0.5) / NT, rr = Math.sqrt(1 - y * y), ph = i * 2.39996 + r() * 0.5; // a Fibonacci shell, the bottom left open
+    const d = unit([Math.cos(ph) * rr, y, Math.sin(ph) * rr]), f = 0.6 + r() * 0.18, c = [d[0] * RX * f, d[1] * RY * f, d[2] * RX * f];
+    const e1 = unit(cross(d, Math.abs(d[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), e2 = cross(d, e1), w = r() * TAU, h = 0.9 + r() * 0.3;
+    const u = unit([e1[0] * Math.cos(w) + e2[0] * Math.sin(w), e1[1] * Math.cos(w) + e2[1] * Math.sin(w), e1[2] * Math.cos(w) + e2[2] * Math.sin(w)]), v = cross(d, u);
+    quad(c, mul(u, h), mul(v, h), i % 3); // facing out
+    quad(c, mul(d, h * 0.85), mul(v, h), (i + 1) % 3); // across, sticking out of the outline
+  }
+  const core = new THREE.IcosahedronGeometry(1, 0).attributes.position.array;
+  for (let i = 0; i < core.length; i += 9) { // each face takes the leaves projected along its own main axis: no streaks on the sides
+    const f = [0, 3, 6].map(j => [core[i + j], core[i + j + 1], core[i + j + 2]]), fn = cross(f[1].map((v, k) => v - f[0][k]), f[2].map((v, k) => v - f[0][k])).map(Math.abs);
+    const [ua, va] = fn[1] >= fn[0] && fn[1] >= fn[2] ? [0, 2] : fn[0] >= fn[2] ? [2, 1] : [0, 1];
+    for (const q of f) { const x = q[0] * RX * 0.66, y = q[1] * RY * 0.64, z = q[2] * RX * 0.66; p.push(x, y, z); n.push(...nrm(x, y, z)); uv.push(...cellUV(3, q[ua] * 0.5 + 0.5, q[va] * 0.5 + 0.5)); }
+  }
+  const crown = new THREE.BufferGeometry(); crown.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); crown.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); crown.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); crown.setAttribute('color', new THREE.Float32BufferAttribute(co, 3));
+  crown.computeBoundingSphere();
+  return { trunk: merge(parts), crown };
+})();
 const GREENS = ['#4f7a35', '#5d8a3b', '#6b8f3e', '#47703a', '#7f9a45', '#a08d3c'];
 function addBox(b, x, y, z, w, h, d, col, ry = 0) { // axis box rotated about y, into a buffer
   const c = Math.cos(ry), s = Math.sin(ry), P = (dx, dy, dz) => [x + dx * c + dz * s, y + dy, z - dx * s + dz * c];
@@ -780,10 +877,10 @@ function* buildTileGen(T) {
     T.tr.forEach(([x, z], i) => {
       const k = 0.75 + tRnd() * 0.6, gy = groundH(x, z);
       q.identity(); m.compose(p.set(x, gy, z), q, s.set(k, k, k)); trunks.setMatrixAt(i, m);
-      q.setFromEuler(e.set(tRnd(), tRnd() * 3, 0)); m.compose(p.set(x, gy + 3.4 * k + 1.2, z), q, s.set(k * (0.9 + tRnd() * 0.3), k * (1 + tRnd() * 0.4), k)); crowns.setMatrixAt(i, m);
+      q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + 3.4 * k + 1.2, z), q, s.set(k * (0.9 + tRnd() * 0.3), k * (1 + tRnd() * 0.4), k)); crowns.setMatrixAt(i, m);
       crowns.setColorAt(i, COL(GREENS[Math.floor(tRnd() * GREENS.length)]));
     });
-    trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; G.add(trunks, crowns);
+    trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns);
   }
   const LPS = (d.lp || []).map(([X, Z]) => [X / 10, Z / 10, 0]); LPS.push(...genLamps(T, d, LPS)); // [x, z, arm direction]
   if (LPS.length) { // one instance per lamp, so each can be knocked down on its own: pole and arm, head; the light pool and the glare go with it

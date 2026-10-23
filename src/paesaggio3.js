@@ -318,7 +318,8 @@ function* buildPaesaggio(T, G) {
   }
   inst(TREE_G.trunk, MAT.trunk, trees, () => 0.55);
   const crowns = inst(TREE_G.crown, MAT.crown, trees); // small fruit trees: the crown low on a short trunk
-  if (crowns) trees.forEach(([x, z], i) => { o3.position.set(x, groundH(x, z) + 3.4 * 0.55 + 0.6, z); o3.rotation.set(0, 0, 0); o3.scale.set(0.6, 0.6, 0.6); o3.updateMatrix(); crowns.setMatrixAt(i, o3.matrix); crowns.setColorAt(i, COL(GREENS[Math.floor(LS_HASH(x, z, 'f') * 3)])); });
+  if (crowns) crowns.customDepthMaterial = TREE_DEPTH;
+  if (crowns) trees.forEach(([x, z], i) => { o3.position.set(x, groundH(x, z) + 3.4 * 0.55 + 0.6, z); o3.rotation.set(0, LS_HASH(x, z, 'r') * TAU, 0); o3.scale.set(0.6, 0.6, 0.6); o3.updateMatrix(); crowns.setMatrixAt(i, o3.matrix); crowns.setColorAt(i, COL(GREENS[Math.floor(LS_HASH(x, z, 'f') * 3)])); });
   inst(LS_POT_G, lam(0x4f7a35), pots, (x, z) => 0.7 + LS_HASH(x, z, 'p') * 0.6);
   if (!T.lsDone) {
     for (const [x, z, r, hh] of solids) { const gy = groundH(x, z); WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: gy - 3, y1: gy + hh }); }
