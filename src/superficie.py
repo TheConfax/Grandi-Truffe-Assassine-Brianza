@@ -219,7 +219,8 @@ def osm_ostacoli(path, lonlat, cache=None):
     if cache and os.path.exists(cache) and os.path.getmtime(cache) > os.path.getmtime(path):
         return [shapely.from_wkb(b) for b in pickle.load(open(cache, 'rb'))]
     W, S_, E, N = lonlat; nodes, out = {}, []
-    skip_hw = {'path', 'track', 'bridleway', 'proposed', 'construction', 'abandoned', 'razed', 'platform'}
+    # the game draws paths and tracks too (build_data.py FOOT): a tile with one is fine like any other road tile
+    skip_hw = {'proposed', 'construction', 'abandoned', 'razed', 'platform'}
     for ev, el in ET.iterparse(path):
         if el.tag == 'node':
             lat, lon = float(el.get('lat')), float(el.get('lon'))
@@ -491,7 +492,13 @@ class Superficie:
             dc = ndimage.distance_transform_edt(~s.CAP, sampling=SF); wt = np.clip(dc / RAMP, 0, 1); s.NEARCAP = dc < RAMP
             k = RT & ~s.AIR; s.ZF[k] = s.L[k] + s.DZ[k] * wt[k]
         s.RANK[s.AIR] = 0; s.BR |= s.AIR
-        s.log('tetto: nodi oltre %.1f m %d, al LiDAR %d, parti di impalcato %d' % (DZ_WARN, int(s.WARN.sum()), int(s.CAP.sum()), int(s.AIR.sum())))
+        # river bed more than DZ_CAP under the LiDAR (and not under a bridge): a covered stretch (the street over the Seveso in the centre,
+        # x 260 z -525, is flat in the DTM 3.5 m over the DBGT bed) or the walls of the ravine in the north. The LiDAR is kept there, else
+        # the burn opens a trench nobody covers
+        AL = np.isin(s.CLS, (C_ALV, C_ARG)) & FIX & ~s.BR; da = np.where(AL, s.L - np.nan_to_num(s.ZF), 0)
+        s.ALVCOP = ndimage.binary_propagation(AL & (da > DZ_CAP), structure=st8, mask=AL & (da > DZ_WARN))
+        s.RANK[s.ALVCOP] = 0
+        s.log('tetto: nodi oltre %.1f m %d, al LiDAR %d, parti di impalcato %d, alveo coperto o sponda al LiDAR %d' % (DZ_WARN, int(s.WARN.sum()), int(s.CAP.sum()), int(s.AIR.sum()), int(s.ALVCOP.sum())))
 
     # ----- 5. ritocchi (src/ritocchi.json): the highest priority, only for proven errors
     def ritocchi(s):
@@ -503,11 +510,15 @@ class Superficie:
 
     def L_at(s, x, z): return tri_interp(s.L, s.R, x, z)
 
-    # ----- 6. slopes: S = clamp(L, lo, hi) with lo/hi the 1/K envelopes of the fixed nodes within BAND (one formula, no seams)
+    # ----- 6. slopes: S = L + clamp(0, lo, hi) with lo/hi the 1/K envelopes of (Z - L) of the fixed nodes within BAND (one formula, no
+    # seams). The envelope is on the offset from the LiDAR, not on the height: on natural slopes steeper than 1/K (the Seveso ravine, the
+    # bank under a road on a hillside) the absolute clamp built a 2:3 fill or cut that never met the LiDAR and left a cliff of up to 7 m at
+    # the edge of the band. On flat ground the two are the same.
     def raccordi(s):
         t0 = time.time(); FIX = s.RANK > 0; nz, nx = FIX.shape
         hi = np.full(FIX.shape, np.inf, np.float32); lo = np.full(FIX.shape, -np.inf, np.float32)
-        sh = np.where(FIX, s.ZF, np.inf).astype(np.float32); sl = np.where(FIX, s.ZF, -np.inf).astype(np.float32)
+        dz = s.ZF - s.L
+        sh = np.where(FIX, dz, np.inf).astype(np.float32); sl = np.where(FIX, dz, -np.inf).astype(np.float32)
         n = int(BAND / SF)
         for dr in range(-n, n + 1):
             for dc in range(-n, n + 1):
@@ -520,7 +531,7 @@ class Superficie:
         BARR = s.BR & ~FIX
         S = s.L.copy(); band = ~FIX & ~BARR & np.isfinite(hi)
         lo_, hi_ = np.minimum(lo, hi), np.maximum(lo, hi)
-        S[band] = np.clip(s.L[band], lo_[band], hi_[band]); S[FIX] = s.ZF[FIX]
+        S[band] = s.L[band] + np.clip(0.0, lo_[band], hi_[band]); S[FIX] = s.ZF[FIX]
         s.S = S; s.FIX = FIX
         d = ndimage.distance_transform_edt(~FIX, sampling=SF); s.DFIX = d
         s.bordo_banda = int((band & (d > BAND - 2.5) & (np.abs(S - s.L) > 0.05)).sum())
@@ -589,7 +600,7 @@ def costruisci(comune='Meda', margine=250.0, blend=BLEND, osm=True, cache_dir=No
     ob = None
     if osm:
         lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
-        ob = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(cache_dir, 'cache_osm.pkl') if cache_dir else None)
+        ob = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(cache_dir, 'cache_osm_v2.pkl') if cache_dir else None)
     s.tessere(ob); _S[comune] = s; return s
 
 
@@ -742,6 +753,18 @@ def controlli(s, out_dir):
                      triangoli_carreggiata=pct(tri, (50, 90, 99)), triangoli_sopra_18=int((tri > 0.18).sum()), celle_carreggiata=int(cell.sum()),
                      soglia='< 18 %% lungo gli assi; ok se ogni asse sopra il 18 %% lo e gia nel DBGT', elenco=sopra[:100], triangoli_ripidi=ripidi[:60])
     rep['C6']['ok'] = len(nuove) == 0
+    # steps S has and the LiDAR has not: adjacent nodes whose difference grows by more than 1.5 m (steeper than the 2:3 slope) (decks, culverts and their edges excluded)
+    ex = (s.BR | s.AIR | s.TOMB)
+    ex = ndimage.binary_dilation(ex, np.ones((3, 3), bool))
+    gr = []
+    for ax in (0, 1):
+        dS, dL = np.abs(np.diff(G, axis=ax)), np.abs(np.diff(s.L, axis=ax))
+        a_ = [slice(None)] * 2; b_ = [slice(None)] * 2; a_[ax] = slice(0, -1); b_[ax] = slice(1, None)
+        m = (dS - dL > 1.5) & IN[tuple(a_)] & IN[tuple(b_)] & ~ex[tuple(a_)] & ~ex[tuple(b_)]
+        cl = s.CLS[tuple(a_)]; clb = s.CLS[tuple(b_)]
+        gr.append((m, np.isin(cl, (C_ALV, C_ARG)) | np.isin(clb, (C_ALV, C_ARG))))
+    ng = sum(int(m.sum()) for m, _ in gr); nga = sum(int((m & a).sum()) for m, a in gr)
+    rep['C6']['gradini_non_nel_lidar'] = dict(definizione='coppie di nodi vicini con |dS| - |dL| > 1.5 m (oltre la scarpata 2:3 su 2 m), fuori da ponti, impalcati e tombini', coppie=ng, di_cui_sponde_alveo=nga)
     punti += [dict(c='C6', x=c['x'], z=c['z'], v=c['pendenza'], link=c['link']) for c in (nuove or sopra)[:10]]
     # C10: water level along the river axes inside the bed
     rep['C10'], acqua, pw = acqua_fiume(s, H, IN)
@@ -860,7 +883,7 @@ def main(argv=None):
     s.base(); s.dbgt(); s.strade(); s.tetto(); s.ritocchi(); s.raccordi()
     t0 = time.time()
     lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
-    osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm.pkl'))
+    osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_v2.pkl'))
     s.t['osm'] = round(time.time() - t0, 1); log('osm: %d oggetti per decidere il passo' % len(osm))
     s.tessere(osm)
     tdir = os.path.join(a.out, 'terreno'); t0 = time.time(); peso = s.scrivi(tdir); s.t['scrittura'] = round(time.time() - t0, 1)
@@ -877,7 +900,7 @@ def main(argv=None):
                               vicino_ponte_m=NEAR_BR, raccordo_tetto_m=RAMP, buffer_passo_fine_m=FINE_BUF, infittimento_m=DENS, aggancio_cordolo_m=KERB_TOL, acqua_sopra_fondo_m=ZW_UP, quanto_10m=Q5),
                dbgt=dict(offset_m=s.info['offset']['valore'], assi_lisciati_quanto_si_muovono=pct(np.abs(s.AX.dz_liscio)), carreggiate=s.nst, bordi_agganciati=s.nkerb, bordi_non_agganciati_oltre_1m=s.kerb_lontani, scarto_aggancio=pct(np.abs(s.kerb_dz)), aree_interne_al_lidar=len(s.interne), alvei_bruciati=s.nalveo, ferrovia_fuori_sedi_punti=s.ferro_fuori),
                lidar=dict(buchi=s.nbuchi, nota='nessun buco nel riquadro: TINITALY non serve qui'),
-               superficie=dict(nodi_fissi=int(s.FIX.sum()), sotto_ponti=int(s.BR.sum()), nodi_impalcato_da_fase3=int(s.AIR.sum()), nodi_tetto=int(s.CAP.sum()), nodi_tombino_tenuti=int(s.TOMB.sum()), nodi_scarpata=int(s.SCARP.sum()),
+               superficie=dict(nodi_fissi=int(s.FIX.sum()), sotto_ponti=int(s.BR.sum()), nodi_impalcato_da_fase3=int(s.AIR.sum()), nodi_tetto=int(s.CAP.sum()), nodi_tombino_tenuti=int(s.TOMB.sum()), nodi_alveo_al_lidar=int(s.ALVCOP.sum()), nodi_scarpata=int(s.SCARP.sum()),
                                bordo_fascia_ancora_mosso=s.bordo_banda, carreggiata_meno_lidar=pct(dz, (10, 50, 90)), ritocchi=s.nrit),
                C9_peso=peso, **rep, punti_da_guardare=punti, tempi_s=dict(s.t, totale=tot))
     ok = all(rep[c].get('ok', True) for c in ('C4', 'C5', 'C6', 'C7', 'C10'))
