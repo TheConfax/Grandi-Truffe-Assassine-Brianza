@@ -2,7 +2,8 @@
 #   build_decks(): bridges from PONTE_PONTE_SEDE (top from the axes and areas with SED=02 on them), the parts of their approaches the DTM
 #     does not have (superficie.py AIR: road more than 3 m over the LiDAR near a bridge), the bridges the DBGT does not flag (superficie.py
 #     PNS: the Milano-Meda over the Taro) and the cover of the gallery (GALLER). Where a deck reaches ground at its own height (spalla) it is
-#     extended to that lattice line and its top is pulled onto S there: the terrain is never moved.
+#     extended to that lattice line and its top is pulled onto S there: the terrain is never moved. A PONTE end that reaches no ground
+#     where OSM says the bridge goes on is carried on to the first ground at its level (EXT_MAX).
 #   build_pits(): the underpass stairwells (landmarks3.js STAIRWELLS, the only source of their depth) as {imp, fondo, gradini}.
 # Writes decks_meda.json and report_fase3.json (C5 on the spalle, C11). No change to brianza.json or to the game.
 #   python src/impalcati.py [--out DIR] [--comune Meda] [--no-png] [--accetta]
@@ -25,6 +26,7 @@ LEVEL_TOL = 0.5   # ground within this of the deck top is where the deck lands (
                   # 1 m also took bank and embankment nodes and copied their slope into road decks (172 triangles over 18 % against 75)
 LEVEL_PED = 1.0   # ... a footbridge lands on a bank up to 1 m lower (a few steps: H.surface climbs 0.8 m)
 REACH = 2.5       # spalla cells reach landing ground this far from the PONTE outline (a dip between them is bridged)
+EXT_MAX = 12.0    # an end with no ground at its level within REACH, where an OSM bridge goes on, is carried on to ground this far at most
 def tol(tipo, ped=False): return LEVEL_PED if (tipo == 'pedonale' or ped) else LEVEL_TOL
 RC = 10.0         # the pull of the deck top onto the ground at its spalle fades over about this distance
 NEAR_V = 2.9      # lattice nodes this close to the footprint carry the deck values
@@ -197,9 +199,12 @@ class Campo:
         ref = Sw.copy(); bycore = np.zeros(X.shape, bool)
         if AIRw.any():
             idx = ndimage.distance_transform_edt(~AIRw, return_distances=False, return_indices=True); ref = ZFw[idx[0], idx[1]]
+        ext = np.zeros(X.shape, bool)   # corners of the cells that carry the deck past a short PONTE end (Impalcati.celle_spalla)
+        for r, c in (core or {}).get('ext', ()):
+            ext[max(0, r - r0):max(0, r + 2 - r0), max(0, c - c0):max(0, c + 2 - c0)] = True
         if core is not None:
             Tw = core['top'](X.ravel(), Z.ravel()).reshape(X.shape); bycore = shapely.distance(core['g'], shapely.points(X, Z)) < SF
-            ref = np.where(bycore | ~AIRw.any(), Tw, ref)
+            ref = np.where(bycore | ext | ~AIRw.any(), Tw, ref)
         land = imp.LAND[r0:r1, c0:c1] & (np.abs(Sw - ref) < tol(tipo, core is not None and core['ped'])) & near & ~AIRw
         s.valid = land | AIRw
         V = np.where(AIRw, ZFw, np.where(land, Sw, np.nan)); s.land = land
@@ -213,7 +218,11 @@ class Campo:
             idx = ndimage.distance_transform_edt(~s.valid, return_distances=False, return_indices=True); nv = V[idx[0], idx[1]]
         else: nv = Sw
         if core is not None:
-            nv = np.where(bycore, Tw + s.pull(X.ravel(), Z.ravel()).reshape(X.shape), nv)
+            tp = Tw + s.pull(X.ravel(), Z.ravel()).reshape(X.shape); nv = np.where(bycore, tp, nv)
+            fill = ext & ~s.valid & ~bycore
+            if fill.any() and land.any():   # the carried-on part: straight from the core end to the ground it reaches
+                dc = shapely.distance(core['g'], shapely.points(X[fill], Z[fill])); dl = ndimage.distance_transform_edt(~land, sampling=SF)[fill]
+                nv[fill] = (dl * tp[fill] + dc * nv[fill]) / np.maximum(dl + dc, 1e-9)
         s.V = np.where(s.valid, V, nv)
 
     def approda(s, rr, cc):  # global lattice nodes -> is it a node where this deck lands (V = S there)
@@ -309,7 +318,7 @@ class Impalcati:
                 if ud: u = direzione([((0, 0), tuple(v)) for v in ud]); dv = np.array([-u[1], u[0]])
             z0 = P['z0'][P['off'][i]:P['off'][i + 1]]
             ped = not (on & {'EL_STR', 'AC_VEI', 'AR_STR', 'EL_FER', 'SD_FER'})   # nothing for cars or trains on it in the DBGT
-            s.cores.append(dict(k=len(s.cores), pid=int(P['id'][i]), g=g, top=top, tipo=tipo, ped=ped, dir=dv if dv is not None else dir_rect(g),
+            s.cores.append(dict(k=len(s.cores), pid=int(P['id'][i]), g=g, top=top, tipo=tipo, ped=ped, dir=dv if dv is not None else dir_rect(g), ob=ob,
                                 assi=sorted({(a['nm'], a['id']) for _, _, a in lines}), aree=sorted({(a['nm'], a['id']) for a in ars}),
                                 z_dbgt=[round(float(np.nanmin(z0)), 2), round(float(np.nanmax(z0)), 2)]))
         return s.cores
@@ -349,17 +358,42 @@ class Impalcati:
     def cbox(s, rc): r, c = rc; x, z = s.R.x0 + c * SF, s.R.z0 + r * SF; return box(x, z, x + SF, z + SF)
 
     def celle_spalla(s, core):  # cells by the core ends (within REACH, inside its width) with a corner on ground at the deck level
-        w = s.R.win(core['g'].bounds, REACH + 2 * SF)
+        w = s.R.win(core['g'].bounds, EXT_MAX + 2 * SF)
         if w is None: return set()
         r0, r1, c0, c1 = w; X, Z = s.R.xz(w)
         lv = s.LAND[r0:r1, c0:c1] & (np.abs(s.SQ[r0:r1, c0:c1] - core['top'](X.ravel(), Z.ravel()).reshape(X.shape)) < tol(core['tipo'], core['ped']))
         n = lv[:-1, :-1].astype(int) + lv[:-1, 1:] + lv[1:, :-1] + lv[1:, 1:]
-        cb = shapely.box(X[:-1, :-1], Z[:-1, :-1], X[:-1, :-1] + SF, Z[:-1, :-1] + SF)
-        hit = (shapely.distance(cb, core['g']) <= REACH) & (n > 0)   # all four at level too: the deck edge then runs on lattice lines
+        cb = shapely.box(X[:-1, :-1], Z[:-1, :-1], X[:-1, :-1] + SF, Z[:-1, :-1] + SF); dcore = shapely.distance(cb, core['g'])
         # only lengthwise: a cell off the core's width would turn the bank by a footbridge into a platform with parapets round it
         nv = np.array([-core['dir'][1], core['dir'][0]]); v = np.asarray(core['g'].exterior.coords) @ nv
-        vc = (X[:-1, :-1] + SF / 2) * nv[0] + (Z[:-1, :-1] + SF / 2) * nv[1]; hit &= (vc >= v.min() - SF / 2) & (vc <= v.max() + SF / 2)
-        return {(r0 + r, c0 + c) for r, c in zip(*np.nonzero(hit))}
+        vc = (X[:-1, :-1] + SF / 2) * nv[0] + (Z[:-1, :-1] + SF / 2) * nv[1]; band = (vc >= v.min() - SF / 2) & (vc <= v.max() + SF / 2)
+        hit = (dcore <= REACH) & (n > 0) & band   # all four at level too: the deck edge then runs on lattice lines
+        # an end with no ground at its level within REACH and no approach of its own (AIR) beyond it, where an OSM bridge goes on past it:
+        # the DBGT PONTE is shorter than the bridge (PONTE 20, via Vignazzola: 33 m against 56 in OSM, the end 6 m over the trench). The
+        # deck is carried on inside its width to the first ground at its level, at most EXT_MAX and no farther than OSM goes
+        dv = np.asarray(core['dir'], float); u = np.asarray(core['g'].exterior.coords) @ dv; uc = (X[:-1, :-1] + SF / 2) * dv[0] + (Z[:-1, :-1] + SF / 2) * dv[1]
+        k = getattr(s, 'air_own', None); own = (s.air_own == core['k']) if k is not None else np.zeros(0, bool)
+        ua = (s.R.x0 + s.air_cc[own] * SF) * dv[0] + (s.R.z0 + s.air_rr[own] * SF) * dv[1] if own.any() else np.zeros(0)
+        ext = set()
+        for sg, end in ((-1, u.min()), (1, u.max())):
+            beyond = sg * (uc - end) > -SF / 2                                   # cells at or past this end
+            if (hit & beyond).any() or (sg * (ua - end) > 0).any(): continue
+            ov = [sg * (np.asarray(wv['p']) @ dv - end).max() for wv in core.get('ob', [])]
+            reach = min(EXT_MAX, max(ov, default=0.0) + SF)
+            if reach <= REACH: continue
+            cand = band & beyond & (n >= 2) & (dcore <= reach)   # a whole cell side on the ground: the lane lands on a lattice line
+            if not cand.any(): s.info.setdefault('estremi_sospesi', []).append(dict(ponte=core['pid'], lato=sg, osm_oltre_m=round(max(ov, default=0.0), 1))); continue
+            al = sg * (uc - end); fill = np.zeros(cand.shape, bool); land = np.zeros(cand.shape, bool)
+            lane = np.indices(cand.shape)[0 if abs(dv[0]) >= abs(dv[1]) else 1]   # the lattice rows (or columns) closest to the deck direction
+            for q in np.unique(lane[cand]):   # lane by lane (across the width): each runs on to its own first cell that reaches the ground
+                m = lane == q; dl = al[cand & m].min()
+                land |= cand & m & (al <= dl + SF / 2); fill |= band & beyond & m & (al < dl) & (dcore <= reach)
+            # lanes that find no ground at the deck level go on as far as the others (a lower bank at their end, not the drop at the PONTE end)
+            rest = band & beyond & ~np.isin(lane, np.unique(lane[cand])) & (al < al[land].max() - SF / 2) & (dcore <= reach); fill |= rest
+            ext |= {(r0 + r, c0 + c) for r, c in zip(*np.nonzero(fill))}; hit |= land
+            s.info.setdefault('estensioni', []).append(dict(ponte=core['pid'], lato=sg, metri=round(float(al[land].max() + SF / 2), 1), celle=int((fill | land).sum())))
+        core['ext'] = ext
+        return {(r0 + r, c0 + c) for r, c in zip(*np.nonzero(hit))} | ext
 
     def _clip(s, pts):  # the road-like polygons holding the points (the deck's own AIR nodes), with the fringe: not the street beside it
         _, js = s.roadt.query(pts, predicate='intersects'); js = np.unique(js)
@@ -532,7 +566,7 @@ def spalla_lati(imp, d, a, b, SB):
 
 def controlli(imp, decks, pits, osm, conf, bj, SB, nb):
     R = imp.R; rep = {}; punti = []; S_ = lambda x, z: tri_interp(SB, R, x, z); byid = {w['id']: w for w in osm}
-    c5, c5p, mosso, estremi = [], [], [], []
+    c5, c5p, mosso, estremi, sospesi = [], [], [], [], []
     for d in decks:
         P, T, Hv = d['P'], d['T'], d['Hv']; d['spalle'] = []
         if not len(T) or d['tipo'] == 'copertura': d['lati'] = dict(n=0); continue
@@ -554,11 +588,18 @@ def controlli(imp, decks, pits, osm, conf, bj, SB, nb):
         # where the OSM ways on the deck leave it (on the outline grown by MATCH_BUF, as they were matched: OSM runs 3-4 m off at PONTE 20):
         # with no spalla within 3 m of the nearest deck point that end is in the air (stairs, a ramp the DBGT has not, a wrong Z)
         spl = [LineString([(q_[0], q_[1]), (q_[2], q_[3])]) for q_ in d['spalle']]; gb = d['imp'].buffer(MATCH_BUF)
+        ue = np.asarray(d['imp'].exterior.coords) @ np.asarray(d['dir'])   # the ends of the deck along its direction
+        us = np.array([[q_[0] + q_[2], q_[1] + q_[3]] for q_ in d['spalle']]) / 2 @ np.asarray(d['dir']) if d['spalle'] else np.zeros(0)
+        for nm_, e_ in (('inizio', ue.min()), ('fine', ue.max())):   # an end of the deck with no spalla within 4 m of it lands nowhere
+            if not (np.abs(us - e_) < 4.0).any():
+                p_ = np.asarray(d['imp'].exterior.coords)[np.argmin(np.abs(ue - e_))]
+                sospesi.append(dict(impalcato=d['id'], fonte=d['fonte'], tipo=d['tipo'], estremo=nm_, x=round(float(p_[0]), 1), z=round(float(p_[1]), 1), link=link(*p_)))
         for oid in d.get('osm', []):
             ln = LineString(byid[oid]['p']); xs = ln.intersection(gb.exterior)
             for c_ in [Point(g_.coords[0]) for g_ in getattr(xs, 'geoms', [xs]) if g_.geom_type == 'Point']:
                 pt = np.array(shapely.ops.nearest_points(d['imp'].exterior, c_)[0].coords[0])
                 if spl and min(l_.distance(Point(pt)) for l_ in spl) < 3.0: continue
+                if min(abs(pt @ d['dir'] - ue.min()), abs(ue.max() - pt @ d['dir'])) > 3.0: continue   # beside the deck (OSM a few m off), not at an end
                 s0 = ln.project(c_); out_ = [np.array(ln.interpolate(s0 + k_).coords[0]) for k_ in (-1.5, 1.5)]
                 out_ = [o for o in out_ if not gb.contains(Point(o))]
                 if not out_: continue
@@ -590,7 +631,7 @@ def controlli(imp, decks, pits, osm, conf, bj, SB, nb):
     rep['C5'] = dict(definizione='spalle: lati del bordo dell impalcato su un lato del reticolo i cui due nodi sono terreno dove l impalcato appoggia (fuori dai ponti, a meno di %.1f m dal piano DBGT); |TIN impalcato - S letto dai .bin| agli estremi del lato e a 1/4, 1/2, 3/4' % LEVEL_TOL,
                      tile_bin_lette=nb, lati_spalla=int(len(c5)), lati_spalla_su_strada=sum(d['lati'].get('spalla_su_strada', 0) for d in decks), spalle=pct(c5, (50, 90, 99)),
                      impalcati_con_spalle=sum(1 for d in decks if d['spalle']), tirata_del_piano_DBGT_verso_S=pct(mosso, (50, 90, 99)),
-                     uscite_vie_osm_senza_spalla=estremi, soglia='p99 < 0.05 m, max < 0.2 m')
+                     uscite_vie_osm_senza_spalla=estremi, estremi_senza_spalla=sospesi, soglia='p99 < 0.05 m, max < 0.2 m')
     rep['C5']['ok'] = bool(len(c5) and rep['C5']['spalle']['p99'] < 0.05 and rep['C5']['spalle']['max'] < 0.2)
     for v, X, k in sorted(c5p, key=lambda q: -q[0])[:10]: punti.append(dict(c='C5', x=round(float(X[0]), 1), z=round(float(X[1]), 1), v=round(float(v), 3), impalcato=k, link=link(*X)))
     # clearance under each deck away from the spalle, what is under it, luce
@@ -601,8 +642,11 @@ def controlli(imp, decks, pits, osm, conf, bj, SB, nb):
         d['S_min'] = float(u['sn'].min())
         if d['tipo'] == 'copertura':   # under the cover is the passage: luce is its floor + LUCE; S over it dips where the LiDAR has the stair holes
             d['luce'] = round(d['fondo'] + LUCE if d.get('fondo') is not None else float(d['Hv'].min()) - d['sp'], 2)
-            d['S_sopra'] = dict(mediana=round(float(np.median(d['Hv'])), 2), minimo=round(float(d['Hv'].min()), 2),
-                                altezza_libera_min=round(float(d['Hv'].min()) - d['sp'] - d['fondo'], 2) if d.get('fondo') is not None else None); continue
+            # the lattice cells across the pit outline take the stair holes of the LiDAR: the rim (1 m) is the pit's own wall, not the cover
+            pu = shapely.union_all([p['g'] for p in pits]) if pits else Polygon()
+            hv = d['Hv'][shapely.distance(pu, shapely.points(d['P'][:, 0], d['P'][:, 1])) > 1.0] if not pu.is_empty else d['Hv']
+            d['S_sopra'] = dict(mediana=round(float(np.median(d['Hv'])), 2), minimo=round(float(d['Hv'].min()), 2), minimo_oltre_1_m_dalle_fosse=round(float(hv.min()), 2),
+                                altezza_libera_min=round(float(hv.min()) - d['sp'] - d['fondo'], 2) if d.get('fondo') is not None else None); continue
         d['luce'] = round(d['S_min'] + LUCE, 2); free = u['hv'] - d['sp'] - u['sn']; far, cl, fx = u['far'], u['cl'], u['fx']
         d['sotto'] = dict(strade=int((fx & np.isin(cl, (C_VEI, C_VEIT, C_PED, C_AREA)) & far).sum()), ferrovia=int((fx & (cl == C_FER) & far).sum()),
                           fiume=int((fx & np.isin(cl, (C_ALV, C_ARG)) & far).sum()), terreno=int((~fx & far).sum()))
@@ -759,8 +803,9 @@ def main(argv=None):
     json.dump(out, open(os.path.join(a.out, 'report_fase3.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=float)
     log('impalcati %d %s; PONTE riconosciuti %d su %d; non segnati %d; pezzi staccati %d; copertura %s; fosse %d; scartati %s' % (
         len(decks), per_tipo, len(ponti), info['ponti_dbgt'], info['ponti_non_segnati'], info['pezzi_staccati'], info['copertura'], len(pits), [e['fonte'] for e in scart]))
-    log('C5 spalle %s (lati %d, su strada %d), tirata del piano DBGT verso S %s, uscite di vie OSM senza spalla %d' % (rep['C5']['spalle'], rep['C5']['lati_spalla'], rep['C5']['lati_spalla_su_strada'],
-        rep['C5']['tirata_del_piano_DBGT_verso_S'], len(rep['C5']['uscite_vie_osm_senza_spalla'])))
+    log('C5 spalle %s (lati %d, su strada %d), tirata del piano DBGT verso S %s, uscite di vie OSM senza spalla %d, estremi senza spalla %s' % (rep['C5']['spalle'], rep['C5']['lati_spalla'], rep['C5']['lati_spalla_su_strada'],
+        rep['C5']['tirata_del_piano_DBGT_verso_S'], len(rep['C5']['uscite_vie_osm_senza_spalla']), [(e['fonte'], e['estremo']) for e in rep['C5']['estremi_senza_spalla']]))
+    if imp.info.get('estensioni'): log('estremi allungati fino al terreno: %s' % imp.info['estensioni'])
     log('C6 impalcati: lungo le vie %s, sopra il 18%% %d; triangoli sopra il 18%% %d' % (rep['C6_impalcati']['pendenza_lungo_le_vie'], rep['C6_impalcati']['vie_sopra_18'], rep['C6_impalcati']['triangoli_sopra_18']))
     log('C11 %s' % rep['C11']['conteggi'])
     if 'nodi_su_impalcato' in rep: log('nodi di oggi sugli impalcati: %d, scarto %s' % (rep['nodi_su_impalcato']['nodi'], rep['nodi_su_impalcato']['scarto']))

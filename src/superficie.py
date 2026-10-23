@@ -35,6 +35,7 @@ AX_SIGMA = 15.0  # the axis Z is smoothed along the network over this (the DBGT 
 LEVEL = 3.0      # an axis this far from the polygon's own vertices is at another level (underpass, ramp beside)
 DZ_WARN, DZ_CAP = 1.5, 3.0   # C4: DBGT farther than this from the LiDAR is listed; farther than DZ_CAP the LiDAR wins (the "tetto")
 NEAR_BR = 30.0   # ... unless within this of a bridge: then it is the part of the deck the DBGT left as ground (phase 3 makes it a deck)
+NEAR_UNDER = 10.0   # ... and a road under the LiDAR this close to a bridge or the gallery is never capped (the DTM is filled across the deck)
 RAMP = 10.0      # the capped patch is joined to the kept DBGT over this distance
 FINE_BUF = 20.0  # a tile is fine (2 m) when one of the features is within this of it
 DENS = 2.0       # polygon rings are densified to this before the TIN (a nearly constrained Delaunay)
@@ -472,7 +473,11 @@ class Superficie:
         dbr = ndimage.distance_transform_edt(~s.BR, sampling=SF) if s.BR.any() else np.full(s.BR.shape, 1e9)
         st8 = np.ones((3, 3), bool); dz = np.nan_to_num(s.DZ)
         s.AIR = ndimage.binary_propagation(RT & (dbr <= NEAR_BR) & (dz > DZ_CAP), structure=st8, mask=RT & (dz > DZ_WARN))
-        s.CAP = ndimage.binary_propagation(RT & (np.abs(dz) > DZ_CAP) & ~s.AIR, structure=st8, mask=RT & (np.abs(dz) > DZ_WARN) & ~s.AIR)
+        # a road under the LiDAR under a bridge or the gallery cover, or by them, keeps the DBGT: the DTM is filled across the deck and a few m
+        # past its edges (via Busnelli under PONTE 12 is flat at 215.2 in the DBGT, the LiDAR rises to 219.7 and shut the road; the streets
+        # over the station underpass took the stair holes of the LiDAR)
+        s.UND = (dbr <= NEAR_UNDER) & (dz < 0)
+        s.CAP = ndimage.binary_propagation(RT & (np.abs(dz) > DZ_CAP) & ~s.AIR & ~s.UND, structure=st8, mask=RT & (np.abs(dz) > DZ_WARN) & ~s.AIR & ~s.UND)
         # a capped patch over the river is a culvert (tombino) the LiDAR sees through: the road keeps the DBGT
         s.TOMB = np.zeros(s.CAP.shape, bool); s.PNS = np.zeros(s.CAP.shape, bool)
         if s.CAP.any():
@@ -494,7 +499,7 @@ class Superficie:
         s.ZRAW = s.ZF.copy(); s.NEARCAP = np.zeros(s.CAP.shape, bool)
         if s.CAP.any():
             dc = ndimage.distance_transform_edt(~s.CAP, sampling=SF); wt = np.clip(dc / RAMP, 0, 1); s.NEARCAP = dc < RAMP
-            k = RT & ~s.AIR; s.ZF[k] = s.L[k] + s.DZ[k] * wt[k]
+            k = RT & ~s.AIR & ~s.UND; s.ZF[k] = s.L[k] + s.DZ[k] * wt[k]
         s.RANK[s.AIR] = 0; s.BR |= s.AIR
         # river bed more than DZ_CAP under the LiDAR (and not under a bridge): a covered stretch (the street over the Seveso in the centre,
         # x 260 z -525, is flat in the DTM 3.5 m over the DBGT bed) or the walls of the ravine in the north. The LiDAR is kept there, else
