@@ -15,6 +15,11 @@ Regola per tutto: niente stili, scritte o dettagli inventati. Quello che non vie
 ## Priorità: parcheggi veri da OSM
 Prima di tutto il resto: vedi la sezione **Parcheggi** in fondo. I dati sono già in `data/maplarge.osm`, non serve aspettare Overpass.
 
+## Quote delle strade: da sistemare (analisi del 23/10 su `brianza.json`)
+Le quote vere del DBGT ci sono solo a Meda; altrove i ponti sono stimati (+6,6 m) e la quota scivola sulle rampe e sulle rotonde vicine.
+- [ ] Rotonde rialzate vicino ai ponti stimati, dove la strada sotto in realtà è in trincea: due allo svincolo della Milano-Meda di Baruccana (fino a 5,1 e 4,2 m, x 489 z 2064 e x 307 z 2004), Viale delle Nazioni Unite a Ceredo (3,6 m, x 2676 z 641), Meredo (1,3 m, x 1312 z 681). Serve il DBGT di Seveso e Seregno, oppure una regola: una rotonda non prende la quota del ponte
+- [ ] A Meda il DBGT alza a impalcato ogni strada più di 0,8 m sopra il modello del terreno, anche dove sotto non passa niente: Manzoni/Rosmini/Cattaneo verso Colombera fino a 11,3 m (x -726 z -1331), Borromeo/Mameli/Molino 8,2 m, Monte Bianco/Cervino 8,1 m, Carso/Monte Rosa 7,7 m, Perlasca/delle Cave 6,9 m, piazza Dozio/Giovanni XXIII 6 m. Lì è il terreno a 10 m che sbaglia: alzare il terreno sotto la strada, e fare impalcati solo dove sotto passa una strada, la ferrovia o il Seveso
+
 ## Telecamera
 - [ ] Telecamera più vicina all'auto
 - [ ] Visuale in terza persona
