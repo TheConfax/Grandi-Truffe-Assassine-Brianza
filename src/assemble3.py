@@ -521,6 +521,8 @@ rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'
 
 # ---- weather: clouds, rain, thunderstorms and fog; codes SOLE, NUVOLE, PIOGGIA, TEMPORALE, NEBBIA
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'weather3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("// ---------------------------------------------------------------- renderer\n", open(os.path.join(HERE, 'foto3_colori.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- renderer\n")
 rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
 rep("13 + S.grip * 0.4) / Math.max(4, Math.abs(v));", "13 + S.grip * (1 - 0.3 * WX.wet) * 0.4) / Math.max(4, Math.abs(v));") # wet tyres slide earlier
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
