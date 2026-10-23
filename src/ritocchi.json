@@ -1,0 +1,4 @@
+{
+ "nota": "Ritocchi a mano del terreno S (docs/motore.md 1.2 e 4, priorita 1), letti da src/superficie.py. Ognuno: {poligono: [[x, z], ...] in metri del gioco, quota: m assoluti oppure offset: m sul LiDAR, commento}. Solo per errori dimostrati. Il DROP della scala Diaz-Anna Frank (world3.js r. 6-15) non serve: il LiDAR a 2 m ha gia la scarpata (225,2 -> 221,1 m in 6 m sul profilo a meta della scala).",
+ "ritocchi": []
+}
