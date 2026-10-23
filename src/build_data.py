@@ -208,7 +208,7 @@ if os.path.exists(CONF):
     for e_ in json.load(open(CONF, encoding='utf-8'))['elements']:
         ls_ = [LineString([proj(p['lat'], p['lon']) for p in m['geometry']]) for m in e_.get('members', []) if m.get('type') == 'way' and len(m.get('geometry') or []) > 1]
         if ls_ and e_.get('tags', {}).get('name'): _comuni[e_['tags']['name'].lower()] = unary_union(list(polygonize(unary_union(ls_))))
-dbt_walls, dbt_vols, dbt_roads, _cov = [], [], [], []
+dbt_walls, dbt_vols, dbt_roads, dbt_pc, _cov = [], [], [], [], []
 for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
     f_ = os.path.join(DBT_DIR, d_, 'dbgt.gpkg')
     if not os.path.exists(f_): continue
@@ -234,10 +234,14 @@ for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
         for part in getattr(g_, 'geoms', [g_]):
             cs_ = list(part.coords)
             if len(cs_) >= 2: dbt_roads.append((_xy(cs_), [c_[2] for c_ in cs_]))
+    try:  # passi carrai (ACC_PC): half of them stand on a divider, where the wall has its gate
+        for (blob,) in con_.execute('select Shape from ACC_PC_ACC_PC_POS'):
+            if blob is not None: g_ = _gpkg_geom(blob); dbt_pc.append(_xy([(g_.x, g_.y)])[0])
+    except sqlite3.OperationalError: pass
     _cov.append(_comuni[d_.lower()]); log('dbgt', d_)
 dbt_cover = unary_union(_cov).buffer(-3) if _cov else GeometryCollection()  # a few metres inside the boundary: the neighbour's data meets it
 prepare(dbt_cover)
-log('dbgt: muri e recinzioni', len(dbt_walls), 'volumi', len(dbt_vols), 'comuni', len(_cov))
+log('dbgt: muri e recinzioni', len(dbt_walls), 'volumi', len(dbt_vols), 'passi carrai', len(dbt_pc), 'comuni', len(_cov))
 OVT = os.path.join(DATA, 'overture', 'edifici_overture.geojson')
 ms_h, ms_only = {}, []
 if os.path.exists(OVT):
@@ -856,6 +860,25 @@ if dbt_walls:
             else: kind, hgt = (5, 1.8) if r_ < 0.5 else (3, 1.7) if r_ < 0.8 else (2, 1.6)
         barriers.append((pts, kind, round(hgt, 1))); kinds_[kind] += 1
     log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', len(dbt_walls), 'per tipo', dict(kinds_))
+# passi carrai: each DBGT driveway point within PC_D of a divider opens it PC_W wide and closes it with a gate as tall as the wall;
+# where a street (class 3 or more) already crosses there the gap stays open. Two points closer than PC_W are one gate
+PC_D, PC_W = 1.5, 3.6
+pc_cuts, pc_gates = [], []
+if dbt_pc:
+    _dbi = [i_ for i_, (p_, k_, h_) in enumerate(barriers) if len(p_) >= 2 and k_ != 6]
+    _dbl = [LineString(barriers[i_][0]) for i_ in _dbi]; _dbt_ = STRtree(_dbl)
+    _main_r = [r['line'] for r in raw_roads if r['c'] <= 3 and flat(r) and r['line'].length > 0.1]; _mrt = STRtree(_main_r)
+    _done = []
+    for p_ in dbt_pc:
+        P_ = Point(p_)
+        if not inside(p_, 0) or any(math.dist(p_, d_) < PC_W for d_ in _done): continue
+        j_ = _dbt_.nearest(P_); L_ = _dbl[j_]
+        if L_.distance(P_) > PC_D or L_.length < PC_W + 0.6: continue
+        s_ = min(max(L_.project(P_), PC_W / 2), L_.length - PC_W / 2); a_, b_ = L_.interpolate(s_ - PC_W / 2), L_.interpolate(s_ + PC_W / 2)
+        _done.append(p_); pc_cuts.append(L_.interpolate(s_).buffer(PC_W / 2))
+        if any(_main_r[k].distance(L_.interpolate(s_)) < 2 for k in _mrt.query(L_.interpolate(s_).buffer(2))): continue
+        hb_ = barriers[_dbi[j_]][2]; pc_gates.append(((a_.x, a_.y), (b_.x, b_.y), round(min(2.2, max(1.2, hb_)), 1)))
+    log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates))
 # railway fill-in: along every track, wherever no fence or wall stands within 12 m on that side, a fence 4.2 m out from the outer track; open at
 # level crossings, platforms, buildings and the ends of the line (the corridor fences above only exist where OSM maps the railway land)
 if railL:
@@ -889,7 +912,7 @@ log('cemetery walls', ncw)
 bar_out = []
 # cut each line only against the pieces of bar_cut it touches, not the whole union: this was most of the build's time
 # (the same pieces bar_cut is the union of, kept apart: united, the street buffers are one polygon as big as the whole network)
-_bc_parts = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1] + [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates]
+_bc_parts = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1] + [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts
 _bc_tree = STRtree(_bc_parts)
 for bi_, (pts, kind, hgt) in enumerate(barriers):
     if bi_ % max(1, len(barriers) // 10) == 0: log('muri %d%%' % (bi_ * 100 // max(1, len(barriers))))  # progress: this used to be the slow step
@@ -935,6 +958,10 @@ for pts, kind, hh in gate_ways:
     if not 0.8 < L.length < 14: continue
     if any(r['c'] <= 3 and flat(r) and r['line'].intersects(L) for r in raw_roads if r['line'].distance(L) < 1): continue
     gate_out.append([q(pts[0][0]), q(pts[0][1]), q(pts[-1][0]), q(pts[-1][1]), kind, round(1.0 if kind == 'l' else min(2.2, max(1.2, hh or 1.6)), 1)])
+for a_, b_, h_ in pc_gates:
+    m_ = ((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2)
+    if any(math.dist(m_, ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20)) < 3 for g_ in gate_out): continue  # OSM has its gate there already
+    gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', h_, 0])
 log('gate meshes', len(gate_out))
 
 # ---- villa frontages: muretto + cancellata along the street with a gate, where OSM has nothing mapped
