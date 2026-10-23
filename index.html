@@ -6045,7 +6045,7 @@ function missionStep(dt) {
 
 // ---------------------------------------------------------------- HUD
 const $ = id => document.getElementById(id);
-let camYaw = 0, camPitch = 0, toastT = 0, bannerT = 0, hintT = 0, lastStreet = '', shake = 0, camMode = 0, paused = false, running = false, bigOpen = false, now = 0;
+let camYaw = 0, camPitch = 0, camBack = false, toastT = 0, bannerT = 0, hintT = 0, lastStreet = '', shake = 0, camMode = 0, paused = false, running = false, bigOpen = false, now = 0;
 function toast(t) { $('toast').textContent = t; $('toast').classList.add('on'); toastT = 3.2; }
 function banner(t, sub) { $('banner').innerHTML = (sub ? `<small>${sub}</small>` : '') + escapeHtml(t); $('banner').classList.add('on'); bannerT = 3; }
 function hint(t) { $('hint').innerHTML = t; $('hint').hidden = false; hintT = 0.25; }
@@ -6518,7 +6518,7 @@ function updCamera(dt) {
     // follow travel direction in reverse, otherwise heading
     let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }
     { const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0; if (s_) camYaw = clamp(camYaw + s_ * 2.6 * dt, -Math.PI, Math.PI); else camYaw *= Math.exp(-2.5 * dt); /* heading grows towards the left */
-      const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; if (GP.back > 0.5) { hx = -hx; hz = -hz; } }
+      const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } } /* looking back and forward again is a cut, not a swing round */
     const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
     let cx = px - hx * dist, cz = pz - hz * dist;
     const f = rayWalls(px, pz, cx, cz); let lift = 0; if (f < 1) { const k = Math.max(0.12, f - 0.08); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3; }
