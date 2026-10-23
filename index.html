@@ -4533,12 +4533,13 @@ function ngPropGeo(key) {
 function ngRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !s.r.d && s.r.c <= 5 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
 // how far in front of a wall the first real street is (not a service road or a driveway), up to 26 m: a shop set back behind its front
 // garden opens onto the street, not onto the yard behind (Billy's in via Vespucci faced its back lane)
-function ngStreetAhead(mx, mz, nx, nz) {
-  for (let t = 2; t <= 26; t += 2) { const x = mx + nx * t, z = mz + nz * t; let f = false; ROADSEG.each(x - 10, z - 10, x + 10, z + 10, s => { if (!f && !s.r.d && s.r.c <= 3 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5) f = true; }); if (f) return t; }
+// returns how far it is, the road's class and whether it is the street of the shop's address (Mikka, via Indipendenza 174, faced a side street)
+function ngStreetAhead(mx, mz, nx, nz, street) {
+  for (let t = 2; t <= 26; t += 2) { const x = mx + nx * t, z = mz + nz * t; let f = null; ROADSEG.each(x - 10, z - 10, x + 10, z + 10, s => { if (!s.r.d && s.r.c <= 3 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5 && (!f || s.r.c < f.c)) f = { t, c: s.r.c, own: !!street && (D.names[s.r.n] || '').toLowerCase() === street }; }); if (f) return f; }
   return null;
 }
-function ngWall(x, z, only) {
-  let host = only, best = null;
+function ngWall(x, z, only, street) {
+  let host = only, best = null; street = (street || '').toLowerCase();
   if (!host) BLD.each(x, z, x, z, b => { if (!host && b.h >= 2.6 && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) host = b; });
   const scan = b => {
     if (b.h < 2.6 || b.noSign) return; const pts = b.pts;
@@ -4547,8 +4548,9 @@ function ngWall(x, z, only) {
       const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, d = segDist(x, z, a[0], a[1], c[0], c[1]);
       let nx = dz / L, nz = -dx / L; if (inPoly(mx + nx * 0.3, mz + nz * 0.3, b.pts)) { nx = -nx; nz = -nz; }
       if (inPoly(mx + nx * 0.3, mz + nz * 0.3, b.pts) || inBuilding(mx + nx * 0.7, mz + nz * 0.7)) continue; // a party wall
-      const road = ngRoad(mx + nx * 7, mz + nz * 7, 3), sa = ngStreetAhead(mx, mz, nx, nz);
-      let score = host ? d * 0.3 + (sa != null ? sa * 0.3 : road ? 6 : 12) - Math.min(L, 20) * 0.15 : d + (sa != null ? sa * 0.2 : road ? 4 : 8);
+      const road = ngRoad(mx + nx * 7, mz + nz * 7, 3), sa = ngStreetAhead(mx, mz, nx, nz, street);
+      const sv = sa ? sa.t * 0.3 - (sa.own ? 8 : 0) - (sa.c === 0 ? 2 : sa.c === 1 ? 1 : 0) : null; // its own street first, then the more important one
+      let score = host ? d * 0.3 + (sv != null ? sv : road ? 6 : 12) - Math.min(L, 20) * 0.15 : d + (sv != null ? sv * 0.7 : road ? 4 : 8);
       if (b.big && L < 10) continue;
       if (b.big) { // a supermarket opens onto its car park: how much of the 20 m in front is parking counts first, then the street, then length
         let park = 0; for (let t = 2; t <= 20; t += 2) if (ngInPark(mx + nx * t, mz + nz * t, 0)) park++;
@@ -4584,7 +4586,7 @@ function ngList() {
   for (const e of D.ng || []) {
     const x = e[0] / 10, z = e[1] / 10, cls = NG_CLASSES[e[2]], sub = e[3] || '', name = e[4] || '', ms = NG_MODELS[cls]; if (!ms) continue;
     let big = null; BLD.each(x - 25, z - 25, x + 25, z + 25, b => { if (b.big && b.big.e === e) big = b; });
-    const W = ngWall(x, z, big); if (!W || W.b.lm) continue;
+    const W = ngWall(x, z, big, e[6]); if (!W || W.b.lm) continue;
     if (big) { // the supermarket's own glass front: it takes its share of the wall, the other shops on it move aside
       const w = clamp(W.L * 0.6, Math.min(8, W.L - 1), Math.min(28, W.L - 1)), along = (x - W.a[0]) * W.ux + (z - W.a[1]) * W.uz;
       const rec = { big: big.big, name, ...W, t: clamp(inPoly(x, z, big.pts) ? W.L / 2 : along, w / 2 + 0.5, W.L - w / 2 - 0.5), w };
@@ -5315,8 +5317,10 @@ function* buildPaesaggio(T, G) {
     const signs = []; // [x, y, z, normal x, z, name]
     for (const [X, Z, ux, uz, w, fwd, back] of d.cl) {
       const x = X / 10, z = Z / 10, rx = -uz, rz = ux, off = w / 2 + 1.2;
-      for (const [sx, sz, nx, nz, name] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back]]) {
-        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5)) continue;
+      for (let [sx, sz, nx, nz, name, sd] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd, 1], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back, -1]]) {
+        // the street can be drawn wider than its width in the data (via Padova: 13 m of asphalt for 7.2): out of the asphalt, half a metre at a time
+        for (let k = 0; k < 12 && onAnyRoad(sx, sz, 0.4); k++) { sx += rx * sd * 0.5; sz += rz * sd * 0.5; }
+        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5) || onAnyRoad(sx, sz, 0.4)) continue;
         signs.push([sx, surfAt(sx, sz), sz, nx, nz, name]);
       }
     }

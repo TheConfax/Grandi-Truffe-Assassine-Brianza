@@ -1168,7 +1168,7 @@ def add_ng(t, p):
     nm = (t.get('name') or '').strip()
     if not nm and c in ('ufficio', 'artigiano') and s in ('company', 'yes', 'association', 'ngo', 'political_party'): return  # an unnamed company: nothing to put on the door
     if any(c == c2 and nm == n2 and math.dist(p, p2) < 15 for c2, n2, p2 in ng_seen): return  # the same shop mapped twice (node and area)
-    ng_seen.append((c, nm, p)); negozi.append([q(p[0]), q(p[1]), NG.index(c), s[:24], nm[:40], (t.get('opening_hours') or '').strip()[:160]])
+    ng_seen.append((c, nm, p)); negozi.append([q(p[0]), q(p[1]), NG.index(c), s[:24], nm[:40], (t.get('opening_hours') or '').strip()[:160], (t.get('addr:street') or '').strip()[:60]])  # the street of its address: the front looks onto it
 for r_, t in ntags.items(): add_ng(t, nodes[r_])
 for wid, (refs, t) in ways.items():
     if refs[0] == refs[-1] and len(refs) >= 4: add_ng(t, centroid(ring(refs)))
@@ -1348,14 +1348,14 @@ blines = [(LineString(bgeo[w_]), sorted(n_)) for w_, n_ in bway.items() if len(n
 cartelli = []
 # the two posts stand 3 m before and after the crossing, w/2 + 1.2 m to the right of each driver (as paesaggio3.js draws them). Where the
 # boundary runs along another street (via Vignazzola) the side street crosses it at the junction and the posts would land on that street:
-# the pair slides along its own road, away from the junction, up to CL_SLIDE m, or is left out
+# the pair slides along its own road, away from the junction, up to CL_SLIDE m, or is left out; 2 m clear of any other street, as the asphalt widens at the corners of a junction (via Padova, Carlo 24/10)
 CL_SLIDE = 30
 _clr = [r for r in raw_roads if r['c'] <= 5 and flat(r) and r['line'].length > 0.1]; _clt = STRtree([r['line'] for r in _clr])
 def _cl_free(r0, x, z, ux, uz, w):
     rx, rz, off = -uz, ux, w / 2 + 1.2
     for sx, sz in ((x - ux * 3 + rx * off, z - uz * 3 + rz * off), (x + ux * 3 - rx * off, z + uz * 3 - rz * off)):
         P_ = Point(sx, sz)
-        if any(_clr[k] is not r0 and _clr[k]['line'].distance(P_) < _clr[k]['w'] / 2 + 0.6 for k in _clt.query(P_.buffer(8))): return False
+        if any(_clr[k] is not r0 and _clr[k]['line'].distance(P_) < _clr[k]['w'] / 2 + 2.0 for k in _clt.query(P_.buffer(10))): return False
     return True
 nmoved = ndrop = nside = nrep = nminor = 0
 CL_MAXC = 1  # only main streets and through roads get them: between towns grown into each other the residential streets have none (Carlo, 23/10)
