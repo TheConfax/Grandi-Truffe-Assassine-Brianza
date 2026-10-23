@@ -548,7 +548,16 @@ function aoGround(b, ring, E, i, innerA) {
     }
   }
 }
-const _aoC = new THREE.Color();
+const _aoC = new THREE.Color(), SILL_COL = new THREE.Color('#e8e3d8');
+function addSill(b, x, y, z, ux, uz, nx, nz) { // a stone sill 1.16 m long sticking 10 cm out of the wall: top, front and underside only (6 triangles)
+  const W = 0.58, D = 0.1, H = 0.035, q = (s, d, dy) => [x + ux * s + nx * d, y + dy, z + uz * s + nz * d];
+  for (const [n, vs] of [[[0, 1, 0], [q(-W, 0, H), q(W, 0, H), q(W, D, H), q(-W, D, H)]], [[nx, 0, nz], [q(-W, D, -H), q(W, D, -H), q(W, D, H), q(-W, D, H)]], [[0, -1, 0], [q(-W, 0, -H), q(W, 0, -H), q(W, D, -H), q(-W, D, -H)]]]) {
+    const k = b.p.length / 3; for (const p of vs) vtx(b, p[0], p[1], p[2], n[0], n[1], n[2], 0, 0, SILL_COL);
+    const e = [vs[1][0] - vs[0][0], vs[1][1] - vs[0][1], vs[1][2] - vs[0][2]], f = [vs[3][0] - vs[0][0], vs[3][1] - vs[0][1], vs[3][2] - vs[0][2]];
+    const cn = [e[1] * f[2] - e[2] * f[1], e[2] * f[0] - e[0] * f[2], e[0] * f[1] - e[1] * f[0]]; // wind each face towards its normal
+    if (cn[0] * n[0] + cn[1] * n[1] + cn[2] * n[2] > 0) b.i.push(k, k + 1, k + 2, k, k + 2, k + 3); else b.i.push(k, k + 2, k + 1, k, k + 3, k + 2);
+  }
+}
 function terrDrawnH(x, z) { // the terrain patch as drawn: visH on its tile's grid, flat in between (the band must not float over a hump between nodes)
   const T = TILES[tileOf(x, z)]; if (!T || !T.st) return visH(x, z);
   const st = T.st, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2, i = Math.floor((x - x0) / st), j = Math.floor((z - z0) / st), fx = (x - x0) / st - i, fz = (z - z0) / st - j;
@@ -850,7 +859,7 @@ function* buildTileGen(T) {
   yield 'buildings';
   // buildings
   {
-    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf();
+    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf();
     let nb = 0;
     for (const B of T.bld) {
       if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower (paesaggio3.js)
@@ -888,6 +897,13 @@ function* buildTileGen(T) {
           const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), ht = pitched ? top - bot : 99, ia = inner(i) ? 0 : 99, ic = inner((i + 1) % nr) ? 0 : 99;
           b.ao.push(bot - ga, ht, ia, ic + L, bot - gc, ht, ia + L, ic, top - gc, pitched ? 0 : 99, ia + L, ic, top - ga, pitched ? 0 : 99, ia, ic + L);
           if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
+          if (kind === 'old') { // stone sills under the painted windows (middle of each bay, 0.9-1 m up each 3.1 m floor), from the first floor: the ground floor is shops
+            const ux = dx / L, uz = dz / L;
+            for (let n = Math.ceil((u0 * tile + 0.7) / tile - 0.5); (n + 0.5) * tile - u0 * tile <= L - 0.7; n++) {
+              const s = (n + 0.5) * tile - u0 * tile, sx = a[0] + ux * s, sz = a[1] + uz * s;
+              for (let k = 1; gmax + 3.1 * k + 2.5 <= top - 0.2; k++) addSill(sillB, sx, gmax + 3.1 * k + 0.96, sz, ux, uz, nx, nz);
+            }
+          }
         }
         for (let i = 0; i < nr; i++) aoGround(aoB, ring, E, i, inner(i));
       }
@@ -905,6 +921,7 @@ function* buildTileGen(T) {
     }
     for (const k of ['old', 'mod', 'plain']) if (wb[k].i.length) mkMesh(wb[k], MAT[k], 10, 'cast', G).geometry.setAttribute('aoD', new THREE.Float32BufferAttribute(wb[k].ao, 4));
     if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
+    if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
