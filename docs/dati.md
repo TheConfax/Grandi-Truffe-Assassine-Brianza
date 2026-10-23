@@ -1,0 +1,53 @@
+# Dati grezzi
+
+La cartella `data/` non è in git (pesa circa 700 MB): qui c'è cosa contiene, da dove viene e chi la usa. La stessa pagina è in `data/README.md`.
+
+Per rigenerare `brianza.json`: `python src/build.py` (con il Python della `.venv`). Controlla che ci siano tutti i file qui sotto, dice quali mancano, poi lancia `src/build_data.py` con il riquadro della mappa (S 45.6345, N 45.6805, W 9.117, E 9.191). Dura 4-10 minuti. La cartella dei dati si può spostare con la variabile `GTA_DATA`.
+
+## Usate dalla build
+
+| File | Fonte | Scaricato | Licenza | Script |
+|---|---|---|---|---|
+| `osm/maplarge.osm` (119 MB) | OpenStreetMap, estratto Overpass del riquadro della mappa (`osm_base` 2026-10-18T11:35Z) | 18/10/2026 | ODbL 1.0, © OpenStreetMap contributors | `build_data.py` (argomento) |
+| `osm/confini_comuni.json` (0,7 MB) | OpenStreetMap via Overpass: `rel[boundary=administrative][admin_level=8](45.62,9.10,45.70,9.24);out geom;` | 20/10/2026 | ODbL 1.0 | `build_data.py` (cartelli di paese, perimetro dei DBGT) |
+| `terreno/w50550_s10.tif` (100 MB) | TINITALY 1.1, INGV, foglio w50550_s10, DEM a 10 m: <https://tinitaly.pi.ingv.it/> | 19/10/2026 | CC BY 4.0, Tarquini S. et al. (2023), doi:10.13127/tinitaly/1.1 | `build_data.py` (argomento) |
+| `overture/edifici_overture.geojson` (14 MB) e `.state` | Overture Maps, tema buildings, release 2026-09-23.1, riquadro della mappa (scaricato con `overturemaps`) | 18/10/2026 | ODbL 1.0 (gli edifici Overture includono dati OSM) | `build_data.py` |
+| `worldcover/ESA_WorldCover_10m_2021_v200_N45E009_Map.tif` (107 MB) | ESA WorldCover 2021 v200, tessera N45E009: <https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N45E009_Map.tif> | 18/10/2026 | CC BY 4.0, © ESA WorldCover project 2021 / Copernicus Sentinel | `wccrop.py` |
+| `worldcover/wc/wc.npy`, `wc_meta.txt` (0,9 MB) | ritaglio del tif sopra, fatto da `python src/wccrop.py` | 19/10/2026 | come sopra | `build_data.py` |
+| `dbt/Meda/dbgt.gpkg` (87 MB) | Regione Lombardia, Database GeoTopografico (DBGT) del comune di Meda, rilievo 2015 | 20/10/2026 | CC BY 4.0 (scheda metadati, sotto) | `build_data.py` (muri `EL_DIV`, altezze `UN_VOL`, quote delle strade `EL_STR_EL_STR_TRA_SG`) |
+
+La build usa ogni `data/dbt/<Comune>/dbgt.gpkg` che trova, purché il nome della cartella sia quello del comune in `confini_comuni.json`. Gli altri file arrivati con il DBGT di Meda (`base_dbt_per_pianificazione.gpkg`, `Isoipse.zip`, `leggimi.txt`) stanno accanto e non li usa nessuno.
+
+## DBGT degli altri comuni (scaricati, non ancora usati)
+
+Il riquadro della mappa tocca nove comuni (verificato con `confini_comuni.json`): Meda 27% del riquadro, Seveso 24%, Lentate sul Seveso 13%, Seregno 9%, Cabiate 8%, Barlassina 8%, Cesano Maderno 7%, Mariano Comense 3%, Cogliate 0,1% (non scaricato).
+
+Sono in `data/dbt/<Comune>/<COMUNE>.zip`, ancora da estrarre: la build legge solo `dbgt.gpkg`, quindi finché resta nello zip non entra nella mappa. Per usarne uno basta estrarre il suo `dbgt.gpkg` nella cartella del comune.
+
+| Comune | Anno di rilievo | Zip | Scaricato |
+|---|---|---|---|
+| Meda | 2015 | 41,8 MB (già estratto) | 20/10/2026 |
+| Seveso | 2015 | 38,8 MB | 23/10/2026 |
+| Lentate sul Seveso | 2021 | 26,8 MB | 23/10/2026 |
+| Cabiate | 2021 | 12,2 MB | 23/10/2026 |
+| Barlassina | 2018 | 9,3 MB | 23/10/2026 |
+| Mariano Comense | 2015 | 34,6 MB | 23/10/2026 |
+| Seregno | 2007 | 42,5 MB | 23/10/2026 |
+| Cesano Maderno | 2005 | 30,5 MB | 23/10/2026 |
+
+- Download diretto per comune: `https://www.geoportale.regione.lombardia.it/rlregis_download/service/package?dbId=514&cod=<codice ISTAT senza zeri davanti>` (Meda 108030, Seveso 108040, Lentate 108054, Cabiate 13035, Barlassina 108005, Mariano 13143, Seregno 108039, Cesano 108019, Cogliate 108020). Il link e l'anno di rilievo vengono dal servizio `DBGT_Inquadramento` del Geoportale (campi `DOWNLOAD` e `ANNO_RIL_AGG`).
+- Scheda metadati: <https://www.geoportale.regione.lombardia.it/metadati?p_p_id=detailSheetMetadata_WAR_gptmetadataportlet&p_p_lifecycle=0&p_p_state=normal&p_p_mode=view&_detailSheetMetadata_WAR_gptmetadataportlet_identifier=r_lombar%3A0092b7ba-c697-433b-b5f2-9f9d9b8694e3&_jsfBridgeRedirect=true> (r_lombar:0092b7ba-c697-433b-b5f2-9f9d9b8694e3, revisione 2023-02-15, scheda aggiornata il 2026-10-06). Limitazioni d'uso: <https://creativecommons.org/licenses/by/4.0/legalcode.it>, cioè CC BY 4.0. Accesso: nessuna limitazione. Né IODL 2.0 né CC BY-NC-SA.
+- Sono fatti come quello di Meda: stesso zip (`dbgt.gpkg`, `base_dbt_per_pianificazione.gpkg`, `Isoipse.zip`, `leggimi.txt`), GeoPackage in EPSG:7791 (RDN2008 / UTM 32N) con le quote Z, le tre tabelle che usa la build ci sono tutte e gli assi stradali hanno la quota. Le differenze: ogni comune contiene solo le classi che ha rilevato (93-111 tabelle), e chi ha fatto il rilievo ha classificato i muri a modo suo. A Meda e Seveso quasi tutto è `95` (altro), a Seregno e Cesano Maderno quasi tutto è `18` (staccionata), a Lentate e Barlassina `17` (recinzione), a Cabiate e Mariano molte `02` (cancellata) e a Mariano 2683 `19` (siepi). Prima di usarli va controllato che quei tipi corrispondano a quello che si vede. Seregno (2007) e Cesano Maderno (2005) sono rilievi vecchi: a Cesano solo 8940 volumi su 14093 hanno l'altezza.
+
+## Terreno più fine (non scaricato)
+
+- **DTM 5×5 della Regione Lombardia, edizione 2015.** Esiste. Formato ERDAS IMAGINE (`.img` + `.ige`), 5 m, WGS84 / UTM 32N, tutta la regione. Le quote vengono per l'80% dal DBT (curve di livello, punti quotati, linee di rottura; nelle aree urbane rilevate a 1:2000 la precisione in quota è 0,30 m), lungo i fiumi dal LiDAR a 1 m. Licenza CC BY 4.0. Scheda: r_lombar:dfc98d60-5f02-4a2b-8113-5ad24cc53a9c. Download: <https://www.cartografia.servizirl.it/download/DTM5_RL.zip>, 3,09 GB (8,3 GB estratto). Non si può ritagliare dallo zip: è un unico file compresso.
+- **LiDAR del Ministero dell'Ambiente (PST-A e PST-A Estensione 2008).** DTM e DSM a 1 m, solo lungo le aste fluviali di I e II ordine. Il WMS `EL.LIDAR.LOMBARDIA.1x1.DTM` (<http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/servizi-LiDAR/LIDAR_LOMBARDIA.map>) disegnato sul riquadro della mappa è pieno al 100%: la valle del Seveso è coperta, con la trincea della Milano-Meda, la ferrovia e le scarpate del fiume. Si scarica in tessere GeoTIFF (EPSG:4326) dal visualizzatore <https://sim.mase.gov.it/portalediaccesso/mappe/#/viewer/new> (vedi anche <https://gn.mase.gov.it/portale/distribuzione-dati-pst>). Licenza CC BY 4.0. L'anno del volo sulla valle del Seveso non l'ho trovato: il piano è del 2008 e dintorni.
+
+## Non usati da nessuno script
+
+- `_vecchi/map.osm` (2,5 MB): primo estratto OSM dal sito di openstreetmap.org (17/10/2026), un riquadro di circa 1,3 × 0,7 km sul centro di Meda. Sostituito da `osm/maplarge.osm`.
+- `_vecchi/MEDA.zip` (42 MB): lo zip originale del DBGT di Meda, già estratto in `dbt/Meda/`. È identico a quello che si scarica oggi.
+- `_vecchi/segnalazioni-*.json`: segnalazioni esportate dal gioco (19/10/2026), non sono dati di mappa.
+
+`src/segnaletica_osm.py` non legge niente da `data/`: usava degli estratti `t*.xml` che non sono stati salvati (vedi `todo.md`, Segnaletica).

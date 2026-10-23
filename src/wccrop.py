@@ -1,6 +1,6 @@
-# Ritaglia ESA WorldCover sull'area del gioco: data/ESA_WorldCover_...tif -> data/wc/wc.npy + wc_meta.txt
+# Ritaglia ESA WorldCover sull'area del gioco: data/worldcover/ESA_WorldCover_...tif -> data/worldcover/wc/wc.npy + wc_meta.txt
 import tifffile, numpy as np, sys, os
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+DATA = os.path.join(os.environ.get('GTA_DATA', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')), 'worldcover')
 os.makedirs(os.path.join(DATA, 'wc'), exist_ok=True)
 f = os.path.join(DATA, 'ESA_WorldCover_10m_2021_v200_N45E009_Map.tif')
 with tifffile.TiffFile(f) as t:

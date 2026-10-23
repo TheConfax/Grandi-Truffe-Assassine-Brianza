@@ -13,7 +13,7 @@ Regola per tutto: niente stili, scritte o dettagli inventati. Quello che non vie
    - [ ] Classi di edifici (villette, condomini, capannoni, cascine) solo con i dati OSM (`building:colour`, `roof:shape`, `building:levels`) o con foto
 
 ## Priorità: parcheggi veri da OSM
-Prima di tutto il resto: vedi la sezione **Parcheggi** in fondo. I dati sono già in `data/maplarge.osm`, non serve aspettare Overpass.
+Prima di tutto il resto: vedi la sezione **Parcheggi** in fondo. I dati sono già in `data/osm/maplarge.osm`, non serve aspettare Overpass.
 
 ## Quote delle strade: da sistemare (analisi del 23/10 su `brianza.json`)
 Le quote vere del DBGT ci sono solo a Meda; altrove i ponti sono stimati (+6,6 m) e la quota scivola sulle rampe e sulle rotonde vicine.
@@ -52,7 +52,7 @@ Fatte in `src/negozi3.js` (dati: chiave `ng` in `brianza.json`, da `build_data.p
 
 ## Segnaletica
 - [ ] Segnaletica orizzontale: linee di arresto e scritte STOP, frecce di corsia, piste ciclabili, strisce blu (oggi ci sono le strisce pedonali, 510 attraversamenti)
-- [ ] Verticale: nel gioco c'è (901 cartelli in `src/segnaletica.json`, generati da `src/segnaletica_osm.py`), ma gli estratti OSM `t*.xml` usati per generarla non sono stati salvati. Rigenerarla da `data/maplarge.osm`, che ha 112 `traffic_sign` mappati, e salvare la sorgente in `data/`
+- [ ] Verticale: nel gioco c'è (901 cartelli in `src/segnaletica.json`, generati da `src/segnaletica_osm.py`), ma gli estratti OSM `t*.xml` usati per generarla non sono stati salvati. Rigenerarla da `data/osm/maplarge.osm`, che ha 112 `traffic_sign` mappati, e salvare la sorgente in `data/osm/`
 
 ## Mappa
 - [ ] Cercare gli edifici fantasma in mappa
@@ -122,7 +122,7 @@ Le foto sono in Viaggiare in Brianza (guide di Meda e Seveso).
 - I monumenti stanno in `src/landmarks3.js` (lista `LANDMARKS` in cima); `python src/assemble3.py` rigenera `index.html`.
 
 ## Parcheggi
-**Priorità.** Oggi i posti sono generati (strisce a pettine dentro i 921 contorni OSM `amenity=parking`). In `data/maplarge.osm` ci sono già 1964 `amenity=parking_space`, 134 parcheggi con `capacity` e 37 strade con `parking:*`:
+**Priorità.** Oggi i posti sono generati (strisce a pettine dentro i 921 contorni OSM `amenity=parking`). In `data/osm/maplarge.osm` ci sono già 1964 `amenity=parking_space`, 134 parcheggi con `capacity` e 37 strade con `parking:*`:
 - [ ] Importare in `build_data.py` i posti veri `amenity=parking_space`, la `capacity` dei parcheggi e i parcheggi lungo strada `parking:left/right/both`
 - [ ] Usare i posti veri dove ci sono (forma, direzione, disabili), la `capacity` come tetto per quelli generati
 - [ ] Posti in linea lungo le strade, strisce blu a pagamento in centro

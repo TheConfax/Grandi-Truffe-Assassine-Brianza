@@ -1,5 +1,5 @@
 """Build the game data for the big Brianza map.
-usage: build_data.py map.osm dem.tif out.json S N W E
+usage: build_data.py map.osm dem.tif out.json S N W E   (or python src/build.py, which checks data/ and passes the right arguments)
 World frame: x = east (m), z = south (m), origin = centre of the cut. Integers are decimetres."""
 import json, math, sys, heapq, hashlib, base64
 def key(p): return (round(p[0]), round(p[1]))
@@ -140,12 +140,12 @@ for members, t in rels:
 import os
 DATA = os.environ.get('GTA_DATA', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data'))
 # ------------------------------------------------------------------ DBGT, the second source (Regione Lombardia, Database GeoTopografico)
-# data/dbt/<Comune>/dbgt.gpkg, as the Geoportale gives it. Inside each comune's boundary (data/confini_comuni.json) it is the reference for
+# data/dbt/<Comune>/dbgt.gpkg, as the Geoportale gives it. Inside each comune's boundary (data/osm/confini_comuni.json) it is the reference for
 # walls and fences (EL_DIV) and for the height of buildings (UN_VOL); OSM stays the base everywhere else
 import sqlite3
 from shapely import wkb as _wkb
 from shapely.ops import polygonize
-CONF = os.path.join(DATA, 'confini_comuni.json'); DBT_DIR = os.path.join(DATA, 'dbt')
+CONF = os.path.join(DATA, 'osm', 'confini_comuni.json'); DBT_DIR = os.path.join(DATA, 'dbt')
 _t7791 = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True)
 def _gpkg_geom(blob): f_ = blob[3]; return _wkb.loads(bytes(blob[8 + [0, 32, 48, 48, 64][(f_ >> 1) & 7]:]))
 def _xy(coords):  # RDN2008 UTM 32N (x, y, z, m) -> game metres
@@ -185,7 +185,7 @@ for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
 dbt_cover = unary_union(_cov).buffer(-3) if _cov else GeometryCollection()  # a few metres inside the boundary: the neighbour's data meets it
 prepare(dbt_cover)
 log('dbgt: muri e recinzioni', len(dbt_walls), 'volumi', len(dbt_vols), 'comuni', len(_cov))
-OVT = os.path.join(DATA, 'edifici_overture.geojson')
+OVT = os.path.join(DATA, 'overture', 'edifici_overture.geojson')
 ms_h, ms_only = {}, []
 if os.path.exists(OVT):
     for f_ in json.load(open(OVT, encoding='utf-8'))['features']:
@@ -301,7 +301,7 @@ for wid, (refs, t) in ways.items():
         pts = ring(refs)
         if len(pts) >= 3: land.append((k_, pts))
 log('terreni', len(land), dict(Counter(k.split(':')[0] + (':' + k.split(':')[1] if k.startswith('sport') else '') for k, _ in land)))
-WCF = os.path.join(DATA, 'wc', 'wc.npy')
+WCF = os.path.join(DATA, 'worldcover', 'wc', 'wc.npy')
 WC = None; WC_BUILT = None
 if os.path.exists(WCF):
     WC = np.load(WCF); wlon0, wlat0, wsx = map(float, open(WCF.replace('wc.npy', 'wc_meta.txt')).read().split())
@@ -1229,9 +1229,9 @@ for wid, (refs, t) in ways.items():
         c_ = centroid(ring(refs))
         if inside(c_, 0): plots.append([q(c_[0]), q(c_[1]), int(num(t['capacity'], 0))])
 # ---- comune boundaries: where a road crosses from one comune into the next, the town signs. [x, z, ux, uz, road width, comune ahead, comune behind]
-# the boundaries come from data/confini_comuni.json (Overpass, admin_level 8 with geometry): the map extract has none
+# the boundaries come from data/osm/confini_comuni.json (Overpass, admin_level 8 with geometry): the map extract has none
 bway, bgeo = defaultdict(set), {}
-CONF = os.path.join(DATA, 'confini_comuni.json')
+CONF = os.path.join(DATA, 'osm', 'confini_comuni.json')
 if os.path.exists(CONF):
     for e_ in json.load(open(CONF, encoding='utf-8'))['elements']:
         nm_ = e_.get('tags', {}).get('name')
