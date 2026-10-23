@@ -86,6 +86,60 @@ def sample(X, Z):
 TSTEP, TM = 10.0, 480
 txs = np.arange(-HW - TM, HW + TM + TSTEP, TSTEP); tzs = np.arange(-HH - TM, HH + TM + TSTEP, TSTEP)
 TX, TZ = np.meshgrid(txs, tzs); TH = sample(TX, TZ); assert (TH > -100).all()
+# LiDAR DTM of the Ministero dell'Ambiente (PST-A, 1 m, flown 2008-2010) where we have it: the tiles of the Geoportale Nazionale in
+# data/terreno/lidar/ (GeoTIFF or ESRI ASCII grid, in degrees or UTM 32N). Each node of the 10 m grid takes the mean of the 1 m cells around
+# it; TINITALY stays only where the LiDAR is missing, blended into it over LID_FADE cells (in town the two differ by up to 7 m)
+import os, glob
+DATA = os.environ.get('GTA_DATA', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data'))
+LID_FADE = 20
+def lidar_tiles(d_):
+    fs = sorted(f_ for f_ in glob.glob(os.path.join(d_, '**', '*'), recursive=True) if f_.lower().endswith(('.tif', '.tiff', '.asc')))
+    for f_ in fs:
+        if f_.lower().endswith('.asc'):
+            hd = {}
+            with open(f_) as fh:
+                for _ in range(6):
+                    k_, v_ = fh.readline().split(); hd[k_.lower()] = float(v_)
+                arr = np.loadtxt(fh, dtype=np.float32)
+            nd_ = hd.get('nodata_value'); cs = hd['cellsize']
+            x0_ = hd.get('xllcorner', hd.get('xllcenter', 0) - cs / 2); y0_ = hd.get('yllcorner', hd.get('yllcenter', 0) - cs / 2) + cs * arr.shape[0]
+            sx_ = sy_ = cs; epsg = 4326 if cs < 0.01 else 32632
+        else:
+            with tifffile.TiffFile(f_) as t_:
+                p_ = t_.pages[0]; tg = p_.tags; arr = p_.asarray().astype(np.float32)
+                sx_, sy_ = tg['ModelPixelScaleTag'].value[:2]; tp = tg['ModelTiepointTag'].value
+                x0_, y0_ = tp[3] - tp[0] * sx_, tp[4] + tp[1] * sy_
+                gk = tg['GeoKeyDirectoryTag'].value if 'GeoKeyDirectoryTag' in tg else (); gk = {gk[i]: gk[i + 3] for i in range(4, len(gk) - 3, 4)}
+                epsg = gk.get(3072) if gk.get(3072) not in (None, 32767) else (gk.get(2048) if gk.get(2048) not in (None, 32767) else (4326 if sx_ < 0.01 else 32632))
+                nd_ = float(tg['GDALNoDataTag'].value) if 'GDALNoDataTag' in tg else None
+        if nd_ is not None: arr[arr == nd_] = np.nan
+        arr[(arr < -100) | (arr > 5000)] = np.nan
+        yield arr, x0_, y0_, sx_, sy_, int(epsg)
+LS, LN = np.zeros(TH.shape), np.zeros(TH.shape); _nlid = 0
+_glon, _glat = lon0 + TX / KX, lat0 - TZ / KZ
+for arr, x0_, y0_, sx_, sy_, epsg in lidar_tiles(os.path.join(DATA, 'terreno', 'lidar')):
+    if epsg == 4326: gx, gy, mx, my = _glon, _glat, sx_ * KX, sy_ * KZ
+    else: (gx, gy), mx, my = Transformer.from_crs('EPSG:4326', 'EPSG:%d' % epsg, always_xy=True).transform(_glon, _glat), sx_, sy_
+    kx, kz = max(1, round(TSTEP / mx)), max(1, round(TSTEP / my))
+    c_, r_ = (gx - x0_) / sx_, (y0_ - gy) / sy_
+    sel = (c_ > -kx) & (c_ < arr.shape[1] + kx) & (r_ > -kz) & (r_ < arr.shape[0] + kz)
+    if not sel.any(): continue
+    _nlid += 1; cs_, rs_ = c_[sel] - kx / 2, r_[sel] - kz / 2
+    for dx in range(kx):
+        ci = np.floor(cs_ + dx + 0.5).astype(int)
+        for dz in range(kz):
+            ri = np.floor(rs_ + dz + 0.5).astype(int); ok = (ci >= 0) & (ci < arr.shape[1]) & (ri >= 0) & (ri < arr.shape[0])
+            v_ = np.full(ci.shape, np.nan, np.float32); v_[ok] = arr[ri[ok], ci[ok]]; ok &= ~np.isnan(v_)
+            LS[sel] += np.where(ok, v_, 0); LN[sel] += ok
+    _kk = kx * kz
+if _nlid:
+    lid = LN >= 0.5 * _kk; TL = np.where(lid, LS / np.maximum(LN, 1), np.nan)
+    w_, cur = lid.astype(np.float32), lid.copy()
+    for _ in range(LID_FADE):  # how many cells inside the covered part, up to LID_FADE (the edge of the grid does not count as missing)
+        pd = np.pad(cur, 1, constant_values=True); cur = cur & pd[:-2, 1:-1] & pd[2:, 1:-1] & pd[1:-1, :-2] & pd[1:-1, 2:]; w_ += cur
+    w_ /= LID_FADE + 1
+    log('lidar: tessere', _nlid, 'griglia coperta %.0f%%' % (lid.mean() * 100), 'TINITALY - LiDAR mediana %.2f m, p90 %.2f m' % (np.nanmedian(TH - TL), np.nanpercentile(TH - TL, 90)))
+    TH = np.where(lid, TL * w_ + TH * (1 - w_), TH)
 TBASE = float(TH.min())
 def ground(x, z):
     fx = min(max((x - txs[0]) / TSTEP, 0), len(txs) - 1.001); fz = min(max((z - tzs[0]) / TSTEP, 0), len(tzs) - 1.001)
@@ -137,8 +191,6 @@ for members, t in rels:
     if 'building' in t:
         ir = join_rings(inners)
         for o in join_rings(outers): add_building(o, ir, t, outers[0] if outers else 'r')
-import os
-DATA = os.environ.get('GTA_DATA', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data'))
 # ------------------------------------------------------------------ DBGT, the second source (Regione Lombardia, Database GeoTopografico)
 # data/dbt/<Comune>/dbgt.gpkg, as the Geoportale gives it. Inside each comune's boundary (data/osm/confini_comuni.json) it is the reference for
 # walls and fences (EL_DIV) and for the height of buildings (UN_VOL); OSM stays the base everywhere else

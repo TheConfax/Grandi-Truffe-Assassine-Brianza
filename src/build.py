@@ -30,6 +30,11 @@ if missing:
     sys.exit(1)
 dbt = sorted(os.path.basename(os.path.dirname(f)) for f in glob.glob(os.path.join(DATA, 'dbt', '*', 'dbgt.gpkg')))
 print('dati a posto; DBGT usati:', ', '.join(dbt))
+# il LiDAR del Ministero è facoltativo: dove manca resta TINITALY. Il riquadro con il margine di 480 m sta in 54 tessere da 0,01 gradi
+lid = [f for f in glob.glob(os.path.join(DATA, 'terreno', 'lidar', '**', '*'), recursive=True) if f.lower().endswith(('.tif', '.tiff', '.asc'))]
+want = ['D%d%04d' % (la, lo) for la in range(4563, 4569) for lo in range(911, 920)]
+named = [t for t in want if any(t in os.path.basename(f).upper() for f in lid)]
+print('LiDAR: %d file in terreno/lidar' % len(lid) + ('' if not lid or not named else ', mancano le tessere ' + (', '.join(t for t in want if t not in named) or 'nessuna')))
 
 out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'brianza.json')
 env = dict(os.environ, GTA_DATA=DATA, PYTHONIOENCODING='utf-8')
