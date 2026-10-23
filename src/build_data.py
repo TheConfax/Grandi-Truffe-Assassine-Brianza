@@ -1329,6 +1329,26 @@ if os.path.exists(CONF):
 pl_by = {t['name']: nodes[r_] for r_, t in ntags.items() if t.get('place') in ('city', 'town', 'village') and t.get('name')}
 blines = [(LineString(bgeo[w_]), sorted(n_)) for w_, n_ in bway.items() if len(n_) == 2 and len(bgeo[w_]) >= 2]
 cartelli = []
+# the two posts stand 3 m before and after the crossing, w/2 + 1.2 m to the right of each driver (as paesaggio3.js draws them). Where the
+# boundary runs along another street (via Vignazzola) the side street crosses it at the junction and the posts would land on that street:
+# the pair slides along its own road, away from the junction, up to CL_SLIDE m, or is left out
+CL_SLIDE = 30
+_clr = [r for r in raw_roads if r['c'] <= 5 and flat(r) and r['line'].length > 0.1]; _clt = STRtree([r['line'] for r in _clr])
+def _cl_free(r0, x, z, ux, uz, w):
+    rx, rz, off = -uz, ux, w / 2 + 1.2
+    for sx, sz in ((x - ux * 3 + rx * off, z - uz * 3 + rz * off), (x + ux * 3 - rx * off, z + uz * 3 - rz * off)):
+        P_ = Point(sx, sz)
+        if any(_clr[k] is not r0 and _clr[k]['line'].distance(P_) < _clr[k]['w'] / 2 + 0.6 for k in _clt.query(P_.buffer(8))): return False
+    return True
+nmoved = ndrop = nside = nrep = nminor = 0
+CL_MAXC = 1  # only main streets and through roads get them: between towns grown into each other the residential streets have none (Carlo, 23/10)
+# a street that runs along the boundary (more than CL_ALONG m of it within 12 m of the line) zigzags across it: it gets one pair per
+# CL_GAP m of the same name, and the side streets that meet it right at the boundary get none (no sign at every turning)
+CL_ALONG, CL_GAP = 40, 250
+_bu = unary_union([b_[0] for b_ in blines]).buffer(12) if blines else GeometryCollection()
+_along = [r for r in _clr if r['line'].intersection(_bu).length > CL_ALONG] if blines else []
+_alt = STRtree([r['line'] for r in _along]) if _along else None
+_cl_by_name = defaultdict(list)
 if blines:
     _bt = STRtree([b_[0] for b_ in blines])
     for r in raw_roads:
@@ -1343,8 +1363,22 @@ if blines:
                 d_ = L_.project(p_); a_ = L_.interpolate(max(0, d_ - 2)); b_ = L_.interpolate(min(L_.length, d_ + 2)); ux, uz = b_.x - a_.x, b_.y - a_.y; l_ = math.hypot(ux, uz) or 1; ux /= l_; uz /= l_
                 ahead, behind = (p_.x + ux * 40, p_.y + uz * 40), (p_.x - ux * 40, p_.y - uz * 40)
                 fwd, back = (na, nb) if math.dist(ahead, pl_by[na]) + math.dist(behind, pl_by[nb]) <= math.dist(ahead, pl_by[nb]) + math.dist(behind, pl_by[na]) else (nb, na)
-                cartelli.append([q(p_.x), q(p_.y), round(ux, 3), round(uz, 3), r['w'], fwd, back])
-log('cartelli di paese', len(cartelli), 'confini', len(blines))
+                if r['c'] > CL_MAXC: nminor += 1; continue
+                if _alt is not None and any(_along[k] is not r and (_along[k]['n'] != r['n'] or r['n'] < 0) and _along[k]['c'] < r['c'] and _along[k]['line'].distance(p_) < 15 for k in _alt.query(p_.buffer(15))): nside += 1; continue
+                if r['n'] >= 0 and any(math.dist(o_, (p_.x, p_.y)) < CL_GAP for o_ in _cl_by_name[(r['n'], na, nb)]): nrep += 1; continue
+                spot = None
+                for s_ in range(0, CL_SLIDE + 1, 3):
+                    for sg_ in ((1,) if s_ == 0 else (1, -1)):
+                        dd_ = d_ + sg_ * s_
+                        if not 4 <= dd_ <= L_.length - 4 and s_: continue
+                        c_ = L_.interpolate(min(max(dd_, 0), L_.length))
+                        if _cl_free(r, c_.x, c_.y, ux, uz, r['w']): spot = c_; break
+                    if spot is not None: break
+                if spot is None: ndrop += 1; continue
+                if spot.distance(p_) > 0.5: nmoved += 1
+                if r['n'] >= 0: _cl_by_name[(r['n'], na, nb)].append((p_.x, p_.y))
+                cartelli.append([q(spot.x), q(spot.y), round(ux, 3), round(uz, 3), r['w'], fwd, back])
+log('cartelli di paese', len(cartelli), 'confini', len(blines), 'spostati via da un incrocio', nmoved, 'senza posto', ndrop, 'laterali di una via sul confine', nside, 'ripetuti sulla stessa via', nrep, 'su vie minori', nminor)
 log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1), 'parcheggi con capienza', len(plots), 'strade con sosta', sum(1 for r in raw_roads if r.get('pk')))
 # ------------------------------------------------------------------ graph & tiles
 used_nodes = {}

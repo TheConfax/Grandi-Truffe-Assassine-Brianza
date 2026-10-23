@@ -5302,20 +5302,20 @@ function* buildPaesaggio(T, G) {
     SIGN_MATS.push(mat); mkMesh(sb, mat, 10, false, G);
   }
   // town signs where a road crosses into the next comune: on the right of whoever arrives, the white sign with the name of the town ahead;
-  // on its back, for those going the other way and leaving it, the same name struck through in red
+  // on its back, for those going the other way and leaving it, the same name struck through in red. Each one is a prop you can knock down
+  // like the other road signs: a group with its foot on the ground (two legs, the panel, the two faces), down for good once hit
   if ((d.cl || []).length) {
-    const faces = []; // [centre x, y, z, normal x, z, name, end?]
+    const signs = []; // [x, y, z, normal x, z, name]
     for (const [X, Z, ux, uz, w, fwd, back] of d.cl) {
       const x = X / 10, z = Z / 10, rx = -uz, rz = ux, off = w / 2 + 1.2;
       for (const [sx, sz, nx, nz, name] of [[x - ux * 3 + rx * off, z - uz * 3 + rz * off, -ux, -uz, fwd], [x + ux * 3 - rx * off, z + uz * 3 - rz * off, ux, uz, back]]) {
-        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5)) continue; const gy = surfAt(sx, sz), ex = nz, ez = -nx;
-        for (const o of [-0.68, 0.68]) { box(0.06, 2.55, 0.06, sx + ex * o - nx * 0.05, gy + 1.27, sz + ez * o - nz * 0.05, '#8f949a'); solidAt(sx + ex * o, sz + ez * o, 0.08, 2.5); } // two legs, one at each side
-        box(1.52, 1.02, 0.04, sx, gy + 2.0, sz, '#e8e6e0', Math.atan2(nx, nz));
-        faces.push([sx + nx * 0.025, gy + 2.0, sz + nz * 0.025, nx, nz, name, false], [sx - nx * 0.025, gy + 2.0, sz - nz * 0.025, -nx, -nz, name, true]);
+        if (inBuilding(sx, sz, 0.3) || nearRail(sx, sz, 2.5)) continue;
+        signs.push([sx, surfAt(sx, sz), sz, nx, nz, name]);
       }
     }
-    if (faces.length) {
-      const CW = 300, CH = 200, cv = document.createElement('canvas'); cv.width = CW * 2; cv.height = CH * Math.ceil(faces.length / 2); const g = cv.getContext('2d'), sb = Buf();
+    if (signs.length) {
+      const CW = 300, CH = 200, cv = document.createElement('canvas'); cv.width = CW * 2; cv.height = CH * signs.length; const g = cv.getContext('2d');
+      const CL = (globalThis.__CL ||= { props: new Map(), legG: new THREE.BoxGeometry(0.06, 2.55, 0.06), panelG: new THREE.BoxGeometry(1.52, 1.02, 0.04), legM: new THREE.MeshLambertMaterial({ color: '#8f949a' }), panelM: new THREE.MeshLambertMaterial({ color: '#e8e6e0' }) });
       // the name in a plain sans, as big as it fits, broken between words over two or three lines when it is long
       const signLines = name => {
         const words = name.toUpperCase().split(/\s+/), F_ = s => `bold ${s}px Arial, Helvetica, sans-serif`; let best = null;
@@ -5325,17 +5325,30 @@ function* buildPaesaggio(T, G) {
         }
         return best;
       };
-      faces.forEach(([cx, cy, cz, nx, nz, name, end], i) => {
-        const col = i % 2, row = Math.floor(i / 2), X0 = col * CW, Y0 = row * CH, L = signLines(name);
-        g.save(); g.translate(X0, Y0); g.fillStyle = '#ffffff'; g.fillRect(0, 0, CW, CH); g.strokeStyle = '#111111'; g.lineWidth = 8; g.strokeRect(12, 12, CW - 24, CH - 24);
-        g.fillStyle = '#111111'; g.font = `bold ${Math.floor(L.size)}px Arial, Helvetica, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-        L.ls.forEach((ln, k) => g.fillText(ln, CW / 2, CH / 2 + (k - (L.ls.length - 1) / 2) * L.size * 1.15 + L.size * 0.04));
-        if (end) { g.strokeStyle = '#c8102e'; g.lineWidth = 14; g.beginPath(); g.moveTo(24, CH - 24); g.lineTo(CW - 24, 24); g.stroke(); }
-        g.restore();
-        const ex = nz, ez = -nx, u0 = col / 2 + 0.003, u1 = (col + 1) / 2 - 0.003, v1 = 1 - Y0 / cv.height - 0.003, v0 = 1 - (Y0 + CH) / cv.height + 0.003, j = sb.p.length / 3;
-        vtx(sb, cx - ex * 0.75, cy - 0.5, cz - ez * 0.75, nx, 0, nz, u0, v0); vtx(sb, cx + ex * 0.75, cy - 0.5, cz + ez * 0.75, nx, 0, nz, u1, v0); vtx(sb, cx + ex * 0.75, cy + 0.5, cz + ez * 0.75, nx, 0, nz, u1, v1); vtx(sb, cx - ex * 0.75, cy + 0.5, cz - ez * 0.75, nx, 0, nz, u0, v1); sb.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
+      // one row of the atlas per sign: the name on the left, struck through on the right for its back
+      signs.forEach(([sx, gy, sz, nx, nz, name], i) => {
+        const L = signLines(name);
+        for (const end of [false, true]) {
+          g.save(); g.translate(end ? CW : 0, i * CH); g.fillStyle = '#ffffff'; g.fillRect(0, 0, CW, CH); g.strokeStyle = '#111111'; g.lineWidth = 8; g.strokeRect(12, 12, CW - 24, CH - 24);
+          g.fillStyle = '#111111'; g.font = `bold ${Math.floor(L.size)}px Arial, Helvetica, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+          L.ls.forEach((ln, k) => g.fillText(ln, CW / 2, CH / 2 + (k - (L.ls.length - 1) / 2) * L.size * 1.15 + L.size * 0.04));
+          if (end) { g.strokeStyle = '#c8102e'; g.lineWidth = 14; g.beginPath(); g.moveTo(24, CH - 24); g.lineTo(CW - 24, 24); g.stroke(); }
+          g.restore();
+        }
       });
-      const tex = new THREE.CanvasTexture(cv), mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(mat); mkMesh(sb, mat, 10, false, G);
+      const tex = new THREE.CanvasTexture(cv), mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(mat);
+      signs.forEach(([sx, gy, sz, nx, nz], i) => {
+        const root = new THREE.Group(); root.position.set(sx, gy, sz); root.rotation.y = Math.atan2(nx, nz); G.add(root); // local +z: towards whoever arrives
+        for (const o of [-0.68, 0.68]) { const l = new THREE.Mesh(CL.legG, CL.legM); l.position.set(o, 1.27, -0.05); l.castShadow = true; root.add(l); }
+        const pnl = new THREE.Mesh(CL.panelG, CL.panelM); pnl.position.set(0, 2.0, 0); pnl.castShadow = true; root.add(pnl);
+        for (const [col, fz, ry] of [[0, 0.025, 0], [1, -0.025, Math.PI]]) {
+          const pg = new THREE.PlaneGeometry(1.5, 1.0), uv = pg.attributes.uv, u0 = col / 2 + 0.003, u1 = (col + 1) / 2 - 0.003, v1 = 1 - i * CH / cv.height - 0.003, v0 = 1 - (i + 1) * CH / cv.height + 0.003;
+          uv.setXY(0, u0, v1); uv.setXY(1, u1, v1); uv.setXY(2, u0, v0); uv.setXY(3, u1, v0);
+          const f = new THREE.Mesh(pg, mat); f.position.set(0, 2.0, fz); f.rotation.y = ry; root.add(f);
+        }
+        const key = sx.toFixed(1) + ',' + sz.toFixed(1), pr = CL.props.get(key); // built again: what was knocked down stays down
+        if (!pr) CL.props.set(key, addProp({ x: sx, z: sz, y: gy, r: 0.8, h: 3, obj: root })); else { pr.obj = root; if (pr.broken) root.rotation.x = -1.45; }
+      });
     }
   }
   yield 'terreni';
