@@ -5,6 +5,16 @@ Censimento del 23/10/2026, numeri contati sul DBGT di Meda e su `data/osm/maplar
 ## Priorità di Carlo
 Muri, recinzioni e passi carrai: oggi sono molto sbagliati. Sono il primo pezzo del motore nuovo. Fonti: DBGT `EL_DIV` (16 728 tratti a Meda) e `ACC_PC` (4 553 passi carrai), con una tabella di traduzione dei tipi per comune (ogni rilievo li classifica a modo suo, vedi `docs/dati.md`) e le foto di Mapillary per controllare i casi dubbi (tipo `95`, "altro", che a Meda è la maggior parte).
 
+Cosa sa il DBGT di Meda sui muri (analisi del 23/10): dove passano e la quota al piede, non l'altezza (`EL_DIV_QE` vuoto ovunque) né com'è fatto il 74% dei tratti (12 366 di tipo `95`, "altro"; il resto: 2 585 reti, 1 667 staccionate, 80 recinzioni, 18 cancellate). Dei 4 553 passi carrai 2 393 stanno entro 1,5 m da un muro o una recinzione, quasi tutti di tipo `95`.
+
+Come rifarli (Carlo, 23/10: "dobbiamo fare diversi ragionamenti, forse anche giocando"):
+- Una sola lista di barriere che unisce DBGT, OSM (`barrier=*`, ottimo dove c'è) e le recinzioni di cantiere, con una regola su chi vince dove si sovrappongono
+- Il tipo: OSM dove lo dice; per gli altri una regola dal contesto (verso strada davanti a una casa, tra giardini, lungo un campo, attorno a una fabbrica) tarata su un campione di foto Mapillary; l'altezza tipica per tipo
+- Aperture: un cancello carraio a ogni passo carraio vicino a un muro; capire se `ACC_INT` (3 731) sono gli ingressi pedonali
+- Cosa si sfonda (reti, staccionate, siepi, transenne di cantiere) e cosa no (muri pieni)
+- Ferrovie fatte bene: sede, recinzioni, sottopassi e passaggi a livello dal DBGT con le quote vere
+- Controlli nella build: cancelli che non danno su una strada o un vialetto, giardini chiusi senza aperture, muri che attraversano una strada o un edificio
+
 ## Forma e quota del mondo: DBGT sul terreno LiDAR
 
 | Cosa | Fonte | A Meda | Note |
