@@ -22,26 +22,54 @@
   "UN_VOL_POR 04": 199,
   "UN_VOL_POR 08": 67
  },
+ "aggiornamenti_dbgt": {
+  "volumi_superati": 8,
+  "volumi_tagliati": 1
+ },
  "offset_dbgt_lidar": {
-  "valore": 0.094,
+  "valore": 0.095,
   "p10": -0.36,
-  "p90": 0.58,
-  "n": 7063
+  "p90": 0.59,
+  "n": 7055
  },
  "edifici_dbgt": 5525,
- "volumi": 7565,
+ "volumi": 7557,
  "accessi": 3731,
  "osm": {
-  "osm_sostituiti": 3687,
+  "osm_sostituiti": 3611,
+  "osm_in_parte_senza_dbgt": 76,
   "osm_senza_dbgt": 64,
   "doppi_al_confine": 4,
+  "tagliati_al_confine": 6,
   "overture_tolti": 1115,
-  "osm_tagliati_sulle_carreggiate": 1,
+  "osm_tagliati_sulle_carreggiate": 4,
   "osm_tolti_sulle_carreggiate": 7
  },
  "osm_senza_dbgt": {
-  "n": 64,
+  "n": 144,
+  "m2": 39035,
   "dove": [
+   [
+    232.2,
+    -296.3,
+    847,
+    "yes",
+    "parte"
+   ],
+   [
+    240.7,
+    -326.2,
+    109,
+    "yes",
+    "parte"
+   ],
+   [
+    219.8,
+    -344.4,
+    16,
+    "yes",
+    "parte"
+   ],
    [
     -642.9,
     85.7,
@@ -49,10 +77,80 @@
     "yes"
    ],
    [
+    1605.5,
+    -447.0,
+    163,
+    "yes",
+    "parte"
+   ],
+   [
+    -1038.4,
+    -332.4,
+    77,
+    "yes",
+    "parte"
+   ],
+   [
     274.5,
     -78.6,
     132,
     "service"
+   ],
+   [
+    904.8,
+    -364.5,
+    186,
+    "residential",
+    "parte"
+   ],
+   [
+    888.7,
+    -374.7,
+    61,
+    "residential",
+    "parte"
+   ],
+   [
+    1102.1,
+    466.4,
+    209,
+    "residential",
+    "parte"
+   ],
+   [
+    328.8,
+    -227.1,
+    6557,
+    "industrial",
+    "parte"
+   ],
+   [
+    498.7,
+    -1362.4,
+    464,
+    "yes",
+    "parte"
+   ],
+   [
+    755.2,
+    -1310.0,
+    201,
+    "yes",
+    "parte"
+   ],
+   [
+    632.4,
+    -1507.4,
+    157,
+    "yes",
+    "parte"
+   ],
+   [
+    630.3,
+    -1489.0,
+    56,
+    "yes",
+    "parte"
    ],
    [
     1837.3,
@@ -85,16 +183,72 @@
     "yes"
    ],
    [
+    556.5,
+    -338.8,
+    262,
+    "roof",
+    "parte"
+   ],
+   [
+    214.1,
+    -503.9,
+    82,
+    "yes",
+    "parte"
+   ],
+   [
+    507.5,
+    -193.7,
+    260,
+    "apartments",
+    "parte"
+   ],
+   [
     1341.2,
     -355.5,
     12,
     "service"
    ],
    [
+    1599.2,
+    330.9,
+    248,
+    "apartments",
+    "parte"
+   ],
+   [
     1750.3,
     295.0,
     264,
     "yes"
+   ],
+   [
+    -399.6,
+    420.7,
+    334,
+    "grandstand",
+    "parte"
+   ],
+   [
+    -414.6,
+    336.1,
+    370,
+    "grandstand",
+    "parte"
+   ],
+   [
+    -408.1,
+    378.3,
+    769,
+    "grandstand",
+    "parte"
+   ],
+   [
+    1696.3,
+    115.1,
+    322,
+    "yes",
+    "parte"
    ],
    [
     772.7,
@@ -115,10 +269,31 @@
     "yes"
    ],
    [
+    244.7,
+    -154.2,
+    3609,
+    "commercial",
+    "parte"
+   ],
+   [
     268.3,
     -220.7,
     1206,
     "commercial"
+   ],
+   [
+    -522.7,
+    -522.8,
+    49,
+    "roof",
+    "parte"
+   ],
+   [
+    -861.0,
+    -1874.2,
+    179,
+    "yes",
+    "parte"
    ],
    [
     -313.1,
@@ -127,16 +302,65 @@
     "grandstand"
    ],
    [
+    -807.6,
+    -31.2,
+    275,
+    "yes",
+    "parte"
+   ],
+   [
+    1145.2,
+    625.6,
+    166,
+    "yes",
+    "parte"
+   ],
+   [
     411.4,
     -107.9,
     117,
     "greenhouse"
    ],
    [
+    611.8,
+    -331.7,
+    95,
+    "yes",
+    "parte"
+   ],
+   [
+    1016.9,
+    -108.6,
+    100,
+    "house",
+    "parte"
+   ],
+   [
+    1021.2,
+    -7.7,
+    337,
+    "apartments",
+    "parte"
+   ],
+   [
+    998.3,
+    -3.7,
+    22,
+    "apartments",
+    "parte"
+   ],
+   [
     788.1,
     -139.6,
     110,
     "roof"
+   ],
+   [
+    -714.2,
+    56.9,
+    106,
+    "yes",
+    "parte"
    ],
    [
     977.0,
@@ -151,10 +375,45 @@
     "yes"
    ],
    [
+    1392.9,
+    -521.4,
+    87,
+    "yes",
+    "parte"
+   ],
+   [
+    568.0,
+    -591.3,
+    2890,
+    "yes",
+    "parte"
+   ],
+   [
     -76.5,
     -1811.2,
     186,
     "industrial"
+   ],
+   [
+    1149.3,
+    -76.2,
+    77,
+    "yes",
+    "parte"
+   ],
+   [
+    1626.4,
+    -926.9,
+    1700,
+    "industrial",
+    "parte"
+   ],
+   [
+    1108.5,
+    -197.7,
+    134,
+    "industrial",
+    "parte"
    ],
    [
     552.0,
@@ -167,6 +426,13 @@
     286.6,
     16,
     "yes"
+   ],
+   [
+    756.6,
+    -944.7,
+    349,
+    "yes",
+    "parte"
    ],
    [
     1017.4,
@@ -197,6 +463,20 @@
     -1616.9,
     58,
     "yes"
+   ],
+   [
+    68.0,
+    -1536.4,
+    54,
+    "yes",
+    "parte"
+   ],
+   [
+    56.5,
+    -1529.4,
+    85,
+    "yes",
+    "parte"
    ],
    [
     -90.6,
@@ -265,6 +545,27 @@
     "yes"
    ],
    [
+    1025.1,
+    518.7,
+    162,
+    "greenhouse",
+    "parte"
+   ],
+   [
+    1347.7,
+    567.3,
+    133,
+    "greenhouse",
+    "parte"
+   ],
+   [
+    1166.6,
+    639.7,
+    119,
+    "garage",
+    "parte"
+   ],
+   [
     1245.7,
     528.7,
     210,
@@ -277,16 +578,58 @@
     "roof"
    ],
    [
+    916.8,
+    244.9,
+    98,
+    "yes",
+    "parte"
+   ],
+   [
     639.6,
     -51.3,
     42,
     "garage"
    ],
    [
+    756.0,
+    45.9,
+    197,
+    "industrial",
+    "parte"
+   ],
+   [
+    194.9,
+    504.5,
+    127,
+    "yes",
+    "parte"
+   ],
+   [
+    143.0,
+    573.1,
+    54,
+    "garage",
+    "parte"
+   ],
+   [
     132.4,
     758.3,
     103,
     "garage"
+   ],
+   [
+    263.3,
+    777.7,
+    147,
+    "yes",
+    "parte"
+   ],
+   [
+    436.8,
+    571.8,
+    98,
+    "yes",
+    "parte"
    ],
    [
     570.5,
@@ -307,6 +650,13 @@
     "garage"
    ],
    [
+    -718.1,
+    362.0,
+    76,
+    "garage",
+    "parte"
+   ],
+   [
     -616.0,
     472.2,
     43,
@@ -325,6 +675,27 @@
     "yes"
    ],
    [
+    -471.4,
+    -285.1,
+    104,
+    "garage",
+    "parte"
+   ],
+   [
+    -474.6,
+    -277.7,
+    87,
+    "garage",
+    "parte"
+   ],
+   [
+    -583.1,
+    -219.0,
+    182,
+    "industrial",
+    "parte"
+   ],
+   [
     -549.5,
     -230.7,
     30,
@@ -335,6 +706,34 @@
     -163.1,
     83,
     "garage"
+   ],
+   [
+    -282.1,
+    -250.8,
+    189,
+    "yes",
+    "parte"
+   ],
+   [
+    -212.1,
+    -130.6,
+    86,
+    "garage",
+    "parte"
+   ],
+   [
+    -218.8,
+    -129.3,
+    79,
+    "garage",
+    "parte"
+   ],
+   [
+    -263.2,
+    -122.1,
+    62,
+    "garage",
+    "parte"
    ],
    [
     -151.0,
@@ -355,10 +754,73 @@
     "house"
    ],
    [
+    1433.0,
+    647.7,
+    214,
+    "yes",
+    "parte"
+   ],
+   [
+    -632.2,
+    -348.4,
+    388,
+    "industrial",
+    "parte"
+   ],
+   [
+    -271.1,
+    -58.9,
+    51,
+    "garage",
+    "parte"
+   ],
+   [
+    -200.1,
+    -82.5,
+    154,
+    "industrial",
+    "parte"
+   ],
+   [
+    -195.1,
+    -91.7,
+    205,
+    "industrial",
+    "parte"
+   ],
+   [
     -758.3,
     160.3,
     62,
     "garage"
+   ],
+   [
+    612.9,
+    305.2,
+    168,
+    "garage",
+    "parte"
+   ],
+   [
+    601.3,
+    299.1,
+    137,
+    "garage",
+    "parte"
+   ],
+   [
+    502.3,
+    173.8,
+    46,
+    "garage",
+    "parte"
+   ],
+   [
+    793.8,
+    308.7,
+    63,
+    "garage",
+    "parte"
    ],
    [
     967.5,
@@ -367,10 +829,24 @@
     "garage"
    ],
    [
+    1002.7,
+    205.5,
+    86,
+    "garage",
+    "parte"
+   ],
+   [
     1009.8,
     207.8,
     24,
     "garage"
+   ],
+   [
+    354.3,
+    -323.0,
+    394,
+    "apartments",
+    "parte"
    ],
    [
     -391.2,
@@ -379,10 +855,24 @@
     "yes"
    ],
    [
+    -838.8,
+    -701.8,
+    102,
+    "yes",
+    "parte"
+   ],
+   [
     -902.2,
     -1058.6,
     112,
     "yes"
+   ],
+   [
+    560.2,
+    -544.1,
+    626,
+    "yes",
+    "parte"
    ],
    [
     599.5,
@@ -397,10 +887,38 @@
     "yes"
    ],
    [
+    1655.2,
+    391.3,
+    103,
+    "yes",
+    "parte"
+   ],
+   [
     1576.7,
     382.5,
     37,
     "garage"
+   ],
+   [
+    -509.7,
+    -512.7,
+    49,
+    "roof",
+    "parte"
+   ],
+   [
+    -594.5,
+    -443.2,
+    79,
+    "garage",
+    "parte"
+   ],
+   [
+    -626.9,
+    -510.8,
+    45,
+    "garage",
+    "parte"
    ],
    [
     -323.3,
@@ -415,6 +933,34 @@
     "yes"
    ],
    [
+    -371.4,
+    -493.0,
+    117,
+    "yes",
+    "parte"
+   ],
+   [
+    74.1,
+    -619.4,
+    57,
+    "yes",
+    "parte"
+   ],
+   [
+    -255.2,
+    -533.5,
+    127,
+    "garage",
+    "parte"
+   ],
+   [
+    -227.1,
+    -490.5,
+    187,
+    "yes",
+    "parte"
+   ],
+   [
     354.4,
     -1950.9,
     74,
@@ -425,63 +971,83 @@
     -1682.6,
     23,
     "yes"
+   ],
+   [
+    -64.0,
+    -417.2,
+    369,
+    "yes",
+    "parte"
+   ],
+   [
+    187.7,
+    -518.9,
+    240,
+    "yes",
+    "parte"
+   ],
+   [
+    310.3,
+    -791.1,
+    111,
+    "yes",
+    "parte"
    ]
   ]
  },
  "volumi_disegnati": {
-  "a_terra": 7063,
+  "a_terra": 7055,
   "alti_02": 28,
   "alti_04": 198,
   "sotterranei": 67,
   "alti_03": 209
  },
  "tipi": {
-  "yes": 2142,
-  "shed": 1118,
-  "garage": 961,
-  "industrial": 496,
-  "house": 215,
-  "apartments": 215,
-  "residential": 161,
+  "yes": 2149,
+  "shed": 1119,
+  "garage": 962,
+  "industrial": 494,
+  "house": 214,
+  "apartments": 212,
+  "residential": 159,
   "commercial": 62,
   "garages": 26,
   "chapel": 24,
   "school": 20,
   "retail": 20,
-  "roof": 17,
+  "roof": 16,
+  "public": 12,
   "church": 11,
-  "public": 10,
   "service": 10,
   "warehouse": 3,
   "kindergarten": 3,
   "civic": 2,
   "train_station": 2,
-  "grandstand": 2,
   "office": 1,
   "kiosk": 1,
   "hospital": 1,
   "supermarket": 1,
   "villa": 1
  },
- "attributi_da_osm": 2878,
+ "attributi_da_osm": 2847,
  "tetti": {
   "dal_dsm": {
    "piano": 2449,
-   "a_falde": 1224,
+   "a_falde": 1222,
    "a_una_falda": 183,
    "a_padiglione": 462,
    "da_osm_roof_shape": 4
   },
   "non_dal_dsm": {
-   "irregolare": 1081,
-   "troppo_ripido": 147,
+   "irregolare": 1080,
+   "troppo_ripido": 145,
    "piccolo": 862,
    "basso": 261,
    "chiome": 24,
-   "alto": 333,
-   "complesso": 182,
+   "alto": 332,
+   "complesso": 181,
    "non_copre": 273,
-   "senza_dsm": 17
+   "senza_dsm": 16
   },
   "colmo_sulla_gronda": {
    "p50": 2.32,
@@ -495,6 +1061,10 @@
   "dove": []
  },
  "doppi_dbgt_osm": {
+  "n": 0,
+  "dove": []
+ },
+ "doppi_dbgt_dbgt": {
   "n": 0,
   "dove": []
  }

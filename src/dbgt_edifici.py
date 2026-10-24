@@ -33,6 +33,8 @@ sys.path.insert(0, HERE)
 import dbgt_quote as dq
 
 FREE_D = 3.0       # an OSM building with no DBGT building within this distance stays (docs/motore.md 7)
+FAR_MIN, FAR_SH = 30.0, 0.25   # ... and one whose part farther than FREE_D from every DBGT building is this big (m2, share of it) is not the
+                   # DBGT's: that part stays, cut off the DBGT buildings
 EDGE_DUP = 0.3     # an OSM building outside the comune overlapping a DBGT building by this share of its area is the same building
 MIN_VOL = 2.0      # volumes smaller than this (m2) are slivers
 RAISED = 1.0       # a volume whose base stands this far over the ground is raised (portico, passage, overhang)
@@ -178,10 +180,12 @@ def fit_tetto(job):
     return vid, res
 
 
-def _tetti_main(inp, out, dsm_dir):
+def _tetti_main(inp, out, dsm_dir, nproc=TETTI_PROC):
     import multiprocessing as mp
     jobs = pickle.load(open(inp, 'rb'))
-    with mp.Pool(TETTI_PROC, initializer=_dsm_init, initargs=(dsm_dir,)) as pool:
+    # in order of place, so that each chunk reads few DSM tiles (in any order every process ended up holding all 54: out of memory)
+    jobs.sort(key=lambda j: (int(j[1][:, 0].mean() // 250), int(j[1][:, 1].mean() // 250)))
+    with mp.Pool(nproc, initializer=_dsm_init, initargs=(dsm_dir,)) as pool:
         res = dict(pool.imap_unordered(fit_tetto, jobs, chunksize=64))
     pickle.dump(res, open(out, 'wb'))
 
@@ -221,13 +225,14 @@ class Edifici:
                     cens['%s_TY %s' % (tab, ty)] += 1
                 for cid, b in rows('select CLASSREF, Shape from %s_CR_EDF_IS' % tab):
                     if b is not None and cid in idx: self.ed[idx[cid]]['is'] = unary_union([p for p, z in poly(dq._geom(b))])
-            for oid, b, av, ced, por in rows('select OBJECTID, Shape, UN_VOL_AV, CEDIUV, UN_VOL_POR from UN_VOL'):
+            vrows = rows('select OBJECTID, Shape, UN_VOL_AV, CEDIUV, UN_VOL_POR, DATA_INI from UN_VOL') or [r + (None,) for r in rows('select OBJECTID, Shape, UN_VOL_AV, CEDIUV, UN_VOL_POR from UN_VOL')]
+            for oid, b, av, ced, por, di in vrows:
                 cens['UN_VOL_POR %s' % por] += 1
                 if b is None or ced not in idx or not av or float(av) <= 0: cens['volumi senza edificio o altezza'] += 1; continue
                 for p, zz in poly(dq._geom(b)):
                     if p.area < MIN_VOL: continue
                     zr = zz[(zz > 100) & np.isfinite(zz)] if zz is not None else np.zeros(0)
-                    self.vol.append(dict(p=p, av=float(av), por=por or '01', ed=idx[ced], zmin=float(zr.min()) if len(zr) else None, oid=oid))
+                    self.vol.append(dict(p=p, av=float(av), por=por or '01', ed=idx[ced], zmin=float(zr.min()) if len(zr) else None, oid=oid, gen=_gen(di, ced)))
                     self.ed[idx[ced]]['vols'].append(len(self.vol) - 1)
             for (b,) in rows('select Shape from ACC_INT'):
                 if b is None: continue
@@ -236,6 +241,7 @@ class Edifici:
                 if b is not None and zon != '0307' and sed in ('01', None): self.carr += [p for p, z in poly(dq._geom(b))]
             con.close()
         self.rep['censimento'] = dict(sorted(cens.items()))
+        self.aggiornati()
         for e in self.ed:  # the footprint: the ground plan (IS), or the union of the volumes
             if 'is' not in e or e['is'].is_empty: e['is'] = unary_union([self.vol[i]['p'] for i in e['vols']]) if e['vols'] else GeometryCollection()
         self.carr_u = unary_union(self.carr) if self.carr else GeometryCollection(); prepare(self.carr_u)
@@ -260,6 +266,34 @@ class Edifici:
         self.rep['edifici_dbgt'] = len(self.ed); self.rep['volumi'] = len(self.vol); self.rep['accessi'] = len(self.acc)
         log('dbgt edifici: edifici', len(self.ed), 'volumi', len(self.vol), 'accessi', len(self.acc), 'offset %+.2f m' % self.off, '%.0fs' % (time.time() - t0))
 
+    def aggiornati(self):
+        """The DBGT's later updates (UN_VOL DATA_INI 2019, or no DATA_INI and the date in the building's code, 20210831_...) add the new
+        volumes of a building without retiring the ones of the 2015 survey: at Meda 14 volumes of 2015 lie under a newer volume of another
+        building (the same house drawn twice, or a block redrawn in parts with their heights). The newer wins: an older volume covered by
+        newer volumes of other buildings for more than half its area goes, one covered less is cut off them."""
+        vs = self.vol
+        if not vs: return
+        t = STRtree([v['p'] for v in vs]); gone = cut = 0; touched = set()
+        for i, v in enumerate(vs):
+            nw = [vs[j]['p'] for j in t.query(v['p'], predicate='intersects') if vs[j]['ed'] != v['ed'] and vs[j]['gen'] > v['gen'] and vs[j]['por'] != '08']
+            if not nw or v['por'] == '08': continue
+            u = unary_union(nw); a = u.intersection(v['p']).area
+            if a <= 1.0: continue
+            if a > 0.5 * v['p'].area: v['via'] = True; gone += 1; touched.add(v['ed']); continue
+            ps = _parts(v['p'].difference(u.buffer(0.05)))
+            big = max(ps, key=lambda q: q.area) if ps else None
+            if big is None or big.area < MIN_VOL: v['via'] = True; gone += 1
+            else: v['p'] = big; cut += 1
+            touched.add(v['ed'])
+        if gone:
+            keep = [k for k, v in enumerate(vs) if not v.get('via')]; ren = {k: n for n, k in enumerate(keep)}
+            self.vol = [vs[k] for k in keep]
+            for e in self.ed: e['vols'] = [ren[k] for k in e['vols'] if k in ren]
+        for k in touched:  # its ground plan is the volumes that stay
+            e = self.ed[k]; e['is'] = unary_union([self.vol[j]['p'] for j in e['vols']]) if e['vols'] else GeometryCollection()
+        self.rep['aggiornamenti_dbgt'] = dict(volumi_superati=gone, volumi_tagliati=cut)
+        self.log('dbgt edifici: volumi superati da un aggiornamento', gone, 'tagliati', cut)
+
     # ---------------------------------------------------------------- OSM against the DBGT
     def unisci(self, buildings, P):
         """buildings: the OSM and Overture buildings of build_data.py (records with 'p', 'k', 'tg'); P(outer, holes) -> polygon.
@@ -278,11 +312,28 @@ class Edifici:
             inside = conf_u.contains(g.centroid)
             if inside:
                 if b.get('ml'): cnt['overture_tolti'] += 1; continue
+                far = None
                 if near:
-                    cnt['osm_sostituiti'] += 1
-                    for i in near:
-                        a = geo[i].intersection(g).area; sh = a / max(1e-6, min(g.area, geo[i].area))
-                        if sh > 0.2 and sh > best.get(i, (0,))[0]: best[i] = (sh, b.get('tg') or {}, b)
+                    # the DBGT has this building when (almost) all of it is within 3 m of DBGT buildings; a DBGT building at a corner of a
+                    # big OSM one does not make it the DBGT's (the Flou block, the Auxologico, Elbo Controlli, the stadium's stands were lost)
+                    nu = unary_union([geo[i] for i in near]); far = g.difference(nu.buffer(FREE_D))
+                    if far.area < max(FAR_MIN, FAR_SH * g.area):
+                        cnt['osm_sostituiti'] += 1
+                        for i in near:
+                            a = geo[i].intersection(g).area; sh = a / max(1e-6, min(g.area, geo[i].area))
+                            if sh > 0.2 and sh > best.get(i, (0,))[0]: best[i] = (sh, b.get('tg') or {}, b)
+                        continue
+                    # its part off the DBGT buildings stays (newer than the survey, or something the DBGT does not have)
+                    ps = [q for q in _parts(g.difference(nu.buffer(0.1))) if q.area >= 10]
+                    if not ps: cnt['osm_sostituiti'] += 1; continue
+                    cnt['osm_in_parte_senza_dbgt'] += 1
+                    for k, q in enumerate(sorted(ps, key=lambda q: -q.area)):
+                        bb = b if k == 0 else dict(b)
+                        q = q.simplify(0.05); bb['p'] = list(q.exterior.coords)[:-1]; bb['k'] = [list(h.coords)[:-1] for h in q.interiors if len(h.coords) >= 4]
+                        if not bb['k']: bb.pop('k')
+                        bb['osm_solo'] = True; c = q.centroid
+                        dove.append([round(c.x, 1), round(c.y, 1), round(q.area), (b.get('tg') or {}).get('building', 'yes'), 'parte'])
+                        kept_osm.append((bb, q))
                     continue
                 cnt['osm_senza_dbgt'] += 1; b['osm_solo'] = True
                 c = g.centroid; dove.append([round(c.x, 1), round(c.y, 1), round(g.area), (b.get('tg') or {}).get('building', 'yes')])
@@ -294,6 +345,13 @@ class Edifici:
                     sh = geo[i].intersection(g).area / max(1e-6, min(g.area, geo[i].area))
                     if sh > best.get(i, (0,))[0]: best[i] = (sh, b.get('tg') or {}, b)
                 continue
+            ov = [geo[i] for i in near if geo[i].intersection(g).area > 1.0]
+            if ov:  # just across the boundary and on a DBGT building by a little: cut off it (the DBGT's shape wins where it has one)
+                ps = _parts(g.difference(unary_union(ov).buffer(0.1))); big = max(ps, key=lambda q: q.area) if ps else None
+                if big is None or big.area < 10: cnt['doppi_al_confine'] += 1; continue
+                big = big.simplify(0.05); b['p'] = list(big.exterior.coords)[:-1]; b['k'] = [list(h.coords)[:-1] for h in big.interiors if len(h.coords) >= 4]
+                if not b['k']: b.pop('k')
+                cnt['tagliati_al_confine'] += 1
             keep.append(b)
         # the OSM buildings that stay are cut off the carriageways (the street always wins, as for OSM's own streets)
         ncut = ndrop = 0
@@ -310,7 +368,7 @@ class Edifici:
                         ncut += 1
             keep.append(b)
         cnt['osm_tagliati_sulle_carreggiate'] = ncut; cnt['osm_tolti_sulle_carreggiate'] = ndrop
-        self.rep['osm'] = dict(cnt); self.rep['osm_senza_dbgt'] = dict(n=len(dove), dove=dove[:200])
+        self.rep['osm'] = dict(cnt); self.rep['osm_senza_dbgt'] = dict(n=len(dove), m2=round(sum(o[2] for o in dove)), dove=dove[:400])
         # the DBGT buildings, volume by volume
         alti, terra = [], []
         ntipo, nvol = Counter(), Counter()
@@ -351,9 +409,11 @@ class Edifici:
         if jobs and os.path.isdir(self.dsm_dir):
             d = tempfile.mkdtemp(prefix='tetti_'); fi, fo = os.path.join(d, 'in.pkl'), os.path.join(d, 'out.pkl')
             pickle.dump(jobs, open(fi, 'wb'))
-            rc = subprocess.call([sys.executable, os.path.abspath(__file__), '--tetti', fi, fo, self.dsm_dir])
-            if rc == 0 and os.path.exists(fo): res = pickle.load(open(fo, 'rb'))
-            else: self.log('dbgt edifici: tetti dal DSM non riusciti, codice', rc)
+            for npr in sorted({TETTI_PROC, min(TETTI_PROC, 4), 1}, reverse=True):  # fewer processes when memory is short, never no roofs in silence
+                rc = subprocess.call([sys.executable, os.path.abspath(__file__), '--tetti', fi, fo, self.dsm_dir, str(npr)])
+                if rc == 0 and os.path.exists(fo): res = pickle.load(open(fo, 'rb')); break
+                self.log('dbgt edifici: tetti dal DSM non riusciti con', npr, 'processi, codice', rc)
+            else: raise RuntimeError('dbgt edifici: tetti dal DSM non riusciti')
         cnt, mot = Counter(), Counter(); rhs = []
         for k, r in enumerate(recs):
             f = res.get(k)
@@ -380,29 +440,45 @@ class Edifici:
     # ---------------------------------------------------------------- checks
     def controlli(self, buildings, P):
         """buildings on a carriageway, DBGT and OSM buildings on top of each other (after the build has done with them)"""
-        on, dup, dd = [], 0, []
-        osm = [(b, P(b['p'], b.get('k', []))) for b in buildings if b.get('osm_solo')]
-        osm = [(b, g) for b, g in osm if g is not None]
+        on, dup, dd, d2 = [], 0, [], []
+        # every building that is not the DBGT's near a comune (OSM kept inside, OSM and Overture just across the boundary)
+        near_c = unary_union([c for c in self.comuni if c is not None]).buffer(60) if self.comuni else GeometryCollection(); prepare(near_c)
+        osm = [(b, P(b['p'], b.get('k', []))) for b in buildings if not b.get('dbgt')]
+        osm = [(b, g) for b, g in osm if g is not None and near_c.intersects(g)]
         ot = STRtree([g for b, g in osm]) if osm else None
-        for b in buildings:
-            if not (b.get('dbgt') or b.get('osm_solo')): continue
-            g = P(b['p'], b.get('k', []))
-            if g is None: continue
+        dg = [(b, P(b['p'], b.get('k', []))) for b in buildings if b.get('dbgt')]; dg = [(b, g) for b, g in dg if g is not None]
+        dt = STRtree([g for b, g in dg]) if dg else None
+        for k, (b, g) in enumerate(dg + [(b, g) for b, g in osm if b.get('osm_solo')]):
             if self.carr_t is not None:
                 a = sum(self.carr[j].intersection(g).area for j in self.carr_t.query(g, predicate='intersects'))
                 if a > 1.0: c = g.centroid; on.append([round(c.x, 1), round(c.y, 1), round(a, 1), 'dbgt' if b.get('dbgt') else 'osm'])
-            if b.get('dbgt') and ot is not None:
+            if not b.get('dbgt'): continue
+            if ot is not None:
                 for j in ot.query(g, predicate='intersects'):
                     a = osm[j][1].intersection(g).area
                     if a > 1.0: dup += 1; c = g.centroid; dd.append([round(c.x, 1), round(c.y, 1), round(a, 1)])
+            for j in dt.query(g, predicate='intersects'):  # volumes of two DBGT buildings on top of each other
+                if j <= k or dg[j][0].get('e') == b.get('e'): continue
+                a = dg[j][1].intersection(g).area
+                if a > 1.0: c = g.centroid; d2.append([round(c.x, 1), round(c.y, 1), round(a, 1)])
         self.rep['su_carreggiata'] = dict(n=len(on), m2=round(sum(o[2] for o in on), 1), dove=sorted(on, key=lambda o: -o[2])[:50])
         self.rep['doppi_dbgt_osm'] = dict(n=dup, dove=dd[:50])
-        self.log('dbgt edifici: su una carreggiata', len(on), '(%.0f m2)' % self.rep['su_carreggiata']['m2'], 'doppi DBGT+OSM', dup)
+        self.rep['doppi_dbgt_dbgt'] = dict(n=len(d2), dove=d2[:50])
+        self.log('dbgt edifici: su una carreggiata', len(on), '(%.0f m2)' % self.rep['su_carreggiata']['m2'], 'doppi DBGT+OSM', dup, 'DBGT+DBGT', len(d2))
 
     def sintesi(self):
         r = self.rep
         return dict(edifici_dbgt=r.get('edifici_dbgt'), volumi=r.get('volumi_disegnati'), osm=r.get('osm'), tetti=r.get('tetti'), su_carreggiata=r.get('su_carreggiata', {}).get('n'),
-                    doppi_dbgt_osm=r.get('doppi_dbgt_osm', {}).get('n'), accessi=r.get('accessi'), offset=r.get('offset_dbgt_lidar', {}).get('valore'))
+                    doppi_dbgt_osm=r.get('doppi_dbgt_osm', {}).get('n'), doppi_dbgt_dbgt=r.get('doppi_dbgt_dbgt', {}).get('n'), aggiornamenti=r.get('aggiornamenti_dbgt'), accessi=r.get('accessi'), offset=r.get('offset_dbgt_lidar', {}).get('valore'))
+
+
+def _gen(di, ced):
+    """when a volume entered the DBGT, as yyyymmdd: its DATA_INI, or the date its building's code starts with (the updates without DATA_INI)"""
+    s = str(di or '')
+    if len(s) >= 10 and s[:4].isdigit() and s[5:7].isdigit() and s[8:10].isdigit(): return int(s[:4] + s[5:7] + s[8:10])
+    c = str(ced or '')
+    if len(c) >= 8 and c[:8].isdigit() and c[:2] in ('19', '20') and 1 <= int(c[4:6]) <= 12: return int(c[:8])
+    return 0
 
 
 def _num(v):
@@ -412,6 +488,6 @@ def _num(v):
 
 if __name__ == '__main__':
     if len(sys.argv) >= 4 and sys.argv[1] == '--tetti':
-        _tetti_main(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else os.path.join(dq.DATA, 'terreno', 'lidar_dsm'))
+        _tetti_main(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else os.path.join(dq.DATA, 'terreno', 'lidar_dsm'), int(sys.argv[5]) if len(sys.argv) > 5 else TETTI_PROC)
     else:
         print(__doc__ or 'uso: python src/dbgt_edifici.py --tetti in.pkl out.pkl [dsm]')
