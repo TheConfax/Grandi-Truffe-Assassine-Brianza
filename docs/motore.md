@@ -335,5 +335,11 @@ Le fasi 1-6 hanno preso dal DBGT solo le quote: terreno, ponti, acqua, altezze. 
 
 **Ordine.** (a) strade e marciapiedi e (b) verde e alberi in parallelo; poi (c) edifici, con un controllo apposta su negozi, vetrine, ingressi e modelli. Ogni pezzo ha lavoro e verifica indipendente; alla fine un collaudo su tutti i punti di `docs/collaudo.md`.
 
+**Edifici fatti a mano (`LANDMARKS`, 48 in `landmarks3.js`) con le impronte del DBGT.** Oggi un modello si aggancia all'edificio OSM il cui centro sta entro 2 m dal suo punto (`landmarks3.js` r. 104, e `also` per le torri a parte); molti hanno coordinate disegnate su quell'impronta (`f`, `front`, `tower`, `canopy`, `base`, `wings`, i chiostri e `YARDS`). Con `EDIFC`:
+- l'aggancio va per sovrapposizione: l'impronta DBGT che contiene il punto del modello o che copre di più la vecchia impronta OSM (e tutte le impronte DBGT che il modello copre, come fa oggi `also`); nessun modello resta senza il suo edificio;
+- il modello è fatto a mano dalle foto e resta dov'è: le sue coordinate non si toccano; l'impronta DBGT sotto serve solo a togliere l'edificio generico, mai modello e scatola insieme;
+- dove l'impronta DBGT esce dal modello in modo visibile, o un altro edificio DBGT entra nei suoi volumi, si scrive nel rapporto per ogni modello (scarto in m) e si decide caso per caso, senza spostare il modello;
+- controllo: 48 modelli agganciati su 48, nessuna scatola generica sotto o dentro un modello, collisioni e cartelli dei modelli come prima; foto prima/dopo di ogni modello (camera dall'alto e dalla strada).
+
 **Controlli della build (nuovi, nel rapporto).** Nessun parapetto, guard rail, palo, cartello, albero o arredo dentro `AC_VEI`; nessun edificio su una carreggiata; assi delle corsie dentro `AC_VEI` (distanza dal bordo ≥ metà corsia); `osm_senza_dbgt` e `dbgt_senza_osm` con coordinate; marciapiedi e piazze disegnati contro `AC_PED` + `AR_STR` (area e IoU).
 
