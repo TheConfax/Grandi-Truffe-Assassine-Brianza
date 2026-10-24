@@ -788,11 +788,15 @@ function* roadBarriers(T) {
       const ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, rx = -uz, rz = ux, ya = H.node(ia), yb = H.node(ib), ns = Math.max(1, Math.round(L / 2));
       for (const sd of [1, -1]) {
         const flag = [], ex = rx * sd, ez = rz * sd;
+        // past the sidewalk: where the edge of the asphalt is on a sidewalk (step 1) the rail goes on its outer edge, not across it (rifinitura
+        // 24/10: under the railway bridge of via Milano the drawn road is now flat to its edge and the rail stood in the middle of the sidewalk)
+        const sideOff = (cx, cz) => { let o = 0; for (; o < 3.5; o += 0.25) { const s = H.stepAt ? H.stepAt(cx + ex * (hw + 0.35 + o), cz + ez * (hw + 0.35 + o)) : null; if (!s || s.kind !== 1) break; } return o > 0 ? o + 0.2 : 0; };
+        const tm = (A[0] + B[0]) / 2, zm = (A[1] + B[1]) / 2, so = sideOff(tm, zm), offS = hw + 0.35 + so;
         for (let q = 0; q < ns; q++) {
           const t = (q + 0.5) / ns, cx = A[0] + (B[0] - A[0]) * t, cz = A[1] + (B[1] - A[1]) * t, yc = H.surface(cx, cz, lerp(ya, yb, t) + 0.5);
           let rail = null;
           if (!nearJ(cx, cz, hw + 8)) {
-            const gx = cx + ex * (hw + 0.35), gz = cz + ez * (hw + 0.35), yE = H.surface(gx, gz, yc + 0.3);
+            const gx = cx + ex * offS, gz = cz + ez * offS, yE = H.surface(gx, gz, yc + 0.3);
             const onCore = H.deckAt(gx, gz).some(o => o.d.nucleo && inPoly(gx, gz, o.d.nucleo) && Math.abs(o.top - yc) < 0.6); // the parapets of the deck
             let other = false; ROADSEG.each(gx - 4, gz - 4, gx + 4, gz + 4, o => { if (!other && o.r !== r && o.r.c <= 5 && segDist(gx, gz, o.a[0], o.a[1], o.b[0], o.b[1]) < o.r.w / 2 + 0.3 && Math.abs(lerp(H.node(o.ia), H.node(o.ib), 0.5) - yE) < 1.5) other = true; });
             if (!onCore && !other) {
@@ -811,7 +815,7 @@ function* roadBarriers(T) {
           if (flag[q] === null) continue;
           let a = q, b = q; while (a > 0 && flag[a - 1] !== null) a--; while (b < ns - 1 && flag[b + 1] !== null) b++;
           if (b - a + 1 < 3 && !(a === 0 && b === ns - 1 && L < 6)) continue;
-          const t0 = q / ns, t1 = (q + 1) / ns, off = hw + 0.35, x0 = A[0] + (B[0] - A[0]) * t0 + ex * off, z0 = A[1] + (B[1] - A[1]) * t0 + ez * off, x1 = A[0] + (B[0] - A[0]) * t1 + ex * off, z1 = A[1] + (B[1] - A[1]) * t1 + ez * off;
+          const t0 = q / ns, t1 = (q + 1) / ns, off = offS, x0 = A[0] + (B[0] - A[0]) * t0 + ex * off, z0 = A[1] + (B[1] - A[1]) * t0 + ez * off, x1 = A[0] + (B[0] - A[0]) * t1 + ex * off, z1 = A[1] + (B[1] - A[1]) * t1 + ez * off;
           const y0 = q > a ? (flag[q - 1] + flag[q]) / 2 : flag[q], y1 = q < b ? (flag[q + 1] + flag[q]) / 2 : flag[q];
           res.rails.push([x0, z0, y0, x1, z1, y1]); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ex, nz: -ez, two: true, y0: Math.min(y0, y1) - 0.8, y1: Math.max(y0, y1) + 2.5, deckw: true });
         }
