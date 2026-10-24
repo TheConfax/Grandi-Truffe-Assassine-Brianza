@@ -12,14 +12,18 @@ Regola per tutto: niente stili, scritte o dettagli inventati. Quello che non vie
    - [ ] Fabbriche e mobilifici, campi sportivi per sport, oratori, asili, edicole votive (sezione qui sotto)
    - [ ] Classi di edifici (villette, condomini, capannoni, cascine) solo con i dati OSM (`building:colour`, `roof:shape`, `building:levels`) o con foto
 
-## Motore nuovo (ramo `motore`, deciso il 23/10)
-Oggi terreno, strade, ponti, acqua e trincee sono strati separati, ognuno con la sua regola per l'altezza, e i glitch nascono dove non sono d'accordo. Il motore nuovo ne fa un modello unico, calcolato nella build: un terreno fine dove strade, trincee, argini e letto del Seveso sono già alla quota vera, con ponti, gallerie e muri di sostegno come oggetti sopra o dentro. Il gioco ha una sola funzione dell'altezza per grafica, auto e pedoni. Auto, pedoni, polizia, missioni, negozi e monumenti restano come sono.
-Ordine: prima il motore (in locale), poi la mappa allargata ai comuni interi, poi gli edifici fatti a mano.
-- [ ] Fase 0, decisioni di Carlo: confine della zona di gioco (confini dei comuni o linea lungo strade e ferrovie), margine visibile ma chiuso (500 m o 1 km), transenne alle uscite
-- [ ] Fase 1, dati per gli otto comuni interi più il margine: LiDAR 1 m, OSM, Overture, confini, DBGT dei comuni del margine, reticolo idrico e uso del suolo della Regione, numeri civici, cartelli (Mapillary, serve il token di Carlo). Per ogni fonte: cosa contiene davvero, licenza, data, dove non va d'accordo con le altre. Le regole su chi vince si scrivono una volta sola
-- [ ] Fase 2, la build del modello unico: terreno a 2 m vicino a strade, fiumi e paesi, più grosso lontano, a pezzi da 250 m; rapporto automatico dei controlli (punte, rotonde rialzate, incroci a raso, ponti senza niente sotto, trincee non confermate dal LiDAR) e screenshot da punti fissi prima/dopo
-- [ ] Fase 3, il gioco legge il formato nuovo, a zone caricate quando ti avvicini; misurare il telefono prima di fissare la risoluzione
-- [ ] Fase 4, una zona per volta partendo da Meda, finché controlli e screenshot sono puliti; poi entra in `main`
+## Motore nuovo (ramo `motore`, deciso il 23/10; aggiornato il 24/10)
+Il mondo intero dal DBGT: forma e quota di tutto ciò che si vede (terreno, strade, marciapiedi, ferrovia, acqua, verde, alberi, edifici, manufatti) dal DBGT sul LiDAR; OSM solo per cos'è una cosa (nomi, sensi, negozi) e per ciò che il DBGT non ha. Piano in `docs/motore.md` (sezioni 1-6 il terreno, sezione 7 il disegno), fonti in `docs/fonti.md` e `docs/dati.md`, punti di Carlo in `docs/collaudo.md`. Meda è la sandbox: si lavora lì finché Carlo non l'ha vista e commentata. Solo in locale (http://localhost:8013/), niente `main` senza il suo sì. Stato dei lavori in corso: http://127.0.0.1:8020/.
+- [x] Fasi 1-6 su Meda (quote DBGT, terreno unico S, impalcati, acqua, `altezze3.js`, superfici ritagliate, fisica), verificate il 24/10; rifinitura del fiume
+- [ ] Sezione 7, in corso dal 24/10: strade e marciapiedi (assi `EL_STR`, `AC_VEI`, `AC_PED`, cortili); ferrovia sugli assi `EL_FER` e confini dal DBGT, insieme alle strade; verde e alberi; manufatti, aree attrezzate, parcheggi, acqua ferma, altezza degli alberi dal DSM; poi edifici (`EDIFC`, `UN_VOL`, tetti dal DSM) con tutti i pezzi fatti a mano spenti e messi in `src/_vecchi/`; poi il collaudo degli agenti
+- [ ] Giro di Carlo su Meda dopo il collaudo, e un giro di correzioni dai suoi commenti
+- [ ] Da controllare nel collaudo: le strade sui ponti si disegnano sull'impalcato, non anche sul terreno sotto
+- [ ] Dopo il giro di Carlo: avvio veloce (i 202 `.bin` di `terreno/` in un file solo); fase 7, il livello lontano oltre 760 m
+- [ ] Prima di estendere la mappa: codice generico per comune (oggi `superficie.py`, `impalcati.py`, `dbgt_quote.py`, `build.py` hanno `comune='Meda'`), build su tutti i core (con le strade nuove dura 25 minuti per la sola Meda), rapporto `docs/portabilita.md` sulle differenze fra i DBGT dei comuni
+- [ ] Fase 8, la mappa estesa ai comuni interi: DBGT di Seveso, Lentate, Barlassina, Cabiate, Mariano, Cesano, Seregno (scaricati ed estratti in `data/dbt/<Comune>/estratto/`), le 33 tessere LiDAR mancanti; chiude il gradino della Milano-Meda sul confine con Seveso (punto 22) e i dossi dei cavalcavia nel margine fuori da Meda
+- [ ] Fase 9, pulizia del motore vecchio
+- [ ] Aperti, per dopo: luci notturne di auto e lampioni tagliate dal terreno sui dossi; prestazioni delle tile (più lente col motore nuovo, 27 000 alberi a Meda); marca della concessionaria da OSM o Overture (punto 17); il Billy's che non si vede (punto 26)
+- [ ] Edifici fotorealistici in serie, dopo: tipi brianzoli fatti con parametri, attributi di ogni edificio dalle foto di Mapillary, colori dei tetti dall'ortofoto, i pezzi forti rifatti a mano dagli screenshot di Carlo (idee del 24/10)
 
 ## Priorità: parcheggi veri da OSM
 Prima di tutto il resto: vedi la sezione **Parcheggi** in fondo. I dati sono già in `data/osm/maplarge.osm`, non serve aspettare Overpass.
