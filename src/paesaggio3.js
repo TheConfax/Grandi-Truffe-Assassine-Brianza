@@ -74,7 +74,7 @@ function* buildPaesaggio(T, G) {
       const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; let open = 0;
       for (let t = 1; t <= 8; t += 1) { if (inBuilding(mx + nx * t, mz + nz * t)) break; open++; }
       if (open < 4) continue;
-      let road = 0; ROADSEG.each(mx - 25, mz - 25, mx + 25, mz + 25, s => { if (!s.r.d && segDist(mx + nx * 6, mz + nz * 6, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 12) road = 1; });
+      let road = 0; ROADSEG.each(mx - 25, mz - 25, mx + 25, mz + 25, s => { if (atGrade(s) && segDist(mx + nx * 6, mz + nz * 6, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 12) road = 1; });
       walls.push({ a, c, L, nx, nz, ux: (c[0] - a[0]) / L, uz: (c[1] - a[1]) / L, score: L * (1 + road) + open });
     }
     if (!walls.length) continue;

@@ -1,17 +1,23 @@
 // ---------------------------------------------------------------- trains (Milano-Asso, Saronno-Seregno, Milano-Chiasso)
 // the height of a train in a tile of S (docs/motore.md 3.1, fase 6): the railway deck under the line, or S (the rail bed), sampled every 2 m
 // along it. The OSM line strays up to 3 m off the DBGT axes, and on the railway bridge over the Seveso (PONTE 11) it fell off the deck
-// into the bed (1.7 m): a deck within 3 m across the line counts, and a 10 m median takes the single samples that still fall off. Outside
+// into the bed (1.7 m): a deck within 3 m across the line counts, S is taken on the nearest cell of rail bed, and a 10 m median takes the
+// single samples that still fall off. Outside
 // S the old profile (the line's own heights, else the ground)
 const TRAIN_STEP = 2;
 function trainProfile(L, pos, old) {
-  const n = Math.floor(L / TRAIN_STEP) + 2, raw = new Float32Array(n), fine = new Uint8Array(n);
+  const n = Math.floor(L / TRAIN_STEP) + 2, raw = new Float32Array(n), fine = new Uint8Array(n); let prev = null;
   for (let k = 0; k < n; k++) {
-    const s = Math.min(L, k * TRAIN_STEP), [x, z, h] = pos(s), g = H.base(x, z); fine[k] = H.fineAt(x, z) ? 1 : 0;
-    if (!fine[k]) { raw[k] = old(s); continue; }
-    let y = g; const rx = Math.cos(h), rz = -Math.sin(h); // across the line
-    for (const o of [0, -1.5, 1.5, -3, 3]) for (const d of H.deckAt(x + rx * o, z + rz * o)) if (d.tipo === 'ferro' && d.top > y && d.top - g > 1) y = d.top;
-    raw[k] = y;
+    const s = Math.min(L, k * TRAIN_STEP), [x, z, h] = pos(s); fine[k] = H.fineAt(x, z) ? 1 : 0;
+    if (!fine[k]) { raw[k] = old(s); prev = null; continue; }
+    const rx = Math.cos(h), rz = -Math.sin(h); let g = H.base(x, z); // across the line: S on the nearest cell of rail bed (material 6) within 3 m, else under the line
+    for (const o of [0, -0.75, 0.75, -1.5, 1.5, -2.25, 2.25, -3, 3]) if (H.mat(x + rx * o, z + rz * o) === 6) { g = H.base(x + rx * o, z + rz * o); break; }
+    // the candidates: the rail bed and the railway decks within 3 m across; the one nearest the height the train has (a deck starts at the
+    // level of the bed at its spalle, so a train runs onto its own bridge, and stays on the bed under the bridge of another line: PONTE 13
+    // crosses the Milano-Asso 6 m over it at x -485, z 90, and the train jumped up onto it)
+    const cand = [g]; for (const o of [0, -1.5, 1.5, -3, 3]) for (const d of H.deckAt(x + rx * o, z + rz * o)) if (d.tipo === 'ferro') cand.push(d.top);
+    let y = g; if (prev !== null) { y = cand[0]; for (const c of cand) if (Math.abs(c - prev) < Math.abs(y - prev)) y = c; }
+    raw[k] = prev = y;
   }
   const out = Float32Array.from(raw);
   for (let k = 2; k < n - 2; k++) if (fine[k]) { const w = [raw[k - 2], raw[k - 1], raw[k], raw[k + 1], raw[k + 2]].sort((a, b) => a - b); out[k] = w[2]; }

@@ -20,7 +20,27 @@ const BUILDINGS = [];
 const SIDEG = new Grid(24), DECKG = new Grid(16), ROADSEG = new Grid(24), STREETS = new Grid(24), NODEG = new Grid(40);
 const SIDE_H = 0.15;
 const PLATG = new Grid(24), PLAT_H = 0.55; // railway platforms (banchine), raised above the rails
-function onAnyRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !s.r.d && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
+// a road segment on the ground: not an old elevated way (r.d), or one that in a tile of S runs on S (the Milano-Meda had a viaduct in the old
+// engine and is in its trench in S: the signs of the junction by (108, 46) were placed as if it were up in the air, in the middle of it, collaudo 3)
+function atGrade(s) {
+  if (!s.r.d) return true;
+  if (s.gr === undefined) { const mx = (s.a[0] + s.b[0]) / 2, mz = (s.a[1] + s.b[1]) / 2; s.gr = H.fineAt(mx, mz) && (H.node(s.ia) + H.node(s.ib)) / 2 - H.base(mx, mz) < 0.8; }
+  return s.gr;
+}
+// a thing of the street furniture standing on the asphalt of a road on the ground: moved square to it, 0.9 m past its edge, on the side it
+// stood (what build_data.py off_carriageway does, but there the old elevated ways do not count: a pole stood in the middle of the Milano-Meda
+// at the junction by (108, 46), collaudo 3); null if it still lands on a road
+function offRoad(x, z) {
+  for (let k = 0; k < 3; k++) {
+    let best = null, bd = 1e9; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (s.r.c > 5 || s.r.t || !atGrade(s)) return; const d = segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) - s.r.w / 2; if (d < 0.3 && d < bd) { bd = d; best = s; } });
+    if (!best) return [x, z];
+    const ex = best.b[0] - best.a[0], ez = best.b[1] - best.a[1], L = hyp(ex, ez) || 1, t = clamp(((x - best.a[0]) * ex + (z - best.a[1]) * ez) / (L * L), 0, 1), cx = best.a[0] + ex * t, cz = best.a[1] + ez * t;
+    let nx = -ez / L, nz = ex / L; if ((x - cx) * nx + (z - cz) * nz < 0) { nx = -nx; nz = -nz; }
+    x = cx + nx * (best.r.w / 2 + 0.9); z = cz + nz * (best.r.w / 2 + 0.9);
+  }
+  return onAnyRoad(x, z, 0.3) ? null : [x, z];
+}
+function onAnyRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && atGrade(s) && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
 function segDist(px, pz, ax, az, bx, bz) { const ex = bx - ax, ez = bz - az, L2 = ex * ex + ez * ez || 1; const t = clamp(((px - ax) * ex + (pz - az) * ez) / L2, 0, 1); return hyp(px - ax - ex * t, pz - az - ez * t); }
 function resample(pts, step) {
   const o = [pts[0]];
@@ -280,7 +300,7 @@ function placeAt(x, z) {
 function nearestRoadPoint(x, z, maxC = 5, R = 60) {
   let best = null, bd = 1e9;
   ROADSEG.each(x - R, z - R, x + R, z + R, s => {
-    if (s.r.c > maxC || s.r.d || s.r.t) return; const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.a[0]) * ex + (z - s.a[1]) * ez) / L2, 0, 1);
+    if (s.r.c > maxC || !atGrade(s) || s.r.t) return; const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.a[0]) * ex + (z - s.a[1]) * ez) / L2, 0, 1);
     const px = s.a[0] + ex * t, pz = s.a[1] + ez * t, d = hyp(px - x, pz - z);
     if (d < bd && !inBuilding(px, pz, 0)) { bd = d; best = { x: px, z: pz, r: { minHalf: s.r.mh }, d }; }
   });
@@ -709,7 +729,7 @@ function deckOutline(dk) {
 const roadsOn = dk => dk.rset || (dk.rset = new Set(dk.ra.map(i => D.roads[i])));
 // is (x, z) on a road, a railway or the river bed of S (where no pillar may stand), roads on the deck itself apart
 function busyGround(dk, x, z) {
-  for (const [dx, dz] of [[0, 0], [1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6]]) { const m = H.mat(x + dx, z + dz); if (m === 1 || m === 4 || m === 6) return true; }
+  for (let k = 0; k < 17; k++) { const r = k ? (k <= 8 ? 1.6 : 3.4) : 0, a = k * TAU / 8, m = H.mat(x + r * Math.cos(a), z + r * Math.sin(a)); if (m === 1 || m === 4 || m === 6) return true; } // asphalt, river bed, rail bed within 3.4 m (a train is 2.9 m wide)
   let f = false; const own = roadsOn(dk); ROADSEG.each(x - 14, z - 14, x + 14, z + 14, s => { if (!f && !own.has(s.r) && s.r.c <= 6 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 1.5) f = true; });
   if (f) return true;
   if (dk.tipo !== 'ferro') RAILG.each(x - 4, z - 4, x + 4, z + 4, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < 3.5) f = true; }); // (on a railway deck its own rails run over the point)
@@ -1597,7 +1617,7 @@ for (const p of D.pois) {
     let road = null;
     for (let t = 1; t <= 45 && !road; t += 0.75) {
       const x = mx + nx * t, z = mz + nz * t; if (t > 1.5 && inBuilding(x, z)) break;
-      ROADSEG.each(x - 1, z - 1, x + 1, z + 1, s => { if (!road && s.r.c <= 5 && !s.r.d && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2) road = { t, s }; });
+      ROADSEG.each(x - 1, z - 1, x + 1, z + 1, s => { if (!road && s.r.c <= 5 && atGrade(s) && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2) road = { t, s }; });
     }
     const score = (road ? road.t : 80) - Math.min(L, 24) * 0.5;
     if (!F || score < F.score) F = { score, a, c, L, mx, mz, nx, nz, road };

@@ -434,7 +434,7 @@ function ngPropGeo(key) {
 }
 
 // ---- where each front goes: the wall of the building the shop is in (or the nearest one) that looks onto a street; shops sharing a wall split it
-function ngRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !s.r.d && s.r.c <= 5 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
+function ngRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && atGrade(s) && s.r.c <= 5 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
 // how far in front of a wall the first real street is (not a service road or a driveway), up to 26 m: a shop set back behind its front
 // garden opens onto the street, not onto the yard behind (Billy's in via Vespucci faced its back lane)
 // returns how far it is, the road's class and whether it is the street of the shop's address (Mikka, via Indipendenza 174, faced a side street)

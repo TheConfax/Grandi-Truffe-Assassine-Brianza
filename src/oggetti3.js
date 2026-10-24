@@ -122,6 +122,7 @@ function updOggetti(dt) { // a jolt in the car when you take a bump fast
   const [cf] = v.circles(); if (bumpAt(cf[0], cf[1]) > 0.02) { shake = Math.max(shake, Math.min(0.7, 0.12 + v.speed * 0.025)); bumpT = 0.5; if (v.speed > 14) sfxCrash(2); }
 }
 
+const OGG_ON_ROAD_K = new Set(['dosso', 'rallentatore', 'piattaforma', 'traliccio', 'antenna', 'torre_acqua', 'lavaggio']); // as build_data.py OGG_ON_ROAD
 function buildOggetti(T, G) {
   const list = T.d.og || [], by = {};
   for (let i = 0; i < list.length; i++) { const o = list[i], k = OGG_KINDS[o[0]]; if (!k) continue; (by[k] = by[k] || []).push([o[1] / 10, o[2] / 10, o[3], o[4], i]); }
@@ -143,7 +144,9 @@ function buildOggetti(T, G) {
   // everything else: one instance each
   const o3 = new THREE.Object3D();
   for (const k in OGG_GEO) {
-    const items = (by[k] || []).filter(([x, z]) => k === 'traliccio' || !inBuilding(x, z, 0)); if (!items.length) continue;
+    let items = (by[k] || []).filter(([x, z]) => k === 'traliccio' || !inBuilding(x, z, 0));
+    if (T.fine && !OGG_ON_ROAD_K.has(k)) items = items.map(it => { const q = offRoad(it[0], it[1]); return q ? [q[0], q[1], ...it.slice(2)] : null; }).filter(Boolean); // in a tile of S: off the asphalt of the ways the old engine had up in the air
+    if (!items.length) continue;
     const S = OGG_SPEC[k], im = new THREE.InstancedMesh(OGG_GEO[k], OGG_MAT, items.length); im.castShadow = true; im.receiveShadow = true;
     items.forEach(([x, z, a, ex, oi], i) => {
       const gy = H.surface(x, z), sy = S.scale ? Math.max(0.4, Math.min(2, (ex || S.scale) / S.scale)) : 1;

@@ -1006,7 +1006,7 @@ function segPlace(s) { // the post on the right of the lane, the plate facing th
   if (s.place) return s.place;
   let [kind, x, z, dx, dz] = s, best = null, bd = 1e9;
   if (kind === 'isola') return (s.place = { px: x, pz: z, dx, dz, hw: 0 }); // on the nose of the splitter island, as computed
-  ROADSEG.each(x - 15, z - 15, x + 15, z + 15, g => { if (g.r.c > 5 || g.r.d || g.r.t) return; const L = hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]) || 1, al = (dx || dz) ? Math.abs((g.b[0] - g.a[0]) * dx + (g.b[1] - g.a[1]) * dz) / L : 1, d = segDist(x, z, g.a[0], g.a[1], g.b[0], g.b[1]) + (al < 0.6 ? 8 : 0); if (d < bd) { bd = d; best = g; } }); // the road the sign talks to: near, and running its way
+  ROADSEG.each(x - 15, z - 15, x + 15, z + 15, g => { if (g.r.c > 5 || !atGrade(g) || g.r.t) return; const L = hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]) || 1, al = (dx || dz) ? Math.abs((g.b[0] - g.a[0]) * dx + (g.b[1] - g.a[1]) * dz) / L : 1, d = segDist(x, z, g.a[0], g.a[1], g.b[0], g.b[1]) + (al < 0.6 ? 8 : 0); if (d < bd) { bd = d; best = g; } }); // the road the sign talks to: near, and running its way
   if (best) bd = segDist(x, z, best.a[0], best.a[1], best.b[0], best.b[1]);
   let hw = best ? best.r.w / 2 : 3, px = x, pz = z;
   if (best) {
@@ -1083,7 +1083,27 @@ const BUILDINGS = [];
 const SIDEG = new Grid(24), DECKG = new Grid(16), ROADSEG = new Grid(24), STREETS = new Grid(24), NODEG = new Grid(40);
 const SIDE_H = 0.15;
 const PLATG = new Grid(24), PLAT_H = 0.55; // railway platforms (banchine), raised above the rails
-function onAnyRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !s.r.d && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
+// a road segment on the ground: not an old elevated way (r.d), or one that in a tile of S runs on S (the Milano-Meda had a viaduct in the old
+// engine and is in its trench in S: the signs of the junction by (108, 46) were placed as if it were up in the air, in the middle of it, collaudo 3)
+function atGrade(s) {
+  if (!s.r.d) return true;
+  if (s.gr === undefined) { const mx = (s.a[0] + s.b[0]) / 2, mz = (s.a[1] + s.b[1]) / 2; s.gr = H.fineAt(mx, mz) && (H.node(s.ia) + H.node(s.ib)) / 2 - H.base(mx, mz) < 0.8; }
+  return s.gr;
+}
+// a thing of the street furniture standing on the asphalt of a road on the ground: moved square to it, 0.9 m past its edge, on the side it
+// stood (what build_data.py off_carriageway does, but there the old elevated ways do not count: a pole stood in the middle of the Milano-Meda
+// at the junction by (108, 46), collaudo 3); null if it still lands on a road
+function offRoad(x, z) {
+  for (let k = 0; k < 3; k++) {
+    let best = null, bd = 1e9; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (s.r.c > 5 || s.r.t || !atGrade(s)) return; const d = segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) - s.r.w / 2; if (d < 0.3 && d < bd) { bd = d; best = s; } });
+    if (!best) return [x, z];
+    const ex = best.b[0] - best.a[0], ez = best.b[1] - best.a[1], L = hyp(ex, ez) || 1, t = clamp(((x - best.a[0]) * ex + (z - best.a[1]) * ez) / (L * L), 0, 1), cx = best.a[0] + ex * t, cz = best.a[1] + ez * t;
+    let nx = -ez / L, nz = ex / L; if ((x - cx) * nx + (z - cz) * nz < 0) { nx = -nx; nz = -nz; }
+    x = cx + nx * (best.r.w / 2 + 0.9); z = cz + nz * (best.r.w / 2 + 0.9);
+  }
+  return onAnyRoad(x, z, 0.3) ? null : [x, z];
+}
+function onAnyRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && atGrade(s) && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
 function segDist(px, pz, ax, az, bx, bz) { const ex = bx - ax, ez = bz - az, L2 = ex * ex + ez * ez || 1; const t = clamp(((px - ax) * ex + (pz - az) * ez) / L2, 0, 1); return hyp(px - ax - ex * t, pz - az - ez * t); }
 function resample(pts, step) {
   const o = [pts[0]];
@@ -1343,7 +1363,7 @@ function placeAt(x, z) {
 function nearestRoadPoint(x, z, maxC = 5, R = 60) {
   let best = null, bd = 1e9;
   ROADSEG.each(x - R, z - R, x + R, z + R, s => {
-    if (s.r.c > maxC || s.r.d || s.r.t) return; const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.a[0]) * ex + (z - s.a[1]) * ez) / L2, 0, 1);
+    if (s.r.c > maxC || !atGrade(s) || s.r.t) return; const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.a[0]) * ex + (z - s.a[1]) * ez) / L2, 0, 1);
     const px = s.a[0] + ex * t, pz = s.a[1] + ez * t, d = hyp(px - x, pz - z);
     if (d < bd && !inBuilding(px, pz, 0)) { bd = d; best = { x: px, z: pz, r: { minHalf: s.r.mh }, d }; }
   });
@@ -1772,7 +1792,7 @@ function deckOutline(dk) {
 const roadsOn = dk => dk.rset || (dk.rset = new Set(dk.ra.map(i => D.roads[i])));
 // is (x, z) on a road, a railway or the river bed of S (where no pillar may stand), roads on the deck itself apart
 function busyGround(dk, x, z) {
-  for (const [dx, dz] of [[0, 0], [1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6]]) { const m = H.mat(x + dx, z + dz); if (m === 1 || m === 4 || m === 6) return true; }
+  for (let k = 0; k < 17; k++) { const r = k ? (k <= 8 ? 1.6 : 3.4) : 0, a = k * TAU / 8, m = H.mat(x + r * Math.cos(a), z + r * Math.sin(a)); if (m === 1 || m === 4 || m === 6) return true; } // asphalt, river bed, rail bed within 3.4 m (a train is 2.9 m wide)
   let f = false; const own = roadsOn(dk); ROADSEG.each(x - 14, z - 14, x + 14, z + 14, s => { if (!f && !own.has(s.r) && s.r.c <= 6 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 1.5) f = true; });
   if (f) return true;
   if (dk.tipo !== 'ferro') RAILG.each(x - 4, z - 4, x + 4, z + 4, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < 3.5) f = true; }); // (on a railway deck its own rails run over the point)
@@ -2660,7 +2680,7 @@ for (const p of D.pois) {
     let road = null;
     for (let t = 1; t <= 45 && !road; t += 0.75) {
       const x = mx + nx * t, z = mz + nz * t; if (t > 1.5 && inBuilding(x, z)) break;
-      ROADSEG.each(x - 1, z - 1, x + 1, z + 1, s => { if (!road && s.r.c <= 5 && !s.r.d && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2) road = { t, s }; });
+      ROADSEG.each(x - 1, z - 1, x + 1, z + 1, s => { if (!road && s.r.c <= 5 && atGrade(s) && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2) road = { t, s }; });
     }
     const score = (road ? road.t : 80) - Math.min(L, 24) * 0.5;
     if (!F || score < F.score) F = { score, a, c, L, mx, mz, nx, nz, road };
@@ -4865,6 +4885,7 @@ function updOggetti(dt) { // a jolt in the car when you take a bump fast
   const [cf] = v.circles(); if (bumpAt(cf[0], cf[1]) > 0.02) { shake = Math.max(shake, Math.min(0.7, 0.12 + v.speed * 0.025)); bumpT = 0.5; if (v.speed > 14) sfxCrash(2); }
 }
 
+const OGG_ON_ROAD_K = new Set(['dosso', 'rallentatore', 'piattaforma', 'traliccio', 'antenna', 'torre_acqua', 'lavaggio']); // as build_data.py OGG_ON_ROAD
 function buildOggetti(T, G) {
   const list = T.d.og || [], by = {};
   for (let i = 0; i < list.length; i++) { const o = list[i], k = OGG_KINDS[o[0]]; if (!k) continue; (by[k] = by[k] || []).push([o[1] / 10, o[2] / 10, o[3], o[4], i]); }
@@ -4886,7 +4907,9 @@ function buildOggetti(T, G) {
   // everything else: one instance each
   const o3 = new THREE.Object3D();
   for (const k in OGG_GEO) {
-    const items = (by[k] || []).filter(([x, z]) => k === 'traliccio' || !inBuilding(x, z, 0)); if (!items.length) continue;
+    let items = (by[k] || []).filter(([x, z]) => k === 'traliccio' || !inBuilding(x, z, 0));
+    if (T.fine && !OGG_ON_ROAD_K.has(k)) items = items.map(it => { const q = offRoad(it[0], it[1]); return q ? [q[0], q[1], ...it.slice(2)] : null; }).filter(Boolean); // in a tile of S: off the asphalt of the ways the old engine had up in the air
+    if (!items.length) continue;
     const S = OGG_SPEC[k], im = new THREE.InstancedMesh(OGG_GEO[k], OGG_MAT, items.length); im.castShadow = true; im.receiveShadow = true;
     items.forEach(([x, z, a, ex, oi], i) => {
       const gy = H.surface(x, z), sy = S.scale ? Math.max(0.4, Math.min(2, (ex || S.scale) / S.scale)) : 1;
@@ -5349,7 +5372,7 @@ function ngPropGeo(key) {
 }
 
 // ---- where each front goes: the wall of the building the shop is in (or the nearest one) that looks onto a street; shops sharing a wall split it
-function ngRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !s.r.d && s.r.c <= 5 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
+function ngRoad(x, z, m) { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && atGrade(s) && s.r.c <= 5 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
 // how far in front of a wall the first real street is (not a service road or a driveway), up to 26 m: a shop set back behind its front
 // garden opens onto the street, not onto the yard behind (Billy's in via Vespucci faced its back lane)
 // returns how far it is, the road's class and whether it is the street of the shop's address (Mikka, via Indipendenza 174, faced a side street)
@@ -5948,7 +5971,7 @@ function* buildPaesaggio(T, G) {
       const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; let open = 0;
       for (let t = 1; t <= 8; t += 1) { if (inBuilding(mx + nx * t, mz + nz * t)) break; open++; }
       if (open < 4) continue;
-      let road = 0; ROADSEG.each(mx - 25, mz - 25, mx + 25, mz + 25, s => { if (!s.r.d && segDist(mx + nx * 6, mz + nz * 6, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 12) road = 1; });
+      let road = 0; ROADSEG.each(mx - 25, mz - 25, mx + 25, mz + 25, s => { if (atGrade(s) && segDist(mx + nx * 6, mz + nz * 6, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 12) road = 1; });
       walls.push({ a, c, L, nx, nz, ux: (c[0] - a[0]) / L, uz: (c[1] - a[1]) / L, score: L * (1 + road) + open });
     }
     if (!walls.length) continue;
@@ -6598,17 +6621,23 @@ function updSmoke(dt) { for (const p of SMOKE) { if (!p.s.visible) continue; p.t
 // ---------------------------------------------------------------- trains (Milano-Asso, Saronno-Seregno, Milano-Chiasso)
 // the height of a train in a tile of S (docs/motore.md 3.1, fase 6): the railway deck under the line, or S (the rail bed), sampled every 2 m
 // along it. The OSM line strays up to 3 m off the DBGT axes, and on the railway bridge over the Seveso (PONTE 11) it fell off the deck
-// into the bed (1.7 m): a deck within 3 m across the line counts, and a 10 m median takes the single samples that still fall off. Outside
+// into the bed (1.7 m): a deck within 3 m across the line counts, S is taken on the nearest cell of rail bed, and a 10 m median takes the
+// single samples that still fall off. Outside
 // S the old profile (the line's own heights, else the ground)
 const TRAIN_STEP = 2;
 function trainProfile(L, pos, old) {
-  const n = Math.floor(L / TRAIN_STEP) + 2, raw = new Float32Array(n), fine = new Uint8Array(n);
+  const n = Math.floor(L / TRAIN_STEP) + 2, raw = new Float32Array(n), fine = new Uint8Array(n); let prev = null;
   for (let k = 0; k < n; k++) {
-    const s = Math.min(L, k * TRAIN_STEP), [x, z, h] = pos(s), g = H.base(x, z); fine[k] = H.fineAt(x, z) ? 1 : 0;
-    if (!fine[k]) { raw[k] = old(s); continue; }
-    let y = g; const rx = Math.cos(h), rz = -Math.sin(h); // across the line
-    for (const o of [0, -1.5, 1.5, -3, 3]) for (const d of H.deckAt(x + rx * o, z + rz * o)) if (d.tipo === 'ferro' && d.top > y && d.top - g > 1) y = d.top;
-    raw[k] = y;
+    const s = Math.min(L, k * TRAIN_STEP), [x, z, h] = pos(s); fine[k] = H.fineAt(x, z) ? 1 : 0;
+    if (!fine[k]) { raw[k] = old(s); prev = null; continue; }
+    const rx = Math.cos(h), rz = -Math.sin(h); let g = H.base(x, z); // across the line: S on the nearest cell of rail bed (material 6) within 3 m, else under the line
+    for (const o of [0, -0.75, 0.75, -1.5, 1.5, -2.25, 2.25, -3, 3]) if (H.mat(x + rx * o, z + rz * o) === 6) { g = H.base(x + rx * o, z + rz * o); break; }
+    // the candidates: the rail bed and the railway decks within 3 m across; the one nearest the height the train has (a deck starts at the
+    // level of the bed at its spalle, so a train runs onto its own bridge, and stays on the bed under the bridge of another line: PONTE 13
+    // crosses the Milano-Asso 6 m over it at x -485, z 90, and the train jumped up onto it)
+    const cand = [g]; for (const o of [0, -1.5, 1.5, -3, 3]) for (const d of H.deckAt(x + rx * o, z + rz * o)) if (d.tipo === 'ferro') cand.push(d.top);
+    let y = g; if (prev !== null) { y = cand[0]; for (const c of cand) if (Math.abs(c - prev) < Math.abs(y - prev)) y = c; }
+    raw[k] = prev = y;
   }
   const out = Float32Array.from(raw);
   for (let k = 2; k < n - 2; k++) if (fine[k]) { const w = [raw[k - 2], raw[k - 1], raw[k], raw[k + 1], raw[k + 2]].sort((a, b) => a - b); out[k] = w[2]; }
@@ -8260,5 +8289,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, collideStatic, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
+window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
 </script>
