@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------- terrain: heights in altezze3.js (H.*)
-const FBuf = () => Object.assign(Buf(), { drape: true, hf: streetH }); // street surfaces: on S, or on a bridge over the water
+const FBuf = () => Object.assign(Buf(), { drape: true, hf: streetH, free: true }); // street surfaces: on S, or on a bridge over the water
 const VBuf = () => Object.assign(Buf(), { drape: true, vis: true, hf: visH }); // drapes on the visible (river-carved) terrain
 // coarse backdrop terrain for the far distance (fine patches are built per tile)
 {
@@ -110,6 +110,20 @@ D.roads.forEach((r, ri) => {
     if (r.d) { const ya = nodeY(r.g[k - 1]), yb = nodeY(r.g[k]), hw = r.w / 2, m = hw + (r.b ? 0 : 14); DECKG.add(Math.min(a[0], b[0]) - m, Math.min(a[1], b[1]) - m, Math.max(a[0], b[0]) + m, Math.max(a[1], b[1]) + m, { ax: a[0], az: a[1], bx: b[0], bz: b[1], ya, yb, hw, r, emb: !r.b }); }
   }
 });
+// the median between the two carriageways of an expressway as the tile draws it, or null (junction leftovers and slivers are not medians)
+function medianOf(q) {
+  const o = dec(q.p); if (o.length < 3) return null; let per = 0; for (let i = 0; i < o.length; i++) per += hyp(o[(i + 1) % o.length][0] - o[i][0], o[(i + 1) % o.length][1] - o[i][1]); const A = Math.abs(sArea(o)), c = centroid(o);
+  if (A < 30 || A / per < 0.6) return null; let local = false; ROADSEG.each(c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8, s => { if (!local && !s.r.x && s.r.c <= 5 && segDist(c[0], c[1], s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5) local = true; });
+  return local ? null : { o, k: q.k.map(dec) };
+}
+// the step layer of the tiles of S (H.addStep, docs/motore.md 1.4): sidewalks 0.15, platforms 0.55, medians 0.15
+const MED_H = 0.15;
+for (const T of TILES) {
+  if (!H.tile(T.t)) continue;
+  for (const q of T.sd) H.addStep(1, SIDE_H, q.o, q.k);
+  for (const q of T.pf || []) H.addStep(2, PLAT_H, q.o, q.k);
+  for (const q of T.d.md || []) { const m = medianOf(q); if (m) H.addStep(3, MED_H, m.o, m.k); }
+}
 function roadBelow(x, z, y, m, self) { let f = false; ROADSEG.each(x - 14, z - 14, x + 14, z + 14, s => { if (f || s.r === self) return; const d = segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]); if (d >= s.r.w / 2 + m) return; if (!s.r.d) { f = true; return; } const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.a[0]) * ex + (z - s.a[1]) * ez) / L2, 0, 1); if (lerp(nodeY(s.ia), nodeY(s.ib), t) < y - 2) f = true; }); return f; }
 function nearLowRail(x, z, m) { let f = false; LOWRAILG.each(x - m, z - m, x + m, z + m, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < m) f = true; }); return f; }
 function nearRail(x, z, m) { let f = false; RAILG.each(x - m, z - m, x + m, z + m, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < m) f = true; }); return f; }
@@ -389,7 +403,7 @@ const TREE_LEAF = (() => {
 })();
 const barkTex = canvasTex(64, 128, (g, w, h) => { g.fillStyle = '#e0dad0'; g.fillRect(0, 0, w, h); for (let i = 0; i < 260; i++) { const v = 170 + rnd() * 85 | 0; g.fillStyle = `rgb(${v},${v - 6},${v - 14})`; g.fillRect(rnd() * w, rnd() * h, 1, 6 + rnd() * 22); } });
 const MAT = {
-  terrain: new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false }), depth: new THREE.MeshBasicMaterial({ colorWrite: false }),
+  terrain: new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false }), depth: new THREE.MeshBasicMaterial({ colorWrite: false }), terrainS: new THREE.MeshLambertMaterial({ map: groundTex }),
   grass: flatMat({ map: grassTex, vertexColors: true }), paved: flatMat({ vertexColors: true, map: asphaltTex }), piazza: flatMat({ map: porfidoTex }), water: flatMat({ color: 0x45738c }), bank: flatMat({ color: 0x6d7d55 }),
   foot: flatMat({ color: 0xc8b89c }), asph: flatMat({ map: asphaltTex }), mark: flatMat({ vertexColors: true }), side: new THREE.MeshLambertMaterial({ map: sidewalkTex }), kerb: new THREE.MeshLambertMaterial({ color: 0xa29c90, side: THREE.DoubleSide }),
   ballast: flatMat({ map: ballastTex }), steel: flatMat({ color: 0xc9ccd1 }),
@@ -401,6 +415,10 @@ const MAT = {
   railing: new THREE.MeshLambertMaterial({ map: fenceTex, alphaTest: 0.35, side: THREE.DoubleSide, color: 0x2a2d30 }), hedge: new THREE.MeshLambertMaterial({ map: grassTex, color: 0x4f7a3a }), median: new THREE.MeshLambertMaterial({ map: concreteTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
   trunk: new THREE.MeshLambertMaterial({ color: 0x5a4636, map: barkTex }), crown: new THREE.MeshLambertMaterial({ map: TREE_LEAF, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true }), lamp: lam(0x4a4d52), lampHead: lam(0xf4f1e6, { emissive: 0x6a6040, emissiveIntensity: 0.4 }),
 };
+// the same looks writing their depth, for the cells a layer owns in a tile of S (cellOwners): drawn with the ground, in its place
+Object.assign(MAT, { grassS: new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }), pavedS: new THREE.MeshLambertMaterial({ vertexColors: true, map: asphaltTex }), waterS: new THREE.MeshLambertMaterial({ color: 0x45738c }),
+  piazzaS: new THREE.MeshLambertMaterial({ map: porfidoTex }), footS: new THREE.MeshLambertMaterial({ color: 0xc8b89c }), asphS: new THREE.MeshLambertMaterial({ map: asphaltTex }) });
+Object.assign(MAT.water, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }); // the water level of a tile of S meets the banks of S, which write their depth
 // the kinds of divider the DBGT adds (build_data.py): plastered low walls, railings with vertical bars, green wire mesh, railway panels, wood
 const barsTex = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#26292c'; for (let x = 4; x < w; x += 10) g.fillRect(x, 0, 3, h); g.fillRect(0, 0, w, 5); g.fillRect(0, h - 6, w, 6); });
 Object.assign(MAT, {
@@ -470,7 +488,7 @@ AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.repla
 const AO_K = [[0, 0.2], [0.45, 0.5], [1.6, 1]]; // distance from the wall, shade (linear: multiplied on the screen, 0.2 darkens by half)
 function aoGround(b, ring, E, i, innerA) {
   const nr = ring.length, a = ring[i], [dx, dz, L, nx, nz] = E[i]; if (L < 0.05) return;
-  const put = (x, z, k) => { const s = surfAt(x, z), y = (onSide(x, z) ? s : Math.min(s, terrDrawnH(x, z))) + 0.03; vtx(b, x, y, z, 0, 1, 0, 0, 0, _aoC.setScalar(k)); };
+  const put = (x, z, k) => { let y; if (H.fineAt(x, z)) y = H.base(x, z) + H.step(x, z) + 0.06; else { const s = surfAt(x, z); y = (onSide(x, z) ? s : Math.min(s, terrDrawnH(x, z))) + 0.03; } vtx(b, x, y, z, 0, 1, 0, 0, 0, _aoC.setScalar(k)); }; // in a tile of S the ground writes its depth: the strip (a shade, not cut on the cells: it would cost seven times the triangles) stands 6 cm over S
   const n = Math.max(1, Math.ceil(L / 5)), w = AO_K.length;
   for (let s = 0; s <= n; s++) { const f = s / n, x = a[0] + dx * f, z = a[1] + dz * f; for (const [d, k] of AO_K) put(x + nx * (d + 0.02), z + nz * (d + 0.02), k); }
   const b0 = b.p.length / 3 - (n + 1) * w;
@@ -500,6 +518,86 @@ function terrDrawnH(x, z) { // the terrain patch as drawn: visH on its tile's gr
   const X = x0 + i * st, Z = z0 + j * st, h00 = visH(X, Z), h11 = visH(X + st, Z + st);
   return fx >= fz ? h00 + fx * (visH(X + st, Z) - h00) + fz * (h11 - visH(X + st, Z)) : h00 + fz * (visH(X, Z + st) - h00) + fx * (h11 - visH(X, Z + st));
 }
+// ---- surfaces on the grid of S (docs/motore.md 3, phase 5): polyFill and mkMesh hand their draped polygons and triangles here
+// a polygon y over the ground, cut on the cells of S (H.clipPoly); false where no tile of S is under it, and polyFill drapes it the old way.
+// Its vertices are absolute (b.ab), mkMesh leaves them alone; a piece over a tile without .bin stays relative and drapes as before
+function clipFill(b, outer, holes, y, vScale, col) {
+  const ab = b.ab || (b.ab = []);
+  return H.clipPoly(outer, holes, (P, fine) => {
+    const i0 = b.p.length / 3;
+    for (let k = 0; k < P.length; k++) { const x = P[k][0], z = P[k][1]; let yy = y; if (fine) { yy += b.free ? H.overFree(x, z, P[k][2]) : P[k][2]; ab[i0 + k] = 1; } vtx(b, x, yy, z, 0, 1, 0, x / vScale, z / vScale, col); }
+    for (let k = 1; k < P.length - 1; k++) triUp(b, i0, i0 + k, i0 + k + 1);
+  }, b.rk);
+}
+// a draped buffer before it becomes a mesh: in a tile of S every triangle (strips, ribbons, quads, discs) is cut on the cells and lies on S,
+// its attributes interpolated, its relative height kept; elsewhere, and for vertical faces, each vertex goes hf(x, z) up as before
+function clipDrape(b, hf, ro, mat) {
+  const hide = mat && mat.depthWrite === false && ro !== undefined; // a flat layer under a layer that owns the cell (H.own) is not drawn there
+  const P = b.p, ab = b.ab || [], nv = P.length / 3, I = b.i, hasC = b.c.length === P.length;
+  if (!H.anyFine() || b.noclip) { for (let v = 0; v < nv; v++) if (!ab[v]) P[v * 3 + 1] += hf(P[v * 3], P[v * 3 + 2]); return; } // noclip: thin strips over a smooth S (rails), each vertex on it
+  const o = { p: [], n: [], uv: [], c: [], i: [] }, remap = new Int32Array(nv).fill(-1);
+  const keep = v => { let r = remap[v]; if (r < 0) { r = remap[v] = o.p.length / 3; o.p.push(P[v * 3], ab[v] ? P[v * 3 + 1] : P[v * 3 + 1] + hf(P[v * 3], P[v * 3 + 2]), P[v * 3 + 2]); o.n.push(b.n[v * 3], b.n[v * 3 + 1], b.n[v * 3 + 2]); o.uv.push(b.uv[v * 2], b.uv[v * 2 + 1]); if (hasC) o.c.push(b.c[v * 3], b.c[v * 3 + 1], b.c[v * 3 + 2]); } return r; };
+  // the attributes of a source triangle as affine functions of (x, z): relative height, normal, uv, colour; pieces of triangles with the same
+  // functions on the same cell triangle are joined again (the two halves of a quad, the quads of a strip, strips of one colour)
+  const attrs = [[P, 3, 1, 1], [b.n, 3, 0, 3], [b.uv, 2, 0, 2], ...(hasC ? [[b.c, 3, 0, 3]] : [])];
+  const groups = new Map();
+  const put = (src, Q, F) => { // a piece on S with the attributes of its source
+    const [a, c, d, den] = src, ax = P[a * 3], az = P[a * 3 + 2], cx = P[c * 3], cz = P[c * 3 + 2], dx = P[d * 3], dz = P[d * 3 + 2], q0 = o.p.length / 3;
+    for (const p of Q) {
+      const x = p[0], z = p[1], l1 = ((cz - dz) * (x - dx) + (dx - cx) * (z - dz)) / den, l2 = ((dz - az) * (x - dx) + (ax - dx) * (z - dz)) / den, l3 = 1 - l1 - l2;
+      const yr = l1 * P[a * 3 + 1] + l2 * P[c * 3 + 1] + l3 * P[d * 3 + 1];
+      o.p.push(x, yr + (F ? (b.free ? H.overFree(x, z, p[2]) : p[2]) : hf(x, z)), z);
+      for (const [A, s, o0, m] of attrs.slice(1)) { const D = A === b.n ? o.n : A === b.uv ? o.uv : o.c; for (let e = o0; e < o0 + m; e++) D.push(l1 * A[a * s + e] + l2 * A[c * s + e] + l3 * A[d * s + e]); }
+    }
+    return q0;
+  };
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t], c = I[t + 1], d = I[t + 2];
+    if (ab[a] && ab[c] && ab[d]) { o.i.push(keep(a), keep(c), keep(d)); continue; }
+    const ax = P[a * 3], az = P[a * 3 + 2], cx = P[c * 3], cz = P[c * 3 + 2], dx = P[d * 3], dz = P[d * 3 + 2], den = (cz - dz) * (ax - dx) + (dx - cx) * (az - dz);
+    if (Math.abs(den) < 1e-9) { o.i.push(keep(a), keep(c), keep(d)); continue; } // vertical or flat to a line: the old drape
+    const up = (cz - az) * (dx - ax) - (cx - ax) * (dz - az) >= 0; // as triUp: the face looks up
+    const pieces = []; let fine = false; H.clipTri([[ax, az], [cx, cz], [dx, dz]], (Q, f, F, key) => { pieces.push([Q, f, F, key]); if (f) fine = true; });
+    if (!fine) { o.i.push(keep(a), keep(c), keep(d)); continue; } // all on old ground
+    if (!up) continue; // the underside of a two-faced strip: on S nobody sees it, and cut on the cells it would cost as much as the top
+    let sig = null;
+    for (const [Q, f, F, key] of pieces) {
+      if (!f) { const q0 = put([a, c, d, den], Q, null); for (let k = 1; k < Q.length - 1; k++) o.i.push(q0, q0 + k, q0 + k + 1); continue; }
+      if (hide && F.own && F.own[key >> 1] > ro) continue;
+      if (sig === null) { const g = []; for (const [A, s, o0, m] of attrs) for (let e = o0; e < o0 + m; e++) { const va = A[a * s + e], vc = A[c * s + e], vd = A[d * s + e], gx = ((cz - dz) * (va - vd) + (dz - az) * (vc - vd)) / den, gz = ((dx - cx) * (va - vd) + (ax - dx) * (vc - vd)) / den; g.push(Math.round(gx * 1e4), Math.round(gz * 1e4), Math.round((vd - gx * (dx - F.x0) - gz * (dz - F.z0)) * 1e3)); } sig = g.join(','); }
+      const gk = F.t + ':' + key + ':' + sig, l = groups.get(gk); if (l) l.p.push(Q); else groups.set(gk, { F, key, src: [a, c, d, den], p: [Q] });
+    }
+  }
+  for (const { F, key, src, p } of groups.values()) {
+    const J = p.length > 1 ? H.joinPieces(F, key, p) : null;
+    for (const Q of J || p) { const q0 = put(src, Q, F); for (let k = 1; k < Q.length - 1; k++) { const A = o.p, i1 = q0 + k, i2 = q0 + k + 1, cr = (A[i1 * 3 + 2] - A[q0 * 3 + 2]) * (A[i2 * 3] - A[q0 * 3]) - (A[i1 * 3] - A[q0 * 3]) * (A[i2 * 3 + 2] - A[q0 * 3 + 2]); if (cr >= 0) o.i.push(q0, i1, i2); else o.i.push(q0, i2, i1); } } // facing up, as triUp
+  }
+  b.p = o.p; b.n = o.n; b.uv = o.uv; b.c = hasC ? o.c : []; b.i = o.i; b.ab = null;
+}
+// a kerb (cordolo): the vertical strip from the surface yf to h over it along a ring, outward normal; in a tile of S each edge is cut where
+// it crosses the cells (H.cutLine) and then thinned to the points the profile of S needs within 1 cm (the bottom goes 0.1 m into the ground,
+// the top 1 cm over the edge of the cover, so no chord opens a slit); elsewhere one quad per edge on the old ground
+function kerbRing(b, ring, h, yf, flip) {
+  const A = sArea(ring);
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02) continue;
+    let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (flip !== undefined && (A < 0) !== flip) { nx = -nx; nz = -nz; }
+    const pts = H.cutLine(a[0], a[1], c[0], c[1], yf), keepP = [pts[0]];
+    if (pts.length > 2) { // Douglas-Peucker on the profile, 1 cm
+      const s = pts.map(p => hyp(p[0] - a[0], p[1] - a[1])), mark = new Uint8Array(pts.length); mark[0] = mark[pts.length - 1] = 1;
+      const dp = (i0, i1) => { let w = -1, e = 0.01; for (let k = i0 + 1; k < i1; k++) { const y = pts[i0][2] + (pts[i1][2] - pts[i0][2]) * (s[k] - s[i0]) / ((s[i1] - s[i0]) || 1), d = Math.abs(pts[k][2] - y); if (d > e) { e = d; w = k; } } if (w > 0) { mark[w] = 1; dp(i0, w); dp(w, i1); } };
+      dp(0, pts.length - 1); keepP.length = 0; pts.forEach((p, k) => { if (mark[k]) keepP.push(p); });
+    } else keepP.push(pts[pts.length - 1]);
+    const fine = pts.length > 2 || H.fineAt((a[0] + c[0]) / 2, (a[1] + c[1]) / 2), lo = fine ? 0.1 : 0, up = fine ? 0.01 : 0;
+    let acc = 0;
+    for (let k = 1; k < keepP.length; k++) {
+      const p = keepP[k - 1], q = keepP[k], l = hyp(q[0] - p[0], q[1] - p[1]), b0 = b.p.length / 3;
+      vtx(b, p[0], p[2] - lo, p[1], nx, 0, nz, acc / 4, 0); vtx(b, q[0], q[2] - lo, q[1], nx, 0, nz, (acc + l) / 4, 0); vtx(b, q[0], q[2] + h + up, q[1], nx, 0, nz, (acc + l) / 4, 1); vtx(b, p[0], p[2] + h + up, p[1], nx, 0, nz, acc / 4, 1);
+      b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); acc += l;
+    }
+  }
+}
+const streetY = (x, z) => H.overFree(x, z, H.base(x, z)); // where the street surfaces and the step covers stand in a tile of S
 const GREENS = ['#4f7a35', '#5d8a3b', '#6b8f3e', '#47703a', '#7f9a45', '#a08d3c'];
 function addBox(b, x, y, z, w, h, d, col, ry = 0) { // axis box rotated about y, into a buffer
   const c = Math.cos(ry), s = Math.sin(ry), P = (dx, dy, dz) => [x + dx * c + dz * s, y + dy, z - dx * s + dz * c];
@@ -571,6 +669,30 @@ function drawDecks(T, top, side) {
 }
 // a tile is built a slice at a time (a generator that yields between its parts), so driving into new ground never freezes the game for the
 // tenth of a second a whole tile takes; it stays hidden until it is complete. buildTile runs one to the end in one go (start, respawn)
+// the surface layers of a tile of S (docs/motore.md 3): each cell a polygon of a layer covers whole goes to the highest layer that does (rank
+// as the draw order: grass 1, paved 1.1, water 2, footway 3, piazza 4, asphalt 5, pedestrian street 5.1), FT.own the rank and FT.sty its look.
+// That layer draws the cell in place of the ground, the polygons cut on the grid only draw the cells their outline crosses: a meadow costs
+// the triangles of the ground and no more. A street surface under a free deck (the bridge's own top is drawn) keeps the ground
+const STY = {};
+function cellOwners(T, F) {
+  const c = F.n - 1, own = F.own = new Float32Array(c * c), sty = F.sty = new Array(c * c).fill(null), d = T.d, uf = new Int8Array(c * c);
+  const underFree = w => { if (!uf[w]) { const i = w % c, j = (w - i) / c; let f = false; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x = F.x0 + (i + a) * F.st, z = F.z0 + (j + b) * F.st; if (H.overFree(x, z, H.base(x, z)) > H.base(x, z) + 0.01) f = true; } uf[w] = f ? 1 : 2; } return uf[w] === 1; };
+  const S = (k, m, vs, col) => { const key = k + (col ? col.getHexString() : ''); return STY[key] || (STY[key] = { m, vs, col: col || null }); };
+  const cover = (o, k, rank, st, street) => { if (o.length < 3) return; H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && underFree(w))) return; own[w] = rank; sty[w] = st; }); };
+  for (const a of d.a || []) {
+    const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer)) continue;
+    if (a.t <= 3 || a.t >= 11) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
+    else if (a.t === 4 && inPiazza(...centroid(outer))) { }
+    else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
+    else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
+    else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
+  }
+  for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, S('f', MAT.footS, 4), true);
+  for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, S('a', MAT.asphS, 9), true);
+  for (const q of d.pz || []) cover(dec(q.p), q.k.map(dec), 5.1, S('z', MAT.piazzaS, 4), true);
+  return own;
+}
+const waterInBed = (a, outer) => { if (a.t !== 6 || !H.fineAt(...centroid(outer))) return false; const pts = [...outer, centroid(outer)]; return pts.filter(([x, z]) => H.mat(x, z) === 4 || riverCut(x, z) > 0).length >= pts.length * 0.3; }; // water inside the bed of S: the water level draws it
 function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!g.next().done); }
 function* buildTileGen(T) {
   if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.t * 7919;
@@ -581,9 +703,18 @@ function* buildTileGen(T) {
   // terrain patch
   const FT = H.tile(T.t); T.fine = !!FT;
   if (FT) { // new engine: the nodes of S as they are, the triangles of H.onTri (docs/motore.md 3: H.base is this mesh, H.check)
-    const n = FT.n, st = FT.st, pos = new Float32Array(n * n * 3), nor = new Float32Array(n * n * 3), uv = new Float32Array(n * n * 2), idx = new Uint32Array((n - 1) * (n - 1) * 6); let q = 0;
+    const n = FT.n, st = FT.st, nc = n - 1, pos = new Float32Array(n * n * 3), nor = new Float32Array(n * n * 3), uv = new Float32Array(n * n * 2), idx = new Uint32Array(nc * nc * 6); let q = 0, tri = 0;
+    // the cells a surface layer covers whole are drawn by that layer, on the same two triangles, in place of the bare ground (cellOwners)
+    const own = cellOwners(T, FT), byStyle = new Map(); { const s_ = srndT; yield 'terrain'; srndT = s_; } T.cellMesh = new Uint8Array(nc * nc); T.cellIdx = new Int32Array(nc * nc); T.ownMeshes = [];
     const setV = (k, x, y, z) => { pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z; uv[k * 2] = x / 10; uv[k * 2 + 1] = z / 10; };
-    H.onTri(T.t, (ax, ay, az, bx, by, bz, cx, cy, cz, a, b, c) => { setV(a, ax, ay, az); setV(b, bx, by, bz); setV(c, cx, cy, cz); idx[q++] = a; idx[q++] = c; idx[q++] = b; }); // wound to face up
+    H.onTri(T.t, (ax, ay, az, bx, by, bz, cx, cy, cz, a, b, c) => {
+      setV(a, ax, ay, az); setV(b, bx, by, bz); setV(c, cx, cy, cz); const w = tri++ >> 1;
+      if (!own[w]) { if (tri & 1) T.cellIdx[w] = q; idx[q++] = a; idx[q++] = c; idx[q++] = b; return; } // wound to face up
+      const sy = FT.sty[w], key = sy.m.id + '|' + (sy.col ? sy.col.getHexString() : ''); let B = byStyle.get(key); if (!B) byStyle.set(key, B = { b: Buf(), sy });
+      if (tri & 1) T.cellIdx[w] = B.b.i.length; const i0 = B.b.p.length / 3;
+      for (const [x, y, z] of [[ax, ay, az], [bx, by, bz], [cx, cy, cz]]) vtx(B.b, x, y, z, 0, 1, 0, x / sy.vs, z / sy.vs, sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
+    });
+    for (const { b, sy } of byStyle.values()) { const k = T.ownMeshes.length + 1; const mm = mkMesh(b, sy.m, -2, false, G); T.ownMeshes.push(mm); for (let w = 0; w < nc * nc; w++) if (own[w] && FT.sty[w].m === sy.m && (FT.sty[w].col ? FT.sty[w].col.getHexString() : '') === (sy.col ? sy.col.getHexString() : '')) T.cellMesh[w] = k; }
     // normals across the tile edges too (the neighbour's nodes, or one-sided where there is no tile of S): no seam in the light
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = j * n + i, x = FT.x0 + i * st, z = FT.z0 + j * st, y = FT.y[k];
@@ -592,9 +723,9 @@ function* buildTileGen(T) {
       const gx = e !== null && w !== null ? (e - w) / (2 * st) : e !== null ? (e - y) / st : (y - w) / st, gz = so !== null && no !== null ? (so - no) / (2 * st) : so !== null ? (so - y) / st : (y - no) / st;
       const L = Math.hypot(gx, 1, gz); nor[k * 3] = -gx / L; nor[k * 3 + 1] = 1 / L; nor[k * 3 + 2] = -gz / L;
     }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
-    const m = new THREE.Mesh(g, MAT.terrain); m.renderOrder = -2; m.receiveShadow = true; G.add(m); T.terrMesh = m; T.st = st;
-    const dm = new THREE.Mesh(g, MAT.depth); dm.position.y = -0.5; dm.renderOrder = -1; G.add(dm);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx.subarray(0, q), 1)); g.computeBoundingSphere();
+    // phase 5: the mesh writes its own depth (the surfaces on it are cut on its cells and win by polygonOffset), so no depth mask under it
+    const m = new THREE.Mesh(g, MAT.terrainS); m.renderOrder = -2; m.receiveShadow = true; G.add(m); T.terrMesh = m; T.st = st;
   } else {
     let cut = false; CUTG.each(x0, z0, x0 + TS, z0 + TS, () => { cut = true; });
     // beside a tile of S its edge nodes are S (H.vis takes the neighbour's on the shared edge): every 2 m, as S, or the edge would crack
@@ -608,27 +739,28 @@ function* buildTileGen(T) {
   yield 'landuse';
   // land use
   {
-    const gB = VBuf(), pB = VBuf(), zB = FBuf(), wB = VBuf();
+    const gB = VBuf(), pB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
+    gB.rk = 1; pB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
     for (const a of d.a || []) {
       const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5) continue; // platforms are built raised, with their furniture
+      if (T.fine && waterInBed(a, outer)) continue; // water inside the bed: the water level below draws it
       try {
-        if (a.t <= 3 || a.t >= 11) polyFill(gB, outer, holes, 0.02, 9, COL(AREA_COL[a.t] || '#ffffff'));
+        if (a.t <= 3 || a.t >= 11) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 4 && inPiazza(...centroid(outer))) { } // a square or a school yard mapped as a car park: drawn by buildPiazze
-        else if (a.t === 6) polyFill(wB, outer, holes, 0.03, 9);
-        else if (a.t === 10) polyFill(zB, outer, holes, 0.05, 4);
-        else polyFill(pB, outer, holes, a.t === 8 || a.t === 9 ? 0.015 : 0.025, 10, COL(AREA_COL[a.t]));
+        else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
+        else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
+        else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
-    put(gB, MAT.grass, 1); put(pB, MAT.paved, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(pB, MAT.paved, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {
       const p = resample(dec(r.p), 3);
       for (let k = 1; k < p.length; k++) {
         const a = p[k - 1], c = p[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
         const nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L;
-        if (T.fine) { // new engine: the bed and the banks are in S, the water stands at its level zw (H.water); the railing follows the bank
-          const wa = H.water(a[0], a[1]), wc = H.water(c[0], c[1]);
-          if (wa !== null && wc !== null) { const i0 = rv.p.length / 3; vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0); triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3); }
+        if (T.fine) { // new engine: the bed and the banks are in S, the water is drawn below at its level zw; the railing follows the bank
           for (const sd of [1, -1]) {
             const ax = a[0] + nx * r.w * sd, az = a[1] + nz * r.w * sd, cx = c[0] + nx * r.w * sd, cz = c[1] + nz * r.w * sd, ya = H.ground(ax, az), yc = H.ground(cx, cz);
             if (!onAnyRoad((ax + cx) / 2, (az + cz) / 2, 1.5)) { const r0 = rail.p.length / 3; vtx(rail, ax, ya + 0.75, az, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 0.75, cz, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 1.05, cz, nx, 0, nz, 0, 0); vtx(rail, ax, ya + 1.05, az, nx, 0, nz, 0, 0); rail.i.push(r0, r0 + 1, r0 + 2, r0, r0 + 2, r0 + 3); }
@@ -644,6 +776,22 @@ function* buildTileGen(T) {
           vtx(wallsR, ax, ga - RIV_D - 0.2, az, -nx * sd, 0, -nz * sd, 0, 0); vtx(wallsR, cx, gc - RIV_D - 0.2, cz, -nx * sd, 0, -nz * sd, L / 2, 0); vtx(wallsR, cx, gc + 0.25, cz, -nx * sd, 0, -nz * sd, L / 2, 1); vtx(wallsR, ax, ga + 0.25, az, -nx * sd, 0, -nz * sd, 0, 1);
           wallsR.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
           if (!onAnyRoad((ax + cx) / 2, (az + cz) / 2, 1.5)) { const r0 = rail.p.length / 3; vtx(rail, ax, ga + 0.75, az, nx, 0, nz, 0, 0); vtx(rail, cx, gc + 0.75, cz, nx, 0, nz, 0, 0); vtx(rail, cx, gc + 1.05, cz, nx, 0, nz, 0, 0); vtx(rail, ax, ga + 1.05, az, nx, 0, nz, 0, 0); rail.i.push(r0, r0 + 1, r0 + 2, r0, r0 + 2, r0 + 3); }
+        }
+      }
+    }
+    if (T.fine) { // the water level (docs/motore.md 3): a sheet at zw over the cells of the bed and the ones next to them, cut on each cell
+      // triangle where zw - S changes sign, so its edge is the line where the water meets the banks of S, with no teeth and no slit
+      const F = H.tile(T.t), n = F.n, c = n - 1, st = F.st, Y = F.y, zw = new Float64Array(n * n).fill(NaN), got = new Uint8Array(n * n);
+      const bed = (i, j) => i >= 0 && j >= 0 && i < c && j < c && F.m && F.m[j * c + i] === 4;
+      const W = k => { if (!got[k]) { got[k] = 1; const w = H.water(F.x0 + (k % n) * st, F.z0 + Math.floor(k / n) * st); zw[k] = w === null ? NaN : w; } return zw[k]; };
+      for (let j = 0; j < c; j++) for (let i = 0; i < c; i++) {
+        const x = F.x0 + i * st, z = F.z0 + j * st;
+        if (!(bed(i, j) || bed(i - 1, j) || bed(i + 1, j) || bed(i, j - 1) || bed(i, j + 1) || riverCut(x + st / 2, z + st / 2) > 0)) continue;
+        const k = j * n + i;
+        for (const tri of [[k, k + 1, k + n + 1], [k, k + n + 1, k + n]]) {
+          const V = tri.map(q => [F.x0 + (q % n) * st, F.z0 + Math.floor(q / n) * st, W(q), W(q) - Y[q]]); if (V.some(v => isNaN(v[2])) || V.every(v => v[3] <= 0)) continue;
+          const o = []; for (let e = 0; e < 3; e++) { const p = V[e], q = V[(e + 1) % 3]; if (p[3] > 0) o.push(p); if ((p[3] > 0) !== (q[3] > 0)) { const t = p[3] / (p[3] - q[3]); o.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t, 0]); } }
+          if (o.length < 3) continue; const i0 = rv.p.length / 3; for (const p of o) vtx(rv, p[0], p[2], p[1], 0, 1, 0, 0, 0); for (let e = 1; e < o.length - 1; e++) triUp(rv, i0, i0 + e, i0 + e + 1);
         }
       }
     }
@@ -678,11 +826,14 @@ function* buildTileGen(T) {
   yield 'streets';
   // street surfaces
   {
-    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6');
+    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; por.rk = 5.1; foot.rk = 3;
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
-    fill(d.as, asp, 0.06, 9); fill(d.pz, por, 0.06, 4); fill(d.ft, foot, 0.045, 4);
+    const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
+    fill(d.as, asp, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fill(d.pz, por, 0.06 * fy, 4); fill(d.ft, foot, 0.045 * fy, 4);
+    { const s_ = srndT; yield 'sidewalks'; srndT = s_; } /* a tile of S cuts its surfaces on the cells: in slices, so building it never stops the game for long */
     for (const q of T.sd) {
-      try { polyFill(sw, q.o, q.k, SIDE_H, 4); } catch (e) { }
+      try { polyFill(sw, q.o, q.k, SIDE_H, 4); } catch (e) { } // the cover of the step: S + SIDE_H on the cells (clipFill)
+      if (T.fine) { for (const ring of [q.o, ...q.k]) kerbRing(kerbS, ring, SIDE_H, streetY); continue; }
       for (const ring of [q.o, ...q.k]) for (let i = 0; i < ring.length; i++) {
         const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02) continue;
         const nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L, base = kerb.p.length / 3;
@@ -690,9 +841,10 @@ function* buildTileGen(T) {
         kerb.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
       }
     }
+    { const s_ = srndT; yield 'crossings'; srndT = s_; } 
     for (const [X, Z, dx, dz, w] of d.cr || []) {
       const x = X / 10, z = Z / 10, nx = -dz, nz = dx;
-      for (let s = -w / 2 + 0.5; s <= w / 2 - 0.4; s += 1.0) quad(mark, x + nx * s, z + nz * s, dx, dz, nx, nz, 3.2, 0.5, 0.085, white);
+      for (let s = -w / 2 + 0.5; s <= w / 2 - 0.4; s += 1.0) quad(mark, x + nx * s, z + nz * s, dx, dz, nx, nz, 3.2, 0.5, 0.085 * fy, white);
     }
     // markings and elevated roads
     const deck = Buf(), dside = Buf(), emb = Buf(), grail = Buf(), dmark = Buf(), pil = Buf();
@@ -706,10 +858,15 @@ function* buildTileGen(T) {
         if (r.t) continue;
         if (r.d) {
           const ya = nodeY(r.g[k - 1]), yb = nodeY(r.g[k]), n = Math.max(1, Math.ceil(L / 3));
-          const pts = []; for (let s = 0; s <= n; s++) { const x = lerp(A[0], B[0], s / n), z = lerp(A[1], B[1], s / n), yy = lerp(ya, yb, s / n), g = groundH(x, z); pts.push([x, z, T.fine ? deckY(x, z, yy) : yy - g < 0.5 ? Math.max(yy, g + 0.02) : yy]); } // decks at grade never sink under the ground
-          const rx = -uz, rz = ux;
+          const pts = []; for (let s = 0; s <= n; s++) { const x = lerp(A[0], B[0], s / n), z = lerp(A[1], B[1], s / n), yy = lerp(ya, yb, s / n), g = groundH(x, z), y = T.fine ? deckY(x, z, yy) : yy - g < 0.5 ? Math.max(yy, g + 0.02) : yy; pts.push([x, z, y, T.fine && y <= g + 1e-3]); } // decks at grade never sink under the ground; [3]: on S
+          const rx = -uz, rz = ux, onB = r.c <= 4 ? asp : r.c === 5 ? por : foot; // the surface of a way of its class, where it runs on S
           for (let s = 1; s < pts.length; s++) {
             const p = pts[s - 1], q = pts[s], gp = groundH(p[0], p[1]), gq = groundH(q[0], q[1]);
+            if (p[3] && q[3]) { // an old elevated way that runs on S in a tile of S (no deck of the new engine under it): drawn on the cells of S, like
+              // the surfaces of the ways at grade; a flat ribbon at the height of its middle stood over the banks and sank in the slopes (collaudo 4-5)
+              const i0 = onB.p.length / 3; for (const [o, sd] of [[p, -1], [p, 1], [q, -1], [q, 1]]) { const x = o[0] + rx * hw * sd, z = o[1] + rz * hw * sd; vtx(onB, x, 0, z, 0, 1, 0, x / (onB === asp ? 9 : 4), z / (onB === asp ? 9 : 4)); }
+              triUp(onB, i0, i0 + 1, i0 + 3); triUp(onB, i0, i0 + 3, i0 + 2); continue;
+            }
             // road surface
             const i0 = deck.p.length / 3;
             vtx(deck, p[0] - rx * hw, p[2] + 0.06, p[1] - rz * hw, 0, 1, 0, (p[0] - rx * hw) / 9, (p[1] - rz * hw) / 9); vtx(deck, p[0] + rx * hw, p[2] + 0.06, p[1] + rz * hw, 0, 1, 0, (p[0] + rx * hw) / 9, (p[1] + rz * hw) / 9);
@@ -742,11 +899,13 @@ function* buildTileGen(T) {
           }
           if (r.w >= 6.5) { // lane dashes on the deck
             const yL = T.fine ? (s => { const f = clamp(s / L * n, 0, n - 1e-9), i = Math.floor(f); return lerp(pts[i][2], pts[i + 1][2], f - i); }) : s => lerp(ya, yb, s / L);
-            for (let s = 1.5; s < L - 3; s += 9) { const x = A[0] + ux * s, z = A[1] + uz * s, y = yL(s) + 0.09; const i0 = dmark.p.length / 3, wv = COL('#f1efe6'); for (const [a, b] of [[0, -0.08], [3, -0.08], [3, 0.08], [0, 0.08]]) vtx(dmark, x + ux * a - uz * b, y + (yL(s + a) - yL(s)), z + uz * a + ux * b, 0, 1, 0, 0, 0, wv); triUp(dmark, i0, i0 + 1, i0 + 2); triUp(dmark, i0, i0 + 2, i0 + 3); }
+            const onS = s => { const f = clamp(s / L * n, 0, n - 1e-9), i = Math.floor(f); return pts[i][3] && pts[i + 1][3]; };
+            for (let s = 1.5; s < L - 3; s += 9) { const x = A[0] + ux * s, z = A[1] + uz * s, y = yL(s) + 0.09; if (T.fine && onS(s) && onS(s + 3)) { quad(mark, x + ux * 1.5, z + uz * 1.5, ux, uz, -uz, ux, 3, 0.16, 0, white); continue; } const i0 = dmark.p.length / 3, wv = COL('#f1efe6'); for (const [a, b] of [[0, -0.08], [3, -0.08], [3, 0.08], [0, 0.08]]) vtx(dmark, x + ux * a - uz * b, y + (yL(s + a) - yL(s)), z + uz * a + ux * b, 0, 1, 0, 0, 0, wv); triUp(dmark, i0, i0 + 1, i0 + 2); triUp(dmark, i0, i0 + 2, i0 + 3); }
           }
           // junction cap: a round patch of asphalt where the deck meets other roads, so ramps and splits have no wedge-shaped holes
           for (const gi of k === r.g.length - 1 ? [r.g[0], r.g[r.g.length - 1]] : []) {
             const C = N[gi]; if (tileOf(C[0], C[1]) !== T.t || NODE_DEG[gi] < 2) continue;
+            if (T.fine && nodeY(gi) <= H.ground(C[0], C[1]) + 1e-3) { disc(onB, C[0], C[1], r.w / 2 + 0.35, 0, onB === asp ? 9 : 4); continue; } // on S: on its cells
             const y = nodeY(gi) + 0.055, R = r.w / 2 + 0.35, c0 = deck.p.length / 3;
             vtx(deck, C[0], y, C[1], 0, 1, 0, C[0] / 9, C[1] / 9);
             for (let q = 0; q <= 18; q++) { const a = q / 18 * Math.PI * 2, x = C[0] + Math.cos(a) * R, z = C[1] + Math.sin(a) * R; vtx(deck, x, y, z, 0, 1, 0, x / 9, z / 9); }
@@ -758,7 +917,7 @@ function* buildTileGen(T) {
         const twoWay = !r.o && r.c <= 2 && r.mh * 2 >= 5.5, lanes = r.o && r.c <= 1 && r.mh * 2 >= 6.6;
         if (!twoWay && !lanes) continue;
         const ja = NODE_DEG[r.g[k - 1]] >= 3 ? hw + 4 : 0, jb = NODE_DEG[r.g[k]] >= 3 ? hw + 4 : 0;
-        for (let s = ja + 0.5; s + 3 < L - jb; s += 7.5) quad(mark, A[0] + ux * (s + 1.5), A[1] + uz * (s + 1.5), ux, uz, -uz, ux, 3, 0.16, 0.08, white);
+        for (let s = ja + 0.5; s + 3 < L - jb; s += 7.5) quad(mark, A[0] + ux * (s + 1.5), A[1] + uz * (s + 1.5), ux, uz, -uz, ux, 3, 0.16, 0.08 * fy, white);
       }
     }
     // in a tile of S the old guardrails and pillars stand on the decks of the new engine and on S (phase 6 makes them from the decks)
@@ -769,8 +928,9 @@ function* buildTileGen(T) {
       grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
     }
     if (T.fine) drawDecks(T, deck, dside);
-    put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); put(mark, MAT.mark, 6);
-    put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9);
+    { const s_ = srndT; yield 'streets put'; srndT = s_; } 
+    put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6);
+    put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9); put(kerbS, MAT.kerb, 9);
     put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10); put(dmark, MAT.deckMark, 10); put(pil, MAT.deckSide, 10, 'cast');
   }
   yield 'walls';
@@ -805,13 +965,14 @@ function* buildTileGen(T) {
         acc += L;
       }
     }
+    const mdS = FBuf(), mdK = Buf();
     for (const q of d.md || []) { // median between the two carriageways: at deck height where elevated
-      { const o0 = dec(q.p); if (o0.length < 3) continue; let per = 0; for (let i = 0; i < o0.length; i++) per += hyp(o0[(i + 1) % o0.length][0] - o0[i][0], o0[(i + 1) % o0.length][1] - o0[i][1]); const A = Math.abs(sArea(o0)), c = centroid(o0);
-        if (A < 30 || A / per < 0.6) continue; let local = false; ROADSEG.each(c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8, s => { if (!local && !s.r.x && s.r.c <= 5 && segDist(c[0], c[1], s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5) local = true; }); if (local) continue; } // junction leftovers are not medians
+      const m = medianOf(q); if (!m) continue; // junction leftovers are not medians
+      if (T.fine) { try { polyFill(mdS, m.o, m.k, MED_H, 4); } catch (e) { } for (const ring of [m.o, ...m.k]) kerbRing(mdK, ring, MED_H, streetY); continue; } // in a tile of S: a step 0.15 over S (or a free deck), cover and kerbs on the cells
       const o = dec(q.p), k = q.k.map(dec), yAt = (x, z) => { let best = null, bd = 1e9; DECKG.each(x - 8, z - 8, x + 8, z + 8, s => { const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.ax) * ex + (z - s.az) * ez) / L2, 0, 1), dd = hyp(x - s.ax - ex * t, z - s.az - ez * t); if (dd < bd && dd < s.hw + 7) { bd = dd; best = lerp(s.ya, s.yb, t); } }); return best === null ? groundH(x, z) : best; };
       try { const base = md.p.length / 3; polyFill(md, densify(o, 4), k.map(h => densify(h, 4)), 0, 4); for (let i = base * 3; i < md.p.length; i += 3) md.p[i + 1] = yAt(md.p[i], md.p[i + 2]) + 0.12; } catch (e) { }
     }
-    put(wl, MAT.wall, 10, 'cast'); put(ft, MAT.railing, 10); put(hd, MAT.hedge, 10, 'cast'); put(md, MAT.median, 9);
+    put(wl, MAT.wall, 10, 'cast'); put(ft, MAT.railing, 10); put(hd, MAT.hedge, 10, 'cast'); put(md, MAT.median, 9); put(mdS, MAT.median, 9); put(mdK, MAT.kerb, 9);
     put(wlP[0], MAT.wallPlaster, 10, 'cast'); put(wlP[1], MAT.wallOchre, 10, 'cast'); put(bars, MAT.bars, 10); put(mesh, MAT.mesh, 10); put(rly, MAT.railPanel, 10); put(wood, MAT.wood, 10, 'cast');
     if (posts.length) { // [x, z, foot, length]
       const pg = new THREE.BoxGeometry(0.06, 1, 0.06); pg.translate(0, 0.5, 0);
@@ -822,7 +983,7 @@ function* buildTileGen(T) {
   yield 'railway';
   // railway & fences
   {
-    const bal = FBuf(), steel = FBuf();
+    const bal = FBuf(), steel = Object.assign(FBuf(), { noclip: true }); // the rails, 12 cm strips 11 cm over a smooth bed: each vertex on S, not cut on the cells
     const ebal = Buf(), esteel = Buf(), eside = Buf();
     for (const r of d.rl || []) {
       const p0 = dec(r.p); if (p0.length < 2) continue;
@@ -967,8 +1128,8 @@ function* buildTileGen(T) {
     LPS.forEach(([x, z, ry], i) => {
       const gy = surfAt(x, z, 1e4), c = Math.cos(ry), s = Math.sin(ry), hx = x + c * 1.15, hz = z - s * 1.15; // the arm reaches out along local +x
       o.position.set(x, gy, z); o.rotation.set(0, ry, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix);
-      const py = surfAt(hx, hz, 1e4) + 0.14, k = pool.p.length / 3, R = 7; // warm light pool on the street at night
-      vtx(pool, hx - R, py, hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, py, hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, py, hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, py, hz + R, 0, 1, 0, 0, 1); triUp(pool, k, k + 1, k + 2); triUp(pool, k, k + 2, k + 3);
+      const py = surfAt(hx, hz, 1e4) + 0.14, k = pool.p.length / 3, R = 7, cy = (x, z) => T.fine && py - 0.14 <= streetY(hx, hz) + 0.2 ? streetY(x, z) + 0.14 : py; // warm light pool on the street at night; in a tile of S its corners on S, so the ground (which writes its depth) does not cut it on a slope
+      vtx(pool, hx - R, cy(hx - R, hz - R), hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, cy(hx + R, hz - R), hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, cy(hx + R, hz + R), hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, cy(hx - R, hz + R), hz + R, 0, 1, 0, 0, 1); triUp(pool, k, k + 1, k + 2); triUp(pool, k, k + 2, k + 3);
       gp.push(hx, gy + 6.82, hz); // glare under the lamp head
       if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
       else for (const p of PROPS) if (p.tile === T && p.li === i) { p.inst.meshes = [pm, hm]; if (p.broken) { o.scale.set(0, 0, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix); o.scale.set(1, 1, 1); } } // built again: the lamps knocked down stay down

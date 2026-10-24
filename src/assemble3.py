@@ -33,13 +33,11 @@ for (let i = 0; i < D.nodes.length; i += 3) { N.push([D.nodes[i] / 10, D.nodes[i
 const dec = a => { const o = []; let x = 0, z = 0; for (let i = 0; i < a.length; i += 2) { x += a[i]; z += a[i + 1]; o.push([x / 10, z / 10]); } return o; };""")
 rep("const STREETS = new Grid(24); // named road segments\nconst JUNC = new Grid(16);\n", "")
 rep("""function mkMesh(b, mat, ro, shadow) {""", """function mkMesh(b, mat, ro, shadow, parent = scene) {""")
-rep("  if (b.drape) for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += groundH(b.p[i], b.p[i + 2]);", "  if (b.drape) { const hf = b.hf || (b.vis ? visH : groundH); for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += hf(b.p[i], b.p[i + 2]); } /* b.hf: altezze3.js, the ground the buffer drapes on */")
-# draped polygons split their edges on the ground they drape on
+rep("  if (b.drape) for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += groundH(b.p[i], b.p[i + 2]);", "  if (b.drape) { clipDrape(b, b.hf || (b.vis ? visH : groundH), ro, mat); if (H.anyFine() && !mat.polygonOffset) { mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -4; } } /* b.hf: altezze3.js, the ground the buffer drapes on; in a tile of S cut on its cells (world3.js clipDrape), off the ground that writes its depth by polygonOffset */")
+# draped polygons split their edges on the ground they drape on (old engine only: over a tile of S polyFill cuts them on its cells, clipFill)
 rep("    const mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = groundH(all[i][0], all[i][1]));", "    const hf = b.hf || groundH, mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = hf(all[i][0], all[i][1]));")
-rep("for (const t of [0.25, 0.5, 0.75]) { const e = groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)", "for (const t of (fz ? Array.from({ length: Math.ceil(Math.sqrt(l) / 2) - 1 }, (_, q) => (q + 1) / Math.ceil(Math.sqrt(l) / 2)) : [0.25, 0.5, 0.75])) { const e = hf(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)")
-# in a tile of S (2 m grid) an edge is tested every 2 m and split down to 2 m: the banks and kerbs of S are narrower than the 4 m the old 10 m
-# ground allowed, and a chord over them sinks under the depth mask (a pale patch of bare terrain) or leaves a sliver (phase 5 clips on the grid)
-rep("const l = (all[i][0] - all[j][0]) ** 2 + (all[i][1] - all[j][1]) ** 2; if (l <= 16) return 0;", "const l = (all[i][0] - all[j][0]) ** 2 + (all[i][1] - all[j][1]) ** 2, fz = H.fineAt(all[i][0], all[i][1]) || H.fineAt(all[j][0], all[j][1]); if (l <= (fz ? 4 : 16)) return 0;")
+rep("for (const t of [0.25, 0.5, 0.75]) { const e = groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)", "for (const t of [0.25, 0.5, 0.75]) { const e = hf(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)")
+rep("function polyFill(b, outer, holes, y, vScale, col) {", "function polyFill(b, outer, holes, y, vScale, col) {\n  if (b.drape && clipFill(b, outer, holes, y, vScale, col)) return; /* docs/motore.md 3: on the cells of S, no drape */")
 rep("      if (mx <= 16 || tris.length + stack.length > 60000) { tris.push([a, c, d]); continue; }", "      if (!mx || tris.length + stack.length > 60000) { tris.push([a, c, d]); continue; } /* L2 is 0 or the squared length of an edge to split */")
 rep("""  scene.add(m); return m;
 }
@@ -236,7 +234,7 @@ rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z
 rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
-rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY,")
+rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY,")
 rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled

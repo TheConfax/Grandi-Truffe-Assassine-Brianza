@@ -1235,7 +1235,14 @@ const PSIGN_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(64, 64, (g, w, 
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), sign = Buf();
   T.stalls = []; T.streetStalls = [];
-  const quad = (x, z, ux, uz, a0, a1, w0, w1, col) => { const nx = -uz, nz = ux, i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
+  const quad = (x, z, ux, uz, a0, a1, w0, w1, col) => { const nx = -uz, nz = ux;
+    if (H.fineAt(x, z)) { // a tile of S: thin paint on a flat car park, in pieces of at most 2.5 m along it, each corner 5 cm over S (b.noclip: cut on the cells it would cost four times the triangles)
+      b.noclip = true; const L = Math.max(Math.abs(a1 - a0), Math.abs(w1 - w0)), along = Math.abs(a1 - a0) >= Math.abs(w1 - w0), m = Math.max(1, Math.ceil(L / 2.5));
+      for (let k = 0; k < m; k++) { const i0 = b.p.length / 3, f0 = k / m, f1 = (k + 1) / m, A0 = along ? a0 + (a1 - a0) * f0 : a0, A1 = along ? a0 + (a1 - a0) * f1 : a1, W0 = along ? w0 : w0 + (w1 - w0) * f0, W1 = along ? w1 : w0 + (w1 - w0) * f1;
+        for (const [s, v] of [[A0, W0], [A1, W0], [A1, W1], [A0, W1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); triUp(b, i0, i0 + 1, i0 + 2); triUp(b, i0, i0 + 2, i0 + 3); }
+      return;
+    }
+    const i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
   const outline = (x, z, ux, uz, l, w, col) => { quad(x, z, ux, uz, -l / 2, l / 2, -w / 2 - 0.06, -w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2, l / 2, w / 2 - 0.06, w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2 - 0.06, -l / 2 + 0.06, -w / 2, w / 2, col); quad(x, z, ux, uz, l / 2 - 0.06, l / 2 + 0.06, -w / 2, w / 2, col); };
   // the spaces OSM maps one by one: white lines, yellow with the blue square for the disabled
   const real = (T.d.ps || []).map(([X, Z, ang, L, Wd, kind]) => ({ x: X / 10, z: Z / 10, ang, L: clamp(L, 4, 7), W: clamp(Wd, 1.8, 3.5), kind }));
@@ -1600,7 +1607,7 @@ const STAIRWELLS = [
 ];
 const CURTAIN_MAT = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
 const HOLE_MAT = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
-for (const m of [MAT.depth]) { m.stencilWrite = true; m.stencilRef = 1; m.stencilFunc = THREE.NotEqualStencilFunc; m.stencilZPass = THREE.KeepStencilOp; }
+for (const m of [MAT.depth, MAT.terrainS, MAT.grassS, MAT.pavedS, MAT.waterS, MAT.piazzaS, MAT.footS, MAT.asphS]) { m.stencilWrite = true; m.stencilRef = 1; m.stencilFunc = THREE.NotEqualStencilFunc; m.stencilZPass = THREE.KeepStencilOp; }
 function hull(pts) {
   const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
   for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
