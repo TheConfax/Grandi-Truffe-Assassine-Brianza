@@ -934,7 +934,7 @@ log('cemetery walls', ncw)
 bar_out = []
 # cut each line only against the pieces of bar_cut it touches, not the whole union: this was most of the build's time
 # (the same pieces bar_cut is the union of, kept apart: united, the street buffers are one polygon as big as the whole network)
-_bc_parts = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1] + [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + (STR.carreggiate(-0.3) if STR else [])
+_bc_parts = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1] + [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + (STR.carreggiate(-0.3) if STR else []) + ([g_.buffer(0.5) for g_ in (_Pp(b['p'], b.get('k', [])) for b in buildings if b.get('dbgt')) if g_ is not None] if ED else [])  # a DBGT divider within 0.5 m of a DBGT facade is the facade's own line
 _bc_tree = STRtree(_bc_parts)
 for bi_, (pts, kind, hgt) in enumerate(barriers):
     if bi_ % max(1, len(barriers) // 10) == 0: log('muri %d%%' % (bi_ * 100 // max(1, len(barriers))))  # progress: this used to be the slow step

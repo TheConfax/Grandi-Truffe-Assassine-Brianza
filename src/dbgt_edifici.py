@@ -317,6 +317,7 @@ class Edifici:
         for i, e in enumerate(self.ed):
             sh, tg, ob = best.get(i, (0, {}, None))
             obt = tg.get('building')
+            if obt in ('roof', 'carport') and e['kind'] == 'E': obt = None   # a roof on posts is a form: the DBGT's building (a volume on the ground) wins
             bt = obt if obt and obt not in ('yes',) else bt_dbgt(e['kind'], e['ty'], e['uso'])
             if tg.get('amenity') == 'place_of_worship' and e['is'].area > 120: bt = 'church'
             ntipo[bt] += 1

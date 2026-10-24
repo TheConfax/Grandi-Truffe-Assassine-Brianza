@@ -436,7 +436,7 @@
   "alti_03": 209
  },
  "tipi": {
-  "yes": 2139,
+  "yes": 2142,
   "shed": 1118,
   "garage": 961,
   "industrial": 496,
@@ -448,7 +448,7 @@
   "chapel": 24,
   "school": 20,
   "retail": 20,
-  "roof": 20,
+  "roof": 17,
   "church": 11,
   "public": 10,
   "service": 10,
@@ -473,7 +473,7 @@
    "da_osm_roof_shape": 4
   },
   "non_dal_dsm": {
-   "irregolare": 1078,
+   "irregolare": 1081,
    "troppo_ripido": 147,
    "piccolo": 862,
    "basso": 261,
@@ -481,7 +481,7 @@
    "alto": 333,
    "complesso": 182,
    "non_copre": 273,
-   "senza_dsm": 20
+   "senza_dsm": 17
   },
   "colmo_sulla_gronda": {
    "p50": 2.32,

@@ -496,12 +496,12 @@
  "superfici": {
   "osm_tenute_vie": 79,
   "asfalto_m2": 860353,
-  "cortili_m2": 1045010,
+  "cortili_m2": 1045008,
   "marciapiedi_m2": 62647,
   "piazze_m2": 44081,
   "vialetti_m2": 31976,
   "isole_m2": 15408,
-  "tempo_s": 31.1,
+  "tempo_s": 30.8,
   "cortili_nei_cantieri_m2": 14143
  },
  "controlli": {
@@ -1270,6 +1270,6 @@
   "attraversamenti": {
    "n": 497
   },
-  "tempo_s": 13.8
+  "tempo_s": 13.1
  }
 }

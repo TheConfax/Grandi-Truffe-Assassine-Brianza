@@ -76,7 +76,8 @@ def osm_tipo(t):
     return 'strada' if t.get('highway') in CAR else 'pedonale'
 
 
-# ---------- the underpass stairwells: landmarks3.js STAIRWELLS holds their depth until phase 6 moves them here ----------
+# ---------- the underpass stairwells: landmarks3.js STAIRWELLS held their depth, written by hand; since 24/10 it is in src/_vecchi/ (docs/motore.md 7)
+# and no pit is made: the DBGT has the GALLER but not the floor of the underpass ----------
 def stairwells(path=None):
     src = open(path or os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read()
     m = re.search(r'const STAIRWELLS = (\[.*?\n\]);', src, re.S)

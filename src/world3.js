@@ -69,25 +69,7 @@ function resample(pts, step) {
   return o;
 }
 const bbox = pts => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; } return [x0, z0, x1, z1]; };
-// places the map fills with trees that are open ground: playing fields
-const NO_TREES = [
-  [[-408.6, 279.7], [-378.5, 452.1], [-276.1, 434.2], [-306.2, 261.8]], // Stadio Mino Favini
-  [[-1835.9, 1110.2], [-1797.9, 1281.0], [-1702.2, 1259.7], [-1740.2, 1088.9]], // Stadio comunale di Seveso
-  [[-741.4, 767.4], [-684.8, 778.6], [-697.6, 837.8], [-754.3, 826.0]], // the cloister of the Seminario di Seveso: its own four trees
-];
-// hedges the map draws where a landmark lays out its own garden
-const NO_HEDGES = [
-  [[-741.4, 767.4], [-684.8, 778.6], [-697.6, 837.8], [-754.3, 826.0]], // the cloister of the Seminario di Seveso
-];
-// buildings in the map that are not there (mostly from Overture): dropped by the centroid of their footprint
-const GHOSTS = [
-  [1243.7, -553.8], [1261.4, -549.6], // a house and a shed across the Curie drive from via Marie Curie
-];
-// walls missing from the map, as barriers of the tile their first point falls in: { p, t (1 wall, 2 low wall with railing, 3 hedge), h }
-const EXTRA_BARRIERS = [
-  { p: [[-566.2, 870.2], [-570.0, 888.0], [-573.9, 906.5]], t: 1, h: 1.7 }, // the Seminario park wall along via Verga, between the two pieces OSM has
-];
-for (const e of EXTRA_BARRIERS) { const d = TILES[tileOf(e.p[0][0], e.p[0][1])].d, enc = []; let px = 0, pz = 0; for (const [x, z] of e.p) { const X = Math.round(x * 10), Z = Math.round(z * 10); enc.push(X - px, Z - pz); px = X; pz = Z; } (d.ba || (d.ba = [])).push({ p: enc, t: e.t, h: e.h }); }
+// (NO_TREES, NO_HEDGES, GHOSTS and EXTRA_BARRIERS, tables of places written by hand, are in src/_vecchi/pezzi_a_mano.js since 24/10/2026)
 // a tree mapped in the river bed of S under the water (the OSM point a few metres off the DBGT bed): its trunk stood in the Seveso, up to
 // 0.35 m under the water, 8 trees in Meda (verifica fase 6). Not drawn, no collision. The same for the railing along an OSM river, at its
 // width from the OSM axis: where that falls in the water of the DBGT bed it ran along the middle of the Seveso
@@ -95,11 +77,11 @@ const inWater = (x, z, gy) => { if (!H.fineAt(x, z)) return false; const w = H.w
 // a tree trunk within r of the point (the trees of every tile are in WALLS from the start): the parking stalls drawn on car parks and along
 // the streets leave a tree's place free, as in a car park lined with trees (the DBGT trees of the yards, src/dbgt_verde.py)
 const treeNear = (x, z, r) => { let f = false; WALLS.each(x - r, z - r, x + r, z + r, o => { if (o.tree && hyp(o.x - x, o.z - z) < r) f = true; }); return f; };
+const EDIF = new Map(); // DBGT building -> its volumes on the ground (a shop looks for its front on all of them)
 for (const T of TILES) {
   const d = T.d;
   for (const B of d.b || []) {
     const outer = dec(B.p); if (outer.length < 3) continue;
-    { const [gx, gz] = centroid(outer); if (GHOSTS.some(([x, z]) => hyp(gx - x, gz - z) < 1.5)) continue; }
     const holes = (B.k || []).map(dec).filter(h => h.length >= 3), bb = bbox(outer);
     const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g }; // g: 1 garages, 2 greenhouse (paesaggio3.js)
     // a volume of the DBGT (src/dbgt_edifici.py): zt the top of its walls and zb its raised base (a portico, a passage, an overhang) above
@@ -113,6 +95,7 @@ for (const T of TILES) {
     }
     if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }); } continue; }
     BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
+    if (B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
     const gys = outer.map(p => H.ground(p[0], p[1])), by0 = Math.min(...gys) - 3, by1 = Math.max(Math.max(...gys) + B.h, B.zt !== undefined ? B.zt + roofTop(rec) : -1e9) + 3;
     for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) {
       const A = sArea(ring);
@@ -124,9 +107,8 @@ for (const T of TILES) {
     }
   }
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
-  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q)) || inWater(x, z, gy)) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5, tree: 1 }); }
+  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy)) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5, tree: 1 }); }
   for (const br of d.ba || []) {
-    if (br.t === 3 && NO_HEDGES.some(q => dec(br.p).every(([x, z]) => inPoly(x, z, q)))) continue; // drawn by the landmark, symmetrical
     const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h, v: br.v }); // follow the ground, not long chords
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2); WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }); }
   }
@@ -176,6 +158,8 @@ function soffit(b, outer, holes, y, col) {
   for (const t of tri) { const P = b.p, A = i0 + t[0], Bq = i0 + t[1], C = i0 + t[2], cy = (P[Bq * 3 + 2] - P[A * 3 + 2]) * (P[C * 3] - P[A * 3]) - (P[Bq * 3] - P[A * 3]) * (P[C * 3 + 2] - P[A * 3 + 2]); if (cy >= 0) b.i.push(A, C, Bq); else b.i.push(A, Bq, C); }
 }
 // a colour of a palette for a building: the same for all the volumes of a DBGT building (e), otherwise the tile's sequence
+// the top of the walls as the tile draws them (a DBGT volume never under the ground round it)
+function bldTop(B) { const gmax = Math.max(...B.pts.map(p => H.ground(p[0], p[1]))); return B.zt !== undefined ? Math.max(B.zt, B.zb !== undefined ? B.zb + 1 : gmax + Math.min(B.h, 2.2)) : gmax + B.h; }
 const hashRnd = n => { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
 function inBuilding(x, z, m = 0) {
   let f = false;
@@ -928,7 +912,6 @@ function cellOwners(T, F) {
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
     if (a.t <= 3 || a.t >= 11) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
-    else if (a.t === 4 && inPiazza(...centroid(outer))) { }
     else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
@@ -1002,7 +985,6 @@ function* buildTileGen(T) {
       if (T.fine && waterInBed(a, outer, holes, T)) continue; // water inside the bed: the water level below draws it
       try {
         if (a.t <= 3 || a.t >= 11) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
-        else if (a.t === 4 && inPiazza(...centroid(outer))) { } // a square or a school yard mapped as a car park: drawn by buildPiazze
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
@@ -1404,15 +1386,13 @@ function* buildTileGen(T) {
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast'); put(doorB, MAT.roof, 10);
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
+  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
   { const s = srndT; yield 'trees'; srndT = s; }
   // trees and street lamps
-  // a tree of the data where a landmark plants its own by hand (the row of conifers of Parco Fusetti, PLAZAS in landmarks3.js: 6 of its 10
-  // stand within 2.5 m of a DBGT tree, the same trees) is drawn once, by the landmark
-  T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4) && !PLAZAS.some(q => (q.trees || []).some(([a, b]) => hyp(a - x, b - z) < 2.5)));
+  T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {
     const n = T.tr.length, trunks = new THREE.InstancedMesh(TREE_G.trunk, MAT.trunk, n), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, n);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
