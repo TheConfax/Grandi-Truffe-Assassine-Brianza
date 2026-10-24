@@ -691,7 +691,7 @@ function genLamps(T, d, osm) {
       let k = 1; while (k < r.cum.length - 1 && r.cum[k] < s) k++;
       const a = N[r.g[k - 1]], b = N[r.g[k]], L = r.cum[k] - r.cum[k - 1] || 1, f = (s - r.cum[k - 1]) / L, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
       const sd = wide ? (n % 2 ? 1 : -1) : side; let off = r.w / 2 + 0.9; for (let e = 0; e < 8 && nearAsph(a[0] + (b[0] - a[0]) * f - uz * off * sd, a[1] + (b[1] - a[1]) * f + ux * off * sd, 0.25); e++) off += 0.25; /* the pole past the edge of the drawn carriageway (the 0.5 m grid of onAsph left some 0.2 m in it) */ const x = a[0] + (b[0] - a[0]) * f - uz * off * sd, z = a[1] + (b[1] - a[1]) * f + ux * off * sd;
-      if (tileOf(x, z) !== T.t || onAnyRoad(x, z, 0.3) || inBuilding(x, z, 0.4) || nearRail(x, z, 4) || osm.some(o => hyp(o[0] - x, o[1] - z) < 14)) continue;
+      if (tileOf(x, z) !== T.t || nearAsph(x, z, 0.25) || onAnyRoad(x, z, 0.3) || inBuilding(x, z, 0.4) || nearRail(x, z, 4) || osm.some(o => hyp(o[0] - x, o[1] - z) < 14)) continue;
       let town = 0; BLD.each(x - 30, z - 30, x + 30, z + 30, () => { town++; }); if (town < 2) continue; // only where there are houses
       out.push([x, z, Math.atan2(ux * sd, uz * sd)]); // arm towards the middle of the road
     }
@@ -1807,7 +1807,10 @@ function buildSignals(T, G) {
     if (tileOf(sg.x, sg.z) !== T.t) continue;
     for (const sd of [1, -1]) { // one pole per direction, on the right-hand kerb, facing the oncoming traffic
       const rx = -sg.uz * sd, rz = sg.ux * sd; let px = sg.x + rx * (sg.w / 2 + 1.2) - sg.ux * sd * 4, pz = sg.z + rz * (sg.w / 2 + 1.2) - sg.uz * sd * 4;
-      let fb = null; for (let k = 0; k < 16 && nearAsph(px, pz, 0.3); k++) { if (!fb && !onAsph(px, pz)) fb = [px, pz]; px += rx * 0.5; pz += rz * 0.5; } if (onAsph(px, pz) && fb) [px, pz] = fb; /* off the drawn carriageway (AC_VEI: wider than the axis says at a junction) */ if (onAsph(px, pz)) continue; const gy = H.ground(px, pz);
+      if (nearAsph(px, pz, 0.3)) { // off the drawn carriageway (AC_VEI: wider than the axis says at a junction): out to the side, or a few metres back or on along the road, 0.1 m past the 0.5 m grid at least
+        let best = null; for (const al of [0, -1, 1, -2, 2, -3, 3, -4, 4, -6, 6]) for (let k = 1; k <= 16; k++) { const qx = px + rx * 0.5 * k - sg.ux * sd * al, qz = pz + rz * 0.5 * k - sg.uz * sd * al, c = k * 0.5 + Math.abs(al) * 0.8; if (best && c >= best.c) break; if (!nearAsph(qx, qz, 0.3)) { best = { c, qx, qz }; break; } if (!nearAsph(qx, qz, 0.1) && (!best || c + 1 < best.c)) best = { c: c + 1, qx, qz }; }
+        if (!best) continue; px = best.qx; pz = best.qz;
+      } const gy = H.ground(px, pz);
       const root = new THREE.Group(); root.position.set(px, gy, pz); root.rotation.y = Math.atan2(-sg.ux * sd, -sg.uz * sd); G.add(root);
       if (!sg.props) sg.props = []; if (sg.props.length < 2) sg.props.push(addProp({ x: px, z: pz, y: gy, r: 0.15, h: 3.5, obj: root })); else { const pr = sg.props[sd > 0 ? 0 : 1]; pr.obj = root; if (pr.broken) root.rotation.x = 1.45; }
       const pole = new THREE.Mesh(boxG(0.14, 3.4, 0.14), lam(0x3a3d42)); pole.position.y = 1.7; pole.castShadow = true; root.add(pole);
@@ -1822,9 +1825,9 @@ function buildSignals(T, G) {
     if (bs && bd < bs.r.w / 2 + 1.4) { // push it out to the kerb, on the side it was drawn (right-hand side if dead centre)
       let sx = -uz, sz = ux; const side = (x - bs.a[0]) * sx + (z - bs.a[1]) * sz; if (side < -0.2) { sx = -sx; sz = -sz; }
       const want = bs.r.w / 2 + 1.6, along = (x - bs.a[0]) * ux + (z - bs.a[1]) * uz, cx = bs.a[0] + ux * along, cz = bs.a[1] + uz * along; x = cx + sx * want; z = cz + sz * want;
-      for (let k = 0; k < 10 && nearAsph(x, z, 0.6); k++) { x += sx * 0.5; z += sz * 0.5; } // off the drawn carriageway (a lay-by of the DBGT)
+      for (let k = 0; k < 12 && nearAsph(x, z, 1.0); k++) { x += sx * 0.5; z += sz * 0.5; } // off the drawn carriageway (a lay-by of the DBGT): the shelter is 2 m deep
     }
-    if (onAsph(x, z)) continue; // still on it: no shelter in the road
+    if (nearAsph(x, z, 0.6)) continue; // still on it: no shelter in the road
     if (inBuilding(x, z, 0.6)) continue;
     const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = Math.atan2(ux, uz); G.add(root);
     const glass = new THREE.MeshLambertMaterial({ color: 0x9fb7c4, transparent: true, opacity: 0.45 });
@@ -1850,8 +1853,8 @@ for (const g of LX) if (g.drive) {
     // the post off the drawn carriageway (AC_VEI, docs/motore.md 7): sideways, the arm longer, or the barrier nearer the track (at least 1.2 m from the
     // outer rail): where the track runs beside a junction the carriageway goes on for more than 6 m sideways (station, via Seveso: posts 1.85 m in it)
     const e0 = g.ext - 3.4 + 1.2; let best = null;
-    for (let ea = g.ext; ea >= e0 - 1e-6 && !(best && best.c === 0); ea -= 0.25) for (let k = 0; k <= 32; k++) {
-      const c = k * 0.25 + (g.ext - ea) * 0.6; if (best && c >= best.c) break;
+    for (let ea = g.ext + 4; ea >= e0 - 1e-6 && !(best && best.c === 0); ea -= 0.25) for (let k = 0; k <= 40; k++) { // up to 4 m further from the track too
+      const c = k * 0.25 + Math.abs(g.ext - ea) * 0.6; if (best && c >= best.c) break;
       const qx = g.x + g.ux * ea * s + nx * (g.hw + 0.55 + k * 0.25) * s, qz = g.z + g.uz * ea * s + nz * (g.hw + 0.55 + k * 0.25) * s;
       if (!nearAsph(qx, qz, 0.3)) { best = { c, ea, k }; break; }
     }

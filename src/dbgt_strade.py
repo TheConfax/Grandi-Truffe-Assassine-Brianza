@@ -359,6 +359,43 @@ def abbina(raw_roads, nodes, D, cover, log=print, new_id=None):
         r['match'] = float(np.mean([m is not None for m in M]))
     for n_, p in newpos.items():
         moved[n_] = math.dist(nodes[n_], p); nodes[n_] = (float(p[0]), float(p[1]))
+    # two ways through the same point of an axis are joined there: the vertices put on the axes are new nodes of each way, and where two ways
+    # run through the same DBGT vertex (within 0.3 m) without an OSM node in common there the graph had two nodes in one place, not connected (verifica
+    # 24/10: on via Indipendenza the cars from the side street drove 7 m past the junction to the OSM node and turned back)
+    from scipy.spatial import cKDTree
+    wof = defaultdict(set)
+    for wi, r in enumerate(raw_roads):
+        if r.get('dbgt'):
+            for n_ in r['refs']: wof[n_].add(wi)
+    ids = list(wof); par = {i: i for i in ids}
+    lev = lambda n_: {(bool(raw_roads[w]['bridge']), bool(raw_roads[w]['tunnel']), raw_roads[w].get('layer', 0)) for w in wof[n_]}
+    def root(i):
+        while par[i] != i: par[i] = par[par[i]]; i = par[i]
+        return i
+    for a_, b_ in cKDTree(np.array([nodes[i] for i in ids])).query_pairs(0.3):   # within 0.3 m, one of them put on an axis (of one way too: a way that runs to a node and back)
+        i, j = ids[a_], ids[b_]
+        if not any(str(k).startswith('dbgt') or k in newpos for k in (i, j)): continue
+        if lev(i) != lev(j): continue   # a bridge over a street is not a junction with it
+        ri, rj = root(i), root(j)
+        if ri != rj: par[ri] = rj
+    canon = {}
+    groups = defaultdict(list)
+    for i in ids: groups[root(i)].append(i)
+    for g in groups.values():
+        if len(g) < 2: continue
+        c = min(g, key=lambda i: (str(i).startswith('dbgt'), str(i)))   # an OSM node (its tags: signals, crossings) before a new one
+        for i in g:
+            if i != c: canon[i] = c
+    nj = 0
+    if canon:
+        for r in raw_roads:
+            if not any(n_ in canon for n_ in r['refs']): continue
+            out = []
+            for n_ in r['refs']:
+                m_ = canon.get(n_, n_)
+                if not out or out[-1] != m_: out.append(m_)
+            if len(out) >= 2: nj += sum(1 for n_ in r['refs'] if n_ in canon); r['refs'] = out
+    rep['nodi_uniti_sugli_assi'] = nj
     mv = np.array(list(moved.values())) if moved else np.zeros(1)
     rep['nodi_nuovi_lungo_gli_assi'] = nnew
     rep['spostamento_nodi_m'] = dict(p50=round(float(np.percentile(mv, 50)), 2), p90=round(float(np.percentile(mv, 90)), 2), p99=round(float(np.percentile(mv, 99)), 2), max=round(float(mv.max()), 2))
