@@ -680,7 +680,7 @@ function cellOwners(T, F) {
   const S = (k, m, vs, col) => { const key = k + (col ? col.getHexString() : ''); return STY[key] || (STY[key] = { m, vs, col: col || null }); };
   const cover = (o, k, rank, st, street) => { if (o.length < 3) return; H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && underFree(w))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
-    const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer)) continue;
+    const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
     if (a.t <= 3 || a.t >= 11) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
     else if (a.t === 4 && inPiazza(...centroid(outer))) { }
     else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
@@ -692,7 +692,15 @@ function cellOwners(T, F) {
   for (const q of d.pz || []) cover(dec(q.p), q.k.map(dec), 5.1, S('z', MAT.piazzaS, 4), true);
   return own;
 }
-const waterInBed = (a, outer) => { if (a.t !== 6 || !H.fineAt(...centroid(outer))) return false; const pts = [...outer, centroid(outer)]; return pts.filter(([x, z]) => H.mat(x, z) === 4 || riverCut(x, z) > 0).length >= pts.length * 0.3; }; // water inside the bed of S: the water level draws it
+// water mapped inside the bed of S (OSM riverbanks): the water level draws it. The cells it covers whole, or for a thin one its corners, at
+// least 30% on the bed (material 4, or next to it) or on an OSM river
+function waterInBed(a, outer, holes, T) {
+  const F = a.t === 6 && H.tile(T.t); if (!F || !F.m) return false; const c = F.n - 1;
+  const bedC = w => { const i = w % c, j = (w - i) / c; for (const [p, q] of [[i, j], [i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]]) if (p >= 0 && q >= 0 && p < c && q < c && F.m[q * c + p] === 4) return true; return riverCut(F.x0 + (i + 0.5) * F.st, F.z0 + (j + 0.5) * F.st) > 0; };
+  let tot = 0, bed = 0; H.coverCells(outer, holes, T.t, w => { tot++; if (bedC(w)) bed++; });
+  if (tot >= 4) return bed >= tot * 0.3;
+  const pts = [...outer, centroid(outer)]; return pts.filter(([x, z]) => bedC(clamp(Math.floor((z - F.z0) / F.st), 0, c - 1) * c + clamp(Math.floor((x - F.x0) / F.st), 0, c - 1))).length >= pts.length * 0.3;
+}
 function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!g.next().done); }
 function* buildTileGen(T) {
   if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.t * 7919;
@@ -743,7 +751,7 @@ function* buildTileGen(T) {
     gB.rk = 1; pB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
     for (const a of d.a || []) {
       const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5) continue; // platforms are built raised, with their furniture
-      if (T.fine && waterInBed(a, outer)) continue; // water inside the bed: the water level below draws it
+      if (T.fine && waterInBed(a, outer, holes, T)) continue; // water inside the bed: the water level below draws it
       try {
         if (a.t <= 3 || a.t >= 11) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 4 && inPiazza(...centroid(outer))) { } // a square or a school yard mapped as a car park: drawn by buildPiazze
@@ -761,6 +769,9 @@ function* buildTileGen(T) {
         const a = p[k - 1], c = p[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
         const nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L;
         if (T.fine) { // new engine: the bed and the banks are in S, the water is drawn below at its level zw; the railing follows the bank
+          const bedNear = [[0, 0], [0.5, 0], [-0.5, 0], [0, 1]].some(([f, g]) => { const x = (a[0] + c[0]) / 2 + nx * r.w * f + (c[0] - a[0]) * g / 2, z = (a[1] + c[1]) / 2 + nz * r.w * f + (c[1] - a[1]) * g / 2; return H.mat(x, z) === 4; });
+          if (!bedNear) { const wa = H.water(a[0], a[1]), wc = H.water(c[0], c[1]); // an OSM river with no bed in S (outside the DBGT): the strip between its banks at H.water, as in phase 4
+            if (wa !== null && wc !== null) { const i0 = rv.p.length / 3; vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0); triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3); } }
           for (const sd of [1, -1]) {
             const ax = a[0] + nx * r.w * sd, az = a[1] + nz * r.w * sd, cx = c[0] + nx * r.w * sd, cz = c[1] + nz * r.w * sd, ya = H.ground(ax, az), yc = H.ground(cx, cz);
             if (!onAnyRoad((ax + cx) / 2, (az + cz) / 2, 1.5)) { const r0 = rail.p.length / 3; vtx(rail, ax, ya + 0.75, az, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 0.75, cz, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 1.05, cz, nx, 0, nz, 0, 0); vtx(rail, ax, ya + 1.05, az, nx, 0, nz, 0, 0); rail.i.push(r0, r0 + 1, r0 + 2, r0, r0 + 2, r0 + 3); }
@@ -779,15 +790,21 @@ function* buildTileGen(T) {
         }
       }
     }
-    if (T.fine) { // the water level (docs/motore.md 3): a sheet at zw over the cells of the bed and the ones next to them, cut on each cell
-      // triangle where zw - S changes sign, so its edge is the line where the water meets the banks of S, with no teeth and no slit
+    if (T.fine) { // the water level (docs/motore.md 3): a sheet at zw, cut on each cell triangle where zw - S changes sign, so its edge is the
+      // line where the water meets the banks of S. It starts from the cells of the bed (material 4: an OSM river outside the DBGT keeps its strip above) and spreads to the cells
+      // next to them as long as the water reaches one of their corners (at most 12 m out): it fills the bed up its banks and never a
+      // hollow the river does not reach (a road in a trench beside it)
       const F = H.tile(T.t), n = F.n, c = n - 1, st = F.st, Y = F.y, zw = new Float64Array(n * n).fill(NaN), got = new Uint8Array(n * n);
-      const bed = (i, j) => i >= 0 && j >= 0 && i < c && j < c && F.m && F.m[j * c + i] === 4;
       const W = k => { if (!got[k]) { got[k] = 1; const w = H.water(F.x0 + (k % n) * st, F.z0 + Math.floor(k / n) * st); zw[k] = w === null ? NaN : w; } return zw[k]; };
-      for (let j = 0; j < c; j++) for (let i = 0; i < c; i++) {
-        const x = F.x0 + i * st, z = F.z0 + j * st;
-        if (!(bed(i, j) || bed(i - 1, j) || bed(i + 1, j) || bed(i, j - 1) || bed(i, j + 1) || riverCut(x + st / 2, z + st / 2) > 0)) continue;
-        const k = j * n + i;
+      const wet = (i, j) => { const k = j * n + i; for (const q of [k, k + 1, k + n, k + n + 1]) if (W(q) - Y[q] > 0) return true; return false; };
+      const dist = new Int8Array(c * c).fill(-1), todo = [];
+      for (let j = 0; j < c; j++) for (let i = 0; i < c; i++) if (F.m && F.m[j * c + i] === 4) { dist[j * c + i] = 0; todo.push(j * c + i); }
+      for (let h = 0; h < todo.length; h++) {
+        const w = todo[h], i = w % c, j = (w - i) / c; if (dist[w] >= 6 || !wet(i, j)) continue;
+        for (const [a, b] of [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]]) if (a >= 0 && b >= 0 && a < c && b < c && dist[b * c + a] < 0) { dist[b * c + a] = dist[w] + 1; todo.push(b * c + a); }
+      }
+      for (const w of todo) {
+        const i = w % c, j = (w - i) / c, k = j * n + i;
         for (const tri of [[k, k + 1, k + n + 1], [k, k + n + 1, k + n]]) {
           const V = tri.map(q => [F.x0 + (q % n) * st, F.z0 + Math.floor(q / n) * st, W(q), W(q) - Y[q]]); if (V.some(v => isNaN(v[2])) || V.every(v => v[3] <= 0)) continue;
           const o = []; for (let e = 0; e < 3; e++) { const p = V[e], q = V[(e + 1) % 3]; if (p[3] > 0) o.push(p); if ((p[3] > 0) !== (q[3] > 0)) { const t = p[3] / (p[3] - q[3]); o.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t, 0]); } }

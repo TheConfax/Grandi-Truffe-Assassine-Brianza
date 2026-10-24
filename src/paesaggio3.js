@@ -19,10 +19,15 @@ function lsSpans(Q, v) { // where the line across at v runs inside the polygon (
 }
 // a flat strip laid on the ground (draped, so y is the height above it), from (s0,v) to (s1,v) in the frame A, w wide, in pieces of 6 m
 function lsStrip(b, A, s0, s1, v, w, col, dy = 0.05) {
-  const n = Math.max(1, Math.ceil((s1 - s0) / 6));
-  for (let k = 0; k < n; k++) {
-    const a = s0 + (s1 - s0) * k / n, c = s0 + (s1 - s0) * (k + 1) / n, i = b.p.length / 3;
-    for (const [s, t] of [[a, v - w / 2], [c, v - w / 2], [c, v + w / 2], [a, v + w / 2]]) { const [x, z] = A.at(s, t); vtx(b, x, dy, z, 0, 1, 0, 0, 0, col); }
+  const n = Math.max(1, Math.ceil((s1 - s0) / 6)), cuts = [];
+  for (let k = 0; k < n; k++) cuts.push([s0 + (s1 - s0) * k / n, s0 + (s1 - s0) * (k + 1) / n]);
+  if (b.noclip) { // a tile of S: the corners stand on S (4 cm higher), and a piece is halved where S rises more than 3 cm over its chord
+    const g = (s, t) => { const [x, z] = A.at(s, t); return H.base(x, z); }, bad = (a, c) => { for (const t of [v - w / 2, v, v + w / 2]) { const ya = g(a, t), yc = g(c, t), m = Math.max(1, Math.round((c - a) / 0.5)); for (let q = 1; q < m; q++) if (g(a + (c - a) * q / m, t) - (ya + (yc - ya) * q / m) > 0.03) return true; } return false; };
+    for (let k = 0; k < cuts.length; k++) { const [a, c] = cuts[k]; if (c - a > 0.6 && bad(a, c)) { cuts.splice(k, 1, [a, (a + c) / 2], [(a + c) / 2, c]); k--; } }
+  }
+  for (const [a, c] of cuts) {
+    const i = b.p.length / 3;
+    for (const [s, t] of [[a, v - w / 2], [c, v - w / 2], [c, v + w / 2], [a, v + w / 2]]) { const [x, z] = A.at(s, t); vtx(b, x, dy + (b.noclip ? 0.04 : 0), z, 0, 1, 0, 0, 0, col); } // b.noclip: a tile of S, corners on S and 4 cm more
     triUp(b, i, i + 1, i + 2); triUp(b, i, i + 2, i + 3);
   }
 }
@@ -54,7 +59,7 @@ const LS_PANEL_M = new THREE.MeshLambertMaterial({ vertexColors: true }), LS_PAN
 const LS_POT_G = (() => { const g = new THREE.IcosahedronGeometry(0.32, 0); g.translate(0, 0.45, 0); return g; })();
 
 function* buildPaesaggio(T, G) {
-  const d = T.d, solid = Buf(), drape = VBuf(), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), F0 = lmFrame(new THREE.Matrix4());
+  const d = T.d, solid = Buf(), drape = Object.assign(VBuf(), { noclip: !!H.tile(T.t) }), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), F0 = lmFrame(new THREE.Matrix4());
   const box = (w, h, dd, x, y, z, col, ry = 0) => F0.geo(solid, lmBox(w, h, dd, x, y, z, ry), null, COL(col));
   const cyl = (r, h, x, y, z, col, seg = 10) => F0.geo(solid, new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z), null, COL(col));
   const solids = [], bales = [], trees = [], pots = [], panels = [];
