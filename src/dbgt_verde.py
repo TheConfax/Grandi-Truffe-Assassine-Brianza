@@ -39,7 +39,8 @@ PS_T = 1
 SPORT_DBGT = {'0201': 'sport:soccer:', '0202': 'sport:tennis:', '0203': 'sport:soccer:', '0204': 'sport:basketball:', '0205': 'sport:boules:',
               '0206': 'sport:baseball:', '0207': 'sport:rugby:', '0208': 'sport:handball:', '08': 'pista:', '0801': 'pista:'}
 GREEN = {1, 2, 3, 11, 12, 13}      # OSM/WorldCover areas the DBGT replaces
-PAVED = {4, 7, 8, 9}               # OSM zones drawn as paving over the green: the DBGT green is cut out of them
+PAVED = {4, 8, 9}                  # OSM zones drawn as paving over the green (car parks, industrial, retail): the DBGT green is cut out of them
+SPORT_LS = ('sport:', 'pista', 'piscina')  # a sports ground is a thing of its own (ATTR_SP), not land cover: OSM's stays where the DBGT has none within 3 m
 LS_GREEN = ('campo', 'prato', 'frutteto', 'orti', 'vivaio', 'aiuola', 'sport:', 'pista', 'piscina')
 FREE_D = 3.0      # OSM keeps its shape only with nothing of the DBGT within this distance (docs/motore.md 7)
 MIN_OSM = 20.0    # leftover OSM pieces smaller than this (m2) are slivers along the DBGT edges
@@ -47,6 +48,7 @@ FIL_STEP = 7.0    # trees along a row (FIL_AL is one line for many trees), as fo
 CLEAR = 0.4       # a trunk stays this far from a forbidden surface (its collision radius in world3.js)
 MOVE = 3.0        # how far a tree may move off a forbidden surface
 DUP = 1.0         # two trees closer than this are one
+BOSCO_M2, SCRUB_M2 = 100.0, 220.0  # ground per scattered tree in the DBGT woods and scrub (Verde.bosco)
 
 # every surface of the DBGT: a point of the comune none of these covers is where OSM may keep its shape
 SURF = ['A_PVEG', 'AATT', 'AB_CDA_AB_CDA_SUP', 'AC_CIC_AC_CIC_SUP_SR', 'AC_PED_AC_PED_SUP_SR', 'AC_VEI_AC_VEI_SUP_SR', 'ALVEO_A_ALVEO_A_SU',
@@ -77,7 +79,7 @@ class Verde:
     def __init__(self, dbt_dir, comuni, cover, log=print, to_game=None, origin=(0.0, 0.0)):
         """dbt_dir: data/dbt; comuni: {nome minuscolo: poligono del confine}; cover: dbt_cover di build_data.py (confini meno 3 m);
         origin: the corner of the game's tiles (-HW, -HH)."""
-        t0 = time.time(); self.log = log; self.cover = cover; self.origin = origin; self.rep = {'comuni': [], 'osm_senza_dbgt': {'aree': [], 'terreni': [], 'alberi': []}}
+        t0 = time.time(); self.log = log; self.cover = cover; self.origin = origin; self.cons = GeometryCollection(); self.rep = {'comuni': [], 'osm_senza_dbgt': {'aree': [], 'terreni': [], 'alberi': []}}
         tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True)
         tg = to_game or (lambda lon, lat: ((lon - LON0) * KX, -(lat - LAT0) * KZ))
         self._tf = lambda g: shapely.transform(shapely.force_2d(g), lambda a: np.column_stack(tg(*tr.transform(a[:, 0], a[:, 1]))))
@@ -155,6 +157,22 @@ class Verde:
         """area_geoms [(type, geom)], land [(kind, pts)] of build_data.py -> the same lists with the DBGT green inside the cover."""
         cv, free = self.cover, self.free
         if cv.is_empty: return area_geoms, land
+        # an OSM building site (landuse=construction) is newer than the survey (Meda 2015): no DBGT green or trees inside it. The site by the
+        # Milano-Meda at x 100 z 140 with its crane was lawns and a wood in the DBGT, cut out of the dark soil it looked like a patchwork
+        cons = unary_union([g.intersection(cv) for at, g in area_geoms if at == 7 and g.intersects(cv)]); self.cons = cons; prepare(cons)
+        if not cons.is_empty:
+            ncut = Counter()
+            def nocons(L, key):
+                res = []
+                for t, q in L:
+                    if q.intersects(cons): ncut[key] += 1; res += [(t, r) for r in _polys(q.difference(cons), 1.0)]
+                    else: res.append((t, q))
+                return res
+            self.areas, self.sport, self.land = nocons(self.areas, 'aree'), nocons(self.sport, 'sport'), nocons(self.land, 'terreni')
+            self.forest = [(t, q) for t, q in self.areas if t in (11, 12)]; self.forest_u = unary_union([q for t, q in self.forest]) if self.forest else GeometryCollection(); prepare(self.forest_u)
+            self.rep['cantieri_osm'] = {'m2': round(cons.area), 'pezzi_dbgt_ritagliati': dict(ncut)}
+        spt = STRtree([q for t, q in self.sport]) if self.sport else None
+        def has_sport(g, d=FREE_D): return spt is not None and len(spt.query(g, predicate='dwithin', distance=d)) > 0
         green_u = unary_union([p for t, p in self.areas] + [p for t, p in self.sport]); gt = STRtree(_polys(green_u))
         out, rm, kept = [], Counter(), []
         X0, Z0 = self.origin
@@ -173,6 +191,12 @@ class Verde:
             return res
         for at, g in area_geoms:
             if not g.intersects(cv): out.append((at, g)); continue
+            if at == 3 and not has_sport(g.intersection(cv)):  # an OSM pitch the DBGT has no sports ground for (newer, or a field on a lawn)
+                out.append((at, g)); c = g.intersection(cv).representative_point(); kept.append({'t': at, 'm2': round(g.intersection(cv).area), 'x': round(c.x, 1), 'z': round(c.y, 1)}); continue
+            if at == 6 and any(t.startswith('01') and q.intersection(g).area > 0.3 * min(q.area, g.area) for t, q in self.sport):  # the pool is ATTR_SP 01
+                rm['piscina'] += 1
+                for p in cut(g, lambda c: c.difference(cv)): out.append((at, p))
+                continue
             if at in GREEN:
                 rm[at] += 1
                 for p in cut(g, lambda c: c.difference(cv)): out.append((at, p))
@@ -222,10 +246,12 @@ class Verde:
             if not k.startswith(LS_GREEN) or len(pts) < 3: out_land.append((k, pts)); continue
             g = Polygon(pts).buffer(0)
             if not g.intersects(cv): out_land.append((k, pts)); continue
+            if k.startswith(SPORT_LS) and not has_sport(g):
+                out_land.append((k, pts)); c = g.representative_point(); self.rep['osm_senza_dbgt']['terreni'].append({'k': k, 'm2': round(g.area), 'x': round(c.x, 1), 'z': round(c.y, 1)}); continue
             lrm += 1
-            for p in _polys(g.difference(cv), 8) + _polys(g.intersection(free), MIN_OSM):
-                out_land.append((k, list(p.exterior.coords)[:-1]))
-                if p.intersects(cv): c = p.representative_point(); self.rep['osm_senza_dbgt']['terreni'].append({'k': k, 'm2': round(p.area), 'x': round(c.x, 1), 'z': round(c.y, 1)})
+            for p in _polys(g.difference(cv), 8): out_land.append((k, list(p.exterior.coords)[:-1]))
+            for p in _polys(g.intersection(free), MIN_OSM):
+                out_land.append((k, list(p.exterior.coords)[:-1])); c = p.representative_point(); self.rep['osm_senza_dbgt']['terreni'].append({'k': k, 'm2': round(p.area), 'x': round(c.x, 1), 'z': round(c.y, 1)})
         for k, p in self.land + new_land: out_land.append((k, list(p.exterior.coords)[:-1]))
         self.rep['aree'] = {'osm_tolte': dict((str(k), v) for k, v in rm.items()), 'dbgt_pezzi_per_tipo': dict((str(k), v) for k, v in sorted(nadd.items())),
                             'osm_tenute_pezzi': len(kept), 'osm_tenute_m2': round(sum(k['m2'] for k in kept)), 'terreni_osm_tolti': lrm,
@@ -243,13 +269,16 @@ class Verde:
         return np.array(out) if out else np.zeros((0, 2))
 
     def bosco(self, strade):
-        """trees scattered in the DBGT woods as build_data.py does in OSM's (one every 70 m2, scrub one every 220, at most 4000 a piece),
-        off the roads and paths (strade: build_data.py roadsU) and its own generator, so the scatter outside the DBGT does not change"""
+        """trees scattered in the DBGT woods: one every 100 m2 (scrub one every 220), at most 4000 a piece, off the roads and paths
+        (strade: build_data.py roadsU), with a generator of their own so the scatter outside the DBGT does not change. build_data.py asks
+        one every 70 m2 of OSM's woods but draws only three candidates a tree: in the long woods along the Seveso (a fifth of their box)
+        that gave one every 120-220 m2, in the round ones one every 75; 100 m2 is what OSM's woods of Meda had on average, everywhere the same"""
         rng = np.random.default_rng(20822); out = []
         for t, g in self.forest:
-            n = int(min(4000, g.area * (1 / 70 if t == 11 else 1 / 220)))
+            n = int(min(4000, g.area / (BOSCO_M2 if t == 11 else SCRUB_M2)))
             if n <= 0: continue
-            x0, z0, x1, z1 = g.bounds; xs = rng.uniform(x0, x1, n * 3); zs = rng.uniform(z0, z1, n * 3)
+            x0, z0, x1, z1 = g.bounds; m = int(n * min(40, 1.3 * (x1 - x0) * (z1 - z0) / g.area)) + 8
+            xs = rng.uniform(x0, x1, m); zs = rng.uniform(z0, z1, m)
             ok = shapely.contains_xy(g, xs, zs) & ~shapely.intersects_xy(strade, xs, zs)
             out += list(zip(xs[ok], zs[ok]))[:n]
         return np.array(out) if out else np.zeros((0, 2))
@@ -279,6 +308,8 @@ class Verde:
         P = np.vstack([D, T[osm][keep_osm], T[gen][keep_gen], B])
         src = np.concatenate([src, np.full(int(keep_osm.sum()), 2), np.full(int(keep_gen.sum()) + len(B), 3)])
         self.rep['osm_senza_dbgt']['alberi'] = [[round(x, 1), round(z, 1)] for x, z in T[osm][keep_osm]]
+        if not self.cons.is_empty:  # DBGT trees in an OSM building site: gone since the survey
+            ic = shapely.contains_xy(self.cons, P[:, 0], P[:, 1]) & (src != 2); self.rep['alberi_dbgt_nei_cantieri'] = int(ic.sum()); P, src = P[~ic], src[~ic]
         # forbidden surfaces: the DBGT's and the game's (cut to the cover, in pieces so the tree query stays local)
         bx = box(*cv.bounds).buffer(10)
         V = list(self.notree)

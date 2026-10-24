@@ -1401,7 +1401,7 @@ if blines:
                 cartelli.append([q(spot.x), q(spot.y), round(ux, 3), round(uz, 3), r['w'], fwd, back])
 log('cartelli di paese', len(cartelli), 'confini', len(blines), 'spostati via da un incrocio', nmoved, 'senza posto', ndrop, 'laterali di una via sul confine', nside, 'ripetuti sulla stessa via', nrep, 'su vie minori', nminor)
 log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1), 'parcheggi con capienza', len(plots), 'strade con sosta', sum(1 for r in raw_roads if r.get('pk')))
-trees = VERDE.alberi(trees, _n_tr, [asph, pedz, side, foot, bunion], railL, pspaces, roadsU); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
+trees = VERDE.alberi(trees, _n_tr, [asph, pedz, side, foot, bunion, rbuf(lambda r: r.get("deck"), 0)], railL, pspaces, roadsU); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
 VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 # ------------------------------------------------------------------ graph & tiles
 used_nodes = {}

@@ -1310,7 +1310,9 @@ function* buildTileGen(T) {
   }
   { const s = srndT; yield 'trees'; srndT = s; }
   // trees and street lamps
-  T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
+  // a tree of the data where a landmark plants its own by hand (the row of conifers of Parco Fusetti, PLAZAS in landmarks3.js: 6 of its 10
+  // stand within 2.5 m of a DBGT tree, the same trees) is drawn once, by the landmark
+  T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4) && !PLAZAS.some(q => (q.trees || []).some(([a, b]) => hyp(a - x, b - z) < 2.5)));
   if (T.tr.length) {
     const n = T.tr.length, trunks = new THREE.InstancedMesh(TREE_G.trunk, MAT.trunk, n), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, n);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
