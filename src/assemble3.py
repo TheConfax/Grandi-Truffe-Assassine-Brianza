@@ -33,7 +33,10 @@ for (let i = 0; i < D.nodes.length; i += 3) { N.push([D.nodes[i] / 10, D.nodes[i
 const dec = a => { const o = []; let x = 0, z = 0; for (let i = 0; i < a.length; i += 2) { x += a[i]; z += a[i + 1]; o.push([x / 10, z / 10]); } return o; };""")
 rep("const STREETS = new Grid(24); // named road segments\nconst JUNC = new Grid(16);\n", "")
 rep("""function mkMesh(b, mat, ro, shadow) {""", """function mkMesh(b, mat, ro, shadow, parent = scene) {""")
-rep("  if (b.drape) for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += groundH(b.p[i], b.p[i + 2]);", "  if (b.drape) for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += b.vis ? visH(b.p[i], b.p[i + 2]) : groundH(b.p[i], b.p[i + 2]);")
+rep("  if (b.drape) for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += groundH(b.p[i], b.p[i + 2]);", "  if (b.drape) { const hf = b.hf || (b.vis ? visH : groundH); for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += hf(b.p[i], b.p[i + 2]); } /* b.hf: altezze3.js, the ground the buffer drapes on */")
+# draped polygons split their edges on the ground they drape on
+rep("    const mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = groundH(all[i][0], all[i][1]));", "    const hf = b.hf || groundH, mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = hf(all[i][0], all[i][1]));")
+rep("for (const t of [0.25, 0.5, 0.75]) { const e = groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)", "for (const t of [0.25, 0.5, 0.75]) { const e = hf(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)")
 rep("""  scene.add(m); return m;
 }
 const flatMat""", """  parent.add(m); return m;
@@ -41,7 +44,7 @@ const flatMat""", """  parent.add(m); return m;
 const flatMat""")
 
 # ---- world: replace everything from "the world" to "audio" with the tiled world + level-aware collisions
-world = open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read()
+world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
 function collideStatic(p, r, y) {
@@ -229,7 +232,7 @@ rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z
 rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
-rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY,")
+rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY,")
 rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
@@ -261,7 +264,7 @@ rep("if (traffic.length < 22 && rnd() < dt * 2) spawnTraffic(true);", "if (traff
 # trains ride on the elevated track
 rep("  const pts = dec(td.p); if (pts.length < 2) return null;", "  const pts = dec(td.p); if (pts.length < 2) return null;\n  const hs = (td.h || []).map((v, i) => v === -32768 ? null : v / 10);")
 rep("const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), Math.atan2(b[0] - a[0], b[1] - a[1])]; };",
-    "const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), x = lerp(a[0], b[0], f), z = lerp(a[1], b[1], f), ha = hs[i - 1] ?? groundH(a[0], a[1]), hb = hs[i] ?? groundH(b[0], b[1]); return [x, z, Math.atan2(b[0] - a[0], b[1] - a[1]), (hs[i - 1] == null && hs[i] == null) ? groundH(x, z) : lerp(ha, hb, f)]; };")
+    "const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), x = lerp(a[0], b[0], f), z = lerp(a[1], b[1], f), ha = hs[i - 1] ?? groundH(a[0], a[1]), hb = hs[i] ?? groundH(b[0], b[1]); return [x, z, Math.atan2(b[0] - a[0], b[1] - a[1]), railY(x, z, (hs[i - 1] == null && hs[i] == null) ? groundH(x, z) : lerp(ha, hb, f))]; };")
 rep("const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h] = T.at(s); g.position.set(x, groundH(x, z) + 0.15, z); g.rotation.y = h;", "const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h, y] = T.at(s); g.position.set(x, y + 0.15, z); g.rotation.y = h; g.userData.y = y;")
 # AI stops at red lights
 rep("    for (const g of LX) if (g.bars && (g.closed || g.ang < 0.7)) for (const b of g.bars) for (const [x, z] of b.probe) check(x, z);",
@@ -372,7 +375,7 @@ async function reportSpot() {
   toast('📍 Punto ' + spotN + ' segnalato' + (rec.via ? ': ' + rec.via : '') + (saved ? '' : ' (solo in locale)'));
 }
 function updVisuals(dt) {""")
-rep("  if (e.code === 'KeyN') skipTime(2);", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyB') reportSpot();")
+rep("  if (e.code === 'KeyN') skipTime(2);", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyB') reportSpot();\n  if (e.code === 'KeyJ' && DEBUG) { const r = H.check(); toast('H.check: ' + r.tile + ' tile, scarto ' + r.scarto_max_m.toFixed(3) + ' m (raggi ' + r.scarto_raggi_m.toFixed(3) + ')'); }")
 rep("      <div><kbd>N</kbd> avanti di 2 ore</div>", "      <div><kbd>N</kbd> avanti di 2 ore</div>\n      <div><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>")
 rep("<kbd>N</kbd> +2 ore · <kbd>U</kbd> audio</p>", "<kbd>N</kbd> +2 ore · <kbd>B</kbd> segnala punto · <kbd>U</kbd> audio</p>")
 # respawn after "wasted": nearest hospital, medical centre or church

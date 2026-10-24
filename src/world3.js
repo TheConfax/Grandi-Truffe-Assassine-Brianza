@@ -1,72 +1,6 @@
-// ---------------------------------------------------------------- terrain (TINITALY 10 m, INGV)
-const TER = D.terrain;
-const TH = (() => { const bin = atob(TER.h16), n = bin.length >> 1, f = new Float32Array(n); for (let i = 0; i < n; i++) f[i] = (bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8)) / 10; return f; })();
-// the bank the covered stair between the Diaz and the Anna Frank climbs: the 10 m model smooths it into a gentle slope, so the field at its
-// foot is dug a few metres lower, fading out within twenty metres and never across the road to the south
-{
-  const A = [-578.8, -718.1], B = [-549.3, -727.1], DROP = 3.2, ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez, Ln = Math.sqrt(L2);
-  for (let j = 0; j < TER.nz; j++) for (let i = 0; i < TER.nx; i++) {
-    const x = TER.x0 + i * TER.step, z = TER.z0 + j * TER.step; if (Math.abs(x - A[0]) > 60 || Math.abs(z - A[1]) > 60) continue;
-    const t = ((x - A[0]) * ex + (z - A[1]) * ez) / L2, side = ((x - A[0]) * ez - (z - A[1]) * ex) / Ln, tc = Math.max(0, Math.min(1, t));
-    const d = Math.hypot(x - A[0] - ex * tc, z - A[1] - ez * tc), reach = side < 0 ? 8 : 22; // side < 0: towards the road
-    const k = Math.max(0, 1 - d / reach) * Math.max(0, 1 - Math.max(0, t) * 1.15);
-    TH[j * TER.nx + i] -= DROP * k * k * (3 - 2 * k);
-  }
-}
-// trenches (trincee): where the DBGT has a road below the terrain model, the ground is dug down to it. Each piece of road is a segment
-// [ax, az, bx, bz, depth at a, depth at b, half width] in decimetres: full depth across the carriageway, then a grassy bank at 1 : CUT_S
-// up to the field. Everything standing on groundH (roads, cars, people, trees, the tiles' terrain) follows; the streets crossing above
-// are decks at their own height, from the build. The same formula is in build_data.py (ground_cut): keep them equal
-const CUTG = new Grid(24), CUT_S = 1.2, CUTS = (D.cut || []).map(c => c.map(v => v / 10)), CUTB = [1e9, 1e9, -1e9, -1e9];
-for (const [ax, az, bx, bz, da, db, hw] of CUTS) {
-  const m = hw + Math.max(da, db) * CUT_S, s = { ax, az, bx, bz, da, db, hw, m };
-  CUTG.add(Math.min(ax, bx) - m, Math.min(az, bz) - m, Math.max(ax, bx) + m, Math.max(az, bz) + m, s);
-  CUTB[0] = Math.min(CUTB[0], ax - m, bx - m); CUTB[1] = Math.min(CUTB[1], az - m, bz - m); CUTB[2] = Math.max(CUTB[2], ax + m, bx + m); CUTB[3] = Math.max(CUTB[3], az + m, bz + m);
-}
-function trenchCut(x, z) {
-  if (x < CUTB[0] || z < CUTB[1] || x > CUTB[2] || z > CUTB[3]) return 0;
-  let c = 0;
-  CUTG.each(x, z, x, z, s => {
-    const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.ax) * ex + (z - s.az) * ez) / L2, 0, 1), d = hyp(x - s.ax - ex * t, z - s.az - ez * t);
-    const D = s.da + (s.db - s.da) * t; c = Math.max(c, Math.min(D, D - (d - s.hw) / CUT_S));
-  });
-  return c;
-}
-// the deepest trench within r of (x, z): how far down the coarse depth mask has to go there
-function trenchNear(x, z, r) { let c = 0; CUTG.each(x - r, z - r, x + r, z + r, s => { if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < r + s.m) c = Math.max(c, s.da, s.db); }); return c; }
-// does the edge a-b come within reach of a trench? (draped surfaces split such edges down to 4 m, or they bridge the hollow)
-function cutTouches(ax, az, bx, bz) {
-  if (!CUTS.length || Math.max(ax, bx) < CUTB[0] || Math.max(az, bz) < CUTB[1] || Math.min(ax, bx) > CUTB[2] || Math.min(az, bz) > CUTB[3]) return false;
-  let f = false;
-  CUTG.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => { if (!f && segSegDist(ax, az, bx, bz, s.ax, s.az, s.bx, s.bz) < s.m) f = true; });
-  return f;
-}
-function segSegDist(ax, az, bx, bz, cx, cz, dx, dz) {
-  const o = (px, pz, qx, qz, rx, rz) => Math.sign((qx - px) * (rz - pz) - (qz - pz) * (rx - px));
-  if (o(ax, az, bx, bz, cx, cz) * o(ax, az, bx, bz, dx, dz) < 0 && o(cx, cz, dx, dz, ax, az) * o(cx, cz, dx, dz, bx, bz) < 0) return 0;
-  return Math.min(segDist(ax, az, cx, cz, dx, dz), segDist(bx, bz, cx, cz, dx, dz), segDist(cx, cz, ax, az, bx, bz), segDist(dx, dz, ax, az, bx, bz));
-}
-function groundH(x, z) {
-  const fx = clamp((x - TER.x0) / TER.step, 0, TER.nx - 1.001), fz = clamp((z - TER.z0) / TER.step, 0, TER.nz - 1.001), i = fx | 0, j = fz | 0, u = fx - i, v = fz - j, k = j * TER.nx + i;
-  // same two triangles per cell as the terrain mesh, so cars, roads and the visible ground agree exactly
-  const h00 = TH[k], h10 = TH[k + 1], h01 = TH[k + TER.nx], h11 = TH[k + TER.nx + 1];
-  return (u >= v ? h00 + u * (h10 - h00) + v * (h11 - h10) : h00 + v * (h01 - h00) + u * (h11 - h01)) - (CUTS.length ? trenchCut(x, z) : 0);
-}
-const FBuf = () => Object.assign(Buf(), { drape: true });
-const VBuf = () => Object.assign(Buf(), { drape: true, vis: true }); // drapes on the visible (river-carved) terrain
-const RIVG = new Grid(24), RIV_D = 2.4;
-for (const td of D.tiles) for (const r of td.rv || []) { const pts = dec(r.p); for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], m = r.w + 1; RIVG.add(Math.min(a[0], b[0]) - m, Math.min(a[1], b[1]) - m, Math.max(a[0], b[0]) + m, Math.max(a[1], b[1]) + m, { a, b, w: r.w, ca: k === 1 && !!(r.e && r.e[0]), cb: k === pts.length - 1 && !!(r.e && r.e[1]) }); } }
-function riverCut(x, z) {
-  let c = 0;
-  RIVG.each(x, z, x, z, s => {
-    const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L2 = ex * ex + ez * ez || 1, t0 = ((x - s.a[0]) * ex + (z - s.a[1]) * ez) / L2;
-    if ((t0 < 0 && s.ca) || (t0 > 1 && s.cb)) return; // square end at a culvert / bridge mouth
-    const t = clamp(t0, 0, 1), d = hyp(x - s.a[0] - ex * t, z - s.a[1] - ez * t);
-    if (d < s.w + 0.4) c = Math.max(c, d < s.w ? RIV_D : RIV_D * (s.w + 0.4 - d) / 0.4);
-  });
-  return c;
-}
-const visH = (x, z) => groundH(x, z) - riverCut(x, z);
+// ---------------------------------------------------------------- terrain: heights in altezze3.js (H.*)
+const FBuf = () => Object.assign(Buf(), { drape: true, hf: streetH }); // street surfaces: on S, or on a bridge over the water
+const VBuf = () => Object.assign(Buf(), { drape: true, vis: true, hf: visH }); // drapes on the visible (river-carved) terrain
 // coarse backdrop terrain for the far distance (fine patches are built per tile)
 {
   const S = 4, b = Buf(), nx = Math.floor((TER.nx - 1) / S) + 1, nz = Math.floor((TER.nz - 1) / S) + 1;
@@ -74,9 +8,8 @@ const visH = (x, z) => groundH(x, z) - riverCut(x, z);
   for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { const k = j * nx + i; triUp(b, k, k + 1, k + nx + 1); triUp(b, k, k + nx + 1, k + nx); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(b.i); g.computeVertexNormals();
   const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false })); m.renderOrder = -3; m.receiveShadow = true; scene.add(m);
-  let gd = g; // the depth mask goes under the trenches too, or it would hide their floor
-  if (CUTS.length) { gd = g.clone(); const P = gd.attributes.position; for (let i = 0; i < P.count; i++) P.setY(i, P.getY(i) - trenchNear(P.getX(i), P.getZ(i), S * TER.step)); }
-  const dm = new THREE.Mesh(gd, new THREE.MeshBasicMaterial({ colorWrite: false, stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc })); dm.position.y = -3.2; // not where a pit is dug (stencil 1) dm.renderOrder = -1; scene.add(dm);
+  // the coarse depth mask (3.2 m under this grid, deeper over the trenches) has been off since 94bb9c2: a // in the middle of its line took
+  // the scene.add with it, and the tiles have their own mask 0.5 m under the drawn ground. Phase 7 makes it again from S (docs/motore.md 2.3)
 }
 
 // ---------------------------------------------------------------- tiles & static data
@@ -165,7 +98,6 @@ function onSide(x, z) {
 
 // ---------------------------------------------------------------- roads, decks (sopraelevate), graphs
 const RIVER_RAILS = [];
-const nodeY = i => NHt[i] !== null ? NHt[i] : groundH(N[i][0], N[i][1]);
 const NODE_DEG = new Array(N.length).fill(0);
 for (const r of D.roads) if (r.c <= 4) { const g = r.g; for (let k = 0; k < g.length; k++) NODE_DEG[g[k]] += (k === 0 || k === g.length - 1) ? 1 : 2; }
 N.forEach(([x, z], i) => NODEG.add(x, z, x, z, { i }));
@@ -271,7 +203,8 @@ for (const td of D.tiles) for (const r of td.rv || []) {
     WALLS.add(ax, az, bx, bz, { ax, az, bx, bz, nx: ux, nz: uz, two: true, y0: gy - 4, y1: gy + 1.1 });
   }
 }
-function surfAt(x, z, cy) { // ground or deck under (x,z), never more than a kerb above the current height
+H.oldSurface = surfAtOld;
+function surfAtOld(x, z, cy) { // old engine (H.surface where a tile has no .bin): ground or deck under (x,z), never more than a kerb above the current height
   const rc = riverCut(x, z);
   let y = groundH(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + (onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : bumpAt(x, z));
   if (cy === undefined) return y;
@@ -559,6 +492,7 @@ function addSill(b, x, y, z, ux, uz, nx, nz) { // a stone sill 1.16 m long stick
   }
 }
 function terrDrawnH(x, z) { // the terrain patch as drawn: visH on its tile's grid, flat in between (the band must not float over a hump between nodes)
+  if (H.fineAt(x, z)) return H.base(x, z); // a tile of the new engine is drawn from H itself
   const T = TILES[tileOf(x, z)]; if (!T || !T.st) return visH(x, z);
   const st = T.st, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2, i = Math.floor((x - x0) / st), j = Math.floor((z - z0) / st), fx = (x - x0) / st - i, fz = (z - z0) / st - j;
   const X = x0 + i * st, Z = z0 + j * st, h00 = visH(X, Z), h11 = visH(X + st, Z + st);
@@ -595,6 +529,44 @@ function genLamps(T, d, osm) {
   }
   return out;
 }
+// height of something of the old engine that runs on a deck (old road nodes, guardrails, pillars, elevated tracks) in a tile of S: the top
+// of the deck of the new engine under it nearest its old height (within 3 m: the old heights stray up to 2.2 m from the new decks, and the
+// Milano-Meda under PONTE 20 is an old elevated road 6 m under it), else S; a train takes its railway deck whatever the old profile says.
+// Transitional: phase 6 makes rails and pillars from the decks
+function deckY(x, z, yOld, tipo) {
+  let best = null; for (const o of H.deckAt(x, z)) if (o.tipo !== 'copertura' && (tipo ? o.tipo === tipo : Math.abs(o.top - yOld) < 3) && (best === null || Math.abs(o.top - yOld) < Math.abs(best - yOld))) best = o.top;
+  const g = H.ground(x, z); return best !== null && best > g ? best : g;
+}
+const railY = (x, z, y) => H.fineAt(x, z) ? deckY(x, z, y, 'ferro') : y; // the trains: on the railway deck or on S in a tile of S, the old profile elsewhere
+// the decks of the new engine (docs/motore.md 1.5), each triangle and each edge in the tile of its middle: the top as it is, the underside
+// sp lower, the sides along the edges of the footprint that do not rest on S (the spalle rest on it)
+function deckEdges(dk) {
+  if (dk.edges) return dk.edges;
+  const key = (ax, az, bx, bz) => { const a = ax.toFixed(2) + ',' + az.toFixed(2), b = bx.toFixed(2) + ',' + bz.toFixed(2); return a < b ? a + ' ' + b : b + ' ' + a; };
+  const cnt = new Map(), T = dk.tri, sp = new Set(dk.spalle.map(e => key(e[0], e[1], e[2], e[3])));
+  for (let i = 0; i < T.length; i += 9) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) { const k = key(T[i + a], T[i + a + 1], T[i + b], T[i + b + 1]); const c = cnt.get(k); cnt.set(k, c ? { n: c.n + 1 } : { n: 1, e: [T[i + a], T[i + a + 1], T[i + a + 2], T[i + b], T[i + b + 1], T[i + b + 2]] }); }
+  dk.edges = []; for (const [k, c] of cnt) if (c.n === 1 && !sp.has(k)) dk.edges.push(c.e);
+  return dk.edges;
+}
+function drawDecks(T, top, side) {
+  for (const dk of H.DECKS) {
+    if (dk.tipo === 'copertura') continue; // its top is S itself (the station underpass)
+    const R = dk.tri, sp = dk.sp;
+    for (let i = 0; i < R.length; i += 9) {
+      if (tileOf((R[i] + R[i + 3] + R[i + 6]) / 3, (R[i + 1] + R[i + 4] + R[i + 7]) / 3) !== T.t) continue;
+      const k = top.p.length / 3; for (const o of [0, 3, 6]) vtx(top, R[i + o], R[i + o + 2], R[i + o + 1], 0, 1, 0, R[i + o] / 9, R[i + o + 1] / 9);
+      triUp(top, k, k + 1, k + 2);
+      const u = side.p.length / 3; for (const o of [0, 3, 6]) vtx(side, R[i + o], R[i + o + 2] - sp, R[i + o + 1], 0, -1, 0, 0, 0);
+      triUp(side, u, u + 1, u + 2); const t3 = side.i.splice(-3); side.i.push(t3[0], t3[2], t3[1]); // facing down
+    }
+    for (const [ax, az, ay, bx, bz, by] of deckEdges(dk)) {
+      if (tileOf((ax + bx) / 2, (az + bz) / 2) !== T.t) continue;
+      const L = hyp(bx - ax, bz - az) || 1, nx = (bz - az) / L, nz = -(bx - ax) / L, b0 = side.p.length / 3;
+      vtx(side, ax, ay - sp, az, nx, 0, nz, 0, 0); vtx(side, bx, by - sp, bz, nx, 0, nz, L / 2, 0); vtx(side, bx, by + 0.02, bz, nx, 0, nz, L / 2, 1); vtx(side, ax, ay + 0.02, az, nx, 0, nz, 0, 1);
+      side.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3, b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); // both faces: the footprint has no fixed winding
+    }
+  }
+}
 // a tile is built a slice at a time (a generator that yields between its parts), so driving into new ground never freezes the game for the
 // tenth of a second a whole tile takes; it stays hidden until it is complete. buildTile runs one to the end in one go (start, respawn)
 function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!g.next().done); }
@@ -605,9 +577,26 @@ function* buildTileGen(T) {
   const put = (b, mat, ro, shadow) => { if (b.i.length) mkMesh(b, mat, ro, shadow, G); };
   const pc = a => COL(a[Math.floor(tRnd() * a.length)]), d = T.d, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
   // terrain patch
-  {
+  const FT = H.tile(T.t); T.fine = !!FT;
+  if (FT) { // new engine: the nodes of S as they are, the triangles of H.onTri (docs/motore.md 3: H.base is this mesh, H.check)
+    const n = FT.n, st = FT.st, pos = new Float32Array(n * n * 3), nor = new Float32Array(n * n * 3), uv = new Float32Array(n * n * 2), idx = new Uint32Array((n - 1) * (n - 1) * 6); let q = 0;
+    const setV = (k, x, y, z) => { pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z; uv[k * 2] = x / 10; uv[k * 2 + 1] = z / 10; };
+    H.onTri(T.t, (ax, ay, az, bx, by, bz, cx, cy, cz, a, b, c) => { setV(a, ax, ay, az); setV(b, bx, by, bz); setV(c, cx, cy, cz); idx[q++] = a; idx[q++] = c; idx[q++] = b; }); // wound to face up
+    // normals across the tile edges too (the neighbour's nodes, or one-sided where there is no tile of S): no seam in the light
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const k = j * n + i, x = FT.x0 + i * st, z = FT.z0 + j * st, y = FT.y[k];
+      const hx = (di, dj) => { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < n && jj < n) return FT.y[jj * n + ii]; const X = x + di * st, Z = z + dj * st; return H.fineAt(X, Z) ? H.base(X, Z) : null; };
+      const e = hx(1, 0), w = hx(-1, 0), so = hx(0, 1), no = hx(0, -1);
+      const gx = e !== null && w !== null ? (e - w) / (2 * st) : e !== null ? (e - y) / st : (y - w) / st, gz = so !== null && no !== null ? (so - no) / (2 * st) : so !== null ? (so - y) / st : (y - no) / st;
+      const L = Math.hypot(gx, 1, gz); nor[k * 3] = -gx / L; nor[k * 3 + 1] = 1 / L; nor[k * 3 + 2] = -gz / L;
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, MAT.terrain); m.renderOrder = -2; m.receiveShadow = true; G.add(m); T.terrMesh = m; T.st = st;
+    const dm = new THREE.Mesh(g, MAT.depth); dm.position.y = -0.5; dm.renderOrder = -1; G.add(dm);
+  } else {
     let cut = false; CUTG.each(x0, z0, x0 + TS, z0 + TS, () => { cut = true; });
-    const st = (d.rv || []).length || cut ? 2 : TER.step, nn = Math.round(TS / st), b = Buf(), w = nn + 1; T.st = st;
+    // beside a tile of S its edge nodes are S (H.vis takes the neighbour's on the shared edge): every 2 m, as S, or the edge would crack
+    const st = (d.rv || []).length || cut || H.nearFine(T.t) ? 2 : TER.step, nn = Math.round(TS / st), b = Buf(), w = nn + 1; T.st = st;
     for (let j = 0; j <= nn; j++) for (let i = 0; i <= nn; i++) { const x = x0 + i * st, z = z0 + j * st; vtx(b, x, visH(x, z), z, 0, 1, 0, x / 10, z / 10); }
     for (let j = 0; j < nn; j++) for (let i = 0; i < nn; i++) { const k = j * w + i; triUp(b, k, k + 1, k + w + 1); triUp(b, k, k + w + 1, k + w); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(b.i); g.computeVertexNormals();
@@ -634,7 +623,17 @@ function* buildTileGen(T) {
       const p = resample(dec(r.p), 3);
       for (let k = 1; k < p.length; k++) {
         const a = p[k - 1], c = p[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
-        const nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L, ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), wa = ga - RIV_D + 0.5, wc = gc - RIV_D + 0.5;
+        const nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L;
+        if (T.fine) { // new engine: the bed and the banks are in S, the water stands at its level zw (H.water); the railing follows the bank
+          const wa = H.water(a[0], a[1]), wc = H.water(c[0], c[1]);
+          if (wa !== null && wc !== null) { const i0 = rv.p.length / 3; vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0); triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3); }
+          for (const sd of [1, -1]) {
+            const ax = a[0] + nx * r.w * sd, az = a[1] + nz * r.w * sd, cx = c[0] + nx * r.w * sd, cz = c[1] + nz * r.w * sd, ya = H.ground(ax, az), yc = H.ground(cx, cz);
+            if (!onAnyRoad((ax + cx) / 2, (az + cz) / 2, 1.5)) { const r0 = rail.p.length / 3; vtx(rail, ax, ya + 0.75, az, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 0.75, cz, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 1.05, cz, nx, 0, nz, 0, 0); vtx(rail, ax, ya + 1.05, az, nx, 0, nz, 0, 0); rail.i.push(r0, r0 + 1, r0 + 2, r0, r0 + 2, r0 + 3); }
+          }
+          continue;
+        }
+        const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), wa = ga - RIV_D + 0.5, wc = gc - RIV_D + 0.5;
         const i0 = rv.p.length / 3; // water
         vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0);
         triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3);
@@ -653,6 +652,15 @@ function* buildTileGen(T) {
       for (const [ei, E, F] of [[0, raw[0], raw[1]], [1, raw[raw.length - 1], raw[raw.length - 2]]]) {
         if (!r.e || !r.e[ei] || !F) continue;
         const L = hyp(F[0] - E[0], F[1] - E[1]) || 1, ux = (F[0] - E[0]) / L, uz = (F[1] - E[1]) / L, nx = -uz, nz = ux, g = groundH(E[0], E[1]), W = r.w + 0.3;
+        if (T.fine) { // new engine: the headwall from under the water to the ground over the culvert, the dark mouth above the water
+          let lo = 1e9, hi = -1e9; for (let q = -1; q <= 1.001; q += 0.25) { const y = H.base(E[0] + nx * W * q, E[1] + nz * W * q); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+          const top = Math.max(hi, H.base(E[0] - ux * 3, E[1] - uz * 3)), hw = H.water(E[0], E[1]), wy = hw !== null ? hw : lo + 0.3; if (top - lo < 0.6) continue; // the bed goes on at grade: no culvert to see
+          quadV(head, E[0] - nx * W, E[1] - nz * W, E[0] + nx * W, E[1] + nz * W, lo - 0.5, top + 0.25, ux, uz);
+          const ow = r.w * 0.78, mh = Math.min(1.5, top - wy - 0.3), mx = E[0] + ux * 0.03, mz = E[1] + uz * 0.03;
+          if (mh > 0.25) quadV(mouth, mx - nx * ow, mz - nz * ow, mx + nx * ow, mz + nz * ow, wy, wy + mh, ux, uz);
+          const par = new THREE.Mesh(boxG(2 * W + 0.3, 0.8, 0.3), lam(0xa9a397)); par.position.set(E[0] - ux * 0.15, top + 0.4 + 0.25, E[1] - uz * 0.15); par.rotation.y = Math.atan2(-nz, nx); par.castShadow = true; G.add(par);
+          continue;
+        }
         quadV(head, E[0] - nx * W, E[1] - nz * W, E[0] + nx * W, E[1] + nz * W, g - RIV_D - 0.2, g + 0.25, ux, uz);
         const ow = r.w * 0.78, wy = g - RIV_D + 0.42, mx = E[0] + ux * 0.03, mz = E[1] + uz * 0.03;
         quadV(mouth, mx - nx * ow, mz - nz * ow, mx + nx * ow, mz + nz * ow, wy, wy + Math.min(1.5, RIV_D - 0.75), ux, uz);
@@ -696,7 +704,7 @@ function* buildTileGen(T) {
         if (r.t) continue;
         if (r.d) {
           const ya = nodeY(r.g[k - 1]), yb = nodeY(r.g[k]), n = Math.max(1, Math.ceil(L / 3));
-          const pts = []; for (let s = 0; s <= n; s++) { const x = lerp(A[0], B[0], s / n), z = lerp(A[1], B[1], s / n), yy = lerp(ya, yb, s / n), g = groundH(x, z); pts.push([x, z, yy - g < 0.5 ? Math.max(yy, g + 0.02) : yy]); } // decks at grade never sink under the ground
+          const pts = []; for (let s = 0; s <= n; s++) { const x = lerp(A[0], B[0], s / n), z = lerp(A[1], B[1], s / n), yy = lerp(ya, yb, s / n), g = groundH(x, z); pts.push([x, z, T.fine ? deckY(x, z, yy) : yy - g < 0.5 ? Math.max(yy, g + 0.02) : yy]); } // decks at grade never sink under the ground
           const rx = -uz, rz = ux;
           for (let s = 1; s < pts.length; s++) {
             const p = pts[s - 1], q = pts[s], gp = groundH(p[0], p[1]), gq = groundH(q[0], q[1]);
@@ -705,6 +713,7 @@ function* buildTileGen(T) {
             vtx(deck, p[0] - rx * hw, p[2] + 0.06, p[1] - rz * hw, 0, 1, 0, (p[0] - rx * hw) / 9, (p[1] - rz * hw) / 9); vtx(deck, p[0] + rx * hw, p[2] + 0.06, p[1] + rz * hw, 0, 1, 0, (p[0] + rx * hw) / 9, (p[1] + rz * hw) / 9);
             vtx(deck, q[0] - rx * hw, q[2] + 0.06, q[1] - rz * hw, 0, 1, 0, (q[0] - rx * hw) / 9, (q[1] - rz * hw) / 9); vtx(deck, q[0] + rx * hw, q[2] + 0.06, q[1] + rz * hw, 0, 1, 0, (q[0] + rx * hw) / 9, (q[1] + rz * hw) / 9);
             triUp(deck, i0, i0 + 1, i0 + 3); triUp(deck, i0, i0 + 3, i0 + 2);
+            if (T.fine) continue; // the sides are the decks' own (below)
             const offP = p[2] - gp, offQ = q[2] - gq;
             if (Math.max(offP, offQ) < 0.25) continue;
             for (const sd of [1, -1]) {
@@ -730,7 +739,8 @@ function* buildTileGen(T) {
             if (r.b || nearLowRail((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, r.w / 2 + 3)) { const b0 = dside.p.length / 3; vtx(dside, p[0] - rx * hw, p[2] - 0.9, p[1] - rz * hw, 0, -1, 0, 0, 0); vtx(dside, p[0] + rx * hw, p[2] - 0.9, p[1] + rz * hw, 0, -1, 0, 1, 0); vtx(dside, q[0] + rx * hw, q[2] - 0.9, q[1] + rz * hw, 0, -1, 0, 1, 1); vtx(dside, q[0] - rx * hw, q[2] - 0.9, q[1] - rz * hw, 0, -1, 0, 0, 1); dside.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); }
           }
           if (r.w >= 6.5) { // lane dashes on the deck
-            for (let s = 1.5; s < L - 3; s += 9) { const x = A[0] + ux * s, z = A[1] + uz * s, y = lerp(ya, yb, s / L) + 0.09; const i0 = dmark.p.length / 3, wv = COL('#f1efe6'); for (const [a, b] of [[0, -0.08], [3, -0.08], [3, 0.08], [0, 0.08]]) vtx(dmark, x + ux * a - uz * b, y + (lerp(ya, yb, (s + a) / L) - lerp(ya, yb, s / L)), z + uz * a + ux * b, 0, 1, 0, 0, 0, wv); triUp(dmark, i0, i0 + 1, i0 + 2); triUp(dmark, i0, i0 + 2, i0 + 3); }
+            const yL = T.fine ? (s => { const f = clamp(s / L * n, 0, n - 1e-9), i = Math.floor(f); return lerp(pts[i][2], pts[i + 1][2], f - i); }) : s => lerp(ya, yb, s / L);
+            for (let s = 1.5; s < L - 3; s += 9) { const x = A[0] + ux * s, z = A[1] + uz * s, y = yL(s) + 0.09; const i0 = dmark.p.length / 3, wv = COL('#f1efe6'); for (const [a, b] of [[0, -0.08], [3, -0.08], [3, 0.08], [0, 0.08]]) vtx(dmark, x + ux * a - uz * b, y + (yL(s + a) - yL(s)), z + uz * a + ux * b, 0, 1, 0, 0, 0, wv); triUp(dmark, i0, i0 + 1, i0 + 2); triUp(dmark, i0, i0 + 2, i0 + 3); }
           }
           // junction cap: a round patch of asphalt where the deck meets other roads, so ramps and splits have no wedge-shaped holes
           for (const gi of k === r.g.length - 1 ? [r.g[0], r.g[r.g.length - 1]] : []) {
@@ -749,12 +759,14 @@ function* buildTileGen(T) {
         for (let s = ja + 0.5; s + 3 < L - jb; s += 7.5) quad(mark, A[0] + ux * (s + 1.5), A[1] + uz * (s + 1.5), ux, uz, -uz, ux, 3, 0.16, 0.08, white);
       }
     }
-    for (const sp of DECK_SOLIDS) if (sp.k === 'pillar' && tileOf(sp.x, sp.z) === T.t) { const g0 = groundH(sp.x, sp.z), h = sp.y - 0.9 - g0; if (h > 0.5) addBox(pil, sp.x, g0 + h / 2, sp.z, 0.9, h, 0.9, null); }
+    // in a tile of S the old guardrails and pillars stand on the decks of the new engine and on S (phase 6 makes them from the decks)
+    for (const sp of DECK_SOLIDS) if (sp.k === 'pillar' && tileOf(sp.x, sp.z) === T.t) { const g0 = groundH(sp.x, sp.z), h = (T.fine ? deckY(sp.x, sp.z, sp.y) : sp.y) - 0.9 - g0; if (h > 0.5) addBox(pil, sp.x, g0 + h / 2, sp.z, 0.9, h, 0.9, null); }
     for (const sp of DECK_SOLIDS.concat(FLAT_RAILS.map(f => ({ k: 'rail', ...f })))) if (sp.k === 'rail' && tileOf((sp.x0 + sp.x1) / 2, (sp.z0 + sp.z1) / 2) === T.t) {
-      const b0 = grail.p.length / 3, nx = sp.z1 - sp.z0, nz = -(sp.x1 - sp.x0), L = hyp(nx, nz) || 1;
-      vtx(grail, sp.x0, sp.y0 + 0.4, sp.z0, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, sp.y1 + 0.4, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, sp.y1 + 0.85, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x0, sp.y0 + 0.85, sp.z0, nx / L, 0, nz / L, 0, 0);
+      const b0 = grail.p.length / 3, nx = sp.z1 - sp.z0, nz = -(sp.x1 - sp.x0), L = hyp(nx, nz) || 1, y0 = T.fine ? deckY(sp.x0, sp.z0, sp.y0) : sp.y0, y1 = T.fine ? deckY(sp.x1, sp.z1, sp.y1) : sp.y1;
+      vtx(grail, sp.x0, y0 + 0.4, sp.z0, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, y1 + 0.4, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, y1 + 0.85, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x0, y0 + 0.85, sp.z0, nx / L, 0, nz / L, 0, 0);
       grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
     }
+    if (T.fine) drawDecks(T, deck, dside);
     put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); put(mark, MAT.mark, 6);
     put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9);
     put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10); put(dmark, MAT.deckMark, 10); put(pil, MAT.deckSide, 10, 'cast');
@@ -819,11 +831,12 @@ function* buildTileGen(T) {
         const A = p0[k - 1], B = p0[k], L = hyp(B[0] - A[0], B[1] - A[1]); if (L < 0.1) continue;
         const n = Math.max(1, Math.ceil(L / 3)), ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, rx = -uz, rz = ux;
         for (let s = 0; s < n; s++) {
-          const t0 = s / n, t1 = (s + 1) / n, x0 = lerp(A[0], B[0], t0), z0 = lerp(A[1], B[1], t0), x1 = lerp(A[0], B[0], t1), z1 = lerp(A[1], B[1], t1), y0 = lerp(hs[k - 1], hs[k], t0), y1 = lerp(hs[k - 1], hs[k], t1);
+          const t0 = s / n, t1 = (s + 1) / n, x0 = lerp(A[0], B[0], t0), z0 = lerp(A[1], B[1], t0), x1 = lerp(A[0], B[0], t1), z1 = lerp(A[1], B[1], t1), y0o = lerp(hs[k - 1], hs[k], t0), y1o = lerp(hs[k - 1], hs[k], t1);
+          const y0 = T.fine ? deckY(x0, z0, y0o, 'ferro') : y0o, y1 = T.fine ? deckY(x1, z1, y1o, 'ferro') : y1o; // in a tile of S: on the railway deck or on S
           const quadA = (b, a0, a1, d0, d1) => { const i0 = b.p.length / 3; vtx(b, x0 + rx * a0, y0 + d0, z0 + rz * a0, 0, 1, 0, 0, t0 * L / 2.4); vtx(b, x0 + rx * a1, y0 + d0, z0 + rz * a1, 0, 1, 0, 1, t0 * L / 2.4); vtx(b, x1 + rx * a1, y1 + d1, z1 + rz * a1, 0, 1, 0, 1, t1 * L / 2.4); vtx(b, x1 + rx * a0, y1 + d1, z1 + rz * a0, 0, 1, 0, 0, t1 * L / 2.4); triUp(b, i0, i0 + 1, i0 + 2); triUp(b, i0, i0 + 2, i0 + 3); };
           quadA(ebal, -2.2, 2.2, 0.07, 0.07); quadA(esteel, -0.8, -0.68, 0.12, 0.12); quadA(esteel, 0.68, 0.8, 0.12, 0.12);
           const g0 = groundH(x0, z0), g1 = groundH(x1, z1);
-          if (Math.max(y0 - g0, y1 - g1) < 0.4) continue;
+          if (T.fine || Math.max(y0 - g0, y1 - g1) < 0.4) continue; // in a tile of S the embankment is in S, the bridge sides are the deck's
           const over = onAnyRoad((x0 + x1) / 2, (z0 + z1) / 2, 2.5) || nearLowRail((x0 + x1) / 2, (z0 + z1) / 2, 4); // a street or another line passes underneath: bridge slab only, open below
           if (over) { const b0 = eside.p.length / 3; vtx(eside, x0 - rx * 2.2, y0 - 1.2, z0 - rz * 2.2, 0, -1, 0, 0, 0); vtx(eside, x0 + rx * 2.2, y0 - 1.2, z0 + rz * 2.2, 0, -1, 0, 1, 0); vtx(eside, x1 + rx * 2.2, y1 - 1.2, z1 + rz * 2.2, 0, -1, 0, 1, 1); vtx(eside, x1 - rx * 2.2, y1 - 1.2, z1 - rz * 2.2, 0, -1, 0, 0, 1); eside.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); }
           for (const sd of [1, -1]) { const ex = rx * sd * 2.2, ez = rz * sd * 2.2, b0 = eside.p.length / 3; vtx(eside, x0 + ex, over ? y0 - 1.2 : Math.min(y0 - 1.2, g0 - 0.3), z0 + ez, rx * sd, 0, rz * sd, 0, 0); vtx(eside, x1 + ex, over ? y1 - 1.2 : Math.min(y1 - 1.2, g1 - 0.3), z1 + ez, rx * sd, 0, rz * sd, 1, 0); vtx(eside, x1 + ex, y1 + 0.9, z1 + ez, rx * sd, 0, rz * sd, 1, 1); vtx(eside, x0 + ex, y0 + 0.9, z0 + ez, rx * sd, 0, rz * sd, 0, 1); eside.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); }
@@ -979,7 +992,8 @@ function freeTile(T) {
 }
 function tileTick(px, pz, budgetMs, force) {
   const t0 = performance.now(), cand = [];
-  for (const T of TILES) { const dd = hyp(T.cx - px, T.cz - pz); T.dist = dd; if (!T.built && dd < 760) cand.push(T); if (T.group) T.group.visible = T.ready && dd < 860; if (T.ready && dd > 1150 && !force) freeTile(T); }
+  H.tick(px, pz, t => TILES[t].built); // the .bin of the new engine come first: a tile waits for its own and its neighbours'
+  for (const T of TILES) { const dd = hyp(T.cx - px, T.cz - pz); T.dist = dd; if (!T.built && dd < 760 && H.ready(T.t)) cand.push(T); if (T.group) T.group.visible = T.ready && dd < 860; if (T.ready && dd > 1150 && !force) freeTile(T); }
   cand.sort((a, b) => a.dist - b.dist);
   if (force) { for (const T of cand) { buildTile(T); if (T.dist > force) break; } if (tileTick.cur) { buildTile(tileTick.cur); tileTick.cur = null; } return; }
   // a slice at a time within the budget, the nearest tile first
