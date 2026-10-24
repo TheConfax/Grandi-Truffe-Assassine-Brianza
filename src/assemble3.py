@@ -1,5 +1,8 @@
 import re
 import os
+import subprocess as _sp, datetime as _dt
+_git = lambda *a: (_sp.run(['git', '-C', os.path.dirname(os.path.dirname(os.path.abspath(__file__))), *a], capture_output=True, text=True).stdout.strip() or '?')
+BUILD_BR, BUILD_SHA, BUILD_AT = _git('rev-parse', '--abbrev-ref', 'HEAD'), _git('rev-parse', '--short', 'HEAD'), _dt.datetime.now().strftime('%d/%m %H:%M')  # the local version line
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 s = open(os.path.join(HERE, 'game.src.html'), encoding='utf-8').read()
 def rep(old, new, cnt=1):
@@ -452,6 +455,10 @@ rep("""  </div>
 
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
+    const txt = 'locale · ramo """ + BUILD_BR + """ · dopo """ + BUILD_SHA + """ · assemblato """ + BUILD_AT + """ · porta ' + location.port;
+    for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
+  }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
   const deps = await get(API + '/deployments?environment=github-pages&per_page=4'); let live = null; // two calls when all is published: GitHub allows 60 an hour
   for (const d of deps) { const st = await get(d.statuses_url + '?per_page=1'); if (st[0] && st[0].state === 'success') { live = d; break; } }
