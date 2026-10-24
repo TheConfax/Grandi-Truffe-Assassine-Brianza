@@ -449,7 +449,7 @@ for wid, (refs, t) in ways.items():
                               'x': hw in ('motorway', 'trunk', 'motorway_link', 'trunk_link'), 'ms': num(t.get('maxspeed')) if str(t.get('maxspeed', '')).replace('.', '').isdigit() else None, 'pk': street_parking(t)})
     elif t.get('railway') == 'rail' and (t.get('tunnel') != 'yes' or sum(math.dist(nodes[a], nodes[b]) for a, b in zip(refs, refs[1:]) if a in nodes and b in nodes) < 200) and t.get('service') not in ('yard', 'siding', 'spur'):  # short rail tunnels (underpasses) stay as track at grade
         lay = num(t.get('layer')) or 0
-        for run in clip_runs(refs, 300): rails.append([nodes[r] for r in run]); rail_raw.append({'refs': run, 'bridge': t.get('bridge') in ('yes', 'viaduct') or lay >= 1, 'emb': t.get('embankment') == 'yes', 'layer': lay})
+        for run in clip_runs(refs, 300): rails.append([nodes[r] for r in run]); rail_raw.append({'refs': run, 'bridge': t.get('bridge') in ('yes', 'viaduct') or lay >= 1, 'emb': t.get('embankment') == 'yes', 'layer': lay, 'wid': wid, 't': t})
     elif t.get('waterway') in ('river', 'stream', 'canal') and t.get('tunnel') not in ('yes', 'culvert') and not str(t.get('layer', '0')).startswith('-'):
         for run in clip_runs(refs, 60): rivers.append(([nodes[r] for r in run], 3.2 if t['waterway'] == 'river' else 1.4))
     elif t.get('barrier') in ('wall', 'fence', 'hedge', 'retaining_wall', 'city_wall', 'guard_rail', 'handrail'):
@@ -515,6 +515,22 @@ if _cov and not os.environ.get('GTA_STRADE_OSM'):
     STR = dbgt_strade.Strade([os.path.join(DBT_DIR, d_, 'dbgt.gpkg') for d_ in sorted(os.listdir(DBT_DIR)) if d_.lower() in _comuni and os.path.exists(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'))], dbt_cover.intersection(RECT.buffer(20)), log)
     STR.assi(raw_roads, nodes)
     for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
+if os.environ.get('GTA_DUMP_FERROVIA'):  # development of src/dbgt_ferrovia.py: the state after the streets are on their axes
+    import pickle
+    pickle.dump(dict(nodes=nodes, raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], rail_raw=rail_raw, ntags=ntags,
+                     rels=[(m_, t_) for m_, t_ in rels if t_.get('route') in ('train', 'railway') or t_.get('type') == 'route' and t_.get('route') == 'train'],
+                     names=names, HW=HW, HH=HH, lat0=lat0, lon0=lon0), open(os.environ['GTA_DUMP_FERROVIA'], 'wb'))
+    sys.exit(0)
+# ---- where a comune has its DBGT the tracks run on the EL_FER axes (docs/motore.md 7, quinto pezzo, src/dbgt_ferrovia.py); OSM keeps the lines,
+# stations and level crossings. After the streets: a level crossing node goes where the street, on its EL_STR axis, crosses the track
+FER = None
+if _cov and not os.environ.get('GTA_FERROVIA_OSM'):
+    import dbgt_ferrovia
+    FER = dbgt_ferrovia.Ferrovia([os.path.join(DBT_DIR, d_, 'dbgt.gpkg') for d_ in sorted(os.listdir(DBT_DIR)) if d_.lower() in _comuni and os.path.exists(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'))], dbt_cover.intersection(RECT.buffer(20)), log)
+    FER.assi(rail_raw, nodes, raw_roads, ntags)
+    rails[:] = [[nodes[n_] for n_ in rr['refs']] for rr in rail_raw]
+    for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
+    area_geoms[:] = FER.banchine(area_geoms, [LineString(p) for p in rails if len(p) >= 2])
 railL0 = [LineString(p) for p in rails if len(p) >= 2]
 _low = [r['line'] for r in raw_roads if not r['bridge'] and not r['tunnel'] and r['line'].length > 0.1] + railL0
 _lowtree = STRtree(_low)
@@ -802,6 +818,7 @@ for rr in rail_raw:
     for i in range(1, len(pts)):
         if not (rr['elev'][i - 1] or rr['elev'][i]): _lowrail.append(LineString([pts[i - 1], pts[i]]))
 corridor = unary_union([l.buffer(2.9, quad_segs=4) for l in _lowrail]) if _lowrail else GeometryCollection()
+if FER: corridor = FER.corridoio(corridor)  # inside the comuni with a DBGT: the rail bed SD_FER
 side = rbuf(lambda r: r['c'] <= 3 and flat(r) and not r['x'] and not r['hw'].endswith('_link') and r.get('clear', 99) > r['w'] / 2 + 1.0, 1.8).difference(asph).difference(pedz).difference(bunion).difference(parking).difference(rbuf(lambda r: r.get('deck') or r['x'], 0.4))
 if not corridor.is_empty: side = side.difference(corridor.buffer(-0.5))
 side = side.buffer(-0.45, join_style=2).buffer(0.45, join_style=2).intersection(side)  # drop slivers the houses squeezed
@@ -912,6 +929,10 @@ if railL:
     for l in (list(_edge.geoms) if hasattr(_edge, 'geoms') else [_edge]):
         if isinstance(l, LineString) and l.length > 6: fences.append(list(l.simplify(0.15).coords)); nfill += 1
     log('ferrovia: recinzioni aggiunte dove mancavano', nfill)
+if FER and STR: fences = FER.fuori_dalle_carreggiate(fences, STR.carreggiate(0.3))  # never in a carriageway
+if FER: fences = FER.via_dai_ponti(fences)  # not hanging on the slopes under a railway bridge
+if FER: fences = FER.via_dai_binari(fences, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'recinzioni_ferrovia')  # never across a track
+if FER: fences = FER.lontano_dai_binari(fences, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'recinzioni')  # nor inside the train
 # cemeteries are walled: perimeter wall wherever OSM has not drawn one (gates/paths open it like any other wall)
 _osm_bar_all = unary_union([LineString(pts).buffer(1.5) for pts, k, h in barriers if len(pts) >= 2]) if barriers else GeometryCollection()
 ncw = 0
@@ -1050,6 +1071,8 @@ _fz = unary_union([Point(f[0] / 10, f[1] / 10).buffer(f[2] + 1.0) for f in fount
 if not _fz.is_empty:
     _nb = len(bar_out); bar_out = [b for b in bar_out if LineString(b[0]).difference(_fz).length > 0.5 * LineString(b[0]).length]
     log('divisori sul bordo delle fontane tolti', _nb - len(bar_out))
+if FER: bar_out = FER.via_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_recinzioni', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
+if FER: bar_out = FER.lontano_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_divisori', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
 
 # ---- rivers: merge the OSM pieces, then cut them where a road / railway / building passes over (a bridge or culvert mouth)
 from shapely.ops import linemerge
@@ -1095,7 +1118,7 @@ log('river pieces', len(riv_out), 'from', len(riv_lines))
 
 # ------------------------------------------------------------------ trains: smooth chains, longest first
 def tang(a, b): L = math.dist(a, b) or 1; return ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
-pieces = [list(p) for p in rails if len(p) >= 2]
+pieces = [list(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not rr.get('x')]  # the DBGT-only tracks (sidings, station tracks) are not for the trains
 ends = defaultdict(list)
 for j, pc in enumerate(pieces): ends[key(pc[0])].append((j, 0)); ends[key(pc[-1])].append((j, 1))
 def grow(chain, used, at_end):
@@ -1368,6 +1391,7 @@ if os.path.exists(CONF):
             if m.get('type') == 'way' and m.get('geometry'): bway[m['ref']].add(nm_); bgeo[m['ref']] = [proj(p['lat'], p['lon']) for p in m['geometry']]
 pl_by = {t['name']: nodes[r_] for r_, t in ntags.items() if t.get('place') in ('city', 'town', 'village') and t.get('name')}
 blines = [(LineString(bgeo[w_]), sorted(n_)) for w_, n_ in bway.items() if len(n_) == 2 and len(bgeo[w_]) >= 2]
+if FER: blines = FER.confini(blines)  # LIM_COM of the DBGT where it has it
 cartelli = []
 # the two posts stand 3 m before and after the crossing, w/2 + 1.2 m to the right of each driver (as paesaggio3.js draws them). Where the
 # boundary runs along another street (via Vignazzola) the side street crosses it at the junction and the posts would land on that street:
@@ -1529,6 +1553,9 @@ for t in range(ntx * ntz):
     if not median.intersects(bx): continue
     for p_ in polys_of(median.intersection(bx), 0.2, 3): push(t, 'md', p_)
 if STR: STR.togli_cortili(VERDE.cons); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
+if FER:  # the rail bed (sf)
+    FER.disegno([LineString(p) for p in rails if len(p) >= 2], unary_union([asph, pedz, side, foot, platforms, bunion] + ([STR.cv] if STR else [])))
+    FER.push_tiles(ntx * ntz, tbox, polys_of, push)
 push_lines('fe', fences)
 for pts, w_, caps in riv_out:
     L = LineString(pts); s0, s1 = pts[0], pts[-1]
@@ -1566,6 +1593,10 @@ if STR:  # the checks of docs/motore.md 7: a summary in brianza.json, the whole 
                   edifici=[P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], alberi=trees, attraversamenti=crossings)
     out['report'] = {'strade': STR.sintesi()}
     json.dump(STR.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_strade.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+if FER:  # trains against platforms, buildings and carriageways; the report beside brianza.json
+    FER.controlli(trains, [g for at, g in area_geoms if at == 5], [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], [g for g, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else [], cartelli)
+    out.setdefault('report', {})['ferrovia'] = FER.sintesi()
+    json.dump(FER.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_ferrovia.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=str)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
 log('written', dst, len(s) // 1024, 'KB', 'tiles', ntx, 'x', ntz, 'roads', len(out_roads), 'nodes', len(NODES))

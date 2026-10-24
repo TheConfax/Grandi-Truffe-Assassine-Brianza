@@ -59,6 +59,12 @@ function onAsph(x, z, key) {
   const i = Math.floor((x - T.cx + TS / 2) * ASPH_S), j = Math.floor((z - T.cz + TS / 2) * ASPH_S); if (i < 0 || j < 0 || i >= ASPH_N || j >= ASPH_N) return false;
   const k = j * ASPH_N + i; return !!(b[k >> 3] & (1 << (k & 7)));
 }
+// on the rail bed of the DBGT (the polygons sf of the tile, decoded once)
+function inBed(T, x, z) {
+  if (!T.sfP) T.sfP = (T.d.sf || []).map(q => { const o = dec(q.p); return { o, k: q.k.map(dec), b: bbox(o) }; });
+  for (const q of T.sfP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
+  return false;
+}
 function nearAsph(x, z, m, key) { if (onAsph(x, z, key)) return true; if (!(m > 0)) return false; const e = m + 0.25; return onAsph(x + e, z, key) || onAsph(x - e, z, key) || onAsph(x, z + e, key) || onAsph(x, z - e, key); }
 function nearDeckCarr(x, z, y, m) { return nearAsph(x, z, m, 'ap') && H.deckAt(x, z).some(o => Math.abs(o.top - y) < 1.5); } // in the carriageway of a bridge at this level (tiles[t].ap) // the bit grid is 0.5 m: m past the edge, not on the cell
 function onAnyRoad(x, z, m) { if (m >= 0 && onAsph(x, z)) return true; let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && atGrade(s) && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
@@ -489,6 +495,9 @@ const MAT = {
 // the same looks writing their depth, for the cells a layer owns in a tile of S (cellOwners): drawn with the ground, in its place
 Object.assign(MAT, { grassS: new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }), pavedS: new THREE.MeshLambertMaterial({ vertexColors: true, map: asphaltTex }), waterS: new THREE.MeshLambertMaterial({ color: 0x45738c }),
   piazzaS: new THREE.MeshLambertMaterial({ map: porfidoTex }), cortileS: new THREE.MeshLambertMaterial({ color: CORTILE_COL }), footS: new THREE.MeshLambertMaterial({ color: 0xc8b89c }), asphS: new THREE.MeshLambertMaterial({ map: asphaltTex }) });
+// the rail bed of the DBGT (SD_FER, tiles[t].sf): the gravel of the ballast without the sleepers, which each track draws over it
+const gravelTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#7e766b'; g.fillRect(0, 0, w, h); noise(g, w, h, 900, 0.5, ['#5d564d', '#9c9487', '#4a443d']); });
+Object.assign(MAT, { gravel: flatMat({ map: gravelTex }), gravelS: new THREE.MeshLambertMaterial({ map: gravelTex }) });
 Object.assign(MAT.water, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }); // the water level of a tile of S meets the banks of S, which write their depth
 // the kinds of divider the DBGT adds (build_data.py): plastered low walls, railings with vertical bars, green wire mesh, railway panels, wood
 const barsTex = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#26292c'; for (let x = 4; x < w; x += 10) g.fillRect(x, 0, 3, h); g.fillRect(0, 0, w, 5); g.fillRect(0, h - 6, w, 6); });
@@ -887,6 +896,7 @@ function cellOwners(T, F) {
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
   for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('c', MAT.cortileS, 10)); // yards and drives of the DBGT (AC_VEI 0307)
+  for (const q of d.sf || []) cover(dec(q.p), q.k.map(dec), 1.3, S('b', MAT.gravelS, 3)); // the rail bed of the DBGT (SD_FER a raso)
   for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, S('f', MAT.footS, 4), true);
   for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, S('a', MAT.asphS, 9), true);
   for (const q of d.pz || []) cover(dec(q.p), q.k.map(dec), 5.1, S('z', MAT.piazzaS, 4), true);
@@ -962,7 +972,8 @@ function* buildTileGen(T) {
       } catch (e) { }
     }
     const cB = FBuf(); cB.rk = 1.2; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 10); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): their own paving, no traffic
-    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    const sB = FBuf(); sB.rk = 1.3; for (const q of d.sf || []) { try { polyFill(sB, dec(q.p), q.k.map(dec), 0.03 * fy, 3); } catch (e) { } } // the rail bed (DBGT SD_FER)
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(sB, MAT.gravel, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {
@@ -1213,7 +1224,22 @@ function* buildTileGen(T) {
     const ebal = Buf(), esteel = Buf(), eside = Buf();
     for (const r of d.rl || []) {
       const p0 = dec(r.p); if (p0.length < 2) continue;
-      if (!r.h) { const p = resample(p0, 4); ribbon(bal, p, -1.9, 1.9, 0.07, 2.4, 'along'); ribbon(steel, p, -0.8, -0.68, 0.11, 9, 'world'); ribbon(steel, p, 0.68, 0.8, 0.11, 9, 'world'); continue; }
+      if (!r.h) { // at grade, each vertex on S. On the rail bed of the DBGT (sf) only the sleepers, 2.6 m long: the bed is its own surface; on a
+        // level crossing no ballast and the rails flush with the street, which runs on across the tracks; elsewhere the old 3.8 m ballast strip
+        const p = resample(p0, 2), cls = p.map(([x, z]) => onAsph(x, z) ? 2 : inBed(T, x, z) ? 1 : 0);
+        for (let k = 1; k < p.length; k++) if (cls[k] === 0 && cls[k - 1] === 1 && k + 1 < p.length && cls[k + 1] === 1) cls[k] = 1; // no one-point gaps
+        let k0 = 0;
+        for (let k = 1; k <= p.length; k++) {
+          if (k < p.length && cls[k] === cls[k0]) continue;
+          const run = p.slice(k0, Math.min(p.length, k + 1)), c = cls[k0], y = c === 2 ? 0.035 : 0.11; // (the run takes the next point: no gap)
+          if (run.length >= 2) {
+            if (c === 0) ribbon(bal, run, -1.9, 1.9, 0.07, 2.4, 'along'); else if (c === 1) ribbon(bal, run, -1.3, 1.3, 0.07, 2.4, 'along');
+            ribbon(steel, run, -0.8, -0.68, y, 9, 'world'); ribbon(steel, run, 0.68, 0.8, y, 9, 'world');
+          }
+          k0 = k;
+        }
+        continue;
+      }
       // elevated track: absolute heights, bridge slab or embankment
       const hs = r.h.map((v, i) => v === -32768 ? H.ground(p0[i][0], p0[i][1]) : v / 10);
       for (let k = 1; k < p0.length; k++) {
