@@ -8334,6 +8334,7 @@ function updHud(dt) {
 
 // ---------------------------------------------------------------- boot
 const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };
+const START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && Math.abs(x) < META.hw && Math.abs(z) < META.hh) return { x, z, n: 'Punto' }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */
 function startSpot() { // the parking on via Yuri Gagarin in Meda, facing the fountain
   const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
   const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
@@ -8352,6 +8353,13 @@ function setupWorld(saved) {
   P.h = h; P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync(); if (saved && saved.money) P.money = saved.money;
   pedTgt = pedTarget(); for (let i = 0; i < pedTgt; i++) spawnPed(true); // the first crowd around the start, not scattered over the whole map
   for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePed(p);
+  if (START !== STATION) { /* the start chosen in the address: the car on the nearest lane, the tiles around it first */
+    const n2 = nearestNode(TRAF_NODES, START.x, START.z), e2 = TRAF[n2][0], [q0, q1] = edgePts(n2, e2.to, e2.off + 0.9), h2 = Math.atan2(q1[0] - q0[0], q1[1] - q0[1]);
+    for (const v of VEH.slice()) if (v !== mine && hyp(v.x - q0[0], v.z - q0[1]) < 7) v.remove();
+    mine.x = q0[0]; mine.z = q0[1]; mine.h = h2; P.x = mine.x + Math.cos(h2) * 2.4; P.z = mine.z - Math.sin(h2) * 2.4; P.h = h2;
+    tileTick(START.x, START.z, 0, 420); for (const T of TILES) T.dist = hyp(T.cx - START.x, T.cz - START.z);
+    P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync();
+  }
 }
 // ---------------------------------------------------------------- cheat codes, typed in the pause menu
 function ferari(x, z, h) { // a red Ferari at (x,z), clearing whatever is parked on that spot
@@ -8395,7 +8403,7 @@ function frame(t) {
   if (ipol) interpEnd(ipol);
 }
 function startGame() {
-  if (running) return; running = true; $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
+  if (running) return; running = true; if (START !== STATION) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
   camInit = false; banner('Via Yuri Gagarin', 'MEDA'); setTimeout(() => { if (P.mode === 'foot') toast('Entra nella Ferari! (' + (GP.seen ? (GP.ps ? '△' : 'Y') : 'F') + ')'); }, 1600);
 }
 $('go').addEventListener('click', startGame);

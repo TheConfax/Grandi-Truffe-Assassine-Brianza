@@ -227,7 +227,7 @@ rep("$('street').textContent = (st || 'Meda') + (TER ? ` · ${Math.round(TER.bas
 rep("const spot = D.pois.find(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')) || { x: 0, z: 0 };",
     "const cands = D.pois.filter(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')), spot = cands.sort((a, b) => hyp(a.x - P.x, a.z - P.z) - hyp(b.x - P.x, b.z - P.z))[0] || STATION;")
 rep("banner(kind === 'busted' ? 'Polizia Locale' : 'Stazione di Meda', 'DI NUOVO IN STRADA');", "banner(spot.n || 'Meda', 'DI NUOVO IN STRADA');")
-rep("const STATION = D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0 };", "const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };")
+rep("const STATION = D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0 };", "const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };\nconst START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && Math.abs(x) < META.hw && Math.abs(z) < META.hh) return { x, z, n: 'Punto' }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */")
 rep("""function setupWorld(saved) {
   spawnParked();""", """function setupWorld(saved) {
   tileTick(STATION.x, STATION.z, 0, 420);
@@ -577,4 +577,16 @@ rep("  if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,",
 rep("interpSnap(); step(1 / 60);", "interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100;")
 rep("  updVisuals(running && !paused ? dt : 0); updRadio(dt);", "  const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  updVisuals(running && !paused ? dt : 0); updRadio(dt);")
 rep("  renderer.render(scene, camera);\n}", "  renderer.render(scene, camera);\n  if (ipol) interpEnd(ipol);\n}")
+# ?x=..&z=.. in the address (START): the game starts there, on the nearest street, already at the wheel of the Ferari
+rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePed(p);\n}",
+    "  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePed(p);\n"
+    "  if (START !== STATION) { /* the start chosen in the address: the car on the nearest lane, the tiles around it first */\n"
+    "    const n2 = nearestNode(TRAF_NODES, START.x, START.z), e2 = TRAF[n2][0], [q0, q1] = edgePts(n2, e2.to, e2.off + 0.9), h2 = Math.atan2(q1[0] - q0[0], q1[1] - q0[1]);\n"
+    "    for (const v of VEH.slice()) if (v !== mine && hyp(v.x - q0[0], v.z - q0[1]) < 7) v.remove();\n"
+    "    mine.x = q0[0]; mine.z = q0[1]; mine.h = h2; P.x = mine.x + Math.cos(h2) * 2.4; P.z = mine.z - Math.sin(h2) * 2.4; P.h = h2;\n"
+    "    tileTick(START.x, START.z, 0, 420); for (const T of TILES) T.dist = hyp(T.cx - START.x, T.cz - START.z);\n"
+    "    P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync();\n"
+    "  }\n}")
+rep("function startGame() {\n  if (running) return; running = true;",
+    "function startGame() {\n  if (running) return; running = true; if (START !== STATION) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car */")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
