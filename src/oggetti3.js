@@ -134,7 +134,7 @@ function buildOggetti(T, G) {
       for (let i = 0; i < n; i++) {
         const s0 = -B.half + i * 2 * B.half / n, s1 = s0 + 2 * B.half / n, sm = (s0 + s1) / 2;
         const ramp = k !== 'dosso' && Math.abs(sm) > B.half - (B.ramp || B.half * 0.6), col = k === 'dosso' ? (j % 2 ? BLK : YEL) : ramp && (j % 2) ? WHT : ASP;
-        const P4 = [[s0, c0], [s1, c0], [s1, c1], [s0, c1]].map(([s, c]) => { const px = x + ux * s + nx * c, pz = z + uz * s + nz * c; return [px, surfAt(px, pz) + 0.035, pz]; });
+        const P4 = [[s0, c0], [s1, c0], [s1, c1], [s0, c1]].map(([s, c]) => { const px = x + ux * s + nx * c, pz = z + uz * s + nz * c; return [px, H.surface(px, pz) + 0.035, pz]; });
         const base = bm.p.length / 3; for (const p of P4) vtx(bm, p[0], p[1], p[2], 0, 1, 0, 0, 0, col); triUp(bm, base, base + 1, base + 2); triUp(bm, base, base + 2, base + 3);
       }
     }
@@ -146,7 +146,7 @@ function buildOggetti(T, G) {
     const items = (by[k] || []).filter(([x, z]) => k === 'traliccio' || !inBuilding(x, z, 0)); if (!items.length) continue;
     const S = OGG_SPEC[k], im = new THREE.InstancedMesh(OGG_GEO[k], OGG_MAT, items.length); im.castShadow = true; im.receiveShadow = true;
     items.forEach(([x, z, a, ex, oi], i) => {
-      const gy = surfAt(x, z), sy = S.scale ? Math.max(0.4, Math.min(2, (ex || S.scale) / S.scale)) : 1;
+      const gy = H.surface(x, z), sy = S.scale ? Math.max(0.4, Math.min(2, (ex || S.scale) / S.scale)) : 1;
       o3.position.set(x, gy, z); o3.rotation.set(0, a, 0); o3.scale.set(1, sy, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix);
       if (!S.r) return;
       if (S.knock) {
@@ -162,7 +162,7 @@ function buildOggetti(T, G) {
     const pts = dec(L.p), big = L.h > 15, offs = big ? [[-6.5, -8], [6.5, -8], [-4.5, -3.5], [4.5, -3.5]] : [[-0.7, -0.6], [0.7, -0.6]];
     for (let i = 1; i < pts.length; i++) {
       const A = pts[i - 1], C = pts[i], l = hyp(C[0] - A[0], C[1] - A[1]); if (l < 0.5) continue;
-      const nx = -(C[1] - A[1]) / l, nz = (C[0] - A[0]) / l, ya = groundH(A[0], A[1]) + L.h, yc = groundH(C[0], C[1]) + L.h;
+      const nx = -(C[1] - A[1]) / l, nz = (C[0] - A[0]) / l, ya = H.ground(A[0], A[1]) + L.h, yc = H.ground(C[0], C[1]) + L.h;
       for (const [o, dy] of offs) wp.push(A[0] + nx * o, ya + dy, A[1] + nz * o, C[0] + nx * o, yc + dy, C[1] + nz * o);
     }
   }

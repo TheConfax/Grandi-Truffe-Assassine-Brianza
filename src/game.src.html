@@ -1189,13 +1189,13 @@ function spawnPolice(patrol) {
   if (a == null) return null;
   if (patrol) { // on its lane, like the traffic
     const e = pick(TRAF[a]), [p0, p1] = edgePts(a, e.to, e.off);
-    const v = new Vehicle('police', '#f4f5f7', p0[0], p0[1], Math.atan2(p1[0] - p0[0], p1[1] - p0[1])); v.driver = 'ai'; v.sleep = false; v.y = nodeY(a); v.sync();
+    const v = new Vehicle('police', '#f4f5f7', p0[0], p0[1], Math.atan2(p1[0] - p0[0], p1[1] - p0[1])); v.driver = 'ai'; v.sleep = false; v.y = H.node(a); v.sync();
     v.ai = { cop: false, prev: a, cur: e.to, q: [[p1[0], p1[1], e.to, e.sp]], cruise: 9, blocked: 0, ignore: 0 };
     return v;
   }
   const [x, z] = N[a]; let h = rnd() * TAU, bf = 1e18;
   for (const e of adj[a]) { const f = W.field[e.to]; if (f < bf) { bf = f; h = Math.atan2(N[e.to][0] - x, N[e.to][1] - z); } }
-  const v = new Vehicle('police', '#f4f5f7', x, z, h); v.driver = 'ai'; v.sleep = false; v.y = nodeY(a); v.sync();
+  const v = new Vehicle('police', '#f4f5f7', x, z, h); v.driver = 'ai'; v.sleep = false; v.y = H.node(a); v.sync();
   v.ai = { cop: true, node: a, prev: -1, q: [[x, z]], blocked: 0, ignore: 0, cruise: 10 };
   return v;
 }
@@ -1218,7 +1218,7 @@ function makeMarker(p, col) {
   const ring = new THREE.Mesh(new THREE.RingGeometry(3.1, 3.9, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.12; g.add(ring);
   const lbl = textSprite(p.n, col); lbl.position.y = 9; g.add(lbl);
-  g.position.set(p.x, groundH(p.x, p.z), p.z); g.userData = { ring, beam }; g.renderOrder = 16; scene.add(g); return g;
+  g.position.set(p.x, H.ground(p.x, p.z), p.z); g.userData = { ring, beam }; g.renderOrder = 16; scene.add(g); return g;
 }
 function textSprite(text, col) {
   const c = document.createElement('canvas'), g = c.getContext('2d'), fs = 46, font = `700 ${fs}px "Barlow Condensed", "Arial Narrow", sans-serif`;
@@ -1700,7 +1700,7 @@ function updCamera(dt) {
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
   const fx = Math.sin(h), fz = Math.cos(h); let want, look;
   if (camMode === 1) {
-    const ht = inCar ? 58 + sp * 0.9 : 36, gy = groundH(px, pz); want = new THREE.Vector3(px, gy + ht, pz + ht * 0.28); look = new THREE.Vector3(px, gy, pz);
+    const ht = inCar ? 58 + sp * 0.9 : 36, gy = H.ground(px, pz); want = new THREE.Vector3(px, gy + ht, pz + ht * 0.28); look = new THREE.Vector3(px, gy, pz);
   } else {
     // follow travel direction in reverse, otherwise heading
     let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }
@@ -1722,7 +1722,7 @@ function updCamera(dt) {
   camera.lookAt(camLook);
   const fov = camMode === 1 ? 55 : 62 + clamp(sp - 15, 0, 30) * 0.35 + (inCar && P.car.boost ? 9 : 0); if (Math.abs(camera.fov - fov) > 0.1) { camera.fov = lerp(camera.fov, fov, 0.08); camera.updateProjectionMatrix(); }
   // sun & shadow box follow the action
-  const sy = groundH(px, pz); sun.target.position.set(px, sy, pz); sun.position.set(px + SUN_DIR.x * 220, sy + SUN_DIR.y * 220, pz + SUN_DIR.z * 220);
+  const sy = H.ground(px, pz); sun.target.position.set(px, sy, pz); sun.position.set(px + SUN_DIR.x * 220, sy + SUN_DIR.y * 220, pz + SUN_DIR.z * 220);
   _far.position.x = camera.position.x * 0.9; _near.position.x = camera.position.x * 0.8;
 }
 function updVisuals(dt) {

@@ -9,6 +9,7 @@ import numpy as np, shapely
 from shapely.geometry import Polygon, LineString, box
 from pyproj import Transformer
 from scipy import ndimage, sparse
+import scipy.sparse.linalg
 from scipy.spatial import cKDTree
 from scipy.interpolate import LinearNDInterpolator
 
@@ -542,12 +543,44 @@ class Superficie:
         S = s.L.copy(); band = ~FIX & ~BARR & np.isfinite(hi)
         lo_, hi_ = np.minimum(lo, hi), np.maximum(lo, hi)
         S[band] = s.L[band] + np.clip(0.0, lo_[band], hi_[band]); S[FIX] = s.ZF[FIX]
+        s.sotto_ponti(S, BARR)
         s.S = S; s.FIX = FIX
         d = ndimage.distance_transform_edt(~FIX, sampling=SF); s.DFIX = d
         s.bordo_banda = int((band & (d > BAND - 2.5) & (np.abs(S - s.L) > 0.05)).sum())
         s.SCARP = band & (np.abs(S - s.L) > 0.05)
         s.t['raccordi'] = round(time.time() - t0, 1)
         s.log('raccordi: nodi in fascia %d, mossi > 5 cm %d, al bordo della fascia ancora mossi %d' % (int(band.sum()), int(s.SCARP.sum()), s.bordo_banda))
+
+    # ----- 6b. under the bridges (fase 6): the nodes under a deck that no road, rail or river fixes kept the LiDAR, and the DTM is filled across
+    # the deck: under the railway bridge over via Milano (PONTE 14) the sides of the 6 m carriageway stood at the top of the deck, 220.3 m
+    # against 214.7, and the diagonal edge of the burn on the 2 m lattice made teeth of 1.3 m across the lane (collaudo 1: the car bounced
+    # under the bridge). There S is the harmonic fill (Laplace, 4 neighbours) of what is around them, the fixed nodes and the ground outside
+    # the deck, never above the LiDAR
+    def sotto_ponti(s, S, BARR):
+        s.SOTTO = np.zeros(BARR.shape, bool); s.n_sotto = 0; s.sotto_dz = np.zeros(0)
+        lab, nl = ndimage.label(BARR)
+        if not nl: return
+        nz, nx = BARR.shape; dzs = []
+        for k, sl in enumerate(ndimage.find_objects(lab)):
+            r0, r1, c0, c1 = max(0, sl[0].start - 1), min(nz, sl[0].stop + 1), max(0, sl[1].start - 1), min(nx, sl[1].stop + 1)
+            M = lab[r0:r1, c0:c1] == k + 1; idx = -np.ones(M.shape, np.int64); n = int(M.sum()); idx[M] = np.arange(n)
+            W = S[r0:r1, c0:c1]; rows, cols, vals = [], [], []; rhs = np.zeros(n); deg = np.zeros(n)
+            rr, cc = np.nonzero(M); me = idx[rr, cc]
+            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                r2, c2 = rr + dr, cc + dc; ok = (r2 >= 0) & (r2 < M.shape[0]) & (c2 >= 0) & (c2 < M.shape[1])
+                deg[me[ok]] += 1; r2, c2, m1 = r2[ok], c2[ok], me[ok]; inn = M[r2, c2]
+                rows.append(m1[inn]); cols.append(idx[r2[inn], c2[inn]]); vals.append(-np.ones(int(inn.sum())))
+                np.add.at(rhs, m1[~inn], W[r2[~inn], c2[~inn]])
+            if not (deg > 0).all(): continue
+            A = sparse.csr_matrix((np.concatenate([deg] + vals), (np.concatenate([np.arange(n)] + rows), np.concatenate([np.arange(n)] + cols))), shape=(n, n))
+            if not np.isfinite(rhs).all(): continue
+            try: u = sparse.linalg.spsolve(A.tocsc(), rhs)
+            except Exception: continue
+            if not np.isfinite(u).all(): continue
+            Lw = s.L[r0:r1, c0:c1][M]; new = np.minimum(Lw, u); dzs.append(new - W[M])
+            W[M] = new; s.SOTTO[r0:r1, c0:c1] |= M; s.n_sotto += n
+        s.sotto_dz = np.concatenate(dzs) if dzs else np.zeros(0)
+        s.log('sotto i ponti: %d nodi riempiti fra i bordi (abbassati di %s m)' % (s.n_sotto, pct(-s.sotto_dz, (50, 90, 99)) if len(s.sotto_dz) else '-'))
 
     # ----- 7. tiles: 2 m or 10 m, seams, quantisation
     def tessere(s, osm=None):
@@ -911,7 +944,7 @@ def main(argv=None):
                dbgt=dict(offset_m=s.info['offset']['valore'], assi_lisciati_quanto_si_muovono=pct(np.abs(s.AX.dz_liscio)), carreggiate=s.nst, bordi_agganciati=s.nkerb, bordi_non_agganciati_oltre_1m=s.kerb_lontani, scarto_aggancio=pct(np.abs(s.kerb_dz)), aree_interne_al_lidar=len(s.interne), alvei_bruciati=s.nalveo, ferrovia_fuori_sedi_punti=s.ferro_fuori),
                lidar=dict(buchi=s.nbuchi, nota='nessun buco nel riquadro: TINITALY non serve qui'),
                superficie=dict(nodi_fissi=int(s.FIX.sum()), sotto_ponti=int(s.BR.sum()), nodi_impalcato_da_fase3=int(s.AIR.sum()), nodi_tetto=int(s.CAP.sum()), nodi_tombino_tenuti=int(s.TOMB.sum()), nodi_alveo_al_lidar=int(s.ALVCOP.sum()), nodi_scarpata=int(s.SCARP.sum()),
-                               bordo_fascia_ancora_mosso=s.bordo_banda, carreggiata_meno_lidar=pct(dz, (10, 50, 90)), ritocchi=s.nrit),
+                               bordo_fascia_ancora_mosso=s.bordo_banda, sotto_ponti_riempiti=s.n_sotto, sotto_ponti_abbassati_m=pct(-s.sotto_dz) if len(s.sotto_dz) else None, carreggiata_meno_lidar=pct(dz, (10, 50, 90)), ritocchi=s.nrit),
                C9_peso=peso, **rep, punti_da_guardare=punti, tempi_s=dict(s.t, totale=tot))
     ok = all(rep[c].get('ok', True) for c in ('C4', 'C5', 'C6', 'C7', 'C10'))
     out['esito'] = {c: rep[c].get('ok') for c in ('C4', 'C5', 'C6', 'C7', 'C10')}

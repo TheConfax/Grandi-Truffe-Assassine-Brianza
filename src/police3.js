@@ -22,7 +22,7 @@ function parkCaserme(T) {
     let n = 0;
     for (const sp of st.spots) {
       if (n >= 3) break;
-      const fx = Math.sin(sp.h) * 1.3, fz = Math.cos(sp.h) * 1.3, y = surfAt(sp.x, sp.z), free = (x, z) => collideStatic({ x, z }, 1.05, y + 0.4) === null && !inBuilding(x, z, 0.4);
+      const fx = Math.sin(sp.h) * 1.3, fz = Math.cos(sp.h) * 1.3, y = H.surface(sp.x, sp.z), free = (x, z) => collideStatic({ x, z }, 1.05, y + 0.4) === null && !inBuilding(x, z, 0.4);
       if (!free(sp.x + fx, sp.z + fz) || !free(sp.x - fx, sp.z - fz) || (!sp.kerb && onAnyRoad(sp.x, sp.z, 0.6))) continue;
       if (VEH.some(v => hyp(v.x - sp.x, v.z - sp.z) < 4.2)) { n++; continue; } // a volante already sits here
       const v = new Vehicle('police', st.cc ? CC_COL : '#f4f5f7', sp.x, sp.z, sp.h); v.parkedTile = T; v.caserma = st; v.y = y; v.sync(); T.parked.push(v); n++;
@@ -35,7 +35,7 @@ function launchVolante(v) { // out of the yard and after you
 }
 function spawnCop(st, post) {
   const [x, z] = st.at(post.lx, post.lz), m = makeAgent(st.cc, !st.cc && !!post.beat);
-  const p = { x, z, h: Math.atan2(st.nx, st.nz), y: surfAt(x, z), vx: 0, vz: 0, vy: 0, side: 1, prev: -1, cur: -1, q: [], m, state: 'walk', t: 0, phase: 0, spd: 1.2, cop: true, st, post, alert: 0, dir: 1 };
+  const p = { x, z, h: Math.atan2(st.nx, st.nz), y: H.surface(x, z), vx: 0, vz: 0, vy: 0, side: 1, prev: -1, cur: -1, q: [], m, state: 'walk', t: 0, phase: 0, spd: 1.2, cop: true, st, post, alert: 0, dir: 1 };
   PEDS.push(p); st.cops.push(p); return p;
 }
 const copsOnFoot = () => PEDS.filter(p => p.cop && p.state !== 'dead');

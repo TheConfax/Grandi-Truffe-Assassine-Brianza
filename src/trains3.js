@@ -55,7 +55,7 @@ function updTrain(dt) {
     }
     T.circ = [];
     T.cars.forEach((g, k) => {
-      const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h] = T.at(s); g.position.set(x, groundH(x, z) + 0.15, z); g.rotation.y = h;
+      const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h] = T.at(s); g.position.set(x, H.ground(x, z) + 0.15, z); g.rotation.y = h;
       const fx = Math.sin(h), fz = Math.cos(h); for (const o of [-8.4, -2.8, 2.8, 8.4]) T.circ.push([x + fx * o, z + fz * o, fx * T.v * T.dir, fz * T.v * T.dir]);
     });
     for (const c of T.circ) circ.push(c);

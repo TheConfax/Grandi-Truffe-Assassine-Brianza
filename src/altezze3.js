@@ -5,58 +5,17 @@
 // until its .bin has arrived, the old engine answers: the 10 m grid with the trenches of D.cut and the river cut (they go in phase 6)
 const TER = D.terrain;
 const TH = (() => { const bin = atob(TER.h16), n = bin.length >> 1, f = new Float32Array(n); for (let i = 0; i < n; i++) f[i] = (bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8)) / 10; return f; })();
-// the bank the covered stair between the Diaz and the Anna Frank climbs: the 10 m model smooths it into a gentle slope, so the field at its
-// foot is dug a few metres lower, fading out within twenty metres and never across the road to the south (old engine only: S has the bank)
-{
-  const A = [-578.8, -718.1], B = [-549.3, -727.1], DROP = 3.2, ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez, Ln = Math.sqrt(L2);
-  for (let j = 0; j < TER.nz; j++) for (let i = 0; i < TER.nx; i++) {
-    const x = TER.x0 + i * TER.step, z = TER.z0 + j * TER.step; if (Math.abs(x - A[0]) > 60 || Math.abs(z - A[1]) > 60) continue;
-    const t = ((x - A[0]) * ex + (z - A[1]) * ez) / L2, side = ((x - A[0]) * ez - (z - A[1]) * ex) / Ln, tc = Math.max(0, Math.min(1, t));
-    const d = Math.hypot(x - A[0] - ex * tc, z - A[1] - ez * tc), reach = side < 0 ? 8 : 22; // side < 0: towards the road
-    const k = Math.max(0, 1 - d / reach) * Math.max(0, 1 - Math.max(0, t) * 1.15);
-    TH[j * TER.nx + i] -= DROP * k * k * (3 - 2 * k);
-  }
-}
-// trenches (trincee), old engine: where the DBGT has a road below the terrain model, the ground is dug down to it. Each piece of road is a
-// segment [ax, az, bx, bz, depth at a, depth at b, half width] in decimetres: full depth across the carriageway, then a grassy bank at
-// 1 : CUT_S up to the field. The same formula is in build_data.py (ground_cut): keep them equal
-const CUTG = new Grid(24), CUT_S = 1.2, CUTS = (D.cut || []).map(c => c.map(v => v / 10)), CUTB = [1e9, 1e9, -1e9, -1e9];
-for (const [ax, az, bx, bz, da, db, hw] of CUTS) {
-  const m = hw + Math.max(da, db) * CUT_S, s = { ax, az, bx, bz, da, db, hw, m };
-  CUTG.add(Math.min(ax, bx) - m, Math.min(az, bz) - m, Math.max(ax, bx) + m, Math.max(az, bz) + m, s);
-  CUTB[0] = Math.min(CUTB[0], ax - m, bx - m); CUTB[1] = Math.min(CUTB[1], az - m, bz - m); CUTB[2] = Math.max(CUTB[2], ax + m, bx + m); CUTB[3] = Math.max(CUTB[3], az + m, bz + m);
-}
-function trenchCut(x, z) {
-  if (x < CUTB[0] || z < CUTB[1] || x > CUTB[2] || z > CUTB[3]) return 0;
-  let c = 0;
-  CUTG.each(x, z, x, z, s => {
-    const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.ax) * ex + (z - s.az) * ez) / L2, 0, 1), d = hyp(x - s.ax - ex * t, z - s.az - ez * t);
-    const D = s.da + (s.db - s.da) * t; c = Math.max(c, Math.min(D, D - (d - s.hw) / CUT_S));
-  });
-  return c;
-}
-// the deepest trench within r of (x, z): how far down the coarse depth mask has to go there
-function trenchNear(x, z, r) { let c = 0; CUTG.each(x - r, z - r, x + r, z + r, s => { if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < r + s.m) c = Math.max(c, s.da, s.db); }); return c; }
-// does the edge a-b come within reach of a trench? (draped surfaces split such edges down to 4 m, or they bridge the hollow)
-function cutTouches(ax, az, bx, bz) {
-  if (!CUTS.length || Math.max(ax, bx) < CUTB[0] || Math.max(az, bz) < CUTB[1] || Math.min(ax, bx) > CUTB[2] || Math.min(az, bz) > CUTB[3]) return false;
-  let f = false;
-  CUTG.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => { if (!f && segSegDist(ax, az, bx, bz, s.ax, s.az, s.bx, s.bz) < s.m) f = true; });
-  return f;
-}
-function segSegDist(ax, az, bx, bz, cx, cz, dx, dz) {
-  const o = (px, pz, qx, qz, rx, rz) => Math.sign((qx - px) * (rz - pz) - (qz - pz) * (rx - px));
-  if (o(ax, az, bx, bz, cx, cz) * o(ax, az, bx, bz, dx, dz) < 0 && o(cx, cz, dx, dz, ax, az) * o(cx, cz, dx, dz, bx, bz) < 0) return 0;
-  return Math.min(segDist(ax, az, cx, cz, dx, dz), segDist(bx, bz, cx, cz, dx, dz), segDist(cx, cz, ax, az, bx, bz), segDist(dx, dz, ax, az, bx, bz));
-}
-function farH(x, z) { // the old ground: the coarse grid, same two triangles per cell, minus the trenches
+// The DROP of the Diaz - Anna Frank stair (3.2 m dug into the coarse grid at the foot of the bank, made for TINITALY) and the trenches of D.cut
+// (trenchCut, CUT_S) are gone (docs/motore.md 3.1, fase 6): S has the bank and the trenches, and all the trenches of D.cut lie in tiles of S.
+// The old ground of the tiles without .bin is the coarse grid as it is
+function farH(x, z) { // the old ground: the coarse grid, same two triangles per cell
   const fx = clamp((x - TER.x0) / TER.step, 0, TER.nx - 1.001), fz = clamp((z - TER.z0) / TER.step, 0, TER.nz - 1.001), i = fx | 0, j = fz | 0, u = fx - i, v = fz - j, k = j * TER.nx + i;
   const h00 = TH[k], h10 = TH[k + 1], h01 = TH[k + TER.nx], h11 = TH[k + TER.nx + 1];
-  return (u >= v ? h00 + u * (h10 - h00) + v * (h11 - h10) : h00 + v * (h01 - h00) + u * (h11 - h01)) - (CUTS.length ? trenchCut(x, z) : 0);
+  return u >= v ? h00 + u * (h10 - h00) + v * (h11 - h10) : h00 + v * (h01 - h00) + u * (h11 - h01);
 }
 const RIVG = new Grid(24), RIV_D = 2.4;
 for (const td of D.tiles) for (const r of td.rv || []) { const pts = dec(r.p); for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], m = r.w + 1; RIVG.add(Math.min(a[0], b[0]) - m, Math.min(a[1], b[1]) - m, Math.max(a[0], b[0]) + m, Math.max(a[1], b[1]) + m, { a, b, w: r.w, ca: k === 1 && !!(r.e && r.e[0]), cb: k === pts.length - 1 && !!(r.e && r.e[1]) }); } }
-function riverCut(x, z) { // old engine: the river bed is dug RIV_D into the drawn ground (S has the bed in it)
+function riverCut(x, z) { // old engine only (the tiles without .bin, outside Meda until phase 8): the river bed dug RIV_D into the drawn ground; S has the bed in it
   let c = 0;
   RIVG.each(x, z, x, z, s => {
     const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L2 = ex * ex + ez * ez || 1, t0 = ((x - s.a[0]) * ex + (z - s.a[1]) * ez) / L2;
@@ -364,6 +323,17 @@ const H = (() => {
     });
     return out;
   }
+  // the deck under road node i that one of its roads runs on (decks[].ra), its top there, or null; worked out once for all nodes
+  let NDK = null;
+  function nodeDeck(i) {
+    if (!NDK) {
+      NDK = new Map(); const on = new Map(); for (const d of DECKS) for (const r of d.ra) { let l = on.get(r); if (!l) on.set(r, l = []); l.push(d); }
+      D.roads.forEach((r, ri) => { const l = on.get(ri); if (!l) return; for (const n of r.g) { if (NDK.has(n)) continue; const [x, z] = N[n]; for (const o of deckAt(x, z)) if (l.includes(o.d)) { NDK.set(n, o.top); break; } } });
+    }
+    const v = NDK.get(i); return v === undefined ? null : v;
+  }
+  // the step of the old engine (tiles without .bin): the sidewalks and platforms the tile draws raised; world3.js fills them in later
+  const oldStep = (x, z) => { try { return onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : 0; } catch (e) { return 0; } }; // (before world3.js has its grids: 0)
   // water level (docs/motore.md 1.3): zw along the DBGT river axes, every 2 m; elsewhere the lowest S across an OSM river + 0.3
   const WG = new Grid(16), WMAX = 12;
   for (const a of TERRENO ? TERRENO.acqua : []) { const p = a.p, zw = a.zw; for (let k = 1; k < zw.length; k++) { const ax = p[2 * k - 2], az = p[2 * k - 1], bx = p[2 * k], bz = p[2 * k + 1]; WG.add(Math.min(ax, bx) - WMAX, Math.min(az, bz) - WMAX, Math.max(ax, bx) + WMAX, Math.max(az, bz) + WMAX, { ax, az, bx, bz, ya: zw[k - 1] - B0, yb: zw[k] - B0 }); } }
@@ -387,11 +357,13 @@ const H = (() => {
     fine: t => !!FT[t], tile: t => FT[t], has: t => STEP[t] > 0,
     fineAt: (x, z) => !!fineAt(x, z),
     base(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); },
-    // S without step until phase 6 (docs/motore.md 3.1): the consumers still add SIDE_H/PLAT_H by hand (platform sides and furniture,
-    // landmarks3.js), and with step in here they stood twice as high (benches and canopies 0.55 m over the platform, its sides spiking to 1.1 m)
-    ground(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); },
+    // the ground as drawn (docs/motore.md 3): S + step, the cover of a sidewalk, a platform or a median where the point is on one; in a tile
+    // without .bin the old ground and its sidewalks and platforms (onSide, onPlatform of world3.js). What draws the step itself (the sides
+    // of a platform, the kerbs) or drapes a surface takes H.base
+    ground(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) + step(x, z) : oldG(x, z) + oldStep(x, z); },
     vis(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z) - rivCut(x, z); }, // the old drawn ground cut the river into the grid
     rivCut, fadeW, // the old engine near S: how deep its river cut is, how much of S it takes
+    inRiver: (x, z) => riverCut(x, z) > 0, // within an OSM river (its axis and width), wherever: the tiles of S use it to find the water mapped in the bed
     // what the street surfaces drape on: S, or the top of a deck nothing but water or field passes under (the asphalt of a bridge over the
     // Seveso stays on the bridge). Transitional: phase 5 clips them on the grid and on the decks
     street(x, z) { const F = fineAt(x, z); if (!F) return oldG(x, z); const g = onF(F, x, z); for (const o of deckAt(x, z)) if (o.d.free && o.top > g) return o.top; return g; },
@@ -409,11 +381,16 @@ const H = (() => {
       return y;
     },
     oldSurface: null, // world3.js: surfAt of the old engine (DECKG, the embankments, the river cut)
-    node(i) { // a road node: on the deck it runs over (the one nearest its old height, within 3 m), else on S
+    // a road node (AI cars, walkers, police spawn): on the deck its road runs over (decks[].ra, the roads the build found on the deck), else
+    // on the deck nearest its old height (within 3 m, the old elevated ways), else on S. Before phase 6 a node on a deck the old data did not
+    // know (old height null) was put on S: a police car born on a bridge came out under it
+    node(i) {
       const [x, z] = N[i], F = fineAt(x, z), y0 = NHt[i];
       if (!F) return y0 === null ? oldG(x, z) : oldDeck(i, y0);
+      const d = nodeDeck(i); if (d !== null) return d;
       return y0 === null ? onF(F, x, z) : onDeck(F, x, z, y0);
     },
+    nodeDeck: i => nodeDeck(i),
     kind(x, z) {
       const F = fineAt(x, z);
       if (F) { const s = stepAt(x, z); if (s) return s.kind === 2 ? 'plat' : 'side'; } else { if (onPlatform(x, z)) return 'plat'; if (onSide(x, z)) return 'side'; }
@@ -482,16 +459,6 @@ const H = (() => {
 })();
 // every tile of S is here before the world is built (see H.tick)
 if (TERRENO) await H.preload(0, 0, 1e9);
-// the old height functions stay one phase as aliases of H.* (docs/motore.md 3.1), with a console.warn once per call site; the stack is read
-// on the first calls and then one call in 1024, so the cost stays small
-const ALIAS_SEEN = new Set(); let aliasN = 0;
-function aliasWarn(name) {
-  if (++aliasN > 4000 && (aliasN & 1023)) return;
-  const st = ((new Error().stack || '').split('\n')[3] || '?').trim(), k = name + ' ' + st; if (ALIAS_SEEN.has(k)) return; ALIAS_SEEN.add(k);
-  console.warn(name + ' è un alias di H.* (docs/motore.md 3.1): ' + st);
-}
-function groundH(x, z) { aliasWarn('groundH'); return H.ground(x, z); }
-function visH(x, z) { aliasWarn('visH'); return H.vis(x, z); }
-function surfAt(x, z, cy) { aliasWarn('surfAt'); return H.surface(x, z, cy); }
-function nodeY(i) { aliasWarn('nodeY'); return H.node(i); }
+// the old height functions (groundH, visH, surfAt, nodeY) are gone (docs/motore.md 3.1, fase 6): every consumer asks H.* itself, and H.*
+// answers with the old engine in the tiles without .bin (outside Meda until phase 8), so no alias is needed there either
 const streetH = (x, z) => H.street(x, z);

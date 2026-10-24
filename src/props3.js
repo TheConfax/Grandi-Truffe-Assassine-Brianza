@@ -48,7 +48,7 @@ function updProps(dt) {
     const d = PROP_DEBRIS[i], o = d.o; d.t += dt; d.vy -= 9.8 * dt;
     o.position.x += d.vx * dt; o.position.y += d.vy * dt; o.position.z += d.vz * dt;
     o.rotateX(d.spin.x * dt); o.rotateY(d.spin.y * dt); o.rotateZ(d.spin.z * dt);
-    const gy = groundH(o.position.x, o.position.z) + 0.1;
+    const gy = H.ground(o.position.x, o.position.z) + 0.1;
     if (o.position.y < gy) { o.position.y = gy; d.vy *= -0.25; d.vx *= 0.6; d.vz *= 0.6; d.spin.multiplyScalar(0.5); }
     if (d.t > 4) PROP_DEBRIS.splice(i, 1);
   }

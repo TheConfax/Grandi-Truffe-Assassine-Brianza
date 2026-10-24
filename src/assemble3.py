@@ -33,10 +33,11 @@ for (let i = 0; i < D.nodes.length; i += 3) { N.push([D.nodes[i] / 10, D.nodes[i
 const dec = a => { const o = []; let x = 0, z = 0; for (let i = 0; i < a.length; i += 2) { x += a[i]; z += a[i + 1]; o.push([x / 10, z / 10]); } return o; };""")
 rep("const STREETS = new Grid(24); // named road segments\nconst JUNC = new Grid(16);\n", "")
 rep("""function mkMesh(b, mat, ro, shadow) {""", """function mkMesh(b, mat, ro, shadow, parent = scene) {""")
-rep("  if (b.drape) for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += groundH(b.p[i], b.p[i + 2]);", "  if (b.drape) { clipDrape(b, b.hf || (b.vis ? visH : groundH), ro, mat); if (H.anyFine() && !mat.polygonOffset) { mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -4; } } /* b.hf: altezze3.js, the ground the buffer drapes on; in a tile of S cut on its cells (world3.js clipDrape), off the ground that writes its depth by polygonOffset */")
+rep("  if (b.drape) for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += groundH(b.p[i], b.p[i + 2]);", "  if (b.drape) { clipDrape(b, b.hf || (b.vis ? H.vis : H.base), ro, mat); if (H.anyFine() && !mat.polygonOffset) { mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -4; } } /* b.hf: altezze3.js, the ground the buffer drapes on; in a tile of S cut on its cells (world3.js clipDrape), off the ground that writes its depth by polygonOffset */")
 # draped polygons split their edges on the ground they drape on (old engine only: over a tile of S polyFill cuts them on its cells, clipFill)
-rep("    const mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = groundH(all[i][0], all[i][1]));", "    const hf = b.hf || groundH, mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = hf(all[i][0], all[i][1]));")
+rep("    const mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = groundH(all[i][0], all[i][1]));", "    const hf = b.hf || H.base, mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = hf(all[i][0], all[i][1]));")
 rep("for (const t of [0.25, 0.5, 0.75]) { const e = groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)", "for (const t of [0.25, 0.5, 0.75]) { const e = hf(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)")
+rep("if (cutTouches(all[i][0], all[i][1], all[j][0], all[j][1])) r = l; else for (const t of [0.25, 0.5, 0.75])", "for (const t of [0.25, 0.5, 0.75])") # the trenches of D.cut are in S (fase 6)
 rep("function polyFill(b, outer, holes, y, vScale, col) {", "function polyFill(b, outer, holes, y, vScale, col) {\n  if (b.drape && clipFill(b, outer, holes, y, vScale, col)) return; /* docs/motore.md 3: on the cells of S, no drape */")
 rep("      if (mx <= 16 || tris.length + stack.length > 60000) { tris.push([a, c, d]); continue; }", "      if (!mx || tris.length + stack.length > 60000) { tris.push([a, c, d]); continue; } /* L2 is 0 or the squared length of an edge to split */")
 rep("""  scene.add(m); return m;
@@ -84,21 +85,21 @@ rep("if (TR && p.state !== 'dead') for (const [cx, cz, tvx, tvz] of TR.circ)", "
 rep("if (TR) for (const [cx, cz, tvx, tvz] of TR.circ) { const dx = P.x - cx", "for (const [cx, cz, tvx, tvz] of TRAIN_CIRC) { const dx = P.x - cx")
 
 # ---- heights on several levels
-rep("const [cf, cb] = this.circles(), yf = surfY(cf[0], cf[1]), yb = surfY(cb[0], cb[1]), ty = (yf + yb) / 2;", "const [cf, cb] = this.circles(), yf = surfAt(cf[0], cf[1], this.y), yb = surfAt(cb[0], cb[1], this.y), ty = (yf + yb) / 2;")
+rep("const [cf, cb] = this.circles(), yf = surfY(cf[0], cf[1]), yb = surfY(cb[0], cb[1]), ty = (yf + yb) / 2;", "const [cf, cb] = this.circles(), yf = H.surface(cf[0], cf[1], this.y), yb = H.surface(cb[0], cb[1], this.y), ty = (yf + yb) / 2;")
 rep("const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad);", "const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad, this.y + 0.4);")
-rep("const fl = surfY(p.x, p.z); p.t += dt;", "const fl = surfAt(p.x, p.z, p.y); p.t += dt;")
-rep("p.phase += spd * dt * 3.2; p.y = surfY(p.x, p.z);", "p.phase += spd * dt * 3.2; p.y = surfAt(p.x, p.z, p.y);")
-rep("const fl = surfY(P.x, P.z); P.y = Math.max(fl,", "const fl = surfAt(P.x, P.z, P.y); P.y = Math.max(fl,")
-rep("P.y = surfY(P.x, P.z); P.h = wrapA(P.h + steerIn * 2.8 * dt);", "P.y = surfAt(P.x, P.z, P.y); P.h = wrapA(P.h + steerIn * 2.8 * dt);")
+rep("const fl = surfY(p.x, p.z); p.t += dt;", "const fl = H.surface(p.x, p.z, p.y); p.t += dt;")
+rep("p.phase += spd * dt * 3.2; p.y = surfY(p.x, p.z);", "p.phase += spd * dt * 3.2; p.y = H.surface(p.x, p.z, p.y);")
+rep("const fl = surfY(P.x, P.z); P.y = Math.max(fl,", "const fl = H.surface(P.x, P.z, P.y); P.y = Math.max(fl,")
+rep("P.y = surfY(P.x, P.z); P.h = wrapA(P.h + steerIn * 2.8 * dt);", "P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + steerIn * 2.8 * dt);")
 rep("const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4);", "const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4, P.y + 0.4);")
 rep("const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35);", "const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35, p.y + 0.4);")
 
 # ---- traffic speeds per road class + spawn heights
 rep("v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to]], cruise: Math.min(v.maxV * 0.8, base * mood), blocked: 0, ignore: 0 }; v.sleep = false;",
-    "v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to, e.sp]], cruise: Math.min(v.maxV * 0.8, base * mood), mood, kind, blocked: 0, ignore: 0 }; v.sleep = false; v.y = nodeY(a); v.sync();")
+    "v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to, e.sp]], cruise: Math.min(v.maxV * 0.8, base * mood), mood, kind, blocked: 0, ignore: 0 }; v.sleep = false; v.y = H.node(a); v.sync();")
 rep("ai.q.push([p0[0], p0[1], -1], [p1[0], p1[1], e.to]);", "ai.q.push([p0[0], p0[1], -1, e.sp], [p1[0], p1[1], e.to, e.sp]);")
 rep("  let cruise = ai.cruise;\n", "  let cruise = ai.kind !== undefined ? Math.min(v.maxV * 0.85, (ai.q[0][3] || 10) * (ai.kind === 'ape' ? 0.55 : ai.kind === 'van' ? 0.9 : 1) * ai.mood) : ai.cruise;\n")
-rep("const p = { x: p0[0], z: p0[1], h: 0, y: 0,", "const p = { x: p0[0], z: p0[1], h: 0, y: nodeY(a),")
+rep("const p = { x: p0[0], z: p0[1], h: 0, y: 0,", "const p = { x: p0[0], z: p0[1], h: 0, y: H.node(a),")
 # police field limited radius
 rep("while (heap.length) { const [d, u] = pop(); if (d > dist[u]) continue;", "while (heap.length) { const [d, u] = pop(); if (d > dist[u] || d > 2500) continue;")
 
@@ -106,7 +107,7 @@ rep("while (heap.length) { const [d, u] = pop(); if (d > dist[u]) continue;", "w
 a = s.index("function spawnParked() {"); b = s.index("// ---------------------------------------------------------------- wanted level & police")
 s = s[:a] + """function parkTile(T) {
   T.parked = []; srndT = 77 + T.t * 131;
-  const add = (m, x, z, h) => { const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.y = surfAt(x, z); v.sync(); T.parked.push(v); };
+  const add = (m, x, z, h) => { const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.y = H.surface(x, z); v.sync(); T.parked.push(v); };
   // car parks with painted stalls: about half of them taken, a car in each and never in the yellow one; lots without stalls keep a few loose cars
   let inStalls = 0;
   for (const st of T.stalls || []) {
@@ -230,11 +231,11 @@ rep("""function setupWorld(saved) {
   tileTick(STATION.x, STATION.z, 0, 420);
   for (const T of TILES) T.dist = hyp(T.cx - STATION.x, T.cz - STATION.z);
   parkTick();""")
-rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z); v.sync(); }", "P.h = h; P.y = surfAt(P.x, P.z); mine.y = surfAt(mine.x, mine.z); mine.sync();")
+rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z); v.sync(); }", "P.h = h; P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync();")
 rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
-rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, surfAt, groundH, nodeY,")
+rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS,")
 rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
@@ -266,8 +267,8 @@ rep("if (traffic.length < 22 && rnd() < dt * 2) spawnTraffic(true);", "if (traff
 # trains ride on the elevated track
 rep("  const pts = dec(td.p); if (pts.length < 2) return null;", "  const pts = dec(td.p); if (pts.length < 2) return null;\n  const hs = (td.h || []).map((v, i) => v === -32768 ? null : v / 10);")
 rep("const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), Math.atan2(b[0] - a[0], b[1] - a[1])]; };",
-    "const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), x = lerp(a[0], b[0], f), z = lerp(a[1], b[1], f), ha = hs[i - 1] ?? groundH(a[0], a[1]), hb = hs[i] ?? groundH(b[0], b[1]); return [x, z, Math.atan2(b[0] - a[0], b[1] - a[1]), railY(x, z, (hs[i - 1] == null && hs[i] == null) ? groundH(x, z) : lerp(ha, hb, f))]; };")
-rep("const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h] = T.at(s); g.position.set(x, groundH(x, z) + 0.15, z); g.rotation.y = h;", "const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h, y] = T.at(s); g.position.set(x, y + 0.15, z); g.rotation.y = h; g.userData.y = y;")
+    "const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), x = lerp(a[0], b[0], f), z = lerp(a[1], b[1], f), ha = hs[i - 1] ?? H.base(a[0], a[1]), hb = hs[i] ?? H.base(b[0], b[1]); return [x, z, Math.atan2(b[0] - a[0], b[1] - a[1]), railY(x, z, (hs[i - 1] == null && hs[i] == null) ? H.base(x, z) : lerp(ha, hb, f))]; };")
+rep("const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h] = T.at(s); g.position.set(x, H.ground(x, z) + 0.15, z); g.rotation.y = h;", "const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h, y] = T.at(s); g.position.set(x, y + 0.15, z); g.rotation.y = h; g.userData.y = y;")
 # AI stops at red lights
 rep("    for (const g of LX) if (g.bars && (g.closed || g.ang < 0.7)) for (const b of g.bars) for (const [x, z] of b.probe) check(x, z);",
     "    for (const g of LX) if (g.bars && (g.closed || g.ang < 0.7)) for (const b of g.bars) for (const [x, z] of b.probe) check(x, z);\n    if (v.ai && !v.ai.cop) SIGG.each(v.x - 30, v.z - 30, v.x + 30, v.z + 30, sg => { if (sigState(axisOf(fx, fz)) === 'g') return; const ox = sg.x - v.x, oz = sg.z - v.z, ahead = ox * fx + oz * fz, side = Math.abs(ox * fz - oz * fx); if (ahead > sg.w / 2 + 3 && ahead < 32 && side < sg.w / 2 + 4) block = Math.min(block, ahead - sg.w / 2 - 1); });")
@@ -369,7 +370,7 @@ let spotDb = null, spotN = 0; (async () => { try { spotDb = await window.claude?
 async function reportSpot() {
   const v = P.mode === 'car' ? P.car : null, x = v ? v.x : P.x, z = v ? v.z : P.z, y = v ? v.y : P.y;
   const lat = META.lat0 - z / 110540, lon = META.lon0 + x / (111320 * Math.cos(META.lat0 * Math.PI / 180));
-  const rec = { x: +x.toFixed(1), z: +z.toFixed(1), y: +y.toFixed(1), suolo: +groundH(x, z).toFixed(1), lat: +lat.toFixed(6), lon: +lon.toFixed(6), via: streetAt(x, z) || '', zona: placeAt(x, z) || '', direzione: Math.round(((v ? v.h : P.h) * 180 / Math.PI + 360) % 360), modo: P.mode, velocita: v ? Math.round(v.speed * 3.6) : 0, cam: camMode, ora: $('clock') ? $('clock').textContent : '', quando: new Date().toISOString(), versione: 'v16' };
+  const rec = { x: +x.toFixed(1), z: +z.toFixed(1), y: +y.toFixed(1), suolo: +H.ground(x, z).toFixed(1), lat: +lat.toFixed(6), lon: +lon.toFixed(6), via: streetAt(x, z) || '', zona: placeAt(x, z) || '', direzione: Math.round(((v ? v.h : P.h) * 180 / Math.PI + 360) % 360), modo: P.mode, velocita: v ? Math.round(v.speed * 3.6) : 0, cam: camMode, ora: $('clock') ? $('clock').textContent : '', quando: new Date().toISOString(), versione: 'v16' };
   spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }
   let saved = false; if (spotDb) { try { await spotDb.collection('segnalazioni').add(rec); saved = true; } catch (e) { saved = false; } }
   if (!saved && /^(localhost|127\\.0\\.0\\.1)$/.test(location.hostname)) { try { const r = await fetch('/segnala', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) }); saved = r.ok; } catch (e) { } } /* local game: straight to the dev server, Claude reads it live */
@@ -498,14 +499,14 @@ rep("""let last = performance.now(), acc = 0;
 function frame(t) {""", """// ---------------------------------------------------------------- cheat codes, typed in the pause menu
 function ferari(x, z, h) { // a red Ferari at (x,z), clearing whatever is parked on that spot
   for (const o of VEH.slice()) if (o !== P.car && hyp(o.x - x, o.z - z) < 5) o.remove();
-  const v = new Vehicle('sport', '#d0141a', x, z, h); v.moved = true; v.y = surfAt(x, z); v.sync(); return v;
+  const v = new Vehicle('sport', '#d0141a', x, z, h); v.moved = true; v.y = H.surface(x, z); v.sync(); return v;
 }
 function cheatRespawn() { // back to the start: via Yuri Gagarin, on foot next to the Ferari, no stars
   if (P.car) { P.car.driver = null; P.car.boost = false; P.car.inp = { thr: 0, brk: 0, steer: 0, hand: 1 }; P.car = null; }
   const [sx, sz, h] = startSpot(); tileTick(sx, sz, 0, 420);
   const mine = ferari(sx, sz, h);
   P.x = mine.x + Math.cos(h) * 2.4; P.z = mine.z - Math.sin(h) * 2.4; if (inBuilding(P.x, P.z, 0.5)) { P.x = mine.x - Math.cos(h) * 2.4; P.z = mine.z + Math.sin(h) * 2.4; }
-  P.h = h; P.y = surfAt(P.x, P.z); P.mode = 'foot'; P.model.g.visible = true; P.hp = 100; P.knock = 0; P.vx = P.vz = P.vy = 0;
+  P.h = h; P.y = H.surface(P.x, P.z); P.mode = 'foot'; P.model.g.visible = true; P.hp = 100; P.knock = 0; P.vx = P.vz = P.vy = 0;
   W.heat = 0; W.stars = 0; W.busted = 0; W.bustT = 0;
   camInit = false; banner('Via Yuri Gagarin', 'MEDA');
 }
@@ -553,7 +554,7 @@ rep("  if (edge(11)) reportSpot();", "  if (edge(13)) reportSpot();")
 # up and down: the camera drops to look up or rises to look down from above, and settles back the same way
 rep("want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz);",
     "{ const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 3 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }\n"
-    "    want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz);")
+    "    want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz);")
 rep("    let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }",
     "    let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }\n"
     "    { const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0; if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -Math.PI, Math.PI); else camYaw *= Math.exp(-2.5 * dt); /* heading grows towards the left */\n"

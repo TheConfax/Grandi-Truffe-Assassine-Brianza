@@ -530,7 +530,7 @@ function ngList() {
       r.cx = r.a[0] + r.ux * r.t; r.cz = r.a[1] + r.uz * r.t; r.tile = tileOf(r.cx, r.cz);
       if (r.big) { r.big.front = r; continue; }
       if (ngDepth(r) < 1.5 && r.bdist < 1.5) continue; // another building right in front: no shop window there
-      if (r.b.gtop === undefined) r.b.gtop = Math.max(...r.b.pts.map(p => groundH(p[0], p[1]))) + r.b.h;
+      if (r.b.gtop === undefined) r.b.gtop = Math.max(...r.b.pts.map(p => H.ground(p[0], p[1]))) + r.b.h;
       NG_LIST.push(r);
     }
   }
@@ -615,9 +615,9 @@ function ngText(g, txt, cx, cy, maxW, maxH, font, col) {
   g.fillStyle = col; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, cx, cy);
 }
 function ngFront(s, C) {
-  const m = s.m, cls = s.cls, W = s.w, hw = W / 2, gy = groundH(s.cx + s.nx * 0.6, s.cz + s.nz * 0.6), top = s.b.gtop - gy;
+  const m = s.m, cls = s.cls, W = s.w, hw = W / 2, gy = H.ground(s.cx + s.nx * 0.6, s.cz + s.nz * 0.6), top = s.b.gtop - gy;
   if (top < 2.7) return;
-  const gl = Math.min(groundH(s.cx - s.ux * hw, s.cz - s.uz * hw), groundH(s.cx + s.ux * hw, s.cz + s.uz * hw)) - gy - 0.35;
+  const gl = Math.min(H.ground(s.cx - s.ux * hw, s.cz - s.uz * hw), H.ground(s.cx + s.ux * hw, s.cz + s.uz * hw)) - gy - 0.35;
   const { F, lx, box, neon, qz, qx, cell, sign } = ngKit(C, s.cx, gy, s.cz, s.nx, s.nz);
   const pal = s.pal || ['#25303f', '#f2f2ee'], bg = pal[0], fg = pal[1], kc = m.k, font = NG_FONT[m.f || 'sans'];
   const caseOf = t => (m.f === 'script' || m.f === 'serif') && s.name ? t : t.toUpperCase();
@@ -829,7 +829,7 @@ function ngLogo(g, w, h, name, bg, fg, badge = true) {
   ngText(g, name.toUpperCase(), (x0 + w) / 2, h * 0.54, (w - x0) * 0.9, h * 0.62, NG_FONT.black, fg);
 }
 function ngBig(B, C) {
-  const S = B.big, f = S.front, pts = B.pts, A = sArea(pts), gys = pts.map(p => groundH(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys), top = gmax + B.h, bot = gmin - 0.6;
+  const S = B.big, f = S.front, pts = B.pts, A = sArea(pts), gys = pts.map(p => H.ground(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys), top = gmax + B.h, bot = gmin - 0.6;
   const v = S.v, wallCol = COL(['#eceae4', '#d9dbdd', '#e3d9c6', '#e8e6e0'][v]), fasc = S.pal[0], fg = S.pal[1], fcol = COL(fasc), fh = [1.4, 1.1, 1.6, 1.25][v], low = COL(v === 3 ? '#3a3d40' : '#5a5c5e');
   const pb = C.panel || (C.panel = Buf()), off = 0.12, n = pts.length;
   const nrm = i => { const a = pts[i], c = pts[(i + 1) % n], L = hyp(c[0] - a[0], c[1] - a[1]) || 1; let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (A < 0) { nx = -nx; nz = -nz; } return [nx, nz, L]; };
@@ -851,7 +851,7 @@ function ngBig(B, C) {
     F0.geo(C.solid, lmBox(2.4, 1.2, 1.5, x, top + 0.6, z), null, COL('#c9ccd1')); F0.geo(C.solid, new THREE.CylinderGeometry(0.45, 0.45, 0.06, 12).translate(x - 0.55, top + 1.23, z), null, COL('#2b2f33')); F0.geo(C.solid, new THREE.CylinderGeometry(0.45, 0.45, 0.06, 12).translate(x + 0.55, top + 1.23, z), null, COL('#2b2f33')); }
   if (!f) return;
   // the glass front with its doors
-  const gy = groundH(f.cx + f.nx * 0.6, f.cz + f.nz * 0.6), K = ngKit(C, f.cx, gy, f.cz, f.nx, f.nz), topL = top - gy, w = f.w, hw = w / 2, gl = gmin - gy - 0.3;
+  const gy = H.ground(f.cx + f.nx * 0.6, f.cz + f.nz * 0.6), K = ngKit(C, f.cx, gy, f.cz, f.nx, f.nz), topL = top - gy, w = f.w, hw = w / 2, gl = gmin - gy - 0.3;
   const Hg = clamp(topL - fh - 0.9, 3.0, 4.2), doors = w >= 16 ? [-w * 0.22, w * 0.22] : [0], dw = 2.4, th = Math.floor(S.h0 * 6), dark = '#3a3d40';
   K.box(w + 0.2, 0.3 - gl, 0.14, 0, (0.3 + gl) / 2, 0.07, dark); K.box(w + 0.2, 0.25, 0.2, 0, Hg + 0.08, 0.1, dark);
   for (const sx of [-1, 1]) K.box(0.14, Hg - gl, 0.16, sx * (hw + 0.03), (Hg + gl) / 2, 0.08, dark);
@@ -868,11 +868,11 @@ function ngBig(B, C) {
   const logo = (Kk, L0, t0, yTop) => { const lw = Math.min(L0 - 1.5, Math.max(5, (S.name.length * 0.62 + 1.8) * (fh + 0.1))), xc = clamp(0, -t0 + lw / 2 + 0.6, L0 - t0 - lw / 2 - 0.6), c = Kk.cell(lw, fh + 0.15, (g, W2, H2) => ngLogo(g, W2, H2, S.name, fasc, fg)); Kk.sign(c, Kk.qz(C.sign, xc - lw / 2, yTop - fh + 0.1, xc + lw / 2, yTop + 0.25, off + 0.006)); };
   if (f.L > 5) logo(K, f.L, f.t, topL);
   let side = null; for (let i = 0; i < n; i++) { const a = pts[i], c = pts[(i + 1) % n], [nx, nz, L] = N_[i]; if (L < 15 || (Math.abs(a[0] - f.a[0]) < 0.01 && Math.abs(a[1] - f.a[1]) < 0.01) || nx * f.nx + nz * f.nz > 0.7) continue; const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (ngRoad(mx + nx * 12, mz + nz * 12, 6) && (!side || L > side.L)) side = { a, c, mx, mz, nx, nz, L }; }
-  if (side) { const g2 = groundH(side.mx, side.mz), K2 = ngKit(C, side.mx, g2, side.mz, side.nx, side.nz); logo(K2, side.L, side.L / 2, top - g2); }
+  if (side) { const g2 = H.ground(side.mx, side.mz), K2 = ngKit(C, side.mx, g2, side.mz, side.nx, side.nz); logo(K2, side.L, side.L / 2, top - g2); }
   // the loading bay round the back
   let back = null; for (let i = 0; i < n; i++) { const a = pts[i], c = pts[(i + 1) % n], [nx, nz, L] = N_[i], mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (L >= 8 && nx * f.nx + nz * f.nz < -0.6 && !inBuilding(mx + nx * 1.5, mz + nz * 1.5) && (!back || L > back.L)) back = { mx, mz, nx, nz, L }; }
   if (back) {
-    const g3 = groundH(back.mx, back.mz), K3 = ngKit(C, back.mx, g3, back.mz, back.nx, back.nz), dh = Math.min(3.3, top - g3 - fh - 0.4);
+    const g3 = H.ground(back.mx, back.mz), K3 = ngKit(C, back.mx, g3, back.mz, back.nx, back.nz), dh = Math.min(3.3, top - g3 - fh - 0.4);
     for (const x of back.L >= 16 ? [-2.3, 2.3] : [0]) {
       for (let y = 0, k = 0; y < dh; y += 0.12, k++) K3.box(3.0, Math.min(0.12, dh - y), 0.04, x, y + 0.06, 0.04, k % 2 ? '#9da1a6' : '#b4b8bd');
       for (const sx of [-1, 1]) { K3.box(0.25, dh + 0.25, 0.3, x + sx * 1.62, (dh + 0.25) / 2, 0.15, '#1d1d1f'); K3.box(0.28, 0.35, 0.22, x + sx * 1.3, 1.15, 0.12, '#e8b520'); }
@@ -902,7 +902,7 @@ function ngBig(B, C) {
       for (let k = 0; k < 7; k++) { K.box(0.52, 0.5, 0.95, x - 1.8 + k * 0.6, 0.75, z, '#c9ccd1'); K.box(0.5, 0.04, 0.04, x - 1.8 + k * 0.6, 1.0, z + 0.48, fasc); }
       if (!S.walls) for (const dx of [-1.5, 0, 1.5]) { const [wx, wz] = K.lx(x + dx, z); WALLS.add(wx - 1, wz - 1, wx + 1, wz + 1, { r: 0.9, x: wx, z: wz, y0: gy - 3, y1: gy + 3 }); }
     } else {
-      const { x, z } = it, py = groundH(it.wx, it.wz) - gy;
+      const { x, z } = it, py = H.ground(it.wx, it.wz) - gy;
       K.box(0.6, 0.6, 2.2, x, py + 0.3, z, '#8a857c'); K.box(0.45, 6.4, 1.9, x, py + 3.4, z, fasc); K.box(0.5, 0.15, 2.0, x, py + 6.65, z, '#3a3d40');
       const c1 = K.cell(1.8, 1.8, (g, W2, H2) => { g.fillStyle = fasc; g.fillRect(0, 0, W2, H2); g.fillStyle = fg; const s = W2 * 0.5; g.fillRect(W2 / 2 - s / 2, H2 * 0.08, s, s); ngText(g, S.name[0].toUpperCase(), W2 / 2, H2 * 0.08 + s * 0.54, s * 0.8, s * 0.8, NG_FONT.black, fasc); const words = S.name.toUpperCase().split(' ').slice(0, 2); words.forEach((wd, i) => ngText(g, wd, W2 / 2, H2 * (0.7 + i * 0.17), W2 * 0.9, H2 * 0.15, NG_FONT.black, fg)); });
       const c2 = K.cell(1.8, 0.9, (g, W2, H2) => { g.fillStyle = '#f2f2ee'; g.fillRect(0, 0, W2, H2); ngText(g, 'P', W2 * 0.2, H2 / 2, W2 * 0.3, H2 * 0.7, NG_FONT.black, '#1d4f9a'); ngText(g, 'PARCHEGGIO CLIENTI', W2 * 0.62, H2 / 2, W2 * 0.68, H2 * 0.25, NG_FONT.sans, '#1a1a1a'); });
@@ -933,22 +933,22 @@ function* buildNegozi(T, G) { // a generator: the tile builder yields between sl
   if (C.cells.length) {
     const order = C.cells.slice().sort((a, b) => b.ph - a.ph); let x = 0, y = 0, rh = 0;
     for (const c of order) { if (x + c.pw > 1024) { x = 0; y += rh + 2; rh = 0; } c.x = x; c.y = y; x += c.pw + 2; rh = Math.max(rh, c.ph); }
-    const H = Math.min(4096, y + rh), cv = document.createElement('canvas'); cv.width = 1024; cv.height = H; const g = cv.getContext('2d');
-    for (const c of C.cells) { if (c.y + c.ph > H) continue; g.save(); g.translate(c.x, c.y); g.beginPath(); g.rect(0, 0, c.pw, c.ph); g.clip(); c.draw(g, c.pw, c.ph); g.restore(); }
-    for (const [i0, c] of C.sq) for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2, u = C.sign.uv[q], v = C.sign.uv[q + 1]; C.sign.uv[q] = (c.x + 0.5 + u * (c.pw - 1)) / 1024; C.sign.uv[q + 1] = 1 - (c.y + 0.5 + (1 - v) * (c.ph - 1)) / H; }
+    const Hh = Math.min(4096, y + rh), cv = document.createElement('canvas'); cv.width = 1024; cv.height = Hh; const g = cv.getContext('2d');
+    for (const c of C.cells) { if (c.y + c.ph > Hh) continue; g.save(); g.translate(c.x, c.y); g.beginPath(); g.rect(0, 0, c.pw, c.ph); g.clip(); c.draw(g, c.pw, c.ph); g.restore(); }
+    for (const [i0, c] of C.sq) for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2, u = C.sign.uv[q], v = C.sign.uv[q + 1]; C.sign.uv[q] = (c.x + 0.5 + u * (c.pw - 1)) / 1024; C.sign.uv[q + 1] = 1 - (c.y + 0.5 + (1 - v) * (c.ph - 1)) / Hh; }
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
     const mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     SIGN_MATS.push(mat); mkMesh(C.sign, mat, 10, false, G);
     yield 'negozi';
   }
-  if (!T.ngDone) for (const it of C.solids) { const gy = groundH(it.x, it.z); WALLS.add(it.x - it.r, it.z - it.r, it.x + it.r, it.z + it.r, { r: it.r, x: it.x, z: it.z, y0: gy - 3, y1: gy + 3 }); }
+  if (!T.ngDone) for (const it of C.solids) { const gy = H.ground(it.x, it.z); WALLS.add(it.x - it.r, it.z - it.r, it.x + it.r, it.z + it.r, { r: it.r, x: it.x, z: it.z, y0: gy - 3, y1: gy + 3 }); }
   // the things outside: one instanced mesh per kind, knocked over like the bins and the benches
   const by = {}; C.props.forEach((it, i) => { it.id = it.id ?? i; (by[it.key] = by[it.key] || []).push(it); });
   const o3 = new THREE.Object3D();
   for (const key in by) {
     const items = by[key], im = new THREE.InstancedMesh(ngPropGeo(key), OGG_MAT, items.length); im.castShadow = true; im.receiveShadow = true;
     items.forEach((it, i) => {
-      const gy = surfAt(it.x, it.z); o3.position.set(it.x, gy, it.z); o3.rotation.set(0, it.a, 0); o3.scale.set(1, 1, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix);
+      const gy = H.surface(it.x, it.z); o3.position.set(it.x, gy, it.z); o3.rotation.set(0, it.a, 0); o3.scale.set(1, 1, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix);
       if (!it.prop) it.prop = addProp({ x: it.x, z: it.z, y: gy, r: it.r, h: it.h, inst: { meshes: [im], i, ry: it.a, base: gy } });
       else { it.prop.inst.meshes = [im]; it.prop.inst.i = i; if (it.prop.broken) { o3.scale.set(0, 0, 0); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); } }
     });

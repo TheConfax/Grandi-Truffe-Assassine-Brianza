@@ -56,7 +56,7 @@ function buildSegnali(T, G) {
   SEGN.forEach((s, idx) => {
     const [kind, x, z] = s; if (tileOf(x, z) !== T.t) return;
     const { px, pz, dx, dz, hw } = segPlace(s); if (s.skip || inBuilding(px, pz, 0.3)) return; // a one-way lane through a courtyard: no post in the wall
-    const gy = groundH(px, pz), wide = kind === 'paese' || kind === 'via' || kind === 'unico';
+    const gy = H.ground(px, pz), wide = kind === 'paese' || kind === 'via' || kind === 'unico';
     const root = new THREE.Group(); root.position.set(px, gy, pz); root.rotation.y = Math.atan2(-dx, -dz); G.add(root);
     if (kind === 'isola') { // the splitter island at a roundabout: a low post with the no entry for the exit lane and, on its right, keep right
       const root = new THREE.Group(); root.position.set(px, gy, pz); root.rotation.y = Math.atan2(-dx, -dz); G.add(root);
