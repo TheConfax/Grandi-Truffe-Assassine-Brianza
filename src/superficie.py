@@ -692,6 +692,13 @@ class Superficie:
                     w, mk = s.raster(P.buffer(VIA_BORDO, 4))   # every cell the drawn surface touches: all its corners flat
                     if w is not None: ALL[w[0]:w[1], w[2]:w[3]] |= mk
             ins[cls] = M
+        # docs/motore.md 7: inside the DBGT the game draws its own areas (AC_VEI, AC_PED, MAN_TR: src/dbgt_strade.py), already burned here at
+        # their height, so inside them nothing is left to do; what remains is the corners of the cells their edge crosses (VIA_BORDO, flat
+        # at the height of the carriageway: else the edge of the asphalt climbs the slope in teeth, punto 1 under PONTE 14) and the ways
+        # still drawn from OSM (the DBGT does not have them, or outside the comune)
+        DBM = (np.isin(s.CLS, (C_VEI, C_VEIT, C_PED, C_AREA)) & (s.RANK > 0)) | s.INT
+        for cls in ins: ins[cls] &= ~DBM
+        s.nvie['nodi_dbgt_nel_disegno'] = int((ALL & DBM).sum())
         N = np.asarray(B['nodes'], float).reshape(-1, 3)[:, :2] / 10; segs, rw = [], []
         for r in B['roads']:
             if r.get('d') or r.get('t'): continue          # decks and tunnels are not drawn on S (build_data.py flat)
