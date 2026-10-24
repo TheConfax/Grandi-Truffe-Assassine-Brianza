@@ -649,8 +649,10 @@ class Strade:
         def new_id(): cnt[0] += 1; return 'dbgt%d' % cnt[0]
         s.dividi(raw_roads, nodes, new_id)
         s.orig = {i: [nodes[n_] for n_ in r['refs']] for i, r in enumerate(raw_roads)}
+        refs0 = {i: list(r['refs']) for i, r in enumerate(raw_roads)}; pos0 = dict(nodes)
         rep, res, nets = abbina(raw_roads, nodes, s.D, s.cover, s.log, new_id)
         s.res, s.nets = res, nets
+        rep['anelli_osm'] = s.anelli(raw_roads, nodes, refs0, pos0)
         # the width of a matched street: its carriageway in cross sections (the ordinary stretches, not junctions or roundabouts)
         nw = 0; dw = []
         for wi, r in enumerate(raw_roads):
@@ -676,6 +678,42 @@ class Strade:
         s.privati(raw_roads, nodes, new_id)
         s.rep['assi'] = rep
         s.log('dbgt strade: %s' % {k: v for k, v in rep.items() if k != 'tratti_contesi_elenco'})
+
+    def anelli(s, raw_roads, nodes, refs0, pos0):
+        """the ring of a roundabout the DBGT draws as chords (EL_STR straight across from one arm to the next round an island MAN_TR: the
+        mini roundabout by the centre at x -77 z -858, the one at x 1670 z -855): matched on them the ring turned 50-180 degrees at its
+        corners and the cars cut across. A one-way way round an island (all its OSM points between the island's radius and 15 m beyond it,
+        round at least 20 degrees of a round island) keeps its OSM line, its nodes where OSM has them (the arms end on the ring), when one of
+        the ways round that island (45 degrees or more of it) came out of the matching turning by more than 35 degrees at a vertex where OSM
+        turns less than 30: the DBGT has no axis for the ring"""
+        isl = []
+        for g in s.isole:   # round ones: the centre of a roundabout, not a splitter island or a median (4 pi A / P^2 at least 0.7)
+            if 4 * math.pi * g.area / g.length ** 2 < 0.7: continue
+            c = g.centroid; isl.append((c.x, c.y, math.sqrt(g.area / math.pi)))
+        if not isl: return 0
+        I = np.array(isl); used = Counter(n_ for r in raw_roads for n_ in r['refs']); back = []
+        def maxturn(pts):
+            t = [_turn(pts[k - 1], pts[k], pts[k + 1])[0] for k in range(1, len(pts) - 1) if math.dist(pts[k - 1], pts[k]) > 0.5 and math.dist(pts[k], pts[k + 1]) > 0.5]
+            return max(t) if t else 0.0
+        ring = defaultdict(list); bad = set()   # island -> the one-way ways round it; islands where one of them came out cornered
+        for wi, r in enumerate(raw_roads):
+            if r.get('dbgt') != 'str' or not r['o'] or wi not in refs0: continue
+            o = np.array([pos0[n_] for n_ in refs0[wi]])
+            d = np.hypot(o[:, None, 0] - I[None, :, 0], o[:, None, 1] - I[None, :, 1]); j = int(np.argmin(d.max(0)))
+            cx, cz, ri = I[j]
+            if not (d[:, j].min() > ri * 0.8 and d[:, j].max() < ri + 15): continue
+            ang = np.unwrap(np.arctan2(o[:, 1] - cz, o[:, 0] - cx))
+            if abs(ang[-1] - ang[0]) < math.radians(20): continue
+            ring[j].append(wi)
+            if abs(ang[-1] - ang[0]) >= math.radians(45) and maxturn([nodes[n_] for n_ in r['refs']]) > 35 and maxturn([tuple(p) for p in o]) < 30: bad.add(j)
+        for j in bad:
+            for wi in ring[j]:
+                r = raw_roads[wi]
+                for n_ in refs0[wi]: nodes[n_] = pos0[n_]   # the ring where OSM has it, its junctions with the arms too: the arms end on it
+                r['refs'] = list(refs0[wi]); r.pop('dbgt', None); r.pop('match', None)
+            back.append(_link(I[j][0], I[j][1]))
+        s.log('dbgt strade: rotatorie con l anello OSM %d %s' % (len(back), back[:10]))
+        return dict(n=len(back), dove=back)
 
     def mezze(s, raw_roads, nodes=None):
         """the free half width of a matched street is its carriageway's (the lanes stay inside AC_VEI)"""
