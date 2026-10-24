@@ -471,7 +471,7 @@
    "vms": 48,
    "cic": 25
   },
-  "tempo_s": 1.5,
+  "tempo_s": 1.6,
   "anelli_osm": {
    "n": 3,
    "dove": [
@@ -485,7 +485,7 @@
    "differenza_dalla_larghezza_osm_m": {
     "p10": -1.75,
     "p50": 0.75,
-    "p90": 4.0
+    "p90": 4.02
    }
   }
  },
@@ -496,13 +496,13 @@
  "superfici": {
   "osm_tenute_vie": 79,
   "asfalto_m2": 860353,
-  "cortili_m2": 974994,
+  "cortili_m2": 1045010,
   "marciapiedi_m2": 62647,
   "piazze_m2": 44081,
   "vialetti_m2": 31976,
   "isole_m2": 15408,
-  "tempo_s": 31.7,
-  "cortili_nei_cantieri_m2": 14123
+  "tempo_s": 31.1,
+  "cortili_nei_cantieri_m2": 14143
  },
  "controlli": {
   "oggetti_in_carreggiata": {
@@ -517,7 +517,7 @@
   },
   "alberi_in_carreggiata": {
    "n": 0,
-   "di": 78060,
+   "di": 78107,
    "dove": []
   },
   "pali_dei_cartelli_in_carreggiata": {
@@ -531,29 +531,8 @@
    "dove": []
   },
   "edifici_su_carreggiata": {
-   "n": 362,
-   "dove": [
-    "?x=495&z=-728",
-    "?x=-614&z=-395",
-    "?x=1533&z=731",
-    "?x=770&z=-1588",
-    "?x=669&z=-1520",
-    "?x=720&z=-1504",
-    "?x=814&z=-1663",
-    "?x=-1051&z=-311",
-    "?x=417&z=-242",
-    "?x=92&z=-822",
-    "?x=26&z=-784",
-    "?x=112&z=-820",
-    "?x=-141&z=-866",
-    "?x=-156&z=-857",
-    "?x=-30&z=-745",
-    "?x=100&z=-809",
-    "?x=-128&z=-850",
-    "?x=1623&z=254",
-    "?x=1057&z=-9",
-    "?x=442&z=851"
-   ]
+   "n": 0,
+   "dove": []
   },
   "corsie_dentro_ac_vei": {
    "campioni": 48666,
@@ -1279,7 +1258,7 @@
    "iou": 0.993
   },
   "asfalto_contro_ac_vei": {
-   "disegnato_m2": 855515,
+   "disegnato_m2": 855557,
    "dbgt_m2": 848777,
    "iou": 0.992
   },
@@ -1291,6 +1270,6 @@
   "attraversamenti": {
    "n": 497
   },
-  "tempo_s": 13.2
+  "tempo_s": 13.8
  }
 }
