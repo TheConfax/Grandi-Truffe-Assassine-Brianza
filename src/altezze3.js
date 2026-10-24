@@ -398,6 +398,7 @@ const H = (() => {
     // the top of a deck nothing but water or field passes under, where it stands over y (the street surfaces of a bridge over the Seveso)
     overFree(x, z, y) { for (const o of deckAt(x, z)) if (o.d.free && o.top > y) y = o.top; return y; },
     step, stepAt, clipPoly, clipTri, coverCells, cutLine, joinPieces, anyFine: () => !!TERRENO,
+    anyFineIn(x0, z0, x1, z1) { const [i0, j0, i1, j1] = tileRange(x0, z0, x1, z1); for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (FT[i + NX * j]) return true; return false; }, // a tile of S under the box
     mat(x, z) { const F = fineAt(x, z); if (!F || !F.m) return 0; const n = F.n, i = clamp(Math.floor((x - F.x0) / F.st), 0, n - 2), j = clamp(Math.floor((z - F.z0) / F.st), 0, n - 2); return F.m[j * (n - 1) + i]; }, // material of the cell (1 asphalt ... 4 river bed)
     addStep(kind, h, o, k) { if (o.length < 3) return; const s = { kind, h, o, k: k || [], bb: bbox(o) }; STG.add(s.bb[0], s.bb[1], s.bb[2], s.bb[3], s); },
     surface(x, z, cy) {
