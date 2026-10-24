@@ -49,7 +49,7 @@ ALV_GIU = 1.0    # the water's edge in a bed is at most this under the ring (whe
 BANK_FLAT = 0.0  # ... and under the lowest ground 2-5 m out from the bed (a flat bank at water level: no pond past the edge)
 WMAX = 12.0      # a bed node takes zw of the nearest axis point within this (the game: H.water)
 VIA_MAX, VIA_OFF, VIA_DZ = 8.0, 4.5, 6.0   # drawn road: a free node this close to a DBGT carriageway, the carriageway within w/2 + VIA_OFF of the OSM axis, at most VIA_DZ under the LiDAR
-VIA_SU = 2.0     # ... and at most this over it (a fill beyond the DBGT carriageway: by point 22 the drawn Milano-Meda was raised 5.9 m where the DBGT stops)
+VIA_SU = 1.0     # ... and at most this over it (a fill beyond the DBGT carriageway: by point 22 the drawn Milano-Meda was raised 5.9 m where the DBGT stops, and with 2 m a fill on the steep LiDAR slope there made a wall of 2.6 m)
 VIA_BORDO = 2.83 # ... and the nodes within one cell diagonal of the drawn surface (the corners of every cell it touches)
 SOTTO_MAX = 0.01 # C10: share of the axis points with the water under the lowest S of the section (covered stretches excluded)
 Q5 = 0.05        # coarse tiles are stored in multiples of 5 cm: the fine border nodes interpolated between them are whole cm, no T crack
@@ -565,7 +565,7 @@ class Superficie:
     def acqua_build(s):
         """zw along the merged EL_IDR axes, every 2 m from upstream: the ring TIN at the axis - ZW_MARG, never over the banks around - 0.1
         (what stands outside the bed before the slopes: fixed roads and sidewalks, else the LiDAR; the higher of the first two samples
-        outside, 1 and 2 m, so the 2 m lattice of the edge does not count), monotone downstream by the closest monotone profile (isotonic
+        outside, 1 and 2 m, so the 2 m lattice of the edge does not count, and the lowest ground 2-5 m out + BANK_FLAT), monotone downstream by the closest monotone profile (isotonic
         regression, which lowers and raises, not the running minimum that dragged everything after one hole down), smoothed over 20 m and
         then under the running minimum of the banks only (the water cannot pass a low bank)."""
         H1 = np.where(s.RANK > 0, s.ZF, s.L); out = []; tree = shapely.STRtree([a[0] for a in s.alvei])
