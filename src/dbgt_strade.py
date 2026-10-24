@@ -975,7 +975,7 @@ class Strade:
             return shapely.contains_xy(C, pts[:, 0], pts[:, 1]) & shapely.contains_xy(s.U_carr, pts[:, 0], pts[:, 1])
         def elenco(pts, m, n=20): return [_link(*p) for p in np.asarray(pts, float).reshape(-1, 2)[m][:n]]
         for nm, pts in (('oggetti', oggetti), ('lampioni', lampioni), ('alberi', alberi)):
-            pts = np.asarray(list(pts), float).reshape(-1, 2); m = dentro(pts); rep[nm + '_in_carreggiata'] = dict(n=int(m.sum()), di=len(pts), dove=elenco(pts, m))
+            pts = np.asarray([tuple(q)[:2] for q in pts], float).reshape(-1, 2); m = dentro(pts)  # x, z only: the trees carry height and crown too (dbgt_manufatti); rep[nm + '_in_carreggiata'] = dict(n=int(m.sum()), di=len(pts), dove=elenco(pts, m))
         # town signs: the two posts as paesaggio3.js puts them, w/2 + 1.2 m right of each driver, 3 m before and after
         posts = []
         for c in cartelli:

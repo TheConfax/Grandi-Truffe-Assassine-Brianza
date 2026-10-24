@@ -1474,8 +1474,8 @@
  "parcheggi_dbgt_m2_sotto_parcheggi_osm_con_posti_propri": 1489,
  "aree": {
   "aatt_pezzi": 648,
-  "aatt_m2": 68807,
-  "aatt_m2_sotto_zone_osm_o_manufatti": 17095,
+  "aatt_m2": 68810,
+  "aatt_m2_sotto_zone_osm_o_manufatti": 17092,
   "aatt_tipi": {
    "06": 81,
    "01": 12,
@@ -1612,51 +1612,51 @@
   "torre_acqua_osm_oggetto_tolta": 1
  },
  "alberi": {
-  "dentro": 24539,
+  "dentro": 24615,
   "spostati_fuori_dai_manufatti": 0,
   "tolti_dentro_i_manufatti": 0,
   "altezza_tipica_se_il_dsm_non_vede": {
    "nei_boschi": 16.2,
    "fuori": 8.4
   },
-  "pixel_vicino_ai_fili_aperti_3x3": 93267,
-  "non_visti_sotto_le_linee_con_altezza_fuori_bosco": 96,
+  "pixel_vicino_ai_fili_aperti_3x3": 93261,
+  "non_visti_sotto_le_linee_con_altezza_fuori_bosco": 97,
   "chioma_su_altezza_tipica": 0.44,
   "tutti": {
-   "n": 24539,
-   "visti_dal_dsm": 21393,
+   "n": 24615,
+   "visti_dal_dsm": 21457,
    "h_p10_p50_p90": [
     4.22,
-    11.65,
-    21.68
+    11.67,
+    21.67
    ],
    "chioma_p10_p50_p90": [
     2.16,
-    5.11,
+    5.12,
     8.5
    ]
   },
   "nei_boschi_dbgt": {
-   "n": 11069,
-   "visti_dal_dsm": 9937,
+   "n": 11118,
+   "visti_dal_dsm": 9973,
    "h_p10_p50_p90": [
-    7.05,
-    16.22,
-    24.52
+    7.01,
+    16.21,
+    24.5
    ],
    "chioma_p10_p50_p90": [
     3.24,
-    5.95,
+    5.93,
     9.0
    ]
   },
   "fuori_dai_boschi": {
-   "n": 13470,
-   "visti_dal_dsm": 11456,
+   "n": 13497,
+   "visti_dal_dsm": 11484,
    "h_p10_p50_p90": [
-    3.58,
-    8.38,
-    15.89
+    3.59,
+    8.39,
+    15.92
    ],
    "chioma_p10_p50_p90": [
     2.0,
