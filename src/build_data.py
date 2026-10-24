@@ -741,7 +741,7 @@ for r in sorted(raw_roads, key=lambda r: r['c']):
             else: s0 += 3
 log('procedural villette', nproc)
 import dbgt_manufatti  # manufatti, yards, car parks, ponds, pylons, tree heights of the DBGT (src/dbgt_manufatti.py, docs/motore.md 7)
-MANUF = dbgt_manufatti.Manufatti(DBT_DIR, _comuni, dbt_cover, log, lambda lon_, lat_: ((lon_ - lon0) * KX, -(lat_ - lat0) * KZ), (-HW, -HH), rect=RECT); buildings[:] = MANUF.edifici(buildings)
+MANUF = dbgt_manufatti.Manufatti(DBT_DIR, _comuni, dbt_cover, log, lambda lon_, lat_: ((lon_ - lon0) * KX, -(lat_ - lat0) * KZ), (-HW, -HH), rect=RECT); buildings[:] = MANUF.edifici(buildings, [g for at, g in area_geoms if at == 7])
 bgeoms = [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9]
 _bl = [(b, g) for b, g in zip([b for b in buildings if b['t'] != 9], bgeoms) if g is not None]
 _bt = STRtree([g for b, g in _bl])

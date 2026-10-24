@@ -50,7 +50,8 @@ RESA = {'01': CABINA, '02': CABINA, '03': CABINA, '07': CONT, '0703': CONT, '070
 LIM = {CABINA: (2.0, 12.0), SERRA: (2.0, 8.0), TORRE: (10.0, 60.0), CONT: (2.0, 30.0), VASCA: (0.0, 6.0)}
 VASCA_RIM = 0.3      # a basin the DSM sees at ground level: a low concrete rim, the water just under it
 TONDO = 0.85         # 4 pi A / P^2 above this: a round tank or silo (a cylinder), else a prism
-DUP_OSM = 0.3        # an OSM building covering this much of a manufatto (or of itself) is that manufatto
+DUP_OSM = 0.3        # a manufatto this much inside a bigger OSM building is part of it (the building stays, the manufatto is not added)
+DUP_BLD = 0.5        # an OSM building this much on a manufatto is that manufatto (it goes, the DBGT shape comes in)
 TOWER_SNAP = 15.0    # an OSM pylon this close to a DBGT base is that pylon
 TOWER_MIN_DSM = 20.0  # a lattice pylon: the DSM catches its top only now and then; below this the reading is the lower steel
 ALB_R = 2.5          # tree height: highest DSM - DTM within this of the point (the DBGT point is the middle of the crown)
@@ -58,6 +59,9 @@ ALB_SEEN = 2.5       # below this the DSM does not see a tree there (planted aft
 ALB_H = (3.0, 35.0)  # m
 ALB_D = (2.0, 16.0)  # crown diameter, m
 CLEAR, MOVE = 0.4, 3.0  # as dbgt_verde.py: a trunk off a manufatto, moved at most this far
+ALB_BLD = 3.0        # DSM pixels this close to a DBGT building and as high as its roof are the roof (2008 and 2015 are a metre or two apart)
+WIRE_R, WIRE_R_MT, PYL_R = 9.0, 3.0, 5.0  # m: around a high-voltage line (its outer conductors are 6.5 m off the axis), a minor line, a pylon
+VASCA_TERRA = 0.5    # a basin whose DSM median is under this is in the ground (a rim), whatever stands around it
 
 
 def _geom(b): f = b[3]; return wkb.loads(bytes(b[8 + [0, 32, 48, 48, 64][(f >> 1) & 7]:]))
@@ -121,6 +125,22 @@ class Grid:
             v = np.full(np.shape(r), np.nan); v[ins] = A[rr[ins], cc[ins]]; g = np.isfinite(v); out[g] += v[g] * ww[g]; w[g] += ww[g]
         return np.where(w > 1e-6, out / np.maximum(w, 1e-6), np.nan)
 
+    def roofs(self, polys, inner=0.5, outer=3.0, tol=2.5):
+        """the pixels of the buildings' roofs: inside each polygon grown by inner, and around it up to outer where DSM - DTM is within tol
+        of the roof (median inside): the DSM of 2008 and the DBGT of 2015 are a metre or two apart, the roof edge spills out; a lower
+        crown beside the wall stays"""
+        M = np.zeros(self.shape, bool)
+        for p in polys:
+            x0, z0, x1, z1 = p.buffer(outer).bounds
+            ra, ca = self.rc(x0, z1); rb, cb = self.rc(x1, z0); ra, rb = min(ra, rb), max(ra, rb); ca, cb = min(ca, cb), max(ca, cb)
+            r0, r1 = max(0, int(math.floor(ra))), min(self.shape[0] - 1, int(math.ceil(rb))); c0, c1 = max(0, int(math.floor(ca))), min(self.shape[1] - 1, int(math.ceil(cb)))
+            if r0 > r1 or c0 > c1: continue
+            R, C = np.mgrid[r0:r1 + 1, c0:c1 + 1]; R, C = R.ravel(), C.ravel(); X, Z = self.xz(R, C); v = self.N[R, C]
+            ins, din, dout = shapely.contains_xy(p, X, Z), shapely.contains_xy(p.buffer(inner), X, Z), shapely.contains_xy(p.buffer(outer), X, Z)
+            hb = np.nanmedian(v[ins]) if np.isfinite(v[ins]).any() else np.inf
+            m = din | (dout & (v >= hb - tol)); M[R[m], C[m]] = True
+        return M
+
     def near(self, A, x, z):  # nearest pixel, NaN outside
         r, c = self.rc(x, z); r, c = np.rint(r).astype(int), np.rint(c).astype(int)
         ins = (r >= 0) & (r < self.shape[0]) & (c >= 0) & (c < self.shape[1]); v = np.full(np.shape(r), np.nan)
@@ -131,7 +151,8 @@ class Grid:
         for p in polys:
             g = p.buffer(buf) if buf else p
             x0, z0, x1, z1 = g.bounds
-            ra, ca = self.rc(x0, z1); rb, cb = self.rc(x1, z0)
+            ra, ca = self.rc(x0, z1); rb, cb = self.rc(x1, z0)  # rows grow southwards, with z: z1 is the last row (min/max, or the mask was empty)
+            ra, rb = min(ra, rb), max(ra, rb); ca, cb = min(ca, cb), max(ca, cb)
             r0, r1 = max(0, int(math.floor(ra))), min(self.shape[0] - 1, int(math.ceil(rb))); c0, c1 = max(0, int(math.floor(ca))), min(self.shape[1] - 1, int(math.ceil(cb)))
             if r0 > r1 or c0 > c1: continue
             R, C = np.mgrid[r0:r1 + 1, c0:c1 + 1]; X, Z = self.xz(R.ravel(), C.ravel())
@@ -233,15 +254,19 @@ class Manufatti:
             h = p90 if (o['tondo'] or kind == TORRE) else p50
             lo, hi = LIM[kind]; rr0 = rr if rr is not None else 0.0
             stands = np.mean(hv > 1.0) >= 0.6 and h - rr0 >= 1.0           # stands out of what is around it
-            if kind == VASCA and p90 is not None and p90 < 0.5 and rr0 < 0.5: o['h_dsm'] = 0.0; o['seen'] = 'a terra'  # a basin in the ground
-            elif stands and lo <= h <= hi: o['h_dsm'] = round(float(h), 1); o['seen'] = 'dsm'; per[kind].append(h)
+            # a basin in the ground: the DSM sees the ground over most of it (at x 1633 z 15 p90 0.0 with something higher around: it got
+            # the 2.8 m walls of the typical basin)
+            if kind == VASCA and p50 < VASCA_TERRA: o['h_dsm'] = 0.0; o['seen'] = 'a terra'
+            elif stands and lo <= h <= hi: o['h_dsm'] = round(float(h), 1); o['seen'] = 'dsm'; per[o['ty']].append(h)
             else: o['h_dsm'] = None; o['seen'] = 'no'
+        # the typical height is the one of the same code (MN_IND_TY): the serbatoio 0702 of x -431 z -75, flat ground in the DSM, took the
+        # 10.9 m of the silos 07; a code with nothing seen takes the lowest height of its kind
         self.typ = {k: round(float(np.median(v)), 1) for k, v in per.items()}
         for o in self.ind:
             k = o['kind']
             if k is None: continue
             if o.get('h_dsm') is not None: o['h'] = o['h_dsm']
-            else: o['h'] = self.typ.get(k, LIM[k][0])
+            else: o['h'] = self.typ.get(o['ty'], LIM[k][0])
         rep = defaultdict(lambda: Counter())
         for o in self.ind: rep[o['ty']][o.get('seen', 'tipo non disegnato')] += 1
         self.rep['altezze_manufatti'] = {'per_tipo': {t: dict(c) for t, c in rep.items()}, 'altezza_tipica_se_il_dsm_non_vede': self.typ,
@@ -249,21 +274,37 @@ class Manufatti:
                                                          'dsm_p50': o.get('p50'), 'dsm_p90': o.get('p90'), 'intorno': o.get('ring'), 'visto': o.get('seen')} for o in self.ind]}
 
     # ---------------------------------------------------------------- buildings: cabins, greenhouses, water tower
-    def edifici(self, buildings):
+    def edifici(self, buildings, cantieri=()):
         """build_data.py's buildings (records with 'p' points): OSM, Overture or procedural buildings that double a manufatto go, the
-        manufatti drawn as buildings come in. Called before bgeoms, so trees, kerbside parking and walls see them."""
+        manufatti drawn as buildings come in. Called before bgeoms, so trees, kerbside parking and walls see them. cantieri: the OSM
+        building sites (landuse=construction), newer than the survey: the manufatti inside them are gone (as the DBGT green, dbgt_verde.py;
+        the basin of x 19 z 133 stood in the dark soil of the site by the Milano-Meda)"""
+        cu = unary_union([g for g in cantieri if g.intersects(self.cover)]) if cantieri else GeometryCollection()
+        if not cu.is_empty:
+            prepare(cu); gone_c = [o for o in self.ind if o.get('kind') and cu.contains(o['g'].representative_point())]
+            for o in gone_c: o['kind'] = None; o['seen'] = 'in un cantiere OSM'
+            self.rep['manufatti_nei_cantieri_osm'] = [{'ty': o['ty'], 'x': round(o['g'].centroid.x, 1), 'z': round(o['g'].centroid.y, 1)} for o in gone_c]
         mine = [o for o in self.ind if o['kind'] in (CABINA, SERRA, TORRE)]
         if not mine: return buildings
-        mt = STRtree([o['g'] for o in mine]); keep, gone = [], Counter()
+        # a building mostly on a manufatto (more than half of it) is that manufatto and goes; a manufatto inside a bigger building stays
+        # out and the building stays (the 30% of the smaller of the two took away an industrial building of 8481 m2 at x 1402 z -1088
+        # for its 53 m2 transformer cabin, and five more of 184-1664 m2)
+        mt = STRtree([o['g'] for o in mine]); keep, gone, dentro = [], Counter(), Counter()
         for b in buildings:
             try: g = Polygon(b['p']).buffer(0)
             except Exception: keep.append(b); continue
-            hit = None
+            hit, inside = None, []
             for i in mt.query(g):
                 o = mine[i]; a = g.intersection(o['g']).area
-                if a > DUP_OSM * min(g.area, o['g'].area): hit = o; break
-            if hit is None: keep.append(b); continue
+                if a > DUP_BLD * g.area: hit = o; break
+                if a > DUP_OSM * o['g'].area: inside.append(o)
+            if hit is None:
+                keep.append(b)
+                for o in inside: o['dentro'] = b.get('bt') or '?'
+                continue
             gone['%s (%s)' % (hit['kind'], b.get('bt'))] += 1
+        for o in [o for o in mine if o.get('dentro')]: o['kind'] = None; o['seen'] = 'dentro un edificio OSM'; dentro['%s in %s' % (o['ty'], o['dentro'])] += 1
+        mine = [o for o in mine if not o.get('dentro')]
         for o in mine:
             pts = [(round(x, 2), round(z, 2)) for x, z in list(o['g'].exterior.coords)[:-1]]
             holes = [[(round(x, 2), round(z, 2)) for x, z in list(i.coords)[:-1]] for i in o['g'].interiors if Polygon(i).area > 0.5]
@@ -272,8 +313,8 @@ class Manufatti:
             else: rec = {'p': pts, 'h': o['h'], 't': 0, 'ht': True, 'lv': None, 'bt': 'yes', 'wt': True, 'mn': o['ty']}
             if holes: rec['k'] = holes
             keep.append(rec); self.new_blds.append(o)
-        self.rep['edifici'] = {'aggiunti': dict(Counter(o['kind'] for o in mine)), 'osm_tolti_doppi': dict(gone)}
-        self.log('dbgt manufatti: edifici aggiunti', dict(Counter(o['kind'] for o in mine)), 'edifici OSM doppi tolti', dict(gone))
+        self.rep['edifici'] = {'aggiunti': dict(Counter(o['kind'] for o in mine)), 'osm_tolti_doppi': dict(gone), 'dentro_edifici_osm_tenuti': dict(dentro)}
+        self.log('dbgt manufatti: edifici aggiunti', dict(Counter(o['kind'] for o in mine)), 'edifici OSM doppi tolti', dict(gone), 'manufatti dentro edifici OSM', dict(dentro))
         return keep
 
     # ---------------------------------------------------------------- areas: yards (AATT), ponds, car parks
@@ -283,7 +324,8 @@ class Manufatti:
         cv = self.cover
         if cv.is_empty: return area_geoms, land
         # OSM paving, water, building sites, cemeteries, platforms, squares over an AATT keep it: the yard is drawn around them
-        osm_pav = [g for at, g in area_geoms if at in (4, 5, 6, 7, 8, 9, 10, 14) and g.intersects(cv)]
+        # (and the pitches and playgrounds: OSM says what a place is; two courts at x -450 z 420 and x -324 z 477 were covered by the yard)
+        osm_pav = [g for at, g in area_geoms if at in (2, 3, 4, 5, 6, 7, 8, 9, 10, 14) and g.intersects(cv)]
         pu = unary_union(osm_pav) if osm_pav else GeometryCollection(); prepare(pu)
         mfu = unary_union([o['g'] for o in self.ind]) if self.ind else GeometryCollection()
         out = list(area_geoms); n_a, m2_a, m2_cut = 0, 0.0, 0.0
@@ -320,6 +362,12 @@ class Manufatti:
             if a > 0.3 * g.area: self.ns_ids.add(id(g)); n_ns += 1
         osm_pk = unary_union([g for at, g in area_geoms if at == 4 and g.intersects(cv)])
         nuovi = sum(1 for p in pk if p.intersection(osm_pk).area < 0.3 * p.area) if pk else 0
+        # an OSM car park that keeps its own stalls (less than 30% under the DBGT one) keeps them alone: the DBGT car park is cut around
+        # it (three of them drew two sets of stalls over 195-703 m2)
+        keep_osm = unary_union([g for at, g in area_geoms if at == 4 and g.intersects(cv) and id(g) not in self.ns_ids])
+        if pk and not keep_osm.is_empty:
+            m2_0 = sum(p.area for p in pk); pk = [q for p in pk for q in _polys(p.difference(keep_osm) if p.intersects(keep_osm) else p, 20.0)]
+            self.pk = pk; self.rep['parcheggi_dbgt_m2_sotto_parcheggi_osm_con_posti_propri'] = round(m2_0 - sum(p.area for p in pk))
         # the water tower of OSM drawn as land, where the DBGT has the tower (MN_IND 12)
         tw = [o['g'].centroid for o in self.ind if o['kind'] == TORRE]; out_land, n_lt = [], 0
         for k, pts in land:
@@ -337,6 +385,7 @@ class Manufatti:
         OSM pylons inside the cover replaced by the DBGT bases (height from the DSM), the lines through them kept here with a height per
         vertex (self.pw), masts where only the DBGT has them, the OSM water tower object where the DBGT draws it."""
         cv, G = self.cover, self.grid
+        self.lines_all = [(p, h) for p, h in power_lines if len(p) >= 2 and LineString(p).intersects(cv.buffer(20))]  # the trees under them (alberi)
         if cv.is_empty: return ogg, power_lines
         kt, ka, kw = OGG.index('traliccio'), OGG.index('antenna'), OGG.index('torre_acqua')
         osm_t = [(i, o[1] / 10, o[2] / 10, o[4]) for i, o in enumerate(ogg) if o[0] == kt]
@@ -441,13 +490,31 @@ class Manufatti:
                 C = P[i] + off; ok = ~hit(C)
                 if ok.any(): P[i] = C[int(np.argmax(ok))]; n_mv += 1
                 else: keep[i] = False; n_rm += 1
-        H = np.full(len(P), np.nan); D = np.full(len(P), np.nan); seen = np.zeros(len(P), bool)
+        H = np.full(len(P), np.nan); D = np.full(len(P), np.nan); seen = np.zeros(len(P), bool); wz = np.zeros(len(P), bool); zone = []
         if G is not None and G.ok:
-            N = np.where(self.bld_mask, np.nan, G.N)  # no roofs
+            # no roofs: the DSM of 2008 and the DBGT of 2015 are a metre or two apart, a tree by a wall took the roof (x 97 z -269: 31.5 m
+            # by a 29.5 m building). Grid.mask had its rows upside down and masked nothing; the roof is cut with its spill (Grid.roofs)
+            N = np.where(G.roofs(self.blds, 0.5, ALB_BLD), np.nan, G.N) if self.blds else G.N.copy()
+            # no wires and no pylons: the DSM catches the conductors of a high-voltage line as rows one pixel wide, 20-35 m up (a tree under
+            # the line at x -509 z 23 took 31.2 m from them). Near the lines an opening of 3 x 3 pixels takes away what is thinner than that
+            # (wires, cross arms), the crowns stay; within PYL_R of a pylon nothing is read
+            from scipy.ndimage import grey_opening
+            big = [LineString(L['p']) for L in self.pw] + list(self.tre) + [LineString(p) for p, h in getattr(self, 'lines_all', []) if h > 15 and len(p) >= 2]
+            small = [LineString(p) for p, h in getattr(self, 'lines_all', []) if h <= 15 and len(p) >= 2]
+            def pieces(L):  # spans one by one: a buffer of a whole line would make the mask walk its bounding box
+                c = list(L.coords); return [LineString(c[i:i + 2]) for i in range(len(c) - 1) if c[i] != c[i + 1]]
+            zone = [s.buffer(WIRE_R) for g in big for s in pieces(g)] + [s.buffer(WIRE_R_MT) for g in small for s in pieces(g)]
+            if zone:
+                Mz = G.mask([p for z_ in zone for p in _polys(z_.intersection(cv.buffer(10)))])
+                No = grey_opening(np.where(np.isfinite(N), N, 0.0), size=(3, 3)); self.n_wire_px = int(Mz.sum())
+                N = np.where(Mz & np.isfinite(N), np.minimum(N, No), N)
+            tw = [Point(t['x'], t['z']).buffer(PYL_R) for t in getattr(self, 'towers', [])]
+            if tw: N = np.where(G.mask(tw), np.nan, N)
             # window of ALB_R m around each point, in pixels (they are 0.78 x 1.1 m)
             ri, ci = int(math.ceil(ALB_R / G.mz)), int(math.ceil(ALB_R / G.mx))
             offs = [(dr, dc) for dr in range(-ri, ri + 1) for dc in range(-ci, ci + 1) if math.hypot(dr * G.mz, dc * G.mx) <= ALB_R]
             r, c = G.rc(P[:, 0], P[:, 1]); r, c = np.rint(r).astype(int), np.rint(c).astype(int)
+            if zone: wz = Mz[np.clip(r, 0, G.shape[0] - 1), np.clip(c, 0, G.shape[1] - 1)]
             V_ = np.full((len(P), len(offs)), np.nan)
             for k, (dr, dc) in enumerate(offs):
                 rr, cc = r + dr, c + dc; okk = (rr >= 0) & (rr < G.shape[0]) & (cc >= 0) & (cc < G.shape[1]); V_[okk, k] = N[rr[okk], cc[okk]]
@@ -474,17 +541,55 @@ class Manufatti:
         H = np.where(seen, np.clip(H, *ALB_H), np.nan)
         D = np.where(seen, np.minimum(D, np.maximum(3.0, 1.3 * nn)), np.nan)
         D = np.where(seen, np.clip(np.clip(D, 0.3 * H, 1.2 * H), *ALB_D), np.nan)
-        htyp = float(np.nanmedian(H)) if seen.any() else 8.0; rtyp = float(np.nanmedian(D / H)) if seen.any() else 0.6
-        H = np.where(seen, H, htyp); D = np.where(seen, D, np.clip(np.minimum(rtyp * htyp, np.maximum(3.0, 1.3 * nn)), *ALB_D))
         inb = shapely.contains_xy(boschi, P[:, 0], P[:, 1]) if boschi is not None and not boschi.is_empty else np.zeros(len(P), bool)
+        # the trees the DSM does not see take the typical height of the seen ones in the same setting: in a wood the wood's, outside the
+        # street and garden trees' (the median of all, 11.5 m, was the woods' pulling up the young trees planted after 2008)
+        htyp = float(np.nanmedian(H)) if seen.any() else 8.0; rtyp = float(np.nanmedian(D / H)) if seen.any() else 0.6
+        HT = np.full(len(P), htyp); RT = np.full(len(P), rtyp)
+        for m in (inb, ~inb):
+            if (m & seen).sum() >= 20: HT[m] = float(np.median(H[m & seen])); RT[m] = float(np.median(D[m & seen] / H[m & seen]))
+        self.htyp_ctx = {'nei_boschi': round(float(HT[inb][0]), 1) if inb.any() else None, 'fuori': round(float(HT[~inb][0]), 1) if (~inb).any() else None}
+        # under a line the strip is kept low (the DSM sees it so): a tree there it does not see is not a tree of the wood around it
+        HT[wz & inb] = HT[~inb][0] if (~inb).any() else HT[wz & inb]; RT[wz & inb] = RT[~inb][0] if (~inb).any() else RT[wz & inb]
+        H = np.where(seen, H, HT); D = np.where(seen, D, np.clip(np.minimum(RT * HT, np.maximum(3.0, 1.3 * nn)), *ALB_D))
         def st(m): return {'n': int(m.sum()), 'visti_dal_dsm': int((m & seen).sum()), 'h_p10_p50_p90': [_pct(H[m & seen], q) for q in (10, 50, 90)], 'chioma_p10_p50_p90': [_pct(D[m & seen], q) for q in (10, 50, 90)]}
-        self.rep['alberi'] = {'dentro': int(len(P)), 'spostati_fuori_dai_manufatti': n_mv, 'tolti_dentro_i_manufatti': n_rm, 'altezza_tipica_se_il_dsm_non_vede': round(htyp, 1),
+        self.rep['alberi'] = {'dentro': int(len(P)), 'spostati_fuori_dai_manufatti': n_mv, 'tolti_dentro_i_manufatti': n_rm, 'altezza_tipica_se_il_dsm_non_vede': self.htyp_ctx,
+                              'pixel_vicino_ai_fili_aperti_3x3': getattr(self, 'n_wire_px', 0), 'non_visti_sotto_le_linee_con_altezza_fuori_bosco': int((wz & inb & ~seen).sum()),
                               'chioma_su_altezza_tipica': round(rtyp, 2), 'tutti': st(keep), 'nei_boschi_dbgt': st(keep & inb), 'fuori_dai_boschi': st(keep & ~inb)}
-        self.log('dbgt manufatti: alberi', len(P), 'visti dal DSM', int(seen.sum()), 'altezza p50 %.1f' % htyp, 'spostati fuori dai manufatti', n_mv, 'tolti', n_rm)
+        self.log('dbgt manufatti: alberi', len(P), 'visti dal DSM', int(seen.sum()), 'altezza tipica', self.htyp_ctx, 'spostati fuori dai manufatti', n_mv, 'tolti', n_rm)
         out = [tuple(t[:2]) for t in T[~ins]]
         for i in np.where(keep)[0]: out.append((float(P[i, 0]), float(P[i, 1]), round(float(H[i]), 1), round(float(D[i]), 1)))
         self.n_alberi_altezza = int(keep.sum())
         return out
+
+    def suolo_gioco(self, x, z):
+        """the ground the game stands the pylons on (m above sea): S of the new engine (terreno/<tx>_<tz>.bin.gz next to index.html, read as
+        altezze3.js reads it, the triangles of its cells) where there is a tile of S, else the old ground of build_data.py. The DTM of 2008
+        differs from S where the DBGT drew the ground anew (2.7 m at the pylon of x -966 z -1324: the wires hung over its insulators)"""
+        if not hasattr(self, '_S'):
+            self._S = {}
+            d = os.path.join(os.path.dirname(HERE), 'terreno')
+            try: idx = json.load(open(os.path.join(d, 'indice.json'), encoding='utf-8'))['tiles']
+            except Exception: idx = {}
+            for k in idx:
+                try:
+                    import gzip
+                    b = open(os.path.join(d, k + '.bin.gz'), 'rb').read()
+                    if b[:2] == b'\x1f\x8b': b = gzip.decompress(b)
+                    if b[:4] != b'GTAS': continue
+                    st, n = b[5], int.from_bytes(b[6:8], 'little'); base = float(np.frombuffer(b, '<f4', 1, 8)[0])
+                    q = np.frombuffer(b, '<u2', n * n, 12).reshape(n, n).astype(np.float64)
+                    self._S[tuple(map(int, k.split('_')))] = (st, n, np.where(q == 65535, np.nan, (base * 100 + q) / 100))
+                except Exception: continue
+        fb = self._ground_fb(x, z) if getattr(self, '_ground_fb', None) else self.suolo(x, z)
+        if not self._S: return fb
+        ox, oz = self.origin; i, j = int((x - ox) // TILE), int((z - oz) // TILE); F = self._S.get((i, j))
+        if F is None: return fb
+        st, n, Y = F; u = min(max((x - ox - i * TILE) / st, 0), n - 1); v = min(max((z - oz - j * TILE) / st, 0), n - 1)
+        a, c = min(int(u), n - 2), min(int(v), n - 2); fu, fv = u - a, v - c
+        h00, h10, h01, h11 = Y[c, a], Y[c, a + 1], Y[c + 1, a], Y[c + 1, a + 1]
+        h = h00 + fu * (h10 - h00) + fv * (h11 - h10) if fu >= fv else h00 + fv * (h01 - h00) + fu * (h11 - h01)
+        return float(h) if np.isfinite(h) else fb
 
     def suolo(self, x, z):  # DTM 1 m (the ground under a pylon), the LiDAR tiles outside the window
         if self.grid is not None:
@@ -518,7 +623,7 @@ class Manufatti:
         # wires: the absolute height of the attachment line (top of the pylon) at every vertex, interpolated where a tile cuts a span
         for L in self.pw:
             pts, hv = L['p'], L['ht']
-            gy = np.array([(ground or self.suolo)(x, z) for x, z in pts])
+            gy = np.array([(ground or self.suolo_gioco)(x, z) for x, z in pts])
             top = gy + np.array(hv) - base
             Ls = LineString(pts); cum = np.concatenate([[0], np.cumsum([math.dist(a, b) for a, b in zip(pts, pts[1:])])])
             ts = set()
@@ -535,7 +640,7 @@ class Manufatti:
     # ---------------------------------------------------------------- checks
     def controlli(self, carreggiate=None, edifici=None, buildings=None, ground=None):
         """things on the carriageways or in buildings, wires under the ground or through buildings."""
-        rep = {}; carreggiate = carreggiate if carreggiate is not None else self.carr; ground = ground or self.suolo
+        rep = {}; carreggiate = carreggiate if carreggiate is not None else self.carr; ground = ground or self.suolo_gioco
         objs = [o['g'] for o in self.ind if o.get('kind')]
         if carreggiate is not None and objs:
             ct = STRtree(carreggiate); rep['manufatti_su_carreggiate_ac_vei'] = sum(1 for g in objs if any(g.intersection(carreggiate[i]).area > 0.5 for i in ct.query(g)))

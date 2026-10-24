@@ -44,8 +44,8 @@
    },
    "11": {
     "dsm": 4,
-    "a terra": 4,
-    "no": 3
+    "a terra": 5,
+    "no": 2
    },
    "07": {
     "dsm": 20
@@ -62,11 +62,12 @@
    }
   },
   "altezza_tipica_se_il_dsm_non_vede": {
-   "cabina": 3.6,
-   "vasca": 2.8,
-   "contenitore": 10.9,
-   "serra": 3.3,
-   "torre": 39.1
+   "03": 3.8,
+   "11": 2.8,
+   "07": 10.9,
+   "13": 3.3,
+   "01": 3.6,
+   "12": 39.1
   },
   "per_oggetto": [
    {
@@ -96,7 +97,7 @@
     "x": -1212.4,
     "z": -1434.1,
     "m2": 13.5,
-    "h": 3.6,
+    "h": 3.8,
     "dsm_p50": 4.28,
     "dsm_p90": 4.36,
     "intorno": 4.38,
@@ -734,7 +735,7 @@
     "x": 276.3,
     "z": -72.7,
     "m2": 74.1,
-    "h": 3.6,
+    "h": 3.8,
     "dsm_p50": 5.83,
     "dsm_p90": 11.57,
     "intorno": 8.25,
@@ -800,7 +801,7 @@
     "x": 179.8,
     "z": 41.6,
     "m2": 8.9,
-    "h": 3.6,
+    "h": 3.8,
     "dsm_p50": 5.95,
     "dsm_p90": 7.76,
     "intorno": 7.46,
@@ -833,7 +834,7 @@
     "x": -430.7,
     "z": -75.2,
     "m2": 20.2,
-    "h": 10.9,
+    "h": 2.0,
     "dsm_p50": 0.2,
     "dsm_p90": 1.15,
     "intorno": 0.02,
@@ -932,7 +933,7 @@
     "x": -410.6,
     "z": -136.7,
     "m2": 4.0,
-    "h": 3.6,
+    "h": 3.8,
     "dsm_p50": 0.58,
     "dsm_p90": 1.36,
     "intorno": 1.15,
@@ -1020,11 +1021,11 @@
     "x": 1632.5,
     "z": 14.8,
     "m2": 8.3,
-    "h": 2.8,
+    "h": 0.0,
     "dsm_p50": 0.0,
     "dsm_p90": 0.01,
     "intorno": 0.98,
-    "visto": "no"
+    "visto": "a terra"
    },
    {
     "ty": "01",
@@ -1446,24 +1447,35 @@
    }
   ]
  },
+ "manufatti_nei_cantieri_osm": [
+  {
+   "ty": "11",
+   "x": 19.1,
+   "z": 132.8
+  }
+ ],
  "edifici": {
   "aggiunti": {
    "serra": 36,
-   "cabina": 56,
+   "cabina": 49,
    "torre": 1
   },
   "osm_tolti_doppi": {
-   "cabina (industrial)": 3,
    "cabina (service)": 1,
-   "cabina (yes)": 18,
+   "cabina (yes)": 14,
    "serra (greenhouse)": 2,
    "cabina (garage)": 1
+  },
+  "dentro_edifici_osm_tenuti": {
+   "01 in yes": 4,
+   "01 in industrial": 3
   }
  },
+ "parcheggi_dbgt_m2_sotto_parcheggi_osm_con_posti_propri": 1489,
  "aree": {
   "aatt_pezzi": 648,
-  "aatt_m2": 70044,
-  "aatt_m2_sotto_zone_osm_o_manufatti": 15859,
+  "aatt_m2": 68807,
+  "aatt_m2_sotto_zone_osm_o_manufatti": 17095,
   "aatt_tipi": {
    "06": 81,
    "01": 12,
@@ -1508,8 +1520,8 @@
     "z": -1439.4
    }
   ],
-  "parcheggi_dbgt": 68,
-  "parcheggi_dbgt_m2": 62757,
+  "parcheggi_dbgt": 66,
+  "parcheggi_dbgt_m2": 61268,
   "parcheggi_dbgt_senza_osm": 38,
   "parcheggi_osm_senza_posti_propri": 47,
   "torre_acqua_osm_tolte": 0
@@ -1603,48 +1615,53 @@
   "dentro": 24539,
   "spostati_fuori_dai_manufatti": 0,
   "tolti_dentro_i_manufatti": 0,
-  "altezza_tipica_se_il_dsm_non_vede": 11.5,
-  "chioma_su_altezza_tipica": 0.47,
+  "altezza_tipica_se_il_dsm_non_vede": {
+   "nei_boschi": 16.2,
+   "fuori": 8.4
+  },
+  "pixel_vicino_ai_fili_aperti_3x3": 93267,
+  "non_visti_sotto_le_linee_con_altezza_fuori_bosco": 96,
+  "chioma_su_altezza_tipica": 0.44,
   "tutti": {
    "n": 24539,
-   "visti_dal_dsm": 21987,
+   "visti_dal_dsm": 21393,
    "h_p10_p50_p90": [
-    4.43,
-    11.53,
-    21.64
+    4.22,
+    11.65,
+    21.68
    ],
    "chioma_p10_p50_p90": [
-    2.9,
-    5.48,
-    8.65
+    2.16,
+    5.11,
+    8.5
    ]
   },
   "nei_boschi_dbgt": {
    "n": 11069,
-   "visti_dal_dsm": 9986,
+   "visti_dal_dsm": 9937,
    "h_p10_p50_p90": [
-    7.06,
+    7.05,
     16.22,
-    24.56
+    24.52
    ],
    "chioma_p10_p50_p90": [
-    3.26,
-    5.96,
+    3.24,
+    5.95,
     9.0
    ]
   },
   "fuori_dai_boschi": {
    "n": 13470,
-   "visti_dal_dsm": 12001,
+   "visti_dal_dsm": 11456,
    "h_p10_p50_p90": [
-    3.8,
-    8.59,
-    15.87
+    3.58,
+    8.38,
+    15.89
    ],
    "chioma_p10_p50_p90": [
-    2.35,
-    5.0,
-    8.18
+    2.0,
+    4.5,
+    8.0
    ]
   }
  },
