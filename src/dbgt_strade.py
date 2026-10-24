@@ -476,7 +476,7 @@ class Strade:
             if ok.sum() < 2: continue
             wm = float(np.median(w[ok]))
             if not 2.4 <= wm <= 30: continue
-            dw.append(wm - r['w']); r['w'] = round(wm, 1); r['wx'] = True; nw += 1
+            dw.append(wm - r['w']); r['w_osm'] = r['w']; r['w'] = round(wm, 1); r['wx'] = True; nw += 1
             r['mh_dbgt'] = round(float(max(1.0, np.percentile(np.minimum(dl, dr)[ok], 5))), 2)
         rep['larghezze_da_ac_vei'] = dict(vie=nw, differenza_dalla_larghezza_osm_m=_pct(dw, (10, 50, 90)))
         s.rep['assi'] = rep

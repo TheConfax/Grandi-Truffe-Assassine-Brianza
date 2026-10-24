@@ -1801,7 +1801,8 @@ function buildSignals(T, G) {
   for (const sg of SIGNALS) {
     if (tileOf(sg.x, sg.z) !== T.t) continue;
     for (const sd of [1, -1]) { // one pole per direction, on the right-hand kerb, facing the oncoming traffic
-      const rx = -sg.uz * sd, rz = sg.ux * sd, px = sg.x + rx * (sg.w / 2 + 1.2) - sg.ux * sd * 4, pz = sg.z + rz * (sg.w / 2 + 1.2) - sg.uz * sd * 4, gy = H.ground(px, pz);
+      const rx = -sg.uz * sd, rz = sg.ux * sd; let px = sg.x + rx * (sg.w / 2 + 1.2) - sg.ux * sd * 4, pz = sg.z + rz * (sg.w / 2 + 1.2) - sg.uz * sd * 4;
+      for (let k = 0; k < 16 && onAsph(px, pz); k++) { px += rx * 0.5; pz += rz * 0.5; } /* off the drawn carriageway (AC_VEI: wider than the axis says at a junction) */ if (onAsph(px, pz)) continue; const gy = H.ground(px, pz);
       const root = new THREE.Group(); root.position.set(px, gy, pz); root.rotation.y = Math.atan2(-sg.ux * sd, -sg.uz * sd); G.add(root);
       if (!sg.props) sg.props = []; if (sg.props.length < 2) sg.props.push(addProp({ x: px, z: pz, y: gy, r: 0.15, h: 3.5, obj: root })); else { const pr = sg.props[sd > 0 ? 0 : 1]; pr.obj = root; if (pr.broken) root.rotation.x = 1.45; }
       const pole = new THREE.Mesh(boxG(0.14, 3.4, 0.14), lam(0x3a3d42)); pole.position.y = 1.7; pole.castShadow = true; root.add(pole);
@@ -1816,7 +1817,9 @@ function buildSignals(T, G) {
     if (bs && bd < bs.r.w / 2 + 1.4) { // push it out to the kerb, on the side it was drawn (right-hand side if dead centre)
       let sx = -uz, sz = ux; const side = (x - bs.a[0]) * sx + (z - bs.a[1]) * sz; if (side < -0.2) { sx = -sx; sz = -sz; }
       const want = bs.r.w / 2 + 1.6, along = (x - bs.a[0]) * ux + (z - bs.a[1]) * uz, cx = bs.a[0] + ux * along, cz = bs.a[1] + uz * along; x = cx + sx * want; z = cz + sz * want;
+      for (let k = 0; k < 10 && onAsph(x, z); k++) { x += sx * 0.5; z += sz * 0.5; } // off the drawn carriageway (a lay-by of the DBGT)
     }
+    if (onAsph(x, z)) continue; // still on it: no shelter in the road
     if (inBuilding(x, z, 0.6)) continue;
     const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = Math.atan2(ux, uz); G.add(root);
     const glass = new THREE.MeshLambertMaterial({ color: 0x9fb7c4, transparent: true, opacity: 0.45 });
@@ -1839,7 +1842,8 @@ const armTex = canvasTex(256, 16, (g, w, h) => { for (let i = 0; i < 8; i++) { g
 for (const g of LX) if (g.drive) {
   const nx = -g.uz, nz = g.ux; g.bars = []; g.lampA = new THREE.MeshLambertMaterial({ color: 0x3a0806, emissive: 0xff2a14, emissiveIntensity: 0 }); g.lampB = g.lampA.clone();
   for (const s of [-1, 1]) {
-    const cx = g.x + g.ux * g.ext * s, cz = g.z + g.uz * g.ext * s, px = cx + nx * (g.hw + 0.55) * s, pz = cz + nz * (g.hw + 0.55) * s, Lb = 2 * g.hw + 0.7;
+    const cx = g.x + g.ux * g.ext * s, cz = g.z + g.uz * g.ext * s; let px = cx + nx * (g.hw + 0.55) * s, pz = cz + nz * (g.hw + 0.55) * s, Lb = 2 * g.hw + 0.7;
+    for (let k = 0; k < 24 && onAsph(px, pz); k++) { px += nx * 0.25 * s; pz += nz * 0.25 * s; Lb += 0.25; } /* the post off the drawn carriageway, the arm longer */
     const root = new THREE.Group(); root.position.set(px, H.ground(px, pz), pz); root.rotation.y = Math.atan2(s * nz, -s * nx); scene.add(root);
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.7, 0.22), lam(0x3c3f44)); post.position.y = 1.35; post.castShadow = true; root.add(post);
     const box = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.75, 0.42), lam(0x5d6168)); box.position.set(-0.05, 0.38, 0); root.add(box);

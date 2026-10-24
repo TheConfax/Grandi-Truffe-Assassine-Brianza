@@ -35,7 +35,7 @@ const SEG_MARK = { line: null, stop: null };
 function segPlace(s) { // the post on the right of the lane, the plate facing the drivers
   if (s.place) return s.place;
   let [kind, x, z, dx, dz] = s, best = null, bd = 1e9;
-  if (kind === 'isola') return (s.place = { px: x, pz: z, dx, dz, hw: 0 }); // on the nose of the splitter island, as computed
+  if (kind === 'isola') { if (onAsph(x, z)) s.skip = true; return (s.place = { px: x, pz: z, dx, dz, hw: 0 }); } // on the nose of the splitter island, as computed; on the drawn carriageway (the DBGT islands MAN_TR lie elsewhere): none
   ROADSEG.each(x - 15, z - 15, x + 15, z + 15, g => { if (g.r.c > 5 || !atGrade(g) || g.r.t) return; const L = hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]) || 1, al = (dx || dz) ? Math.abs((g.b[0] - g.a[0]) * dx + (g.b[1] - g.a[1]) * dz) / L : 1, d = segDist(x, z, g.a[0], g.a[1], g.b[0], g.b[1]) + (al < 0.6 ? 8 : 0); if (d < bd) { bd = d; best = g; } }); // the road the sign talks to: near, and running its way
   if (best) bd = segDist(x, z, best.a[0], best.a[1], best.b[0], best.b[1]);
   let hw = best ? best.r.w / 2 : 3, px = x, pz = z;

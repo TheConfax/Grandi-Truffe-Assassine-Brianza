@@ -470,13 +470,6 @@ if os.environ.get('GTA_DUMP_STRADE'):  # development of src/dbgt_strade.py: the 
     import pickle
     pickle.dump(dict(nodes=nodes, raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], rail_refs=[rr['refs'] for rr in rail_raw],
                      ntags=ntags, names=names, HW=HW, HH=HH), open(os.environ['GTA_DUMP_STRADE'], 'wb'))
-# ---- where a comune has its DBGT the streets take their shape from it (docs/motore.md 7, src/dbgt_strade.py): the ways run on the EL_STR axes
-STR = None
-if _cov and not os.environ.get('GTA_STRADE_OSM'):
-    import dbgt_strade
-    STR = dbgt_strade.Strade([os.path.join(DBT_DIR, d_, 'dbgt.gpkg') for d_ in sorted(os.listdir(DBT_DIR)) if d_.lower() in _comuni and os.path.exists(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'))], dbt_cover.intersection(RECT.buffer(20)), log)
-    STR.assi(raw_roads, nodes)
-    for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
 # ---- narrow streets: where the houses stand closer than the default width, shrink the road instead of letting walls poke into it
 _hb = [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9 and not b.get('ml')]; _hb = [g for g in _hb if g is not None]
 _ht = STRtree(_hb); nnarrow = 0
@@ -514,6 +507,14 @@ for b in buildings:
     keep_b.append(b)
 buildings[:] = keep_b
 log('buildings clipped to the street edge', nclip, 'dropped', ndrop)
+# ---- where a comune has its DBGT the streets take their shape from it (docs/motore.md 7, src/dbgt_strade.py): the ways run on the EL_STR axes.
+# After the OSM buildings are fitted to the OSM streets above: moved first, the axes cut the church of Meda and its model was lost
+STR = None
+if _cov and not os.environ.get('GTA_STRADE_OSM'):
+    import dbgt_strade
+    STR = dbgt_strade.Strade([os.path.join(DBT_DIR, d_, 'dbgt.gpkg') for d_ in sorted(os.listdir(DBT_DIR)) if d_.lower() in _comuni and os.path.exists(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'))], dbt_cover.intersection(RECT.buffer(20)), log)
+    STR.assi(raw_roads, nodes)
+    for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
 railL0 = [LineString(p) for p in rails if len(p) >= 2]
 _low = [r['line'] for r in raw_roads if not r['bridge'] and not r['tunnel'] and r['line'].length > 0.1] + railL0
 _lowtree = STRtree(_low)
@@ -1373,6 +1374,7 @@ def _cl_free(r0, x, z, ux, uz, w):
     rx, rz, off = -uz, ux, w / 2 + 1.2
     for sx, sz in ((x - ux * 3 + rx * off, z - uz * 3 + rz * off), (x + ux * 3 - rx * off, z + uz * 3 - rz * off)):
         P_ = Point(sx, sz)
+        if STR and STR.U_carr.contains(P_): return False  # a post in a carriageway of the DBGT (a ramp beside the road)
         if any(_clr[k] is not r0 and _clr[k]['line'].distance(P_) < _clr[k]['w'] / 2 + 2.0 for k in _clt.query(P_.buffer(10))): return False
     return True
 nmoved = ndrop = nside = nrep = nminor = 0
