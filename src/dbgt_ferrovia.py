@@ -28,6 +28,7 @@ D_FREE = 3.0      # map matching: a sample farther than this from every axis may
 X_MIN = 3.0       # an EL_FER stretch no OSM way runs on, at least this long, becomes a track of its own
 CLEAR = 1.65      # a platform edge at least this far from the middle of a track (the train is 2.9 m wide; Italian platforms 1.65-1.75 m)
 FENCE_OUT = 0.6   # the railway fence this far outside the rail bed
+LIM_EDGE = 2.0    # ... and only if it lies within this of the edge of the DBGT (copertura_completa)
 LIM_SNAP = 8.0    # a LIM_COM piece whose two ends lie within this of an OSM boundary line replaces that stretch of it
 
 
@@ -85,9 +86,9 @@ class Ferrovia:
 
     def __init__(s, gpkgs, cover, log=print):
         t0 = time.time(); s.log = log; s.cover = cover; shapely.prepare(cover); s.rep = {}
-        D = None; s.lim = {}
+        D = None; s.lim = {}; s.dirs = {}
         for f in gpkgs:
-            d = leggi(f); s.lim[os.path.basename(os.path.dirname(os.path.abspath(f)))] = d['lim']
+            d = leggi(f); k = os.path.basename(os.path.dirname(os.path.abspath(f))); s.lim[k] = d['lim']; s.dirs[k] = os.path.dirname(os.path.abspath(f))
             if D is None: D = d
             else:
                 for k in D: D[k] += d[k]
@@ -330,9 +331,19 @@ class Ferrovia:
     # ---- 3. the comune boundaries
     def confini(s, blines):
         """LIM_COM pieces of each DBGT spliced into the OSM boundary lines of its comune (the town signs). A piece whose two ends lie
-        within LIM_SNAP of a boundary line replaces the stretch between their projections"""
-        out = []; nrep = 0; mrep = 0.0; scarti = []
-        low = {k.lower(): v for k, v in s.lim.items()}
+        within LIM_SNAP of a boundary line replaces the stretch between their projections, but only if it agrees with the edge of the
+        DBGT itself (copertura_completa of base_dbt_per_pianificazione.gpkg, which the Geoportale gives with every comune) within
+        LIM_EDGE: at Meda LIM_COM and COMUNE are fragments (13 pieces, 1.46 km of a 14.6 km boundary, docs/portabilita.md) that run
+        6-29 m inside both the OSM boundary and the edge of the DBGT, so they are not the boundary and OSM stays"""
+        out = []; nrep = 0; mrep = 0.0; scarti = []; prova = []
+        low = {}
+        for k, v in s.lim.items():
+            edge = s.bordo_dbgt(k); ok = []
+            for P_ in v:
+                d = max(edge.distance(Point(c)) for c in P_.coords) if edge is not None else None
+                prova.append(dict(comune=k, metri=round(P_.length), dal_bordo_del_dbgt_max_m=None if d is None else round(d, 1)))
+                if d is not None and d <= LIM_EDGE: ok.append(P_)
+            low[k.lower()] = ok
         for L, names in blines:
             lims = [p for n_ in names for p in low.get(n_.lower(), [])]
             if not lims: out.append((L, names)); continue
@@ -349,9 +360,23 @@ class Ferrovia:
                 scarti += [old.distance(Point(c)) for c in piece.coords]
                 cur = LineString(cs); nrep += 1; mrep += piece.length
             out.append((cur, names))
-        s.rep['confini'] = dict(pezzi_lim_com=sum(len(v) for v in s.lim.values()), pezzi_usati=nrep, metri=round(mrep), scarto_da_osm_m=_pct(scarti), fonte='LIM_COM del DBGT dove c e, OSM (confini_comuni.json) altrove')
+        s.rep['confini'] = dict(pezzi_lim_com=sum(len(v) for v in s.lim.values()), metri_lim_com=round(sum(l.length for v in s.lim.values() for l in v)), pezzi_usati=nrep, metri_usati=round(mrep),
+                                scarto_da_osm_m=_pct(scarti), pezzi=prova, regola='un pezzo LIM_COM entra solo se sta entro %.0f m dal bordo del DBGT (copertura_completa); altrimenti OSM (confini_comuni.json)' % LIM_EDGE)
         s.log('dbgt ferrovia: confini %s' % s.rep['confini'])
         return out
+
+    def bordo_dbgt(s, comune):
+        """the outer edge of the DBGT of a comune: the union of copertura_completa (base_dbt_per_pianificazione.gpkg), its largest part"""
+        f = os.path.join(s.dirs.get(comune, ''), 'base_dbt_per_pianificazione.gpkg')
+        if not os.path.exists(f): return None
+        con = sqlite3.connect(f); tr = ds._tr()
+        try:
+            col = con.execute("select column_name from gpkg_geometry_columns where table_name = 'copertura_completa'").fetchone()[0]
+            gs = [shapely.transform(shapely.force_2d(dq._geom(r[0])), lambda c: ds._game(tr, c)).buffer(0) for r in con.execute('select "%s" from copertura_completa' % col) if r[0] is not None]
+        except (sqlite3.OperationalError, TypeError): return None
+        if not gs: return None
+        U = unary_union(gs); P = max(_parts(U), key=lambda p: p.area)
+        return P.exterior
 
     # ---- 4. tiles
     def disegno(s, rail_lines, cut):
