@@ -22,7 +22,8 @@
 import os, sys, math, time, sqlite3, json, pickle, subprocess, tempfile
 from collections import Counter, defaultdict
 import numpy as np, shapely
-from shapely.geometry import Polygon, Point, GeometryCollection, box
+from shapely.geometry import Polygon, Point, LineString, GeometryCollection, box
+import shapely.ops
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 from shapely import prepare
@@ -44,9 +45,13 @@ DSM_COVER = 0.7    # ... and the structure (over 1.5 m above the ground) covers 
 DSM_TREES = 0.35   # more than this share of the DSM points far above the fitted roof: tree crowns over the roof
 S_MIN, S_MAX = 0.12, 1.3   # slopes of a pitched roof (7 to 52 degrees)
 OSM_SLOPE = 0.55   # a roof shape OSM gives without its height: about 29 degrees
+ALA_MIN = 15.0     # the smallest wing of a volume cut into wings for its roof (m2)
 RECT_FILL = 0.8    # the pitched roofs are fitted on the volume's minimum rectangle: only where the volume fills this much of it
 RH_MAX = {1: 6.0, 2: 6.0, 3: 3.0}   # the highest ridge over the eaves (m): a steeper fit is the next, taller building seen by the DSM along a
                    # shared wall (a shed of 81 m2 came out with a single slope rising 17.9 m)
+MIN_IN = 0.3       # a way inside the buildings for less than this (m) is left as it is
+CLEAR_FOOT, CLEAR_CAR = 0.6, 1.0   # how far from the walls a way that ran inside a building moves (footways, the others)
+PUSH_MAX = 2.5     # a stretch never deeper than this inside the walls moves out; a deeper one goes through the building and is cut
 TETTI_PROC = max(1, min(12, (os.cpu_count() or 4) - 2))
 
 # what a building is when OSM does not say: DBGT use (EDIFC_USO, Specifiche p. 137) and type (EDIFC_TY p. 135, EDI_MIN_TY p. 151) as an OSM
@@ -101,6 +106,35 @@ def rect_frame(poly):
     if L1 < 1e-6 or L2 < 1e-6: return rr.mean(0), np.array([1.0, 0.0]), np.array([0.0, 1.0]), 0.0, 0.0
     u, v = (e1 / L1, e2 / L2) if L1 >= L2 else (e2 / L2, e1 / L1)
     return rr.mean(0), u, v, max(L1, L2) / 2, min(L1, L2) / 2
+
+
+def ali(poly, depth=0):
+    """an L, a T, a U (a volume that fills less than RECT_FILL of its minimum rectangle, no holes) cut into wings that each fill their own
+    rectangle: cuts along the volume's two axes through its vertices, the one that leaves the least empty rectangle; at most two rounds
+    (four wings), each wing over ALA_MIN m2. [] when it does not come apart that way"""
+    c, u, v, a, b = rect_frame(poly)
+    def fill(q): r = q.minimum_rotated_rectangle; return q.area / max(1e-6, r.area)
+    if fill(poly) >= RECT_FILL: return [poly]
+    if depth >= 2: return []
+    P = np.asarray(poly.exterior.coords)[:-1] - c; qs = (P @ u, P @ v); R = 4 * max(a, b) + 10
+    best = None
+    for ax, qq in ((0, qs[0]), (1, qs[1])):
+        d = u if ax == 0 else v; o = v if ax == 0 else u
+        for t in np.unique(np.round(qq, 2)):
+            if t <= qq.min() + 1.0 or t >= qq.max() - 1.0: continue
+            p0 = c + d * t - o * R; p1 = c + d * t + o * R
+            try: ps = [q for q in _parts(shapely.ops.split(poly, LineString([p0, p1])))]
+            except Exception: continue
+            if len(ps) < 2 or min(q.area for q in ps) < ALA_MIN: continue
+            empty = sum(q.minimum_rotated_rectangle.area - q.area for q in ps)
+            if best is None or empty < best[0]: best = (empty, ps)
+    if best is None: return []
+    out = []
+    for q in best[1]:
+        sub = ali(q, depth + 1)
+        if not sub: return []
+        out += sub
+    return out if len(out) <= 4 and all(fill(q) >= RECT_FILL and q.area >= ALA_MIN for q in out) else []
 
 
 def _tls(A, h, it=3, cut=0.8):
@@ -299,7 +333,10 @@ class Edifici:
         """buildings: the OSM and Overture buildings of build_data.py (records with 'p', 'k', 'tg'); P(outer, holes) -> polygon.
         Returns the new list of the buildings on the ground; the raised volumes are in self.alti"""
         t0 = time.time()
-        geo = [e['is'] for e in self.ed]; ok = [i for i, g in enumerate(geo) if not g.is_empty]
+        # a DBGT building with only underground volumes (UN_VOL_POR 08: the garages under a garden or a yard) is not drawn and is not what
+        # stands on top: an OSM building over it is something the DBGT does not have (verifica 24/10, x -558 z -587)
+        geo = [e['is'] if any(self.vol[j]['por'] != '08' for j in e['vols']) else GeometryCollection() for e in self.ed]
+        ok = [i for i, g in enumerate(geo) if not g.is_empty]
         dt = STRtree([geo[i] for i in ok]); confs = [c for c in self.comuni if c is not None]
         conf_u = unary_union(confs) if confs else GeometryCollection(); prepare(conf_u)
         best = {}   # DBGT building -> (overlap share, OSM tags)
@@ -371,13 +408,20 @@ class Edifici:
         self.rep['osm'] = dict(cnt); self.rep['osm_senza_dbgt'] = dict(n=len(dove), m2=round(sum(o[2] for o in dove)), dove=dove[:400])
         # the DBGT buildings, volume by volume
         alti, terra = [], []
-        ntipo, nvol = Counter(), Counter()
+        ntipo, nvol, nstato = Counter(), Counter(), Counter()
         for i, e in enumerate(self.ed):
             sh, tg, ob = best.get(i, (0, {}, None))
             obt = tg.get('building')
             if obt in ('roof', 'carport') and e['kind'] == 'E': obt = None   # a roof on posts is a form: the DBGT's building (a volume on the ground) wins
             bt = obt if obt and obt not in ('yes',) else bt_dbgt(e['kind'], e['ty'], e['uso'])
             if tg.get('amenity') == 'place_of_worship' and e['is'].area > 120: bt = 'church'
+            # the state in 2015 (EDIFC_STAT): a ruin stays a ruin (walls to its height, no roof) unless OSM, newer, says what it is now
+            # (anything but 'yes' or ruins); a building under construction then is finished by now when OSM maps it as a building, and
+            # otherwise is drawn as surveyed, a bare shell with a flat roof
+            stato = None
+            if e['kind'] == 'E' and e['st'] == '02' and (obt in (None, 'yes', 'ruins') or tg.get('ruins') == 'yes'): stato = 2
+            elif e['kind'] == 'E' and e['st'] == '01' and obt in (None, 'construction'): stato = 1
+            if stato: nstato[stato] += 1; bt = 'yes' if stato == 2 else bt
             ntipo[bt] += 1
             for vi in e['vols']:
                 v = self.vol[vi]
@@ -391,32 +435,72 @@ class Edifici:
                 if tg.get('roof:colour'): rec['rcol'] = tg['roof:colour'][:20]
                 if tg.get('roof:shape'): rec['rs'] = tg['roof:shape']
                 if tg.get('man_made') == 'water_tower': rec['wt'] = True
+                if stato: rec['st'] = stato
                 if v.get('alto'): rec['zb'] = round(v['z0'] - self.base, 2); alti.append(rec); nvol['alti_' + v['por']] += 1
                 else: terra.append(rec); nvol['a_terra'] += 1
         self.alti = alti; self.terra = terra
         self.rep['volumi_disegnati'] = dict(nvol); self.rep['tipi'] = dict(ntipo.most_common())
         self.rep['attributi_da_osm'] = len(best)
+        self.rep['stato_2015'] = dict(ruderi=nstato[2], in_costruzione_senza_osm=nstato[1], diruti=sum(1 for e in self.ed if e['kind'] == 'E' and e['st'] == '02'), in_costruzione=sum(1 for e in self.ed if e['kind'] == 'E' and e['st'] == '01'))
         self.log('dbgt edifici: OSM', dict(cnt), 'volumi', dict(nvol), 'con attributi OSM', len(best), '%.0fs' % (time.time() - t0))
         return keep + terra
 
     # ---------------------------------------------------------------- roofs
+    def _dsm(self, jobs):
+        """fit_tetto on the jobs in processes of their own: {id: result}"""
+        if not jobs or not os.path.isdir(self.dsm_dir): return {}
+        d = tempfile.mkdtemp(prefix='tetti_'); fi, fo = os.path.join(d, 'in.pkl'), os.path.join(d, 'out.pkl')
+        pickle.dump(jobs, open(fi, 'wb'))
+        for npr in sorted({TETTI_PROC, min(TETTI_PROC, 4), 1}, reverse=True):  # fewer processes when memory is short, never no roofs in silence
+            rc = subprocess.call([sys.executable, os.path.abspath(__file__), '--tetti', fi, fo, self.dsm_dir, str(npr)])
+            if rc == 0 and os.path.exists(fo): return pickle.load(open(fo, 'rb'))
+            self.log('dbgt edifici: tetti dal DSM non riusciti con', npr, 'processi, codice', rc)
+        raise RuntimeError('dbgt edifici: tetti dal DSM non riusciti')
+
     def tetti(self):
-        """the roof of every DBGT volume from the DSM (in its own processes), or from OSM roof:shape; the reasons in the report"""
+        """the roof of every DBGT volume from the DSM (in its own processes), or from OSM roof:shape; the reasons in the report.
+        A volume shaped like an L, a T or a U is cut into its wings (ali), each with its roof from the DSM: the wings are drawn as volumes of
+        their own (same building, same height). Returns the new ground pieces (the raised ones go in self.alti)"""
         t0 = time.time()
         recs = self.terra + self.alti
-        jobs = [(k, np.asarray(r['p']), bool(r.get('k')), r['zt'] + self.base, r['zt'] + self.base - r['h'], r['bt'] in ('church', 'cathedral', 'chapel')) for k, r in enumerate(recs) if r['bt'] not in ('roof',)]
-        res = {}
-        if jobs and os.path.isdir(self.dsm_dir):
-            d = tempfile.mkdtemp(prefix='tetti_'); fi, fo = os.path.join(d, 'in.pkl'), os.path.join(d, 'out.pkl')
-            pickle.dump(jobs, open(fi, 'wb'))
-            for npr in sorted({TETTI_PROC, min(TETTI_PROC, 4), 1}, reverse=True):  # fewer processes when memory is short, never no roofs in silence
-                rc = subprocess.call([sys.executable, os.path.abspath(__file__), '--tetti', fi, fo, self.dsm_dir, str(npr)])
-                if rc == 0 and os.path.exists(fo): res = pickle.load(open(fo, 'rb')); break
-                self.log('dbgt edifici: tetti dal DSM non riusciti con', npr, 'processi, codice', rc)
-            else: raise RuntimeError('dbgt edifici: tetti dal DSM non riusciti')
-        cnt, mot = Counter(), Counter(); rhs = []
+        job = lambda k, r, ring: (k, np.asarray(ring), bool(r.get('k')), r['zt'] + self.base, r['zt'] + self.base - r['h'], r['bt'] in ('church', 'cathedral', 'chapel'))
+        res = self._dsm([job(k, r, r['p']) for k, r in enumerate(recs) if r['bt'] not in ('roof',) and not r.get('st')])
+        # the wings of the irregular volumes, in a second round
+        wings, wj = {}, []
         for k, r in enumerate(recs):
             f = res.get(k)
+            if not f or f.get('m') != 'irregolare' or r.get('k'): continue
+            p = Polygon(r['p']).buffer(0)
+            if p.geom_type != 'Polygon': continue
+            ps = ali(p)
+            if len(ps) < 2: continue
+            wings[k] = ps
+            for n, q in enumerate(ps): wj.append(job((k, n), r, np.asarray(q.exterior.coords)[:-1]))
+        wres = self._dsm(wj)
+        new_t, new_a, nw = [], [], Counter()
+        for k, ps in wings.items():
+            rr = [wres.get((k, n)) or {} for n in range(len(ps))]
+            if not any(x.get('rk') in (1, 2, 3) for x in rr): nw['ali_senza_falde'] += 1; continue   # flat all over: the volume stays whole
+            r = recs[k]; nw['volumi_in_ali'] += 1; nw['ali'] += len(ps)
+            for n, (q, x) in enumerate(zip(ps, rr)):
+                rec = r if n == 0 else dict(r)
+                rec['p'] = [tuple(c) for c in np.asarray(q.exterior.coords)[:-1]]; rec.pop('k', None); rec['ala'] = True
+                for kk in ('rk', 'rf', 'rc'): rec.pop(kk, None)
+                if x.get('rk'):
+                    rec['rk'] = x['rk']
+                    if x['rk'] != 4: rec['rf'] = x['rf']; rec['rc'] = x['rc']
+                else: rec['rk'] = 4; nw['ali_piane_senza_dsm'] += 1   # a wing the DSM does not fit: flat, as the whole volume was
+                nw[{1: 'ala_a_falde', 2: 'ala_a_padiglione', 3: 'ala_a_una_falda', 4: 'ala_piana'}[rec['rk']]] += 1
+                if n: (new_a if 'zb' in r else new_t).append(rec)
+            res[k] = dict(rk=-1)
+        self.terra += new_t; self.alti += new_a
+        cnt, mot = Counter(), Counter(); rhs = []
+        for k, r in enumerate(recs):
+            if r.get('st'):  # a ruin has no roof, a shell under construction a flat one
+                if r['st'] == 1: r['rk'] = 4
+                cnt['rudere_senza_tetto' if r['st'] == 2 else 'in_costruzione_piano'] += 1; continue
+            f = res.get(k)
+            if f and f.get('rk') == -1: cnt['in_ali'] += 1; continue
             if f and f.get('rk'):
                 r['rk'] = f['rk']
                 if f['rk'] != 4: r['rf'] = f['rf']; r['rc'] = f['rc']; rhs.append(f['rh'])
@@ -434,8 +518,116 @@ class Edifici:
                         c, pl, rh = piani_tetto(kk, p, OSM_SLOPE)
                         r['rk'] = kk; r['rf'] = [round(float(x), 3) for q in pl for x in q]; r['rc'] = [round(float(c[0]), 2), round(float(c[1]), 2)]
                     cnt['da_osm_roof_shape'] += 1
-        self.rep['tetti'] = dict(dal_dsm=dict(cnt), non_dal_dsm=dict(mot), colmo_sulla_gronda=dict(p50=round(float(np.median(rhs)), 2), p90=round(float(np.percentile(rhs, 90)), 2), max=round(float(max(rhs)), 2)) if rhs else None)
-        self.log('dbgt edifici: tetti dal DSM', dict(cnt), 'no', dict(mot), '%.0fs' % (time.time() - t0))
+        self.rep['tetti'] = dict(dal_dsm=dict(cnt), non_dal_dsm=dict(mot), ali=dict(nw), colmo_sulla_gronda=dict(p50=round(float(np.median(rhs)), 2), p90=round(float(np.percentile(rhs, 90)), 2), max=round(float(max(rhs)), 2)) if rhs else None)
+        self.log('dbgt edifici: tetti dal DSM', dict(cnt), 'no', dict(mot), 'ali', dict(nw), '%.0fs' % (time.time() - t0))
+        return new_t
+
+    # ---------------------------------------------------------------- the OSM ways against the DBGT buildings
+    def vie(self, raw_roads, nodes, buildings=None, P=None):
+        """The OSM ways no DBGT axis took (footways, service roads, the streets OSM draws over a yard) were drawn against the OSM buildings,
+        and the OSM buildings were cut on them. The DBGT buildings are not cut (their shape wins), so a way that runs inside one moves out:
+        verifica 24/10, 26 ways inside a DBGT volume for more than 1 m (266 m), most of them footways and service roads 1 m inside a facade
+        (x 249 z -589 for 32 m), and the AI pedestrians walked through the walls. A stretch inside a building (ground volumes, and the OSM
+        buildings kept inside the comune) that is never deeper than PUSH_MAX moves out to `clear` m from the walls (its nodes and new ones in
+        between); one that goes deeper, or that cannot get out without crossing the building, is cut away: the DBGT has no passage there (a
+        passage under a building is a raised volume, UN_VOL_POR 04, and is not an obstacle here). Tunnels and bridges stay. In place, before
+        build_data.py draws the ways; the moves and cuts in the report (vie_negli_edifici)"""
+        t0 = time.time()
+        obs = [g for g in (Polygon(r['p'], r.get('k') or []).buffer(0) for r in getattr(self, 'terra', [])) if not g.is_empty]
+        if buildings is not None and P is not None:   # the OSM buildings kept inside the comune as they are now (cut on the streets, not the roofs on posts)
+            obs += [g for g in (P(b['p'], b.get('k', [])) for b in buildings if b.get('osm_solo') and b.get('t') != 9 and b.get('bt') not in ('roof', 'carport')) if g is not None and not g.is_empty]
+        if not obs: return
+        T = STRtree(obs); cnt = [0]; rep = dict(spostate=[], tagliate=[])
+        def new_id(): cnt[0] += 1; return 'edv%d' % cnt[0]
+        def inside_len(xy, U): return LineString(xy).intersection(U).length if len(xy) >= 2 else 0.0
+        nmove = ncut = 0
+        for pas in range(2):   # a node moved for one way may bring the next way into a wall: a second round
+            for wi in range(len(raw_roads)):
+                r = raw_roads[wi]
+                if r.get('tunnel') or r.get('bridge') or len(r['refs']) < 2: continue
+                xy = np.array([nodes[n_] for n_ in r['refs']], float)
+                line = LineString(xy)
+                if line.length < 0.5: continue
+                cand = [obs[j] for j in T.query(line, predicate='dwithin', distance=2.5)]
+                if not cand: continue
+                U = unary_union(cand)
+                if line.intersection(U).length < MIN_IN: continue
+                clear = CLEAR_FOOT if r['c'] >= 6 else CLEAR_CAR
+                Uc = U.buffer(clear, quad_segs=3); B = Uc.boundary
+                # samples every 0.5 m, the nodes among them
+                S, owner = [], []   # point, node index (or -1)
+                for i in range(len(xy) - 1):
+                    a, b = xy[i], xy[i + 1]; L = float(np.hypot(*(b - a))); n = max(1, int(math.ceil(L / 0.5)))
+                    for k in range(n): S.append(a + (b - a) * k / n); owner.append(i if k == 0 else -1)
+                S.append(xy[-1]); owner.append(len(xy) - 1); S = np.array(S)
+                ins = shapely.contains_xy(Uc, S[:, 0], S[:, 1])
+                if not ins.any(): continue
+                runs = []; k = 0
+                while k < len(S):
+                    if not ins[k]: k += 1; continue
+                    j = k
+                    while j + 1 < len(S) and ins[j + 1]: j += 1
+                    runs.append((k, j)); k = j + 1
+                newpts = {}; drop = []   # sample -> new position; runs cut away
+                for k0, k1 in runs:
+                    seg = S[k0:k1 + 1]
+                    if inside_len(np.vstack([S[max(k0 - 1, 0)], seg, S[min(k1 + 1, len(S) - 1)]]), U) < 0.05 and len(seg) < 4: continue   # only the clearance, not the wall
+                    dep = np.array([B.distance(Point(p)) for p in seg])
+                    if dep.max() <= clear + PUSH_MAX:
+                        q = [shapely.ops.nearest_points(B, Point(p))[0] for p in seg]; q = np.array([[g.x, g.y] for g in q])
+                        test = np.vstack(([S[k0 - 1]] if k0 > 0 else []) + [q] + ([S[k1 + 1]] if k1 + 1 < len(S) else []))
+                        if inside_len(test, U) < 0.2:
+                            for k, p in zip(range(k0, k1 + 1), q): newpts[k] = p
+                            continue
+                    drop.append((k0, k1))
+                if not newpts and not drop: continue
+                # the new polyline: the nodes that stay, moved nodes, new nodes where a stretch moved (simplified)
+                pieces, cur, run_pts = [], [], []
+                def flush_run():
+                    if not run_pts: return
+                    P_ = np.array([p for p, nd in run_pts]); keep = set()
+                    if len(P_) > 2:
+                        sl = LineString(P_).simplify(0.15)
+                        sc = np.asarray(sl.coords)
+                        for c in sc[1:-1]: keep.add(int(np.argmin(np.hypot(*(P_ - c).T))))
+                    for idx, (p, nd) in enumerate(run_pts):
+                        if nd is not None:
+                            nodes[nd] = (float(p[0]), float(p[1]))
+                            cur.append(nd)
+                        elif idx in keep or idx in (0, len(run_pts) - 1):
+                            nid = new_id(); nodes[nid] = (float(p[0]), float(p[1])); cur.append(nid)
+                    run_pts.clear()
+                dropped = np.zeros(len(S), bool)
+                for k0, k1 in drop: dropped[k0:k1 + 1] = True
+                for k in range(len(S)):
+                    nd = r['refs'][owner[k]] if owner[k] >= 0 else None
+                    if dropped[k]:
+                        flush_run()
+                        if len(cur) >= 2: pieces.append(cur)
+                        cur = []; continue
+                    if cur == [] and k > 0 and dropped[k - 1] and nd is None:   # the way starts again at the wall
+                        nid = new_id(); nodes[nid] = (float(S[k][0]), float(S[k][1])); cur.append(nid); continue
+                    if k in newpts: run_pts.append((newpts[k], nd)); continue
+                    flush_run()
+                    if nd is not None: cur.append(nd)
+                    elif k + 1 < len(S) and dropped[k + 1]:   # the way stops at the wall
+                        nid = new_id(); nodes[nid] = (float(S[k][0]), float(S[k][1])); cur.append(nid)
+                flush_run()
+                if len(cur) >= 2: pieces.append(cur)
+                pieces = [[n_ for i_, n_ in enumerate(p) if i_ == 0 or n_ != p[i_ - 1]] for p in pieces]
+                pieces = [p for p in pieces if len(p) >= 2 and LineString([nodes[n_] for n_ in p]).length >= 2.0]
+                m = xy[len(xy) // 2]; nm = r.get('n', -1)
+                lin = round(line.intersection(U).length, 1)
+                if drop:
+                    ncut += 1; rep['tagliate'].append([round(float(m[0]), 1), round(float(m[1]), 1), r['c'], lin, sum(int(k1 - k0 + 1) for k0, k1 in drop) // 2, nm])
+                if newpts: nmove += 1; rep['spostate'].append([round(float(m[0]), 1), round(float(m[1]), 1), r['c'], lin, round(float(max(np.hypot(*(newpts[k] - S[k])) for k in newpts)), 2), nm])
+                if not pieces: r['refs'] = r['refs'][:1] * 2; r['vuota'] = True; continue
+                r['refs'] = pieces[0]
+                for p in pieces[1:]: r.setdefault('parte', wi); raw_roads.append(dict(r, refs=p))
+        n_empty = sum(1 for r in raw_roads if r.get('vuota'))
+        raw_roads[:] = [r for r in raw_roads if not r.get('vuota')]
+        self.rep['vie_negli_edifici'] = dict(spostate=nmove, tagliate=ncut, tolte=n_empty, dove_spostate=rep['spostate'][:80], dove_tagliate=rep['tagliate'][:80])
+        self.log('dbgt edifici: vie OSM negli edifici, spostate', nmove, 'tagliate', ncut, 'tolte', n_empty, '%.0fs' % (time.time() - t0))
 
     # ---------------------------------------------------------------- checks
     def controlli(self, buildings, P):
@@ -469,7 +661,8 @@ class Edifici:
     def sintesi(self):
         r = self.rep
         return dict(edifici_dbgt=r.get('edifici_dbgt'), volumi=r.get('volumi_disegnati'), osm=r.get('osm'), tetti=r.get('tetti'), su_carreggiata=r.get('su_carreggiata', {}).get('n'),
-                    doppi_dbgt_osm=r.get('doppi_dbgt_osm', {}).get('n'), doppi_dbgt_dbgt=r.get('doppi_dbgt_dbgt', {}).get('n'), aggiornamenti=r.get('aggiornamenti_dbgt'), accessi=r.get('accessi'), offset=r.get('offset_dbgt_lidar', {}).get('valore'))
+                    doppi_dbgt_osm=r.get('doppi_dbgt_osm', {}).get('n'), doppi_dbgt_dbgt=r.get('doppi_dbgt_dbgt', {}).get('n'), aggiornamenti=r.get('aggiornamenti_dbgt'), accessi=r.get('accessi'), offset=r.get('offset_dbgt_lidar', {}).get('valore'),
+                    vie_negli_edifici={k: v for k, v in r.get('vie_negli_edifici', {}).items() if not k.startswith('dove')}, stato_2015=r.get('stato_2015'))
 
 
 def _gen(di, ced):

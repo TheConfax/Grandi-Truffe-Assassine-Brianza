@@ -36,9 +36,9 @@
  "volumi": 7557,
  "accessi": 3731,
  "osm": {
-  "osm_sostituiti": 3611,
-  "osm_in_parte_senza_dbgt": 76,
-  "osm_senza_dbgt": 64,
+  "osm_sostituiti": 3609,
+  "osm_in_parte_senza_dbgt": 77,
+  "osm_senza_dbgt": 65,
   "doppi_al_confine": 4,
   "tagliati_al_confine": 6,
   "overture_tolti": 1115,
@@ -46,8 +46,8 @@
   "osm_tolti_sulle_carreggiate": 7
  },
  "osm_senza_dbgt": {
-  "n": 144,
-  "m2": 39035,
+  "n": 146,
+  "m2": 39191,
   "dove": [
    [
     232.2,
@@ -313,6 +313,13 @@
     625.6,
     166,
     "yes",
+    "parte"
+   ],
+   [
+    495.3,
+    -303.4,
+    122,
+    "garages",
     "parte"
    ],
    [
@@ -650,6 +657,12 @@
     "garage"
    ],
    [
+    -770.7,
+    356.8,
+    12,
+    "yes"
+   ],
+   [
     -718.1,
     362.0,
     76,
@@ -761,9 +774,9 @@
     "parte"
    ],
    [
-    -632.2,
-    -348.4,
-    388,
+    -631.4,
+    -348.2,
+    410,
     "industrial",
     "parte"
    ],
@@ -1003,15 +1016,15 @@
   "alti_03": 209
  },
  "tipi": {
-  "yes": 2149,
+  "yes": 2156,
   "shed": 1119,
-  "garage": 962,
-  "industrial": 494,
+  "garage": 959,
+  "industrial": 493,
   "house": 214,
-  "apartments": 212,
+  "apartments": 211,
   "residential": 159,
-  "commercial": 62,
-  "garages": 26,
+  "commercial": 61,
+  "garages": 25,
   "chapel": 24,
   "school": 20,
   "retail": 20,
@@ -1029,31 +1042,259 @@
   "supermarket": 1,
   "villa": 1
  },
- "attributi_da_osm": 2847,
+ "attributi_da_osm": 2830,
+ "stato_2015": {
+  "ruderi": 33,
+  "in_costruzione_senza_osm": 5,
+  "diruti": 33,
+  "in_costruzione": 7
+ },
  "tetti": {
   "dal_dsm": {
-   "piano": 2449,
-   "a_falde": 1222,
+   "rudere_senza_tetto": 36,
+   "piano": 2441,
+   "a_falde": 1216,
    "a_una_falda": 183,
+   "in_ali": 477,
    "a_padiglione": 462,
+   "in_costruzione_piano": 5,
    "da_osm_roof_shape": 4
   },
   "non_dal_dsm": {
-   "irregolare": 1080,
-   "troppo_ripido": 145,
-   "piccolo": 862,
-   "basso": 261,
+   "troppo_ripido": 141,
+   "irregolare": 601,
+   "piccolo": 859,
+   "basso": 260,
    "chiome": 24,
-   "alto": 332,
-   "complesso": 181,
-   "non_copre": 273,
+   "alto": 325,
+   "complesso": 179,
+   "non_copre": 265,
    "senza_dsm": 16
+  },
+  "ali": {
+   "volumi_in_ali": 477,
+   "ali": 1100,
+   "ali_piane_senza_dsm": 181,
+   "ala_piana": 423,
+   "ala_a_falde": 460,
+   "ali_senza_falde": 245,
+   "ala_a_padiglione": 84,
+   "ala_a_una_falda": 133
   },
   "colmo_sulla_gronda": {
    "p50": 2.32,
    "p90": 3.31,
    "max": 9.2
   }
+ },
+ "vie_negli_edifici": {
+  "spostate": 16,
+  "tagliate": 9,
+  "tolte": 1,
+  "dove_spostate": [
+   [
+    -173.5,
+    -1874.9,
+    2,
+    12.5,
+    2.06,
+    554
+   ],
+   [
+    92.7,
+    -839.8,
+    2,
+    7.6,
+    0.51,
+    654
+   ],
+   [
+    129.8,
+    -860.6,
+    4,
+    3.5,
+    1.97,
+    -1
+   ],
+   [
+    179.2,
+    -603.1,
+    2,
+    13.5,
+    1.89,
+    708
+   ],
+   [
+    636.3,
+    -967.5,
+    4,
+    0.5,
+    1.59,
+    741
+   ],
+   [
+    634.7,
+    -967.6,
+    4,
+    6.3,
+    1.47,
+    -1
+   ],
+   [
+    629.1,
+    -951.2,
+    4,
+    1.3,
+    1.1,
+    -1
+   ],
+   [
+    182.0,
+    -390.1,
+    4,
+    33.4,
+    1.94,
+    -1
+   ],
+   [
+    752.7,
+    -685.7,
+    6,
+    55.6,
+    1.25,
+    -1
+   ],
+   [
+    320.6,
+    -659.6,
+    6,
+    63.9,
+    1.39,
+    -1
+   ],
+   [
+    720.3,
+    563.5,
+    6,
+    0.5,
+    1.09,
+    -1
+   ],
+   [
+    732.8,
+    -40.9,
+    6,
+    5.0,
+    0.92,
+    -1
+   ],
+   [
+    733.9,
+    -47.7,
+    6,
+    1.2,
+    1.52,
+    -1
+   ],
+   [
+    735.5,
+    -39.0,
+    6,
+    0.7,
+    1.35,
+    -1
+   ],
+   [
+    504.3,
+    888.6,
+    4,
+    0.6,
+    1.57,
+    -1
+   ],
+   [
+    570.1,
+    909.6,
+    6,
+    0.4,
+    0.96,
+    -1
+   ]
+  ],
+  "dove_tagliate": [
+   [
+    92.7,
+    -839.8,
+    2,
+    7.6,
+    16,
+    654
+   ],
+   [
+    88.3,
+    -767.5,
+    6,
+    3.3,
+    4,
+    -1
+   ],
+   [
+    -104.7,
+    -860.2,
+    4,
+    7.4,
+    9,
+    -1
+   ],
+   [
+    388.4,
+    -982.6,
+    2,
+    16.6,
+    18,
+    460
+   ],
+   [
+    486.8,
+    -403.3,
+    6,
+    6.7,
+    8,
+    -1
+   ],
+   [
+    634.7,
+    -967.6,
+    4,
+    6.3,
+    8,
+    -1
+   ],
+   [
+    752.7,
+    -685.7,
+    6,
+    55.6,
+    36,
+    -1
+   ],
+   [
+    29.2,
+    -724.9,
+    6,
+    10.6,
+    14,
+    -1
+   ],
+   [
+    583.9,
+    -539.1,
+    6,
+    18.8,
+    27,
+    -1
+   ]
+  ]
  },
  "su_carreggiata": {
   "n": 0,

@@ -483,15 +483,18 @@ function ngWall(x, z, only, street, need = 0, use = null, skip = null) {
         let park = 0; for (let t = 2; t <= 20; t += 2) if (ngInPark(mx + nx * t, mz + nz * t, 0)) park++;
         score = d * 0.3 - park * 2 - (road ? 6 : 0) - Math.min(L, 40) * 0.1; // the OSM point is often at the door
       }
-      if (b.e !== undefined) { // a DBGT wall: room for a front, and nothing right in front of it (a garden wall, the next volume), or the shop is lost
+      if (b.e !== undefined) { // a DBGT wall: room for a front
         if (L < 4) score += 3;
         if (!sa) score += 8; // a front that looks onto a yard with no street within 26 m: only if the building has nothing better
         if (L < need) score += 20; else if (use && (use.get(ngKey({ a, c })) || 0) + need + 0.3 > L) score += 8; // too short for the front, or taken by the shops already on it
+      }
+      let blk = 0; if (b !== host && host && !(host.e !== undefined && b.e === host.e)) score += 2; // the wall of a volume built onto the shop's building (an annex along its facade)
+      { // nothing right in front of the wall (a garden wall, the next volume, an annex along the facade), or the shop is lost (Flou in via Cadorna: a DBGT strip 1 m deep along its OSM building)
         let nb = 0, ns = 0; for (const f of [-0.4, -0.2, 0, 0.2, 0.4]) for (const dd of [0.6, 1.1, 1.45]) { const px = mx + ux * L * f + nx * dd, pz = mz + uz * L * f + nz * dd; let bl = inBuilding(px, pz); if (!bl) WALLS.each(px - 0.3, pz - 0.3, px + 0.3, pz + 0.3, q => { if (!bl && q.two && segDist(px, pz, q.ax, q.az, q.bx, q.bz) < 0.25) bl = true; }); ns++; if (bl) nb++; }
-        score += 12 * nb / ns;
+        score += 12 * nb / ns; blk = nb / ns;
       }
       if (skip && skip.has(ngKey({ a, c }))) return; // a wall already tried for this shop
-      if ((host || d < 12) && (!best || score < best.score)) best = { score, a, c, L, nx, nz, b, ux, uz };
+      if ((host || d < 12) && (!best || score < best.score)) best = { score, a, c, L, nx, nz, b, ux, uz, blk };
     };
     if (b.e !== undefined) { for (const r of ngRuns(b)) if (!r.party && r.L >= 2.6) one(r.a, r.c, r.L, r.nx, r.nz, r.ux, r.uz); return; }
     for (let i = 0; i < pts.length; i++) {
@@ -504,7 +507,16 @@ function ngWall(x, z, only, street, need = 0, use = null, skip = null) {
   };
   if (host && host.e !== undefined && EDIF.has(host.e)) for (const v of EDIF.get(host.e)) scan(v); // a DBGT building is several volumes: the front can be on any of them
   else if (host) scan(host); else BLD.each(x - 12, z - 12, x + 12, z + 12, scan);
+  if (host && (!best || best.blk > 0.3)) { // its best wall has something right in front: the volumes built onto it (within 0.6 m all round), whose outer wall is the facade there
+    const own = host.e !== undefined && EDIF.has(host.e) ? EDIF.get(host.e) : [host], bb = host.bb;
+    BLD.each(bb[0] - 1, bb[1] - 1, bb[2] + 1, bb[3] + 1, b => { if (own.includes(b) || b.zb !== undefined || (host.e !== undefined && b.e === host.e)) return; if (own.some(o => ngTouch(o, b, 0.6))) scan(b); });
+  }
   return best;
+}
+function ngTouch(a, b, m) { // two footprints within m of each other somewhere
+  if (a.bb[0] > b.bb[2] + m || b.bb[0] > a.bb[2] + m || a.bb[1] > b.bb[3] + m || b.bb[1] > a.bb[3] + m) return false;
+  for (const [P, Q] of [[a.pts, b.pts], [b.pts, a.pts]]) for (const p of P) for (let i = 0; i < Q.length; i++) { const q = Q[i], r = Q[(i + 1) % Q.length]; if (segDist(p[0], p[1], q[0], q[1], r[0], r[1]) < m) return true; }
+  return false;
 }
 let NG_LIST = null; const NG_SKIP = []; // the shops left without a front and why (the checks of docs/motore.md 7)
 const NG_NAMED = new Map(); // name -> shops, so the plain signs (signList) leave these to their fronts
@@ -566,7 +578,7 @@ function ngList() {
     });
     list.forEach((r, i) => { r.t = (span[i][0] + span[i][1]) / 2; r.w = span[i][1] - span[i][0]; });
     for (const r of list) {
-      if (r.w < 2.2) { if (r.b.e !== undefined && !r.big) retry.push(r); NG_SKIP.push([r.name, r.x, r.z, 'senza posto sul muro ' + r.L.toFixed(1)]); continue; }
+      if (r.w < 2.2) { if (!r.big) retry.push(r); NG_SKIP.push([r.name, r.x, r.z, 'senza posto sul muro ' + r.L.toFixed(1)]); continue; }
       r.cx = r.a[0] + r.ux * r.t; r.cz = r.a[1] + r.uz * r.t; r.tile = tileOf(r.cx, r.cz);
       if (r.big) { r.big.front = r; continue; }
       if (ngDepth(r) < 1.5 && r.bdist < 1.5 && r.b.e !== undefined) { // a DBGT wall with a garden wall or a shed in front of part of it: the front moves along it to a free stretch
@@ -577,7 +589,7 @@ function ngList() {
         if (ngDepth(r) < 1.5 && r.bdist < 1.5) { r.t = t0; r.cx = r.a[0] + r.ux * t0; r.cz = r.a[1] + r.uz * t0; delete r.depth; ngDepth(r); }
         r.tile = tileOf(r.cx, r.cz);
       }
-      if (ngDepth(r) < 1.5 && r.bdist < (r.b.e !== undefined ? 1.0 : 1.5)) { if (r.b.e !== undefined && !r.big) retry.push(r); NG_SKIP.push([r.name, r.x, r.z, 'qualcosa davanti a ' + r.bdist.toFixed(2)]); continue; } // another building right in front: no shop window there
+      if (ngDepth(r) < 1.5 && r.bdist < (r.b.e !== undefined ? 1.0 : 1.5)) { if (!r.big) retry.push(r); NG_SKIP.push([r.name, r.x, r.z, 'qualcosa davanti a ' + r.bdist.toFixed(2)]); continue; } // another building right in front: no shop window there
       if (r.b.gtop === undefined) r.b.gtop = bldTop(r.b);
       NG_LIST.push(r);
     }
@@ -586,12 +598,12 @@ function ngList() {
   for (const r of retry) {
     const skip = new Set([ngKey(r)]), e = D.ng.find(q => q[4] === r.name && Math.abs(q[0] / 10 - r.x) < 0.05 && Math.abs(q[1] / 10 - r.z) < 0.05); if (!e) continue;
     for (let k = 0; k < 4; k++) {
-      const W = ngWall(r.x, r.z, null, e[6], r.m.w * 0.55 + 0.4, use, skip); if (!W || W.b.e === undefined) break; skip.add(ngKey(W));
+      const W = ngWall(r.x, r.z, null, e[6], r.m.w * 0.55 + 0.4, use, skip); if (!W) break; skip.add(ngKey(W));
       const w = Math.min(r.m.w, W.L - 0.4), taken = NG_LIST.filter(q => ngKey(q) === ngKey(W)), along = (r.x - W.a[0]) * W.ux + (r.z - W.a[1]) * W.uz;
       const q = { ...r, ...W, w, depth: undefined, bdist: undefined }; let ok = false;
       for (let dt = 0; dt < W.L && !ok; dt += 0.5) for (const sg of dt ? [1, -1] : [1]) {
         const t = clamp(along, w / 2 + 0.2, W.L - w / 2 - 0.2) + sg * dt; if (t < w / 2 + 0.2 || t > W.L - w / 2 - 0.2 || taken.some(o => Math.abs(o.t - t) < (o.w + w) / 2 + 0.3)) continue;
-        q.t = t; q.cx = W.a[0] + W.ux * t; q.cz = W.a[1] + W.uz * t; delete q.depth; if (!(ngDepth(q) < 1.5 && q.bdist < 1.0)) { ok = true; break; } }
+        q.t = t; q.cx = W.a[0] + W.ux * t; q.cz = W.a[1] + W.uz * t; delete q.depth; if (!(ngDepth(q) < 1.5 && q.bdist < (W.b.e !== undefined ? 1.0 : 1.5))) { ok = true; break; } }
       if (!ok || w < 2.2) continue;
       q.tile = tileOf(q.cx, q.cz); if (q.b.gtop === undefined) q.b.gtop = bldTop(q.b); NG_LIST.push(q); use.set(ngKey(W), (use.get(ngKey(W)) || 0) + w + 0.3);
       const i = NG_SKIP.findIndex(sk => sk[0] === r.name && sk[1] === r.x && sk[2] === r.z); if (i >= 0) NG_SKIP.splice(i, 1);

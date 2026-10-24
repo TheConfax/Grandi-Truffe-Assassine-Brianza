@@ -278,7 +278,7 @@ if _cov and not os.environ.get('GTA_EDIFICI_OSM'):  # where a comune has its DBG
     import dbgt_edifici
     ED = dbgt_edifici.Edifici([(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'), _comuni[d_.lower()]) for d_ in sorted(os.listdir(DBT_DIR)) if d_.lower() in _comuni and os.path.exists(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'))],
                               log, lambda lon_, lat_: ((lon_ - lon0) * KX, -(lat_ - lat0) * KZ), round(TBASE, 1))
-    buildings[:] = ED.unisci(buildings, _Pp); ED.tetti()
+    buildings[:] = ED.unisci(buildings, _Pp); buildings += ED.tetti()  # (the wings of the volumes cut for their roofs come back as new pieces)
     for b in buildings + ED.alti: b.setdefault('t', BTYPE.get(b['bt'], 0))
 elif dbt_vols:  # (GTA_EDIFICI_OSM: the OSM buildings with the DBGT's heights, as before) where the Comune's map covers: its heights, no footprints only the ML model saw, its buildings OSM lacks
     _vg = [_Pp(p_) for p_, h_ in dbt_vols]; _vok = [i for i, g_ in enumerate(_vg) if g_ is not None]; _vt = STRtree([_vg[i] for i in _vok])
@@ -522,6 +522,9 @@ if _cov and not os.environ.get('GTA_STRADE_OSM'):
     import dbgt_strade
     STR = dbgt_strade.Strade([os.path.join(DBT_DIR, d_, 'dbgt.gpkg') for d_ in sorted(os.listdir(DBT_DIR)) if d_.lower() in _comuni and os.path.exists(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'))], dbt_cover.intersection(RECT.buffer(20)), log)
     STR.assi(raw_roads, nodes)
+    for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
+if ED:  # the OSM ways no DBGT axis took move out of the DBGT buildings, or are cut where they go through one (dbgt_edifici.py vie)
+    ED.vie(raw_roads, nodes, buildings, P)
     for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
 railL0 = [LineString(p) for p in rails if len(p) >= 2]
 _low = [r['line'] for r in raw_roads if not r['bridge'] and not r['tunnel'] and r['line'].length > 0.1] + railL0
@@ -1462,7 +1465,7 @@ def tbox(t): i, j = t % ntx, t // ntx; return box(-HW + i * TILE, -HH + j * TILE
 def push(t, k, v): tiles[t].setdefault(k, []).append(v)
 for b in buildings + (ED.alti if ED else []):
     c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b.get('t', BTYPE.get(b.get('bt'), 0))}
-    for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'wc', 'rcol'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours
+    for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'wc', 'rcol', 'st'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
         if b.get(k_) is not None: rec[k_] = b[k_]
     if b.get('k'): rec['k'] = [enc(h) for h in b['k']]
     if b.get('bt') in ('garage', 'garages'): rec['g'] = 1  # rows of up-and-over doors

@@ -85,8 +85,10 @@ for (const T of TILES) {
     const holes = (B.k || []).map(dec).filter(h => h.length >= 3), bb = bbox(outer);
     const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g }; // g: 1 garages, 2 greenhouse (paesaggio3.js)
     // a volume of the DBGT (src/dbgt_edifici.py): zt the top of its walls and zb its raised base (a portico, a passage, an overhang) above
-    // terrain.base, e its building, rk/rf/rc its roof (planes over the top of the walls), wc/rcol the colours OSM gives
-    for (const k of ['zt', 'zb', 'e', 'rk', 'rf', 'rc', 'wc', 'rcol']) if (B[k] !== undefined) rec[k] = B[k];
+    // terrain.base, e its building, rk/rf/rc its roof (planes over the top of the walls), wc/rcol the colours OSM gives, st its state in the
+    // 2015 survey when OSM does not say otherwise (2 a ruin: walls without a roof, no shop signs; 1 under construction: a bare shell)
+    for (const k of ['zt', 'zb', 'e', 'rk', 'rf', 'rc', 'wc', 'rcol', 'st']) if (B[k] !== undefined) rec[k] = B[k];
+    if (rec.st) rec.noSign = true;
     T.bld.push(rec);
     if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
       BUILDINGS.push(rec); const y1 = B.zt + 3;
@@ -1322,6 +1324,7 @@ function* buildTileGen(T) {
       else { kind = 'old'; wallCol = pcB(PAL_OLD); }
       if (top - bot < 4.8 && !raised) kind = 'plain';
       wallCol = colOr(B.wc, () => wallCol);
+      if (B.st) { kind = 'plain'; wallCol = B.st === 2 ? pcB(['#a39a8b', '#9c9284', '#aaa08e']) : COL('#b9b6ae'); } // a ruin: bare stone and brick; a shell: concrete
       const b = wb[kind], tile = kind === 'old' ? 3.4 : kind === 'mod' ? 4.2 : 4;
       // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
       const planes = roofPlanes(B), flatDbgt = B.rk === 4;
@@ -1343,6 +1346,12 @@ function* buildTileGen(T) {
             const ga = raised ? bot - 3 : H.ground(ax, az), gc = raised ? bot - 3 : H.ground(cx, cz);
             b.ao.push(bot - ga, pitched ? ya - bot : 99, ia + s0, ic + L - s0, bot - gc, pitched ? yc - bot : 99, ia + s1, ic + L - s1, yc - gc, pitched ? 0 : 99, ia + s1, ic + L - s1, ya - ga, pitched ? 0 : 99, ia + s0, ic + L - s0);
             if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
+            if (B.st === 2) { // a ruin has no roof: the inside of its walls shows from above
+              const bi = b.p.length / 3;
+              vtx(b, ax, bot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, bot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, (yc - gmax) / 3.1, wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, (ya - gmax) / 3.1, wallCol);
+              b.ao.push(bot - ga, 99, 99, 99, bot - gc, 99, 99, 99, yc - gc, 99, 99, 99, ya - ga, 99, 99, 99);
+              if (nx * (-dz) + nz * dx > 0) b.i.push(bi, bi + 2, bi + 1, bi, bi + 3, bi + 2); else b.i.push(bi, bi + 1, bi + 2, bi, bi + 2, bi + 3);
+            }
           }
           const u0 = acc / tile; acc += L;
           if (kind === 'old') { // stone sills under the painted windows (middle of each bay, 0.9-1 m up each 3.1 m floor), from the first floor: the ground floor is shops
@@ -1356,6 +1365,7 @@ function* buildTileGen(T) {
         if (!raised) for (let i = 0; i < nr; i++) aoGround(aoB, ring, E, i, inner(i));
       }
       if (raised) soffit(roofB, outer, holes, bot, COL('#9a958c'));
+      if (B.st === 2) continue;
       if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
       else if (pitched) {
         const [cx, cz] = centroid(outer), rh = Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
@@ -1372,7 +1382,7 @@ function* buildTileGen(T) {
     // the entrances of the DBGT (ACC_INT, the middle of the opening): a door on the nearest wall within 1.5 m
     for (const [X, Z] of d.ai || []) {
       const x = X / 10, z = Z / 10; let best = null;
-      BLD.each(x - 2, z - 2, x + 2, z + 2, Bb => { if (Bb.lm || Bb.big || Bb.t === 9 || Bb.zb !== undefined) return; const P = Bb.pts; for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1.4) continue; const dd = segDist(x, z, a[0], a[1], c[0], c[1]); if (dd < 1.5 && (!best || dd < best.d)) best = { d: dd, a, c, L, B: Bb }; } });
+      BLD.each(x - 2, z - 2, x + 2, z + 2, Bb => { if (Bb.lm || Bb.big || Bb.t === 9 || Bb.zb !== undefined || Bb.st === 2) return; const P = Bb.pts; for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1.4) continue; const dd = segDist(x, z, a[0], a[1], c[0], c[1]); if (dd < 1.5 && (!best || dd < best.d)) best = { d: dd, a, c, L, B: Bb }; } });
       if (!best) continue;
       const { a, c, L } = best, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L; let nx = uz, nz = -ux; const s = clamp((x - a[0]) * ux + (z - a[1]) * uz, 0.7, L - 0.7), px = a[0] + ux * s, pz = a[1] + uz * s;
       if (inPoly(px + nx * 0.2, pz + nz * 0.2, best.B.pts)) { nx = -nx; nz = -nz; }
