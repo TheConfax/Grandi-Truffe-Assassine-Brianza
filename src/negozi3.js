@@ -760,11 +760,13 @@ function ngFront(s, C) {
   if (ext.has('app')) { const ly = top > sy + sh + 0.45 ? sy + sh + 0.18 : Hv - 0.35; for (const sx of [-1, 1]) { const x = sx * (hw - 0.3); box(0.04, 0.04, 0.35, x, ly + 0.05, 0.17, '#2b2b2b'); neon('warm', 0.16, 0.1, 0.18, x, ly, 0.33); } }
   if (ext.has('menu') && doors.length) { const x = doors[0][1] + 0.35 < hw - 0.2 ? doors[0][1] + 0.35 : doors[0][0] - 0.35; box(0.46, 0.62, 0.06, x, 1.45, 0.07, '#2b2b2b'); neon('warm', 0.38, 0.52, 0.02, x, 1.45, 0.105); }
   if (ext.has('neon')) { const g0 = segs.find(q => q[0] === 'glass'); if (g0 && g0[2] - g0[1] > 0.9) { const x = (g0[1] + g0[2]) / 2, c = cell(0.72, 0.24, (g, w, h) => { g.fillStyle = '#120a0a'; g.fillRect(0, 0, w, h); g.shadowColor = '#ff3a3a'; g.shadowBlur = 6; ngText(g, 'APERTO', w / 2, h / 2, w * 0.85, h * 0.7, NG_FONT.script, '#ff5a4a'); g.shadowBlur = 0; }); sign(c, qz(C.sign, x - 0.36, Hv - 0.62, x + 0.36, Hv - 0.38, 0.06)); } }
-  // standing on the pavement: worked out once (what stands there stays, even when the tile is built again)
+  // standing on the pavement: worked out once (what stands there stays, even when the tile is built again). Off the asphalt as drawn too
+  // (nearAsph: in Meda the carriageways, parking lanes and car parks AC_VEI, wider than the axis band of ngRoad; unione di strade e verde,
+  // 24/10: 34 pots, tables and bins of the shops stood on them)
   if (!s.items) {
     s.items = []; const here = [];
     const free = (x, z, r) => {
-      const [wx, wz] = lx(x, z); if (z + r > depth - 0.15 || ngRoad(wx, wz, r + 0.3) || inBuilding(wx, wz, r * 0.7) || nearRail(wx, wz, 3) || ngInPark(wx, wz, r + 0.2)) return null;
+      const [wx, wz] = lx(x, z); if (z + r > depth - 0.15 || ngRoad(wx, wz, r + 0.3) || nearAsph(wx, wz, r) || inBuilding(wx, wz, r * 0.7) || nearRail(wx, wz, 3) || ngInPark(wx, wz, r + 0.2)) return null;
       if (here.some(([hx, hz, hr]) => hyp(hx - wx, hz - wz) < hr + r + 0.15)) return null;
       let hit = false; WALLS.each(wx - r - 1, wz - r - 1, wx + r + 1, wz + r + 1, q => { if (!hit && q.r && !(q.dyn && !q.on) && hyp(q.x - wx, q.z - wz) < q.r + r + 0.2) hit = true; }); if (hit) return null;
       PROPG.each(wx - 1, wz - 1, wx + 1, wz + 1, p => { if (!hit && hyp(p.x - wx, p.z - wz) < p.r + r + 0.3) hit = true; }); if (hit) return null;

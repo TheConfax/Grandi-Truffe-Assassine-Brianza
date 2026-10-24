@@ -938,6 +938,15 @@ class Strade:
         sh = (dl - dr) / 2
         return round(x - uz * sh, 1), round(z + ux * sh, 1), round(max(2.5, dl + dr), 1)
 
+    def togli_cortili(s, cantieri):
+        """the yards inside an OSM building site (landuse=construction) are gone since the survey (Meda 2015), as the green and the trees
+        of the DBGT there (dbgt_verde.py cons): the site keeps its own ground (unione di strade e verde, 24/10: the site with the crane
+        along the Milano-Meda was a grey yard with patches of earth)"""
+        if cantieri is None or cantieri.is_empty or s.cv.is_empty: return
+        a0 = s.cv.area; s.cv = s.cv.difference(cantieri)
+        s.rep['superfici']['cortili_nei_cantieri_m2'] = round(a0 - s.cv.area); s.rep['superfici']['cortili_m2'] = round(s.cv.area)
+        s.log('dbgt strade: cortili tolti nei cantieri OSM %d m2' % round(a0 - s.cv.area))
+
     def push_tiles(s, ntiles, tbox, polys_of, push):
         """the yards (cv), the islands and medians of the DBGT (md with g: 1, drawn whatever their size; v: 1 grass on top) and the carriageways
         on bridges (ap, only for what keeps off the carriageway) in the tiles.

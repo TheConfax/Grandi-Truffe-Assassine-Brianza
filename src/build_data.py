@@ -1528,7 +1528,7 @@ for t in range(ntx * ntz):
     bx = tbox(t)
     if not median.intersects(bx): continue
     for p_ in polys_of(median.intersection(bx), 0.2, 3): push(t, 'md', p_)
-if STR: STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
+if STR: STR.togli_cortili(VERDE.cons); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
 push_lines('fe', fences)
 for pts, w_, caps in riv_out:
     L = LineString(pts); s0, s1 = pts[0], pts[-1]

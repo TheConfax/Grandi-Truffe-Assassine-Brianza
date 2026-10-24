@@ -1,0 +1,1296 @@
+{
+ "vie_tagliate_al_confine": {
+  "vie": 18,
+  "nodi_nuovi": 11
+ },
+ "vie_nei_cortili_senza_traffico": {
+  "n": 23,
+  "dove": [
+   "?x=-590&z=-966",
+   "?x=-629&z=-1072",
+   "?x=-598&z=-1019",
+   "?x=-1040&z=-404",
+   "?x=-1056&z=-448",
+   "?x=-249&z=-1941",
+   "?x=-146&z=-1762",
+   "?x=1003&z=-1249",
+   "?x=-157&z=-1886",
+   "?x=82&z=-830",
+   "?x=-215&z=-154",
+   "?x=-937&z=-542",
+   "?x=-1071&z=-495",
+   "?x=191&z=-616",
+   "?x=483&z=-874",
+   "?x=-299&z=622",
+   "?x=1819&z=-346",
+   "?x=223&z=-662",
+   "?x=-712&z=230",
+   "?x=-743&z=191",
+   "?x=1025&z=-165",
+   "?x=65&z=-170",
+   "?x=371&z=-898"
+  ],
+  "code_nei_cortili": 5,
+  "dove_code": [
+   "?x=854&z=873",
+   "?x=1368&z=-79",
+   "?x=1263&z=-315",
+   "?x=-572&z=-1658",
+   "?x=1599&z=551"
+  ]
+ },
+ "assi": {
+  "carreggiate_doppie_osm_su_un_asse": 9,
+  "tratti_contesi": 68,
+  "tratti_contesi_elenco": [
+   {
+    "perde": "tertiary o",
+    "vince": "residential o",
+    "m": 15.0,
+    "link": "?x=672&z=-531"
+   },
+   {
+    "perde": "tertiary",
+    "vince": "tertiary o",
+    "m": 9.0,
+    "link": "?x=1429&z=428"
+   },
+   {
+    "perde": "unclassified",
+    "vince": "unclassified",
+    "m": 12.0,
+    "link": "?x=1759&z=-358"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 15.0,
+    "link": "?x=690&z=189"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 12.0,
+    "link": "?x=130&z=4"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "trunk_link o",
+    "m": 60.0,
+    "link": "?x=76&z=250"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 30.0,
+    "link": "?x=72&z=215"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 30.0,
+    "link": "?x=79&z=214"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 96.0,
+    "link": "?x=60&z=324"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 90.0,
+    "link": "?x=68&z=323"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 18.0,
+    "link": "?x=0&z=244"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 15.0,
+    "link": "?x=-91&z=294"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 18.0,
+    "link": "?x=-78&z=216"
+   },
+   {
+    "perde": "trunk o",
+    "vince": "trunk_link o",
+    "m": 54.0,
+    "link": "?x=-33&z=714"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 9.0,
+    "link": "?x=-144&z=681"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 159.0,
+    "link": "?x=31&z=451"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 156.0,
+    "link": "?x=29&z=448"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 39.0,
+    "link": "?x=-51&z=477"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 30.0,
+    "link": "?x=65&z=380"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 27.0,
+    "link": "?x=57&z=379"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 27.0,
+    "link": "?x=64&z=380"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 12.0,
+    "link": "?x=-186&z=235"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 156.0,
+    "link": "?x=88&z=131"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 150.0,
+    "link": "?x=96&z=130"
+   },
+   {
+    "perde": "service o",
+    "vince": "residential o",
+    "m": 15.0,
+    "link": "?x=623&z=-975"
+   },
+   {
+    "perde": "residential",
+    "vince": "service",
+    "m": 18.0,
+    "link": "?x=576&z=-1501"
+   },
+   {
+    "perde": "residential o",
+    "vince": "tertiary o",
+    "m": 12.0,
+    "link": "?x=392&z=-515"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 21.0,
+    "link": "?x=34&z=-18"
+   },
+   {
+    "perde": "unclassified o",
+    "vince": "tertiary o",
+    "m": 9.0,
+    "link": "?x=316&z=-138"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 33.0,
+    "link": "?x=325&z=508"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 18.0,
+    "link": "?x=1664&z=-839"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 18.0,
+    "link": "?x=1669&z=-841"
+   },
+   {
+    "perde": "unclassified",
+    "vince": "residential",
+    "m": 9.0,
+    "link": "?x=-952&z=-1450"
+   },
+   {
+    "perde": "residential",
+    "vince": "residential",
+    "m": 18.0,
+    "link": "?x=-296&z=-969"
+   },
+   {
+    "perde": "unclassified o",
+    "vince": "unclassified o",
+    "m": 12.0,
+    "link": "?x=29&z=-286"
+   },
+   {
+    "perde": "unclassified o",
+    "vince": "unclassified o",
+    "m": 27.0,
+    "link": "?x=37&z=-283"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 15.0,
+    "link": "?x=1270&z=693"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 24.0,
+    "link": "?x=-74&z=490"
+   },
+   {
+    "perde": "trunk o",
+    "vince": "trunk_link o",
+    "m": 12.0,
+    "link": "?x=-235&z=212"
+   },
+   {
+    "perde": "trunk o",
+    "vince": "trunk_link o",
+    "m": 51.0,
+    "link": "?x=-277&z=189"
+   },
+   {
+    "perde": "trunk o",
+    "vince": "trunk_link o",
+    "m": 27.0,
+    "link": "?x=-247&z=205"
+   },
+   {
+    "perde": "service o",
+    "vince": "trunk o",
+    "m": 72.0,
+    "link": "?x=-579&z=122"
+   },
+   {
+    "perde": "service o",
+    "vince": "trunk o",
+    "m": 33.0,
+    "link": "?x=-703&z=102"
+   },
+   {
+    "perde": "service o",
+    "vince": "trunk o",
+    "m": 48.0,
+    "link": "?x=-742&z=100"
+   },
+   {
+    "perde": "unclassified o",
+    "vince": "unclassified",
+    "m": 12.0,
+    "link": "?x=863&z=55"
+   },
+   {
+    "perde": "service",
+    "vince": "unclassified o",
+    "m": 15.0,
+    "link": "?x=880&z=74"
+   },
+   {
+    "perde": "service",
+    "vince": "unclassified o",
+    "m": 12.0,
+    "link": "?x=945&z=207"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "trunk_link o",
+    "m": 30.0,
+    "link": "?x=166&z=480"
+   },
+   {
+    "perde": "residential o",
+    "vince": "tertiary o",
+    "m": 12.0,
+    "link": "?x=401&z=-419"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 15.0,
+    "link": "?x=261&z=-1253"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 12.0,
+    "link": "?x=1333&z=655"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 12.0,
+    "link": "?x=1341&z=705"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 15.0,
+    "link": "?x=1271&z=711"
+   },
+   {
+    "perde": "residential o",
+    "vince": "tertiary o",
+    "m": 18.0,
+    "link": "?x=1284&z=700"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 9.0,
+    "link": "?x=490&z=-659"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 48.0,
+    "link": "?x=-495&z=-511"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 51.0,
+    "link": "?x=-500&z=-512"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 15.0,
+    "link": "?x=1648&z=-863"
+   },
+   {
+    "perde": "residential",
+    "vince": "residential",
+    "m": 9.0,
+    "link": "?x=-166&z=-925"
+   },
+   {
+    "perde": "tertiary",
+    "vince": "tertiary o",
+    "m": 45.0,
+    "link": "?x=1449&z=373"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 18.0,
+    "link": "?x=1408&z=408"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 15.0,
+    "link": "?x=1663&z=-860"
+   },
+   {
+    "perde": "unclassified",
+    "vince": "unclassified",
+    "m": 24.0,
+    "link": "?x=1897&z=-641"
+   },
+   {
+    "perde": "unclassified",
+    "vince": "unclassified",
+    "m": 9.0,
+    "link": "?x=1896&z=-650"
+   },
+   {
+    "perde": "tertiary",
+    "vince": "tertiary o",
+    "m": 9.0,
+    "link": "?x=1432&z=418"
+   },
+   {
+    "perde": "service",
+    "vince": "unclassified",
+    "m": 12.0,
+    "link": "?x=-580&z=-150"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 9.0,
+    "link": "?x=1682&z=-851"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "tertiary o",
+    "m": 9.0,
+    "link": "?x=236&z=469"
+   }
+  ],
+  "buchi_riempiti": 3,
+  "nodi_spostati": 3649,
+  "nodi_su_giunzione_dbgt": 497,
+  "nodi_media": 204,
+  "nodi_senza_giunzione_comune": 18,
+  "nodi_uniti_sugli_assi": 208,
+  "punte_tolte": 77,
+  "nodi_nuovi_lungo_gli_assi": 4340,
+  "spostamento_nodi_m": {
+   "p50": 0.74,
+   "p90": 2.3,
+   "p99": 5.43,
+   "max": 12.5
+  },
+  "vie_abbinate": {
+   "str": 912,
+   "vms": 48,
+   "cic": 25
+  },
+  "tempo_s": 1.5,
+  "anelli_osm": {
+   "n": 3,
+   "dove": [
+    "?x=-76&z=-856",
+    "?x=1674&z=-857",
+    "?x=251&z=478"
+   ]
+  },
+  "larghezze_da_ac_vei": {
+   "vie": 698,
+   "differenza_dalla_larghezza_osm_m": {
+    "p10": -1.75,
+    "p50": 0.75,
+    "p90": 4.0
+   }
+  }
+ },
+ "corsie_locali": {
+  "vie": 479,
+  "carreggiate_condivise": 91
+ },
+ "superfici": {
+  "osm_tenute_vie": 79,
+  "asfalto_m2": 860353,
+  "cortili_m2": 974994,
+  "marciapiedi_m2": 62647,
+  "piazze_m2": 44081,
+  "vialetti_m2": 31976,
+  "isole_m2": 15408,
+  "tempo_s": 31.7,
+  "cortili_nei_cantieri_m2": 14123
+ },
+ "controlli": {
+  "oggetti_in_carreggiata": {
+   "n": 0,
+   "di": 374,
+   "dove": []
+  },
+  "lampioni_in_carreggiata": {
+   "n": 0,
+   "di": 91,
+   "dove": []
+  },
+  "alberi_in_carreggiata": {
+   "n": 0,
+   "di": 78060,
+   "dove": []
+  },
+  "pali_dei_cartelli_in_carreggiata": {
+   "n": 0,
+   "di": 32,
+   "dove": []
+  },
+  "barriere_in_carreggiata": {
+   "n": 0,
+   "metri": 0.0,
+   "dove": []
+  },
+  "edifici_su_carreggiata": {
+   "n": 362,
+   "dove": [
+    "?x=495&z=-728",
+    "?x=-614&z=-395",
+    "?x=1533&z=731",
+    "?x=770&z=-1588",
+    "?x=669&z=-1520",
+    "?x=720&z=-1504",
+    "?x=814&z=-1663",
+    "?x=-1051&z=-311",
+    "?x=417&z=-242",
+    "?x=92&z=-822",
+    "?x=26&z=-784",
+    "?x=112&z=-820",
+    "?x=-141&z=-866",
+    "?x=-156&z=-857",
+    "?x=-30&z=-745",
+    "?x=100&z=-809",
+    "?x=-128&z=-850",
+    "?x=1623&z=254",
+    "?x=1057&z=-9",
+    "?x=442&z=851"
+   ]
+  },
+  "corsie_dentro_ac_vei": {
+   "campioni": 48666,
+   "fuori": 1232,
+   "quota": 0.0253,
+   "fuori_per_motivo": {
+    "altro": 510,
+    "strettoia": 552,
+    "incrocio": 170
+   },
+   "auto_fuori": 956,
+   "nota_auto": "la linea della corsia a meno di 0,9 m (mezza auto) dal bordo o fuori",
+   "margine_m": {
+    "p1": -0.59,
+    "p10": 0.12,
+    "p50": 1.03
+   },
+   "dove": [
+    "?x=1937&z=-613",
+    "?x=-125&z=723",
+    "?x=967&z=-1481",
+    "?x=957&z=-1465",
+    "?x=797&z=-894",
+    "?x=794&z=-896",
+    "?x=841&z=-641",
+    "?x=912&z=-614",
+    "?x=786&z=-1643",
+    "?x=784&z=-1644",
+    "?x=698&z=-1317",
+    "?x=280&z=-1914",
+    "?x=282&z=-1911",
+    "?x=330&z=-1859",
+    "?x=332&z=-1857",
+    "?x=694&z=-1195",
+    "?x=693&z=-1193",
+    "?x=463&z=-1133",
+    "?x=463&z=-1136",
+    "?x=437&z=-1077",
+    "?x=443&z=-1089",
+    "?x=444&z=-1392",
+    "?x=444&z=-1389",
+    "?x=200&z=-662",
+    "?x=198&z=-660",
+    "?x=113&z=-810",
+    "?x=107&z=-808",
+    "?x=312&z=-599",
+    "?x=1698&z=-564",
+    "?x=1695&z=-565"
+   ]
+  },
+  "corsie_di_fronte": {
+   "n": 113,
+   "campioni": 124687,
+   "vie_diverse": 113,
+   "stessa_via": 3490,
+   "nota": "punti di corsia (1 m) con una corsia di verso opposto a meno di 1.8 m, lontano dagli incroci",
+   "dove": [
+    "?x=1896&z=-643",
+    "?x=256&z=-1253",
+    "?x=530&z=-184",
+    "?x=863&z=55",
+    "?x=406&z=-414",
+    "?x=255&z=-1254",
+    "?x=267&z=450",
+    "?x=188&z=-1281",
+    "?x=407&z=-414",
+    "?x=253&z=-1255",
+    "?x=185&z=-1282",
+    "?x=407&z=-414",
+    "?x=250&z=-1257",
+    "?x=409&z=-412",
+    "?x=1331&z=659",
+    "?x=408&z=-413",
+    "?x=410&z=-412",
+    "?x=863&z=55",
+    "?x=248&z=-1258",
+    "?x=1332&z=658"
+   ]
+  },
+  "traffico_nei_cortili": {
+   "n": 2,
+   "metri": 36,
+   "nota": "vie con traffico IA per 12 m o piu sopra un cortile AC_VEI 0307",
+   "dove": [
+    "?x=398&z=-967",
+    "?x=1425&z=-188"
+   ]
+  },
+  "osm_senza_dbgt": {
+   "n": 79,
+   "metri": 6385,
+   "per_classe": {
+    "service": 27,
+    "path": 13,
+    "steps": 6,
+    "cycleway": 2,
+    "footway": 24,
+    "unclassified": 1,
+    "track": 2,
+    "residential": 2,
+    "tertiary": 2
+   },
+   "elenco": [
+    {
+     "classe": "service",
+     "m": 83,
+     "link": "?x=474&z=16"
+    },
+    {
+     "classe": "path",
+     "m": 487,
+     "link": "?x=163&z=-2395"
+    },
+    {
+     "classe": "path",
+     "m": 358,
+     "link": "?x=-521&z=-2163"
+    },
+    {
+     "classe": "service",
+     "m": 14,
+     "link": "?x=74&z=-841"
+    },
+    {
+     "classe": "service",
+     "m": 15,
+     "link": "?x=-111&z=-857"
+    },
+    {
+     "classe": "steps",
+     "m": 27,
+     "link": "?x=79&z=-777"
+    },
+    {
+     "classe": "cycleway",
+     "m": 239,
+     "link": "?x=914&z=579"
+    },
+    {
+     "classe": "path",
+     "m": 449,
+     "link": "?x=-609&z=-1857"
+    },
+    {
+     "classe": "path",
+     "m": 281,
+     "link": "?x=-791&z=-2078"
+    },
+    {
+     "classe": "path",
+     "m": 113,
+     "link": "?x=2024&z=-516"
+    },
+    {
+     "classe": "steps",
+     "m": 21,
+     "link": "?x=363&z=-471"
+    },
+    {
+     "classe": "steps",
+     "m": 12,
+     "link": "?x=399&z=-559"
+    },
+    {
+     "classe": "steps",
+     "m": 12,
+     "link": "?x=411&z=-546"
+    },
+    {
+     "classe": "footway",
+     "m": 17,
+     "link": "?x=400&z=-549"
+    },
+    {
+     "classe": "footway",
+     "m": 148,
+     "link": "?x=42&z=-1961"
+    },
+    {
+     "classe": "footway",
+     "m": 18,
+     "link": "?x=401&z=-566"
+    },
+    {
+     "classe": "service",
+     "m": 30,
+     "link": "?x=1381&z=-346"
+    },
+    {
+     "classe": "path",
+     "m": 267,
+     "link": "?x=430&z=-2133"
+    },
+    {
+     "classe": "footway",
+     "m": 13,
+     "link": "?x=17&z=-1885"
+    },
+    {
+     "classe": "footway",
+     "m": 237,
+     "link": "?x=-523&z=-1267"
+    },
+    {
+     "classe": "path",
+     "m": 132,
+     "link": "?x=-624&z=-1699"
+    },
+    {
+     "classe": "path",
+     "m": 117,
+     "link": "?x=-39&z=-1581"
+    },
+    {
+     "classe": "footway",
+     "m": 137,
+     "link": "?x=518&z=-541"
+    },
+    {
+     "classe": "unclassified",
+     "m": 290,
+     "link": "?x=1501&z=-246"
+    },
+    {
+     "classe": "path",
+     "m": 272,
+     "link": "?x=-523&z=-2017"
+    },
+    {
+     "classe": "service",
+     "m": 158,
+     "link": "?x=504&z=-578"
+    },
+    {
+     "classe": "footway",
+     "m": 31,
+     "link": "?x=511&z=-519"
+    },
+    {
+     "classe": "footway",
+     "m": 41,
+     "link": "?x=520&z=-568"
+    },
+    {
+     "classe": "service",
+     "m": 55,
+     "link": "?x=581&z=-618"
+    },
+    {
+     "classe": "service",
+     "m": 44,
+     "link": "?x=574&z=-619"
+    },
+    {
+     "classe": "steps",
+     "m": 17,
+     "link": "?x=362&z=-477"
+    },
+    {
+     "classe": "steps",
+     "m": 18,
+     "link": "?x=359&z=-469"
+    },
+    {
+     "classe": "footway",
+     "m": 69,
+     "link": "?x=370&z=-486"
+    },
+    {
+     "classe": "track",
+     "m": 63,
+     "link": "?x=-696&z=-1605"
+    },
+    {
+     "classe": "footway",
+     "m": 33,
+     "link": "?x=842&z=623"
+    },
+    {
+     "classe": "cycleway",
+     "m": 164,
+     "link": "?x=811&z=254"
+    },
+    {
+     "classe": "footway",
+     "m": 92,
+     "link": "?x=816&z=203"
+    },
+    {
+     "classe": "footway",
+     "m": 77,
+     "link": "?x=785&z=194"
+    },
+    {
+     "classe": "footway",
+     "m": 11,
+     "link": "?x=807&z=171"
+    },
+    {
+     "classe": "residential",
+     "m": 99,
+     "link": "?x=818&z=211"
+    },
+    {
+     "classe": "service",
+     "m": 98,
+     "link": "?x=871&z=173"
+    },
+    {
+     "classe": "footway",
+     "m": 150,
+     "link": "?x=925&z=472"
+    },
+    {
+     "classe": "tertiary",
+     "m": 25,
+     "link": "?x=74&z=214"
+    },
+    {
+     "classe": "tertiary",
+     "m": 25,
+     "link": "?x=77&z=214"
+    },
+    {
+     "classe": "residential",
+     "m": 43,
+     "link": "?x=803&z=-25"
+    },
+    {
+     "classe": "footway",
+     "m": 25,
+     "link": "?x=726&z=-31"
+    },
+    {
+     "classe": "footway",
+     "m": 20,
+     "link": "?x=733&z=-41"
+    },
+    {
+     "classe": "footway",
+     "m": 6,
+     "link": "?x=732&z=-45"
+    },
+    {
+     "classe": "footway",
+     "m": 6,
+     "link": "?x=737&z=-41"
+    },
+    {
+     "classe": "service",
+     "m": 34,
+     "link": "?x=533&z=564"
+    },
+    {
+     "classe": "service",
+     "m": 125,
+     "link": "?x=504&z=576"
+    },
+    {
+     "classe": "service",
+     "m": 25,
+     "link": "?x=552&z=902"
+    },
+    {
+     "classe": "footway",
+     "m": 15,
+     "link": "?x=571&z=908"
+    },
+    {
+     "classe": "service",
+     "m": 34,
+     "link": "?x=894&z=1012"
+    },
+    {
+     "classe": "path",
+     "m": 156,
+     "link": "?x=324&z=-2347"
+    },
+    {
+     "classe": "service",
+     "m": 34,
+     "link": "?x=-664&z=97"
+    },
+    {
+     "classe": "service",
+     "m": 31,
+     "link": "?x=-624&z=100"
+    },
+    {
+     "classe": "service",
+     "m": 16,
+     "link": "?x=-653&z=96"
+    },
+    {
+     "classe": "service",
+     "m": 10,
+     "link": "?x=-642&z=91"
+    },
+    {
+     "classe": "service",
+     "m": 28,
+     "link": "?x=-625&z=104"
+    }
+   ]
+  },
+  "dbgt_senza_osm": {
+   "n": 117,
+   "metri": 6200,
+   "per_tipo": {
+    "01": 76,
+    "0101": 3,
+    "0307": 2,
+    "0102": 2,
+    "0206": 31,
+    "0205": 3
+   },
+   "elenco": [
+    {
+     "tipo": "01",
+     "m": 322,
+     "link": "?x=-145&z=-2615"
+    },
+    {
+     "tipo": "01",
+     "m": 298,
+     "link": "?x=591&z=-1908"
+    },
+    {
+     "tipo": "01",
+     "m": 276,
+     "link": "?x=-826&z=-150"
+    },
+    {
+     "tipo": "01",
+     "m": 259,
+     "link": "?x=-378&z=-2423"
+    },
+    {
+     "tipo": "01",
+     "m": 204,
+     "link": "?x=-615&z=-1578"
+    },
+    {
+     "tipo": "0101",
+     "m": 195,
+     "link": "?x=-1047&z=-1718"
+    },
+    {
+     "tipo": "01",
+     "m": 189,
+     "link": "?x=24&z=-1921"
+    },
+    {
+     "tipo": "01",
+     "m": 169,
+     "link": "?x=1493&z=889"
+    },
+    {
+     "tipo": "01",
+     "m": 164,
+     "link": "?x=1569&z=-994"
+    },
+    {
+     "tipo": "01",
+     "m": 164,
+     "link": "?x=-1042&z=-939"
+    },
+    {
+     "tipo": "01",
+     "m": 157,
+     "link": "?x=-775&z=-1893"
+    },
+    {
+     "tipo": "01",
+     "m": 142,
+     "link": "?x=91&z=132"
+    },
+    {
+     "tipo": "01",
+     "m": 136,
+     "link": "?x=-740&z=-1690"
+    },
+    {
+     "tipo": "01",
+     "m": 135,
+     "link": "?x=543&z=-1433"
+    },
+    {
+     "tipo": "01",
+     "m": 128,
+     "link": "?x=-541&z=-892"
+    },
+    {
+     "tipo": "01",
+     "m": 121,
+     "link": "?x=-404&z=-1462"
+    },
+    {
+     "tipo": "01",
+     "m": 121,
+     "link": "?x=744&z=-1336"
+    },
+    {
+     "tipo": "01",
+     "m": 117,
+     "link": "?x=1530&z=-109"
+    },
+    {
+     "tipo": "01",
+     "m": 110,
+     "link": "?x=568&z=-834"
+    },
+    {
+     "tipo": "01",
+     "m": 103,
+     "link": "?x=-712&z=-1018"
+    },
+    {
+     "tipo": "01",
+     "m": 102,
+     "link": "?x=513&z=-1757"
+    },
+    {
+     "tipo": "01",
+     "m": 99,
+     "link": "?x=44&z=-735"
+    },
+    {
+     "tipo": "01",
+     "m": 94,
+     "link": "?x=1647&z=-506"
+    },
+    {
+     "tipo": "01",
+     "m": 85,
+     "link": "?x=333&z=-1790"
+    },
+    {
+     "tipo": "01",
+     "m": 83,
+     "link": "?x=1439&z=-558"
+    },
+    {
+     "tipo": "01",
+     "m": 80,
+     "link": "?x=450&z=-1159"
+    },
+    {
+     "tipo": "01",
+     "m": 80,
+     "link": "?x=1587&z=-992"
+    },
+    {
+     "tipo": "01",
+     "m": 76,
+     "link": "?x=733&z=-1247"
+    },
+    {
+     "tipo": "01",
+     "m": 72,
+     "link": "?x=597&z=-1721"
+    },
+    {
+     "tipo": "01",
+     "m": 68,
+     "link": "?x=-873&z=-1349"
+    },
+    {
+     "tipo": "01",
+     "m": 66,
+     "link": "?x=-321&z=-1708"
+    },
+    {
+     "tipo": "01",
+     "m": 64,
+     "link": "?x=784&z=-1364"
+    },
+    {
+     "tipo": "01",
+     "m": 63,
+     "link": "?x=301&z=-441"
+    },
+    {
+     "tipo": "0307",
+     "m": 60,
+     "link": "?x=1250&z=-1151"
+    },
+    {
+     "tipo": "01",
+     "m": 57,
+     "link": "?x=-585&z=-1212"
+    },
+    {
+     "tipo": "01",
+     "m": 55,
+     "link": "?x=1749&z=-907"
+    },
+    {
+     "tipo": "01",
+     "m": 52,
+     "link": "?x=1521&z=-1026"
+    },
+    {
+     "tipo": "01",
+     "m": 51,
+     "link": "?x=-519&z=-1153"
+    },
+    {
+     "tipo": "01",
+     "m": 51,
+     "link": "?x=1613&z=-856"
+    },
+    {
+     "tipo": "01",
+     "m": 50,
+     "link": "?x=774&z=-937"
+    },
+    {
+     "tipo": "01",
+     "m": 50,
+     "link": "?x=1810&z=-875"
+    },
+    {
+     "tipo": "01",
+     "m": 49,
+     "link": "?x=-789&z=13"
+    },
+    {
+     "tipo": "01",
+     "m": 45,
+     "link": "?x=1679&z=-944"
+    },
+    {
+     "tipo": "0102",
+     "m": 41,
+     "link": "?x=36&z=444"
+    },
+    {
+     "tipo": "01",
+     "m": 41,
+     "link": "?x=-365&z=-1392"
+    },
+    {
+     "tipo": "01",
+     "m": 36,
+     "link": "?x=1607&z=-1025"
+    },
+    {
+     "tipo": "01",
+     "m": 35,
+     "link": "?x=-645&z=-1253"
+    },
+    {
+     "tipo": "01",
+     "m": 35,
+     "link": "?x=-776&z=-1021"
+    },
+    {
+     "tipo": "0206",
+     "m": 35,
+     "link": "?x=325&z=1"
+    },
+    {
+     "tipo": "01",
+     "m": 34,
+     "link": "?x=-550&z=-1183"
+    },
+    {
+     "tipo": "01",
+     "m": 34,
+     "link": "?x=1562&z=-880"
+    },
+    {
+     "tipo": "01",
+     "m": 34,
+     "link": "?x=1290&z=-640"
+    },
+    {
+     "tipo": "01",
+     "m": 33,
+     "link": "?x=535&z=-1719"
+    },
+    {
+     "tipo": "01",
+     "m": 32,
+     "link": "?x=-16&z=-1818"
+    },
+    {
+     "tipo": "01",
+     "m": 29,
+     "link": "?x=-79&z=-1194"
+    },
+    {
+     "tipo": "01",
+     "m": 29,
+     "link": "?x=574&z=-1761"
+    },
+    {
+     "tipo": "01",
+     "m": 26,
+     "link": "?x=1641&z=-964"
+    },
+    {
+     "tipo": "0206",
+     "m": 26,
+     "link": "?x=-91&z=-870"
+    },
+    {
+     "tipo": "01",
+     "m": 26,
+     "link": "?x=-620&z=-1235"
+    },
+    {
+     "tipo": "01",
+     "m": 25,
+     "link": "?x=75&z=214"
+    }
+   ]
+  },
+  "marciapiedi_e_piazze_contro_ac_ped": {
+   "disegnato_m2": 106137,
+   "dbgt_m2": 106937,
+   "iou": 0.993
+  },
+  "asfalto_contro_ac_vei": {
+   "disegnato_m2": 855515,
+   "dbgt_m2": 848777,
+   "iou": 0.992
+  },
+  "strada_disegnata_contro_ar_str": {
+   "ar_str_m2": 862068,
+   "coperta_dal_disegno": 0.998,
+   "nota": "AR_STR e l unione di AC_VEI, AC_PED e MAN_TR pezzo per pezzo; il disegno ha in piu parcheggi (AC_VEI 0301) e aree pedonali fuori dalla sede stradale"
+  },
+  "attraversamenti": {
+   "n": 497
+  },
+  "tempo_s": 13.2
+ }
+}
