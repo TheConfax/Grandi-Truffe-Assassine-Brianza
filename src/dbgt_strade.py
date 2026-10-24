@@ -273,14 +273,14 @@ def abbina(raw_roads, nodes, D, cover, log=print, new_id=None):
     for wi, (nk, P, V, M) in res.items():
         for k, m in enumerate(M):
             if m is not None: claim[(nk, m[0], int(m[1] // 2))].append((m[2], wi, k))
-    lost = defaultdict(set)
+    lost = defaultdict(set); winner = {}
     for key, lst in claim.items():
         ws = {w for _, w, _ in lst}
         if len(ws) < 2: continue
         best = min(lst)[1]
         for d_, w, k in lst:
-            if w != best: lost[w].add(k)
-    nconf = 0
+            if w != best: lost[w].add(k); winner[(w, k)] = best
+    nconf = 0; conf = []
     for w, ks in lost.items():
         nk, P, V, M = res[w]
         # only real overlaps: a run of at least 3 lost samples (a junction shares a point, not a stretch)
@@ -292,8 +292,9 @@ def abbina(raw_roads, nodes, D, cover, log=print, new_id=None):
         for run in runs:
             if len(run) >= 3:
                 for k in run: M[k] = None
-                nconf += 1
-    rep['tratti_contesi'] = nconf
+                nconf += 1; wb = raw_roads[winner[(w, run[0])]]; rl = raw_roads[w]; p = P[run[len(run) // 2]]
+                conf.append(dict(perde='%s%s' % (rl['hw'], ' o' if rl['o'] else ''), vince='%s%s' % (wb['hw'], ' o' if wb['o'] else ''), m=len(run) * STEP, link=_link(*p)))
+    rep['tratti_contesi'] = nconf; rep['tratti_contesi_elenco'] = conf
     # where each OSM node goes: the matched point of its sample, per way; a shared node takes the DBGT junction its ways' routes have in common
     pos = defaultdict(list)   # node ref -> [(way, point)]
     for wi, (nk, P, V, M) in res.items():
@@ -389,7 +390,7 @@ class Raster:
 
     def ray(s, M, P, N, rmax=20.0, step=0.25):
         """distance from each point P along the direction N to the first cell outside M (rmax if none)"""
-        d = np.full(len(P), rmax); alive = np.ones(len(P), bool)
+        d = np.full(len(P), float(rmax)); alive = np.ones(len(P), bool)   # float: with rmax 25 the distances were cut to whole metres
         for k in range(1, int(rmax / step) + 1):
             t = k * step; q = P + N * t; inm = s.at(M, q[:, 0], q[:, 1])
             hit = alive & ~inm; d[hit] = t - step / 2; alive &= inm
@@ -503,22 +504,50 @@ class Strade:
         s.rep['vie_tagliate_al_confine'] = dict(vie=ncut, nodi_nuovi=nnew)
         s.log('dbgt strade: vie tagliate al confine del comune %d (nodi nuovi %d)' % (ncut, nnew))
 
-    def privati(s, raw_roads, nodes):
+    def privati(s, raw_roads, nodes, new_id=None):
         """the streets OSM maps over a yard of the DBGT (AC_VEI 0307: inside a private area, no EL_STR axis there) carry no AI traffic: more
         than half of the way in a yard and not in a carriageway (verifica 24/10: 26 residential ways, the cul-de-sacs of Via della Vigna, Via
-        Federico Borromeo, Via Martiri di Bologna...). The player still drives there"""
-        CO = s.R.draw(s.cortili); out = []
-        for r in raw_roads:
-            r.pop('pv', None)
+        Federico Borromeo, Via Martiri di Bologna...). A way that ends in a yard (a run of 12 m or more to its first or last node: Via Arno,
+        Via Vignola, Via Piermarini, Via del Ry, verifica 24/10; no Mapillary photo within 30 m of any) is cut where the yard begins and the
+        piece in the yard has no AI traffic either. The player still drives there"""
+        CO = s.R.draw(s.cortili); out = []; tails = []
+        for wi in range(len(raw_roads)):
+            r = raw_roads[wi]; r.pop('pv', None)
             if r['c'] > 3 or len(r['refs']) < 2: continue
             xy = np.array([nodes[n_] for n_ in r['refs']]); P, U, V = _samples(xy)
             inc = shapely.contains_xy(s.cover, P[:, 0], P[:, 1])
             if inc.sum() < 3: continue
             yard = s.R.at(CO, P[:, 0], P[:, 1]) & ~s.R.at(s.CV, P[:, 0], P[:, 1]) & inc
             if yard.sum() >= 5 and yard.sum() >= 0.5 * len(P):
-                r['pv'] = 1; m = P[len(P) // 2]; out.append(_link(*m))
-        s.rep['vie_nei_cortili_senza_traffico'] = dict(n=len(out), dove=out[:40])
-        s.log('dbgt strade: vie nei cortili senza traffico IA %d' % len(out))
+                r['pv'] = 1; m = P[len(P) // 2]; out.append(_link(*m)); continue
+            if new_id is None or not yard.any(): continue
+            cum = np.r_[0, np.cumsum(np.hypot(*np.diff(P, axis=0).T))]
+            a = 0
+            while a < len(P) and yard[a]: a += 1
+            b = len(P) - 1
+            while b >= 0 and yard[b]: b -= 1
+            cut0 = cum[a] if a >= 4 and a < len(P) else None             # a yard from the first node to here
+            cut1 = cum[b] if len(P) - 1 - b >= 4 and b >= 0 else None    # from here to the last node
+            if cut0 is not None and cut1 is not None and cut1 - cut0 < 10: continue
+            for c_ in ([cut1] if cut1 is not None else []) + ([cut0] if cut0 is not None else []):   # the far cut first: the near one keeps its index
+                k = s._taglia(raw_roads, wi, c_, nodes, new_id)
+                if k is None: continue
+                tail = k if c_ == cut1 else wi
+                raw_roads[tail]['pv'] = 1; q = nodes[raw_roads[tail]['refs'][len(raw_roads[tail]['refs']) // 2]]; tails.append(_link(*q))
+        s.rep['vie_nei_cortili_senza_traffico'] = dict(n=len(out), dove=out[:40], code_nei_cortili=len(tails), dove_code=tails[:40])
+        s.log('dbgt strade: vie nei cortili senza traffico IA %d, code di vie nei cortili %d' % (len(out), len(tails)))
+
+    def _taglia(s, raw_roads, wi, d, nodes, new_id):
+        """way wi cut at d m from its start (at its node when one is within 1.5 m, else a new node): wi keeps the first piece, the second is
+        appended; its index is returned (None when the cut falls at an end)"""
+        r = raw_roads[wi]; refs = list(r['refs']); xy = np.array([nodes[n_] for n_ in refs]); cum = np.r_[0, np.cumsum(np.hypot(*np.diff(xy, axis=0).T))]
+        if d < 1.5 or d > cum[-1] - 1.5: return None
+        j = int(np.argmin(np.abs(cum - d)))
+        if abs(cum[j] - d) < 1.5 and 0 < j < len(refs) - 1: a, b = refs[:j + 1], refs[j:]
+        else:
+            i = int(np.searchsorted(cum, d)); f_ = (d - cum[i - 1]) / max(cum[i] - cum[i - 1], 1e-9); p = xy[i - 1] + (xy[i] - xy[i - 1]) * f_
+            nid = new_id(); nodes[nid] = (float(p[0]), float(p[1])); a, b = refs[:i] + [nid], [nid] + refs[i:]
+        r['refs'] = a; r.setdefault('parte', wi); raw_roads.append(dict(r, refs=b)); return len(raw_roads) - 1
 
     def assi(s, raw_roads, nodes):
         cnt = [0]
@@ -549,14 +578,60 @@ class Strade:
             d_, dl_, dr_ = np.minimum(dl, dr)[ok], dl[ok], dr[ok]; mid = np.abs(dl_ - dr_) < 0.5 * np.maximum(dl_, dr_)
             r['mh_dbgt'] = round(float(max(1.0, np.percentile(d_[mid] if mid.sum() > 3 else d_, 5))), 2)
         rep['larghezze_da_ac_vei'] = dict(vie=nw, differenza_dalla_larghezza_osm_m=_pct(dw, (10, 50, 90)))
-        s.privati(raw_roads, nodes)
+        s.privati(raw_roads, nodes, new_id)
         s.rep['assi'] = rep
         s.log('dbgt strade: %s' % rep)
 
-    def mezze(s, raw_roads):
+    def mezze(s, raw_roads, nodes=None):
         """the free half width of a matched street is its carriageway's (the lanes stay inside AC_VEI)"""
         for r in raw_roads:
             if r.get('mh_dbgt'): r['mh'] = round(min(r['w'] / 2, r['mh_dbgt']), 2)
+        if nodes is not None: s.corsie_locali(raw_roads, nodes)
+
+    def corsie_locali(s, raw_roads, nodes, passo=1.0, rmax=12.0):
+        """the lane lines of the AI cars node by node (r['lf'] forward, r['lb'] backward: cm right of the axis at each node of refs; an edge
+        runs from the value at its start to the value at its end, world3.js edgePts): from the carriageway across the axis (AC_VEI of the
+        ordinary stretches), not from the axis alone. EL_STR does not always run in the middle of its carriageway (via Seveso by the station
+        1 m from the east edge of 7 m; on via Indipendenza it crosses the carriageway on a 40 m straight), and a carriageway narrows or
+        widens along a street: with one offset for the whole way 3.3% of the lane samples were less than half a lane from the edge
+        (verifica 24/10). Samples every passo m across the ordinary carriageway (a sample where it opens to the side, wider than 1.25 times
+        the way's median or 1.3 times its width, is not one): its middle c and width W, running medians over 15 m, at each node the value
+        along the way there (a node more than 6 m from any sample, in a junction, keeps the old lane). Two-way: each direction right of the
+        middle by 0.2 W, at most the old lane (min(0.24 w, mh / 2)): where the carriageway narrows the lanes come closer; one-way: the middle.
+        Lanes under half a lane from the edge: 3.3% of the samples with one offset a way, 2.35% so (the rest at narrowings and junctions)"""
+        nl = 0
+        for r in raw_roads:
+            r.pop('lf', None); r.pop('lb', None)
+            if r['c'] > 3 or r.get('dbgt') != 'str' or len(r['refs']) < 2: continue
+            xy = np.array([nodes[n_] for n_ in r['refs']]); P, U, Sx = [], [], []
+            cum = np.r_[0, np.cumsum(np.hypot(*np.diff(xy, axis=0).T))]
+            for i in range(len(xy) - 1):
+                a, b = xy[i], xy[i + 1]; d = b - a; L = cum[i + 1] - cum[i]
+                if L < 1e-6: continue
+                n = max(1, int(round(L / passo)))
+                for k in range(n): f_ = (k + 0.5) / n; P.append(a + d * f_); U.append(d / L); Sx.append(cum[i] + L * f_)
+            if len(P) < 3: continue
+            P, U, Sx = np.array(P), np.array(U), np.array(Sx); N = np.column_stack((-U[:, 1], U[:, 0]))
+            dr, dl = s.R.ray(s.TR, P, N, rmax), s.R.ray(s.TR, P, -N, rmax)   # N = (-uz, ux) is the right of the way (x east, z south; edgePts)
+            Wd = dl + dr; c = (dr - dl) / 2
+            ok = s.R.at(s.TR, P[:, 0], P[:, 1]) & shapely.contains_xy(s.cover, P[:, 0], P[:, 1]) & (dl < rmax) & (dr < rmax) & (Wd >= 2.4)
+            if ok.sum() < 3: continue
+            ok &= Wd <= min(1.25 * np.median(Wd[ok]), 1.3 * r['w']) + 0.5
+            if ok.sum() < 3: continue
+            vi = np.where(ok)[0]
+            sm = lambda v: np.array([np.median(v[vi[max(0, j - 7):j + 8]]) for j in range(len(vi))])
+            cn, Wn = np.interp(cum, Sx[vi], sm(c)), np.interp(cum, Sx[vi], sm(Wd))
+            lane0 = 0.0 if r['o'] else min(r['w'] * 0.24, r['mh'] * 0.5)
+            hl = np.minimum(0.2 * Wn, lane0)   # never further from the middle than the old lane (0.22 W or 0.24 W outright: 4.0 and 4.6% of the samples)
+            out = [np.clip(cn, -4.0, 4.0)] if r['o'] else [np.clip(cn + hl, 0.3, 5.0), np.clip(hl - cn, 0.3, 5.0)]
+            far = np.abs(cum[:, None] - Sx[vi][None, :]).min(1) > 6.0   # a node in a junction, away from any ordinary carriageway: the old lane
+            for o in out: o[far] = lane0
+            if all(np.abs(o - lane0).max() < 0.1 for o in out): continue
+            r['lf'] = [int(round(v * 100)) for v in out[0]]
+            if not r['o']: r['lb'] = [int(round(v * 100)) for v in out[1]]
+            nl += 1
+        s.rep['corsie_locali'] = dict(vie=nl)
+        s.log('dbgt strade: corsie IA dalla carreggiata, vie %d' % nl)
 
     def carreggiate(s, buf=0.0):
         """the carriageway pieces inside the comuni (buffered): nothing stands or is built in them. Shrunk, the union is shrunk (shrinking
@@ -618,14 +693,18 @@ class Strade:
         return round(min(w + 6, max(w, 2 * max(dl, dr) + 0.2)), 1) if max(dl, dr) < 25 else w   # at most 3 m more a side (a ray along a junction runs on)
 
     def push_tiles(s, ntiles, tbox, polys_of, push):
-        """the yards (cv) and the islands and medians of the DBGT (md with g: 1, drawn whatever their size; v: 1 grass on top) in the tiles.
+        """the yards (cv), the islands and medians of the DBGT (md with g: 1, drawn whatever their size; v: 1 grass on top) and the carriageways
+        on bridges (ap, only for what keeps off the carriageway) in the tiles.
         Grass or paved: MAN_TR_VRD is empty at Meda; on the Mapillary photos of 10 islands and medians (strade/mly_man) 8 are grass or a hedge
         behind a kerb, the small ones paved: grass from ISOLA_VERDE m2 up"""
         P1 = _parts(s.cv); P2 = [p for p in _parts(s.md_dbgt) if p.area >= ISOLA_VERDE]; P3 = [p for p in _parts(s.md_dbgt) if p.area < ISOLA_VERDE]
-        T1, T2, T3 = (STRtree(P_) if P_ else None for P_ in (P1, P2, P3))
+        # ap: the carriageways on the bridges (AC_VEI SED 02; the deck draws its own top): the guardrails of the ramps keep out of them (verifica
+        # 24/10: 20 pieces in them on the decks of the Milano-Meda junction)
+        P4 = _parts(_u([g for g, a in s.D['vei'] if a.get('sed') not in ('01', None) and a['zon'] not in NON_CARR]).intersection(s.cover))
+        T1, T2, T3, T4 = (STRtree(P_) if P_ else None for P_ in (P1, P2, P3, P4))
         for t in range(ntiles):
             bx = tbox(t)
-            for P_, T_, key, extra in ((P1, T1, 'cv', {}), (P2, T2, 'md', {'g': 1, 'v': 1}), (P3, T3, 'md', {'g': 1})):
+            for P_, T_, key, extra in ((P1, T1, 'cv', {}), (P2, T2, 'md', {'g': 1, 'v': 1}), (P3, T3, 'md', {'g': 1}), (P4, T4, 'ap', {})):
                 if T_ is None: continue
                 idx = T_.query(bx)
                 if not len(idx): continue
@@ -665,6 +744,14 @@ class Strade:
                 if s.carr[j].intersection(g).area > 1.0: ne += 1; dove.append(_link(g.centroid.x, g.centroid.y)); break
         rep['edifici_su_carreggiata'] = dict(n=ne, dove=dove[:20])
         rep['corsie_dentro_ac_vei'] = s.corsie(raw_roads, nodes)
+        # AI traffic over the yards (AC_VEI 0307 outside any carriageway): the ways with AI traffic, metres in a yard
+        CO = s.R.draw(s.cortili); ny, my, dv = 0, 0.0, []
+        for r in raw_roads:
+            if r['c'] > 3 or r.get('pv') or len(r['refs']) < 2: continue
+            xy = np.array([nodes[n_] for n_ in r['refs']]); P, U, V = _samples(xy)
+            yd = s.R.at(CO, P[:, 0], P[:, 1]) & ~s.R.at(s.CV, P[:, 0], P[:, 1]) & shapely.contains_xy(C, P[:, 0], P[:, 1])
+            if yd.sum() >= 4: ny += 1; my += STEP * yd.sum(); dv.append(_link(*P[yd][len(P[yd]) // 2]))
+        rep['traffico_nei_cortili'] = dict(n=ny, metri=round(my), nota='vie con traffico IA per 12 m o piu sopra un cortile AC_VEI 0307', dove=dv[:20])
         rep.update(s._resto(raw_roads))
         rep['attraversamenti'] = dict(n=len(attraversamenti))
         rep['tempo_s'] = round(time.time() - t0, 1)
@@ -673,9 +760,13 @@ class Strade:
         return s.rep
 
     def corsie(s, raw_roads, nodes):
-        """lanes inside AC_VEI: the lane line of the AI cars (axis + r.lane to the right, as world3.js) at least half a lane from the edge
+        """lanes inside AC_VEI: the lane line of the AI cars (axis + r.lane, or r.lf / r.lb of the segment, to the right, as world3.js) at least half a lane from the edge
         (half the lane width, at most 1.5 m, minus 0.25), on the ordinary stretches: in junctions the lanes are virtual"""
-        C = s.cover; tot = bad = car = 0; dove = []; dist = []
+        C = s.cover; tot = bad = car = 0; dove = []; dist = []; why = Counter(); deg = Counter()
+        for r in raw_roads:
+            if r['c'] <= 5:
+                for k, n_ in enumerate(r['refs']): deg[n_] += 1 if k in (0, len(r['refs']) - 1) else 2
+        J = np.array([nodes[n_] for n_, d_ in deg.items() if d_ >= 3]).reshape(-1, 2); JT = STRtree(shapely.points(J))
         for r in raw_roads:
             if r['c'] > 3 or r.get('dbgt') != 'str': continue
             xy = np.array([nodes[n_] for n_ in r['refs']]); P, U, V = _samples(xy)
@@ -683,13 +774,19 @@ class Strade:
             ins = s.R.at(s.TR, P[:, 0], P[:, 1]) & shapely.contains_xy(C, P[:, 0], P[:, 1])
             if not ins.any(): continue
             lane = 0.0 if r['o'] else min(r['w'] * 0.24, r['mh'] * 0.5); half = min(1.5, (r['w'] if r['o'] else r['w'] / 2) / 2)
-            N = np.column_stack((-U[:, 1], U[:, 0]))
-            for sg in ((1,) if r['o'] else (1, -1)):
-                Q = P[ins] + N[ins] * lane * sg; inq = shapely.contains_xy(s.U_carr, Q[:, 0], Q[:, 1])
+            N = np.column_stack((-U[:, 1], U[:, 0]))   # the right of the way
+            cum = np.r_[0, np.cumsum(np.hypot(*np.diff(xy, axis=0).T))]; sP = np.r_[0, np.cumsum(np.hypot(*np.diff(P, axis=0).T))]
+            for sg, key in ((1, 'lf'), (-1, 'lb'))[:1 if r['o'] else 2]:
+                off = np.interp(sP, cum, np.asarray(r[key], float) / 100) if r.get(key) else np.full(len(P), lane)   # the lanes node by node (corsie_locali)
+                Q = P[ins] + N[ins] * (off[ins] * sg)[:, None]; inq = shapely.contains_xy(s.U_carr, Q[:, 0], Q[:, 1])
                 d = s.bordi.query_nearest(shapely.points(Q), return_distance=True, all_matches=False)[1] if len(Q) else np.zeros(0); d[~inq] = 0
                 b = d < half - 0.25; tot += len(Q); bad += int(b.sum()); car += int((d < 0.9).sum()); dist += list(d - half)
                 for q in Q[b][:2]: dove.append(_link(*q))
-        return dict(campioni=tot, fuori=bad, quota=round(bad / max(1, tot), 4), auto_fuori=car, nota_auto='la linea della corsia a meno di 0,9 m (mezza auto) dal bordo o fuori',
+                if b.any():   # why: by a junction (a node of 3 ways within w/2 + 8 m), where the carriageway is narrower than the way's width by 0.75 m
+                    Pb, Nb = P[ins][b], N[ins][b]; dj = JT.query_nearest(shapely.points(Pb), return_distance=True, all_matches=False)[1]
+                    Wl = s.R.ray(s.TR, Pb, Nb, 12.0) + s.R.ray(s.TR, Pb, -Nb, 12.0)
+                    for dj_, wl_ in zip(dj, Wl): why['incrocio' if dj_ < r['w'] / 2 + 8 else 'strettoia' if wl_ < r['w'] - 0.75 else 'altro'] += 1
+        return dict(campioni=tot, fuori=bad, quota=round(bad / max(1, tot), 4), fuori_per_motivo=dict(why), auto_fuori=car, nota_auto='la linea della corsia a meno di 0,9 m (mezza auto) dal bordo o fuori',
                     margine_m=_pct(dist, (1, 10, 50)), dove=dove[:30])
 
     def _resto(s, raw_roads):

@@ -786,7 +786,7 @@ for r in raw_roads:
     md = float(dd.min())
     r['mh'] = round(max(min(r['w'] / 2, md - 0.3), min(r['w'] / 2, 1.3)), 2)
     r['wk'] = round(max(r['mh'] + 0.45, min(r['w'] / 2 + 0.9, md - 0.55)), 2) if r['c'] <= 3 else (round(max(0.4, r['mh'] - 0.5), 2) if r['c'] <= 5 else 0)
-if STR: STR.mezze(raw_roads)
+if STR: STR.mezze(raw_roads, nodes)  # and the lanes of the AI cars segment by segment from the carriageway
 def rbuf(cond, extra):
     out = [r['line'].buffer(r['w'] / 2 + extra, quad_segs=5) for r in raw_roads if cond(r) and r['line'].length > 0.1]
     return unary_union(out) if out else GeometryCollection()
@@ -1431,6 +1431,8 @@ for r in raw_roads:
     if r.get('pk'): rec['pk'] = r['pk']
     if r.get('pv'): rec['pv'] = 1  # over a yard of the DBGT (AC_VEI 0307): no AI traffic (src/dbgt_strade.py privati)
     if r.get('w_osm') is not None: rec['wd'] = 1  # w is the carriageway of the DBGT (AC_VEI): the markings go by it, mh is the lanes' room
+    for k_ in ('lf', 'lb'):  # the AI lanes node by node from the carriageway of the DBGT (dbgt_strade.py corsie_locali)
+        if r.get(k_) and len(r[k_]) == len(r['refs']): rec[k_] = r[k_]
     out_roads.append(rec)
 q = lambda v: int(round(v * 10))
 NODES = [[q(nodes[ref][0]), q(nodes[ref][1]), q(deckH[ref]) if ref in deckH else -32768] for ref in node_list]
