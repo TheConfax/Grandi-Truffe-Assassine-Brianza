@@ -1211,7 +1211,8 @@ const RAILG = new Grid(24), LOWRAILG = new Grid(24);
 for (const td of D.tiles) for (const f of td.rl || []) { if (f.h) continue; const pts = dec(f.p); for (let k = 1; k < pts.length; k++) LOWRAILG.add(Math.min(pts[k - 1][0], pts[k][0]), Math.min(pts[k - 1][1], pts[k][1]), Math.max(pts[k - 1][0], pts[k][0]), Math.max(pts[k - 1][1], pts[k][1]), { a: pts[k - 1], b: pts[k] }); }
 for (const td of D.tiles) for (const f of td.rl || []) { const pts = dec(f.p); for (let k = 1; k < pts.length; k++) RAILG.add(Math.min(pts[k - 1][0], pts[k][0]), Math.min(pts[k - 1][1], pts[k][1]), Math.max(pts[k - 1][0], pts[k][0]), Math.max(pts[k - 1][1], pts[k][1]), { a: pts[k - 1], b: pts[k] }); }
 // guardrails along ground-level expressways (both sides; links and junctions stay open). A way with a deck somewhere along it
-// gets them on its stretches less than 1.4 m up, at the road's height: the deck rails below only start there
+// gets them on its stretches less than 1.4 m up, at the road's height: the deck rails below only start there. Old engine only: in a tile
+// of S the guardrails come from S and the decks (sBarriers, below)
 const FLAT_RAILS = [];
 for (const r of D.roads) if (r.x && !r.t && r.c === 0) {
   for (let k = 1; k < r.g.length; k++) {
@@ -1222,6 +1223,7 @@ for (const r of D.roads) if (r.x && !r.t && r.c === 0) {
     for (let s0 = 0; s0 < L; s0 += 4) {
       const s1 = Math.min(L, s0 + 4), x0 = a[0] + ux * s0, z0 = a[1] + uz * s0, x1 = a[0] + ux * s1, z1 = a[1] + uz * s1;
       if ((NODE_DEG[r.g[k - 1]] >= 3 && s0 < 25) || (NODE_DEG[r.g[k]] >= 3 && s1 > L - 25)) continue;
+      if (H.fineAt((x0 + x1) / 2, (z0 + z1) / 2)) continue;
       for (const sd of [1, -1]) {
         const w = r.w / 2 + 0.4, gx = (x0 + x1) / 2 + rx * sd * w, gz = (z0 + z1) / 2 + rz * sd * w;
         let other = false; ROADSEG.each(gx - 4, gz - 4, gx + 4, gz + 4, o => { if (!other && o.r !== r && o.r.c <= 5 && segDist(gx, gz, o.a[0], o.a[1], o.b[0], o.b[1]) < o.r.w / 2 + 0.3) other = true; });
@@ -1234,10 +1236,9 @@ for (const r of D.roads) if (r.x && !r.t && r.c === 0) {
     }
   }
 }
-// collisions for elevated roads: guardrails on top, embankment toes and pillars below. In a tile of S they stand where the tile draws
-// them, on the deck of the new engine or on S (deckY): between two nodes on different decks the old line runs over open ground, and a
-// pillar there was an invisible obstacle (by PONTE 20)
-const DECK_SOLIDS = [], onS = (x, z, y) => H.fineAt(x, z) ? deckY(x, z, y) : y;
+// collisions for elevated roads: guardrails on top, embankment toes and pillars below. Old engine only (DECK_SOLIDS): in a tile of S the
+// parapets and pillars come from the decks and the guardrails from S (sBarriers, below; before phase 6 the old rails stood on deckY there)
+const DECK_SOLIDS = [];
 for (const r of D.roads) if (r.d) {
   const pts = r.g.map(i => [N[i][0], N[i][1], H.node(i)]);
   for (let k = 1; k < pts.length; k++) {
@@ -1245,7 +1246,8 @@ for (const r of D.roads) if (r.d) {
     const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, rx = -uz, rz = ux, n = Math.max(1, Math.ceil(L / 4));
     for (let s = 0; s < n; s++) {
       const t0 = s / n, t1 = (s + 1) / n, x0 = lerp(a[0], b[0], t0), z0 = lerp(a[1], b[1], t0), x1 = lerp(a[0], b[0], t1), z1 = lerp(a[1], b[1], t1);
-      const y0 = onS(x0, z0, lerp(a[2], b[2], t0)), y1 = onS(x1, z1, lerp(a[2], b[2], t1)), ym = (y0 + y1) / 2, off = ym - H.ground((x0 + x1) / 2, (z0 + z1) / 2);
+      if (H.fineAt((x0 + x1) / 2, (z0 + z1) / 2)) continue;
+      const y0 = lerp(a[2], b[2], t0), y1 = lerp(a[2], b[2], t1), ym = (y0 + y1) / 2, off = ym - H.ground((x0 + x1) / 2, (z0 + z1) / 2);
       if (off < 0.6) continue;
       for (const sd of [1, -1]) {
         const ex = rx * sd, ez = rz * sd, gx = (x0 + x1) / 2 + ex * (r.w / 2 + 0.3), gz = (z0 + z1) / 2 + ez * (r.w / 2 + 0.3);
@@ -1257,7 +1259,7 @@ for (const r of D.roads) if (r.d) {
       }
     }
     if (r.b) for (let s = 12; s < L - 4; s += 24) {
-      const x = a[0] + ux * s, z = a[1] + uz * s, y = onS(x, z, lerp(a[2], b[2], s / L)), off = y - H.ground(x, z);
+      const x = a[0] + ux * s, z = a[1] + uz * s; if (H.fineAt(x, z)) continue; const y = lerp(a[2], b[2], s / L), off = y - H.ground(x, z);
       if (off < 2.5) continue;
       for (const o of r.w > 9 ? [-r.w / 3, r.w / 3] : [0]) { const px = x + rx * o, pz = z + rz * o; if (roadBelow(px, pz, y, 1.4, r) || nearRail(px, pz, 3.5)) continue; WALLS.add(px - 0.5, pz - 0.5, px + 0.5, pz + 0.5, { r: 0.45, x: px, z: pz, y0: -1e4, y1: y - 1.5, deckw: true }); DECK_SOLIDS.push({ k: 'pillar', x: px, z: pz, y }); }
     }
@@ -1276,6 +1278,7 @@ for (const td of D.tiles) for (const r of td.rl || []) {
     const n = Math.max(1, Math.ceil(L / 3)), ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, rx = -uz, rz = ux;
     for (let s = 0; s < n; s++) {
       const x0 = lerp(A[0], B[0], s / n), z0 = lerp(A[1], B[1], s / n), x1 = lerp(A[0], B[0], (s + 1) / n), z1 = lerp(A[1], B[1], (s + 1) / n), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+      if (H.fineAt(mx, mz)) continue; // in a tile of S: the parapets of the railway decks (sBarriers)
       const y = lerp(hs[k - 1], hs[k], (s + 0.5) / n), g = H.ground(mx, mz); if (y - g < 1.0 || onAnyRoad(mx, mz, 3.0) || nearLowRail(mx, mz, 4.5)) continue;
       for (const sd of [1, -1]) { const ax = x0 + rx * 2.3 * sd, az = z0 + rz * 2.3 * sd, bx = x1 + rx * 2.3 * sd, bz = z1 + rz * 2.3 * sd; WALLS.add(ax, az, bx, bz, { ax, az, bx, bz, nx: rx * sd, nz: rz * sd, two: true, y0: g - 3, y1: y + 1 }); }
     }
@@ -1748,6 +1751,122 @@ function drawDecks(T, top, side) {
     }
   }
 }
+// ---- barriers of the new engine (docs/motore.md 3.1, fase 6; collaudo.md 6-9). In a tile of S: parapets along the edges of the decks where
+// stepping off drops, pillars under the decks every PIL_STEP m, guardrails along the expressways and their ramps and along the main roads
+// where S beside them drops or rises more than RAIL_DROP (embankments and trenches). The decks' are worked out once at the start, the
+// roads' when their tile is first built; each with its collision. (A retaining wall where S rises steeply at the edge of a road was tried
+// for the underpass of via Milano and dropped: the DBGT carriageway there is 4 m flat against 8 m of OSM road, so the wall stood on the
+// drawn asphalt)
+const RAIL_DROP = 1.2, PIL_STEP = 15;
+const DECK_BAR = { rails: [], pillars: [] };
+function deckTopAt(dk, x, z) { for (const o of H.deckAt(x, z)) if (o.d === dk) return o; return null; }
+// the edges the parapets follow: the PONTE footprint (nucleo), straight; without one the boundary edges of the triangles (2 m steps)
+function deckOutline(dk) {
+  const out = [];
+  if (dk.nucleo && dk.nucleo.length >= 3) { const o = dk.nucleo; for (let i = 0; i < o.length; i++) out.push([o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1]]); }
+  else for (const [ax, az, , bx, bz] of deckEdges(dk)) out.push([ax, az, bx, bz]);
+  return out;
+}
+const roadsOn = dk => dk.rset || (dk.rset = new Set(dk.ra.map(i => D.roads[i])));
+// is (x, z) on a road, a railway or the river bed of S (where no pillar may stand), roads on the deck itself apart
+function busyGround(dk, x, z) {
+  for (const [dx, dz] of [[0, 0], [1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6]]) { const m = H.mat(x + dx, z + dz); if (m === 1 || m === 4 || m === 6) return true; }
+  let f = false; const own = roadsOn(dk); ROADSEG.each(x - 14, z - 14, x + 14, z + 14, s => { if (!f && !own.has(s.r) && s.r.c <= 6 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 1.5) f = true; });
+  if (f) return true;
+  if (dk.tipo !== 'ferro') RAILG.each(x - 4, z - 4, x + 4, z + 4, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < 3.5) f = true; }); // (on a railway deck its own rails run over the point)
+  const w = H.water(x, z); return f || (w !== null && w > H.base(x, z));
+}
+for (const dk of H.DECKS) {
+  if (dk.tipo === 'copertura') continue;
+  const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null;
+  for (const [ax, az, bx, bz] of deckOutline(dk)) {
+    const L = hyp(bx - ax, bz - az); if (L < 0.05) continue;
+    let nx = (bz - az) / L, nz = -(bx - ax) / L; const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+    if (ring ? inPoly(mx + nx * 0.3, mz + nz * 0.3, ring) : !!deckTopAt(dk, mx + nx * 0.3, mz + nz * 0.3)) { nx = -nx; nz = -nz; } // outward
+    const n = Math.max(1, Math.round(L)), ys = [];
+    for (let k = 0; k <= n; k++) { const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n, o = deckTopAt(dk, x - nx * 0.25, z - nz * 0.25) || deckTopAt(dk, x - nx * 0.6, z - nz * 0.6); ys.push(o ? o.top : null); }
+    for (let k = 0; k < n; k++) {
+      const y0 = ys[k], y1 = ys[k + 1]; if (y0 === null || y1 === null) continue;
+      const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, qx = x + nx * 0.7, qz = z + nz * 0.7, top = (y0 + y1) / 2;
+      if (H.deckAt(qx, qz).some(o => o.tipo !== 'copertura' && Math.abs(o.top - top) < 0.6)) continue; // the deck goes on (its ramps, another deck)
+      if (top - H.base(qx, qz) < 0.8) continue; // it rests on the ground there (a spalla)
+      const seg = { ax: ax + (bx - ax) * k / n, az: az + (bz - az) * k / n, bx: ax + (bx - ax) * (k + 1) / n, bz: az + (bz - az) * (k + 1) / n };
+      DECK_BAR.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, dk.tipo === 'pedonale' ? 2 : 1, nx, nz]);
+      WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + 2.5, deckw: true });
+    }
+  }
+  // pillars: on the long axis of the footprint (two lines on a wide deck), every PIL_STEP m, where the deck stands more than 2.5 m over
+  // the ground and the ground is free (no road, railway or water under them: niente oggetti in mezzo alla strada)
+  const P = ring || dk.imp; if (!P || P.length < 3) continue;
+  const c = centroid(P); let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - c[0]) ** 2; szz += (z - c[1]) ** 2; sxz += (x - c[0]) * (z - c[1]); }
+  const an = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(an), uz = Math.sin(an);
+  let s0 = 1e9, s1 = -1e9, v0 = 1e9, v1 = -1e9; for (const [x, z] of P) { const s = (x - c[0]) * ux + (z - c[1]) * uz, v = -(x - c[0]) * uz + (z - c[1]) * ux; s0 = Math.min(s0, s); s1 = Math.max(s1, s); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+  const len = s1 - s0, wid = v1 - v0, nP = Math.floor((len - 6) / PIL_STEP); if (nP < 1) continue;
+  const vs = wid > 12 ? [v0 + wid / 4, v1 - wid / 4] : [(v0 + v1) / 2];
+  for (let k = 1; k <= nP; k++) for (const v of vs) {
+    const s = s0 + len * k / (nP + 1), x = c[0] + ux * s - uz * v, z = c[1] + uz * s + ux * v;
+    if (!inPoly(x, z, P)) continue; let edge = 1e9; for (let i = 0; i < P.length; i++) edge = Math.min(edge, segDist(x, z, P[i][0], P[i][1], P[(i + 1) % P.length][0], P[(i + 1) % P.length][1])); if (edge < 1.2) continue;
+    const o = deckTopAt(dk, x, z); if (!o) continue; const g = H.base(x, z), bot = o.top - dk.sp; if (bot - g < 2.5 || busyGround(dk, x, z)) continue;
+    DECK_BAR.pillars.push([x, z, g, bot]); WALLS.add(x - 0.5, z - 0.5, x + 0.5, z + 0.5, { r: 0.45, x, z, y0: g - 3, y1: bot - 0.3, deckw: true });
+  }
+}
+// guardrails along the roads of tile T (once per tile, with their collisions): [x0, z0, y0, x1, z1, y1]
+const ROAD_BAR = new Map();
+function* roadBarriers(T) {
+  if (ROAD_BAR.has(T.t)) return ROAD_BAR.get(T.t);
+  const res = { rails: [] }, nearJ = (x, z, r) => { let f = false; NODEG.each(x - r, z - r, x + r, z + r, ({ i }) => { if (!f && NODE_DEG[i] >= 3 && hyp(N[i][0] - x, N[i][1] - z) < r) f = true; }); return f; };
+  let n = 0;
+  for (const ri of T.d.rp || []) {
+    const r = D.roads[ri]; if (r.t || !(r.c <= 1 || r.x)) continue; if (++n % 12 === 0) yield 'barriers roads';
+    const hw = r.w / 2;
+    for (let k = 1; k < r.g.length; k++) {
+      const ia = r.g[k - 1], ib = r.g[k], A = N[ia], B = N[ib], L = hyp(B[0] - A[0], B[1] - A[1]); if (L < 1) continue;
+      if (tileOf((A[0] + B[0]) / 2, (A[1] + B[1]) / 2) !== T.t || !H.fineAt((A[0] + B[0]) / 2, (A[1] + B[1]) / 2)) continue;
+      const ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, rx = -uz, rz = ux, ya = H.node(ia), yb = H.node(ib), ns = Math.max(1, Math.round(L / 2));
+      for (const sd of [1, -1]) {
+        const flag = [], ex = rx * sd, ez = rz * sd;
+        for (let q = 0; q < ns; q++) {
+          const t = (q + 0.5) / ns, cx = A[0] + (B[0] - A[0]) * t, cz = A[1] + (B[1] - A[1]) * t, yc = H.surface(cx, cz, lerp(ya, yb, t) + 0.5);
+          let rail = null;
+          if (!nearJ(cx, cz, hw + 8)) {
+            const gx = cx + ex * (hw + 0.35), gz = cz + ez * (hw + 0.35), yE = H.surface(gx, gz, yc + 0.3);
+            const onCore = H.deckAt(gx, gz).some(o => o.d.nucleo && inPoly(gx, gz, o.d.nucleo) && Math.abs(o.top - yc) < 0.6); // the parapets of the deck
+            let other = false; ROADSEG.each(gx - 4, gz - 4, gx + 4, gz + 4, o => { if (!other && o.r !== r && o.r.c <= 5 && segDist(gx, gz, o.a[0], o.a[1], o.b[0], o.b[1]) < o.r.w / 2 + 0.3 && Math.abs(lerp(H.node(o.ia), H.node(o.ib), 0.5) - yE) < 1.5) other = true; });
+            if (!onCore && !other) {
+              if (Math.abs(yE - yc) < 0.5) {
+                let lo = 1e9, hi = -1e9; for (const d of [1, 2, 3, 4]) { const y = H.surface(gx + ex * d, gz + ez * d, yE + 0.3); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+                if (r.x || yE - lo > RAIL_DROP || hi - yE > RAIL_DROP) rail = yE;
+              } else if (r.x) rail = yc; // the edge is already on the bank: the rail at the level of the road, its posts down to S
+            }
+          }
+          flag.push(rail);
+        }
+        for (let q = 0; q < ns; q++) { // runs of at least 3 pieces (6 m), or the whole of a short segment
+          if (flag[q] === null) continue;
+          let a = q, b = q; while (a > 0 && flag[a - 1] !== null) a--; while (b < ns - 1 && flag[b + 1] !== null) b++;
+          if (b - a + 1 < 3 && !(a === 0 && b === ns - 1 && L < 6)) continue;
+          const t0 = q / ns, t1 = (q + 1) / ns, off = hw + 0.35, x0 = A[0] + (B[0] - A[0]) * t0 + ex * off, z0 = A[1] + (B[1] - A[1]) * t0 + ez * off, x1 = A[0] + (B[0] - A[0]) * t1 + ex * off, z1 = A[1] + (B[1] - A[1]) * t1 + ez * off;
+          const y0 = q > a ? (flag[q - 1] + flag[q]) / 2 : flag[q], y1 = q < b ? (flag[q + 1] + flag[q]) / 2 : flag[q];
+          res.rails.push([x0, z0, y0, x1, z1, y1]); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ex, nz: -ez, two: true, y0: Math.min(y0, y1) - 0.8, y1: Math.max(y0, y1) + 2.5, deckw: true });
+        }
+      }
+    }
+  }
+  ROAD_BAR.set(T.t, res); return res;
+}
+// draw them: guardrail strips on posts, the parapets (a concrete kerb with a rail, a railing on the footbridges), the pillars
+function* drawBarriers(T, grail, pil) {
+  const rail = (x0, z0, y0, x1, z1, y1, a, b) => { const L = hyp(x1 - x0, z1 - z0) || 1, nx = (z1 - z0) / L, nz = -(x1 - x0) / L, b0 = grail.p.length / 3; vtx(grail, x0, y0 + a, z0, nx, 0, nz, 0, 0); vtx(grail, x1, y1 + a, z1, nx, 0, nz, 0, 0); vtx(grail, x1, y1 + b, z1, nx, 0, nz, 0, 0); vtx(grail, x0, y0 + b, z0, nx, 0, nz, 0, 0); grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
+  for (const [x0, z0, y0, x1, z1, y1, kind] of DECK_BAR.rails) {
+    if (tileOf((x0 + x1) / 2, (z0 + z1) / 2) !== T.t) continue;
+    const L = hyp(x1 - x0, z1 - z0) || 1, ry = Math.atan2(-(z1 - z0), x1 - x0);
+    if (kind === 2) { rail(x0, z0, y0, x1, z1, y1, 1.0, 1.1); rail(x0, z0, y0, x1, z1, y1, 0.45, 0.5); addBox(pil, x0, y0 + 0.55, z0, 0.08, 1.1, 0.08, null); continue; } // a footbridge: a handrail and a bar on posts
+    addBox(pil, (x0 + x1) / 2, (y0 + y1) / 2 + 0.2, (z0 + z1) / 2, L + 0.02, 0.5, 0.3, null, ry); rail(x0, z0, y0, x1, z1, y1, 0.6, 0.95); // a concrete kerb and a rail
+  }
+  for (const [x, z, g, bot] of DECK_BAR.pillars) if (tileOf(x, z) === T.t) addBox(pil, x, (g + bot) / 2 - 0.2, z, 0.9, bot - g + 0.4, 0.9, null);
+  const R = yield* roadBarriers(T);
+  for (const [x0, z0, y0, x1, z1, y1] of R.rails) { rail(x0, z0, y0, x1, z1, y1, 0.45, 0.8); const L = hyp(x1 - x0, z1 - z0); for (let s = 0; s < L; s += 2) { const f = s / L, x = lerp(x0, x1, f), z = lerp(z0, z1, f), y = lerp(y0, y1, f), g = Math.min(y, H.ground(x, z)); addBox(pil, x, (g + y + 0.75) / 2 - 0.1, z, 0.1, y + 0.75 - g + 0.2, 0.1, null); } } // posts every 2 m, down to the ground
+}
 // a tile is built a slice at a time (a generator that yields between its parts), so driving into new ground never freezes the game for the
 // tenth of a second a whole tile takes; it stays hidden until it is complete. buildTile runs one to the end in one go (start, respawn)
 // the surface layers of a tile of S (docs/motore.md 3): each cell a polygon of a layer covers whole goes to the highest layer that does (rank
@@ -2019,10 +2138,11 @@ function* buildTileGen(T) {
         for (let s = ja + 0.5; s + 3 < L - jb; s += 7.5) quad(mark, A[0] + ux * (s + 1.5), A[1] + uz * (s + 1.5), ux, uz, -uz, ux, 3, 0.16, 0.08 * fy, white);
       }
     }
-    // in a tile of S the old guardrails and pillars stand on the decks of the new engine and on S (phase 6 makes them from the decks)
-    for (const sp of DECK_SOLIDS) if (sp.k === 'pillar' && tileOf(sp.x, sp.z) === T.t) { const g0 = H.ground(sp.x, sp.z), h = (T.fine ? deckY(sp.x, sp.z, sp.y) : sp.y) - 0.9 - g0; if (h > 0.5) addBox(pil, sp.x, g0 + h / 2, sp.z, 0.9, h, 0.9, null); }
+    // the old guardrails and pillars (old engine); in a tile of S the parapets, pillars and guardrails of sBarriers
+    for (const sp of DECK_SOLIDS) if (sp.k === 'pillar' && tileOf(sp.x, sp.z) === T.t) { const g0 = H.ground(sp.x, sp.z), h = sp.y - 0.9 - g0; if (h > 0.5) addBox(pil, sp.x, g0 + h / 2, sp.z, 0.9, h, 0.9, null); }
+    if (T.fine) { const s_ = srndT; yield* drawBarriers(T, grail, pil); srndT = s_; }
     for (const sp of DECK_SOLIDS.concat(FLAT_RAILS.map(f => ({ k: 'rail', ...f })))) if (sp.k === 'rail' && tileOf((sp.x0 + sp.x1) / 2, (sp.z0 + sp.z1) / 2) === T.t) {
-      const b0 = grail.p.length / 3, nx = sp.z1 - sp.z0, nz = -(sp.x1 - sp.x0), L = hyp(nx, nz) || 1, y0 = T.fine ? deckY(sp.x0, sp.z0, sp.y0) : sp.y0, y1 = T.fine ? deckY(sp.x1, sp.z1, sp.y1) : sp.y1;
+      const b0 = grail.p.length / 3, nx = sp.z1 - sp.z0, nz = -(sp.x1 - sp.x0), L = hyp(nx, nz) || 1, y0 = sp.y0, y1 = sp.y1;
       vtx(grail, sp.x0, y0 + 0.4, sp.z0, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, y1 + 0.4, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, y1 + 0.85, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x0, y0 + 0.85, sp.z0, nx / L, 0, nz / L, 0, 0);
       grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
     }
@@ -8117,5 +8237,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
+window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
 </script>

@@ -37,6 +37,7 @@ LEVEL = 3.0      # an axis this far from the polygon's own vertices is at anothe
 DZ_WARN, DZ_CAP = 1.5, 3.0   # C4: DBGT farther than this from the LiDAR is listed; farther than DZ_CAP the LiDAR wins (the "tetto")
 NEAR_BR = 30.0   # ... unless within this of a bridge: then it is the part of the deck the DBGT left as ground (phase 3 makes it a deck)
 NEAR_UNDER = 10.0   # ... and a road under the LiDAR this close to a bridge or the gallery is never capped (the DTM is filled across the deck)
+LUCE_MIN = 2.5   # inside a PONTE, fixed nodes this far over the lowest fixed ones are at the level of the deck (fase 6)
 RAMP = 10.0      # the capped patch is joined to the kept DBGT over this distance
 FINE_BUF = 20.0  # a tile is fine (2 m) when one of the features is within this of it
 DENS = 2.0       # polygon rings are densified to this before the TIN (a nearly constrained Delaunay)
@@ -315,7 +316,7 @@ class Superficie:
         sh = (s.R.nz, s.R.nx)
         s.RANK = np.zeros(sh, np.int8); s.INS = np.zeros(sh, bool); s.DST = np.full(sh, np.inf, np.float32)
         s.ZF = np.full(sh, np.nan); s.CLS = np.zeros(sh, np.int8); s.FID = np.full(sh, -1, np.int32)
-        s.BR = np.zeros(sh, bool)
+        s.BR = np.zeros(sh, bool); s.BRP = np.zeros(sh, bool)
 
     def burn(s, P, rank, cls, fid, hfun, fringe=True):
         w = s.R.win(P.bounds, FRINGE + SF)
@@ -350,7 +351,9 @@ class Superficie:
             for i in range(len(L['off']) - 1):
                 if nm not in ('PONTE', 'GALLER') and sed_ok(L, i): continue
                 w, m = s.raster(poly(L, i))
-                if w is not None: s.BR[w[0]:w[1], w[2]:w[3]] |= m
+                if w is not None:
+                    s.BR[w[0]:w[1], w[2]:w[3]] |= m
+                    if nm == 'PONTE': s.BRP[w[0]:w[1], w[2]:w[3]] |= m
         okz = lambda z, ft: ~np.isnan(z)
         # carriageways: own axes (blended), else an axis within 8 m (not for the inner areas ZON 0307), else the TIN of the vertices
         V = D['AC_VEI']; s.vei = {}; s.interne = []; nst = dict(asse=0, asse_vicino=0, tin=0, interne=0, scartati=0)
@@ -526,7 +529,8 @@ class Superficie:
     # bank under a road on a hillside) the absolute clamp built a 2:3 fill or cut that never met the LiDAR and left a cliff of up to 7 m at
     # the edge of the band. On flat ground the two are the same.
     def raccordi(s):
-        t0 = time.time(); FIX = s.RANK > 0; nz, nx = FIX.shape
+        t0 = time.time(); s.deck_level()
+        FIX = s.RANK > 0; nz, nx = FIX.shape
         hi = np.full(FIX.shape, np.inf, np.float32); lo = np.full(FIX.shape, -np.inf, np.float32)
         dz = s.ZF - s.L
         sh = np.where(FIX, dz, np.inf).astype(np.float32); sl = np.where(FIX, dz, -np.inf).astype(np.float32)
@@ -543,44 +547,79 @@ class Superficie:
         S = s.L.copy(); band = ~FIX & ~BARR & np.isfinite(hi)
         lo_, hi_ = np.minimum(lo, hi), np.maximum(lo, hi)
         S[band] = s.L[band] + np.clip(0.0, lo_[band], hi_[band]); S[FIX] = s.ZF[FIX]
-        s.sotto_ponti(S, BARR)
-        s.S = S; s.FIX = FIX
+        s.FIX = FIX; s.sotto_ponti(S, BARR)
+        s.S = S
         d = ndimage.distance_transform_edt(~FIX, sampling=SF); s.DFIX = d
         s.bordo_banda = int((band & (d > BAND - 2.5) & (np.abs(S - s.L) > 0.05)).sum())
         s.SCARP = band & (np.abs(S - s.L) > 0.05)
         s.t['raccordi'] = round(time.time() - t0, 1)
         s.log('raccordi: nodi in fascia %d, mossi > 5 cm %d, al bordo della fascia ancora mossi %d' % (int(band.sum()), int(s.SCARP.sum()), s.bordo_banda))
 
+    # ----- 6a. what the DBGT burns at the level of a deck inside a PONTE (fase 6): the rail bed SD_FER of the railway bridge over via Milano
+    # (PONTE 14) is one piece with SED=01 across the bridge, and since the DTM is filled across the deck it was no higher than the LiDAR
+    # (not a deck part for the cap of step 4): fixed at 220.3 m, 5.5 m over the road under it and 2 m from it. Inside a PONTE footprint with
+    # fixed nodes at two levels, those more than LUCE_MIN over the lowest are the deck's, not the ground's: they are freed, and filled below
+    def deck_level(s):
+        s.ALTO = np.zeros(s.BRP.shape, bool); lab, nl = ndimage.label(s.BRP, np.ones((3, 3), bool))
+        for k, sl in enumerate(ndimage.find_objects(lab)):
+            M = (lab[sl] == k + 1) & (s.RANK[sl] > 0)
+            if M.sum() < 4: continue
+            z = s.ZF[sl][M]; lo = np.nanmin(z)
+            hi = M & (s.ZF[sl] > lo + LUCE_MIN)
+            if hi.any() and (M & ~hi).sum() >= 4: s.ALTO[sl] |= hi
+        s.RANK[s.ALTO] = 0
+        s.log('a livello di impalcato dentro un PONTE: %d nodi liberati' % int(s.ALTO.sum()))
+
     # ----- 6b. under the bridges (fase 6): the nodes under a deck that no road, rail or river fixes kept the LiDAR, and the DTM is filled across
     # the deck: under the railway bridge over via Milano (PONTE 14) the sides of the 6 m carriageway stood at the top of the deck, 220.3 m
     # against 214.7, and the diagonal edge of the burn on the 2 m lattice made teeth of 1.3 m across the lane (collaudo 1: the car bounced
-    # under the bridge). There S is the harmonic fill (Laplace, 4 neighbours) of what is around them, the fixed nodes and the ground outside
-    # the deck, never above the LiDAR
+    # under the bridge). What passes under a bridge goes on under it as it is on either side: each such node takes the line through it along
+    # what passes under (the direction of the fixed road, rail or river nodes under the deck), and S there is the linear interpolation of the
+    # first nodes outside the patch on that line, on both sides of the deck (the cross-section of the trench carries on under the bridge, with
+    # its sidewalks). Where nothing fixed passes under (a ramp over a field) the harmonic fill (Laplace, 4 neighbours) of what is around. Never
+    # above the LiDAR
     def sotto_ponti(s, S, BARR):
-        s.SOTTO = np.zeros(BARR.shape, bool); s.n_sotto = 0; s.sotto_dz = np.zeros(0)
-        lab, nl = ndimage.label(BARR)
+        s.SOTTO = np.zeros(BARR.shape, bool); s.n_sotto = 0; s.sotto_dz = np.zeros(0); s.sotto_modo = dict(lungo=0, laplace=0)
+        lab, nl = ndimage.label(BARR, np.ones((3, 3), bool))
         if not nl: return
-        nz, nx = BARR.shape; dzs = []
+        nz, nx = BARR.shape; dzs = []; FIXED = s.FIX & s.BR & np.isin(s.CLS, (C_VEI, C_VEIT, C_FER, C_ALV, C_ARG, C_PED, C_AREA))
         for k, sl in enumerate(ndimage.find_objects(lab)):
-            r0, r1, c0, c1 = max(0, sl[0].start - 1), min(nz, sl[0].stop + 1), max(0, sl[1].start - 1), min(nx, sl[1].stop + 1)
-            M = lab[r0:r1, c0:c1] == k + 1; idx = -np.ones(M.shape, np.int64); n = int(M.sum()); idx[M] = np.arange(n)
-            W = S[r0:r1, c0:c1]; rows, cols, vals = [], [], []; rhs = np.zeros(n); deg = np.zeros(n)
-            rr, cc = np.nonzero(M); me = idx[rr, cc]
-            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                r2, c2 = rr + dr, cc + dc; ok = (r2 >= 0) & (r2 < M.shape[0]) & (c2 >= 0) & (c2 < M.shape[1])
-                deg[me[ok]] += 1; r2, c2, m1 = r2[ok], c2[ok], me[ok]; inn = M[r2, c2]
-                rows.append(m1[inn]); cols.append(idx[r2[inn], c2[inn]]); vals.append(-np.ones(int(inn.sum())))
-                np.add.at(rhs, m1[~inn], W[r2[~inn], c2[~inn]])
-            if not (deg > 0).all(): continue
-            A = sparse.csr_matrix((np.concatenate([deg] + vals), (np.concatenate([np.arange(n)] + rows), np.concatenate([np.arange(n)] + cols))), shape=(n, n))
-            if not np.isfinite(rhs).all(): continue
-            try: u = sparse.linalg.spsolve(A.tocsc(), rhs)
-            except Exception: continue
-            if not np.isfinite(u).all(): continue
-            Lw = s.L[r0:r1, c0:c1][M]; new = np.minimum(Lw, u); dzs.append(new - W[M])
-            W[M] = new; s.SOTTO[r0:r1, c0:c1] |= M; s.n_sotto += n
+            P = 6; r0, r1, c0, c1 = max(0, sl[0].start - P), min(nz, sl[0].stop + P), max(0, sl[1].start - P), min(nx, sl[1].stop + P)
+            M = lab[r0:r1, c0:c1] == k + 1; n = int(M.sum()); W = S[r0:r1, c0:c1]; Lw = s.L[r0:r1, c0:c1]
+            rr, cc = np.nonzero(M); new = None
+            fr, fc = np.nonzero(FIXED[r0:r1, c0:c1])
+            if len(fr) >= 6:  # the direction of what passes under: the long axis of the fixed nodes under the deck
+                X = np.stack((fc, fr), 1).astype(float); X -= X.mean(0); ev, evec = np.linalg.eigh(X.T @ X / len(X))
+                if ev[1] > 3 * max(ev[0], 1e-6):
+                    u = evec[:, 1]; vals = np.full(n, np.nan)
+                    for i in range(n):
+                        ends = []
+                        for sg in (1, -1):
+                            t = 0.5
+                            while t < 400:
+                                c_, r_ = int(round(cc[i] + sg * u[0] * t)), int(round(rr[i] + sg * u[1] * t))
+                                if r_ < 0 or c_ < 0 or r_ >= M.shape[0] or c_ >= M.shape[1]: break
+                                if not M[r_, c_]: ends.append((t, W[r_, c_])); break
+                                t += 0.5
+                        if len(ends) == 2: vals[i] = (ends[0][1] * ends[1][0] + ends[1][1] * ends[0][0]) / (ends[0][0] + ends[1][0])
+                        elif len(ends) == 1: vals[i] = ends[0][1]
+                    if np.isfinite(vals).all(): new = vals; s.sotto_modo['lungo'] += n
+            if new is None:  # harmonic fill
+                idx = -np.ones(M.shape, np.int64); idx[M] = np.arange(n); me = idx[rr, cc]; rows, cols, vals_ = [], [], []; rhs = np.zeros(n); deg = np.zeros(n)
+                for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    r2, c2 = rr + dr, cc + dc; ok = (r2 >= 0) & (r2 < M.shape[0]) & (c2 >= 0) & (c2 < M.shape[1])
+                    deg[me[ok]] += 1; r2, c2, m1 = r2[ok], c2[ok], me[ok]; inn = M[r2, c2]
+                    rows.append(m1[inn]); cols.append(idx[r2[inn], c2[inn]]); vals_.append(-np.ones(int(inn.sum())))
+                    np.add.at(rhs, m1[~inn], W[r2[~inn], c2[~inn]])
+                if not (deg > 0).all() or not np.isfinite(rhs).all(): continue
+                A = sparse.csr_matrix((np.concatenate([deg] + vals_), (np.concatenate([np.arange(n)] + rows), np.concatenate([np.arange(n)] + cols))), shape=(n, n))
+                try: new = sparse.linalg.spsolve(A.tocsc(), rhs)
+                except Exception: continue
+                if not np.isfinite(new).all(): continue
+                s.sotto_modo['laplace'] += n
+            new = np.minimum(Lw[M], new); dzs.append(new - W[M]); W[M] = new; s.SOTTO[r0:r1, c0:c1] |= M; s.n_sotto += n
         s.sotto_dz = np.concatenate(dzs) if dzs else np.zeros(0)
-        s.log('sotto i ponti: %d nodi riempiti fra i bordi (abbassati di %s m)' % (s.n_sotto, pct(-s.sotto_dz, (50, 90, 99)) if len(s.sotto_dz) else '-'))
+        s.log('sotto i ponti: %d nodi (%s), abbassati di %s m' % (s.n_sotto, s.sotto_modo, pct(-s.sotto_dz, (50, 90, 99)) if len(s.sotto_dz) else '-'))
 
     # ----- 7. tiles: 2 m or 10 m, seams, quantisation
     def tessere(s, osm=None):
@@ -944,7 +983,7 @@ def main(argv=None):
                dbgt=dict(offset_m=s.info['offset']['valore'], assi_lisciati_quanto_si_muovono=pct(np.abs(s.AX.dz_liscio)), carreggiate=s.nst, bordi_agganciati=s.nkerb, bordi_non_agganciati_oltre_1m=s.kerb_lontani, scarto_aggancio=pct(np.abs(s.kerb_dz)), aree_interne_al_lidar=len(s.interne), alvei_bruciati=s.nalveo, ferrovia_fuori_sedi_punti=s.ferro_fuori),
                lidar=dict(buchi=s.nbuchi, nota='nessun buco nel riquadro: TINITALY non serve qui'),
                superficie=dict(nodi_fissi=int(s.FIX.sum()), sotto_ponti=int(s.BR.sum()), nodi_impalcato_da_fase3=int(s.AIR.sum()), nodi_tetto=int(s.CAP.sum()), nodi_tombino_tenuti=int(s.TOMB.sum()), nodi_alveo_al_lidar=int(s.ALVCOP.sum()), nodi_scarpata=int(s.SCARP.sum()),
-                               bordo_fascia_ancora_mosso=s.bordo_banda, sotto_ponti_riempiti=s.n_sotto, sotto_ponti_abbassati_m=pct(-s.sotto_dz) if len(s.sotto_dz) else None, carreggiata_meno_lidar=pct(dz, (10, 50, 90)), ritocchi=s.nrit),
+                               bordo_fascia_ancora_mosso=s.bordo_banda, dentro_ponte_a_livello_impalcato=int(s.ALTO.sum()), sotto_ponti_riempiti=s.n_sotto, sotto_ponti_modo=s.sotto_modo, sotto_ponti_abbassati_m=pct(-s.sotto_dz) if len(s.sotto_dz) else None, carreggiata_meno_lidar=pct(dz, (10, 50, 90)), ritocchi=s.nrit),
                C9_peso=peso, **rep, punti_da_guardare=punti, tempi_s=dict(s.t, totale=tot))
     ok = all(rep[c].get('ok', True) for c in ('C4', 'C5', 'C6', 'C7', 'C10'))
     out['esito'] = {c: rep[c].get('ok') for c in ('C4', 'C5', 'C6', 'C7', 'C10')}
