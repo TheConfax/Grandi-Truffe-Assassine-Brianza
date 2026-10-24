@@ -932,6 +932,7 @@ if railL:
 if FER and STR: fences = FER.fuori_dalle_carreggiate(fences, STR.carreggiate(0.3))  # never in a carriageway
 if FER: fences = FER.via_dai_ponti(fences)  # not hanging on the slopes under a railway bridge
 if FER: fences = FER.via_dai_binari(fences, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'recinzioni_ferrovia')  # never across a track
+if FER: fences = FER.lontano_dai_binari(fences, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'recinzioni')  # nor inside the train
 # cemeteries are walled: perimeter wall wherever OSM has not drawn one (gates/paths open it like any other wall)
 _osm_bar_all = unary_union([LineString(pts).buffer(1.5) for pts, k, h in barriers if len(pts) >= 2]) if barriers else GeometryCollection()
 ncw = 0
@@ -1071,6 +1072,7 @@ if not _fz.is_empty:
     _nb = len(bar_out); bar_out = [b for b in bar_out if LineString(b[0]).difference(_fz).length > 0.5 * LineString(b[0]).length]
     log('divisori sul bordo delle fontane tolti', _nb - len(bar_out))
 if FER: bar_out = FER.via_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_recinzioni', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
+if FER: bar_out = FER.lontano_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_divisori', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
 
 # ---- rivers: merge the OSM pieces, then cut them where a road / railway / building passes over (a bridge or culvert mouth)
 from shapely.ops import linemerge

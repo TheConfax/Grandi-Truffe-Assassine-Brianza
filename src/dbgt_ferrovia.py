@@ -258,10 +258,41 @@ class Ferrovia:
 
     # ---- 2. what stands along the track
     def corridoio(s, corridor):
-        """the railway land for the fences: the rail bed SD_FER inside the cover (a little wider), the buffer of the tracks outside"""
+        """the railway land for the fences: inside the cover the rail bed SD_FER a little wider, but never narrower than the buffer of the
+        tracks (`corridor`, 2.9 m from the middle of each track), the gaps between them closed and the small holes filled; outside the
+        buffer of the tracks as before. Verifica del 24/10: on the Milano-Chiasso SD_FER is a strip about 2 m wide around each track
+        (14 266 m2, width 2.1 m) and in the station it has a hole (the AC_PED over the underpass): the fences on its edge stood 1.0-1.6 m
+        from the middle of the tracks, inside the train (2.94 m wide), and between the two tracks of the line (4.9 km in Meda)"""
         if s.U_sede.is_empty: return corridor
         inner = s.cover.buffer(-1)
-        return unary_union([corridor.difference(inner), s.U_sede.buffer(FENCE_OUT, join_style=2).intersection(inner)])
+        U = unary_union([s.U_sede.buffer(FENCE_OUT, join_style=2), corridor.intersection(s.cover)])
+        U = U.buffer(CORR_CLOSE, join_style=2).buffer(-CORR_CLOSE, join_style=2)
+        U = unary_union([Polygon(p.exterior, [h for h in p.interiors if Polygon(h).area > CORR_HOLE]) for p in _parts(U) if p.geom_type == 'Polygon'])
+        s.rep['corridoio'] = dict(sd_fer_allargata_m2=round(s.U_sede.buffer(FENCE_OUT, join_style=2).area), corridoio_nel_comune_m2=round(U.intersection(inner).area))
+        return unary_union([corridor.difference(inner), U.intersection(inner)])
+
+    def lontano_dai_binari(s, items, rail_lines, nome, get=lambda b: b, put=lambda b, pts: pts):
+        """inside the cover no fence or wall nearer than BODY_CLEAR to the middle of an at-grade track, along it or across it: the train
+        (2.94 m wide, its cars overhanging on the curves) would run through it. OSM fences drawn on the track, DBGT dividers between the
+        tracks of the station 1.36 m from one of them, the edge of a narrow rail bed"""
+        ponti = getattr(s, 'Z_ponti', None)
+        if ponti is None: s.via_dai_binari([], [], '_'); ponti = s.Z_ponti
+        rl = [p for l in rail_lines for p in _parts(l.difference(ponti) if not ponti.is_empty else l) if p.geom_type == 'LineString']
+        if not rl: return items
+        Z = unary_union([l.buffer(BODY_CLEAR, cap_style=2) for l in rl]).intersection(s.cover); shapely.prepare(Z)
+        out = []; nc = 0; lost = 0.0
+        for b in items:
+            pts = get(b)
+            if len(pts) < 2: out.append(b); continue
+            L = LineString(pts)
+            if not Z.intersects(L): out.append(b); continue
+            rest = L.difference(Z)
+            if L.length - rest.length < 0.05: out.append(b); continue
+            nc += 1; lost += L.length - rest.length
+            for p in _parts(rest):
+                if p.geom_type == 'LineString' and p.length > 1.0: out.append(put(b, list(p.coords)))
+        s.rep.setdefault('lontano_dai_binari', {})[nome] = dict(n=nc, metri=round(lost, 1), distanza_m=BODY_CLEAR)
+        return out
 
     def banchine(s, area_geoms, rail_lines):
         """platforms (area type 5) clear of the middle of every track by CLEAR: an OSM platform that runs over a track is cut back"""
@@ -442,3 +473,6 @@ PONTE_FENCE = 8.0 # no corridor fence this near a railway bridge of the DBGT
 TRACK_CLEAR = 2.3 # no fence or wall nearer than this to the middle of a track it crosses (the train is 2.9 m wide)
 BED_HW = 2.1      # the drawn rail bed at least this far either side of a track (the old ballast strip)
 STEP_COV = 2.0    # the coverage of an element is known every few metres: a free stretch is trimmed by this at each end
+CORR_CLOSE = 1.0  # the fence corridor: gaps narrower than twice this closed
+CORR_HOLE = 400.0 # ... and holes smaller than this (m2) filled
+BODY_CLEAR = 1.6  # no fence or wall nearer than this to the middle of an at-grade track (the train body is 2.94 m wide)
