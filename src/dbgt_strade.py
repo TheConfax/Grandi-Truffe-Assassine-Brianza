@@ -10,8 +10,8 @@
 #     AR_VMS; OSM's own surfaces stay only where the DBGT has nothing within 3 m
 #   - checks (report): street furniture, barriers and buildings in the carriageway, lanes inside AC_VEI, drawn sidewalks and squares
 #     against AC_PED + AR_STR
-# Used by build_data.py (a few lines call it); python src/dbgt_strade.py DUMP runs the matching alone on a dump of build_data.py
-# (GTA_DUMP_STRADE=file), with a picture of the result.
+# Used by build_data.py (a few lines call it, class Strade). To work on it without the whole build: GTA_DUMP_STRADE=file makes build_data.py
+# pickle nodes and raw_roads before the matching; Strade(...).assi(raw_roads, nodes) runs on that alone in a few seconds.
 import os, sys, math, time, sqlite3
 from collections import defaultdict, Counter
 import numpy as np, shapely
