@@ -35,7 +35,7 @@ const SEG_MARK = { line: null, stop: null };
 function segPlace(s) { // the post on the right of the lane, the plate facing the drivers
   if (s.place) return s.place;
   let [kind, x, z, dx, dz] = s, best = null, bd = 1e9;
-  if (kind === 'isola') { if (onAsph(x, z)) s.skip = true; return (s.place = { px: x, pz: z, dx, dz, hw: 0 }); } // on the nose of the splitter island, as computed; on the drawn carriageway (the DBGT islands MAN_TR lie elsewhere): none
+  if (kind === 'isola') { if (nearAsph(x, z, 0.1)) s.skip = true; return (s.place = { px: x, pz: z, dx, dz, hw: 0 }); } // on the nose of the splitter island, as computed; on the drawn carriageway (the DBGT islands MAN_TR lie elsewhere): none
   ROADSEG.each(x - 15, z - 15, x + 15, z + 15, g => { if (g.r.c > 5 || !atGrade(g) || g.r.t) return; const L = hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]) || 1, al = (dx || dz) ? Math.abs((g.b[0] - g.a[0]) * dx + (g.b[1] - g.a[1]) * dz) / L : 1, d = segDist(x, z, g.a[0], g.a[1], g.b[0], g.b[1]) + (al < 0.6 ? 8 : 0); if (d < bd) { bd = d; best = g; } }); // the road the sign talks to: near, and running its way
   if (best) bd = segDist(x, z, best.a[0], best.a[1], best.b[0], best.b[1]);
   let hw = best ? best.r.w / 2 : 3, px = x, pz = z;
@@ -45,8 +45,8 @@ function segPlace(s) { // the post on the right of the lane, the plate facing th
     if (!dx && !dz) { dx = ex / L; dz = ez / L; if ((x - cx) * -dz + (z - cz) * dx < 0) { dx = -dx; dz = -dz; } } // the side of the road it was mapped on is its right
     else { const k = dx * ex / L + dz * ez / L; if (Math.abs(k) > 0.5) { dx = ex / L * Math.sign(k); dz = ez / L * Math.sign(k); } } // squared up with the road
     if (bd < hw + 0.6) { px = cx - dz * (hw + 0.9); pz = cz + dx * (hw + 0.9); } // off the asphalt, on the right
-    for (let k = 0; k < 8 && onAnyRoad(px, pz, 0.25); k++) { px -= dz * 0.6; pz += dx * 0.6; } // still on a road (a junction, a parallel lane): a little further out
-    if (onAnyRoad(px, pz, 0.25)) s.skip = true; // nowhere to stand: better no sign than one in the middle of the road
+    for (let k = 0; k < 8 && (onAnyRoad(px, pz, 0.25) || nearAsph(px, pz, 0.25)); k++) { px -= dz * 0.6; pz += dx * 0.6; } // still on a road (a junction, a parallel lane, the drawn carriageway past its 0.5 m grid): a little further out
+    if (onAnyRoad(px, pz, 0.25) || nearAsph(px, pz, 0.1)) s.skip = true; // nowhere to stand: better no sign than one in the middle of the road
     s.lane = { cx, cz, hw };
   }
   return (s.place = { px, pz, dx, dz, hw });
