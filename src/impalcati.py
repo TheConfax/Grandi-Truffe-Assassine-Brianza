@@ -33,6 +33,7 @@ NEAR_V = 2.9      # lattice nodes this close to the footprint carry the deck val
 BAD_RING = 1.5    # a PONTE ring vertex this far from the axes and areas on the deck is not the deck top (dropped from its TIN)
 ASSIGN_D = sf.NEAR_BR + 2.5   # an AIR patch with a node within this of a bridge belongs to bridges
 LAT_HW = {'strada': 3.5, 'ferro': 2.5, 'pedonale': 1.5}   # half width of an OSM bridge way that runs beside its PONTE (fase 6)
+FLANK_LO, FLANK_HI = 0.05, 0.8   # a boundary vertex of a deck off its core this far over S moves onto S (Impalcati.fianchi, verifica fase 6)
 OSM_DIR = 5.0     # OSM bridges within this of a PONTE give its type and direction when the DBGT has no axis on it
 MATCH_BUF = 3.0   # roads and OSM ways are matched on the footprint grown by this (OSM is often 2-4 m off the DBGT)
 UNDER_MIN = 1.0   # a deck whose top lies under S by more than this (median) is not a bridge one can see: reported, not emitted
@@ -434,8 +435,31 @@ class Impalcati:
         for j, idx in enumerate(s.liberi):
             ca, _ = by.get(('l', j), ([], []))
             s._deck(None, ca, [], 'ponte non segnato', idx)
+        s.fianchi()
         s.info['t_impalcati'] = round(time.time() - t0, 1)
         return s.decks
+
+    # ----- the flanks (verifica fase 6): off the PONTE core the deck cells (spalla cells, extensions, the cells under the OSM way) end on the
+    # lattice lines, and where S beside them lies a little lower the flank was a step of 0.2-0.8 m (132 m of outline on 21 decks, 21 m of
+    # it on asphalt): a walker went up it in one frame (0.79 m by PONTE 10), a wheel 0.32 m (PONTE 17), 0.20 (the foot of PONTE 19 on the
+    # Milano-Meda). As at the spalle, the vertex of the deck moves onto S, not S onto the deck: a boundary vertex off the core, not shared
+    # with another deck, FLANK_LO-FLANK_HI over S, takes S. Over FLANK_HI the drop stays and the parapets hold it
+    def fianchi(s):
+        n = 0; geoms = [d['imp'] for d in s.decks]
+        for i, d in enumerate(s.decks):
+            P, T, Hv = d['P'], d['T'], d['Hv']
+            if not len(T) or d['tipo'] == 'copertura': continue
+            E = bordi(T); vi = np.unique(E[:, :2])
+            if d['core'] is not None: vi = vi[shapely.distance(d['core']['g'], shapely.points(P[vi, 0], P[vi, 1])) > 0.05]   # the DBGT bridge keeps its sides
+            if not len(vi): continue
+            pts = shapely.points(P[vi, 0], P[vi, 1])
+            other = np.zeros(len(vi), bool)
+            for j, g in enumerate(geoms):
+                if j != i and g.distance(d['imp']) < 0.1: other |= shapely.distance(g, pts) < 0.1
+            Sv = s.Sat(P[vi, 0], P[vi, 1]); dh = Hv[vi] - Sv
+            m = ~other & (dh > FLANK_LO) & (dh < FLANK_HI)
+            Hv[vi[m]] = Sv[m]; n += int(m.sum())
+        s.info['fianchi_a_S'] = n
 
     def _deck(s, core, cells_air, cells_sp, fonte, air_idx):
         ea = shapely.union_all([s.cbox(rc) for rc in cells_air]) if cells_air else Polygon()
@@ -822,6 +846,7 @@ def main(argv=None):
         rep['C5']['tirata_del_piano_DBGT_verso_S'], len(rep['C5']['uscite_vie_osm_senza_spalla']), [(e['fonte'], e['estremo']) for e in rep['C5']['estremi_senza_spalla']]))
     if imp.info.get('estensioni'): log('estremi allungati fino al terreno: %s' % imp.info['estensioni'])
     if imp.info.get('allargati_sulla_via_osm'): log('allargati sotto la via OSM accanto al PONTE: %s' % imp.info['allargati_sulla_via_osm'])
+    log('fianchi portati su S (vertici di bordo fuori dal nucleo, %.2f-%.2f m sopra S): %d' % (FLANK_LO, FLANK_HI, imp.info.get('fianchi_a_S', 0)))
     log('C6 impalcati: lungo le vie %s, sopra il 18%% %d; triangoli sopra il 18%% %d' % (rep['C6_impalcati']['pendenza_lungo_le_vie'], rep['C6_impalcati']['vie_sopra_18'], rep['C6_impalcati']['triangoli_sopra_18']))
     log('C11 %s' % rep['C11']['conteggi'])
     if 'nodi_su_impalcato' in rep: log('nodi di oggi sugli impalcati: %d, scarto %s' % (rep['nodi_su_impalcato']['nodi'], rep['nodi_su_impalcato']['scarto']))
