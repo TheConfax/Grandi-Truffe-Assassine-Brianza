@@ -1002,6 +1002,7 @@ function segTexOf(kind, extra) {
 }
 const SEG_POLE = new THREE.MeshLambertMaterial({ color: 0x9a9da1 });
 const SEG_MARK = { line: null, stop: null };
+function inPolyAny(x, z) { const T = TILES[tileOf(x, z)]; return !!T && (T.d.md || []).some(q => q.g && inPoly(x, z, dec(q.p))); } // inside an island of the DBGT
 function dbgtIsland(x, z, R) { // the nearest point 0.5 m inside an island of the DBGT (tiles[t].md with g) within R m, or null
   let best = null, bd = R;
   for (const T of TILES) { if (Math.abs(T.cx - x) > TS / 2 + R || Math.abs(T.cz - z) > TS / 2 + R) continue;
@@ -1013,8 +1014,8 @@ function dbgtIsland(x, z, R) { // the nearest point 0.5 m inside an island of th
 function segPlace(s) { // the post on the right of the lane, the plate facing the drivers
   if (s.place) return s.place;
   let [kind, x, z, dx, dz] = s, best = null, bd = 1e9;
-  if (kind === 'isola') { // on the nose of the splitter island, as computed; on the drawn carriageway: on the nearest island of the DBGT (MAN_TR) within 8 m, without the OSM island, else none (verifica 24/10: 31 of 89 lost)
-    if (nearAsph(x, z, 0.1)) { const q = dbgtIsland(x, z, 8); if (q) { s[5] = null; x = q[0]; z = q[1]; } else s.skip = true; }
+  if (kind === 'isola') { // on the nose of the splitter island, as computed. Where the DBGT has an island (MAN_TR) within 8 m: on it, without the OSM island over or beside it; else on the drawn carriageway none (verifica 24/10: 31 of 89 lost)
+    const q = dbgtIsland(x, z, 8); if (q) { s[5] = null; if (!inPolyAny(x, z)) { x = q[0]; z = q[1]; } } else if (nearAsph(x, z, 0.1)) s.skip = true;
     return (s.place = { px: x, pz: z, dx, dz, hw: 0 });
   }
   ROADSEG.each(x - 15, z - 15, x + 15, z + 15, g => { if (g.r.c > 5 || !atGrade(g) || g.r.t) return; const L = hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]) || 1, al = (dx || dz) ? Math.abs((g.b[0] - g.a[0]) * dx + (g.b[1] - g.a[1]) * dz) / L : 1, d = segDist(x, z, g.a[0], g.a[1], g.b[0], g.b[1]) + (al < 0.6 ? 8 : 0); if (d < bd) { bd = d; best = g; } }); // the road the sign talks to: near, and running its way
