@@ -71,6 +71,9 @@ for (const e of EXTRA_BARRIERS) { const d = TILES[tileOf(e.p[0][0], e.p[0][1])].
 // 0.35 m under the water, 8 trees in Meda (verifica fase 6). Not drawn, no collision. The same for the railing along an OSM river, at its
 // width from the OSM axis: where that falls in the water of the DBGT bed it ran along the middle of the Seveso
 const inWater = (x, z, gy) => { if (!H.fineAt(x, z)) return false; const w = H.water(x, z); return w !== null && (w > gy + 0.1 || (w > gy - 0.15 && H.mat(x, z) === 4)); }; // under the water, or in the bed at the water's edge (the sheet of water is drawn wherever zw is over S by the bed)
+// a tree trunk within r of the point (the trees of every tile are in WALLS from the start): the parking stalls drawn on car parks and along
+// the streets leave a tree's place free, as in a car park lined with trees (the DBGT trees of the yards, src/dbgt_verde.py)
+const treeNear = (x, z, r) => { let f = false; WALLS.each(x - r, z - r, x + r, z + r, o => { if (o.tree && hyp(o.x - x, o.z - z) < r) f = true; }); return f; };
 for (const T of TILES) {
   const d = T.d;
   for (const B of d.b || []) {
@@ -92,7 +95,7 @@ for (const T of TILES) {
     }
   }
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
-  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q)) || inWater(x, z, gy)) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5 }); }
+  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q)) || inWater(x, z, gy)) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5, tree: 1 }); }
   for (const br of d.ba || []) {
     if (br.t === 3 && NO_HEDGES.some(q => dec(br.p).every(([x, z]) => inPoly(x, z, q)))) continue; // drawn by the landmark, symmetrical
     const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h, v: br.v }); // follow the ground, not long chords
