@@ -345,5 +345,7 @@ Le fasi 1-6 hanno preso dal DBGT solo le quote: terreno, ponti, acqua, altezze. 
 - Controllo: nessun riferimento rotto (POI con `lm`, cartelli, collisioni, minimappa, missioni che puntavano a un modello), il gioco parte e gira; foto prima/dopo dei luoghi dei 48 modelli e di piazze, cortili e sottopasso.
 - Chi lo fa: il lavoro sugli edifici (che tocca già `landmarks3.js`); il collaudo finale controlla che non resti niente scritto a mano.
 
+**Quarto pezzo e ordine delle unioni** (24/10). In parallelo agli edifici lavora un quarto pezzo sul ramo `motore-manufatti` (partito da `motore-verde`): manufatti `MN_IND`, `MAN_TR`, `MN_ARR`, `MN_INT`, `MN_RTC`, aree attrezzate `AATT`, parcheggi `PAR_AR`, `SP_ACQ`/`INVASO`, tralicci e linee `TRALIC`/`TR_ELE`, altezza e chioma degli alberi da DSM − DTM. Ordine delle unioni in `motore`: (1) strade + verde, (2) manufatti, (3) edifici; il collaudo finale parte solo con tutti e tre dentro. Chi fa un'unione o il collaudo e trova `origin/motore-manufatti` pronto e non ancora unito, lo unisce prima (e lo scrive nella nota).
+
 **Controlli della build (nuovi, nel rapporto).** Nessun parapetto, guard rail, palo, cartello, albero o arredo dentro `AC_VEI`; nessun edificio su una carreggiata; assi delle corsie dentro `AC_VEI` (distanza dal bordo ≥ metà corsia); `osm_senza_dbgt` e `dbgt_senza_osm` con coordinate; marciapiedi e piazze disegnati contro `AC_PED` + `AR_STR` (area e IoU).
 
