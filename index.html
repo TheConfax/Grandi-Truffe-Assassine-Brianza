@@ -6411,6 +6411,23 @@ function lsNet(A, sm, vm, half, postH, netH, G, box, y0 = 0) { // posts at the s
   mkMesh(net, MAT.net, 11, false, G); box(0.03, 0.06, half * 2, (ax + bx) / 2, top, (az + bz) / 2, '#f4f2ea', ry);
 }
 
+// the edge of the area drawn from the DBGT (docs/motore.md, section 7): a tall red see-through wall along the boundary of every active comune,
+// like the border of a Minecraft world, so you can tell when you leave the part made properly; the same line goes on the minimap and on the
+// big map (assemble3.py). The rings come from the COMUNE layer of each active DBGT (src/confine_dbgt.py -> confine_dbgt.json)
+const CONFINE = await (async () => { try { const r = await fetch('confine_dbgt.json'); if (!r.ok) return []; const j = await r.json(); return j && j.ver === 1 ? j.comuni : []; } catch (e) { return []; } })();
+{
+  const WALL_H = 150, mat = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, fog: false });
+  for (const c of CONFINE) {
+    const p = c.p, pos = [];
+    for (let i = 0; i < p.length; i++) {
+      const a = p[i], b = p[(i + 1) % p.length], ya = H.ground(a[0], a[1]) - 5, yb = H.ground(b[0], b[1]) - 5; // from under the ground: no gap on the slopes
+      pos.push(a[0], ya, a[1], b[0], yb, b[1], b[0], yb + WALL_H, b[1], a[0], ya, a[1], b[0], yb + WALL_H, b[1], a[0], ya + WALL_H, a[1]);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const m = new THREE.Mesh(g, mat); m.renderOrder = 20; m.frustumCulled = false; scene.add(m);
+  }
+}
+
 // ---------------------------------------------------------------- audio
 const AU = { on: false, ctx: null, muted: false };
 function audioInit() {
@@ -7034,6 +7051,7 @@ BIGC.width = BOX * 2; BIGC.height = BOZ * 2;
     g.beginPath(); r.g.forEach((i, k) => k ? g.lineTo(N[i][0], N[i][1]) : g.moveTo(N[i][0], N[i][1])); g.stroke();
   }
   g.setLineDash([12, 10]); g.strokeStyle = '#c96b4a'; g.lineWidth = 4; for (const r of RAILPTS) { g.beginPath(); r.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); } g.setLineDash([]);
+  g.strokeStyle = 'rgba(255,60,40,.9)'; g.lineWidth = 9; for (const c of CONFINE) { g.beginPath(); c.p.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.stroke(); } /* the edge of the area drawn from the DBGT (confine3.js) */
 }
 const mm = $('minimap'), mg = mm.getContext('2d');
 function drawBlip(g, x, y, col, r, edge, R) {
@@ -7054,6 +7072,7 @@ function drawMinimap() {
     mg.strokeStyle = r.c === 6 ? '#4b4f58' : r.d ? '#f0c27a' : r.c <= 1 ? '#d8cfbd' : r.c === 5 ? '#9b8676' : '#a7a49c'; mg.lineWidth = r.c === 6 ? 1.6 : r.w + (r.c <= 1 ? 2 : 0.5);
     mg.beginPath(); mg.moveTo(sg.a[0], sg.a[1]); mg.lineTo(sg.b[0], sg.b[1]); mg.stroke();
   }
+  mg.strokeStyle = 'rgba(255,60,40,.9)'; mg.lineWidth = 4 / zoom; for (const c of CONFINE) { mg.beginPath(); c.p.forEach((q, i) => i ? mg.lineTo(q[0], q[1]) : mg.moveTo(q[0], q[1])); mg.closePath(); mg.stroke(); } /* the edge of the area drawn from the DBGT (confine3.js) */
   mg.setTransform(1, 0, 0, 1, 0, 0);
   const tr = (x, z) => { const dx = (x - px) * zoom, dz = (z - pz) * zoom, a = h - Math.PI, c = Math.cos(a), s = Math.sin(a); return [dx * c - dz * s, dx * s + dz * c]; };
   mg.translate(R, R);
