@@ -1091,21 +1091,26 @@ function updTrain(dt) {
 const laneOff = (S, e) => S.two ? Math.max(e.off, Math.min(e.off + (e.o ? 1.6 : 0.95), (e.w || 6) / 2 - 0.55)) : e.off;
 function spawnTraffic(near) {
   const a = near ? nodeInRing(TRAF_NODES, P.x, P.z, 90, 260, true) : pick(TRAF_NODES);
-  const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off);
+  const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off, e);
   let kind = pickModel(TRAFFIC_MIX); if (e.x && MODELS[kind].noX) kind = 'moto'; // no bikes or small scooters on the superstrada
-  const col = colorFor(kind), [q0, q1] = MODELS[kind].two ? edgePts(a, e.to, laneOff(MODELS[kind], e)) : [p0, p1];
+  const col = colorFor(kind), [q0, q1] = MODELS[kind].two ? edgePts(a, e.to, laneOff(MODELS[kind], e), e) : [p0, p1];
   const v = new Vehicle(kind, col, q0[0], q0[1], Math.atan2(q1[0] - q0[0], q1[1] - q0[1]));
   const base = kind === 'ape' ? 6.5 : kind === 'van' ? 9 : kind === 'sport' ? 13 : 10.5, mood = rnd() < 0.13 ? 1.45 : 0.75 + rnd() * 0.45; // a few "schegge" in a hurry
   v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to]], cruise: Math.min(v.maxV * 0.8, base * mood), blocked: 0, ignore: 0 }; v.sleep = false;
   return v;
 }
 function extendRoute(v) {
-  const ai = v.ai;
-  while (ai.q.length < 4) {
-    const last = ai.q.length ? ai.q[ai.q.length - 1][2] : ai.cur, prev = ai.q.length > 1 ? ai.q[ai.q.length - 2][2] : ai.prev;
+  // at least 4 waypoints and 32 m of road ahead (the curves of the DBGT axes come in segments of 1-3 m: the corner slowing needs to see them);
+  // prev is the node the last queued edge starts from (q[len - 2] is that edge's first point, -1: U-turns were allowed at every node)
+  const ai = v.ai; let ahead = 0; { let px = v.x, pz = v.z; for (const q of ai.q) { ahead += hyp(q[0] - px, q[1] - pz); px = q[0]; pz = q[1]; } }
+  while (ai.q.length < 4 || (ahead < 32 && ai.q.length < 60)) {
+    const last = ai.q.length ? ai.q[ai.q.length - 1][2] : ai.cur; let prev = -1;
+    for (let i = ai.q.length - 2; i >= 0; i--) if (ai.q[i][2] >= 0) { prev = ai.q[i][2]; break; }
+    if (prev < 0) prev = ai.q.length ? (last === ai.cur ? ai.prev : ai.cur) : ai.prev;
     let opts = TRAF[last].filter(e => e.to !== prev); if (!opts.length) opts = TRAF[last]; if (!opts.length) break;
     if (v.spec.noX && opts.some(e => !e.x)) opts = opts.filter(e => !e.x);
-    const e = pick(opts), [p0, p1] = edgePts(last, e.to, laneOff(v.spec, e));
+    const e = pick(opts), [p0, p1] = edgePts(last, e.to, laneOff(v.spec, e), e);
+    { const lq = ai.q.length ? ai.q[ai.q.length - 1] : [v.x, v.z]; ahead += hyp(p0[0] - lq[0], p0[1] - lq[1]) + hyp(p1[0] - p0[0], p1[1] - p0[1]); }
     ai.q.push([p0[0], p0[1], -1], [p1[0], p1[1], e.to]);
   }
 }
@@ -1188,7 +1193,7 @@ function spawnPolice(patrol) {
   for (let k = 0; k < 16 && c.length; k++) { const i = pick(c); if (onScreen(N[i][0], N[i][1]) || VEH.some(o => hyp(o.x - N[i][0], o.z - N[i][1]) < 9)) continue; a = i; break; }
   if (a == null) return null;
   if (patrol) { // on its lane, like the traffic
-    const e = pick(TRAF[a]), [p0, p1] = edgePts(a, e.to, e.off);
+    const e = pick(TRAF[a]), [p0, p1] = edgePts(a, e.to, e.off, e);
     const v = new Vehicle('police', '#f4f5f7', p0[0], p0[1], Math.atan2(p1[0] - p0[0], p1[1] - p0[1])); v.driver = 'ai'; v.sleep = false; v.y = H.node(a); v.sync();
     v.ai = { cop: false, prev: a, cur: e.to, q: [[p1[0], p1[1], e.to, e.sp]], cruise: 9, blocked: 0, ignore: 0 };
     return v;
@@ -1485,6 +1490,15 @@ function aiTraffic(v, dt) {
   if (ai.q.length > 1) { // slow for corners
     const [ax, az] = ai.q[0], [bx, bz] = ai.q[1], d = hyp(ax - v.x, az - v.z), turn = Math.abs(wrapA(Math.atan2(bx - ax, bz - az) - Math.atan2(ax - v.x, az - v.z)));
     if (d < 20 && turn > 0.5) cruise = Math.min(cruise, 5.5 + (1 - turn / Math.PI) * 4);
+    // and for curves: the turn of the queued lane over 12 m gives the radius, 4.5 m/s2 sideways at most, braking 4 m/s2 before it (a roundabout of
+    // the DBGT is a ring of short segments, none turning 0.5 rad: the cars took it at full speed, verifica 24/10)
+    const hs = []; let px = v.x, pz = v.z, sd = 0;
+    for (const q of ai.q) { const L = hyp(q[0] - px, q[1] - pz); if (L > 0.3) { hs.push([sd, Math.atan2(q[0] - px, q[1] - pz)]); sd += L; px = q[0]; pz = q[1]; } if (sd > 45) break; }
+    for (let i = 1; i < hs.length; i++) {
+      let th = 0, j = i + 1; while (j < hs.length && hs[j][0] - hs[i][0] < 12) { th += Math.abs(wrapA(hs[j][1] - hs[j - 1][1])); j++; }
+      const span = (j < hs.length ? hs[j][0] : sd) - hs[i][0]; if (span < 4 || th < 0.2) continue;
+      cruise = Math.min(cruise, Math.sqrt(4.5 * span / th + 8 * hs[i][0]));
+    }
   }
   if (ai.pass > 0) { // overtaking: follow the lane line (last waypoint → next) moved 2.2 m to the left, aiming 12 m ahead on it (a far node barely changes the heading)
     const A = ai.from, dx = tx - A[0], dz = tz - A[1], d = hyp(dx, dz) || 1, ux = dx / d, uz = dz / d, k = Math.min(1, ai.pass / 0.6, (3.4 - ai.pass) / 0.6 + 0.35);
