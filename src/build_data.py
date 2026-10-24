@@ -1375,7 +1375,7 @@ def _cl_free(r0, x, z, ux, uz, w):
     for sx, sz in ((x - ux * 3 + rx * off, z - uz * 3 + rz * off), (x + ux * 3 - rx * off, z + uz * 3 - rz * off)):
         P_ = Point(sx, sz)
         if STR and STR.U_carr.contains(P_): return False  # a post in a carriageway of the DBGT (a ramp beside the road)
-        if any(_clr[k] is not r0 and _clr[k]['line'].distance(P_) < _clr[k]['w'] / 2 + 2.0 for k in _clt.query(P_.buffer(10))): return False
+        if any(_clr[k] is not r0 and (r0.get('parte') is None or _clr[k].get('parte') != r0.get('parte')) and _clr[k]['line'].distance(P_) < _clr[k]['w'] / 2 + 2.0 for k in _clt.query(P_.buffer(10))): return False
     return True
 nmoved = ndrop = nside = nrep = nminor = 0
 CL_MAXC = 1  # only main streets and through roads get them: between towns grown into each other the residential streets have none (Carlo, 23/10)
@@ -1429,6 +1429,7 @@ for r in raw_roads:
     if r['x']: rec['x'] = 1
     if r.get('under'): rec['u'] = 1
     if r.get('pk'): rec['pk'] = r['pk']
+    if r.get('pv'): rec['pv'] = 1  # over a yard of the DBGT (AC_VEI 0307): no AI traffic (src/dbgt_strade.py privati)
     out_roads.append(rec)
 q = lambda v: int(round(v * 10))
 NODES = [[q(nodes[ref][0]), q(nodes[ref][1]), q(deckH[ref]) if ref in deckH else -32768] for ref in node_list]

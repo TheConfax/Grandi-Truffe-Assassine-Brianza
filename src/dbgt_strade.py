@@ -455,9 +455,74 @@ class Strade:
             time.time() - t0, len(D['str']), len(s.asfalto), len(s.cortili), len(s.marciapiedi), len(s.piazze), len(s.vialetti), len(s.isole)))
 
     # ---- 1. the axes
+    def dividi(s, raw_roads, nodes, new_id, minimo=10.0):
+        """a way that runs in and out of the comune is cut where it crosses the boundary (a node there, or the way's node within 2 m): the
+        width and the free half width of the DBGT are for the part inside, outside it stays OSM as it was (verifica 24/10: Via della Cavalla,
+        855 m outside Meda, had taken 5.2 m instead of 6.5, Via Ventiquattro Maggio a free half width of 1 m for 423 m out of the comune).
+        Excursions shorter than minimo m are not cut"""
+        C = s.cover; Bd = C.boundary; nnew = 0; ncut = 0
+        for wi in range(len(raw_roads)):
+            r = raw_roads[wi]
+            if not (r['c'] <= 5 or r['hw'] in ('cycleway', 'track', 'path', 'bridleway')) or len(r['refs']) < 2: continue
+            xy = np.array([nodes[n_] for n_ in r['refs']]); ins = shapely.contains_xy(C, xy[:, 0], xy[:, 1])
+            if ins.all() or not ins.any(): continue
+            cum = np.r_[0, np.cumsum(np.hypot(*np.diff(xy, axis=0).T))]
+            cuts = []   # (distance along the way, segment index i: between node i-1 and i, point)
+            for i in range(1, len(xy)):
+                if ins[i] == ins[i - 1]: continue
+                p = LineString([xy[i - 1], xy[i]]).intersection(Bd)
+                pts = [g for g in getattr(p, 'geoms', [p]) if g.geom_type == 'Point']
+                q = min(pts, key=lambda g: g.distance(Point(xy[i - 1]))) if pts else Point((xy[i - 1] + xy[i]) / 2)
+                cuts.append((cum[i - 1] + q.distance(Point(xy[i - 1])), i, (q.x, q.y)))
+            # drop the cuts around a run shorter than minimo (a way that grazes the boundary)
+            while True:
+                bounds = [0.0] + [c[0] for c in cuts] + [cum[-1]]; runs = np.diff(bounds)
+                k = int(np.argmin(runs)) if len(runs) else -1
+                if not cuts or runs[k] >= minimo: break
+                if k == 0: cuts.pop(0)
+                elif k == len(runs) - 1: cuts.pop()
+                else: del cuts[k - 1:k + 1]
+            if not cuts: continue
+            refs = list(r['refs']); out = []; cur = [refs[0]]; ci = 0
+            for i in range(1, len(refs)):
+                while ci < len(cuts) and cuts[ci][1] == i:
+                    d0, _, q = cuts[ci]; ci += 1
+                    if d0 - cum[i - 1] < 2.0 and len(cur) > 1: out.append(cur); cur = [cur[-1]]; continue     # the node before is on the boundary
+                    if cum[i] - d0 < 2.0: break                                                             # the node after: cut there
+                    nid = new_id(); nodes[nid] = (float(q[0]), float(q[1])); cur.append(nid); out.append(cur); cur = [nid]; nnew += 1
+                else:
+                    cur.append(refs[i]); continue
+                cur.append(refs[i]); out.append(cur); cur = [refs[i]]
+            if len(cur) > 1: out.append(cur)
+            out = [p for p in out if len(p) > 1]
+            if len(out) < 2: continue
+            r['refs'] = out[0]; r['parte'] = wi   # the pieces of one way know each other (build_data.py _cl_free: a sibling is not another road)
+            for p in out[1:]: raw_roads.append(dict(r, refs=p))
+            ncut += 1
+        s.rep['vie_tagliate_al_confine'] = dict(vie=ncut, nodi_nuovi=nnew)
+        s.log('dbgt strade: vie tagliate al confine del comune %d (nodi nuovi %d)' % (ncut, nnew))
+
+    def privati(s, raw_roads, nodes):
+        """the streets OSM maps over a yard of the DBGT (AC_VEI 0307: inside a private area, no EL_STR axis there) carry no AI traffic: more
+        than half of the way in a yard and not in a carriageway (verifica 24/10: 26 residential ways, the cul-de-sacs of Via della Vigna, Via
+        Federico Borromeo, Via Martiri di Bologna...). The player still drives there"""
+        CO = s.R.draw(s.cortili); out = []
+        for r in raw_roads:
+            r.pop('pv', None)
+            if r['c'] > 3 or len(r['refs']) < 2: continue
+            xy = np.array([nodes[n_] for n_ in r['refs']]); P, U, V = _samples(xy)
+            inc = shapely.contains_xy(s.cover, P[:, 0], P[:, 1])
+            if inc.sum() < 3: continue
+            yard = s.R.at(CO, P[:, 0], P[:, 1]) & ~s.R.at(s.CV, P[:, 0], P[:, 1]) & inc
+            if yard.sum() >= 5 and yard.sum() >= 0.5 * len(P):
+                r['pv'] = 1; m = P[len(P) // 2]; out.append(_link(*m))
+        s.rep['vie_nei_cortili_senza_traffico'] = dict(n=len(out), dove=out[:40])
+        s.log('dbgt strade: vie nei cortili senza traffico IA %d' % len(out))
+
     def assi(s, raw_roads, nodes):
         cnt = [0]
         def new_id(): cnt[0] += 1; return 'dbgt%d' % cnt[0]
+        s.dividi(raw_roads, nodes, new_id)
         s.orig = {i: [nodes[n_] for n_ in r['refs']] for i, r in enumerate(raw_roads)}
         rep, res, nets = abbina(raw_roads, nodes, s.D, s.cover, s.log, new_id)
         s.res, s.nets = res, nets
@@ -477,8 +542,13 @@ class Strade:
             wm = float(np.median(w[ok]))
             if not 2.4 <= wm <= 30: continue
             dw.append(wm - r['w']); r['w_osm'] = r['w']; r['w'] = round(wm, 1); r['wx'] = True; nw += 1
-            r['mh_dbgt'] = round(float(max(1.0, np.percentile(np.minimum(dl, dr)[ok], 5))), 2)
+            # the free half width: p5 of the distance to the nearer edge where the axis runs in the middle of its carriageway (|dl - dr| under
+            # half the larger): where it runs off centre (the mouth of a junction, a stretch the matching left) it is not the lane's room, and
+            # taken in it gave 28 two-way streets a free half width of 1 m (lanes 0.5 m from the axis, no centre line; verifica 24/10)
+            d_, dl_, dr_ = np.minimum(dl, dr)[ok], dl[ok], dr[ok]; mid = np.abs(dl_ - dr_) < 0.5 * np.maximum(dl_, dr_)
+            r['mh_dbgt'] = round(float(max(1.0, np.percentile(d_[mid] if mid.sum() > 3 else d_, 5))), 2)
         rep['larghezze_da_ac_vei'] = dict(vie=nw, differenza_dalla_larghezza_osm_m=_pct(dw, (10, 50, 90)))
+        s.privati(raw_roads, nodes)
         s.rep['assi'] = rep
         s.log('dbgt strade: %s' % rep)
 
