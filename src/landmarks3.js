@@ -1264,6 +1264,7 @@ function buildParkingLines(T, G) {
           const cx0 = A[0] + ux * s, cz0 = A[1] + uz * s, free = clearance(cx0, cz0, rx * side, rz * side, 14), half = Math.min(r.w / 2, free - 0.3), off = half + depth / 2 + 0.1;
           if (free < half + depth + 0.2 || half < r.lane + 0.8) continue;
           const x = cx0 + rx * off * side, z = cz0 + rz * off * side; if (inBuilding(x, z, 0.4) || nearJunction(x, z, 10)) continue;
+          { const lu = step >= depth, a = Math.abs(step - depth) / 2, rr = Math.min(step, depth) / 2 + 0.4, dx = lu ? ux : rx * side, dz = lu ? uz : rz * side; if (treeNear(x + dx * a, z + dz * a, rr) || treeNear(x - dx * a, z - dz * a, rr)) continue; } /* a street tree in the stall: left free */
           outline(x, z, ux, uz, step - 0.25, depth, paid ? BLUE : W);
           const h = kind === 1 ? Math.atan2(ux, uz) + (side < 0 ? Math.PI : 0) : kind === 3 ? Math.atan2(rx * side, rz * side) : Math.atan2(rx * side + ux, rz * side + uz);
           T.streetStalls.push({ x, z, h, kind, paid });
@@ -1290,6 +1291,7 @@ function buildParkingLines(T, G) {
         if (w < 5 || (row === 1 && w < 10.5)) { flush(); continue; }
         const v0 = row ? hi - 4.8 : lo + 0.2, v1 = row ? hi - 0.2 : lo + 4.8, vm = (v0 + v1) / 2;
         if (!ok(s, vm) || !ok(s - 0.9, vm) || !ok(s + 0.9, vm)) { flush(); continue; }
+        { const at = v => [cx + ux * s + nx * v, cz + uz * s + nz * v]; if (treeNear(...at(v0 + 1.2), 1.75) || treeNear(...at(v1 - 1.2), 1.75)) { flush(); continue; } } /* a tree of the car park in the stall: left free */
         const x = cx + ux * s + nx * vm, z = cz + uz * s + nz * vm;
         run.push({ s, v0, v1, x, z, h: Math.atan2(nx, nz) + (row ? 0 : Math.PI) }); // nose towards the aisle in the middle
       }

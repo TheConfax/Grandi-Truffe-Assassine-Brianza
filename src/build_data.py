@@ -1211,6 +1211,9 @@ for row in rows:
         for k in range(int(L // 7) + 1):
             f = k * 7 / L if L else 0; p = (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
             if inside(p, 0): trees.append(p)
+# where there is a DBGT its green and its trees replace OSM's and WorldCover's (src/dbgt_verde.py, docs/motore.md 7)
+import dbgt_verde
+VERDE = dbgt_verde.Verde(DBT_DIR, _comuni, dbt_cover, log, lambda lon_, lat_: ((lon_ - lon0) * KX, -(lat_ - lat0) * KZ), (-HW, -HH)); _n_tr = len(trees)
 # forests: scatter trees inside wood polygons (deterministic), avoiding roads & buildings
 rng = np.random.default_rng(20821)
 _railbuf = unary_union([l.buffer(4) for l in railL]) if railL else GeometryCollection(); prepare(_railbuf)
@@ -1226,6 +1229,7 @@ for at, g in area_geoms:
     ptsg = shapely.points(xs_, zs_)
     ok = shapely.contains(g, ptsg) & ~shapely.intersects(roadsU, ptsg) & ~shapely.intersects(bunion, ptsg) & ~shapely.intersects(_railbuf, ptsg) & (np.abs(xs_) <= HW) & (np.abs(zs_) <= HH)
     for x, z in list(zip(xs_[ok], zs_[ok]))[:n]: trees.append((x, z))
+area_geoms, land = VERDE.aree(area_geoms, land)  # after OSM's woods got their trees: the scatter outside the DBGT stays as it was
 log('pois', len(pois), 'places', len(places), 'trees', len(trees), 'crossings', len(crossings))
 # ---- street objects from OSM: [kind, x, z, angle, extra]. The angle follows the nearest street (a bench faces it, a bump lies across it);
 # extra is a height (pylons, poles, masts) or the street width (bumps). Kinds by index, same order as OGG_KINDS in oggetti3.js
@@ -1417,6 +1421,8 @@ if blines:
                 cartelli.append([q(spot.x), q(spot.y), round(ux, 3), round(uz, 3), STR.larghezza_locale(spot.x, spot.y, ux, uz, r['w']) if STR else r['w'], fwd, back])
 log('cartelli di paese', len(cartelli), 'confini', len(blines), 'spostati via da un incrocio', nmoved, 'senza posto', ndrop, 'laterali di una via sul confine', nside, 'ripetuti sulla stessa via', nrep, 'su vie minori', nminor)
 log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1), 'parcheggi con capienza', len(plots), 'strade con sosta', sum(1 for r in raw_roads if r.get('pk')))
+trees = VERDE.alberi(trees, _n_tr, [rbuf(flat, 0), bunion, rbuf(lambda r: r.get("deck"), 0)], railL, pspaces, roadsU, [side]); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
+VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 # ------------------------------------------------------------------ graph & tiles
 used_nodes = {}
 out_roads = []
