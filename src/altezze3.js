@@ -387,7 +387,9 @@ const H = (() => {
     fine: t => !!FT[t], tile: t => FT[t], has: t => STEP[t] > 0,
     fineAt: (x, z) => !!fineAt(x, z),
     base(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); },
-    ground(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) + step(x, z) : oldG(x, z); },
+    // S without step until phase 6 (docs/motore.md 3.1): the consumers still add SIDE_H/PLAT_H by hand (platform sides and furniture,
+    // landmarks3.js), and with step in here they stood twice as high (benches and canopies 0.55 m over the platform, its sides spiking to 1.1 m)
+    ground(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); },
     vis(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z) - rivCut(x, z); }, // the old drawn ground cut the river into the grid
     rivCut, fadeW, // the old engine near S: how deep its river cut is, how much of S it takes
     // what the street surfaces drape on: S, or the top of a deck nothing but water or field passes under (the asphalt of a bridge over the
