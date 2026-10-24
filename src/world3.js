@@ -735,11 +735,13 @@ function* buildTileGen(T) {
     H.onTri(T.t, (ax, ay, az, bx, by, bz, cx, cy, cz, a, b, c) => {
       setV(a, ax, ay, az); setV(b, bx, by, bz); setV(c, cx, cy, cz); const w = tri++ >> 1;
       if (!own[w]) { if (tri & 1) T.cellIdx[w] = q; idx[q++] = a; idx[q++] = c; idx[q++] = b; return; } // wound to face up
-      const sy = FT.sty[w], key = sy.m.id + '|' + (sy.col ? sy.col.getHexString() : ''); let B = byStyle.get(key); if (!B) byStyle.set(key, B = { b: Buf(), sy });
-      if (tri & 1) T.cellIdx[w] = B.b.i.length; const i0 = B.b.p.length / 3;
-      for (const [x, y, z] of [[ax, ay, az], [bx, by, bz], [cx, cy, cz]]) vtx(B.b, x, y, z, 0, 1, 0, x / sy.vs, z / sy.vs, sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
+      // one buffer per look (STY shares one object per material and colour); k: its mesh in [terrMesh, ...ownMeshes]. No strings or arrays per
+      // triangle: built that way this slice took 40-60 ms in the town centre (a stutter while driving), now about as long as the bare terrain
+      const sy = FT.sty[w]; let B = byStyle.get(sy); if (!B) byStyle.set(sy, B = { b: Buf(), sy, k: byStyle.size + 1 });
+      if (tri & 1) { T.cellIdx[w] = B.b.i.length; T.cellMesh[w] = B.k; } const i0 = B.b.p.length / 3, vs = sy.vs;
+      vtx(B.b, ax, ay, az, 0, 1, 0, ax / vs, az / vs, sy.col); vtx(B.b, bx, by, bz, 0, 1, 0, bx / vs, bz / vs, sy.col); vtx(B.b, cx, cy, cz, 0, 1, 0, cx / vs, cz / vs, sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
     });
-    for (const { b, sy } of byStyle.values()) { const k = T.ownMeshes.length + 1; const mm = mkMesh(b, sy.m, -2, false, G); T.ownMeshes.push(mm); for (let w = 0; w < nc * nc; w++) if (own[w] && FT.sty[w].m === sy.m && (FT.sty[w].col ? FT.sty[w].col.getHexString() : '') === (sy.col ? sy.col.getHexString() : '')) T.cellMesh[w] = k; }
+    for (const { b, sy } of byStyle.values()) T.ownMeshes.push(mkMesh(b, sy.m, -2, false, G));
     // normals across the tile edges too (the neighbour's nodes, or one-sided where there is no tile of S): no seam in the light
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = j * n + i, x = FT.x0 + i * st, z = FT.z0 + j * st, y = FT.y[k];
