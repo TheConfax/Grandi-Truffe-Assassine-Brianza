@@ -464,6 +464,7 @@ class Strade:
         for wi in range(len(raw_roads)):
             r = raw_roads[wi]
             if not (r['c'] <= 5 or r['hw'] in ('cycleway', 'track', 'path', 'bridleway')) or len(r['refs']) < 2: continue
+            if r['x']: continue   # the Milano-Meda stays whole: cut, its town sign at PONTE 20 found no room on the short piece (width there 10 m OSM, 9.8 DBGT)
             xy = np.array([nodes[n_] for n_ in r['refs']]); ins = shapely.contains_xy(C, xy[:, 0], xy[:, 1])
             if ins.all() or not ins.any(): continue
             cum = np.r_[0, np.cumsum(np.hypot(*np.diff(xy, axis=0).T))]
