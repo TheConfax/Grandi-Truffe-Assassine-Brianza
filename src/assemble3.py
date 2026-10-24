@@ -36,7 +36,11 @@ rep("""function mkMesh(b, mat, ro, shadow) {""", """function mkMesh(b, mat, ro, 
 rep("  if (b.drape) for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += groundH(b.p[i], b.p[i + 2]);", "  if (b.drape) { const hf = b.hf || (b.vis ? visH : groundH); for (let i = 0; i < b.p.length; i += 3) b.p[i + 1] += hf(b.p[i], b.p[i + 2]); } /* b.hf: altezze3.js, the ground the buffer drapes on */")
 # draped polygons split their edges on the ground they drape on
 rep("    const mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = groundH(all[i][0], all[i][1]));", "    const hf = b.hf || groundH, mid = new Map(), gh = [], G = i => gh[i] !== undefined ? gh[i] : (gh[i] = hf(all[i][0], all[i][1]));")
-rep("for (const t of [0.25, 0.5, 0.75]) { const e = groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)", "for (const t of [0.25, 0.5, 0.75]) { const e = hf(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)")
+rep("for (const t of [0.25, 0.5, 0.75]) { const e = groundH(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)", "for (const t of (fz ? Array.from({ length: Math.ceil(Math.sqrt(l) / 2) - 1 }, (_, q) => (q + 1) / Math.ceil(Math.sqrt(l) / 2)) : [0.25, 0.5, 0.75])) { const e = hf(all[i][0] + (all[j][0] - all[i][0]) * t, all[i][1] + (all[j][1] - all[i][1]) * t)")
+# in a tile of S (2 m grid) an edge is tested every 2 m and split down to 2 m: the banks and kerbs of S are narrower than the 4 m the old 10 m
+# ground allowed, and a chord over them sinks under the depth mask (a pale patch of bare terrain) or leaves a sliver (phase 5 clips on the grid)
+rep("const l = (all[i][0] - all[j][0]) ** 2 + (all[i][1] - all[j][1]) ** 2; if (l <= 16) return 0;", "const l = (all[i][0] - all[j][0]) ** 2 + (all[i][1] - all[j][1]) ** 2, fz = H.fineAt(all[i][0], all[i][1]) || H.fineAt(all[j][0], all[j][1]); if (l <= (fz ? 4 : 16)) return 0;")
+rep("      if (mx <= 16 || tris.length + stack.length > 60000) { tris.push([a, c, d]); continue; }", "      if (!mx || tris.length + stack.length > 60000) { tris.push([a, c, d]); continue; } /* L2 is 0 or the squared length of an edge to split */")
 rep("""  scene.add(m); return m;
 }
 const flatMat""", """  parent.add(m); return m;
