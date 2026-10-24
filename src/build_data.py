@@ -1452,6 +1452,7 @@ for r in raw_roads:
     if r.get('under'): rec['u'] = 1
     if r.get('pk'): rec['pk'] = r['pk']
     if r.get('pv'): rec['pv'] = 1  # over a yard of the DBGT (AC_VEI 0307): no AI traffic (src/dbgt_strade.py privati)
+    if r.get('w_osm') is not None: rec['wd'] = 1  # w is the carriageway of the DBGT (AC_VEI): the markings go by it, mh is the lanes' room
     out_roads.append(rec)
 q = lambda v: int(round(v * 10))
 NODES = [[q(nodes[ref][0]), q(nodes[ref][1]), q(deckH[ref]) if ref in deckH else -32768] for ref in node_list]
