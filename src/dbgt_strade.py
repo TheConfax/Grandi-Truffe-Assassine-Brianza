@@ -396,12 +396,70 @@ def abbina(raw_roads, nodes, D, cover, log=print, new_id=None):
                 if not out or out[-1] != m_: out.append(m_)
             if len(out) >= 2: nj += sum(1 for n_ in r['refs'] if n_ in canon); r['refs'] = out
     rep['nodi_uniti_sugli_assi'] = nj
+    # spikes (verifica 24/10: 98 ways turned 150-180 degrees at a vertex where OSM turned less than 40, a car made a U-turn there): the shared
+    # node of a junction placed beside or beyond the point where the way's route meets the other way. (a) A, N, A: the detour to N goes when
+    # every other way through N passes through A as well, or ends at N within 6 m of A (it ends at A then); (b) a short loop back to a node the way passed (N .. N) goes;
+    # (c) a reversal with a leg under 2.5 m: a vertex of this way only goes, a shared node moves onto the line of its neighbours (under 2.5 m)
+    nsp = _punte(raw_roads, nodes)
+    rep['punte_tolte'] = nsp
     mv = np.array(list(moved.values())) if moved else np.zeros(1)
     rep['nodi_nuovi_lungo_gli_assi'] = nnew
     rep['spostamento_nodi_m'] = dict(p50=round(float(np.percentile(mv, 50)), 2), p90=round(float(np.percentile(mv, 90)), 2), p99=round(float(np.percentile(mv, 99)), 2), max=round(float(mv.max()), 2))
     rep['vie_abbinate'] = dict(Counter(nk for nk, *_ in res.values()))
     rep['tempo_s'] = round(time.time() - t0, 1)
     return rep, res, nets
+
+
+def _turn(p, q, r):
+    a = (q[0] - p[0], q[1] - p[1]); b = (r[0] - q[0], r[1] - q[1]); la, lb = math.hypot(*a), math.hypot(*b)
+    if la < 1e-6 or lb < 1e-6: return 0.0, la, lb
+    c = max(-1.0, min(1.0, (a[0] * b[0] + a[1] * b[1]) / (la * lb))); return math.degrees(math.acos(c)), la, lb
+
+
+def _punte(raw_roads, nodes):
+    ways_of = defaultdict(set)
+    for wi, r in enumerate(raw_roads):
+        for n_ in r['refs']: ways_of[n_].add(wi)
+    mine = lambda n_, wi: ways_of[n_] <= {wi}
+    nsp = 0
+    for wi, r in enumerate(raw_roads):
+        if not r.get('dbgt'): continue
+        refs = list(r['refs'])
+        for _ in range(200):
+            if len(refs) < 3: break
+            done = False
+            for k in range(1, len(refs) - 1):   # (a)
+                a_, n_, b_ = refs[k - 1], refs[k], refs[k + 1]
+                if a_ != b_ and math.dist(nodes[a_], nodes[b_]) > 0.3: continue
+                oth = [w for w in ways_of[n_] if w != wi and a_ not in raw_roads[w]['refs']]
+                if oth:   # ways that end at N end at A instead (within 6 m: N was put beside the junction), else N stays
+                    if math.dist(nodes[a_], nodes[n_]) > 6 or any(raw_roads[w]['refs'][0] != n_ and raw_roads[w]['refs'][-1] != n_ for w in oth): continue
+                    for w in oth:
+                        rw = raw_roads[w]['refs']; raw_roads[w]['refs'] = [a_] + rw[1:] if rw[0] == n_ else rw[:-1] + [a_]
+                        ways_of[n_].discard(w); ways_of[a_].add(w)
+                refs = refs[:k] + refs[k + 2:] if a_ == b_ else refs[:k] + refs[k + 1:]; done = True; break
+            if not done:   # (b) a short loop back to a node it passed (N .. N), whose other vertices are this way's or on ways through N too
+                for i in range(len(refs) - 2):
+                    e = refs[i]
+                    j = next((j for j in range(i + 2, min(len(refs), i + 14)) if refs[j] == e), None)
+                    if j is None: continue
+                    if all(all(e in raw_roads[w]['refs'] for w in ways_of[n_] if w != wi) for n_ in refs[i + 1:j]):
+                        refs = refs[:i + 1] + refs[j + 1:]; done = True; break
+            if not done:   # (c)
+                for k in range(1, len(refs) - 1):
+                    a_, n_, b_ = refs[k - 1], refs[k], refs[k + 1]; t, la, lb = _turn(nodes[a_], nodes[n_], nodes[b_])
+                    if t < 150 or min(la, lb) > 2.5: continue
+                    if mine(n_, wi): refs = refs[:k] + refs[k + 1:]; done = True; break
+                    pa, pb, pn = np.array(nodes[a_]), np.array(nodes[b_]), np.array(nodes[n_]); d = pb - pa; L2 = float(d @ d)
+                    if L2 < 1e-6: continue
+                    q = pa + d * max(0.0, min(1.0, float((pn - pa) @ d) / L2))
+                    if math.dist(q, pn) < 2.5: nodes[n_] = (float(q[0]), float(q[1])); done = True; break
+            if not done: break
+            nsp += 1
+        if refs != r['refs']:
+            for n_ in set(r['refs']) - set(refs): ways_of[n_].discard(wi)
+            r['refs'] = refs
+    return nsp
 
 
 # ---------------------------------------------------------------- rasters of the areas (widths, lanes, what stands in the carriageway)
@@ -617,7 +675,7 @@ class Strade:
         rep['larghezze_da_ac_vei'] = dict(vie=nw, differenza_dalla_larghezza_osm_m=_pct(dw, (10, 50, 90)))
         s.privati(raw_roads, nodes, new_id)
         s.rep['assi'] = rep
-        s.log('dbgt strade: %s' % rep)
+        s.log('dbgt strade: %s' % {k: v for k, v in rep.items() if k != 'tratti_contesi_elenco'})
 
     def mezze(s, raw_roads, nodes=None):
         """the free half width of a matched street is its carriageway's (the lanes stay inside AC_VEI)"""
