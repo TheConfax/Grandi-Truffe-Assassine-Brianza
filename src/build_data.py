@@ -1203,7 +1203,7 @@ signals = [[round(nodes[r_][0], 1), round(nodes[r_][1], 1)] for r_, t in ntags.i
 lamps = [[round(nodes[r_][0], 1), round(nodes[r_][1], 1)] for r_, t in ntags.items() if t.get('highway') == 'street_lamp' and inside(nodes[r_], 0)]
 if STR:  # lamps out of the carriageway, crossings as wide as it is where they cross
     lamps = [[round(v_, 1) for v_ in (STR.fuori(tuple(l_)) or l_)] for l_ in lamps]
-    crossings = [c_[:4] + [STR.larghezza_locale(*c_)] for c_ in crossings]
+    crossings = [(lambda a_: [a_[0], a_[1]] + c_[2:4] + [a_[2]])(STR.attraversamento(*c_)) for c_ in crossings]  # edge to edge of the carriageway there
 trees = [nodes[r_] for r_, t in ntags.items() if t.get('natural') == 'tree' and inside(nodes[r_], 0)]
 for row in rows:
     for a, b in zip(row, row[1:]):

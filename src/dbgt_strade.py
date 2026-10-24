@@ -268,18 +268,49 @@ def abbina(raw_roads, nodes, D, cover, log=print, new_id=None):
         res[wi] = (nk, P, V, M)
     log('dbgt strade: abbinamento %d vie in %.0f s' % (len(res), time.time() - t0))
     # one axis, one way: where two OSM ways run on the same stretch of an element (a dual carriageway mapped as one road, a service road
-    # beside a street), the stretch goes to the nearer one; the other stays OSM there
-    claim = defaultdict(list)   # (net, element, 2 m bin) -> [(distance, way, sample)]
+    # beside a street), the stretch goes to the nearer one on average over the stretch; the other stays OSM there. Decided per pair of ways
+    # over all the samples they share, not in 2 m bins one by one: with samples every 3 m a bin caught a third of them, scattered, two ways
+    # on either side of the axis won bins by turns, no run of lost samples was long enough and both went onto the axis, their lanes one on
+    # top of the other (verifica 24/10: x 91 z 134 for 136 m, the south arm of the via Milano roundabout). A sample is shared when the other
+    # way has one within a sample step along the same element. Two one-way ways running opposite ways on opposite sides of the axis, both
+    # 1 m or more from it (the two carriageways OSM draws where the DBGT has one wide carriageway and one axis), both keep their OSM line
+    on = defaultdict(lambda: defaultdict(list))   # (net, element) -> {way: [(t, sample)]}
     for wi, (nk, P, V, M) in res.items():
         for k, m in enumerate(M):
-            if m is not None: claim[(nk, m[0], int(m[1] // 2))].append((m[2], wi, k))
-    lost = defaultdict(set); winner = {}
-    for key, lst in claim.items():
-        ws = {w for _, w, _ in lst}
+            if m is not None: on[(nk, m[0])][wi].append((m[1], k))
+    share = defaultdict(lambda: defaultdict(list))   # (way a, way b) -> {way: [sample]}
+    for key, byw in on.items():
+        ws = sorted(byw)
         if len(ws) < 2: continue
-        best = min(lst)[1]
-        for d_, w, k in lst:
-            if w != best: lost[w].add(k); winner[(w, k)] = best
+        Ts = {w: np.sort(np.array([t for t, _ in byw[w]])) for w in ws}
+        for i_ in range(len(ws)):
+            for j_ in range(i_ + 1, len(ws)):
+                for w, o in ((ws[i_], ws[j_]), (ws[j_], ws[i_])):
+                    to = Ts[o]
+                    for t, k in byw[w]:
+                        j = int(np.searchsorted(to, t)); near = min(abs(to[j - 1] - t) if j > 0 else 1e9, abs(to[j] - t) if j < len(to) else 1e9)
+                        if near <= STEP: share[(ws[i_], ws[j_])][w].append(k)
+    def side_dir(w, ks):   # median side of the axis (+1 right of the element) and way along it (+1 with it) of the samples ks of way w
+        nk, P, V, M = res[w]; rt = nets[nk]; U = _samples(np.array([nodes[n_] for n_ in raw_roads[w]['refs']]))[1]; sd, dr = [], []
+        for k in ks:
+            e, t, d_, q = M[k]; c = rt.cum[e]; j = min(max(int(np.searchsorted(c, t)) - 1, 0), len(c) - 2); xy = rt.assi[e]['xy']; u = xy[j + 1] - xy[j]
+            o = P[k] - q; sd.append(np.sign(u[0] * o[1] - u[1] * o[0])); dr.append(np.sign(u @ U[k]))
+        return float(np.median(sd)), float(np.median(dr))
+    lost = defaultdict(set); winner = {}; ndual = 0
+    for (wa, wb), byw in share.items():
+        ka, kb = byw.get(wa, []), byw.get(wb, [])
+        if len(ka) < 3 or len(kb) < 3: continue   # a junction: the two ways touch, they do not share a stretch
+        da = float(np.mean([res[wa][3][k][2] for k in ka])); db = float(np.mean([res[wb][3][k][2] for k in kb]))
+        if raw_roads[wa]['o'] and raw_roads[wb]['o'] and min(da, db) >= 1.0:
+            sa, ra = side_dir(wa, ka); sb, rb = side_dir(wb, kb)
+            if sa * sb < 0 and ra * rb < 0:
+                ndual += 1
+                for k in ka: lost[wa].add(k); winner[(wa, k)] = wb
+                for k in kb: lost[wb].add(k); winner[(wb, k)] = wa
+                continue
+        lw, ww, kl = (wb, wa, kb) if db > da else (wa, wb, ka)
+        for k in kl: lost[lw].add(k); winner[(lw, k)] = ww
+    rep['carreggiate_doppie_osm_su_un_asse'] = ndual
     nconf = 0; conf = []
     for w, ks in lost.items():
         nk, P, V, M = res[w]
@@ -295,6 +326,7 @@ def abbina(raw_roads, nodes, D, cover, log=print, new_id=None):
                 nconf += 1; wb = raw_roads[winner[(w, run[0])]]; rl = raw_roads[w]; p = P[run[len(run) // 2]]
                 conf.append(dict(perde='%s%s' % (rl['hw'], ' o' if rl['o'] else ''), vince='%s%s' % (wb['hw'], ' o' if wb['o'] else ''), m=len(run) * STEP, link=_link(*p)))
     rep['tratti_contesi'] = nconf; rep['tratti_contesi_elenco'] = conf
+    rep['buchi_riempiti'] = _riempi(res, nets, lost, cover)
     # where each OSM node goes: the matched point of its sample, per way; a shared node takes the DBGT junction its ways' routes have in common
     pos = defaultdict(list)   # node ref -> [(way, point)]
     for wi, (nk, P, V, M) in res.items():
@@ -408,6 +440,42 @@ def abbina(raw_roads, nodes, D, cover, log=print, new_id=None):
     rep['vie_abbinate'] = dict(Counter(nk for nk, *_ in res.values()))
     rep['tempo_s'] = round(time.time() - t0, 1)
     return rep, res, nets
+
+
+def _riempi(res, nets, lost, cover, nmax=40):
+    """an unmatched run of samples between two matched ones of the same way (not lost to another way) is matched on the route between
+    them when the route is about as long as the way there (35% + 6 m longer at most: a cut curve) and every sample of the run has a candidate on it within R_CAND:
+    an OSM way drawn straight across a curve of its street (Via Trieste, verifica 24/10: up to 9 m off the axis for 68 m, across the
+    sidewalk) stayed unmatched there, the matching preferred the unmatched state to a candidate farther than D_FREE"""
+    nf = 0
+    for wi, (nk, P, V, M) in res.items():
+        rt = nets[nk]; n = len(M); k = 0
+        while k < n:
+            if M[k] is not None: k += 1; continue
+            j = k
+            while j < n and M[j] is None: j += 1
+            a, b = k - 1, j   # matched samples around the run k..j-1
+            k = j
+            if a < 0 or b >= n or j - (a + 1) > nmax or any(q in lost.get(wi, ()) for q in range(a + 1, b)): continue
+            if not shapely.contains_xy(cover, P[a:b + 1, 0], P[a:b + 1, 1]).all(): continue
+            L, how = rt.route(M[a], M[b])
+            dk = float(np.hypot(*np.diff(P[a:b + 1], axis=0).T).sum())
+            if L == math.inf or L > 1.35 * dk + 6 or L < dk - 6: continue   # the way cuts a curve: the route is longer
+            els = {M[a][0], M[b][0]}
+            if how[0] != 'same':
+                ns = rt.path_nodes(*how) or []
+                els |= {rt.edge_of[(min(u, v), max(u, v))] for u, v in zip(ns, ns[1:])}
+            Tg = P[a + 2:b + 1] - P[a:b - 1]; Tg = Tg / np.maximum(1e-6, np.hypot(Tg[:, 0], Tg[:, 1]))[:, None]
+            C = rt.candidates(P[a + 1:b], Tg)
+            pick = []
+            for cs in C:
+                cs = [c for c in cs if c[0] in els]
+                if not cs: break
+                pick.append(min(cs, key=lambda c: c[2]))
+            if len(pick) != b - a - 1: continue
+            for q, c in zip(range(a + 1, b), pick): M[q] = c
+            nf += 1
+    return nf
 
 
 def _turn(p, q, r):
@@ -729,11 +797,36 @@ class Strade:
         widens along a street: with one offset for the whole way 3.3% of the lane samples were less than half a lane from the edge
         (verifica 24/10). Samples every passo m across the ordinary carriageway (a sample where it opens to the side, wider than 1.25 times
         the way's median or 1.3 times its width, is not one): its middle c and width W, running medians over 15 m, at each node the value
-        along the way there (a node more than 6 m from any sample, in a junction, keeps the old lane). Two-way: each direction right of the
-        middle by 0.2 W, at most the old lane (min(0.24 w, mh / 2)): where the carriageway narrows the lanes come closer; one-way: the middle.
-        Lanes under half a lane from the edge: 3.3% of the samples with one offset a way, 2.35% so (the rest at narrowings and junctions)"""
-        nl = 0
-        for r in raw_roads:
+        along the way there (a node more than 6 m from any sample, in a junction, keeps the old lane). Two-way: each direction in the middle
+        of its half, W / 4 right of the middle (W the p25 over 15 m), at most W / 2 - 1 m, 0.3-2 m; one-way: the middle. Where another street
+        with traffic runs alongside in the same carriageway it ends halfway between the two axes (bound)"""
+        nl = 0; nsh = 0
+        # the axes of the other streets with traffic: a carriageway two of them run in (two one-way carriageways OSM draws where the DBGT has
+        # one, a street and its parallel ramp) is shared at the line halfway between their axes, else both lanes went to its middle, one on
+        # the other (verifica 24/10: 409 m of lanes of opposite ways closer than 1.8 m, 42 before the work)
+        segs, own, sdir = [], [], []
+        for ri, r in enumerate(raw_roads):
+            if r['c'] > 3 or r.get('pv') or len(r['refs']) < 2: continue
+            xy = np.array([nodes[n_] for n_ in r['refs']])
+            for a, b in zip(xy[:-1], xy[1:]):
+                L = math.hypot(*(b - a))
+                if L > 0.05: segs.append((a, b)); own.append(r.get('parte', ri)); sdir.append((b - a) / L)
+        SA = np.array([s[0] for s in segs]); SB = np.array([s[1] for s in segs]); own = np.array(own); sdir = np.array(sdir)
+        ST = STRtree(shapely.linestrings(np.stack((SA, SB), 1)))
+        def bound(ri, P, U, N):   # distance right and left of each sample to halfway to the axis of another street running alongside (inf if none)
+            br, bl = np.full(len(P), np.inf), np.full(len(P), np.inf)
+            qi, qj = ST.query(shapely.points(P), predicate='dwithin', distance=2 * rmax)
+            if not len(qi): return br, bl
+            keep = (own[qj] != ri) & (np.abs((sdir[qj] * U[qi]).sum(1)) > 0.85); qi, qj = qi[keep], qj[keep]
+            a, d = SA[qj], SB[qj] - SA[qj]; n_ = N[qi]; p = P[qi]
+            den = n_[:, 0] * d[:, 1] - n_[:, 1] * d[:, 0]; ok = np.abs(den) > 1e-6
+            w_ = a - p; s_ = (w_[:, 0] * d[:, 1] - w_[:, 1] * d[:, 0]) / np.where(ok, den, 1); t_ = (w_[:, 0] * n_[:, 1] - w_[:, 1] * n_[:, 0]) / np.where(ok, den, 1)
+            ok &= (t_ >= 0) & (t_ <= 1) & (np.abs(s_) > 0.5)
+            for i_, s__ in zip(qi[ok], s_[ok]):
+                if s__ > 0: br[i_] = min(br[i_], s__ / 2)
+                else: bl[i_] = min(bl[i_], -s__ / 2)
+            return br, bl
+        for ri, r in enumerate(raw_roads):
             r.pop('lf', None); r.pop('lb', None)
             if r['c'] > 3 or r.get('dbgt') != 'str' or len(r['refs']) < 2: continue
             xy = np.array([nodes[n_] for n_ in r['refs']]); P, U, Sx = [], [], []
@@ -746,16 +839,23 @@ class Strade:
             if len(P) < 3: continue
             P, U, Sx = np.array(P), np.array(U), np.array(Sx); N = np.column_stack((-U[:, 1], U[:, 0]))
             dr, dl = s.R.ray(s.TR, P, N, rmax), s.R.ray(s.TR, P, -N, rmax)   # N = (-uz, ux) is the right of the way (x east, z south; edgePts)
+            ok0 = (dl < rmax) & (dr < rmax)
+            br, bl = bound(r.get('parte', ri), P, U, N); sh = (br < dr) | (bl < dl); nsh += int(sh.any())
+            dr, dl = np.minimum(dr, br), np.minimum(dl, bl)
             Wd = dl + dr; c = (dr - dl) / 2
-            ok = s.R.at(s.TR, P[:, 0], P[:, 1]) & shapely.contains_xy(s.cover, P[:, 0], P[:, 1]) & (dl < rmax) & (dr < rmax) & (Wd >= 2.4)
+            ok = s.R.at(s.TR, P[:, 0], P[:, 1]) & shapely.contains_xy(s.cover, P[:, 0], P[:, 1]) & ok0 & (Wd >= 2.4)
             if ok.sum() < 3: continue
             ok &= Wd <= min(1.25 * np.median(Wd[ok]), 1.3 * r['w']) + 0.5
             if ok.sum() < 3: continue
             vi = np.where(ok)[0]
             sm = lambda v: np.array([np.median(v[vi[max(0, j - 7):j + 8]]) for j in range(len(vi))])
             cn, Wn = np.interp(cum, Sx[vi], sm(c)), np.interp(cum, Sx[vi], sm(Wd))
+            Wq = np.interp(cum, Sx[vi], np.array([np.percentile(Wd[vi[max(0, j - 7):j + 8]], 25) for j in range(len(vi))]))   # the narrower part of the 15 m
             lane0 = 0.0 if r['o'] else min(r['w'] * 0.24, r['mh'] * 0.5)
-            hl = np.minimum(0.2 * Wn, lane0)   # never further from the middle than the old lane (0.22 W or 0.24 W outright: 4.0 and 4.6% of the samples)
+            # each lane in the middle of its half (W / 4 from the middle, W the p25 over 15 m), the car's body inside (W / 2 - 1 m), 0.3-2 m: capped at the old lane
+            # (min(0.2 W, min(0.24 w, mh / 2)), mh the p5 of the room) the two lanes of 5-6 m streets came 1.6-1.8 m apart, the cars of the
+            # two ways one on the other (verifica 24/10: Via Como, 5.8 m, lanes 1.68 m apart for 1 km)
+            hl = np.clip(np.minimum(0.25 * Wq, 0.5 * Wq - 1.0), 0.3, 2.0)
             out = [np.clip(cn, -4.0, 4.0)] if r['o'] else [np.clip(cn + hl, 0.3, 5.0), np.clip(hl - cn, 0.3, 5.0)]
             far = np.abs(cum[:, None] - Sx[vi][None, :]).min(1) > 6.0   # a node in a junction, away from any ordinary carriageway: the old lane
             for o in out: o[far] = lane0
@@ -763,8 +863,8 @@ class Strade:
             r['lf'] = [int(round(v * 100)) for v in out[0]]
             if not r['o']: r['lb'] = [int(round(v * 100)) for v in out[1]]
             nl += 1
-        s.rep['corsie_locali'] = dict(vie=nl)
-        s.log('dbgt strade: corsie IA dalla carreggiata, vie %d' % nl)
+        s.rep['corsie_locali'] = dict(vie=nl, carreggiate_condivise=nsh)
+        s.log('dbgt strade: corsie IA dalla carreggiata, vie %d (carreggiata condivisa con un altra via %d)' % (nl, nsh))
 
     def carreggiate(s, buf=0.0):
         """the carriageway pieces inside the comuni (buffered): nothing stands or is built in them. Shrunk, the union is shrunk (shrinking
@@ -825,6 +925,18 @@ class Strade:
         dl, dr = s.R.ray(s.CV, P, N, 25)[0], s.R.ray(s.CV, P, -N, 25)[0]
         return round(min(w + 6, max(w, 2 * max(dl, dr) + 0.2)), 1) if max(dl, dr) < 25 else w   # at most 3 m more a side (a ray along a junction runs on)
 
+    def attraversamento(s, x, z, ux, uz, w):
+        """a zebra crossing at (x, z) across a street running (ux, uz): its middle and width, edge to edge of the carriageway there. The
+        game draws it symmetric about its middle; centred on the axis with the larger side twice (larghezza_locale) the stripes ran onto
+        the sidewalk where the axis is off the middle of the carriageway (verifica 24/10: 53 crossings 0.5-3 m on a sidewalk, 18 before
+        the work). A side that runs on more than w/2 + 3 m (the mouth of a junction) counts w/2"""
+        if not s.R.at(s.CV, [x], [z])[0]: return x, z, w
+        P = np.array([[x, z]]); N = np.array([[-uz, ux]])
+        dl, dr = float(s.R.ray(s.CV, P, N, 25)[0]), float(s.R.ray(s.CV, P, -N, 25)[0]); lim = w / 2 + 3
+        dl, dr = (dl if dl < lim else w / 2), (dr if dr < lim else w / 2)
+        sh = (dl - dr) / 2
+        return round(x - uz * sh, 1), round(z + ux * sh, 1), round(max(2.5, dl + dr), 1)
+
     def push_tiles(s, ntiles, tbox, polys_of, push):
         """the yards (cv), the islands and medians of the DBGT (md with g: 1, drawn whatever their size; v: 1 grass on top) and the carriageways
         on bridges (ap, only for what keeps off the carriageway) in the tiles.
@@ -877,6 +989,7 @@ class Strade:
                 if s.carr[j].intersection(g).area > 1.0: ne += 1; dove.append(_link(g.centroid.x, g.centroid.y)); break
         rep['edifici_su_carreggiata'] = dict(n=ne, dove=dove[:20])
         rep['corsie_dentro_ac_vei'] = s.corsie(raw_roads, nodes)
+        rep['corsie_di_fronte'] = s.frontali(raw_roads, nodes)
         # AI traffic over the yards (AC_VEI 0307 outside any carriageway): the ways with AI traffic, metres in a yard
         CO = s.R.draw(s.cortili); ny, my, dv = 0, 0.0, []
         for r in raw_roads:
@@ -921,6 +1034,36 @@ class Strade:
                     for dj_, wl_ in zip(dj, Wl): why['incrocio' if dj_ < r['w'] / 2 + 8 else 'strettoia' if wl_ < r['w'] - 0.75 else 'altro'] += 1
         return dict(campioni=tot, fuori=bad, quota=round(bad / max(1, tot), 4), fuori_per_motivo=dict(why), auto_fuori=car, nota_auto='la linea della corsia a meno di 0,9 m (mezza auto) dal bordo o fuori',
                     margine_m=_pct(dist, (1, 10, 50)), dove=dove[:30])
+
+    def frontali(s, raw_roads, nodes, lim=1.8):
+        """lanes of opposite ways closer than lim m (cars of the two ways one on the other), away from junctions (8 m from a node of 3 ways):
+        of two different streets (two carriageways on one axis, verifica 24/10) and the two lanes of one two-way street (narrow streets)"""
+        from scipy.spatial import cKDTree
+        deg = Counter()
+        for r in raw_roads:
+            if r['c'] <= 5:
+                for k, n_ in enumerate(r['refs']): deg[n_] += 1 if k in (0, len(r['refs']) - 1) else 2
+        P, U, W = [], [], []
+        for wi, r in enumerate(raw_roads):
+            if r['c'] > 3 or r.get('pv') or len(r['refs']) < 2: continue
+            g = r['refs']; xy = np.array([nodes[n_] for n_ in g]); lane = 0.0 if r['o'] else min(r['w'] * 0.24, r['mh'] * 0.5)
+            lf = r.get('lf') if r.get('lf') and len(r['lf']) == len(g) else None; lb = r.get('lb') if r.get('lb') and len(r['lb']) == len(g) else None
+            for k in range(1, len(g)):
+                sides = [(xy[k - 1], xy[k], lf[k - 1] / 100 if lf else lane, lf[k] / 100 if lf else lane, g[k - 1], g[k])]
+                if not r['o']: sides.append((xy[k], xy[k - 1], lb[k] / 100 if lb else lane, lb[k - 1] / 100 if lb else lane, g[k], g[k - 1]))
+                for p, q, oa, ob, na, nb in sides:
+                    d = q - p; L = math.hypot(*d)
+                    if L < 0.5: continue
+                    u = d / L; R = np.array([-u[1], u[0]])
+                    for t in (np.arange(max(1, int(L))) + 0.5) / max(1, int(L)):
+                        if (deg[na] >= 3 and t * L < 8) or (deg[nb] >= 3 and (1 - t) * L < 8): continue
+                        P.append(p + d * t + R * (oa + (ob - oa) * t)); U.append(u); W.append(r.get('parte', wi))
+        if not P: return {}
+        P, U, W = np.array(P), np.array(U), np.array(W); ins = shapely.contains_xy(s.cover, P[:, 0], P[:, 1]); P, U, W = P[ins], U[ins], W[ins]
+        pr = np.array(list(cKDTree(P).query_pairs(lim))).reshape(-1, 2); i, j = pr[:, 0], pr[:, 1]; opp = (U[i] * U[j]).sum(1) < -0.7
+        dv = (W[i] != W[j]) & opp; sv = (W[i] == W[j]) & opp
+        dove = [_link(*P[a]) for a in i[dv][::max(1, int(dv.sum()) // 20)][:20]]
+        return dict(campioni=len(P), vie_diverse=len(set(i[dv]) | set(j[dv])), stessa_via=len(set(i[sv]) | set(j[sv])), nota='punti di corsia (1 m) con una corsia di verso opposto a meno di %.1f m, lontano dagli incroci' % lim, dove=dove)
 
     def _resto(s, raw_roads):
         C = s.cover; rep = {}
