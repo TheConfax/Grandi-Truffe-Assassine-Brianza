@@ -140,8 +140,10 @@ for (const r of D.roads) if (r.x && !r.t && r.c === 0) {
     }
   }
 }
-// collisions for elevated roads: guardrails on top, embankment toes and pillars below
-const DECK_SOLIDS = [];
+// collisions for elevated roads: guardrails on top, embankment toes and pillars below. In a tile of S they stand where the tile draws
+// them, on the deck of the new engine or on S (deckY): between two nodes on different decks the old line runs over open ground, and a
+// pillar there was an invisible obstacle (by PONTE 20)
+const DECK_SOLIDS = [], onS = (x, z, y) => H.fineAt(x, z) ? deckY(x, z, y) : y;
 for (const r of D.roads) if (r.d) {
   const pts = r.g.map(i => [N[i][0], N[i][1], nodeY(i)]);
   for (let k = 1; k < pts.length; k++) {
@@ -149,7 +151,7 @@ for (const r of D.roads) if (r.d) {
     const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, rx = -uz, rz = ux, n = Math.max(1, Math.ceil(L / 4));
     for (let s = 0; s < n; s++) {
       const t0 = s / n, t1 = (s + 1) / n, x0 = lerp(a[0], b[0], t0), z0 = lerp(a[1], b[1], t0), x1 = lerp(a[0], b[0], t1), z1 = lerp(a[1], b[1], t1);
-      const y0 = lerp(a[2], b[2], t0), y1 = lerp(a[2], b[2], t1), ym = (y0 + y1) / 2, off = ym - groundH((x0 + x1) / 2, (z0 + z1) / 2);
+      const y0 = onS(x0, z0, lerp(a[2], b[2], t0)), y1 = onS(x1, z1, lerp(a[2], b[2], t1)), ym = (y0 + y1) / 2, off = ym - groundH((x0 + x1) / 2, (z0 + z1) / 2);
       if (off < 0.6) continue;
       for (const sd of [1, -1]) {
         const ex = rx * sd, ez = rz * sd, gx = (x0 + x1) / 2 + ex * (r.w / 2 + 0.3), gz = (z0 + z1) / 2 + ez * (r.w / 2 + 0.3);
@@ -161,7 +163,7 @@ for (const r of D.roads) if (r.d) {
       }
     }
     if (r.b) for (let s = 12; s < L - 4; s += 24) {
-      const x = a[0] + ux * s, z = a[1] + uz * s, y = lerp(a[2], b[2], s / L), off = y - groundH(x, z);
+      const x = a[0] + ux * s, z = a[1] + uz * s, y = onS(x, z, lerp(a[2], b[2], s / L)), off = y - groundH(x, z);
       if (off < 2.5) continue;
       for (const o of r.w > 9 ? [-r.w / 3, r.w / 3] : [0]) { const px = x + rx * o, pz = z + rz * o; if (roadBelow(px, pz, y, 1.4, r) || nearRail(px, pz, 3.5)) continue; WALLS.add(px - 0.5, pz - 0.5, px + 0.5, pz + 0.5, { r: 0.45, x: px, z: pz, y0: -1e4, y1: y - 1.5, deckw: true }); DECK_SOLIDS.push({ k: 'pillar', x: px, z: pz, y }); }
     }
@@ -992,7 +994,7 @@ function freeTile(T) {
 }
 function tileTick(px, pz, budgetMs, force) {
   const t0 = performance.now(), cand = [];
-  H.tick(px, pz, t => TILES[t].built); // the .bin of the new engine come first: a tile waits for its own and its neighbours'
+  H.tick(px, pz); // the .bin of the new engine come first: a tile waits for its own and its neighbours'
   for (const T of TILES) { const dd = hyp(T.cx - px, T.cz - pz); T.dist = dd; if (!T.built && dd < 760 && H.ready(T.t)) cand.push(T); if (T.group) T.group.visible = T.ready && dd < 860; if (T.ready && dd > 1150 && !force) freeTile(T); }
   cand.sort((a, b) => a.dist - b.dist);
   if (force) { for (const T of cand) { buildTile(T); if (T.dist > force) break; } if (tileTick.cur) { buildTile(tileTick.cur); tileTick.cur = null; } return; }

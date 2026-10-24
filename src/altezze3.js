@@ -70,7 +70,7 @@ function riverCut(x, z) { // old engine: the river bed is dug RIV_D into the dra
 // without it the whole map runs on the old engine
 const TERRENO = await (async () => { try { const r = await fetch('terreno/indice.json'); if (!r.ok) return null; const j = await r.json(); return j && j.ver === 1 ? j : null; } catch (e) { return null; } })();
 const H = (() => {
-  const TSZ = META.tile, HW = META.hw, HHt = META.hh, NX = META.ntx, NZ = META.ntz, B0 = TER.base, LOAD_R = 1150, FREE_R = 1600;
+  const TSZ = META.tile, HW = META.hw, HHt = META.hh, NX = META.ntx, NZ = META.ntz, B0 = TER.base, LOAD_R = 1150;
   const STEP = new Uint8Array(NX * NZ), FT = new Array(NX * NZ).fill(null), LS = new Uint8Array(NX * NZ); // LS: 0 not asked, 1 coming, 2 here, 3 failed
   if (TERRENO) for (const k in TERRENO.tiles) { const [tx, tz] = k.split('_').map(Number); if (tx >= 0 && tz >= 0 && tx < NX && tz < NZ) STEP[tx + NX * tz] = TERRENO.tiles[k]; }
   const tx0 = t => -HW + (t % NX) * TSZ, tz0 = t => -HHt + Math.floor(t / NX) * TSZ;
@@ -106,6 +106,28 @@ const H = (() => {
     const fu = u - i, fv = v - j, k = j * n + i, Y = F.y, h00 = Y[k], h10 = Y[k + 1], h01 = Y[k + n], h11 = Y[k + n + 1];
     return fu >= fv ? h00 + fu * (h10 - h00) + fv * (h11 - h10) : h00 + fv * (h01 - h00) + fu * (h11 - h01);
   }
+  // the old engine beside S (transitional, until phase 8 brings S everywhere): within FADE_R of a tile of S the old heights are pulled to S,
+  // fully at the shared edge, smoothly back to the old engine at FADE_R. Without it the edge of Meda was a step up to 4.6 m in 2 m in the
+  // ground, and 6.7 m on the Milano-Meda west of Meda, where the old engine has a viaduct that S does not have. Each tile of S within reach
+  // gives the difference (target - old) at its nearest point; they are mixed with weights 1/d^2 (exact at the edge, continuous at the corners)
+  const FADE_R = 80;
+  function fade(x, z, yOld, target, old) { // target(F, px, pz), old(px, pz): the heights at the edge point
+    const i = Math.floor((x + HW) / TSZ), j = Math.floor((z + HHt) / TSZ); let sw = 0, sc = 0, dmin = FADE_R;
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+      const I = i + a, J = j + b; if (I < 0 || J < 0 || I >= NX || J >= NZ) continue; const F = FT[I + NX * J]; if (!F) continue;
+      const px = clamp(x, F.x0, F.x0 + TSZ), pz = clamp(z, F.z0, F.z0 + TSZ), d = hyp(x - px, z - pz); if (d >= FADE_R) continue;
+      const c = target(F, px, pz) - old(px, pz); if (d < 1e-6) return yOld + c;
+      sw += 1 / (d * d); sc += c / (d * d); if (d < dmin) dmin = d;
+    }
+    if (!sw) return yOld;
+    const t = 1 - dmin / FADE_R; return yOld + t * t * (3 - 2 * t) * sc / sw;
+  }
+  const oldG = (x, z) => fade(x, z, farH(x, z), onF, farH); // the old ground, meeting S
+  function onDeck(F, x, z, y0) { // something of the old engine at height y0 over S: the deck of the new engine nearest y0 (within 3 m), else S
+    const g = onF(F, x, z); let best = null;
+    for (const o of deckAt(x, z)) if (o.tipo !== 'copertura' && Math.abs(o.top - y0) < 3 && (best === null || Math.abs(o.top - y0) < Math.abs(best - y0))) best = o.top;
+    return best !== null && best > g ? best : g;
+  }
   const step = (x, z) => 0; // phase 5: the kerbs, platforms and medians of tiles[t].st; until then H.surface adds them the old way
   // decks (docs/motore.md 1.5): triangles of the top in game heights, indexed on a 16 m grid
   const DECKS = [], DKG = new Grid(16);
@@ -139,8 +161,8 @@ const H = (() => {
     RIVG.each(x, z, x, z, s => {
       const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L = hyp(ex, ez) || 1, t = clamp(((x - s.a[0]) * ex + (z - s.a[1]) * ez) / (L * L), 0, 1), px = s.a[0] + ex * t, pz = s.a[1] + ez * t;
       if (w !== null || hyp(x - px, z - pz) > s.w) return;
-      const F = fineAt(px, pz); if (!F) { w = farH(px, pz) - RIV_D + 0.5; return; }
-      let lo = 1e9; for (let q = -1; q <= 1.001; q += 0.25) { const qx = px - ez / L * s.w * q, qz = pz + ex / L * s.w * q, Fq = fineAt(qx, qz); lo = Math.min(lo, Fq ? onF(Fq, qx, qz) : farH(qx, qz)); }
+      const F = fineAt(px, pz); if (!F) { w = oldG(px, pz) - RIV_D + 0.5; return; }
+      let lo = 1e9; for (let q = -1; q <= 1.001; q += 0.25) { const qx = px - ez / L * s.w * q, qz = pz + ex / L * s.w * q, Fq = fineAt(qx, qz); lo = Math.min(lo, Fq ? onF(Fq, qx, qz) : oldG(qx, qz)); }
       w = lo + 0.3;
     });
     return w;
@@ -150,12 +172,12 @@ const H = (() => {
     B0, DECKS, onLoad, farH, deckAt, water,
     fine: t => !!FT[t], tile: t => FT[t], has: t => STEP[t] > 0,
     fineAt: (x, z) => !!fineAt(x, z),
-    base(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : farH(x, z); },
-    ground(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) + step(x, z) : farH(x, z); },
-    vis(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : farH(x, z) - riverCut(x, z); }, // the old drawn ground cut the river into the grid
+    base(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); },
+    ground(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) + step(x, z) : oldG(x, z); },
+    vis(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z) - riverCut(x, z); }, // the old drawn ground cut the river into the grid
     // what the street surfaces drape on: S, or the top of a deck nothing but water or field passes under (the asphalt of a bridge over the
     // Seveso stays on the bridge). Transitional: phase 5 clips them on the grid and on the decks
-    street(x, z) { const F = fineAt(x, z); if (!F) return farH(x, z); const g = onF(F, x, z); for (const o of deckAt(x, z)) if (o.d.free && o.top > g) return o.top; return g; },
+    street(x, z) { const F = fineAt(x, z); if (!F) return oldG(x, z); const g = onF(F, x, z); for (const o of deckAt(x, z)) if (o.d.free && o.top > g) return o.top; return g; },
     surface(x, z, cy) {
       const F = fineAt(x, z); if (!F) return H.oldSurface(x, z, cy);
       let y = onF(F, x, z) + step(x, z) + (onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : bumpAt(x, z));
@@ -165,10 +187,9 @@ const H = (() => {
     },
     oldSurface: null, // world3.js: surfAt of the old engine (DECKG, the embankments, the river cut)
     node(i) { // a road node: on the deck it runs over (the one nearest its old height, within 3 m), else on S
-      const [x, z] = N[i], F = fineAt(x, z); if (!F) return NHt[i] !== null ? NHt[i] : farH(x, z);
-      const g = onF(F, x, z); if (NHt[i] === null) return g;
-      let best = null; for (const o of deckAt(x, z)) if (o.tipo !== 'copertura' && Math.abs(o.top - NHt[i]) < 3 && (best === null || Math.abs(o.top - NHt[i]) < Math.abs(best - NHt[i]))) best = o.top;
-      return best !== null && best > g ? best : g;
+      const [x, z] = N[i], F = fineAt(x, z), y0 = NHt[i];
+      if (!F) return y0 === null ? oldG(x, z) : fade(x, z, y0, (G, px, pz) => onDeck(G, px, pz, y0), () => y0); // an old deck beside S comes down (or up) to it
+      return y0 === null ? onF(F, x, z) : onDeck(F, x, z, y0);
     },
     kind(x, z) {
       if (onPlatform(x, z)) return 'plat'; if (onSide(x, z)) return 'side';
@@ -194,13 +215,11 @@ const H = (() => {
       }
       return true;
     },
-    // loading (tileTick): the .bin within LOAD_R, given back beyond FREE_R when neither the tile nor a neighbour is built
-    tick(px, pz, built) {
-      for (let t = 0; t < NX * NZ; t++) {
-        if (!STEP[t]) continue; const d = hyp(tx0(t) + TSZ / 2 - px, tz0(t) + TSZ / 2 - pz);
-        if (d < LOAD_R && !LS[t]) load(t);
-        else if (d > FREE_R && LS[t] === 2 && !near(t).some(built)) { FT[t] = null; LS[t] = 0; }
-      }
+    // loading (tileTick): the .bin within LOAD_R. They all come at the start (below) and are never given back: what the world builds once
+    // at the start (guardrails, pillars and walls of the old roads, the old decks of surfAt) must see S wherever S is, not only near the
+    // station (it left invisible pillars of the old viaduct by PONTE 20); Meda's 202 tiles are 16 MB in memory
+    tick(px, pz) {
+      for (let t = 0; t < NX * NZ; t++) if (STEP[t] && !LS[t] && hyp(tx0(t) + TSZ / 2 - px, tz0(t) + TSZ / 2 - pz) < LOAD_R) load(t);
     },
     ready(t) { for (const u of near(t)) if (STEP[u] && LS[u] !== 2 && LS[u] !== 3) { if (!LS[u]) load(u); return false; } return true; }, // a tile is built once its .bin and its neighbours' are here
     nearFine: t => near(t).some(u => FT[u]),
@@ -237,8 +256,8 @@ const H = (() => {
   function near(t) { const i = t % NX, j = Math.floor(t / NX), o = []; for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const I = i + a, J = j + b; if (I >= 0 && J >= 0 && I < NX && J < NZ) o.push(I + NX * J); } return o; }
   return H;
 })();
-// the start is at the station of Meda: its tiles are here before the world is built
-{ const st = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione'); if (st && TERRENO) await H.preload(st.x, st.z, 1250); }
+// every tile of S is here before the world is built (see H.tick)
+if (TERRENO) await H.preload(0, 0, 1e9);
 // the old height functions stay one phase as aliases of H.* (docs/motore.md 3.1), with a console.warn once per call site; the stack is read
 // on the first calls and then one call in 1024, so the cost stays small
 const ALIAS_SEEN = new Set(); let aliasN = 0;
