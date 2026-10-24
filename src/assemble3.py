@@ -235,7 +235,7 @@ rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z
 rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
-rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR,")
+rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, updNegozi, LANDMARKS, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, collideStatic,")
 rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
@@ -264,11 +264,7 @@ rep("  const a = near ? nodeInRing(TRAF_NODES, P.x, P.z, 90, 260, true) : pick(T
 rep("const TRAF_NODES = nodesWith(TRAF),", "const EXPRESS_NODES = [...new Set(D.roads.filter(r => r.x && !r.t).flatMap(r => r.g))].filter(i => TRAF[i].length && inLim(N[i][0], N[i][1], 20)), TRAF_NODES = nodesWith(TRAF),")
 rep("const ADJ_OF = new Map([[TRAF_NODES, TRAF], [DRIVE_NODES, DRIVE], [WALK_NODES, WALK]]);", "const ADJ_OF = new Map([[TRAF_NODES, TRAF], [DRIVE_NODES, DRIVE], [WALK_NODES, WALK]]);")
 rep("if (traffic.length < 22 && rnd() < dt * 2) spawnTraffic(true);", "if (traffic.length < 28 && rnd() < dt * 2.5) spawnTraffic(true);")
-# trains ride on the elevated track
-rep("  const pts = dec(td.p); if (pts.length < 2) return null;", "  const pts = dec(td.p); if (pts.length < 2) return null;\n  const hs = (td.h || []).map((v, i) => v === -32768 ? null : v / 10);")
-rep("const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), Math.atan2(b[0] - a[0], b[1] - a[1])]; };",
-    "const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), x = lerp(a[0], b[0], f), z = lerp(a[1], b[1], f), ha = hs[i - 1] ?? H.base(a[0], a[1]), hb = hs[i] ?? H.base(b[0], b[1]); return [x, z, Math.atan2(b[0] - a[0], b[1] - a[1]), railY(x, z, (hs[i - 1] == null && hs[i] == null) ? H.base(x, z) : lerp(ha, hb, f))]; };")
-rep("const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h] = T.at(s); g.position.set(x, H.ground(x, z) + 0.15, z); g.rotation.y = h;", "const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h, y] = T.at(s); g.position.set(x, y + 0.15, z); g.rotation.y = h; g.userData.y = y;")
+# (the heights of the trains are in trains3.js: trainProfile, fase 6)
 # AI stops at red lights
 rep("    for (const g of LX) if (g.bars && (g.closed || g.ang < 0.7)) for (const b of g.bars) for (const [x, z] of b.probe) check(x, z);",
     "    for (const g of LX) if (g.bars && (g.closed || g.ang < 0.7)) for (const b of g.bars) for (const [x, z] of b.probe) check(x, z);\n    if (v.ai && !v.ai.cop) SIGG.each(v.x - 30, v.z - 30, v.x + 30, v.z + 30, sg => { if (sigState(axisOf(fx, fz)) === 'g') return; const ox = sg.x - v.x, oz = sg.z - v.z, ahead = ox * fx + oz * fz, side = Math.abs(ox * fz - oz * fx); if (ahead > sg.w / 2 + 3 && ahead < 32 && side < sg.w / 2 + 4) block = Math.min(block, ahead - sg.w / 2 - 1); });")

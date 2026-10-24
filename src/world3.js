@@ -658,7 +658,6 @@ function deckY(x, z, yOld, tipo) {
   let best = null; for (const o of H.deckAt(x, z)) if (o.tipo !== 'copertura' && (tipo ? o.tipo === tipo : Math.abs(o.top - yOld) < 3) && (best === null || Math.abs(o.top - yOld) < Math.abs(best - yOld))) best = o.top;
   const g = H.base(x, z); return best !== null && best > g ? best : g;
 }
-const railY = (x, z, y) => H.fineAt(x, z) ? deckY(x, z, y, 'ferro') : y; // the trains: on the railway deck or on S in a tile of S, the old profile elsewhere
 // the decks of the new engine (docs/motore.md 1.5), each triangle and each edge in the tile of its middle: the top as it is, the underside
 // sp lower, the sides along the edges of the footprint that do not rest on S (the spalle rest on it)
 function deckEdges(dk) {
@@ -697,11 +696,14 @@ function drawDecks(T, top, side) {
 const RAIL_DROP = 1.2, PIL_STEP = 15;
 const DECK_BAR = { rails: [], pillars: [] };
 function deckTopAt(dk, x, z) { for (const o of H.deckAt(x, z)) if (o.d === dk) return o; return null; }
-// the edges the parapets follow: the PONTE footprint (nucleo), straight; without one the boundary edges of the triangles (2 m steps)
+// the edges the parapets follow: the PONTE footprint (nucleo), straight, and the boundary edges of the triangles off it (the spalla cells, the
+// extensions and the approach ramps, in 2 m steps: past the end of the parapet of PONTE 16 a walker fell 3.3 m off them into the Seveso)
 function deckOutline(dk) {
-  const out = [];
-  if (dk.nucleo && dk.nucleo.length >= 3) { const o = dk.nucleo; for (let i = 0; i < o.length; i++) out.push([o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1]]); }
-  else for (const [ax, az, , bx, bz] of deckEdges(dk)) out.push([ax, az, bx, bz]);
+  const out = [], o = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null;
+  if (o) for (let i = 0; i < o.length; i++) out.push([o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1], 1]);
+  const onO = (x, z) => { for (let i = 0; i < o.length; i++) if (segDist(x, z, o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1]) < 0.35) return true; return false; };
+  const along = (ax, az, bx, bz) => o && (inPoly((ax + bx) / 2, (az + bz) / 2, o) || (onO(ax, az) && onO(bx, bz) && onO((ax + bx) / 2, (az + bz) / 2))); // inside the core or along its outline
+  for (const [ax, az, , bx, bz] of deckEdges(dk)) if (!along(ax, az, bx, bz)) out.push([ax, az, bx, bz, 0]);
   return out;
 }
 const roadsOn = dk => dk.rset || (dk.rset = new Set(dk.ra.map(i => D.roads[i])));
@@ -716,16 +718,16 @@ function busyGround(dk, x, z) {
 for (const dk of H.DECKS) {
   if (dk.tipo === 'copertura') continue;
   const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null;
-  for (const [ax, az, bx, bz] of deckOutline(dk)) {
+  for (const [ax, az, bx, bz, core] of deckOutline(dk)) {
     const L = hyp(bx - ax, bz - az); if (L < 0.05) continue;
     let nx = (bz - az) / L, nz = -(bx - ax) / L; const mx = (ax + bx) / 2, mz = (az + bz) / 2;
-    if (ring ? inPoly(mx + nx * 0.3, mz + nz * 0.3, ring) : !!deckTopAt(dk, mx + nx * 0.3, mz + nz * 0.3)) { nx = -nx; nz = -nz; } // outward
+    if (core ? inPoly(mx + nx * 0.3, mz + nz * 0.3, ring) : !!deckTopAt(dk, mx + nx * 0.3, mz + nz * 0.3)) { nx = -nx; nz = -nz; } // outward
     const n = Math.max(1, Math.round(L)), ys = [];
     for (let k = 0; k <= n; k++) { const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n, o = deckTopAt(dk, x - nx * 0.25, z - nz * 0.25) || deckTopAt(dk, x - nx * 0.6, z - nz * 0.6); ys.push(o ? o.top : null); }
     for (let k = 0; k < n; k++) {
       const y0 = ys[k], y1 = ys[k + 1]; if (y0 === null || y1 === null) continue;
       const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, qx = x + nx * 0.7, qz = z + nz * 0.7, top = (y0 + y1) / 2;
-      if (H.deckAt(qx, qz).some(o => o.tipo !== 'copertura' && Math.abs(o.top - top) < 0.6)) continue; // the deck goes on (its ramps, another deck)
+      if (H.deckAt(x + nx * 0.25, z + nz * 0.25).some(o => o.tipo !== 'copertura' && Math.abs(o.top - top) < 0.6)) continue; // the deck goes on (its ramps, another deck)
       if (top - H.base(qx, qz) < 0.8) continue; // it rests on the ground there (a spalla)
       const seg = { ax: ax + (bx - ax) * k / n, az: az + (bz - az) * k / n, bx: ax + (bx - ax) * (k + 1) / n, bz: az + (bz - az) * (k + 1) / n };
       DECK_BAR.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, dk.tipo === 'pedonale' ? 2 : 1, nx, nz]);
@@ -748,13 +750,13 @@ for (const dk of H.DECKS) {
   }
 }
 // guardrails along the roads of tile T (once per tile, with their collisions): [x0, z0, y0, x1, z1, y1]
-const ROAD_BAR = new Map();
+const ROAD_BAR = new Map(), ON_DECK = new Set(); for (const dk of H.DECKS) for (const ri of dk.ra) ON_DECK.add(ri); // the roads that run on a deck
 function* roadBarriers(T) {
   if (ROAD_BAR.has(T.t)) return ROAD_BAR.get(T.t);
   const res = { rails: [] }, nearJ = (x, z, r) => { let f = false; NODEG.each(x - r, z - r, x + r, z + r, ({ i }) => { if (!f && NODE_DEG[i] >= 3 && hyp(N[i][0] - x, N[i][1] - z) < r) f = true; }); return f; };
   let n = 0;
   for (const ri of T.d.rp || []) {
-    const r = D.roads[ri]; if (r.t || !(r.c <= 1 || r.x)) continue; if (++n % 12 === 0) yield 'barriers roads';
+    const r = D.roads[ri]; if (r.t || r.c > 5 || !(r.c <= 1 || r.x || ON_DECK.has(ri))) continue; if (++n % 12 === 0) yield 'barriers roads'; // main roads, ramps, and any road on a deck (off the PONTE core, where the parapets are)
     const hw = r.w / 2;
     for (let k = 1; k < r.g.length; k++) {
       const ia = r.g[k - 1], ib = r.g[k], A = N[ia], B = N[ib], L = hyp(B[0] - A[0], B[1] - A[1]); if (L < 1) continue;

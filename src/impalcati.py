@@ -32,6 +32,7 @@ RC = 10.0         # the pull of the deck top onto the ground at its spalle fades
 NEAR_V = 2.9      # lattice nodes this close to the footprint carry the deck values
 BAD_RING = 1.5    # a PONTE ring vertex this far from the axes and areas on the deck is not the deck top (dropped from its TIN)
 ASSIGN_D = sf.NEAR_BR + 2.5   # an AIR patch with a node within this of a bridge belongs to bridges
+LAT_HW = {'strada': 3.5, 'ferro': 2.5, 'pedonale': 1.5}   # half width of an OSM bridge way that runs beside its PONTE (fase 6)
 OSM_DIR = 5.0     # OSM bridges within this of a PONTE give its type and direction when the DBGT has no axis on it
 MATCH_BUF = 3.0   # roads and OSM ways are matched on the footprint grown by this (OSM is often 2-4 m off the DBGT)
 UNDER_MIN = 1.0   # a deck whose top lies under S by more than this (median) is not a bridge one can see: reported, not emitted
@@ -392,8 +393,22 @@ class Impalcati:
             rest = band & beyond & ~np.isin(lane, np.unique(lane[cand])) & (al < al[land].max() - SF / 2) & (dcore <= reach); fill |= rest
             ext |= {(r0 + r, c0 + c) for r, c in zip(*np.nonzero(fill))}; hit |= land
             s.info.setdefault('estensioni', []).append(dict(ponte=core['pid'], lato=sg, metri=round(float(al[land].max() + SF / 2), 1), celle=int((fill | land).sum())))
-        core['ext'] = ext
-        return {(r0 + r, c0 + c) for r, c in zip(*np.nonzero(hit))} | ext
+        # the OSM bridge beside the PONTE (fase 6): the way the game draws and drives runs up to 4 m off the DBGT footprint (via Vignazzola on
+        # PONTE 20, 3-4 m north of it: the cars on it went down into the trench of the Milano-Meda and up again, 6 m in 6 m). The cells under
+        # its width, within the length of the core and its extension, over ground lower than the deck, carry the deck too (as the extension)
+        lat = set(); top = core['top'](X.ravel(), Z.ravel()).reshape(X.shape); low = ~lv[:-1, :-1] | ~lv[:-1, 1:] | ~lv[1:, :-1] | ~lv[1:, 1:]
+        ue = [u.min(), u.max()] + [((s.R.x0 + c_ * SF + SF / 2) * dv[0] + (s.R.z0 + r_ * SF + SF / 2) * dv[1]) for r_, c_ in ext]
+        for wv in core.get('ob', []):
+            if osm_tipo(wv['t']) != core['tipo']: continue
+            gb = LineString(wv['p']).buffer(LAT_HW[core['tipo']], cap_style=2); shapely.prepare(gb)
+            ins = shapely.area(shapely.intersection(cb, gb)) > 0.4 * SF * SF
+            m = ins & ~hit & low & (uc >= min(ue) - REACH - SF) & (uc <= max(ue) + REACH + SF) & (dcore <= 6.0 + REACH) & (dcore > 0)   # (past the ends as far as the spalle reach: the way crosses the crest of the bank there)
+            sub = (s.SQ[r0:r1 - 1, c0:c1 - 1] + s.SQ[r0 + 1:r1, c0 + 1:c1]) / 2 < (top[:-1, :-1] - 0.5)   # over a drop: the deck is needed
+            lat |= {(r0 + r, c0 + c) for r, c in zip(*np.nonzero(m & sub))}
+        lat -= ext
+        if lat: s.info.setdefault('allargati_sulla_via_osm', []).append(dict(ponte=core['pid'], celle=len(lat)))
+        core['ext'] = ext | lat
+        return {(r0 + r, c0 + c) for r, c in zip(*np.nonzero(hit))} | ext | lat
 
     def _clip(s, pts):  # the road-like polygons holding the points (the deck's own AIR nodes), with the fringe: not the street beside it
         _, js = s.roadt.query(pts, predicate='intersects'); js = np.unique(js)
@@ -806,6 +821,7 @@ def main(argv=None):
     log('C5 spalle %s (lati %d, su strada %d), tirata del piano DBGT verso S %s, uscite di vie OSM senza spalla %d, estremi senza spalla %s' % (rep['C5']['spalle'], rep['C5']['lati_spalla'], rep['C5']['lati_spalla_su_strada'],
         rep['C5']['tirata_del_piano_DBGT_verso_S'], len(rep['C5']['uscite_vie_osm_senza_spalla']), [(e['fonte'], e['estremo']) for e in rep['C5']['estremi_senza_spalla']]))
     if imp.info.get('estensioni'): log('estremi allungati fino al terreno: %s' % imp.info['estensioni'])
+    if imp.info.get('allargati_sulla_via_osm'): log('allargati sotto la via OSM accanto al PONTE: %s' % imp.info['allargati_sulla_via_osm'])
     log('C6 impalcati: lungo le vie %s, sopra il 18%% %d; triangoli sopra il 18%% %d' % (rep['C6_impalcati']['pendenza_lungo_le_vie'], rep['C6_impalcati']['vie_sopra_18'], rep['C6_impalcati']['triangoli_sopra_18']))
     log('C11 %s' % rep['C11']['conteggi'])
     if 'nodi_su_impalcato' in rep: log('nodi di oggi sugli impalcati: %d, scarto %s' % (rep['nodi_su_impalcato']['nodi'], rep['nodi_su_impalcato']['scarto']))

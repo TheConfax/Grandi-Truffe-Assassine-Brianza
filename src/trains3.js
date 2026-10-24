@@ -1,9 +1,31 @@
 // ---------------------------------------------------------------- trains (Milano-Asso, Saronno-Seregno, Milano-Chiasso)
+// the height of a train in a tile of S (docs/motore.md 3.1, fase 6): the railway deck under the line, or S (the rail bed), sampled every 2 m
+// along it. The OSM line strays up to 3 m off the DBGT axes, and on the railway bridge over the Seveso (PONTE 11) it fell off the deck
+// into the bed (1.7 m): a deck within 3 m across the line counts, and a 10 m median takes the single samples that still fall off. Outside
+// S the old profile (the line's own heights, else the ground)
+const TRAIN_STEP = 2;
+function trainProfile(L, pos, old) {
+  const n = Math.floor(L / TRAIN_STEP) + 2, raw = new Float32Array(n), fine = new Uint8Array(n);
+  for (let k = 0; k < n; k++) {
+    const s = Math.min(L, k * TRAIN_STEP), [x, z, h] = pos(s), g = H.base(x, z); fine[k] = H.fineAt(x, z) ? 1 : 0;
+    if (!fine[k]) { raw[k] = old(s); continue; }
+    let y = g; const rx = Math.cos(h), rz = -Math.sin(h); // across the line
+    for (const o of [0, -1.5, 1.5, -3, 3]) for (const d of H.deckAt(x + rx * o, z + rz * o)) if (d.tipo === 'ferro' && d.top > y && d.top - g > 1) y = d.top;
+    raw[k] = y;
+  }
+  const out = Float32Array.from(raw);
+  for (let k = 2; k < n - 2; k++) if (fine[k]) { const w = [raw[k - 2], raw[k - 1], raw[k], raw[k + 1], raw[k + 2]].sort((a, b) => a - b); out[k] = w[2]; }
+  return out;
+}
 const TRAINS = D.trains.map((td, ti) => {
   const pts = dec(td.p); if (pts.length < 2) return null;
+  const hs = (td.h || []).map(v => v === -32768 ? null : v / 10);
   const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + hyp(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
   const L = cum[cum.length - 1];
-  const at = s => { s = clamp(s, 0, L); let lo = 1, hi = cum.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cum[m] < s) lo = m + 1; else hi = m; } const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), Math.atan2(b[0] - a[0], b[1] - a[1])]; };
+  const pos = s => { s = clamp(s, 0, L); let lo = 1, hi = cum.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cum[m] < s) lo = m + 1; else hi = m; } const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), Math.atan2(b[0] - a[0], b[1] - a[1]), i, f]; };
+  const old = s => { const [x, z, , i, f] = pos(s), a = pts[i - 1], b = pts[i]; if (hs[i - 1] == null && hs[i] == null) return H.base(x, z); return lerp(hs[i - 1] ?? H.base(a[0], a[1]), hs[i] ?? H.base(b[0], b[1]), f); };
+  let prof = null;
+  const at = s => { s = clamp(s, 0, L); const [x, z, h] = pos(s); if (!prof) prof = trainProfile(L, pos, old); const k = Math.min(prof.length - 2, Math.floor(s / TRAIN_STEP)), f = s / TRAIN_STEP - k; return [x, z, h, lerp(prof[k], prof[k + 1], f)]; };
   const cars = [];
   const livery = ti % 2 ? ['#e9ece8', '#2b6fb3', '#1f2833'] : ['#eef0ec', '#2f8f55', '#1f2833'];
   for (let k = 0; k < 3; k++) {
@@ -55,7 +77,7 @@ function updTrain(dt) {
     }
     T.circ = [];
     T.cars.forEach((g, k) => {
-      const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h] = T.at(s); g.position.set(x, H.ground(x, z) + 0.15, z); g.rotation.y = h;
+      const s = T.s - T.dir * (k * 22.4 + 11); const [x, z, h, y] = T.at(s); g.position.set(x, y + 0.15, z); g.rotation.y = h; g.userData.y = y;
       const fx = Math.sin(h), fz = Math.cos(h); for (const o of [-8.4, -2.8, 2.8, 8.4]) T.circ.push([x + fx * o, z + fz * o, fx * T.v * T.dir, fz * T.v * T.dir]);
     });
     for (const c of T.circ) circ.push(c);
