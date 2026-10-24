@@ -207,7 +207,7 @@ for (const td of D.tiles) for (const r of td.rv || []) {
 }
 H.oldSurface = surfAtOld;
 function surfAtOld(x, z, cy) { // old engine (H.surface where a tile has no .bin): ground or deck under (x,z), never more than a kerb above the current height
-  const rc = riverCut(x, z);
+  const rc = H.rivCut(x, z);
   let y = groundH(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + (onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : bumpAt(x, z));
   if (cy === undefined) return y;
   let under;
@@ -635,7 +635,7 @@ function* buildTileGen(T) {
           }
           continue;
         }
-        const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), wa = ga - RIV_D + 0.5, wc = gc - RIV_D + 0.5;
+        const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), wa = ga - RIV_D * (1 - H.fadeW(a[0], a[1])) + 0.5, wc = gc - RIV_D * (1 - H.fadeW(c[0], c[1])) + 0.5; // near S the cut fades out (H.rivCut)
         const i0 = rv.p.length / 3; // water
         vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0);
         triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3);

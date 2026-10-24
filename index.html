@@ -523,23 +523,56 @@ const H = (() => {
     const fu = u - i, fv = v - j, k = j * n + i, Y = F.y, h00 = Y[k], h10 = Y[k + 1], h01 = Y[k + n], h11 = Y[k + n + 1];
     return fu >= fv ? h00 + fu * (h10 - h00) + fv * (h11 - h10) : h00 + fv * (h01 - h00) + fu * (h11 - h01);
   }
-  // the old engine beside S (transitional, until phase 8 brings S everywhere): within FADE_R of a tile of S the old heights are pulled to S,
-  // fully at the shared edge, smoothly back to the old engine at FADE_R. Without it the edge of Meda was a step up to 4.6 m in 2 m in the
-  // ground, and 6.7 m on the Milano-Meda west of Meda, where the old engine has a viaduct that S does not have. Each tile of S within reach
-  // gives the difference (target - old) at its nearest point; they are mixed with weights 1/d^2 (exact at the edge, continuous at the corners)
-  const FADE_R = 80;
-  function fade(x, z, yOld, target, old) { // target(F, px, pz), old(px, pz): the heights at the edge point
-    const i = Math.floor((x + HW) / TSZ), j = Math.floor((z + HHt) / TSZ); let sw = 0, sc = 0, dmin = FADE_R;
+  // the old engine beside S (transitional, until phase 8 brings S everywhere): within FADE_R of a tile of S the old ground is pulled to S,
+  // fully at the shared edge, smoothly back to the old engine at FADE_R. Each tile of S within reach gives the difference S - old ground at
+  // its nearest point, mixed with weights 1/d^2 (exact at the edge, continuous at the corners). Without it the edge of Meda was a step of
+  // up to 4.6 m in 2 m in the ground
+  const FADE_R = 120, smooth = d => { const t = 1 - d / FADE_R; return t * t * (3 - 2 * t); };
+  function oldG(x, z) {
+    const y = farH(x, z), i = Math.floor((x + HW) / TSZ), j = Math.floor((z + HHt) / TSZ); let sw = 0, sc = 0, dmin = FADE_R;
     for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
       const I = i + a, J = j + b; if (I < 0 || J < 0 || I >= NX || J >= NZ) continue; const F = FT[I + NX * J]; if (!F) continue;
       const px = clamp(x, F.x0, F.x0 + TSZ), pz = clamp(z, F.z0, F.z0 + TSZ), d = hyp(x - px, z - pz); if (d >= FADE_R) continue;
-      const c = target(F, px, pz) - old(px, pz); if (d < 1e-6) return yOld + c;
+      const c = onF(F, px, pz) - farH(px, pz); if (d < 1e-6) return y + c;
       sw += 1 / (d * d); sc += c / (d * d); if (d < dmin) dmin = d;
     }
-    if (!sw) return yOld;
-    const t = 1 - dmin / FADE_R; return yOld + t * t * (3 - 2 * t) * sc / sw;
+    return sw ? y + smooth(dmin) * sc / sw : y;
   }
-  const oldG = (x, z) => fade(x, z, farH(x, z), onF, farH); // the old ground, meeting S
+  function dS(x, z) { // distance to the nearest loaded tile of S, FADE_R if none is nearer
+    const i = Math.floor((x + HW) / TSZ), j = Math.floor((z + HHt) / TSZ); let dmin = FADE_R;
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+      const I = i + a, J = j + b; if (I < 0 || J < 0 || I >= NX || J >= NZ) continue; const F = FT[I + NX * J]; if (!F) continue;
+      dmin = Math.min(dmin, hyp(x - clamp(x, F.x0, F.x0 + TSZ), z - clamp(z, F.z0, F.z0 + TSZ)));
+    }
+    return dmin;
+  }
+  const fadeW = (x, z) => { const d = dS(x, z); return d < FADE_R ? smooth(d) : 0; };
+  // the old river cut (RIV_D into the old ground) fades out the same way: at the edge S has the bed in it
+  const rivCut = (x, z) => { const c = riverCut(x, z); return c > 0 ? c * (1 - fadeW(x, z)) : 0; };
+  // an old deck (a node with its own height) within FADE_R of S comes down, or up, to the height of S where its road crosses the edge (the
+  // nearest crossing along the roads, within 2 FADE_R; else the ground), with the same weight as the ground, so the ramps of a junction
+  // stay together. The old engine has viaducts that S does not have (the Milano-Meda west of Meda stood 6.7 m over S at the edge of
+  // Meda). The decks of the new engine are all in Meda, farther in
+  let NADJ = null; const NFADE = new Map();
+  function oldDeck(i, y0) {
+    const [x, z] = N[i], dmin = dS(x, z); if (dmin >= FADE_R) return y0;
+    let f = NFADE.get(i);
+    if (f === undefined) {
+      if (!NADJ) { NADJ = new Map(); const add = (a, b) => { let l = NADJ.get(a); if (!l) NADJ.set(a, l = []); l.push(b); }; for (const r of D.roads) for (let k = 1; k < r.g.length; k++) { add(r.g[k - 1], r.g[k]); add(r.g[k], r.g[k - 1]); } }
+      f = null; const dist = new Map([[i, 0]]), todo = [i];
+      while (todo.length) { // shortest way along the roads to the first crossing into S, within FADE_R
+        todo.sort((a, b) => dist.get(b) - dist.get(a)); const a = todo.pop(), da = dist.get(a); if (f && da >= f[1]) break;
+        for (const b of NADJ.get(a) || []) {
+          const [ax, az] = N[a], [bx, bz] = N[b], L = hyp(bx - ax, bz - az);
+          if (fineAt(bx, bz)) { let lo = 0, hi = 1; for (let q = 0; q < 20; q++) { const m = (lo + hi) / 2; if (fineAt(ax + (bx - ax) * m, az + (bz - az) * m)) hi = m; else lo = m; } // where the segment enters S
+            const d = da + L * hi; if (d < 2 * FADE_R && (!f || d < f[1])) f = [H.base(ax + (bx - ax) * hi, az + (bz - az) * hi), d]; continue; }
+          const d = da + L; if (d < 2 * FADE_R && (!dist.has(b) || d < dist.get(b))) { dist.set(b, d); todo.push(b); }
+        }
+      }
+      NFADE.set(i, f);
+    }
+    return y0 + smooth(dmin) * ((f ? f[0] : oldG(x, z)) - y0);
+  }
   function onDeck(F, x, z, y0) { // something of the old engine at height y0 over S: the deck of the new engine nearest y0 (within 3 m), else S
     const g = onF(F, x, z); let best = null;
     for (const o of deckAt(x, z)) if (o.tipo !== 'copertura' && Math.abs(o.top - y0) < 3 && (best === null || Math.abs(o.top - y0) < Math.abs(best - y0))) best = o.top;
@@ -578,7 +611,7 @@ const H = (() => {
     RIVG.each(x, z, x, z, s => {
       const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L = hyp(ex, ez) || 1, t = clamp(((x - s.a[0]) * ex + (z - s.a[1]) * ez) / (L * L), 0, 1), px = s.a[0] + ex * t, pz = s.a[1] + ez * t;
       if (w !== null || hyp(x - px, z - pz) > s.w) return;
-      const F = fineAt(px, pz); if (!F) { w = oldG(px, pz) - RIV_D + 0.5; return; }
+      const F = fineAt(px, pz); if (!F) { w = oldG(px, pz) - RIV_D * (1 - fadeW(px, pz)) + 0.5; return; }
       let lo = 1e9; for (let q = -1; q <= 1.001; q += 0.25) { const qx = px - ez / L * s.w * q, qz = pz + ex / L * s.w * q, Fq = fineAt(qx, qz); lo = Math.min(lo, Fq ? onF(Fq, qx, qz) : oldG(qx, qz)); }
       w = lo + 0.3;
     });
@@ -591,7 +624,8 @@ const H = (() => {
     fineAt: (x, z) => !!fineAt(x, z),
     base(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); },
     ground(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) + step(x, z) : oldG(x, z); },
-    vis(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z) - riverCut(x, z); }, // the old drawn ground cut the river into the grid
+    vis(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z) - rivCut(x, z); }, // the old drawn ground cut the river into the grid
+    rivCut, fadeW, // the old engine near S: how deep its river cut is, how much of S it takes
     // what the street surfaces drape on: S, or the top of a deck nothing but water or field passes under (the asphalt of a bridge over the
     // Seveso stays on the bridge). Transitional: phase 5 clips them on the grid and on the decks
     street(x, z) { const F = fineAt(x, z); if (!F) return oldG(x, z); const g = onF(F, x, z); for (const o of deckAt(x, z)) if (o.d.free && o.top > g) return o.top; return g; },
@@ -605,7 +639,7 @@ const H = (() => {
     oldSurface: null, // world3.js: surfAt of the old engine (DECKG, the embankments, the river cut)
     node(i) { // a road node: on the deck it runs over (the one nearest its old height, within 3 m), else on S
       const [x, z] = N[i], F = fineAt(x, z), y0 = NHt[i];
-      if (!F) return y0 === null ? oldG(x, z) : fade(x, z, y0, (G, px, pz) => onDeck(G, px, pz, y0), () => y0); // an old deck beside S comes down (or up) to it
+      if (!F) return y0 === null ? oldG(x, z) : oldDeck(i, y0);
       return y0 === null ? onF(F, x, z) : onDeck(F, x, z, y0);
     },
     kind(x, z) {
@@ -1078,7 +1112,7 @@ for (const td of D.tiles) for (const r of td.rv || []) {
 }
 H.oldSurface = surfAtOld;
 function surfAtOld(x, z, cy) { // old engine (H.surface where a tile has no .bin): ground or deck under (x,z), never more than a kerb above the current height
-  const rc = riverCut(x, z);
+  const rc = H.rivCut(x, z);
   let y = groundH(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + (onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : bumpAt(x, z));
   if (cy === undefined) return y;
   let under;
@@ -1506,7 +1540,7 @@ function* buildTileGen(T) {
           }
           continue;
         }
-        const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), wa = ga - RIV_D + 0.5, wc = gc - RIV_D + 0.5;
+        const ga = groundH(a[0], a[1]), gc = groundH(c[0], c[1]), wa = ga - RIV_D * (1 - H.fadeW(a[0], a[1])) + 0.5, wc = gc - RIV_D * (1 - H.fadeW(c[0], c[1])) + 0.5; // near S the cut fades out (H.rivCut)
         const i0 = rv.p.length / 3; // water
         vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0);
         triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3);
