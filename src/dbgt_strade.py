@@ -797,8 +797,8 @@ class Strade:
         widens along a street: with one offset for the whole way 3.3% of the lane samples were less than half a lane from the edge
         (verifica 24/10). Samples every passo m across the ordinary carriageway (a sample where it opens to the side, wider than 1.25 times
         the way's median or 1.3 times its width, is not one): its middle c and width W, running medians over 15 m, at each node the value
-        along the way there (a node more than 6 m from any sample, in a junction, keeps the old lane). Two-way: each direction in the middle
-        of its half, W / 4 right of the middle (W the p25 over 15 m), at most W / 2 - 1 m, 0.3-2 m; one-way: the middle. Where another street
+        along the way there (a node more than 6 m from any sample, in a junction, keeps the old lane). Two-way: each direction
+        0.2 W right of the middle (W the p25 over 15 m), at least 0.9 m, at most W / 2 - 1 m, 0.3-2 m; one-way: the middle. Where another street
         with traffic runs alongside in the same carriageway it ends halfway between the two axes (bound)"""
         nl = 0; nsh = 0
         # the axes of the other streets with traffic: a carriageway two of them run in (two one-way carriageways OSM draws where the DBGT has
@@ -852,10 +852,11 @@ class Strade:
             cn, Wn = np.interp(cum, Sx[vi], sm(c)), np.interp(cum, Sx[vi], sm(Wd))
             Wq = np.interp(cum, Sx[vi], np.array([np.percentile(Wd[vi[max(0, j - 7):j + 8]], 25) for j in range(len(vi))]))   # the narrower part of the 15 m
             lane0 = 0.0 if r['o'] else min(r['w'] * 0.24, r['mh'] * 0.5)
-            # each lane in the middle of its half (W / 4 from the middle, W the p25 over 15 m), the car's body inside (W / 2 - 1 m), 0.3-2 m: capped at the old lane
-            # (min(0.2 W, min(0.24 w, mh / 2)), mh the p5 of the room) the two lanes of 5-6 m streets came 1.6-1.8 m apart, the cars of the
-            # two ways one on the other (verifica 24/10: Via Como, 5.8 m, lanes 1.68 m apart for 1 km)
-            hl = np.clip(np.minimum(0.25 * Wq, 0.5 * Wq - 1.0), 0.3, 2.0)
+            # 0.2 W right of the middle (W the p25 over 15 m), 0.9 at least (two cars side by side), the car's body inside (W / 2 - 1 m), 0.3-2 m. Capped at the old lane as well
+            # (min(0.24 w, mh / 2), mh the p5 of the room) the two lanes of 5-6 m streets came 1.6-1.8 m apart, the cars of the two ways one on
+            # the other (verifica 24/10: Via Como, 5.8 m, lanes 1.68 m apart for 1 km); 0.22 W and 0.25 W put more lanes within half a lane
+            # of the edge (3.4 and 6.4% of the samples, 2.4% so) for fewer close lanes on the narrowest streets
+            hl = np.clip(np.minimum(0.5 * Wq - 1.0, np.maximum(0.2 * Wq, 0.9)), 0.3, 2.0)
             out = [np.clip(cn, -4.0, 4.0)] if r['o'] else [np.clip(cn + hl, 0.3, 5.0), np.clip(hl - cn, 0.3, 5.0)]
             far = np.abs(cum[:, None] - Sx[vi][None, :]).min(1) > 6.0   # a node in a junction, away from any ordinary carriageway: the old lane
             for o in out: o[far] = lane0
@@ -1063,7 +1064,7 @@ class Strade:
         pr = np.array(list(cKDTree(P).query_pairs(lim))).reshape(-1, 2); i, j = pr[:, 0], pr[:, 1]; opp = (U[i] * U[j]).sum(1) < -0.7
         dv = (W[i] != W[j]) & opp; sv = (W[i] == W[j]) & opp
         dove = [_link(*P[a]) for a in i[dv][::max(1, int(dv.sum()) // 20)][:20]]
-        return dict(campioni=len(P), vie_diverse=len(set(i[dv]) | set(j[dv])), stessa_via=len(set(i[sv]) | set(j[sv])), nota='punti di corsia (1 m) con una corsia di verso opposto a meno di %.1f m, lontano dagli incroci' % lim, dove=dove)
+        return dict(n=len(set(i[dv]) | set(j[dv])), campioni=len(P), vie_diverse=len(set(i[dv]) | set(j[dv])), stessa_via=len(set(i[sv]) | set(j[sv])), nota='punti di corsia (1 m) con una corsia di verso opposto a meno di %.1f m, lontano dagli incroci' % lim, dove=dove)
 
     def _resto(s, raw_roads):
         C = s.cover; rep = {}
