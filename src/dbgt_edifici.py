@@ -52,6 +52,8 @@ RH_MAX = {1: 6.0, 2: 6.0, 3: 3.0}   # the highest ridge over the eaves (m): a st
 MIN_IN = 0.3       # a way inside the buildings for less than this (m) is left as it is
 CLEAR_FOOT, CLEAR_CAR = 0.6, 1.0   # how far from the walls a way that ran inside a building moves (footways, the others)
 PUSH_MAX = 2.5     # a stretch never deeper than this inside the walls moves out; a deeper one goes through the building and is cut
+CU_MIN, CU_STD, CU_DROP = 4.0, 1.0, 2.5   # a dome or a spire from the DSM: this far over the highest wall, this round, this drop at its rim (m)
+CU_TOWER = 80.0    # ... a spire stands on a volume this small (m2): a bell tower
 TETTI_PROC = max(1, min(12, (os.cpu_count() or 4) - 2))
 
 # what a building is when OSM does not say: DBGT use (EDIFC_USO, Specifiche p. 137) and type (EDIFC_TY p. 135, EDI_MIN_TY p. 151) as an OSM
@@ -415,7 +417,7 @@ class Edifici:
             if obt in ('roof', 'carport') and e['kind'] == 'E': obt = None   # a roof on posts is a form: the DBGT's building (a volume on the ground) wins
             bt = obt if obt and obt not in ('yes',) else bt_dbgt(e['kind'], e['ty'], e['uso'])
             if tg.get('amenity') == 'place_of_worship' and e['is'].area > 120: bt = 'church'
-            # the state in 2015 (EDIFC_STAT): a ruin stays a ruin (walls to its height, no roof) unless OSM, newer, says what it is now
+            # the state in 2015 (EDIFC_STAT): a ruin stays a ruin (bare walls to its height, the roof only where the DSM sees one) unless OSM, newer, says what it is now
             # (anything but 'yes' or ruins); a building under construction then is finished by now when OSM maps it as a building, and
             # otherwise is drawn as surveyed, a bare shell with a flat roof
             stato = None
@@ -457,6 +459,61 @@ class Edifici:
             self.log('dbgt edifici: tetti dal DSM non riusciti con', npr, 'processi, codice', rc)
         raise RuntimeError('dbgt edifici: tetti dal DSM non riusciti')
 
+    def cupole(self, recs):
+        """domes and spires from the DSM: a church whose DSM rises a peak at least CU_MIN m over its highest wall, round (the DSM in each ring
+        round the peak within CU_STD m) and standing clear of the roof round it (a drop of CU_DROP m at its rim). The dome is drawn as the
+        DSM's own profile turned round the peak (median height ring by ring, every 0.5 m), down to the top of the walls of the volume it
+        stands on (the drum). Santa Maria Nascente: 43.1 m over the ground, rim at 11 m, on a crossing the DBGT gives 11.2 m (verifica 24/10:
+        a grey box round a hole). The record of that volume gets cu = {c: centre, r: radii, y: heights above terrain.base}"""
+        if not os.path.isdir(self.dsm_dir): return 0
+        dsm = dq.Lidar(self.dsm_dir); n = 0; byb = defaultdict(list)
+        for k, r in enumerate(recs):
+            if r['bt'] in ('church', 'cathedral', 'chapel') and not r.get('st'): byb[r['e']].append(k)
+        for e, ks in byb.items():
+            polys = [Polygon(recs[k]['p'], recs[k].get('k') or []).buffer(0) for k in ks]
+            U = unary_union(polys); Ub = U.buffer(3.0); x0, z0, x1, z1 = Ub.bounds   # 3 m round it: a tower alone shows its rim against the ground
+            gx, gz = np.meshgrid(np.arange(x0, x1, 0.5) + 0.25, np.arange(z0, z1, 0.5) + 0.25)
+            m = shapely.contains_xy(Ub, gx.ravel(), gz.ravel()); X, Z = gx.ravel()[m], gz.ravel()[m]
+            if len(X) < 10: continue
+            Y = dsm.at(X, Z) - self.base; ok = np.isfinite(Y); X, Z, Y = X[ok], Z[ok], Y[ok]
+            inU = shapely.contains_xy(U, X, Z)
+            if inU.sum() < 4: continue
+            tops = [recs[k]['zt'] for k in ks]; tmax = max(tops)
+            pk = float(Y[inU].max())
+            if pk - tmax < CU_MIN: continue
+            sel = inU & (Y > pk - 1.0); cx, cz = float(X[sel].mean()), float(Z[sel].mean()); d = np.hypot(X - cx, Z - cz)
+            prof = []
+            for i in range(40):
+                s_ = (d >= i * 0.5) & (d < i * 0.5 + 0.5)
+                if s_.sum() < 2: prof.append(None); continue
+                prof.append((i * 0.5 + 0.25, float(np.median(Y[s_])), float(np.std(Y[s_]))))
+            rim = None
+            for i in range(1, len(prof) - 3):
+                if prof[i] is None: break
+                if prof[i][2] > CU_STD: break
+                nxt = [q for q in prof[i + 1:i + 4] if q is not None]
+                if nxt and prof[i][1] - min(q[1] for q in nxt) >= CU_DROP: rim = i; break
+            ins = [k for k, p in zip(ks, polys) if p.contains(Point(cx, cz))]
+            if not ins: continue
+            k = ins[0]; base = recs[k]['zt']; pv = polys[ks.index(k)]
+            if rim is not None and prof[rim][0] >= 1.0:   # a dome standing clear of the roof round it
+                R = [q for q in prof[:rim + 1] if q is not None]
+            elif pv.area <= CU_TOWER:   # a spire on a tower: its profile down to the top of the tower's walls, within the tower
+                rin = pv.exterior.distance(Point(cx, cz))
+                R = []
+                for q in prof:
+                    if q is None: continue
+                    if q[0] > rin or q[1] < base + 0.3: break
+                    R.append(q)
+                if len(R) < 2: continue
+            else: continue
+            rr = [0.0] + [q[0] for q in R]; yy = [pk] + [q[1] for q in R]
+            for i in range(1, len(yy)): yy[i] = min(yy[i], yy[i - 1])   # never rising outwards
+            if yy[-1] - base < 0.3: continue
+            recs[k]['cu'] = dict(c=[round(cx, 2), round(cz, 2)], r=[round(v, 2) for v in rr] + [round(rr[-1], 2)], y=[round(v, 2) for v in yy] + [round(base, 2)])
+            n += 1; self.log('dbgt edifici: cupola o guglia a x %.0f z %.0f, %.1f m sopra il muro piu alto, raggio %.1f m' % (cx, cz, pk - tmax, rr[-1]))
+        return n
+
     def tetti(self):
         """the roof of every DBGT volume from the DSM (in its own processes), or from OSM roof:shape; the reasons in the report.
         A volume shaped like an L, a T or a U is cut into its wings (ali), each with its roof from the DSM: the wings are drawn as volumes of
@@ -464,12 +521,12 @@ class Edifici:
         t0 = time.time()
         recs = self.terra + self.alti
         job = lambda k, r, ring: (k, np.asarray(ring), bool(r.get('k')), r['zt'] + self.base, r['zt'] + self.base - r['h'], r['bt'] in ('church', 'cathedral', 'chapel'))
-        res = self._dsm([job(k, r, r['p']) for k, r in enumerate(recs) if r['bt'] not in ('roof',) and not r.get('st')])
+        res = self._dsm([job(k, r, r['p']) for k, r in enumerate(recs) if r['bt'] not in ('roof',) and r.get('st') != 1])
         # the wings of the irregular volumes, in a second round
         wings, wj = {}, []
         for k, r in enumerate(recs):
             f = res.get(k)
-            if not f or f.get('m') != 'irregolare' or r.get('k'): continue
+            if not f or f.get('m') != 'irregolare' or r.get('k') or r.get('st'): continue
             p = Polygon(r['p']).buffer(0)
             if p.geom_type != 'Polygon': continue
             ps = ali(p)
@@ -496,10 +553,15 @@ class Edifici:
         self.terra += new_t; self.alti += new_a
         cnt, mot = Counter(), Counter(); rhs = []
         for k, r in enumerate(recs):
-            if r.get('st'):  # a ruin has no roof, a shell under construction a flat one
-                if r['st'] == 1: r['rk'] = 4
-                cnt['rudere_senza_tetto' if r['st'] == 2 else 'in_costruzione_piano'] += 1; continue
             f = res.get(k)
+            if r.get('st') == 1: r['rk'] = 4; cnt['in_costruzione_piano'] += 1; continue   # a shell under construction: a flat roof
+            if r.get('st') == 2:   # a ruin keeps the roof the DSM (2008) sees over it (st 3), otherwise it has none
+                if f and f.get('rk'):
+                    r['st'] = 3; r['rk'] = f['rk']
+                    if f['rk'] != 4: r['rf'] = f['rf']; r['rc'] = f['rc']
+                    cnt['rudere_con_tetto_dal_dsm'] += 1
+                else: cnt['rudere_senza_tetto'] += 1
+                continue
             if f and f.get('rk') == -1: cnt['in_ali'] += 1; continue
             if f and f.get('rk'):
                 r['rk'] = f['rk']
@@ -518,6 +580,7 @@ class Edifici:
                         c, pl, rh = piani_tetto(kk, p, OSM_SLOPE)
                         r['rk'] = kk; r['rf'] = [round(float(x), 3) for q in pl for x in q]; r['rc'] = [round(float(c[0]), 2), round(float(c[1]), 2)]
                     cnt['da_osm_roof_shape'] += 1
+        cnt['cupole_e_guglie_dal_dsm'] = self.cupole(self.terra + self.alti)
         self.rep['tetti'] = dict(dal_dsm=dict(cnt), non_dal_dsm=dict(mot), ali=dict(nw), colmo_sulla_gronda=dict(p50=round(float(np.median(rhs)), 2), p90=round(float(np.percentile(rhs, 90)), 2), max=round(float(max(rhs)), 2)) if rhs else None)
         self.log('dbgt edifici: tetti dal DSM', dict(cnt), 'no', dict(mot), 'ali', dict(nw), '%.0fs' % (time.time() - t0))
         return new_t

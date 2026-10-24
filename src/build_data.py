@@ -1465,7 +1465,7 @@ def tbox(t): i, j = t % ntx, t // ntx; return box(-HW + i * TILE, -HH + j * TILE
 def push(t, k, v): tiles[t].setdefault(k, []).append(v)
 for b in buildings + (ED.alti if ED else []):
     c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b.get('t', BTYPE.get(b.get('bt'), 0))}
-    for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'wc', 'rcol', 'st'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
+    for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
         if b.get(k_) is not None: rec[k_] = b[k_]
     if b.get('k'): rec['k'] = [enc(h) for h in b['k']]
     if b.get('bt') in ('garage', 'garages'): rec['g'] = 1  # rows of up-and-over doors

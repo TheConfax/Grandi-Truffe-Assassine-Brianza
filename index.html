@@ -156,7 +156,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo motore-edifici · dopo 0f19315 · assemblato 25/10 00:12 · porta ' + location.port;
+    const txt = 'locale · ramo motore-edifici · dopo 54c6603 · assemblato 25/10 01:04 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1171,8 +1171,9 @@ for (const T of TILES) {
     const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g }; // g: 1 garages, 2 greenhouse (paesaggio3.js)
     // a volume of the DBGT (src/dbgt_edifici.py): zt the top of its walls and zb its raised base (a portico, a passage, an overhang) above
     // terrain.base, e its building, rk/rf/rc its roof (planes over the top of the walls), wc/rcol the colours OSM gives, st its state in the
-    // 2015 survey when OSM does not say otherwise (2 a ruin: walls without a roof, no shop signs; 1 under construction: a bare shell)
-    for (const k of ['zt', 'zb', 'e', 'rk', 'rf', 'rc', 'wc', 'rcol', 'st']) if (B[k] !== undefined) rec[k] = B[k];
+    // 2015 survey when OSM does not say otherwise (2 a ruin with no roof over it in the DSM: bare walls only; 3 a ruin with its roof; 1 under
+    // construction: a bare concrete shell; no shop signs on any of them)
+    for (const k of ['zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st']) if (B[k] !== undefined) rec[k] = B[k];
     if (rec.st) rec.noSign = true;
     T.bld.push(rec);
     if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
@@ -1210,7 +1211,7 @@ for (const T of TILES) {
 // the roof of a DBGT volume (src/dbgt_edifici.py): over the top of its walls max(0, min_k f_k), f_k = A + Bx (x - cx) + Bz (z - cz)
 function roofPlanes(B) { if (B._pl !== undefined) return B._pl; let pl = null; if (B.rf && B.rc) { pl = []; for (let i = 0; i + 2 < B.rf.length; i += 3) pl.push([B.rf[i], B.rf[i + 1], B.rf[i + 2]]); } return (B._pl = pl); }
 function roofAt(B, x, z) { const pl = roofPlanes(B); if (!pl) return 0; let m = Infinity; for (const p of pl) m = Math.min(m, p[0] + p[1] * (x - B.rc[0]) + p[2] * (z - B.rc[1])); return Math.max(0, m); }
-function roofTop(B) { if (!roofPlanes(B)) return 0; let m = 0; for (const p of B.pts) m = Math.max(m, roofAt(B, p[0], p[1])); return m + Math.max(0, ...B._pl.map(q => q[0])); }
+function roofTop(B) { const d = B.cu ? Math.max(...B.cu.y) - (B.zt || 0) : 0; if (!roofPlanes(B)) return Math.max(0, d); let m = 0; for (const p of B.pts) m = Math.max(m, roofAt(B, p[0], p[1])); return Math.max(d, m + Math.max(0, ...B._pl.map(q => q[0]))); }
 // where along the wall a to c the roof changes plane or meets the eaves: the wall's top is straight between these
 function roofBreaks(B, a, c) {
   const pl = roofPlanes(B), ts = [0, 1]; if (!pl) return ts;
@@ -1237,6 +1238,21 @@ function roofFaces(b, B, top, col) {
     for (const q of P) vtx(b, q[0], top + Math.max(0, p[0] + p[1] * (q[0] - c[0]) + p[2] * (q[1] - c[1])), q[1], n.x, n.y, n.z, 0, 0, col);
     for (const t of tri) triUp(b, i0 + t[0], i0 + t[1], i0 + t[2]);
   });
+}
+// a dome or a spire from the DSM (cu: centre, radii, heights over terrain.base, the last one the top of the walls under it): the profile turned
+// round its axis, flat-shaded, 24 sides
+function domeFaces(b, cu, col) {
+  const [cx, cz] = cu.c, R = cu.r, Y = cu.y, N = 24;
+  for (let i = 0; i + 1 < R.length; i++) for (let k = 0; k < N; k++) {
+    const a0 = k / N * TAU, a1 = (k + 1) / N * TAU, P = [[R[i], Y[i], a0], [R[i + 1], Y[i + 1], a0], [R[i + 1], Y[i + 1], a1], [R[i], Y[i], a1]].map(([r, y, a]) => [cx + Math.cos(a) * r, y, cz + Math.sin(a) * r]);
+    for (const [p, q, w] of [[P[0], P[1], P[2]], [P[0], P[2], P[3]]]) {
+      const n = new THREE.Vector3(q[0] - p[0], q[1] - p[1], q[2] - p[2]).cross(new THREE.Vector3(w[0] - p[0], w[1] - p[1], w[2] - p[2])); if (n.lengthSq() < 1e-10) continue; n.normalize();
+      const mx = (p[0] + q[0] + w[0]) / 3 - cx, mz = (p[2] + q[2] + w[2]) / 3 - cz; if (n.x * mx + n.z * mz < 0 || (Math.abs(n.x * mx + n.z * mz) < 1e-6 && n.y < 0)) n.negate(); // outwards
+      const i0 = b.p.length / 3; for (const v of [p, q, w]) vtx(b, v[0], v[1], v[2], n.x, n.y, n.z, 0, 0, col);
+      const e1 = [q[0] - p[0], q[1] - p[1], q[2] - p[2]], e2 = [w[0] - p[0], w[1] - p[1], w[2] - p[2]], cr = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+      if (cr[0] * n.x + cr[1] * n.y + cr[2] * n.z >= 0) b.i.push(i0, i0 + 1, i0 + 2); else b.i.push(i0, i0 + 2, i0 + 1);
+    }
+  }
 }
 // the underside of a raised volume, facing down
 function soffit(b, outer, holes, y, col) {
@@ -2409,7 +2425,7 @@ function* buildTileGen(T) {
       else { kind = 'old'; wallCol = pcB(PAL_OLD); }
       if (top - bot < 4.8 && !raised) kind = 'plain';
       wallCol = colOr(B.wc, () => wallCol);
-      if (B.st) { kind = 'plain'; wallCol = B.st === 2 ? pcB(['#a39a8b', '#9c9284', '#aaa08e']) : COL('#b9b6ae'); } // a ruin: bare stone and brick; a shell: concrete
+      if (B.st) { kind = 'plain'; wallCol = B.st !== 1 ? pcB(['#a39a8b', '#9c9284', '#aaa08e']) : COL('#b9b6ae'); } // a ruin: bare stone and brick; a shell: concrete
       const b = wb[kind], tile = kind === 'old' ? 3.4 : kind === 'mod' ? 4.2 : 4;
       // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
       const planes = roofPlanes(B), flatDbgt = B.rk === 4;
@@ -2450,6 +2466,7 @@ function* buildTileGen(T) {
         if (!raised) for (let i = 0; i < nr; i++) aoGround(aoB, ring, E, i, inner(i));
       }
       if (raised) soffit(roofB, outer, holes, bot, COL('#9a958c'));
+      if (B.cu) domeFaces(roofB, B.cu, COL('#8e928c')); // lead grey: the DSM does not say the colour
       if (B.st === 2) continue;
       if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
       else if (pitched) {
@@ -2462,7 +2479,7 @@ function* buildTileGen(T) {
           vtx(roofB, v1.x, v1.y, v1.z, n.x, n.y, n.z, 0, 0, col); vtx(roofB, v2.x, v2.y, v2.z, n.x, n.y, n.z, 0, 0, col); vtx(roofB, v3.x, v3.y, v3.z, n.x, n.y, n.z, 0, 0, col);
           triUp(roofB, base, base + 1, base + 2);
         }
-      } else { try { polyFill(roofB, outer, holes, top, 10, colOr(B.rcol, () => pcB(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT, 1))); } catch (e) { } }
+      } else { try { polyFill(roofB, outer, holes, top, 10, B.st === 1 ? COL('#a9a6a0') : colOr(B.rcol, () => pcB(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT, 1))); } catch (e) { } }
     }
     // the entrances of the DBGT (ACC_INT, the middle of the opening): a door on the nearest wall within 1.5 m
     for (const [X, Z] of d.ai || []) {

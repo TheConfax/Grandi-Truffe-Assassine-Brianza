@@ -1051,14 +1051,16 @@
  },
  "tetti": {
   "dal_dsm": {
-   "rudere_senza_tetto": 36,
+   "rudere_con_tetto_dal_dsm": 13,
    "piano": 2441,
    "a_falde": 1216,
    "a_una_falda": 183,
    "in_ali": 477,
    "a_padiglione": 462,
    "in_costruzione_piano": 5,
-   "da_osm_roof_shape": 4
+   "rudere_senza_tetto": 23,
+   "da_osm_roof_shape": 4,
+   "cupole_e_guglie_dal_dsm": 3
   },
   "non_dal_dsm": {
    "troppo_ripido": 141,
