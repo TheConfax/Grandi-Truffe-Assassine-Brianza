@@ -466,6 +466,17 @@ log('roads', len(raw_roads), 'rails', len(rails), 'rivers', len(rivers))
 # ---- only bridges that pass over a road or a railway are raised (river bridges stay at street level); short tunnels stay on the surface
 for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
 for r in raw_roads: r['tunnel'] = r['tunnel'] and r['line'].length > 80
+if os.environ.get('GTA_DUMP_STRADE'):  # development of src/dbgt_strade.py: the state at this point, to work on it without the whole build
+    import pickle
+    pickle.dump(dict(nodes=nodes, raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], rail_refs=[rr['refs'] for rr in rail_raw],
+                     ntags=ntags, names=names, HW=HW, HH=HH), open(os.environ['GTA_DUMP_STRADE'], 'wb'))
+# ---- where a comune has its DBGT the streets take their shape from it (docs/motore.md 7, src/dbgt_strade.py): the ways run on the EL_STR axes
+STR = None
+if _cov and not os.environ.get('GTA_STRADE_OSM'):
+    import dbgt_strade
+    STR = dbgt_strade.Strade([os.path.join(DBT_DIR, d_, 'dbgt.gpkg') for d_ in sorted(os.listdir(DBT_DIR)) if d_.lower() in _comuni and os.path.exists(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'))], dbt_cover.intersection(RECT.buffer(20)), log)
+    STR.assi(raw_roads, nodes)
+    for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
 # ---- narrow streets: where the houses stand closer than the default width, shrink the road instead of letting walls poke into it
 _hb = [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9 and not b.get('ml')]; _hb = [g for g in _hb if g is not None]
 _ht = STRtree(_hb); nnarrow = 0
@@ -774,6 +785,7 @@ for r in raw_roads:
     md = float(dd.min())
     r['mh'] = round(max(min(r['w'] / 2, md - 0.3), min(r['w'] / 2, 1.3)), 2)
     r['wk'] = round(max(r['mh'] + 0.45, min(r['w'] / 2 + 0.9, md - 0.55)), 2) if r['c'] <= 3 else (round(max(0.4, r['mh'] - 0.5), 2) if r['c'] <= 5 else 0)
+if STR: STR.mezze(raw_roads)
 def rbuf(cond, extra):
     out = [r['line'].buffer(r['w'] / 2 + extra, quad_segs=5) for r in raw_roads if cond(r) and r['line'].length > 0.1]
     return unary_union(out) if out else GeometryCollection()
@@ -795,6 +807,7 @@ side = side.buffer(-0.45, join_style=2).buffer(0.45, join_style=2).intersection(
 foot = rbuf(lambda r: r['c'] == 6 and flat(r), 0).difference(asph).difference(side).difference(pedz).difference(bunion)
 ex = rbuf(lambda r: r['x'] and not r['tunnel'], 0)
 median = ex.buffer(4.5, quad_segs=3).buffer(-4.5, quad_segs=3).difference(ex).difference(bunion) if not ex.is_empty else GeometryCollection()
+if STR: asph, pedz, side, foot, median = STR.superfici(raw_roads, asph, pedz, side, foot, median, bunion)  # inside the comuni with a DBGT: its areas
 log('surfaces done')
 
 # railway fences: corridor edge, open at level crossings / platforms / track ends
@@ -912,7 +925,7 @@ log('cemetery walls', ncw)
 bar_out = []
 # cut each line only against the pieces of bar_cut it touches, not the whole union: this was most of the build's time
 # (the same pieces bar_cut is the union of, kept apart: united, the street buffers are one polygon as big as the whole network)
-_bc_parts = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1] + [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts
+_bc_parts = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1] + [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + (STR.carreggiate(-0.3) if STR else [])
 _bc_tree = STRtree(_bc_parts)
 for bi_, (pts, kind, hgt) in enumerate(barriers):
     if bi_ % max(1, len(barriers) // 10) == 0: log('muri %d%%' % (bi_ * 100 // max(1, len(barriers))))  # progress: this used to be the slow step
@@ -1187,6 +1200,9 @@ for r_, t in ntags.items():
         if d > 0.1: crossings.append([round(nodes[r_][0], 1), round(nodes[r_][1], 1), round((c[0] - a[0]) / d, 3), round((c[1] - a[1]) / d, 3), r['mh'] * 2])
 signals = [[round(nodes[r_][0], 1), round(nodes[r_][1], 1)] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and inside(nodes[r_], 0)]
 lamps = [[round(nodes[r_][0], 1), round(nodes[r_][1], 1)] for r_, t in ntags.items() if t.get('highway') == 'street_lamp' and inside(nodes[r_], 0)]
+if STR:  # lamps out of the carriageway, crossings as wide as it is where they cross
+    lamps = [[round(v_, 1) for v_ in (STR.fuori(tuple(l_)) or l_)] for l_ in lamps]
+    crossings = [c_[:4] + [STR.larghezza_locale(*c_)] for c_ in crossings]
 trees = [nodes[r_] for r_, t in ntags.items() if t.get('natural') == 'tree' and inside(nodes[r_], 0)]
 for row in rows:
     for a, b in zip(row, row[1:]):
@@ -1266,6 +1282,8 @@ OGG_ON_ROAD = ('dosso', 'rallentatore', 'piattaforma', 'traliccio', 'antenna', '
 def off_carriageway(p):
     """Street furniture OSM maps on the carriageway (a glass bell on the parking lane of via Seveso, Carlo 24/10): moved square to the road,
     0.9 m past its edge, on the side it stood"""
+    if STR and STR.cover.contains(Point(p)):  # inside a DBGT: out of the real carriageway (AC_VEI), to the nearest edge
+        q_ = STR.fuori(p); return (q_, True) if q_ is not None else (p, False)
     for i in _segtree.query(Point(p).buffer(12)):
         L, r = _segs[i]
         if r['c'] > 5 or not flat(r): continue
@@ -1394,7 +1412,7 @@ if blines:
                 if spot is None: ndrop += 1; continue
                 if spot.distance(p_) > 0.5: nmoved += 1
                 if r['n'] >= 0: _cl_by_name[(r['n'], na, nb)].append((p_.x, p_.y))
-                cartelli.append([q(spot.x), q(spot.y), round(ux, 3), round(uz, 3), r['w'], fwd, back])
+                cartelli.append([q(spot.x), q(spot.y), round(ux, 3), round(uz, 3), STR.larghezza_locale(spot.x, spot.y, ux, uz, r['w']) if STR else r['w'], fwd, back])
 log('cartelli di paese', len(cartelli), 'confini', len(blines), 'spostati via da un incrocio', nmoved, 'senza posto', ndrop, 'laterali di una via sul confine', nside, 'ripetuti sulla stessa via', nrep, 'su vie minori', nminor)
 log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1), 'parcheggi con capienza', len(plots), 'strade con sosta', sum(1 for r in raw_roads if r.get('pk')))
 # ------------------------------------------------------------------ graph & tiles
@@ -1498,6 +1516,7 @@ for t in range(ntx * ntz):
     bx = tbox(t)
     if not median.intersects(bx): continue
     for p_ in polys_of(median.intersection(bx), 0.2, 3): push(t, 'md', p_)
+if STR: STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
 push_lines('fe', fences)
 for pts, w_, caps in riv_out:
     L = LineString(pts); s0, s1 = pts[0], pts[-1]
@@ -1530,6 +1549,11 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'trains': [{'p': enc(t['pts']), 'st': t['st'], 'stn': t['stn'], 'h': [q(coordH[key(p_)]) if key(p_) in coordH else -32768 for p_ in t['pts']]} for t in trains],
        'pois': pois, 'ng': negozi, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index],
        'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0)]}
+if STR:  # the checks of docs/motore.md 7: a summary in brianza.json, the whole report beside it
+    STR.controlli(raw_roads, nodes, oggetti=[(o[1] / 10, o[2] / 10) for o in ogg if OGG[o[0]] not in OGG_ON_ROAD], lampioni=lamps, cartelli=cartelli, barriere=[b_[0] for b_ in bar_out],
+                  edifici=[P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], alberi=trees, attraversamenti=crossings)
+    out['report'] = {'strade': STR.sintesi()}
+    json.dump(STR.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_strade.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
 log('written', dst, len(s) // 1024, 'KB', 'tiles', ntx, 'x', ntz, 'roads', len(out_roads), 'nodes', len(NODES))
