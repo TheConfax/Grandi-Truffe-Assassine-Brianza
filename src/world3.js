@@ -1356,7 +1356,7 @@ function* buildTileGen(T) {
         if (!raised) for (let i = 0; i < nr; i++) aoGround(aoB, ring, E, i, inner(i));
       }
       if (raised) soffit(roofB, outer, holes, bot, COL('#9a958c'));
-      if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(ROOF_COTTO, 1)));
+      if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
       else if (pitched) {
         const [cx, cz] = centroid(outer), rh = Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
         for (let i = 0; i < outer.length; i++) {

@@ -156,7 +156,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo motore-edifici · dopo d4e0e76 · assemblato 24/10 22:35 · porta ' + location.port;
+    const txt = 'locale · ramo motore-edifici · dopo 2c5f66a · assemblato 24/10 22:52 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2441,7 +2441,7 @@ function* buildTileGen(T) {
         if (!raised) for (let i = 0; i < nr; i++) aoGround(aoB, ring, E, i, inner(i));
       }
       if (raised) soffit(roofB, outer, holes, bot, COL('#9a958c'));
-      if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(ROOF_COTTO, 1)));
+      if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
       else if (pitched) {
         const [cx, cz] = centroid(outer), rh = Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
         for (let i = 0; i < outer.length; i++) {
