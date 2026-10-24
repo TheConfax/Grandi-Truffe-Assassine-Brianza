@@ -715,6 +715,7 @@ class Superficie:
             tx, tz = ti % ntx, ti // ntx; bx, bz = -m['hw'] + tx * TILE, -m['hh'] + tz * TILE
             if bx > x1 or bx + TILE < x0 or bz > z1 or bz + TILE < z0: continue
             for b in T['b']:
+                if 'zb' in b: continue   # a raised DBGT volume (portico, passage: dbgt_edifici.py): the road goes on under it
                 o = dec(b['p'])
                 if len(o) >= 3: case.append(Polygon(o))
         # by a PONTE, what the DBGT fixes at the level of the deck inside the drawn road is the bridge, not the ground: under the railway
