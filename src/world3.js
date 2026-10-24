@@ -122,7 +122,7 @@ for (const T of TILES) {
     }
   }
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
-  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q)) || inWater(x, z, gy)) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5, tree: 1 }); }
+  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q)) || inWater(x, z, gy)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const br of d.ba || []) {
     if (br.t === 3 && NO_HEDGES.some(q => dec(br.p).every(([x, z]) => inPoly(x, z, q)))) continue; // drawn by the landmark, symmetrical
     const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h, v: br.v }); // follow the ground, not long chords
@@ -416,7 +416,7 @@ function edgePts(a, b, off, e) { // e: the edge, whose lane may change along it 
 
 // ---------------------------------------------------------------- tile builder
 const CORTILE_COL = 0xb9b5ac; // the paving of yards and drives (tiles[t].cv): a plain light grey, the DBGT does not say what it is made of
-const AREA_COL = { 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6' };
+const AREA_COL = { 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6', 17: '#b9b5ac' }; // 17: yards of the DBGT (AATT, dbgt_manufatti.py), a plain light grey paving (MAT.aatt)
 const PAL_OLD = ['#dfae62', '#e8c98a', '#dba08a', '#ece4d3', '#d99060', '#c7c9a6', '#e3b98f', '#f0dcb0'];
 const PAL_MOD = ['#dcd7cd', '#cbc4b7', '#bdb5a8', '#e6e0d5', '#c9b9a0', '#d5cbbb'];
 const PAL_IND = ['#aaa69d', '#9d998f', '#b6ae9e', '#8f949a'];
@@ -493,7 +493,7 @@ const MAT = {
   trunk: new THREE.MeshLambertMaterial({ color: 0x5a4636, map: barkTex }), crown: new THREE.MeshLambertMaterial({ map: TREE_LEAF, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true }), lamp: lam(0x4a4d52), lampHead: lam(0xf4f1e6, { emissive: 0x6a6040, emissiveIntensity: 0.4 }),
 };
 // the same looks writing their depth, for the cells a layer owns in a tile of S (cellOwners): drawn with the ground, in its place
-Object.assign(MAT, { grassS: new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }), pavedS: new THREE.MeshLambertMaterial({ vertexColors: true, map: asphaltTex }), waterS: new THREE.MeshLambertMaterial({ color: 0x45738c }),
+Object.assign(MAT, { aattS: new THREE.MeshLambertMaterial({ color: 0xb9b5ac }), aatt: flatMat({ color: 0xb9b5ac }), grassS: new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }), pavedS: new THREE.MeshLambertMaterial({ vertexColors: true, map: asphaltTex }), waterS: new THREE.MeshLambertMaterial({ color: 0x45738c }),
   piazzaS: new THREE.MeshLambertMaterial({ map: porfidoTex }), cortileS: new THREE.MeshLambertMaterial({ color: CORTILE_COL }), footS: new THREE.MeshLambertMaterial({ color: 0xc8b89c }), asphS: new THREE.MeshLambertMaterial({ map: asphaltTex }) });
 // the rail bed of the DBGT (SD_FER, tiles[t].sf): the gravel of the ballast without the sleepers, which each track draws over it
 const gravelTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#7e766b'; g.fillRect(0, 0, w, h); noise(g, w, h, 900, 0.5, ['#5d564d', '#9c9487', '#4a443d']); });
@@ -889,10 +889,11 @@ function cellOwners(T, F) {
   const cover = (o, k, rank, st, street) => { if (o.length < 3) return; H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && underFree(w))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
-    if (a.t <= 3 || a.t >= 11) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
+    if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
     else if (a.t === 4 && inPiazza(...centroid(outer))) { }
     else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
+    else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
   for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('c', MAT.cortileS, 10)); // yards and drives of the DBGT (AC_VEI 0307)
@@ -958,22 +959,23 @@ function* buildTileGen(T) {
   yield 'landuse';
   // land use
   {
-    const gB = VBuf(), pB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
-    gB.rk = 1; pB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
+    const gB = VBuf(), pB = VBuf(), yB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
+    gB.rk = 1; pB.rk = 1.1; yB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
     for (const a of d.a || []) {
       const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5) continue; // platforms are built raised, with their furniture
       if (T.fine && waterInBed(a, outer, holes, T)) continue; // water inside the bed: the water level below draws it
       try {
-        if (a.t <= 3 || a.t >= 11) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
+        if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 4 && inPiazza(...centroid(outer))) { } // a square or a school yard mapped as a car park: drawn by buildPiazze
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
+        else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
     const cB = FBuf(); cB.rk = 1.2; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 10); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): their own paving, no traffic
     const sB = FBuf(); sB.rk = 1.3; for (const q of d.sf || []) { try { polyFill(sB, dec(q.p), q.k.map(dec), 0.03 * fy, 3); } catch (e) { } } // the rail bed (DBGT SD_FER)
-    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(sB, MAT.gravel, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {
@@ -1358,7 +1360,7 @@ function* buildTileGen(T) {
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
+  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
@@ -1370,10 +1372,16 @@ function* buildTileGen(T) {
   if (T.tr.length) {
     const n = T.tr.length, trunks = new THREE.InstancedMesh(TREE_G.trunk, MAT.trunk, n), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, n);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
-    T.tr.forEach(([x, z], i) => {
+    T.tr.forEach(([x, z, th, td], i) => {
       const k = 0.75 + tRnd() * 0.6, gy = H.ground(x, z);
+      if (th) { // height th and crown diameter td from the DSM: the crown model is about 5.4 m across and 4.5 m high, its top 2.5 m over its origin; the trunk reaches the origin
+        const sx = td / 5.4 * (0.94 + tRnd() * 0.12), hc = Math.max(1.2, Math.min(0.6 * th, 2.0 * td, th - 1.5)), sy = hc / 4.5 * (0.95 + tRnd() * 0.1), yc = th - 2.5 * sy, tw = clamp(Math.sqrt(th / 7), 0.7, 1.8);
+        q.identity(); m.compose(p.set(x, gy, z), q, s.set(tw, Math.max(0.3, yc / 4.6), tw)); trunks.setMatrixAt(i, m);
+        q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + yc, z), q, s.set(sx, sy, sx * (0.94 + tRnd() * 0.12))); crowns.setMatrixAt(i, m);
+      } else {
       q.identity(); m.compose(p.set(x, gy, z), q, s.set(k, k, k)); trunks.setMatrixAt(i, m);
       q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + 3.4 * k + 1.2, z), q, s.set(k * (0.9 + tRnd() * 0.3), k * (1 + tRnd() * 0.4), k)); crowns.setMatrixAt(i, m);
+      }
       crowns.setColorAt(i, COL(GREENS[Math.floor(tRnd() * GREENS.length)]));
     });
     trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns);

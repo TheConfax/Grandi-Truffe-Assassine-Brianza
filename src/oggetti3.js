@@ -165,10 +165,48 @@ function buildOggetti(T, G) {
     const pts = dec(L.p), big = L.h > 15, offs = big ? [[-6.5, -8], [6.5, -8], [-4.5, -3.5], [4.5, -3.5]] : [[-0.7, -0.6], [0.7, -0.6]];
     for (let i = 1; i < pts.length; i++) {
       const A = pts[i - 1], C = pts[i], l = hyp(C[0] - A[0], C[1] - A[1]); if (l < 0.5) continue;
-      const nx = -(C[1] - A[1]) / l, nz = (C[0] - A[0]) / l, ya = H.ground(A[0], A[1]) + L.h, yc = H.ground(C[0], C[1]) + L.h;
+      const nx = -(C[1] - A[1]) / l, nz = (C[0] - A[0]) / l;
+      if (L.y && big) { // DBGT pylons (dbgt_manufatti.py): y the top of the pylon at each vertex, ht its height; the wires hang from the insulators of the model scaled to it
+        const ta = L.y[i - 1] / 10, tc = L.y[i] / 10, ha = L.ht[i - 1] / 10, hc = L.ht[i] / 10;
+        for (const [o, k] of [[-6.5, 0.323], [6.5, 0.323], [-4.5, 0.173], [4.5, 0.173]]) wp.push(A[0] + nx * o, ta - k * ha, A[1] + nz * o, C[0] + nx * o, tc - k * hc, C[1] + nz * o);
+        continue;
+      }
+      const ya = H.ground(A[0], A[1]) + L.h, yc = H.ground(C[0], C[1]) + L.h;
       for (const [o, dy] of offs) wp.push(A[0] + nx * o, ya + dy, A[1] + nz * o, C[0] + nx * o, yc + dy, C[1] + nz * o);
     }
   }
   if (wp.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); G.add(new THREE.LineSegments(g, WIRE_MAT)); }
   T.ogDone = true;
+}
+
+// ---------------------------------------------------------------- manufatti of the DBGT (dbgt_manufatti.py, tiles[t].mf): plain shapes, no detail
+// k 1 a round tank or silo (MN_IND 07, 0702): a cylinder of radius r and height h, flat top; k 2 the same not round: the footprint raised to h;
+// k 3 an open basin (MN_IND 11): concrete walls up to h, the water 12 cm under the rim. Heights from the DSM where it sees them. Solid
+function buildManufatti(T, G) {
+  const list = T.d.mf || []; if (!list.length) return;
+  const b = Buf(), F = lmFrame(new THREE.Matrix4()), METAL = COL('#b9bdc0'), CONC = COL('#aaa59b'), WATER = COL('#41687a'), solid = !T.mfDone;
+  const ring = (pts, y0, y1, col, walls) => { // walls of a ring of points from y0 to y1 (y per point), and their collision
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], c = pts[(i + 1) % pts.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
+      F.face(b, [[a[0], y0[i], a[1]], [c[0], y0[(i + 1) % pts.length], c[1]], [c[0], y1, c[1]], [a[0], y1, a[1]]], 2, col);
+      if (walls) WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(...y0) - 3, y1 });
+    }
+  };
+  for (const m of list) {
+    const h = m.h / 10;
+    if (m.k === 1) {
+      const x = m.c[0] / 10, z = m.c[1] / 10, r = m.r / 10, n = Math.max(10, Math.min(28, Math.round(r * 5))), pts = [];
+      for (let i = 0; i < n; i++) { const a = i * TAU / n; pts.push([x + Math.cos(a) * r, z + Math.sin(a) * r]); }
+      const gys = pts.map(p => H.ground(p[0], p[1])), top = H.ground(x, z) + h;
+      ring(pts, gys.map(g => g - 0.3), top, METAL, false); F.face(b, pts.map(p => [p[0], top, p[1]]), 2, METAL);
+      if (solid) WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: Math.min(...gys) - 3, y1: top });
+    } else {
+      const pts = dec(m.p); if (pts.length < 3) continue;
+      const [cx, cz] = centroid(pts), gys = pts.map(p => H.ground(p[0], p[1])), top = H.ground(cx, cz) + h;
+      ring(pts, gys.map(g => g - 0.3), top, m.k === 3 ? CONC : METAL, solid);
+      F.face(b, pts.map(p => [p[0], m.k === 3 ? top - 0.12 : top, p[1]]), 2, m.k === 3 ? WATER : METAL);
+    }
+  }
+  if (b.i.length) mkMesh(b, LMAT.trim, 10, 'cast', G);
+  T.mfDone = true;
 }

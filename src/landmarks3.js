@@ -1272,8 +1272,8 @@ function buildParkingLines(T, G) {
       }
     }
   }
-  for (const a of T.d.a || []) {
-    if (a.t !== 4) continue; const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P); if (inPiazza(cx, cz)) continue;
+  for (const a of (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || [])) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
+    const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P); if (inPiazza(cx, cz)) continue;
     // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
     const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
