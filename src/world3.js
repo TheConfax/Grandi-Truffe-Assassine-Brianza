@@ -795,7 +795,10 @@ function* roadBarriers(T) {
               if (Math.abs(yE - yc) < 0.5) {
                 let lo = 1e9, hi = -1e9; for (const d of [1, 2, 3, 4]) { const y = H.surface(gx + ex * d, gz + ez * d, yE + 0.3); lo = Math.min(lo, y); hi = Math.max(hi, y); }
                 if (r.x || yE - lo > RAIL_DROP || hi - yE > RAIL_DROP) rail = yE;
-              } else if (r.x) rail = yc; // the edge is already on the bank: the rail at the level of the road, its posts down to S
+              } else if (r.x && yE < yc && yc - yE < 2 && !H.deckAt(gx, gz).length && !H.deckAt(cx, cz).some(o => Math.abs(o.top - yc) < 0.6)) rail = yc; // the edge is already on the bank: the rail at the level of the road, its posts down to S.
+              // Not where the edge is higher than the road (a bank or the flank of a deck holds the car, and the rail at the road's level was
+              // buried in it, by PONTE 19), nor past the edge of a deck or over a drop of 2 m or more (it hung in the air on posts up to 7.5 m
+              // long, down the side of PONTE 19 and under deck 10: the parapets hold the edges of the decks). Verifica fase 6
             }
           }
           flag.push(rail);
@@ -824,7 +827,7 @@ function* drawBarriers(T, grail, pil) {
   }
   for (const [x, z, g, bot] of DECK_BAR.pillars) if (tileOf(x, z) === T.t) addBox(pil, x, (g + bot) / 2 - 0.2, z, 0.9, bot - g + 0.4, 0.9, null);
   const R = yield* roadBarriers(T);
-  for (const [x0, z0, y0, x1, z1, y1] of R.rails) { rail(x0, z0, y0, x1, z1, y1, 0.45, 0.8); const L = hyp(x1 - x0, z1 - z0); for (let s = 0; s < L; s += 2) { const f = s / L, x = lerp(x0, x1, f), z = lerp(z0, z1, f), y = lerp(y0, y1, f), g = Math.min(y, H.ground(x, z)); addBox(pil, x, (g + y + 0.75) / 2 - 0.1, z, 0.1, y + 0.75 - g + 0.2, 0.1, null); } } // posts every 2 m, down to the ground
+  for (const [x0, z0, y0, x1, z1, y1] of R.rails) { rail(x0, z0, y0, x1, z1, y1, 0.45, 0.8); const L = hyp(x1 - x0, z1 - z0); for (let s = 0; s < L; s += 2) { const f = s / L, x = lerp(x0, x1, f), z = lerp(z0, z1, f), y = lerp(y0, y1, f), g = Math.min(y, H.surface(x, z, y + 0.3)); addBox(pil, x, (g + y + 0.75) / 2 - 0.1, z, 0.1, y + 0.75 - g + 0.2, 0.1, null); } } // posts every 2 m, down to the ground or the deck under them (not through it to the road below: deck 10, verifica fase 6)
 }
 // a tile is built a slice at a time (a generator that yields between its parts), so driving into new ground never freezes the game for the
 // tenth of a second a whole tile takes; it stays hidden until it is complete. buildTile runs one to the end in one go (start, respawn)
