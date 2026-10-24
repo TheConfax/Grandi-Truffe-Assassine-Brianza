@@ -630,9 +630,9 @@ function ngFront(s, C) {
     if (opt.sub && h > 18) { ngText(g, opt.main, mx, h * 0.38, mw, h * 0.52, font, fgc); ngText(g, opt.sub, mx, h * 0.8, mw, h * 0.22, NG_FONT.sans, fgc); }
     else ngText(g, opt.main, mx, h * 0.53, mw, h * 0.7, font, fgc);
   };
-  // heights: the glass up to H, the sign above it up to the floor above (the building may be low)
-  const bay = m.d === 'g', H = bay ? clamp(top - 1.0, 2.6, 3.6) : clamp(top - 1.2, 2.3, 2.9);
-  let sh = clamp(top - H - 0.35, 0, m.s === 'cas' || m.s === 'pan' ? 0.75 : 0.7), stype = m.s;
+  // heights: the glass up to Hv (not H: that is the height API of altezze3.js, used above), the sign above it up to the floor above (the building may be low)
+  const bay = m.d === 'g', Hv = bay ? clamp(top - 1.0, 2.6, 3.6) : clamp(top - 1.2, 2.3, 2.9);
+  let sh = clamp(top - Hv - 0.35, 0, m.s === 'cas' || m.s === 'pan' ? 0.75 : 0.7), stype = m.s;
   const ext = new Set(m.x || []);
   if (stype === 'ten' && !(m.a && C.depth(s) >= 1.1)) stype = 'pan';
   if (sh < 0.32 && ['pan', 'cas', 'fas', 'let'].includes(stype)) { stype = 'none'; ext.add('ban'); }
@@ -656,36 +656,36 @@ function ngFront(s, C) {
     if (t === 'glass') {
       box(w, y0 - gl, 0.1, c, (y0 + gl) / 2, 0.05, stone);
       const n = Math.max(1, Math.round(w / 1.9)), pw = w / n;
-      for (let i = 0; i < n; i++) { const i0 = qz(gb, a + i * pw + 0.03, y0, a + (i + 1) * pw - 0.03, H - 0.06, 0.035); for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2; gb.uv[q] = gb.uv[q] ? wc[2] : wc[0]; gb.uv[q + 1] = gb.uv[q + 1] ? wc[3] : wc[1]; } if (i) box(0.06, H - y0, 0.08, a + i * pw, (H + y0) / 2, 0.05, kc); }
+      for (let i = 0; i < n; i++) { const i0 = qz(gb, a + i * pw + 0.03, y0, a + (i + 1) * pw - 0.03, Hv - 0.06, 0.035); for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2; gb.uv[q] = gb.uv[q] ? wc[2] : wc[0]; gb.uv[q + 1] = gb.uv[q + 1] ? wc[3] : wc[1]; } if (i) box(0.06, Hv - y0, 0.08, a + i * pw, (Hv + y0) / 2, 0.05, kc); }
       box(w, 0.05, 0.14, c, y0 + 0.02, 0.07, kc);
     } else if (t === 'door' || t === 'slide') {
-      const dh = Math.min(t === 'slide' ? 2.5 : 2.35, H - 0.12);
+      const dh = Math.min(t === 'slide' ? 2.5 : 2.35, Hv - 0.12);
       box(w - 0.08, dh, 0.03, c, dh / 2, 0.04, '#28303a'); box(0.06, dh, 0.09, a + 0.03, dh / 2, 0.05, kc); box(0.06, dh, 0.09, b - 0.03, dh / 2, 0.05, kc); box(w, 0.08, 0.09, c, dh + 0.04, 0.05, kc);
       if (t === 'slide') box(0.03, dh, 0.06, c, dh / 2, 0.06, '#c9ccd1'); else box(0.03, 0.55, 0.05, b - 0.16, 1.05, 0.08, '#c9ccd1');
-      if (H - 0.06 - dh - 0.08 > 0.15) box(w, H - 0.06 - dh - 0.08, 0.07, c, (H - 0.06 + dh + 0.08) / 2, 0.04, kc);
+      if (Hv - 0.06 - dh - 0.08 > 0.15) box(w, Hv - 0.06 - dh - 0.08, 0.07, c, (Hv - 0.06 + dh + 0.08) / 2, 0.04, kc);
       box(w + 0.2, 0.12 - gl, 0.4, c, 0.06 + gl / 2, 0.2, '#b8b3a8'); box(w, 0.03 - gl, 0.11, c, (0.03 + gl) / 2, 0.05, '#28303a');
       doors.push([a, b]);
     } else if (t === 'bay') {
-      const i0 = qz(gb, a, 0.0, b, H - 0.45, 0.02); for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2; gb.uv[q] = gb.uv[q] ? wc[2] : wc[0]; gb.uv[q + 1] = gb.uv[q + 1] ? wc[3] : wc[1]; }
-      box(w + 0.1, 0.34, 0.34, c, H - 0.2, 0.17, '#8f949a');
-      for (let y = H - 0.37, k = 0; k < 6; y -= 0.07, k++) box(w, 0.07, 0.03, c, y - 0.035, 0.05, k % 2 ? '#a9adb2' : '#bfc3c8');
-      box(w, 0.04, 0.06, c, H - 0.81, 0.06, '#6b6e72'); box(w + 0.1, 0.02 - gl, 0.6, c, (0.02 + gl) / 2, 0.3, '#8a857c');
+      const i0 = qz(gb, a, 0.0, b, Hv - 0.45, 0.02); for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2; gb.uv[q] = gb.uv[q] ? wc[2] : wc[0]; gb.uv[q + 1] = gb.uv[q + 1] ? wc[3] : wc[1]; }
+      box(w + 0.1, 0.34, 0.34, c, Hv - 0.2, 0.17, '#8f949a');
+      for (let y = Hv - 0.37, k = 0; k < 6; y -= 0.07, k++) box(w, 0.07, 0.03, c, y - 0.035, 0.05, k % 2 ? '#a9adb2' : '#bfc3c8');
+      box(w, 0.04, 0.06, c, Hv - 0.81, 0.06, '#6b6e72'); box(w + 0.1, 0.02 - gl, 0.6, c, (0.02 + gl) / 2, 0.3, '#8a857c');
       doors.push([a, b]);
     } else if (t === 'port') {
-      const ph = Math.min(2.7, H); box(w, ph, 0.12, c, ph / 2, 0.02, m.k === '#e8e2d0' ? '#2f4a3a' : '#5a3e28');
+      const ph = Math.min(2.7, Hv); box(w, ph, 0.12, c, ph / 2, 0.02, m.k === '#e8e2d0' ? '#2f4a3a' : '#5a3e28');
       for (const sx of [-1, 1]) for (const yy of [0.6, 1.6]) box(w / 2 - 0.2, 0.7, 0.03, c + sx * w / 4, yy, 0.09, m.k === '#e8e2d0' ? '#263d30' : '#4a3220');
       box(0.04, ph, 0.03, c, ph / 2, 0.09, '#2a1f10'); box(0.06, 0.18, 0.06, c + 0.12, 1.1, 0.12, '#c9a85a');
       box(w + 0.5, 0.25, 0.2, c, ph + 0.12, 0.08, '#b8b3a8'); for (const sx of [-1, 1]) box(0.25, ph, 0.18, c + sx * (w / 2 + 0.12), ph / 2, 0.06, '#b8b3a8');
       box(w + 0.3, 0.14 - gl, 0.5, c, 0.07 + gl / 2, 0.25, '#b8b3a8');
       doors.push([a, b]);
     } else if (t === 'shut') {
-      for (let y = 0, k = 0; y < H - 0.3; y += 0.09, k++) box(w, Math.min(0.09, H - 0.3 - y), 0.03, c, y + 0.045, 0.045, k % 2 ? '#9da1a6' : '#b4b8bd');
-      box(w + 0.1, 0.3, 0.3, c, H - 0.15, 0.15, '#8f949a'); box(w, 0.03 - gl, 0.09, c, (0.03 + gl) / 2, 0.045, '#55575b');
+      for (let y = 0, k = 0; y < Hv - 0.3; y += 0.09, k++) box(w, Math.min(0.09, Hv - 0.3 - y), 0.03, c, y + 0.045, 0.045, k % 2 ? '#9da1a6' : '#b4b8bd');
+      box(w + 0.1, 0.3, 0.3, c, Hv - 0.15, 0.15, '#8f949a'); box(w, 0.03 - gl, 0.09, c, (0.03 + gl) / 2, 0.045, '#55575b');
       if (m.k !== '#3a3d40') { const pc = cell(0.8, 0.4, (g, w2, h2) => { g.fillStyle = '#f2c230'; g.fillRect(0, 0, w2, h2); ngText(g, 'AFFITTASI', w2 / 2, h2 / 2, w2 * 0.9, h2 * 0.55, NG_FONT.black, '#c8102e'); }); sign(pc, qz(C.sign, c - 0.4, 1.35, c + 0.4, 1.75, 0.065)); }
     } else if (t === 'wall') {
       box(w, 0.25 - gl, 0.05, c, (0.25 + gl) / 2, 0.025, '#8a857c');
     } else if (t === 'atm') {
-      box(w, H - 0.06 - gl, 0.1, c, (H - 0.06 + gl) / 2, 0.05, '#d9d6cf'); neon('screen', 0.34, 0.26, 0.04, c, 1.4, 0.12); box(0.3, 0.2, 0.08, c, 1.08, 0.12, '#2b2f33'); box(0.5, 0.75, 0.04, c, 1.28, 0.105, '#55575b');
+      box(w, Hv - 0.06 - gl, 0.1, c, (Hv - 0.06 + gl) / 2, 0.05, '#d9d6cf'); neon('screen', 0.34, 0.26, 0.04, c, 1.4, 0.12); box(0.3, 0.2, 0.08, c, 1.08, 0.12, '#2b2f33'); box(0.5, 0.75, 0.04, c, 1.28, 0.105, '#55575b');
       const hc = cell(0.8, 0.2, (g, w2, h2) => { g.fillStyle = '#1d6fb8'; g.fillRect(0, 0, w2, h2); ngText(g, 'BANCOMAT', w2 / 2, h2 / 2, w2 * 0.9, h2 * 0.75, NG_FONT.sans, '#fff'); });
       sign(hc, qz(C.sign, c - 0.38, 1.85, c + 0.38, 2.04, 0.105));
     }
@@ -694,20 +694,20 @@ function ngFront(s, C) {
   // (or, in the trades without shutters, a dark veil over the glass when the shop is shut with its lights off)
   if (s.oh && m.d !== 'x' && m.d !== 'p') for (const [t, a, b] of segs) {
     if (!['glass', 'door', 'slide', 'bay'].includes(t)) continue;
-    const yT = t === 'bay' ? H - 0.37 : H - 0.06;
+    const yT = t === 'bay' ? Hv - 0.37 : Hv - 0.06;
     if (s.noShut) { if (t === 'bay') continue; const i0 = qz(C.dark, a, 0.02, b, yT, 0.1); C.darks.push({ s, i0, dark: true, y0: C.dark.p[i0 * 3 + 1], y1: C.dark.p[(i0 + 3) * 3 + 1] }); continue; }
     const i0 = qz(C.shut, a, 0, b, yT, 0.12), U = C.shut.uv;
     U[i0 * 2] = 0; U[i0 * 2 + 1] = 0; U[i0 * 2 + 2] = b - a; U[i0 * 2 + 3] = 0; U[i0 * 2 + 4] = b - a; U[i0 * 2 + 5] = yT; U[i0 * 2 + 6] = 0; U[i0 * 2 + 7] = yT;
     C.shuts.push({ s, i0, y0: C.shut.p[i0 * 3 + 1], y1: C.shut.p[(i0 + 3) * 3 + 1] });
-    if (t !== 'bay') box(b - a, 0.18, 0.16, (a + b) / 2, H - 0.13, 0.1, '#9da1a6');
+    if (t !== 'bay') box(b - a, 0.18, 0.16, (a + b) / 2, Hv - 0.13, 0.1, '#9da1a6');
   }
   // the frame (a street door has its own stone surround)
   if (m.d !== 'p') {
-    box(fw, H - gl, m.fs === 'portal' ? 0.16 : 0.11, -hw + fw / 2, (H + gl) / 2, 0.055, kc); box(fw, H - gl, m.fs === 'portal' ? 0.16 : 0.11, hw - fw / 2, (H + gl) / 2, 0.055, kc);
-    box(W, 0.1, 0.12, 0, H - 0.03, 0.06, kc);
+    box(fw, Hv - gl, m.fs === 'portal' ? 0.16 : 0.11, -hw + fw / 2, (Hv + gl) / 2, 0.055, kc); box(fw, Hv - gl, m.fs === 'portal' ? 0.16 : 0.11, hw - fw / 2, (Hv + gl) / 2, 0.055, kc);
+    box(W, 0.1, 0.12, 0, Hv - 0.03, 0.06, kc);
   }
   // the sign
-  const sy = H + 0.08, scy = sy + sh / 2;
+  const sy = Hv + 0.08, scy = sy + sh / 2;
   if (stype === 'pan' || stype === 'cas') {
     const d = stype === 'cas' ? 0.22 : 0.06, sw = W - 0.12; box(sw, sh, d, 0, scy, d / 2 + 0.01, kc);
     const c = cell(sw - 0.1, sh - 0.08, (g, w, h) => drawSign(g, w, h, bg, fg, { main, sub, icon: m.icon }));
@@ -728,7 +728,7 @@ function ngFront(s, C) {
   // the awning (or the glass canopy)
   const depth = C.depth(s), aw = m.a;
   if (aw && depth >= 1.1) {
-    const D_ = Math.min(aw[0] === 'pen' ? 1.6 : 1.4, depth - 0.35), yT = H + 0.06, drop = aw[0] === 'pen' ? 0 : 0.42 * D_ / 1.4, val = 0.24, xa = -hw + 0.04, xb = hw - 0.04;
+    const D_ = Math.min(aw[0] === 'pen' ? 1.6 : 1.4, depth - 0.35), yT = Hv + 0.06, drop = aw[0] === 'pen' ? 0 : 0.42 * D_ / 1.4, val = 0.24, xa = -hw + 0.04, xb = hw - 0.04;
     if (aw[0] === 'pen') { // over the sign when the wall is high enough, so it never hides it
       const yC = stype !== 'none' && stype !== 'tar' && top > sy + sh + 0.9 ? sy + sh + 0.1 : yT, yR = Math.min(yC + 0.9, top - 0.1);
       box(W - 0.1, 0.07, D_, 0, yC + 0.05, D_ / 2, '#c9d6dc'); box(W - 0.1, 0.12, 0.06, 0, yC + 0.05, D_, kc);
@@ -744,7 +744,7 @@ function ngFront(s, C) {
     }
   }
   // on the wall
-  const hsY = Math.max(H + 0.45, 2.75), side = m.d === 'r' ? -1 : 1;
+  const hsY = Math.max(Hv + 0.45, 2.75), side = m.d === 'r' ? -1 : 1;
   if (ext.has('ban') && top > hsY + 0.4) {
     const bx = side * (hw - 0.3), c = cell(0.7, 0.7, (g, w, h) => { g.fillStyle = bg || kc; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(0, 0, w, 4); const words = main.split(' ').slice(0, 3); words.forEach((wd, i) => ngText(g, wd, w / 2, h * (i + 0.5) / words.length + (words.length === 1 ? 0 : 0), w * 0.86, h * 0.8 / words.length, font, bg ? fg : '#fff')); });
     box(0.08, 0.72, 0.72, bx, hsY, 0.66, kc); box(0.05, 0.05, 0.32, bx, hsY + 0.38, 0.16, '#55575b');
@@ -757,9 +757,9 @@ function ngFront(s, C) {
     sign(c, qx(C.sign, 0.325, hsY - 0.35, 0.875, hsY + 0.35, bx + 0.037, 1)); sign(c, qx(C.sign, 0.325, hsY - 0.35, 0.875, hsY + 0.35, bx - 0.037, -1));
   }
   if (ext.has('palo')) { const bx = side * (hw - 0.22), cols = ['#c8102e', '#f2f2ee', '#1d4f9a', '#f2f2ee']; for (let i = 0; i < 8; i++) F.geo(C.solid, new THREE.CylinderGeometry(0.09, 0.09, 0.09, 10).translate(bx, 1.75 + i * 0.09, 0.2), null, COL(cols[i % 4])); for (const y of [1.68, 2.5]) F.geo(C.solid, new THREE.SphereGeometry(0.1, 10, 5).translate(bx, y, 0.2), null, COL('#c9ccd1')); box(0.04, 0.04, 0.15, bx, 2.1, 0.08, '#8f949a'); }
-  if (ext.has('app')) { const ly = top > sy + sh + 0.45 ? sy + sh + 0.18 : H - 0.35; for (const sx of [-1, 1]) { const x = sx * (hw - 0.3); box(0.04, 0.04, 0.35, x, ly + 0.05, 0.17, '#2b2b2b'); neon('warm', 0.16, 0.1, 0.18, x, ly, 0.33); } }
+  if (ext.has('app')) { const ly = top > sy + sh + 0.45 ? sy + sh + 0.18 : Hv - 0.35; for (const sx of [-1, 1]) { const x = sx * (hw - 0.3); box(0.04, 0.04, 0.35, x, ly + 0.05, 0.17, '#2b2b2b'); neon('warm', 0.16, 0.1, 0.18, x, ly, 0.33); } }
   if (ext.has('menu') && doors.length) { const x = doors[0][1] + 0.35 < hw - 0.2 ? doors[0][1] + 0.35 : doors[0][0] - 0.35; box(0.46, 0.62, 0.06, x, 1.45, 0.07, '#2b2b2b'); neon('warm', 0.38, 0.52, 0.02, x, 1.45, 0.105); }
-  if (ext.has('neon')) { const g0 = segs.find(q => q[0] === 'glass'); if (g0 && g0[2] - g0[1] > 0.9) { const x = (g0[1] + g0[2]) / 2, c = cell(0.72, 0.24, (g, w, h) => { g.fillStyle = '#120a0a'; g.fillRect(0, 0, w, h); g.shadowColor = '#ff3a3a'; g.shadowBlur = 6; ngText(g, 'APERTO', w / 2, h / 2, w * 0.85, h * 0.7, NG_FONT.script, '#ff5a4a'); g.shadowBlur = 0; }); sign(c, qz(C.sign, x - 0.36, H - 0.62, x + 0.36, H - 0.38, 0.06)); } }
+  if (ext.has('neon')) { const g0 = segs.find(q => q[0] === 'glass'); if (g0 && g0[2] - g0[1] > 0.9) { const x = (g0[1] + g0[2]) / 2, c = cell(0.72, 0.24, (g, w, h) => { g.fillStyle = '#120a0a'; g.fillRect(0, 0, w, h); g.shadowColor = '#ff3a3a'; g.shadowBlur = 6; ngText(g, 'APERTO', w / 2, h / 2, w * 0.85, h * 0.7, NG_FONT.script, '#ff5a4a'); g.shadowBlur = 0; }); sign(c, qz(C.sign, x - 0.36, Hv - 0.62, x + 0.36, Hv - 0.38, 0.06)); } }
   // standing on the pavement: worked out once (what stands there stays, even when the tile is built again)
   if (!s.items) {
     s.items = []; const here = [];
