@@ -67,6 +67,10 @@ const EXTRA_BARRIERS = [
   { p: [[-566.2, 870.2], [-570.0, 888.0], [-573.9, 906.5]], t: 1, h: 1.7 }, // the Seminario park wall along via Verga, between the two pieces OSM has
 ];
 for (const e of EXTRA_BARRIERS) { const d = TILES[tileOf(e.p[0][0], e.p[0][1])].d, enc = []; let px = 0, pz = 0; for (const [x, z] of e.p) { const X = Math.round(x * 10), Z = Math.round(z * 10); enc.push(X - px, Z - pz); px = X; pz = Z; } (d.ba || (d.ba = [])).push({ p: enc, t: e.t, h: e.h }); }
+// a tree mapped in the river bed of S under the water (the OSM point a few metres off the DBGT bed): its trunk stood in the Seveso, up to
+// 0.35 m under the water, 8 trees in Meda (verifica fase 6). Not drawn, no collision. The same for the railing along an OSM river, at its
+// width from the OSM axis: where that falls in the water of the DBGT bed it ran along the middle of the Seveso
+const inWater = (x, z, gy) => { if (!H.fineAt(x, z)) return false; const w = H.water(x, z); return w !== null && (w > gy + 0.1 || (w > gy - 0.15 && H.mat(x, z) === 4)); }; // under the water, or in the bed at the water's edge (the sheet of water is drawn wherever zw is over S by the bed)
 for (const T of TILES) {
   const d = T.d;
   for (const B of d.b || []) {
@@ -88,7 +92,7 @@ for (const T of TILES) {
     }
   }
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
-  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q))) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5 }); }
+  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q)) || inWater(x, z, gy)) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5 }); }
   for (const br of d.ba || []) {
     if (br.t === 3 && NO_HEDGES.some(q => dec(br.p).every(([x, z]) => inPoly(x, z, q)))) continue; // drawn by the landmark, symmetrical
     const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h, v: br.v }); // follow the ground, not long chords
@@ -248,7 +252,7 @@ for (const td of D.tiles) for (const r of td.rv || []) {
     const nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L;
     for (const sd of [1, -1]) {
       const ax = a[0] + nx * W * sd, az = a[1] + nz * W * sd, bx = c[0] + nx * W * sd, bz = c[1] + nz * W * sd, mx = (ax + bx) / 2, mz = (az + bz) / 2;
-      if (onAnyRoad(mx, mz, 1.5)) continue; const gy = H.ground(mx, mz);
+      if (onAnyRoad(mx, mz, 1.5)) continue; const gy = H.ground(mx, mz); if (inWater(mx, mz, gy)) continue; // (no railing drawn there either)
       WALLS.add(ax, az, bx, bz, { ax, az, bx, bz, nx: nx * sd, nz: nz * sd, two: true, y0: gy - 4, y1: gy + 1.1 });
     }
   }
@@ -937,7 +941,7 @@ function* buildTileGen(T) {
             if (wa !== null && wc !== null) { const i0 = rv.p.length / 3; vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0); triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3); } }
           for (const sd of [1, -1]) {
             const ax = a[0] + nx * r.w * sd, az = a[1] + nz * r.w * sd, cx = c[0] + nx * r.w * sd, cz = c[1] + nz * r.w * sd, ya = H.ground(ax, az), yc = H.ground(cx, cz);
-            if (!onAnyRoad((ax + cx) / 2, (az + cz) / 2, 1.5)) { const r0 = rail.p.length / 3; vtx(rail, ax, ya + 0.75, az, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 0.75, cz, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 1.05, cz, nx, 0, nz, 0, 0); vtx(rail, ax, ya + 1.05, az, nx, 0, nz, 0, 0); rail.i.push(r0, r0 + 1, r0 + 2, r0, r0 + 2, r0 + 3); }
+            if (!onAnyRoad((ax + cx) / 2, (az + cz) / 2, 1.5) && !inWater((ax + cx) / 2, (az + cz) / 2, (ya + yc) / 2)) { const r0 = rail.p.length / 3; vtx(rail, ax, ya + 0.75, az, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 0.75, cz, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 1.05, cz, nx, 0, nz, 0, 0); vtx(rail, ax, ya + 1.05, az, nx, 0, nz, 0, 0); rail.i.push(r0, r0 + 1, r0 + 2, r0, r0 + 2, r0 + 3); }
           }
           continue;
         }
