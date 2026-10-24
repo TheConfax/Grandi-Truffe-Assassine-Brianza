@@ -287,6 +287,46 @@ class Ferrovia:
         s.rep['recinzioni_tagliate_sulle_carreggiate'] = cut
         return out
 
+    def via_dai_ponti(s, lines):
+        """the railway fences of the corridor (the edge of the rail bed) not within PONTE_FENCE of a railway bridge: there the rail bed runs
+        on over the street below (via Milano under PONTE 14) and the fence stood on the slopes of the cutting, hanging under the deck"""
+        s.via_dai_binari([], [], '_')   # makes Z_ponti
+        Z = s.Z_ponti.buffer(PONTE_FENCE).intersection(s.cover) if not s.Z_ponti.is_empty else None
+        if Z is None: return lines
+        out = []; nc = 0
+        for f in lines:
+            L = LineString(f)
+            if not Z.intersects(L): out.append(f); continue
+            nc += 1
+            for p in _parts(L.difference(Z)):
+                if p.geom_type == 'LineString' and p.length > 2: out.append(list(p.coords))
+        s.rep['recinzioni_tolte_vicino_ai_ponti'] = nc
+        return out
+
+    def via_dai_binari(s, items, rail_lines, nome, get=lambda b: b, put=lambda b, pts: pts):
+        """fences and walls that cross a track are opened over it (TRACK_CLEAR either side of the middle of the track): the corridor of the
+        rail bed closes across the line at the ends of a bridge, and a few DBGT dividers run across the tracks at a level crossing"""
+        ponti = getattr(s, 'Z_ponti', None)
+        if ponti is None:   # the railway bridges of the DBGT: what crosses under them is not across the track
+            s.Z_ponti = ponti = unary_union([g.buffer(1.0) for g, a in s.D['sd'] if a['sed'] == '02'] + [s.assi_L[e].buffer(3.0) for e, a in enumerate(s.D['fer']) if a.get('sed') == '02'])
+        rail_lines = [p for l in rail_lines for p in _parts(l.difference(ponti) if not ponti.is_empty else l) if p.geom_type == 'LineString']
+        T = STRtree(rail_lines) if rail_lines else None
+        if T is None: return items
+        out = []; nc = 0; lost = 0.0
+        for b in items:
+            pts = get(b)
+            if len(pts) < 2: out.append(b); continue
+            L = LineString(pts); hit = [rail_lines[j] for j in T.query(L) if rail_lines[j].intersects(L)]
+            if not hit: out.append(b); continue
+            # only around the crossing points: a fence that also runs along the track nearer than TRACK_CLEAR keeps that stretch
+            xs = [q for h in hit for q in _parts(h.intersection(L))]
+            zona = unary_union([h.buffer(TRACK_CLEAR) for h in hit]).intersection(unary_union([q.buffer(3 * TRACK_CLEAR) for q in xs]))
+            rest = L.difference(zona); nc += 1; lost += L.length - rest.length
+            for p in _parts(rest):
+                if p.geom_type == 'LineString' and p.length > 1.0: out.append(put(b, list(p.coords)))
+        s.rep.setdefault('aperti_sui_binari', {})[nome] = dict(n=nc, metri=round(lost, 1))
+        return out
+
     # ---- 3. the comune boundaries
     def confini(s, blines):
         """LIM_COM pieces of each DBGT spliced into the OSM boundary lines of its comune (the town signs). A piece whose two ends lie
@@ -315,7 +355,7 @@ class Ferrovia:
 
     # ---- 4. tiles
     def disegno(s, rail_lines, cut):
-        """the rail bed to draw: SD_FER a raso, and at least the old 3.8 m strip along every track (between two tracks the DBGT may have
+        """the rail bed to draw: SD_FER a raso, and at least a 4.2 m strip along every track (2.1 m a side: two tracks 4 m apart meet) (between two tracks the DBGT may have
         something else, as the pedestrian area over the station underpass, AC_PED in galleria: it is not on the surface), less the streets,
         sidewalks, platforms and buildings (`cut`) and the bridges (their deck is drawn)"""
         ponti = [g.buffer(2.0) for g, a in s.D['sd'] if a['sed'] == '02'] + [s.assi_L[e].buffer(3.0) for e, a in enumerate(s.D['fer']) if a.get('sed') == '02']
@@ -373,5 +413,7 @@ class Ferrovia:
                     banchine=s.rep.get('banchine'), confini=s.rep.get('confini'), treni=[{k: v for k, v in r.items() if not k.endswith('_dove')} for r in c.get('treni', [])])
 
 
-BED_HW = 1.9      # the drawn rail bed at least this far either side of a track (the old ballast strip)
+PONTE_FENCE = 8.0 # no corridor fence this near a railway bridge of the DBGT
+TRACK_CLEAR = 2.3 # no fence or wall nearer than this to the middle of a track it crosses (the train is 2.9 m wide)
+BED_HW = 2.1      # the drawn rail bed at least this far either side of a track (the old ballast strip)
 STEP_COV = 2.0    # the coverage of an element is known every few metres: a free stretch is trimmed by this at each end
