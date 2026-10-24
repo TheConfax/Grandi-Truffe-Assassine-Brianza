@@ -46,6 +46,9 @@ FREE_D = 3.0      # OSM keeps its shape only with nothing of the DBGT within thi
 MIN_OSM = 20.0    # leftover OSM pieces smaller than this (m2) are slivers along the DBGT edges
 FIL_STEP = 7.0    # trees along a row (FIL_AL is one line for many trees), as for OSM's tree_row
 CLEAR = 0.4       # a trunk stays this far from a forbidden surface (its collision radius in world3.js)
+CLEAR_DBGT = 0.25  # a DBGT tree that stands where the DBGT allows it (a verge, a front garden, a yard) keeps its place this far from the
+                   # DBGT's forbidden surfaces (the trunk's foot, world3.js TREE_G), even under the 1.8 m pavement the game guesses along OSM's
+                   # streets (build_data.py side): verifica del 24/10, without this the trees of narrow verges and front gardens moved or went
 MOVE = 3.0        # how far a tree may move off a forbidden surface
 DUP = 1.0         # two trees closer than this are one
 BOSCO_M2, SCRUB_M2 = 100.0, 220.0  # ground per scattered tree in the DBGT woods and scrub (Verde.bosco)
@@ -283,9 +286,10 @@ class Verde:
             out += list(zip(xs[ok], zs[ok]))[:n]
         return np.array(out) if out else np.zeros((0, 2))
 
-    def alberi(self, trees, n_gen, vietati=(), rail=(), posti=(), strade=None):
+    def alberi(self, trees, n_gen, vietati=(), rail=(), posti=(), strade=None, morbidi=()):
         """trees: build_data.py's list, [0:n_gen] OSM (nodes and tree rows), [n_gen:] scattered in the woods; vietati: the game's own
-        surfaces (asphalt, pavements, footways, buildings), strade: every road and path buffered (roadsU), rail: railway lines, posti: the parking spaces OSM maps one by one ([x, z, angle,
+        surfaces (every street, path and footway at its width, as world3.js onAnyRoad; buildings; decks), morbidi: the 1.8 m pavements the game guesses along OSM's streets
+        (a DBGT tree on a verge or a garden the guess covers stays there), strade: every road and path buffered (roadsU), rail: railway lines, posti: the parking spaces OSM maps one by one ([x, z, angle,
         length, width, kind], decimetres). Returns the list with the DBGT trees inside the cover."""
         cv = self.cover; T = np.asarray(trees, float).reshape(-1, 2)
         if cv.is_empty: return trees
@@ -312,10 +316,14 @@ class Verde:
             ic = shapely.contains_xy(self.cons, P[:, 0], P[:, 1]) & (src != 2); self.rep['alberi_dbgt_nei_cantieri'] = int(ic.sum()); P, src = P[~ic], src[~ic]
         # forbidden surfaces: the DBGT's and the game's (cut to the cover, in pieces so the tree query stays local)
         bx = box(*cv.bounds).buffer(10)
-        V = list(self.notree)
+        V = []  # the game's hard surfaces (streets and paths at their width, buildings, decks, railway, parking spaces); the DBGT's are self.notree, OSM's pavements VS
         for g in vietati:
             if g is None or g.is_empty: continue
             V += [q for p in _polys(g.intersection(bx)) for q in _split(p)]
+        VS = []
+        for g in morbidi:
+            if g is None or g.is_empty: continue
+            VS += [q for p in _polys(g.intersection(bx)) for q in _split(p)]
         for L in rail:
             if L.intersects(bx): V += _polys(L.buffer(3.6))  # with CLEAR the 4 m the game keeps trees from the tracks (world3.js nearRail)
         for X, Z, a, l, w, *_ in posti:  # a car stands there (landmarks3.js draws the space and parks a car on it)
@@ -323,18 +331,23 @@ class Verde:
             if not bx.contains(Point(x, z)): continue
             ux, uz = math.sin(a), math.cos(a); l, w = min(max(l, 4), 7) / 2, min(max(w, 1.8), 3.5) / 2
             V.append(Polygon([(x + ux * l * s + uz * w * t, z + uz * l * s - ux * w * t) for s, t in ((-1, -1), (1, -1), (1, 1), (-1, 1))]))
-        vt = STRtree(V)
-        def hit(pts):
-            m = np.zeros(len(pts), bool)
-            if not len(pts): return m
-            a, _ = vt.query(shapely.points(pts), predicate='dwithin', distance=CLEAR); m[np.unique(a)] = True; return m
+        vt, vd, vs = STRtree(V), STRtree(self.notree) if self.notree else None, STRtree(VS) if VS else None
+        def near(tree, pts, d, m):
+            if tree is not None and len(pts): a, _ = tree.query(shapely.points(pts), predicate='dwithin', distance=d); m[np.unique(a)] = True
+            return m
+        def hit(pts):  # off every forbidden surface by the collision radius
+            m = np.zeros(len(pts), bool); near(vt, pts, CLEAR, m); near(vd, pts, CLEAR, m); return near(vs, pts, CLEAR, m)
+        def hit_dbgt(pts):  # where the DBGT allows a tree: off the DBGT's forbidden surfaces by the trunk's foot, off the game's hard ones
+            m = np.zeros(len(pts), bool); near(vt, pts, CLEAR, m); return near(vd, pts, CLEAR_DBGT, m)
         bad = hit(P); moved = np.zeros(len(P), bool); drop = np.zeros(len(P), bool)
         ang = np.linspace(0, 2 * math.pi, 16, endpoint=False); rad = np.arange(0.5, MOVE + 0.01, 0.5)
         off = np.array([(r * math.cos(a), r * math.sin(a)) for r in rad for a in ang])
         why = Counter()
         for i in np.where(bad)[0]:
             if src[i] == 3: drop[i] = True; why['bosco'] += 1; continue  # a scattered tree just goes
-            C = P[i] + off; ok = ~hit(C) & shapely.contains_xy(cv, C[:, 0], C[:, 1])
+            if src[i] < 2 and not hit_dbgt(P[i:i + 1])[0]: why['restano_in_aiuola'] += 1; continue  # a DBGT tree on a verge or a front garden under the guessed pavement
+            C = P[i] + off; inc = shapely.contains_xy(cv, C[:, 0], C[:, 1]); ok = ~hit(C) & inc
+            if not ok.any() and src[i] < 2: ok = ~hit_dbgt(C) & inc
             if ok.any(): j = int(np.argmax(ok)); P[i] = C[j]; moved[i] = True; why['spostati'] += 1
             else: drop[i] = True; why['tolti'] += 1
         # where a tree stood on what (for the report)
