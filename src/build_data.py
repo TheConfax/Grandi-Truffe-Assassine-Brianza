@@ -740,6 +740,8 @@ for r in sorted(raw_roads, key=lambda r: r['c']):
                 s0 += fw + 7 + h01(f"g{s0:.0f}{sd}") * 6
             else: s0 += 3
 log('procedural villette', nproc)
+import dbgt_manufatti  # manufatti, yards, car parks, ponds, pylons, tree heights of the DBGT (src/dbgt_manufatti.py, docs/motore.md 7)
+MANUF = dbgt_manufatti.Manufatti(DBT_DIR, _comuni, dbt_cover, log, lambda lon_, lat_: ((lon_ - lon0) * KX, -(lat_ - lat0) * KZ), (-HW, -HH), rect=RECT); buildings[:] = MANUF.edifici(buildings)
 bgeoms = [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9]
 _bl = [(b, g) for b, g in zip([b for b in buildings if b['t'] != 9], bgeoms) if g is not None]
 _bt = STRtree([g for b, g in _bl])
@@ -1213,6 +1215,7 @@ for at, g in area_geoms:
     ok = shapely.contains(g, ptsg) & ~shapely.intersects(roadsU, ptsg) & ~shapely.intersects(bunion, ptsg) & ~shapely.intersects(_railbuf, ptsg) & (np.abs(xs_) <= HW) & (np.abs(zs_) <= HH)
     for x, z in list(zip(xs_[ok], zs_[ok]))[:n]: trees.append((x, z))
 area_geoms, land = VERDE.aree(area_geoms, land)  # after OSM's woods got their trees: the scatter outside the DBGT stays as it was
+area_geoms, land = MANUF.aree(area_geoms, land)
 log('pois', len(pois), 'places', len(places), 'trees', len(trees), 'crossings', len(crossings))
 # ---- street objects from OSM: [kind, x, z, angle, extra]. The angle follows the nearest street (a bench faces it, a bump lies across it);
 # extra is a height (pylons, poles, masts) or the street width (bumps). Kinds by index, same order as OGG_KINDS in oggetti3.js
@@ -1314,6 +1317,7 @@ for wid, (refs, t) in ways.items():
     pts = [nodes[n_] for n_ in refs if n_ in nodes]
     if len(pts) >= 2: power_lines.append((pts, 28 if t['power'] == 'line' else 8.5))
 log('oggetti', len(ogg), dict(Counter(OGG[o[0]] for o in ogg)), 'linee elettriche', len(power_lines), 'spostati fuori dalla carreggiata', n_off_road)
+ogg, power_lines = MANUF.elettrico(ogg, power_lines, OGG)
 
 # ---- real parking: the spaces mapped one by one (a rectangle each, split when it says capacity > 1) and the capacity of the car parks
 pspaces, plots = [], []  # [x, z, angle of the long side, length, width, kind 0 normal / 1 disabled / 2 charging]; [x, z, capacity]
@@ -1403,6 +1407,7 @@ log('cartelli di paese', len(cartelli), 'confini', len(blines), 'spostati via da
 log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1), 'parcheggi con capienza', len(plots), 'strade con sosta', sum(1 for r in raw_roads if r.get('pk')))
 trees = VERDE.alberi(trees, _n_tr, [asph, pedz, side, foot, bunion, rbuf(lambda r: r.get("deck"), 0)], railL, pspaces, roadsU); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
 VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
+trees = MANUF.alberi(trees, VERDE.forest_u)
 # ------------------------------------------------------------------ graph & tiles
 used_nodes = {}
 out_roads = []
@@ -1466,6 +1471,7 @@ for t in range(ntx * ntz):
         c = AG[i].intersection(bx)
         for p in polys_of(c, 0.3, 2):
             p['t'] = area_geoms[i][0]; push(t, 'a', p)
+            if id(AG[i]) in MANUF.ns_ids: p['ns'] = 1  # a car park of the DBGT draws its stalls
 def push_lines(key_, lines, extra=None):
     for i, pts in enumerate(lines):
         L = LineString(pts)
@@ -1514,7 +1520,7 @@ for pts, w_, caps in riv_out:
                 cc = list(part.coords)
                 e = [int(caps[0] and math.dist(cc[0], s0) < 0.05 or caps[1] and math.dist(cc[0], s1) < 0.05), int(caps[1] and math.dist(cc[-1], s1) < 0.05 or caps[0] and math.dist(cc[-1], s0) < 0.05)]
                 push(t, 'rv', {'p': enc(cc), 'w': w_, 'e': e})
-for x, z in trees: push(tid(x, z), 'tr', [q(x), q(z)])
+for t_ in trees: push(tid(t_[0], t_[1]), 'tr', [q(t_[0]), q(t_[1])] + [q(v) for v in t_[2:4]])  # [x, z] or [x, z, height, crown] (dm, dbgt_manufatti.py)
 for ri, r in enumerate(raw_roads):  # road pieces per tile (for markings and decks)
     pts = [nodes[n_] for n_ in r['refs']]
     hs = [deckH.get(n_) for n_ in r['refs']] if r.get('deck') else None
@@ -1527,6 +1533,9 @@ for s_ in pspaces: push(tid(s_[0] / 10, s_[1] / 10), 'ps', s_)
 for p_ in plots: push(tid(p_[0] / 10, p_[1] / 10), 'pc', p_)
 for c_ in cartelli: push(tid(c_[0] / 10, c_[1] / 10), 'cl', c_)
 push_lines('pw', [p for p, h in power_lines], lambda i: {'h': power_lines[i][1]})
+MANUF._ground_fb = lambda x_, z_: ground(x_, z_) + TBASE
+for t_, k_, r_ in MANUF.uscite(tid, tbox, enc, base=round(TBASE, 1)): push(t_, k_, r_)
+MANUF.controlli(buildings=buildings); MANUF.scrivi(os.path.splitext(dst)[0] + '_manufatti.json')
 # terrain as base64 uint16 decimetres
 TH16 = np.clip(np.round((TH - TBASE) * 10), 0, 65535).astype('<u2')
 out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 1), 'tile': TILE, 'ntx': ntx, 'ntz': ntz},

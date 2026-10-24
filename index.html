@@ -1158,7 +1158,7 @@ for (const T of TILES) {
     }
   }
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
-  for (const [X, Z] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q)) || inWater(x, z, gy)) continue; T.tr.push([x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + 5, tree: 1 }); }
+  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q)) || inWater(x, z, gy)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const br of d.ba || []) {
     if (br.t === 3 && NO_HEDGES.some(q => dec(br.p).every(([x, z]) => inPoly(x, z, q)))) continue; // drawn by the landmark, symmetrical
     const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h, v: br.v }); // follow the ground, not long chords
@@ -1449,7 +1449,7 @@ function edgePts(a, b, off) {
 }
 
 // ---------------------------------------------------------------- tile builder
-const AREA_COL = { 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6' };
+const AREA_COL = { 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6', 17: '#b9b5ac' }; // 17: yards of the DBGT (AATT, dbgt_manufatti.py), a plain light grey paving (MAT.aatt)
 const PAL_OLD = ['#dfae62', '#e8c98a', '#dba08a', '#ece4d3', '#d99060', '#c7c9a6', '#e3b98f', '#f0dcb0'];
 const PAL_MOD = ['#dcd7cd', '#cbc4b7', '#bdb5a8', '#e6e0d5', '#c9b9a0', '#d5cbbb'];
 const PAL_IND = ['#aaa69d', '#9d998f', '#b6ae9e', '#8f949a'];
@@ -1526,7 +1526,7 @@ const MAT = {
   trunk: new THREE.MeshLambertMaterial({ color: 0x5a4636, map: barkTex }), crown: new THREE.MeshLambertMaterial({ map: TREE_LEAF, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true }), lamp: lam(0x4a4d52), lampHead: lam(0xf4f1e6, { emissive: 0x6a6040, emissiveIntensity: 0.4 }),
 };
 // the same looks writing their depth, for the cells a layer owns in a tile of S (cellOwners): drawn with the ground, in its place
-Object.assign(MAT, { grassS: new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }), pavedS: new THREE.MeshLambertMaterial({ vertexColors: true, map: asphaltTex }), waterS: new THREE.MeshLambertMaterial({ color: 0x45738c }),
+Object.assign(MAT, { aattS: new THREE.MeshLambertMaterial({ color: 0xb9b5ac }), aatt: flatMat({ color: 0xb9b5ac }), grassS: new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }), pavedS: new THREE.MeshLambertMaterial({ vertexColors: true, map: asphaltTex }), waterS: new THREE.MeshLambertMaterial({ color: 0x45738c }),
   piazzaS: new THREE.MeshLambertMaterial({ map: porfidoTex }), footS: new THREE.MeshLambertMaterial({ color: 0xc8b89c }), asphS: new THREE.MeshLambertMaterial({ map: asphaltTex }) });
 Object.assign(MAT.water, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }); // the water level of a tile of S meets the banks of S, which write their depth
 // the kinds of divider the DBGT adds (build_data.py): plastered low walls, railings with vertical bars, green wire mesh, railway panels, wood
@@ -1917,10 +1917,11 @@ function cellOwners(T, F) {
   const cover = (o, k, rank, st, street) => { if (o.length < 3) return; H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && underFree(w))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
-    if (a.t <= 3 || a.t >= 11) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
+    if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
     else if (a.t === 4 && inPiazza(...centroid(outer))) { }
     else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
+    else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
   for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, S('f', MAT.footS, 4), true);
@@ -1984,20 +1985,21 @@ function* buildTileGen(T) {
   yield 'landuse';
   // land use
   {
-    const gB = VBuf(), pB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
-    gB.rk = 1; pB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
+    const gB = VBuf(), pB = VBuf(), yB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
+    gB.rk = 1; pB.rk = 1.1; yB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
     for (const a of d.a || []) {
       const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5) continue; // platforms are built raised, with their furniture
       if (T.fine && waterInBed(a, outer, holes, T)) continue; // water inside the bed: the water level below draws it
       try {
-        if (a.t <= 3 || a.t >= 11) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
+        if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 4 && inPiazza(...centroid(outer))) { } // a square or a school yard mapped as a car park: drawn by buildPiazze
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
+        else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
-    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(pB, MAT.paved, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(pB, MAT.paved, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {
@@ -2367,7 +2369,7 @@ function* buildTileGen(T) {
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti]) {
+  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
@@ -2379,10 +2381,16 @@ function* buildTileGen(T) {
   if (T.tr.length) {
     const n = T.tr.length, trunks = new THREE.InstancedMesh(TREE_G.trunk, MAT.trunk, n), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, n);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
-    T.tr.forEach(([x, z], i) => {
+    T.tr.forEach(([x, z, th, td], i) => {
       const k = 0.75 + tRnd() * 0.6, gy = H.ground(x, z);
+      if (th) { // height th and crown diameter td from the DSM: the crown model is about 5.4 m across and 4.5 m high, its top 2.5 m over its origin; the trunk reaches the origin
+        const sx = td / 5.4 * (0.94 + tRnd() * 0.12), hc = Math.max(1.2, Math.min(0.6 * th, 2.0 * td, th - 1.5)), sy = hc / 4.5 * (0.95 + tRnd() * 0.1), yc = th - 2.5 * sy, tw = clamp(Math.sqrt(th / 7), 0.7, 1.8);
+        q.identity(); m.compose(p.set(x, gy, z), q, s.set(tw, Math.max(0.3, yc / 4.6), tw)); trunks.setMatrixAt(i, m);
+        q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + yc, z), q, s.set(sx, sy, sx * (0.94 + tRnd() * 0.12))); crowns.setMatrixAt(i, m);
+      } else {
       q.identity(); m.compose(p.set(x, gy, z), q, s.set(k, k, k)); trunks.setMatrixAt(i, m);
       q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + 3.4 * k + 1.2, z), q, s.set(k * (0.9 + tRnd() * 0.3), k * (1 + tRnd() * 0.4), k)); crowns.setMatrixAt(i, m);
+      }
       crowns.setColorAt(i, COL(GREENS[Math.floor(tRnd() * GREENS.length)]));
     });
     trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns);
@@ -4195,8 +4203,8 @@ function buildParkingLines(T, G) {
       }
     }
   }
-  for (const a of T.d.a || []) {
-    if (a.t !== 4) continue; const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P); if (inPiazza(cx, cz)) continue;
+  for (const a of (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || [])) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
+    const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P); if (inPiazza(cx, cz)) continue;
     // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
     const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
@@ -4946,12 +4954,50 @@ function buildOggetti(T, G) {
     const pts = dec(L.p), big = L.h > 15, offs = big ? [[-6.5, -8], [6.5, -8], [-4.5, -3.5], [4.5, -3.5]] : [[-0.7, -0.6], [0.7, -0.6]];
     for (let i = 1; i < pts.length; i++) {
       const A = pts[i - 1], C = pts[i], l = hyp(C[0] - A[0], C[1] - A[1]); if (l < 0.5) continue;
-      const nx = -(C[1] - A[1]) / l, nz = (C[0] - A[0]) / l, ya = H.ground(A[0], A[1]) + L.h, yc = H.ground(C[0], C[1]) + L.h;
+      const nx = -(C[1] - A[1]) / l, nz = (C[0] - A[0]) / l;
+      if (L.y && big) { // DBGT pylons (dbgt_manufatti.py): y the top of the pylon at each vertex, ht its height; the wires hang from the insulators of the model scaled to it
+        const ta = L.y[i - 1] / 10, tc = L.y[i] / 10, ha = L.ht[i - 1] / 10, hc = L.ht[i] / 10;
+        for (const [o, k] of [[-6.5, 0.323], [6.5, 0.323], [-4.5, 0.173], [4.5, 0.173]]) wp.push(A[0] + nx * o, ta - k * ha, A[1] + nz * o, C[0] + nx * o, tc - k * hc, C[1] + nz * o);
+        continue;
+      }
+      const ya = H.ground(A[0], A[1]) + L.h, yc = H.ground(C[0], C[1]) + L.h;
       for (const [o, dy] of offs) wp.push(A[0] + nx * o, ya + dy, A[1] + nz * o, C[0] + nx * o, yc + dy, C[1] + nz * o);
     }
   }
   if (wp.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); G.add(new THREE.LineSegments(g, WIRE_MAT)); }
   T.ogDone = true;
+}
+
+// ---------------------------------------------------------------- manufatti of the DBGT (dbgt_manufatti.py, tiles[t].mf): plain shapes, no detail
+// k 1 a round tank or silo (MN_IND 07, 0702): a cylinder of radius r and height h, flat top; k 2 the same not round: the footprint raised to h;
+// k 3 an open basin (MN_IND 11): concrete walls up to h, the water 12 cm under the rim. Heights from the DSM where it sees them. Solid
+function buildManufatti(T, G) {
+  const list = T.d.mf || []; if (!list.length) return;
+  const b = Buf(), F = lmFrame(new THREE.Matrix4()), METAL = COL('#b9bdc0'), CONC = COL('#aaa59b'), WATER = COL('#41687a'), solid = !T.mfDone;
+  const ring = (pts, y0, y1, col, walls) => { // walls of a ring of points from y0 to y1 (y per point), and their collision
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], c = pts[(i + 1) % pts.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
+      F.face(b, [[a[0], y0[i], a[1]], [c[0], y0[(i + 1) % pts.length], c[1]], [c[0], y1, c[1]], [a[0], y1, a[1]]], 2, col);
+      if (walls) WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(...y0) - 3, y1 });
+    }
+  };
+  for (const m of list) {
+    const h = m.h / 10;
+    if (m.k === 1) {
+      const x = m.c[0] / 10, z = m.c[1] / 10, r = m.r / 10, n = Math.max(10, Math.min(28, Math.round(r * 5))), pts = [];
+      for (let i = 0; i < n; i++) { const a = i * TAU / n; pts.push([x + Math.cos(a) * r, z + Math.sin(a) * r]); }
+      const gys = pts.map(p => H.ground(p[0], p[1])), top = H.ground(x, z) + h;
+      ring(pts, gys.map(g => g - 0.3), top, METAL, false); F.face(b, pts.map(p => [p[0], top, p[1]]), 2, METAL);
+      if (solid) WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: Math.min(...gys) - 3, y1: top });
+    } else {
+      const pts = dec(m.p); if (pts.length < 3) continue;
+      const [cx, cz] = centroid(pts), gys = pts.map(p => H.ground(p[0], p[1])), top = H.ground(cx, cz) + h;
+      ring(pts, gys.map(g => g - 0.3), top, m.k === 3 ? CONC : METAL, solid);
+      F.face(b, pts.map(p => [p[0], m.k === 3 ? top - 0.12 : top, p[1]]), 2, m.k === 3 ? WATER : METAL);
+    }
+  }
+  if (b.i.length) mkMesh(b, LMAT.trim, 10, 'cast', G);
+  T.mfDone = true;
 }
 
 // ---------------------------------------------------------------- shop fronts by class (negozi)
