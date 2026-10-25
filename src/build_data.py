@@ -1554,6 +1554,19 @@ log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1)
 trees = VERDE.alberi(trees, _n_tr, [_rbuf('flat0'), bunion, _rbuf('deck0')], railL, pspaces, roadsU, [side]); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
 VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 trees = MANUF.alberi(trees, VERDE.forest_u)
+# ---- the lanes of the AI cars away from walls, fences, gates and buildings, in every comune (src/corsie_ia.py): all of them are final here
+import corsie_ia
+_cia_n = [0]
+def _cia_id(): _cia_n[0] += 1; return 'ia%d' % _cia_n[0]
+_cia_ost = [b_[0] for b_ in bar_out] + list(fences) + [[(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)] for g_ in gate_out]
+_cia_ost += [list(b_['p']) + [b_['p'][0]] for b_ in buildings if b_.get('t') != 9 and len(b_['p']) >= 3] + [list(h_) + [h_[0]] for b_ in buildings if b_.get('t') != 9 for h_ in b_.get('k', []) if len(h_) >= 3]
+_cia_asf = [asph, _cv_f.result()] if STR else None  # the asphalt drawn (AC_VEI, the OSM ways without it) and the paved yards
+if os.environ.get('GTA_DUMP_CORSIE'):  # development of src/corsie_ia.py: its inputs, to work on it without the whole build
+    import pickle
+    pickle.dump(dict(raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], nodes=nodes, deckH=deckH, ostacoli=_cia_ost, asfalto=_cia_asf, cover=dbt_cover if STR else None), open(os.environ['GTA_DUMP_CORSIE'], 'wb'))
+_cia_rep = corsie_ia.corsie(raw_roads, nodes, deckH, _cia_ost, _cia_asf, dbt_cover if STR else None, _cia_id, log)
+if STR: STR.rep['corsie_ia'] = _cia_rep
+del _cia_ost, _cia_asf
 # ------------------------------------------------------------------ graph & tiles
 used_nodes = {}
 out_roads = []
@@ -1569,8 +1582,9 @@ for r in raw_roads:
     if r.get('pv'): rec['pv'] = 1  # over a yard of the DBGT (AC_VEI 0307): no AI traffic (src/dbgt_strade.py privati)
     if r.get('sg'): rec['sg'] = 1  # its markings are in tiles[].sg (dbgt_righe.py): none on its axis
     if r.get('w_osm') is not None: rec['wd'] = 1  # w is the carriageway of the DBGT (AC_VEI): the markings go by it, mh is the lanes' room
-    for k_ in ('lf', 'lb'):  # the AI lanes node by node from the carriageway of the DBGT (dbgt_strade.py corsie_locali)
+    for k_ in ('lf', 'lb'):  # the AI lanes node by node: from the carriageway of the DBGT (dbgt_strade.py corsie_locali), away from the obstacles (corsie_ia.py)
         if r.get(k_) and len(r[k_]) == len(r['refs']): rec[k_] = r[k_]
+    if r.get('nt'): rec['nt'] = r['nt']  # the segments k (g[k-1] to g[k]) without AI traffic (corsie_ia.py)
     out_roads.append(rec)
 q = lambda v: int(round(v * 10))
 NODES = [[q(nodes[ref][0]), q(nodes[ref][1]), q(deckH[ref]) if ref in deckH else -32768] for ref in node_list]
