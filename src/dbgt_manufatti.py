@@ -651,10 +651,15 @@ class Manufatti:
             d = os.path.join(os.path.dirname(HERE), 'terreno')
             try: idx = json.load(open(os.path.join(d, 'indice.json'), encoding='utf-8'))['tiles']
             except Exception: idx = {}
+            pk = None  # since the fast start the tiles are in terreno/pacco.bin (src/terreno_pacco.py): offset and length per tile in indice.json
+            try:
+                ii = json.load(open(os.path.join(d, 'indice.json'), encoding='utf-8')).get('pacco'); pk = (open(os.path.join(d, ii['file']), 'rb').read(), ii['tile']) if ii else None
+            except Exception: pk = None
             for k in idx:
                 try:
                     import gzip
-                    b = open(os.path.join(d, k + '.bin.gz'), 'rb').read()
+                    if pk is not None and k in pk[1]: o_, n_ = pk[1][k]; b = pk[0][o_:o_ + n_]
+                    else: b = open(os.path.join(d, k + '.bin.gz'), 'rb').read()
                     if b[:2] == b'\x1f\x8b': b = gzip.decompress(b)
                     if b[:4] != b'GTAS': continue
                     st, n = b[5], int.from_bytes(b[6:8], 'little'); base = float(np.frombuffer(b, '<f4', 1, 8)[0])

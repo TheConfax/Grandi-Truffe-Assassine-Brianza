@@ -7,6 +7,7 @@
 #   python src/terreno_gioco.py --da DIR            pack the outputs of superficie.py / impalcati.py found in DIR
 #   python src/terreno_gioco.py --da DIR --rigenera run superficie.py and impalcati.py into DIR first (under 1 min for Meda: impalcati.py reuses the surface superficie.py just made)
 import os, sys, json, gzip, glob, re, argparse, struct, io
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 
@@ -57,6 +58,7 @@ def main(argv=None):
     ind = dict(ver=1, fase=4, comune=a.comune, nota='docs/motore.md fase 4: quote in m sul mare; il gioco toglie terrain.base di brianza.json',
                tiles=tiles, decks=decks, pits=dk.get('pits', []), acqua=acqua)
     open(os.path.join(a.out, 'indice.json'), 'w', encoding='utf-8').write(json.dumps(ind, ensure_ascii=False, separators=(',', ':')))
+    import terreno_pacco; terreno_pacco.impacchetta(a.out)  # i .bin.gz in un file solo (avvio veloce)
     print('terreno: %d tile (%s), %.1f MB in gzip; impalcati %d, fosse %d, assi d acqua %d; indice %.0f KB' % (
         len(tiles), {s: sum(1 for v in tiles.values() if v == s) for s in sorted(set(tiles.values()))}, peso / 1e6, len(decks), len(ind['pits']), len(acqua),
         os.path.getsize(os.path.join(a.out, 'indice.json')) / 1024))

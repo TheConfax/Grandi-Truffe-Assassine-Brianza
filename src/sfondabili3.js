@@ -1,12 +1,12 @@
 // ---------------------------------------------------------------- barriers a car breaks through, as in GTA (Carlo, 26/10)
-// What counts is what the game draws (the kinds of src/barriere.py), not the DBGT code: 5 wire mesh, 6 railway fence, 7 post and rail break one
+// What counts is what the game draws (the kinds of src/barriere.py), not the DBGT code: 5 wire mesh, 7 post and rail break one
 // panel at a time (the 2-3 m piece you hit), which flies off with a few bits; 3 a hedge opens only where the car passes, a hole as wide as the
-// car, and slows it; 1 wall, 2 low wall with railings, 4 retaining wall never. Every break slows the car and does it a little harm. The broken
+// car, and slows it; 1 wall, 2 low wall with railings, 4 retaining wall, 6 railway fence (drawn as a concrete kerb with mesh panels on top: it looks like a low wall with railings) never. Every break slows the car and does it a little harm. The broken
 // pieces stay broken while their tile is built: a tile built again (you went away and came back) has them all whole. The railway corridor
 // fences of OSM (T.fe: a 0.9 m concrete wall under the net) stay solid, the gates and the building-site panels as they were.
 // The collision segments are those of world3.js (one per drawn segment, in WALLS); a broken one is off (s.off, skipped by collideStatic and
 // rayWalls). The mesh stays one per material per tile: a broken piece knows its index ranges and has them zeroed.
-const BAR_PANEL = { 5: { len: 2.6, slow: 0.86, dmg: 2, bit: 0x6f8a6f }, 6: { len: 2.6, slow: 0.8, dmg: 3, bit: 0xa8adb2 }, 7: { len: 2.5, slow: 0.88, dmg: 1.5, bit: 0x8a6a4a } };
+const BAR_PANEL = { 5: { len: 2.6, slow: 0.86, dmg: 2, bit: 0x6f8a6f }, 7: { len: 2.5, slow: 0.88, dmg: 1.5, bit: 0x8a6a4a } };
 const BAR_HEDGE = { slowPerM: 0.12, dmgPerM: 0.4, bit: 0x4f7a3a };
 const BAR_MIN_P = 3, BAR_VN_P = 1.2, BAR_MIN_H = 2.5, BAR_VN_H = 0.8; // m/s: speed of the car and towards the barrier needed to break it
 const BAR_KEYS = ['wl', 'ft', 'hd', 'wlP0', 'wlP1', 'bars', 'mesh', 'rly', 'wood'];
