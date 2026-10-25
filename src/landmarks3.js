@@ -211,6 +211,20 @@ function buildParkingLines(T, G) {
   if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
   if (sign.i.length) mkMesh(sign, PSIGN_MAT, 10, false, G);
 }
+// the benches and bins of the parks: one instance each, the models of oggetti3.js, knocked down like the street lamps; built again, a fallen one
+// stays down (as the lamps)
+const PARK_PROPS = new Map();
+function parkProps(G, k, list) {
+  if (!list.length) return;
+  const S = OGG_SPEC[k], im = new THREE.InstancedMesh(OGG_GEO[k], OGG_MAT, list.length), o3 = new THREE.Object3D(); im.castShadow = true; im.receiveShadow = true;
+  list.forEach(([x, z, a, gy], i) => {
+    o3.position.set(x, gy, z); o3.rotation.set(0, a, 0); o3.scale.set(1, 1, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix);
+    const key = k + ':' + x.toFixed(1) + ',' + z.toFixed(1), p = PARK_PROPS.get(key);
+    if (!p) PARK_PROPS.set(key, addProp({ x, z, y: gy, r: S.r, h: S.h, inst: { meshes: [im], i, ry: a, base: gy } }));
+    else { p.inst.meshes = [im]; p.inst.i = i; if (p.broken) { o3.scale.set(0, 0, 0); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); } }
+  });
+  G.add(im);
+}
 // park furniture: along the footpaths inside parks and gardens, benches every so often (on alternate sides) and lamp posts, a bin by each bench;
 // a flower bed fills the middle of a small round plaza where paths meet
 function buildParkFurniture(T, G) {
@@ -219,8 +233,8 @@ function buildParkFurniture(T, G) {
   const inPark = (x, z, m = 8) => parks.some(p => { // inside a park or garden, or along its edge
     if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) return false; if (inPoly(x, z, p.o)) return true;
     for (let i = 0; i < p.o.length; i++) { const A = p.o[i], C = p.o[(i + 1) % p.o.length]; if (segDist(x, z, A[0], A[1], C[0], C[1]) < m) return true; } return false; });
-  const F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf();
-  const WOOD = COL('#7a5a3c'), IRON = COL('#2e3236'), BIN = COL('#3d5a3a'), x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
+  const F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), benches = [], bins = [];
+  const x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
   for (const r of D.roads) {
     if (r.c !== 6 || r.d || r.t) continue;
     let acc = 0, k = 0;
@@ -232,12 +246,9 @@ function buildParkFurniture(T, G) {
         if (x < x0 || x >= x0 + TS || z < z0 || z >= z0 + TS || !inPark(x, z)) continue;
         const sd = k % 2 ? 1 : -1, off = r.w / 2 + 0.9, bx = x + nx * off * sd, bz = z + nz * off * sd, gy = H.ground(bx, bz);
         if (inBuilding(bx, bz, 1.2) || onAnyRoad(bx, bz, 0.2) && !onFoot(bx, bz)) continue;
-        if (k % 3) { // bench facing the path, a bin beside it
-          const R = ry + (sd > 0 ? Math.PI : 0), at = (dx, dz) => [bx + Math.cos(R) * dx + Math.sin(R) * dz, bz - Math.sin(R) * dx + Math.cos(R) * dz];
-          F.geo(Bs.trim, lmBox(1.8, 0.07, 0.42, 0, gy + 0.45, 0).rotateY(R).translate(bx, 0, bz), null, WOOD);
-          F.geo(Bs.trim, lmBox(1.8, 0.36, 0.06, 0, gy + 0.78, -0.2).rotateY(R).translate(bx, 0, bz), null, WOOD);
-          for (const e of [-0.75, 0.75]) { const [px, pz] = at(e, 0); F.geo(Bs.trim, lmBox(0.07, 0.45, 0.45, 0, 0, 0).rotateY(R).translate(px, gy + 0.22, pz), null, IRON); }
-          const [qx, qz] = at(1.4, 0); F.geo(Bs.trim, new THREE.CylinderGeometry(0.22, 0.2, 0.75, 10).translate(qx, gy + 0.37, qz), null, BIN);
+        if (k % 3) { // bench facing the path, a bin beside it: both knocked down like the street lamps (parkProps)
+          const R = ry + (sd > 0 ? Math.PI : 0), qx = bx + Math.cos(R) * 1.4, qz = bz - Math.sin(R) * 1.4;
+          benches.push([bx, bz, R, gy]); bins.push([qx, qz, R, H.ground(qx, qz)]);
         } else { addBox(lamps, bx, gy + 2.0, bz, 0.11, 4.0, 0.11, null); addBox(heads, bx, gy + 4.05, bz, 0.42, 0.22, 0.42, null); } // park lamp
       }
       acc += Ln;
@@ -252,6 +263,7 @@ function buildParkFurniture(T, G) {
     F.geo(Bs.trim, new THREE.CylinderGeometry(rad - 0.25, rad - 0.25, 0.1, 28).translate(cx, gy + 0.42, cz), null, COL('#5d4632'));
     for (let i = 0; i < 40; i++) { const a = i * 2.4, d = (rad - 0.6) * Math.sqrt((i + 0.5) / 40); F.geo(Bs.trim, new THREE.IcosahedronGeometry(0.28, 0).translate(cx + Math.cos(a) * d, gy + 0.6, cz + Math.sin(a) * d), null, COL(['#d8364a', '#f0c23a', '#e87ab0', '#ffffff', '#5f8f3a'][i % 5])); }
   }
+  parkProps(G, 'panchina', benches); parkProps(G, 'cestino', bins);
   if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
   if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
 }
