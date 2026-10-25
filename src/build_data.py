@@ -24,6 +24,7 @@ inside = lambda p, m=0: abs(p[0]) <= HW + m and abs(p[1]) <= HH + m
 TILE = 250.0
 import time; _T0 = time.time()
 log = lambda *a: print('%4.0fs' % (time.time() - _T0), *a, flush=True)  # seconds since the start: where the build spends its time
+from presto import presto, in_parallelo  # the heavy GEOS calls on all the cores, each the same call as before (src/presto.py)
 
 # ------------------------------------------------------------------ parse
 nodes, ntags, ways, rels, wrefs = {}, {}, {}, [], {}
@@ -91,6 +92,31 @@ TX, TZ = np.meshgrid(txs, tzs); TH = sample(TX, TZ); assert (TH > -100).all()
 # it; TINITALY stays only where the LiDAR is missing, blended into it over LID_FADE cells (in town the two differ by up to 7 m)
 import os, glob
 DATA = os.environ.get('GTA_DATA', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data'))
+# ESA WorldCover, used with the areas further down: each class as boxes, united and without single-pixel speckle, and the buffer of the roads
+# it must not cover, on threads from here (src/presto.py) while the rest goes on. None of it needs more than the parse (nodes and ways do not
+# change before the areas); the opening of the built-up class alone was 30 s
+WCF = os.path.join(DATA, 'worldcover', 'wc', 'wc.npy')
+WC = None; WC_BUILT = None; WCT = {10: 11, 30: 1, 40: 13, 50: None}
+def _wc_aperto(cls_):
+    m_ = (WC == cls_); boxes = []
+    for r_ in range(m_.shape[0]):
+        row = m_[r_]; d_ = np.diff(np.concatenate(([0], row.view(np.int8), [0])))
+        st_, en_ = np.where(d_ == 1)[0], np.where(d_ == -1)[0]
+        la0, la1 = wlat0 - r_ * wsx, wlat0 - (r_ + 1) * wsx
+        for a_, b_ in zip(st_, en_):
+            x0, z0 = proj(la0, wlon0 + a_ * wsx); x1, z1 = proj(la1, wlon0 + b_ * wsx); boxes.append(box(min(x0, x1), min(z0, z1), max(x0, x1), max(z0, z1)))
+    return unary_union(boxes).buffer(-6).buffer(6)  # drop single-pixel speckle
+if os.path.exists(WCF):
+    WC = np.load(WCF); wlon0, wlat0, wsx = map(float, open(WCF.replace('wc.npy', 'wc_meta.txt')).read().split())
+    from concurrent.futures import Future
+    _wc_ap = {c_: Future() for c_ in WCT}
+    def _wc_classi():  # one class after the other, as before (each class's boxes are a lot of memory): each result as soon as it is ready
+        for c_ in WCT:
+            try: _wc_ap[c_].set_result(_wc_aperto(c_))
+            except BaseException as e_: _wc_ap[c_].set_exception(e_)
+    presto(_wc_classi)
+    _wc_rl = [(LineString([nodes[n_] for n_ in refs if n_ in nodes]), 5.0 if t['highway'] in ('motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'motorway_link', 'trunk_link') else 3.5) for refs, t in ways.values() if 'highway' in t and t.get('area') != 'yes' and len([n_ for n_ in refs if n_ in nodes]) > 1]
+    _wc_roads = presto(lambda: unary_union([l_.buffer(d_) for l_, d_ in _wc_rl]))
 LID_FADE = 20
 def lidar_tiles(d_):
     fs = sorted(f_ for f_ in glob.glob(os.path.join(d_, '**', '*'), recursive=True) if f_.lower().endswith(('.tif', '.tiff', '.asc')))
@@ -366,23 +392,13 @@ for wid, (refs, t) in ways.items():
         pts = ring(refs)
         if len(pts) >= 3: land.append((k_, pts))
 log('terreni', len(land), dict(Counter(k.split(':')[0] + (':' + k.split(':')[1] if k.startswith('sport') else '') for k, _ in land)))
-WCF = os.path.join(DATA, 'worldcover', 'wc', 'wc.npy')
-WC = None; WC_BUILT = None
-if os.path.exists(WCF):
-    WC = np.load(WCF); wlon0, wlat0, wsx = map(float, open(WCF.replace('wc.npy', 'wc_meta.txt')).read().split())
-    osm_land = unary_union([g for at, g in area_geoms]).buffer(1)
-    _wc_roads = unary_union([LineString([nodes[n_] for n_ in refs if n_ in nodes]).buffer(5.0 if t['highway'] in ('motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'motorway_link', 'trunk_link') else 3.5) for refs, t in ways.values() if 'highway' in t and t.get('area') != 'yes' and len([n_ for n_ in refs if n_ in nodes]) > 1])
-    WCT = {10: 11, 30: 1, 40: 13, 50: None}
+if WC is not None:
+    osm_land = presto(lambda ag_: unary_union(ag_).buffer(1), [g for at, g in area_geoms])
+    def _wc_fuori(cls_): return _wc_ap[cls_].result().difference(osm_land.result()).difference(_wc_roads.result()).intersection(RECT.buffer(40))  # never over a road
+    _wc_u = {c_: presto(_wc_fuori, c_) for c_ in WCT}
     for cls_, at_ in WCT.items():
-        m_ = (WC == cls_); boxes = []
-        for r_ in range(m_.shape[0]):
-            row = m_[r_]; d_ = np.diff(np.concatenate(([0], row.view(np.int8), [0])))
-            st_, en_ = np.where(d_ == 1)[0], np.where(d_ == -1)[0]
-            la0, la1 = wlat0 - r_ * wsx, wlat0 - (r_ + 1) * wsx
-            for a_, b_ in zip(st_, en_):
-                x0, z0 = proj(la0, wlon0 + a_ * wsx); x1, z1 = proj(la1, wlon0 + b_ * wsx); boxes.append(box(min(x0, x1), min(z0, z1), max(x0, x1), max(z0, z1)))
-        u_ = unary_union(boxes).buffer(-6).buffer(6).difference(osm_land).difference(_wc_roads).intersection(RECT.buffer(40))  # drop single-pixel speckle; never over a road
-        if at_ is None: WC_BUILT = u_; log('worldcover built-up outside OSM zones', round(u_.area / 1e6, 2), 'km2'); continue
+        if at_ is None: continue  # the built-up class is taken where it is used (the villette, below)
+        u_ = _wc_u[cls_].result()
         added = 0
         for g_ in (list(u_.geoms) if hasattr(u_, 'geoms') else [u_]):
             if g_.geom_type == 'Polygon' and g_.area > 600: area_geoms.append((at_, g_.simplify(2.5))); added += g_.area
@@ -676,7 +692,7 @@ if dbt_roads:
         for a_, b_ in zip(r['refs'], r['refs'][1:]):
             L = max(0.5, math.dist(nodes[a_], nodes[b_])); cadj[a_].append((b_, L)); cadj[b_].append((a_, L))
         if r['bridge'] and not any(n_ in zh for n_ in r['refs']): _nobr.update(r['refs'])
-    _miss = [n_ for n_ in incov if n_ not in zh and n_ not in _nobr]; _fill = {}
+    _miss = [n_ for n_ in sorted(incov) if n_ not in zh and n_ not in _nobr]; _fill = {}  # in order of id: in the order of the set the fill (300 rounds, each node from its neighbours as they are) changed with PYTHONHASHSEED, a few heights by 1 dm from build to build
     for _ in range(300):
         for n_ in _miss:
             sw = sv = 0.0
@@ -745,6 +761,7 @@ coordH = {key(nodes[n_]): h for n_, h in railH.items()}
 
 # ------------------------------------------------------------------ geometry (shapely)
 # ---- fill residential blocks that OSM left empty with villette along the streets (OSM building coverage is patchy outside the centres)
+if WC is not None: WC_BUILT = _wc_u[50].result(); log('worldcover built-up outside OSM zones', round(WC_BUILT.area / 1e6, 2), 'km2'); del _wc_u, _wc_ap, osm_land, _wc_roads
 _res = unary_union([g for at, g in area_geoms if at == 16] + ([WC_BUILT] if WC_BUILT is not None else [])).intersection(RECT.buffer(-10))
 _occ = unary_union([g.buffer(8) for g in _hb])
 _band = unary_union([r['line'].buffer(r['w'] / 2 + 2.6, cap_style=2) for r in raw_roads if r['c'] <= 6 and not r['tunnel'] and r['line'].length > 0.5])
@@ -799,8 +816,20 @@ for i, (b, g) in enumerate(_bl):
     b['t'] = 10; nvil += 1; b['villa'] = True
     if (not b['ht'] or pool) and not b.get('dbgt'): b['h'] = round((6.6 if a > 250 else 5.9) + h01(str(b['p'][0])) * 1.6, 1)
 log('villette', nvil)
-bunion = unary_union([g for g in bgeoms if g is not None]).buffer(0.05)
-prepare(bunion)
+def rbuf(cond, extra):
+    out = [r['line'].buffer(r['w'] / 2 + extra, quad_segs=5) for r in raw_roads if cond(r) and r['line'].length > 0.1]
+    return unary_union(out) if out else GeometryCollection()
+flat = lambda r: not r.get('deck') and not r['tunnel']
+# the buildings united and the unions of the street buffers used below, on threads from here (src/presto.py): streets and buildings do not
+# change any more (the lanes below only add mh, wk, lf, lb). Each is taken (_rbuf) where it was computed
+_bunion = presto(lambda gs_: unary_union(gs_).buffer(0.05), [g for g in bgeoms if g is not None])
+_rb = {k_: presto(rbuf, c_, e_) for k_, (c_, e_) in dict(
+    asph=(lambda r: r['c'] <= 4 and flat(r), 0), pedz=(lambda r: r['c'] == 5 and flat(r), 0),
+    side=(lambda r: r['c'] <= 3 and flat(r) and not r['x'] and not r['hw'].endswith('_link') and r.get('clear', 99) > r['w'] / 2 + 1.0, 1.8),
+    deck_x=(lambda r: r.get('deck') or r['x'], 0.4), foot=(lambda r: r['c'] == 6 and flat(r), 0), ex=(lambda r: r['x'] and not r['tunnel'], 0),
+    parallel=(lambda r: flat(r) and r['c'] <= 6, 0.4), cut5=(lambda r: r['c'] <= 5 and flat(r), 0.5), cut6=(lambda r: r['c'] == 6 and flat(r), 0.25),
+    cut06=(lambda r: r['c'] <= 5 and flat(r), 0.6), cut02=(lambda r: r['c'] == 6 and flat(r), 0.2)).items()}
+def _rbuf(k_): return _rb.pop(k_).result()
 btree_geoms = [g for g in bgeoms if g is not None]
 btree = STRtree(btree_geoms)
 def road_line(r): return LineString([nodes[n_] for n_ in r['refs']])
@@ -821,15 +850,35 @@ RIGHE = None
 if STR:  # the road markings from the edges of the carriageway AC_VEI (src/dbgt_righe.py)
     import dbgt_righe
     RIGHE, STR.rep['righe'] = dbgt_righe.righe(STR, raw_roads, nodes, log)
-def rbuf(cond, extra):
-    out = [r['line'].buffer(r['w'] / 2 + extra, quad_segs=5) for r in raw_roads if cond(r) and r['line'].length > 0.1]
-    return unary_union(out) if out else GeometryCollection()
-flat = lambda r: not r.get('deck') and not r['tunnel']
+bunion = _bunion.result()
+prepare(bunion)
+_bunb = {d_: presto(bunion.buffer, d_) for d_ in (0.15, 0.3, 0.6)}  # used further down (twice 0.3): computed once, at the same time
 parking = unary_union([g for at, g in area_geoms if at in (4,)])
 platforms = unary_union([g for at, g in area_geoms if at == 5])
-asph = rbuf(lambda r: r['c'] <= 4 and flat(r), 0).difference(bunion)
-pedz = rbuf(lambda r: r['c'] == 5 and flat(r), 0).difference(asph).difference(bunion)
+_plat06 = presto(platforms.buffer, 0.6)
+def _med(f_): ex_ = f_.result(); return ex_.buffer(4.5, quad_segs=3).buffer(-4.5, quad_segs=3).difference(ex_).difference(bunion) if not ex_.is_empty else GeometryCollection()
+_median = presto(_med, _rb.pop('ex'))
+_gates0 = [Point(nodes[r_]) for r_, t in ntags.items() if t.get('barrier') in ('gate', 'lift_gate', 'swing_gate', 'sliding_gate', 'entrance', 'kissing_gate')]  # = gates below
+_bar_cut = presto(lambda a_, b_: unary_union([a_.result(), b_.result(), _bunb[0.15].result()] + [g.buffer(1.8) for g in _gates0]), _rb.pop('cut5'), _rb.pop('cut6'))
+asph = _rbuf('asph').difference(bunion)
+# from asph on, the first steps of side and foot do not need pedz: on threads at the same time (the same differences in the same order)
+_pedz_f = presto(lambda f_: f_.result().difference(asph).difference(bunion), _rb.pop('pedz'))
+_side0_f = presto(lambda f_: f_.result().difference(asph), _rb.pop('side'))
+_foot0_f = presto(lambda f_: f_.result().difference(asph), _rb.pop('foot'))
 railL = [LineString(p) for p in rails if len(p) >= 2]
+# where the rail fences open (the corridor fences and the fill-in below computed these same lists one after the other): the level crossings
+# of the flat streets and the track ends here, their unions with the platforms and the buildings, and the 4.2 m strip, on threads
+xpts = []
+for r in raw_roads:
+    if not flat(r) or r['c'] > 6: continue
+    for l in railL:
+        if r['line'].distance(l) > 0.01: continue
+        x_ = r['line'].intersection(l)
+        for g_ in ([x_] if x_.geom_type == 'Point' else [g for g in getattr(x_, 'geoms', []) if g.geom_type == 'Point']): xpts.append(g_.buffer(r['w'] / 2 + 3.5))
+tips = [c for i, l in enumerate(railL) for c in (l.coords[0], l.coords[-1]) if not any(l2.distance(Point(c)) < 1.0 for j, l2 in enumerate(railL) if j != i)]
+_openings_f = presto(lambda: unary_union(xpts + [_plat06.result(), _bunb[0.3].result()] + [Point(c).buffer(9) for c in tips]))
+_r42_f = [presto(lambda: unary_union([l.buffer(4.2, cap_style=2) for l in railL]))]
+pedz = _pedz_f.result()
 _lowrail = []
 for rr in rail_raw:
     pts = [nodes[n_] for n_ in rr['refs']]
@@ -837,29 +886,27 @@ for rr in rail_raw:
         if not (rr['elev'][i - 1] or rr['elev'][i]): _lowrail.append(LineString([pts[i - 1], pts[i]]))
 corridor = unary_union([l.buffer(2.9, quad_segs=4) for l in _lowrail]) if _lowrail else GeometryCollection()
 if FER: corridor = FER.corridoio(corridor)  # inside the comuni with a DBGT: the rail bed SD_FER
-side = rbuf(lambda r: r['c'] <= 3 and flat(r) and not r['x'] and not r['hw'].endswith('_link') and r.get('clear', 99) > r['w'] / 2 + 1.0, 1.8).difference(asph).difference(pedz).difference(bunion).difference(parking).difference(rbuf(lambda r: r.get('deck') or r['x'], 0.4))
+side = _side0_f.result().difference(pedz).difference(bunion).difference(parking).difference(_rbuf('deck_x'))  # = rbuf(...).difference(asph).difference(pedz)...
 if not corridor.is_empty: side = side.difference(corridor.buffer(-0.5))
 side = side.buffer(-0.45, join_style=2).buffer(0.45, join_style=2).intersection(side)  # drop slivers the houses squeezed
-foot = rbuf(lambda r: r['c'] == 6 and flat(r), 0).difference(asph).difference(side).difference(pedz).difference(bunion)
-ex = rbuf(lambda r: r['x'] and not r['tunnel'], 0)
-median = ex.buffer(4.5, quad_segs=3).buffer(-4.5, quad_segs=3).difference(ex).difference(bunion) if not ex.is_empty else GeometryCollection()
+foot = _foot0_f.result().difference(side).difference(pedz).difference(bunion)  # = rbuf(c == 6 and flat, 0).difference(asph).difference(side)...
+median = _median.result(); del _median, _pedz_f, _side0_f, _foot0_f
 if STR: asph, pedz, side, foot, median = STR.superfici(raw_roads, asph, pedz, side, foot, median, bunion)  # inside the comuni with a DBGT: its areas
 log('surfaces done')
+# the building sites the DBGT green leaves out (VERDE.aree), the yards less those (STR.togli_cortili) and the rail bed drawn round everything
+# (FER.disegno), on threads from here (src/presto.py): the sites (area_geoms 7, final since FER.banchine), the surfaces, the platforms, the
+# buildings and the tracks are final. The tests on the prepared cover stay here
+_c7 = [g for at, g in area_geoms if at == 7 and g.intersects(dbt_cover)]
+_cons_f = presto(lambda: unary_union([g.intersection(dbt_cover) for g in _c7]))
+if STR: _cv_f = presto(lambda: (lambda cv_, c_: cv_ if (c_ is None or c_.is_empty or cv_.is_empty) else cv_.difference(c_))(STR.cv, _cons_f.result()))
+if FER: _fer_f = presto(lambda: FER.massicciata([LineString(p) for p in rails if len(p) >= 2], unary_union([asph, pedz, side, foot, platforms, bunion] + ([_cv_f.result()] if STR else []))))
 
 # railway fences: corridor edge, open at level crossings / platforms / track ends
 fences = []
 if not corridor.is_empty:
-    xpts = []
-    for r in raw_roads:
-        if not flat(r) or r['c'] > 6: continue
-        for l in railL:
-            if r['line'].distance(l) > 0.01: continue
-            x_ = r['line'].intersection(l)
-            for g_ in ([x_] if x_.geom_type == 'Point' else [g for g in getattr(x_, 'geoms', []) if g.geom_type == 'Point']): xpts.append(g_.buffer(r['w'] / 2 + 3.5))
-    parallel = rbuf(lambda r: flat(r) and r['c'] <= 6, 0.4)
+    openings = _openings_f.result()  # unary_union(xpts + [platforms.buffer(0.6), bunion.buffer(0.3)] + [Point(c).buffer(9) for c in tips])
+    parallel = _rbuf('parallel')
     corr = corridor.difference(parallel).difference(bunion)
-    tips = [c for i, l in enumerate(railL) for c in (l.coords[0], l.coords[-1]) if not any(l2.distance(Point(c)) < 1.0 for j, l2 in enumerate(railL) if j != i)]
-    openings = unary_union(xpts + [platforms.buffer(0.6), bunion.buffer(0.3)] + [Point(c).buffer(9) for c in tips])
     cut = corr.boundary.difference(openings).intersection(RECT.buffer(20))
     merged = linemerge(cut) if not cut.is_empty and cut.geom_type in ('MultiLineString', 'LineString') else cut
     for l in (list(merged.geoms) if hasattr(merged, 'geoms') else [merged]):
@@ -874,7 +921,7 @@ if dbt_walls:  # the railway fences stay where the DBGT has none of its own with
     fences = _fk
 log('fences', len(fences))
 gates = [Point(nodes[r_]) for r_, t in ntags.items() if t.get('barrier') in ('gate', 'lift_gate', 'swing_gate', 'sliding_gate', 'entrance', 'kissing_gate')]
-bar_cut = unary_union([rbuf(lambda r: r['c'] <= 5 and flat(r), 0.5), rbuf(lambda r: r['c'] == 6 and flat(r), 0.25), bunion.buffer(0.15)] + [g.buffer(1.8) for g in gates])
+bar_cut = _bar_cut.result(); del _bar_cut, _bunb[0.15]  # = unary_union([rbuf(c <= 5 and flat, 0.5), rbuf(c == 6 and flat, 0.25), bunion.buffer(0.15)] + [g.buffer(1.8) for g in gates]), on a thread since bunion
 prepare(bar_cut)
 # where the DBGT covers, its dividers replace OSM's (emptied in place: the gates below index this list by position)
 # Kinds: 1 wall, 2 low wall with railings, 3 hedge, 4 retaining wall, 5 wire mesh, 6 railway fence, 7 wooden post-and-rail. What each DBGT line
@@ -914,6 +961,8 @@ if dbt_walls:
 # passi carrai: each DBGT driveway point within PC_D of a divider opens it PC_W wide and closes it with a gate as tall as the wall;
 # where a street (class 3 or more) already crosses there the gap stays open. Two points closer than PC_W are one gate
 PC_D, PC_W = 1.5, 3.6
+# the barriers do not change until the cemetery walls: their union for those, on a thread from here (src/presto.py)
+_osm_bar_all_f = presto(lambda b_: unary_union([LineString(pts).buffer(1.5) for pts, k, h in b_ if len(pts) >= 2]) if b_ else GeometryCollection(), list(barriers))
 pc_cuts, pc_gates = [], []
 if dbt_pc:
     _dbi = [i_ for i_, (p_, k_, h_) in enumerate(barriers) if len(p_) >= 2 and k_ != 6]
@@ -930,20 +979,14 @@ if dbt_pc:
         if any(_main_r[k].distance(L_.interpolate(s_)) < 2 for k in _mrt.query(L_.interpolate(s_).buffer(2))): continue
         hb_ = barriers[_dbi[j_]][2]; pc_gates.append(((a_.x, a_.y), (b_.x, b_.y), round(min(2.2, max(1.2, hb_)), 1), barriers[_dbi[j_]][1]))
     log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates))
+_bc_parts_f = presto(lambda: ([r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1], [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + ([g_ for g_ in (g.buffer(-0.3, join_style=2) for g in STR.carr_ponti) if not g_.is_empty] if STR else []) + ([g_.buffer(0.5) for g_ in (_Pp(b['p'], b.get('k', [])) for b in buildings if b.get('dbgt')) if g_ is not None] if ED else [])))  # the pieces the barriers are cut against (below), on a thread from here: all final
 # railway fill-in: along every track, wherever no fence or wall stands within 12 m on that side, a fence 4.2 m out from the outer track; open at
 # level crossings, platforms, buildings and the ends of the line (the corridor fences above only exist where OSM maps the railway land)
 if railL:
     _have = unary_union([LineString(f_).buffer(12) for f_ in fences] + [LineString(p_).buffer(12) for p_, k_, h_ in barriers if len(p_) >= 2])
-    _xs = []
-    for r in raw_roads:
-        if not flat(r) or r['c'] > 6: continue
-        for l in railL:
-            if r['line'].distance(l) > 0.01: continue
-            x_ = r['line'].intersection(l)
-            for g_ in ([x_] if x_.geom_type == 'Point' else [g for g in getattr(x_, 'geoms', []) if g.geom_type == 'Point']): _xs.append(g_.buffer(r['w'] / 2 + 3.5))
-    _tips = [c_ for i, l in enumerate(railL) for c_ in (l.coords[0], l.coords[-1]) if not any(l2.distance(Point(c_)) < 1.0 for j, l2 in enumerate(railL) if j != i)]
-    _open = unary_union(_xs + [platforms.buffer(0.6), bunion.buffer(0.3), _have] + [Point(c_).buffer(9) for c_ in _tips])
-    _edge = unary_union([l.buffer(4.2, cap_style=2) for l in railL]).boundary.difference(_open).intersection(RECT.buffer(20))
+    _xs, _tips = xpts, tips  # the same crossings and track ends as the corridor fences above
+    _open = unary_union(_xs + [_plat06.result(), _bunb[0.3].result(), _have] + [Point(c_).buffer(9) for c_ in _tips]); del _plat06, _bunb[0.3], _openings_f
+    _edge = _r42_f.pop().result().boundary.difference(_open).intersection(RECT.buffer(20))  # = unary_union([l.buffer(4.2, cap_style=2) for l in railL]).boundary...
     _edge = linemerge(_edge) if not _edge.is_empty and _edge.geom_type in ('MultiLineString', 'LineString') else _edge
     nfill = 0
     for l in (list(_edge.geoms) if hasattr(_edge, 'geoms') else [_edge]):
@@ -954,7 +997,7 @@ if FER: fences = FER.via_dai_ponti(fences)  # not hanging on the slopes under a 
 if FER: fences = FER.via_dai_binari(fences, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'recinzioni_ferrovia')  # never across a track
 if FER: fences = FER.lontano_dai_binari(fences, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'recinzioni')  # nor inside the train
 # cemeteries are walled: perimeter wall wherever OSM has not drawn one (gates/paths open it like any other wall)
-_osm_bar_all = unary_union([LineString(pts).buffer(1.5) for pts, k, h in barriers if len(pts) >= 2]) if barriers else GeometryCollection()
+_osm_bar_all = _osm_bar_all_f.result(); del _osm_bar_all_f
 ncw = 0
 for at, g in area_geoms:
     if at != 14: continue
@@ -964,6 +1007,13 @@ for at, g in area_geoms:
         for part in (list(ring_.geoms) if hasattr(ring_, 'geoms') else [ring_]):
             if isinstance(part, LineString) and part.length > 2: barriers.append((list(part.coords), 1, 2.4)); ncw += 1
 log('cemetery walls', ncw)
+# from here the barriers, the streets and the surfaces are final: the cut of the villa frontages below and the street buffers of the trees, on
+# threads from here (src/presto.py), each the same union as where it is taken
+_osm_bar_f = presto(lambda b_: unary_union([LineString(pts).buffer(2.0) for pts, k, h in b_ if len(pts) >= 2]) if b_ else GeometryCollection(), list(barriers))
+_cut_f_f = presto(lambda a_, b_: unary_union([a_.result(), b_.result(), _bunb[0.6].result(), parking, platforms, pedz, _osm_bar_f.result(),
+                                               corridor.buffer(0.5) if not corridor.is_empty else GeometryCollection(), dbt_cover] + [LineString(p).buffer(w + 1.5) for p, w in rivers if len(p) >= 2]),
+                  _rb.pop('cut06'), _rb.pop('cut02'))  # the street buffers rbuf(c <= 5 and flat, 0.6) and rbuf(c == 6 and flat, 0.2) started with the others
+_rb.update(roadsU=presto(rbuf, lambda r: True, 1.0), flat0=presto(rbuf, flat, 0), deck0=presto(rbuf, lambda r: r.get("deck"), 0))
 bar_out = []
 # a divider never disappears (Carlo, 25/10; src/barriere.py sul_confine). A divider of the DBGT that falls in a street at grade (AC_VEI 01,
 # 02) moves onto the edge of the street, its face on it; it opens only where the street goes across it, or where a way crosses it
@@ -974,9 +1024,8 @@ bar_out = []
 from barriere import sul_confine, passaggi, margine, SPOSTAMENTI
 # cut each line only against the pieces of bar_cut it touches, not the whole union: this was most of the build's time
 # (the same pieces bar_cut is the union of, kept apart: united, the street buffers are one polygon as big as the whole network)
-_osm_rb = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1]
+_osm_rb, _bc_parts = _bc_parts_f.result(); del _bc_parts_f  # = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1], [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + ([g_ for g_ in (g.buffer(-0.3, join_style=2) for g in STR.carr_ponti) if not g_.is_empty] if STR else []) + ([g_.buffer(0.5) for g_ in (_Pp(b['p'], b.get('k', [])) for b in buildings if b.get('dbgt')) if g_ is not None] if ED else [])  # a DBGT divider within 0.5 m of a DBGT facade is the facade's own line
 _osm_rt = STRtree(_osm_rb)
-_bc_parts = [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + ([g_ for g_ in (g.buffer(-0.3, join_style=2) for g in STR.carr_ponti) if not g_.is_empty] if STR else []) + ([g_.buffer(0.5) for g_ in (_Pp(b['p'], b.get('k', [])) for b in buildings if b.get('dbgt')) if g_ is not None] if ED else [])  # a DBGT divider within 0.5 m of a DBGT facade is the facade's own line
 _bc_tree = STRtree(_bc_parts)
 _mv = STR.carreggiate(0, strade=True) if STR else []
 _mvt = STRtree(_mv) if _mv else None
@@ -1057,10 +1106,6 @@ log('gate meshes', len(gate_out))
 _vil = [(b, g) for b, g in _bl if b.get('villa')]
 _streets = [r for r in raw_roads if r['c'] <= 3 and flat(r) and not r['x'] and r['line'].length > 5]
 _stt = STRtree([r['line'] for r in _streets])
-_osm_bar = unary_union([LineString(pts).buffer(2.0) for pts, k, h in barriers if len(pts) >= 2]) if barriers else GeometryCollection()
-_cut_f = unary_union([rbuf(lambda r: r['c'] <= 5 and flat(r), 0.6), rbuf(lambda r: r['c'] == 6 and flat(r), 0.2), bunion.buffer(0.6), parking, platforms, pedz, _osm_bar,
-                      corridor.buffer(0.5) if not corridor.is_empty else GeometryCollection(), dbt_cover] + [LineString(p).buffer(w + 1.5) for p, w in rivers if len(p) >= 2])  # no made-up frontages where the DBGT has the real ones
-prepare(_cut_f)
 _drive = [r for r in raw_roads if r['c'] in (4, 5) and flat(r) and r['line'].length > 1]
 _dt = STRtree([r['line'] for r in _drive]) if _drive else None
 front_lines, front_gates = [], []
@@ -1092,6 +1137,8 @@ for b, g in _vil:
     if gp is None:
         gp = off.interpolate(off.project(c)); depth = g.distance(gp); gw = 3.4 if depth > 2.8 else 1.2
     ga = off.project(gp); front_gates.append((off, ga, min(5.5, gw)))
+_cut_f = _cut_f_f.result(); del _cut_f_f, _osm_bar_f, _bunb[0.6]  # no made-up frontages where the DBGT has the real ones (the union of the street buffers, buildings, car parks, platforms, squares, barriers, rail corridor, DBGT cover and rivers; taken here, after the loop that does not use it)
+prepare(_cut_f)
 fl = unary_union(front_lines) if front_lines else GeometryCollection()
 gate_zone = unary_union([o.interpolate(a).buffer(w / 2) for o, a, w in front_gates]) if front_gates else GeometryCollection()
 fl = fl.difference(_cut_f).difference(gate_zone)
@@ -1294,7 +1341,7 @@ VERDE = dbgt_verde.Verde(DBT_DIR, _comuni, dbt_cover, log, lambda lon_, lat_: ((
 # forests: scatter trees inside wood polygons (deterministic), avoiding roads & buildings
 rng = np.random.default_rng(20821)
 _railbuf = unary_union([l.buffer(4) for l in railL]) if railL else GeometryCollection(); prepare(_railbuf)
-roadsU = rbuf(lambda r: True, 1.0)
+roadsU = _rbuf('roadsU')
 prepare(roadsU)
 for at, g in area_geoms:
     if at not in (11, 12, 2): continue
@@ -1306,7 +1353,7 @@ for at, g in area_geoms:
     ptsg = shapely.points(xs_, zs_)
     ok = shapely.contains(g, ptsg) & ~shapely.intersects(roadsU, ptsg) & ~shapely.intersects(bunion, ptsg) & ~shapely.intersects(_railbuf, ptsg) & (np.abs(xs_) <= HW) & (np.abs(zs_) <= HH)
     for x, z in list(zip(xs_[ok], zs_[ok]))[:n]: trees.append((x, z))
-area_geoms, land = VERDE.aree(area_geoms, land)  # after OSM's woods got their trees: the scatter outside the DBGT stays as it was
+area_geoms, land = VERDE.aree(area_geoms, land, cons=_cons_f.result())  # after OSM's woods got their trees: the scatter outside the DBGT stays as it was
 area_geoms, land = MANUF.aree(area_geoms, land)
 log('pois', len(pois), 'places', len(places), 'trees', len(trees), 'crossings', len(crossings))
 # ---- street objects from OSM: [kind, x, z, angle, extra]. The angle follows the nearest street (a bench faces it, a bump lies across it);
@@ -1467,7 +1514,7 @@ CL_MAXC = 1  # only main streets and through roads get them: between towns grown
 # CL_GAP m of the same name, and the side streets that meet it right at the boundary get none (no sign at every turning)
 CL_ALONG, CL_GAP = 40, 250
 _bu = unary_union([b_[0] for b_ in blines]).buffer(12) if blines else GeometryCollection()
-_along = [r for r in _clr if r['line'].intersection(_bu).length > CL_ALONG] if blines else []
+_along = [r for r, l_ in zip(_clr, in_parallelo(lambda r: r['line'].intersection(_bu).length, _clr)) if l_ > CL_ALONG] if blines else []  # the intersections on all the cores
 _alt = STRtree([r['line'] for r in _along]) if _along else None
 _cl_by_name = defaultdict(list)
 if blines:
@@ -1500,8 +1547,11 @@ if blines:
                 if r['n'] >= 0: _cl_by_name[(r['n'], na, nb)].append((p_.x, p_.y))
                 cartelli.append([q(spot.x), q(spot.y), round(ux, 3), round(uz, 3), STR.larghezza_locale(spot.x, spot.y, ux, uz, r['w']) if STR else r['w'], fwd, back])
 log('cartelli di paese', len(cartelli), 'confini', len(blines), 'spostati via da un incrocio', nmoved, 'senza posto', ndrop, 'laterali di una via sul confine', nside, 'ripetuti sulla stessa via', nrep, 'su vie minori', nminor)
+if FER:  # the trains against platforms, buildings and carriageways (FER.controlli, at the end), on a thread from here: all of it is final
+    _fer_ctl_a = (trains, [g for at, g in area_geoms if at == 5], [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], [g for g, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else [], cartelli)
+    _fer_ctl_f = presto(FER.misura_treni, *_fer_ctl_a)
 log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1), 'parcheggi con capienza', len(plots), 'strade con sosta', sum(1 for r in raw_roads if r.get('pk')))
-trees = VERDE.alberi(trees, _n_tr, [rbuf(flat, 0), bunion, rbuf(lambda r: r.get("deck"), 0)], railL, pspaces, roadsU, [side]); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
+trees = VERDE.alberi(trees, _n_tr, [_rbuf('flat0'), bunion, _rbuf('deck0')], railL, pspaces, roadsU, [side]); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
 VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 trees = MANUF.alberi(trees, VERDE.forest_u)
 # ------------------------------------------------------------------ graph & tiles
@@ -1613,10 +1663,10 @@ for t in range(ntx * ntz):
     bx = tbox(t)
     if not median.intersects(bx): continue
     for p_ in polys_of(median.intersection(bx), 0.2, 3): push(t, 'md', p_)
-if STR: STR.togli_cortili(VERDE.cons); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
+if STR: STR.togli_cortili(VERDE.cons, _cv_f.result()); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
 if RIGHE: dbgt_righe.push_tiles(RIGHE, ntx * ntz, tbox, push)  # the road markings (sg)
 if FER:  # the rail bed (sf)
-    FER.disegno([LineString(p) for p in rails if len(p) >= 2], unary_union([asph, pedz, side, foot, platforms, bunion] + ([STR.cv] if STR else [])))
+    FER.disegno(None, None, pronto=_fer_f.result())  # = FER.disegno(the tracks, unary_union([asph, pedz, side, foot, platforms, bunion] + [STR.cv])), on a thread since the surfaces
     FER.push_tiles(ntx * ntz, tbox, polys_of, push)
 push_lines('fe', fences)
 for pts, w_, caps in riv_out:
@@ -1664,7 +1714,7 @@ if STR:  # the checks of docs/motore.md 7: a summary in brianza.json, the whole 
     out.setdefault('report', {})['strade'] = STR.sintesi()
     json.dump(STR.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_strade.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 if FER:  # trains against platforms, buildings and carriageways; the report beside brianza.json
-    FER.controlli(trains, [g for at, g in area_geoms if at == 5], [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], [g for g, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else [], cartelli)
+    FER.controlli(*_fer_ctl_a, pronto=_fer_ctl_f.result())  # = FER.controlli(trains, [g for at, g in area_geoms if at == 5], [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], [g for g, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else [], cartelli), measured on a thread since the town signs
     out.setdefault('report', {})['ferrovia'] = FER.sintesi()
     json.dump(FER.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_ferrovia.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=str)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)

@@ -25,6 +25,7 @@ from scipy.sparse.csgraph import dijkstra
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import dbgt_quote as dq
+from presto import presto, in_parallelo   # the heavy GEOS calls on all the cores, each the same call (src/presto.py)
 
 # AC_VEI_ZON (Specifiche di contenuto regionali, AC_VEI): 01 carriageway (0101 ordinary, 0102 ramp, 0103 service road, 0104 level crossing,
 # 0105 alley), 02 structured traffic (0201 toll, 0204 square, 0205 junction, 0206 roundabout), 03 unstructured (0301 car park, 0307 inside a
@@ -620,6 +621,9 @@ class Strade:
         s.T_carr = STRtree(s.carr)
         bb = cover.bounds; bb = (bb[0] - 40, bb[1] - 40, bb[2] + 40, bb[3] + 40)
         s.R = Raster(bb); s.CV = s.R.draw(s.carr); s.TR = s.R.draw(s.tronco)
+        # the unions of the DBGT layers alone used further on (superfici), on threads from now: nothing changes them
+        s._pronte = dict(tutto3=presto(lambda: _u([g.buffer(3.0, quad_segs=2) for g in s.tutto])), tutto=presto(_u, s.tutto), isole=presto(_u, s.isole), cortili=presto(_u, s.cortili),
+                         aree_m2=presto(lambda: [round(_u(g).area) for g in (s.asfalto, s.marciapiedi, s.piazze, s.vialetti)]))
         log('dbgt strade: strati letti in %.0f s, assi %d, carreggiate %d, cortili %d, marciapiedi %d, piazze e passaggi %d, vialetti ciclabili e sterrati %d, isole %d' % (
             time.time() - t0, len(D['str']), len(s.asfalto), len(s.cortili), len(s.marciapiedi), len(s.piazze), len(s.vialetti), len(s.isole)))
 
@@ -903,29 +907,39 @@ class Strade:
     # ---- 2. the surfaces
     def superfici(s, raw_roads, asph, pedz, side, foot, median, bunion):
         t0 = time.time(); C = s.cover
-        tutto = _u([g.buffer(3.0, quad_segs=2) for g in s.tutto]); shapely.prepare(tutto)
+        out_C = lambda g: g.difference(C) if not g.is_empty else g
+        # the unions below that need neither sole nor each other, on threads from here (src/presto.py): each the same _u as before
+        P_ = s._pronte; tutto_f = P_.pop('tutto')
+        ft_f = presto(lambda: _u([foot.difference(tutto_f.result()) if not foot.is_empty else foot] + s.vialetti))
+        sd_f = presto(lambda: _u([out_C(side)] + s.marciapiedi))
+        tutto = s._pronte.pop('tutto3').result()   # = _u([g.buffer(3.0, quad_segs=2) for g in s.tutto]), on a thread since the reading of the layers
         # OSM ways the DBGT does not have: no axis matched and no DBGT surface within 3 m along most of them; their surfaces stay OSM
-        sole = []
+        cand = []   # the tests here, the differences against the whole DBGT on all the cores
         for wi, r in enumerate(raw_roads):
             if r['c'] > 6 or r['line'].length < 0.5 or not C.intersects(r['line']): continue
             if r.get('dbgt') and r.get('match', 0) >= 0.5: continue
             L = r['line'].intersection(C)
             if L.length < 0.5: continue
-            if L.difference(tutto).length / L.length > 0.5: sole.append(wi)
+            cand.append((wi, L))
+        sole = [wi for (wi, L), ok in zip(cand, in_parallelo(lambda c_: c_[1].difference(tutto).length / c_[1].length > 0.5, cand)) if ok]
+        shapely.prepare(tutto)
         s.sole = sole
         buf = lambda cs: _u([raw_roads[wi]['line'].buffer(raw_roads[wi]['w'] / 2, quad_segs=5) for wi in sole if raw_roads[wi]['c'] in cs and not raw_roads[wi].get('deck') and not raw_roads[wi]['tunnel']])
-        dbgt_all = _u(s.tutto); out = {}
-        out_C = lambda g: g.difference(C) if not g.is_empty else g
+        dbgt_all = tutto_f.result(); out = {}   # = _u(s.tutto)
+        pz_f = presto(lambda: _u([out_C(pedz)] + s.piazze + [buf((5,)).difference(dbgt_all).difference(bunion)]))
         out['as'] = _u([out_C(asph)] + s.asfalto + [buf((0, 1, 2, 3, 4)).difference(dbgt_all).difference(bunion)])
-        out['pz'] = _u([out_C(pedz)] + s.piazze + [buf((5,)).difference(dbgt_all).difference(bunion)]).difference(out['as'])
-        out['sd'] = _u([out_C(side)] + s.marciapiedi).difference(out['as']).difference(out['pz'])
-        out['ft'] = _u([foot.difference(dbgt_all) if not foot.is_empty else foot] + s.vialetti).difference(out['as']).difference(out['sd']).difference(out['pz']).difference(bunion)
+        cv_f = presto(lambda c_: c_.result().difference(out['as']).difference(bunion), P_.pop('cortili'))   # = _u(s.cortili).difference(out['as']).difference(bunion)
+        out['pz'] = pz_f.result().difference(out['as'])
+        out['sd'] = sd_f.result().difference(out['as']).difference(out['pz'])
+        out['ft'] = ft_f.result().difference(out['as']).difference(out['sd']).difference(out['pz']).difference(bunion)
         out['md'] = out_C(median)
-        s.md_dbgt = _u(s.isole)
-        s.cv = _u(s.cortili).difference(out['as']).difference(bunion)
+        s.md_dbgt = P_.pop('isole').result()   # = _u(s.isole)
+        s.cv = cv_f.result()
         s.surf = out
-        s.rep['superfici'] = dict(osm_tenute_vie=len(sole), asfalto_m2=round(_u(s.asfalto).area), cortili_m2=round(s.cv.area), marciapiedi_m2=round(_u(s.marciapiedi).area),
-                                  piazze_m2=round(_u(s.piazze).area), vialetti_m2=round(_u(s.vialetti).area), isole_m2=round(s.md_dbgt.area), tempo_s=round(time.time() - t0, 1))
+        s._pronte['aree'] = presto(s._resto_aree)   # the surfaces are final: the comparison of controlli on a thread from here
+        a_as, a_sd, a_pz, a_vi = P_.pop('aree_m2').result()   # round(_u(...).area) of asfalto, marciapiedi, piazze, vialetti
+        s.rep['superfici'] = dict(osm_tenute_vie=len(sole), asfalto_m2=a_as, cortili_m2=round(s.cv.area), marciapiedi_m2=a_sd,
+                                  piazze_m2=a_pz, vialetti_m2=a_vi, isole_m2=round(s.md_dbgt.area), tempo_s=round(time.time() - t0, 1))
         s.log('dbgt strade: superfici %s' % s.rep['superfici'])
         return out['as'], out['pz'], out['sd'], out['ft'], out['md']
 
@@ -961,12 +975,12 @@ class Strade:
         sh = (dl - dr) / 2
         return round(x - uz * sh, 1), round(z + ux * sh, 1), round(max(2.5, dl + dr), 1)
 
-    def togli_cortili(s, cantieri):
+    def togli_cortili(s, cantieri, cv=None):
         """the yards inside an OSM building site (landuse=construction) are gone since the survey (Meda 2015), as the green and the trees
         of the DBGT there (dbgt_verde.py cons): the site keeps its own ground (unione di strade e verde, 24/10: the site with the crane
         along the Milano-Meda was a grey yard with patches of earth)"""
         if cantieri is None or cantieri.is_empty or s.cv.is_empty: return
-        a0 = s.cv.area; s.cv = s.cv.difference(cantieri)
+        a0 = s.cv.area; s.cv = s.cv.difference(cantieri) if cv is None else cv   # cv: that difference already made (build_data.py, on a thread)
         s.rep['superfici']['cortili_nei_cantieri_m2'] = round(a0 - s.cv.area); s.rep['superfici']['cortili_m2'] = round(s.cv.area)
         s.log('dbgt strade: cortili tolti nei cantieri OSM %d m2' % round(a0 - s.cv.area))
 
@@ -1119,7 +1133,13 @@ class Strade:
             m = L.interpolate(0.5, normalized=True); senza.append(dict(tipo=a.get('ty'), m=round(L.length), link=_link(m.x, m.y)))
         senza.sort(key=lambda o: -o['m'])
         rep['dbgt_senza_osm'] = dict(n=len(senza), metri=sum(o['m'] for o in senza), per_tipo=dict(Counter(o['tipo'] for o in senza)), elenco=senza[:60])
-        # drawn sidewalks and squares against AC_PED + AR_STR
+        f = getattr(s, '_pronte', {}).pop('aree', None)   # started at the end of superfici
+        rep.update(f.result() if f is not None else s._resto_aree())
+        return rep
+
+    def _resto_aree(s):
+        """drawn sidewalks and squares against AC_PED + AR_STR (only unions and intersections: on a thread from the end of superfici)"""
+        C = s.cover; rep = {}
         def iou(a, b):
             a, b = a.intersection(C), b.intersection(C); i = a.intersection(b).area; u = a.union(b).area
             return dict(disegnato_m2=round(a.area), dbgt_m2=round(b.area), iou=round(i / u, 3) if u else None)

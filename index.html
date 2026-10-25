@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo righe · dopo 8e93494 · assemblato 25/10 05:23 · porta ' + location.port;
+    const txt = 'locale · ramo build-veloce · dopo 929804c · assemblato 25/10 05:28 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2218,37 +2218,6 @@ function* buildTileGen(T) {
     }
     // markings and elevated roads
     const deck = Buf(), dside = Buf(), emb = Buf(), grail = Buf(), dmark = Buf(), pil = Buf();
-    // the markings drawn from the edges of the carriageway AC_VEI where the DBGT has them (tiles[t].sg, src/dbgt_righe.py): [type, level, s0,
-    // points in cm delta-encoded]; type 0 edge line, 1 continuous centre line, 2 dashed (3 m every 7.5 m, the phase from s0, the length of the
-    // line before this tile in dm); level 2 on a bridge: on the top of its deck. The streets that have them (roads[].sg) draw nothing on their axis
-    const top = (x, z) => { let y = null; for (const o of H.deckAt(x, z)) if (o.tipo !== 'copertura' && (y === null || o.top > y)) y = o.top; return y; }; // the highest deck over (x, z)
-    for (const [ty, lev, s0, E] of d.sg || []) {
-      const P = []; let px = 0, pz = 0; for (let i = 0; i < E.length; i += 2) { px += E[i]; pz += E[i + 1]; P.push([px / 100, pz / 100]); }
-      if (P.length < 2) continue;
-      const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + hyp(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
-      const at = s => { let i = 1; while (i < P.length - 1 && cum[i] < s) i++; const f = clamp((s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), 0, 1); return [lerp(P[i - 1][0], P[i][0], f), lerp(P[i - 1][1], P[i][1], f)]; };
-      const piece = (a, b) => { const o = [at(a)]; for (let i = 1; i < P.length - 1; i++) if (cum[i] > a && cum[i] < b) o.push(P[i]); o.push(at(b)); return o; }; // the line from a to b m along it
-      const runs = []; if (ty !== 2) runs.push([0, cum[cum.length - 1]]);
-      else { const S0 = s0 / 10, L = cum[cum.length - 1]; for (let k = Math.floor(S0 / 7.5); k * 7.5 - S0 < L; k++) { const a = Math.max(0, k * 7.5 - S0), b = Math.min(L, k * 7.5 + 3 - S0); if (b - a > 0.2) runs.push([a, b]); } }
-      for (const [a, b] of runs) {
-        let Q = piece(a, b); if (Q.length < 2) continue;
-        if (lev === 2 && T.fine) { // on the bridge: on the top of the deck where there is one (absolute heights, a vertex every 2 m at most), on S past its ends
-          const Q2 = [Q[0]]; for (let i = 1; i < Q.length; i++) { const p = Q[i - 1], q = Q[i], n = Math.max(1, Math.ceil(hyp(q[0] - p[0], q[1] - p[1]) / 2)); for (let k = 1; k <= n; k++) Q2.push([lerp(p[0], q[0], k / n), lerp(p[1], q[1], k / n)]); }
-          const on = Q2.map(q => top(q[0], q[1]) !== null);
-          for (let i = 0; i < Q2.length;) {
-            let j = i; while (j + 1 < Q2.length && on[j + 1] === on[i]) j++;
-            const R2 = Q2.slice(i, Math.min(Q2.length, j + 2)); // a run and the first vertex of the next one: no gap between them
-            if (R2.length >= 2) {
-              if (on[i]) { const i0 = dmark.p.length / 3; ribbon(dmark, R2, -0.075, 0.075, 0, 1, 'along', white); for (let v = i0; v < dmark.p.length / 3; v++) { const y = top(dmark.p[v * 3], dmark.p[v * 3 + 2]); dmark.p[v * 3 + 1] = (y === null ? H.ground(dmark.p[v * 3], dmark.p[v * 3 + 2]) : y) + 0.09; } }
-              else ribbon(mark, R2, -0.075, 0.075, 0.08 * fy, 1, 'along', white);
-            }
-            i = j + 1;
-          }
-          continue;
-        }
-        ribbon(mark, Q, -0.075, 0.075, 0.08 * fy, 1, 'along', white);
-      }
-    }
     for (const ri of d.rp || []) {
       const r = D.roads[ri];
       for (let k = 1; k < r.g.length; k++) {
@@ -2298,7 +2267,7 @@ function* buildTileGen(T) {
             }
             if (r.b || nearLowRail((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, r.w / 2 + 3)) { const b0 = dside.p.length / 3; vtx(dside, p[0] - rx * hw, p[2] - 0.9, p[1] - rz * hw, 0, -1, 0, 0, 0); vtx(dside, p[0] + rx * hw, p[2] - 0.9, p[1] + rz * hw, 0, -1, 0, 1, 0); vtx(dside, q[0] + rx * hw, q[2] - 0.9, q[1] + rz * hw, 0, -1, 0, 1, 1); vtx(dside, q[0] - rx * hw, q[2] - 0.9, q[1] - rz * hw, 0, -1, 0, 0, 1); dside.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); }
           }
-          if (r.w >= 6.5 && !r.sg) { // lane dashes on the deck (not where the markings come from the carriageway: tiles[t].sg)
+          if (r.w >= 6.5) { // lane dashes on the deck
             const yL = T.fine ? (s => { const f = clamp(s / L * n, 0, n - 1e-9), i = Math.floor(f); return lerp(pts[i][2], pts[i + 1][2], f - i); }) : s => lerp(ya, yb, s / L);
             const onS = s => { const f = clamp(s / L * n, 0, n - 1e-9), i = Math.floor(f); return pts[i][3] && pts[i + 1][3]; };
             for (let s = 1.5; s < L - 3; s += 9) { const x = A[0] + ux * s, z = A[1] + uz * s, y = yL(s) + 0.09; if (T.fine && onS(s) && onS(s + 3)) { quad(mark, x + ux * 1.5, z + uz * 1.5, ux, uz, -uz, ux, 3, 0.16, 0, white); continue; } const i0 = dmark.p.length / 3, wv = COL('#f1efe6'); for (const [a, b] of [[0, -0.08], [3, -0.08], [3, 0.08], [0, 0.08]]) vtx(dmark, x + ux * a - uz * b, y + (yL(s + a) - yL(s)), z + uz * a + ux * b, 0, 1, 0, 0, 0, wv); triUp(dmark, i0, i0 + 1, i0 + 2); triUp(dmark, i0, i0 + 2, i0 + 3); }
@@ -2316,7 +2285,7 @@ function* buildTileGen(T) {
         }
         // flat road: centre / lane dashes
         const free = r.wd ? r.w : r.mh * 2, twoWay = !r.o && r.c <= 2 && !r.pv && free >= 5.5, lanes = r.o && r.c <= 1 && free >= 6.6; // r.wd: the width of the carriageway AC_VEI (mh there is the p5 room of the lanes: by it 16 km of centre line went, verifica 24/10)
-        if ((!twoWay && !lanes) || r.sg) continue; // r.sg: its markings come from the carriageway (tiles[t].sg, above)
+        if (!twoWay && !lanes) continue;
         const ja = NODE_DEG[r.g[k - 1]] >= 3 ? hw + 4 : 0, jb = NODE_DEG[r.g[k]] >= 3 ? hw + 4 : 0;
         for (let s = ja + 0.5; s + 3 < L - jb; s += 7.5) quad(mark, A[0] + ux * (s + 1.5), A[1] + uz * (s + 1.5), ux, uz, -uz, ux, 3, 0.16, 0.08 * fy, white);
       }

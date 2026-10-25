@@ -23,6 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import dbgt_quote as dq
 import dbgt_strade as ds
+from presto import presto   # (src/presto.py)
 
 D_FREE = 3.0      # map matching: a sample farther than this from every axis may stay unmatched (the OSM tracks are 0.3 m off, p99 0.7)
 X_MIN = 3.0       # an EL_FER stretch no OSM way runs on, at least this long, becomes a track of its own
@@ -100,6 +101,7 @@ class Ferrovia:
         s.sede = [g for g, a in D['sd'] if a['sed'] in ('01', None)]       # a raso: on the bridges the deck is drawn
         s.U_sede = unary_union(s.sede) if s.sede else GeometryCollection()
         s.U_pl = unary_union(D['pl']) if D['pl'] else GeometryCollection()
+        s._bordi = {k: presto(s.bordo_dbgt, k) for k in s.lim}   # the edge of each DBGT for confini, on threads from now
         log('dbgt ferrovia: strati letti in %.1f s, assi EL_FER %d (%.0f m), sedi SD_FER %d (%.0f m2 a raso), giunzioni GZ_FER %d, passaggi a livello AC_VEI 0104 %d, limiti LIM_COM %d (%.0f m)' % (
             time.time() - t0, len(D['fer']), sum(l.length for l in s.assi_L), len(D['sd']), s.U_sede.area, len(D['gz']), len(D['pl']), len(D['lim']), sum(l.length for l in D['lim'])))
 
@@ -377,7 +379,7 @@ class Ferrovia:
         out = []; nrep = 0; mrep = 0.0; scarti = []; prova = []
         low = {}
         for k, v in s.lim.items():
-            edge = s.bordo_dbgt(k); ok = []
+            f_ = getattr(s, '_bordi', {}).pop(k, None); edge = f_.result() if f_ is not None else s.bordo_dbgt(k); ok = []
             for P_ in v:
                 d = max(edge.distance(Point(c)) for c in P_.coords) if edge is not None else None
                 prova.append(dict(comune=k, metri=round(P_.length), dal_bordo_del_dbgt_max_m=None if d is None else round(d, 1)))
@@ -418,15 +420,21 @@ class Ferrovia:
         return P.exterior
 
     # ---- 4. tiles
-    def disegno(s, rail_lines, cut):
+    def disegno(s, rail_lines, cut, pronto=None):
         """the rail bed to draw: SD_FER a raso, and at least a 4.2 m strip along every track (2.1 m a side: two tracks 4 m apart meet) (between two tracks the DBGT may have
         something else, as the pedestrian area over the station underpass, AC_PED in galleria: it is not on the surface), less the streets,
-        sidewalks, platforms and buildings (`cut`) and the bridges (their deck is drawn)"""
+        sidewalks, platforms and buildings (`cut`) and the bridges (their deck is drawn). pronto: massicciata() already computed (build_data.py
+        starts it on a thread)"""
+        s.U_draw, agg = pronto if pronto is not None else s.massicciata(rail_lines, cut)
+        s.rep['massicciata'] = dict(sd_fer_a_raso_m2=round(s.U_sede.area), disegnata_m2=round(s.U_draw.area), aggiunta_lungo_i_binari_m2=round(agg))
+
+    def massicciata(s, rail_lines, cut):
+        """the geometry of disegno and the area added along the tracks: unions and differences only, no state changed"""
         ponti = [g.buffer(2.0) for g, a in s.D['sd'] if a['sed'] == '02'] + [s.assi_L[e].buffer(3.0) for e, a in enumerate(s.D['fer']) if a.get('sed') == '02']
         strip = unary_union([l.buffer(BED_HW, cap_style=2) for l in rail_lines]).intersection(s.cover) if rail_lines else GeometryCollection()
         U = unary_union([s.U_sede, strip]).difference(cut).difference(unary_union(ponti) if ponti else GeometryCollection())
-        s.U_draw = U.buffer(-0.05).buffer(0.05)
-        s.rep['massicciata'] = dict(sd_fer_a_raso_m2=round(s.U_sede.area), disegnata_m2=round(s.U_draw.area), aggiunta_lungo_i_binari_m2=round(s.U_draw.difference(s.U_sede).area))
+        U = U.buffer(-0.05).buffer(0.05)
+        return U, U.difference(s.U_sede).area
 
     def push_tiles(s, ntiles, tbox, polys_of, push):
         """the rail bed a raso (sf) in the tiles"""
@@ -440,9 +448,17 @@ class Ferrovia:
             for p_ in polys_of(c, 0.1, 0.3): push(t, 'sf', p_)
 
     # ---- 5. checks
-    def controlli(s, trains, platforms, buildings, carr, cartelli):
+    def controlli(s, trains, platforms, buildings, carr, cartelli, pronto=None):
         """the trains (their path, a 2.9 m box along it) against platforms, buildings and carriageways (but at the level crossings);
-        the town signs"""
+        the town signs. pronto: misura_treni() already computed (build_data.py starts it on a thread)"""
+        rep, out = pronto if pronto is not None else s.misura_treni(trains, platforms, buildings, carr, cartelli)
+        s.rep['controlli'] = rep
+        s.log('dbgt ferrovia: controlli %s' % {k: v for k, v in rep.items() if k != 'treni'})
+        for r in out: s.log('   treno', {k: v for k, v in r.items()})
+        return s.rep
+
+    def misura_treni(s, trains, platforms, buildings, carr, cartelli):
+        """the measures of controlli, (rep, trains), no state changed"""
         t0 = time.time(); rep = {}; C = s.cover
         pl = unary_union([g for g in platforms]) if platforms else GeometryCollection()
         bu = unary_union([g for g in buildings if g is not None]) if buildings else GeometryCollection()
@@ -466,10 +482,7 @@ class Ferrovia:
                                         elenco=[_link(x, z) for x, z, *_ in s.lx])
         rep['cartelli_di_paese'] = dict(n=len(cartelli))
         rep['tempo_s'] = round(time.time() - t0, 1)
-        s.rep['controlli'] = rep
-        s.log('dbgt ferrovia: controlli %s' % {k: v for k, v in rep.items() if k != 'treni'})
-        for r in out: s.log('   treno', {k: v for k, v in r.items()})
-        return s.rep
+        return rep, out
 
     def sintesi(s):
         a = s.rep.get('assi', {}); c = s.rep.get('controlli', {})

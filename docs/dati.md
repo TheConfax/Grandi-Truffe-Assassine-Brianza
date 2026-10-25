@@ -2,7 +2,7 @@
 
 La cartella `data/` non è in git (pesa circa 700 MB): qui c'è cosa contiene, da dove viene e chi la usa. La stessa pagina è in `data/README.md`.
 
-Per rigenerare `brianza.json`: `python src/build.py` (con il Python della `.venv`). Controlla che ci siano tutti i file qui sotto, dice quali mancano, poi lancia `src/build_data.py` con il riquadro della mappa (S 45.6345, N 45.6805, W 9.117, E 9.191). Dura 4-10 minuti. La cartella dei dati si può spostare con la variabile `GTA_DATA`.
+Per rigenerare `brianza.json`: `python src/build.py` (con il Python della `.venv`). Controlla che ci siano tutti i file qui sotto, dice quali mancano, poi lancia `src/build_data.py` con il riquadro della mappa (S 45.6345, N 45.6805, W 9.117, E 9.191). Dura circa 4 minuti per Meda (le grandi operazioni GEOS su più core, `src/presto.py`; il terreno, `python src/terreno_gioco.py --da DIR --rigenera`, meno di uno) e dà sempre gli stessi file. La cartella dei dati si può spostare con la variabile `GTA_DATA`.
 
 ## Usate dalla build
 
