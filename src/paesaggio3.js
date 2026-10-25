@@ -39,11 +39,6 @@ function lsLine(b, A, s0, v0, s1, v1, w, col) { // a painted line between two po
     triUp(b, i, i + 1, i + 2); triUp(b, i, i + 2, i + 3);
   }
 }
-// what landmarks3.js already draws by hand: the school yards and courts (YARDS), the stadiums inside their four floodlight towers
-const LS_SKIP = (x, z) => YARDS.some(y => inPoly(x, z, y.p)) || LANDMARKS.some(L => {
-  if (L.build !== buildStadio) return false; const o = L.o, dx = x - o.o[0], dz = z - o.o[1], a = dx * o.ua[0] + dz * o.ua[1], b = dx * o.ua[1] - dz * o.ua[0];
-  const ta = o.towers.map(t => t[0]), tb = o.towers.map(t => t[1]); return a >= Math.min(...ta) && a <= Math.max(...ta) && b >= Math.min(...tb) && b <= Math.max(...tb);
-});
 const lsFreeAt = (x, z, r) => !onAnyRoad(x, z, r) && !inBuilding(x, z, r) && !nearRail(x, z, 3) && !ngInPark(x, z, r);
 // up-and-over doors: a pressed-steel texture, tinted per door
 const LS_DOOR_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, map: canvasTex(64, 64, (g, w, h) => {
@@ -117,7 +112,6 @@ function* buildPaesaggio(T, G) {
   for (const L0 of d.ls || []) {
     const P = dec(L0.p); if (P.length < 3) continue;
     const kind = L0.s, A = lsAxis(P), [cx, cz] = [A.cx, A.cz], h = LS_HASH(cx, cz, kind), area = Math.abs(sArea(P));
-    if (LS_SKIP(cx, cz)) continue;
     if (kind === 'campo' || kind === 'prato') {
       if (kind === 'campo') { // furrows the long way: ploughed, green, ripe or stubble, the hash decides
         const pal = [['#8f6e4e', '#7d5f42'], ['#8fae5a', '#7c9a4b'], ['#d6bf72', '#c8b064'], ['#d9cf9e', '#cbbf8c']][Math.floor(h * 4)];
@@ -161,8 +155,8 @@ function* buildPaesaggio(T, G) {
       spots.forEach(([x, z], k) => {
         const gy = H.ground(x, z);
         if (k === 0 && area > 1200) { // tower crane: lattice mast as a yellow column, jib and counter-jib, cab, counterweight
-          // as tall as 22-32 m at most, most of them lower; the one seen from the spawn past Junior B and Amplifon stays as it is
-          const Hmax = 22 + LS_HASH(x, z, 'gru') * 10, Hh = hyp(cx - 384.6, cz + 359.9) < 10 ? Hmax : 12 + (Hmax - 12) * LS_HASH(x, z, 'altezza'), a = LS_HASH(x, z, 'brac') * TAU;
+          // as tall as 22-32 m at most, most of them lower
+          const Hmax = 22 + LS_HASH(x, z, 'gru') * 10, Hh = 12 + (Hmax - 12) * LS_HASH(x, z, 'altezza'), a = LS_HASH(x, z, 'brac') * TAU;
           box(1.6, Hh, 1.6, x, gy + Hh / 2, z, '#e8b520'); for (let y = 2; y < Hh; y += 2.5) box(1.7, 0.12, 1.7, x, gy + y, z, '#c99a10');
           box(42, 1.1, 1.1, x + Math.sin(a) * 12, gy + Hh + 0.6, z + Math.cos(a) * 12, '#e8b520', a + Math.PI / 2); box(2.4, 2.2, 2, x - Math.sin(a) * 9, gy + Hh - 0.2, z - Math.cos(a) * 9, '#8f949a', a);
           box(1.6, 1.6, 1.6, x + Math.sin(a) * 1.6, gy + Hh - 0.4, z + Math.cos(a) * 1.6, '#f2efe6', a); box(0.12, 0.12, 0.12, x, gy + Hh + 1.5, z, '#c8102e');

@@ -183,6 +183,7 @@ def add_building(outer, holes, t, key):
     rec = {'p': outer, 'h': round(bheight(t, a, key), 1), 't': BTYPE.get(bt, 0), 'ht': bool(num(t.get('height')) or num(t.get('building:levels'))), 'lv': num(t.get('building:levels')), 'bt': bt}
     if t.get('man_made') == 'water_tower': rec['wt'] = True; rec['h'] = num(t.get('height')) or max(rec['h'], 25)
     if holes: rec['k'] = [h for h in holes if len(h) >= 3]
+    rec['tg'] = {k_: t[k_] for k_ in ('building', 'building:levels', 'roof:shape', 'roof:colour', 'building:colour', 'name', 'amenity', 'man_made') if k_ in t}  # what a DBGT building takes from OSM (dbgt_edifici.py)
     buildings.append(rec)
 mp_ways = set()
 for members, t in rels:
@@ -272,7 +273,14 @@ for k_, (o_, hs_, hh_, st_) in enumerate(ms_only):
     n0 = len(buildings); add_building(o_, hs_, tt, 'ms%d' % k_); nms += len(buildings) - n0
     if len(buildings) > n0: buildings[-1]['ml'] = True
 log('overture: ML heights for', len(ms_h), 'OSM buildings, ML-only footprints added', nms)
-if dbt_vols:  # where the Comune's map covers: its heights, no footprints only the ML model saw, its buildings OSM lacks
+ED = None
+if _cov and not os.environ.get('GTA_EDIFICI_OSM'):  # where a comune has its DBGT the buildings are its volumes (docs/motore.md 7, src/dbgt_edifici.py)
+    import dbgt_edifici
+    ED = dbgt_edifici.Edifici([(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'), _comuni[d_.lower()]) for d_ in sorted(os.listdir(DBT_DIR)) if d_.lower() in _comuni and os.path.exists(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'))],
+                              log, lambda lon_, lat_: ((lon_ - lon0) * KX, -(lat_ - lat0) * KZ), round(TBASE, 1))
+    buildings[:] = ED.unisci(buildings, _Pp); buildings += ED.tetti()  # (the wings of the volumes cut for their roofs come back as new pieces)
+    for b in buildings + ED.alti: b.setdefault('t', BTYPE.get(b['bt'], 0))
+elif dbt_vols:  # (GTA_EDIFICI_OSM: the OSM buildings with the DBGT's heights, as before) where the Comune's map covers: its heights, no footprints only the ML model saw, its buildings OSM lacks
     _vg = [_Pp(p_) for p_, h_ in dbt_vols]; _vok = [i for i, g_ in enumerate(_vg) if g_ is not None]; _vt = STRtree([_vg[i] for i in _vok])
     keep_, nh_, nd_ = [], 0, 0
     for b in buildings:
@@ -489,7 +497,7 @@ log('narrowed streets', nnarrow)
 _cb = [r['line'].buffer(r['w'] / 2 + 0.15) for r in raw_roads if r['c'] <= 5 and not r['bridge'] and not r['tunnel'] and r['line'].length > 0.5]
 _cbt = STRtree(_cb); nclip = ndrop = 0; keep_b = []
 for b in buildings:
-    if b['t'] == 9: keep_b.append(b); continue
+    if b['t'] == 9 or b.get('dbgt'): keep_b.append(b); continue  # the DBGT's buildings and carriageways agree (dbgt_edifici.py checks it)
     g = P(b['p'], b.get('k', []))
     if g is None: continue
     hits = [_cb[j] for j in _cbt.query(g) if _cb[j].intersects(g)]
@@ -531,6 +539,9 @@ if _cov and not os.environ.get('GTA_FERROVIA_OSM'):
     rails[:] = [[nodes[n_] for n_ in rr['refs']] for rr in rail_raw]
     for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
     area_geoms[:] = FER.banchine(area_geoms, [LineString(p) for p in rails if len(p) >= 2])
+if ED:  # the OSM ways no DBGT axis took move out of the DBGT buildings, or are cut where they go through one (dbgt_edifici.py vie)
+    ED.vie(raw_roads, nodes, buildings, P)
+    for r in raw_roads: r['line'] = LineString([nodes[n_] for n_ in r['refs']])
 railL0 = [LineString(p) for p in rails if len(p) >= 2]
 _low = [r['line'] for r in raw_roads if not r['bridge'] and not r['tunnel'] and r['line'].length > 0.1] + railL0
 _lowtree = STRtree(_low)
@@ -785,7 +796,7 @@ for i, (b, g) in enumerate(_bl):
     near = [j for j in _bt.query(g.buffer(1.0)) if j != i]
     if any(_bl[j][1].area > 30 and _bl[j][1].distance(g) < 0.8 for j in near) and b['bt'] == 'yes' and not pool: continue
     b['t'] = 10; nvil += 1; b['villa'] = True
-    if not b['ht'] or pool: b['h'] = round((6.6 if a > 250 else 5.9) + h01(str(b['p'][0])) * 1.6, 1)
+    if (not b['ht'] or pool) and not b.get('dbgt'): b['h'] = round((6.6 if a > 250 else 5.9) + h01(str(b['p'][0])) * 1.6, 1)
 log('villette', nvil)
 bunion = unary_union([g for g in bgeoms if g is not None]).buffer(0.05)
 prepare(bunion)
@@ -949,7 +960,7 @@ log('cemetery walls', ncw)
 bar_out = []
 # cut each line only against the pieces of bar_cut it touches, not the whole union: this was most of the build's time
 # (the same pieces bar_cut is the union of, kept apart: united, the street buffers are one polygon as big as the whole network)
-_bc_parts = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1] + [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + (STR.carreggiate(-0.3) if STR else [])
+_bc_parts = [r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1] + [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + (STR.carreggiate(-0.3) if STR else []) + ([g_.buffer(0.5) for g_ in (_Pp(b['p'], b.get('k', [])) for b in buildings if b.get('dbgt')) if g_ is not None] if ED else [])  # a DBGT divider within 0.5 m of a DBGT facade is the facade's own line
 _bc_tree = STRtree(_bc_parts)
 for bi_, (pts, kind, hgt) in enumerate(barriers):
     if bi_ % max(1, len(barriers) // 10) == 0: log('muri %d%%' % (bi_ * 100 // max(1, len(barriers))))  # progress: this used to be the slow step
@@ -1481,8 +1492,10 @@ tiles = [{} for _ in range(ntx * ntz)]
 def tid(x, z): return min(ntx - 1, max(0, int((x + HW) // TILE))) + ntx * min(ntz - 1, max(0, int((z + HH) // TILE)))
 def tbox(t): i, j = t % ntx, t // ntx; return box(-HW + i * TILE, -HH + j * TILE, -HW + (i + 1) * TILE, -HH + (j + 1) * TILE)
 def push(t, k, v): tiles[t].setdefault(k, []).append(v)
-for b in buildings:
-    c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b['t']}
+for b in buildings + (ED.alti if ED else []):
+    c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b.get('t', BTYPE.get(b.get('bt'), 0))}
+    for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
+        if b.get(k_) is not None: rec[k_] = b[k_]
     if b.get('k'): rec['k'] = [enc(h) for h in b['k']]
     if b.get('bt') in ('garage', 'garages'): rec['g'] = 1  # rows of up-and-over doors
     elif b.get('bt') == 'greenhouse': rec['g'] = 2  # glass
@@ -1597,10 +1610,15 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'trains': [{'p': enc(t['pts']), 'st': t['st'], 'stn': t['stn'], 'h': [q(coordH[key(p_)]) if key(p_) in coordH else -32768 for p_ in t['pts']]} for t in trains],
        'pois': pois, 'ng': negozi, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index],
        'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0)]}
+if ED:  # the buildings of the DBGT: entrances, checks, report
+    for x_, z_ in ED.acc:
+        if inside((x_, z_), 0): push(tid(x_, z_), 'ai', [q(x_), q(z_)])
+    ED.controlli(buildings, _Pp); out.setdefault('report', {})['edifici'] = ED.sintesi()
+    json.dump(ED.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_edifici.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 if STR:  # the checks of docs/motore.md 7: a summary in brianza.json, the whole report beside it
     STR.controlli(raw_roads, nodes, oggetti=[(o[1] / 10, o[2] / 10) for o in ogg if OGG[o[0]] not in OGG_ON_ROAD], lampioni=lamps, cartelli=cartelli, barriere=[b_[0] for b_ in bar_out],
                   edifici=[P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], alberi=trees, attraversamenti=crossings)
-    out['report'] = {'strade': STR.sintesi()}
+    out.setdefault('report', {})['strade'] = STR.sintesi()
     json.dump(STR.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_strade.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 if FER:  # trains against platforms, buildings and carriageways; the report beside brianza.json
     FER.controlli(trains, [g for at, g in area_geoms if at == 5], [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], [g for g, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else [], cartelli)

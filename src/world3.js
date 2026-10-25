@@ -75,25 +75,7 @@ function resample(pts, step) {
   return o;
 }
 const bbox = pts => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; } return [x0, z0, x1, z1]; };
-// places the map fills with trees that are open ground: playing fields
-const NO_TREES = [
-  [[-408.6, 279.7], [-378.5, 452.1], [-276.1, 434.2], [-306.2, 261.8]], // Stadio Mino Favini
-  [[-1835.9, 1110.2], [-1797.9, 1281.0], [-1702.2, 1259.7], [-1740.2, 1088.9]], // Stadio comunale di Seveso
-  [[-741.4, 767.4], [-684.8, 778.6], [-697.6, 837.8], [-754.3, 826.0]], // the cloister of the Seminario di Seveso: its own four trees
-];
-// hedges the map draws where a landmark lays out its own garden
-const NO_HEDGES = [
-  [[-741.4, 767.4], [-684.8, 778.6], [-697.6, 837.8], [-754.3, 826.0]], // the cloister of the Seminario di Seveso
-];
-// buildings in the map that are not there (mostly from Overture): dropped by the centroid of their footprint
-const GHOSTS = [
-  [1243.7, -553.8], [1261.4, -549.6], // a house and a shed across the Curie drive from via Marie Curie
-];
-// walls missing from the map, as barriers of the tile their first point falls in: { p, t (1 wall, 2 low wall with railing, 3 hedge), h }
-const EXTRA_BARRIERS = [
-  { p: [[-566.2, 870.2], [-570.0, 888.0], [-573.9, 906.5]], t: 1, h: 1.7 }, // the Seminario park wall along via Verga, between the two pieces OSM has
-];
-for (const e of EXTRA_BARRIERS) { const d = TILES[tileOf(e.p[0][0], e.p[0][1])].d, enc = []; let px = 0, pz = 0; for (const [x, z] of e.p) { const X = Math.round(x * 10), Z = Math.round(z * 10); enc.push(X - px, Z - pz); px = X; pz = Z; } (d.ba || (d.ba = [])).push({ p: enc, t: e.t, h: e.h }); }
+// (NO_TREES, NO_HEDGES, GHOSTS and EXTRA_BARRIERS, tables of places written by hand, are in src/_vecchi/pezzi_a_mano.js since 24/10/2026)
 // a tree mapped in the river bed of S under the water (the OSM point a few metres off the DBGT bed): its trunk stood in the Seveso, up to
 // 0.35 m under the water, 8 trees in Meda (verifica fase 6). Not drawn, no collision. The same for the railing along an OSM river, at its
 // width from the OSM axis: where that falls in the water of the DBGT bed it ran along the middle of the Seveso
@@ -101,17 +83,29 @@ const inWater = (x, z, gy) => { if (!H.fineAt(x, z)) return false; const w = H.w
 // a tree trunk within r of the point (the trees of every tile are in WALLS from the start): the parking stalls drawn on car parks and along
 // the streets leave a tree's place free, as in a car park lined with trees (the DBGT trees of the yards, src/dbgt_verde.py)
 const treeNear = (x, z, r) => { let f = false; WALLS.each(x - r, z - r, x + r, z + r, o => { if (o.tree && hyp(o.x - x, o.z - z) < r) f = true; }); return f; };
+const EDIF = new Map(); // DBGT building -> its volumes on the ground (a shop looks for its front on all of them)
 for (const T of TILES) {
   const d = T.d;
   for (const B of d.b || []) {
     const outer = dec(B.p); if (outer.length < 3) continue;
-    { const [gx, gz] = centroid(outer); if (GHOSTS.some(([x, z]) => hyp(gx - x, gz - z) < 1.5)) continue; }
     const holes = (B.k || []).map(dec).filter(h => h.length >= 3), bb = bbox(outer);
     const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g }; // g: 1 garages, 2 greenhouse (paesaggio3.js)
+    // a volume of the DBGT (src/dbgt_edifici.py): zt the top of its walls and zb its raised base (a portico, a passage, an overhang) above
+    // terrain.base, e its building, rk/rf/rc its roof (planes over the top of the walls), wc/rcol the colours OSM gives, st its state in the
+    // 2015 survey when OSM does not say otherwise (2 a ruin with no roof over it in the DSM: bare walls only; 3 a ruin with its roof; 1 under
+    // construction: a bare concrete shell; no shop signs on any of them)
+    for (const k of ['zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st']) if (B[k] !== undefined) rec[k] = B[k];
+    if (rec.st) rec.noSign = true;
     T.bld.push(rec);
+    if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
+      BUILDINGS.push(rec); const y1 = B.zt + 3;
+      for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1 }); } }
+      continue;
+    }
     if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }); } continue; }
     BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
-    const gys = outer.map(p => H.ground(p[0], p[1])), by0 = Math.min(...gys) - 3, by1 = Math.max(...gys) + B.h + 3;
+    if (B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
+    const gys = outer.map(p => H.ground(p[0], p[1])), by0 = Math.min(...gys) - 3, by1 = Math.max(Math.max(...gys) + B.h, B.zt !== undefined ? B.zt + roofTop(rec) : -1e9) + 3;
     for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) {
       const A = sArea(ring);
       for (let i = 0; i < ring.length; i++) {
@@ -122,9 +116,8 @@ for (const T of TILES) {
     }
   }
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
-  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (NO_TREES.some(q => inPoly(x, z, q)) || inWater(x, z, gy)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
+  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const br of d.ba || []) {
-    if (br.t === 3 && NO_HEDGES.some(q => dec(br.p).every(([x, z]) => inPoly(x, z, q)))) continue; // drawn by the landmark, symmetrical
     const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h, v: br.v }); // follow the ground, not long chords
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2); WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }); }
   }
@@ -136,6 +129,62 @@ for (const T of TILES) {
   }
   for (const q of d.a || []) if (q.t === 5) { const o = dec(q.p); if (o.length < 3) continue; const rec = { o, k: (q.k || []).map(dec), bb: bbox(o) }; (T.pf || (T.pf = [])).push(rec); PLATG.add(rec.bb[0], rec.bb[1], rec.bb[2], rec.bb[3], rec); }
 }
+// the roof of a DBGT volume (src/dbgt_edifici.py): over the top of its walls max(0, min_k f_k), f_k = A + Bx (x - cx) + Bz (z - cz)
+function roofPlanes(B) { if (B._pl !== undefined) return B._pl; let pl = null; if (B.rf && B.rc) { pl = []; for (let i = 0; i + 2 < B.rf.length; i += 3) pl.push([B.rf[i], B.rf[i + 1], B.rf[i + 2]]); } return (B._pl = pl); }
+function roofAt(B, x, z) { const pl = roofPlanes(B); if (!pl) return 0; let m = Infinity; for (const p of pl) m = Math.min(m, p[0] + p[1] * (x - B.rc[0]) + p[2] * (z - B.rc[1])); return Math.max(0, m); }
+function roofTop(B) { const d = B.cu ? Math.max(...B.cu.y) - (B.zt || 0) : 0; if (!roofPlanes(B)) return Math.max(0, d); let m = 0; for (const p of B.pts) m = Math.max(m, roofAt(B, p[0], p[1])); return Math.max(d, m + Math.max(0, ...B._pl.map(q => q[0]))); }
+// where along the wall a to c the roof changes plane or meets the eaves: the wall's top is straight between these
+function roofBreaks(B, a, c) {
+  const pl = roofPlanes(B), ts = [0, 1]; if (!pl) return ts;
+  const f = (p, t) => p[0] + p[1] * (a[0] + (c[0] - a[0]) * t - B.rc[0]) + p[2] * (a[1] + (c[1] - a[1]) * t - B.rc[1]);
+  const lin = [...pl.map(p => [f(p, 0), f(p, 1)])], add = (u, v) => { if ((u > 0) !== (v > 0) && Math.abs(u - v) > 1e-9) { const t = u / (u - v); if (t > 1e-4 && t < 1 - 1e-4) ts.push(t); } };
+  for (let i = 0; i < lin.length; i++) { add(lin[i][0], lin[i][1]); for (let j = i + 1; j < lin.length; j++) add(lin[i][0] - lin[j][0], lin[i][1] - lin[j][1]); }
+  return ts.sort((p, q) => p - q);
+}
+// the polygon cut by the half-plane g <= 0 (g = [A, Bx, Bz] round c): Sutherland-Hodgman
+function clipHalf(P, g, c) {
+  const v = p => g[0] + g[1] * (p[0] - c[0]) + g[2] * (p[1] - c[1]), o = [];
+  for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], va = v(a), vb = v(b); if (va <= 0) o.push(a); if ((va <= 0) !== (vb <= 0)) { const t = va / (va - vb); o.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); } }
+  return o;
+}
+// the faces of the roof: each plane on the part of the volume where it is the lowest
+function roofFaces(b, B, top, col) {
+  const pl = roofPlanes(B), c = B.rc;
+  pl.forEach((p, k) => {
+    let P = B.pts.map(q => [q[0], q[1]]);
+    for (let j = 0; j < pl.length && P.length >= 3; j++) if (j !== k) P = clipHalf(P, [p[0] - pl[j][0], p[1] - pl[j][1], p[2] - pl[j][2]], c);
+    if (P.length < 3 || Math.abs(sArea(P)) < 0.01) return;
+    let tri; try { tri = THREE.ShapeUtils.triangulateShape(P.map(q => new THREE.Vector2(q[0], q[1])), []); } catch (e) { return; }
+    const n = new THREE.Vector3(-p[1], 1, -p[2]).normalize(), i0 = b.p.length / 3;
+    for (const q of P) vtx(b, q[0], top + Math.max(0, p[0] + p[1] * (q[0] - c[0]) + p[2] * (q[1] - c[1])), q[1], n.x, n.y, n.z, 0, 0, col);
+    for (const t of tri) triUp(b, i0 + t[0], i0 + t[1], i0 + t[2]);
+  });
+}
+// a dome or a spire from the DSM (cu: centre, radii, heights over terrain.base, the last one the top of the walls under it): the profile turned
+// round its axis, flat-shaded, 24 sides
+function domeFaces(b, cu, col) {
+  const [cx, cz] = cu.c, R = cu.r, Y = cu.y, N = 24;
+  for (let i = 0; i + 1 < R.length; i++) for (let k = 0; k < N; k++) {
+    const a0 = k / N * TAU, a1 = (k + 1) / N * TAU, P = [[R[i], Y[i], a0], [R[i + 1], Y[i + 1], a0], [R[i + 1], Y[i + 1], a1], [R[i], Y[i], a1]].map(([r, y, a]) => [cx + Math.cos(a) * r, y, cz + Math.sin(a) * r]);
+    for (const [p, q, w] of [[P[0], P[1], P[2]], [P[0], P[2], P[3]]]) {
+      const n = new THREE.Vector3(q[0] - p[0], q[1] - p[1], q[2] - p[2]).cross(new THREE.Vector3(w[0] - p[0], w[1] - p[1], w[2] - p[2])); if (n.lengthSq() < 1e-10) continue; n.normalize();
+      const mx = (p[0] + q[0] + w[0]) / 3 - cx, mz = (p[2] + q[2] + w[2]) / 3 - cz; if (n.x * mx + n.z * mz < 0 || (Math.abs(n.x * mx + n.z * mz) < 1e-6 && n.y < 0)) n.negate(); // outwards
+      const i0 = b.p.length / 3; for (const v of [p, q, w]) vtx(b, v[0], v[1], v[2], n.x, n.y, n.z, 0, 0, col);
+      const e1 = [q[0] - p[0], q[1] - p[1], q[2] - p[2]], e2 = [w[0] - p[0], w[1] - p[1], w[2] - p[2]], cr = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+      if (cr[0] * n.x + cr[1] * n.y + cr[2] * n.z >= 0) b.i.push(i0, i0 + 1, i0 + 2); else b.i.push(i0, i0 + 2, i0 + 1);
+    }
+  }
+}
+// the underside of a raised volume, facing down
+function soffit(b, outer, holes, y, col) {
+  let tri; try { tri = THREE.ShapeUtils.triangulateShape(outer.map(q => new THREE.Vector2(q[0], q[1])), holes.map(h => h.map(q => new THREE.Vector2(q[0], q[1])))); } catch (e) { return; }
+  const all = outer.concat(...holes), i0 = b.p.length / 3; for (const q of all) vtx(b, q[0], y, q[1], 0, -1, 0, 0, 0, col);
+  for (const t of tri) { const P = b.p, A = i0 + t[0], Bq = i0 + t[1], C = i0 + t[2], cy = (P[Bq * 3 + 2] - P[A * 3 + 2]) * (P[C * 3] - P[A * 3]) - (P[Bq * 3] - P[A * 3]) * (P[C * 3 + 2] - P[A * 3 + 2]); if (cy >= 0) b.i.push(A, C, Bq); else b.i.push(A, Bq, C); }
+}
+// a colour of a palette for a building: the same for all the volumes of a DBGT building (e), otherwise the tile's sequence
+// the top of the walls as the tile draws them (a DBGT volume never under the ground round it)
+function bldTop(B) { const gmax = Math.max(...B.pts.map(p => H.ground(p[0], p[1]))); return B.zt !== undefined ? Math.max(B.zt, B.zb !== undefined ? B.zb + 1 : gmax + Math.min(B.h, 2.2)) : gmax + B.h; }
+const hashRnd = n => { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
 function inBuilding(x, z, m = 0) {
   let f = false;
   BLD.each(x - m, z - m, x + m, z + m, b => { if (!f && x >= b.bb[0] - m && x <= b.bb[2] + m && z >= b.bb[1] - m && z <= b.bb[3] + m && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) f = true; });
@@ -890,7 +939,6 @@ function cellOwners(T, F) {
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
     if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
-    else if (a.t === 4 && inPiazza(...centroid(outer))) { }
     else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
     else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
@@ -966,7 +1014,6 @@ function* buildTileGen(T) {
       if (T.fine && waterInBed(a, outer, holes, T)) continue; // water inside the bed: the water level below draws it
       try {
         if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
-        else if (a.t === 4 && inPiazza(...centroid(outer))) { } // a square or a school yard mapped as a car park: drawn by buildPiazze
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
         else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
@@ -1295,13 +1342,17 @@ function* buildTileGen(T) {
   yield 'buildings';
   // buildings
   {
-    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf();
+    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf(), doorB = Buf();
     let nb = 0;
     for (const B of T.bld) {
       if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower (paesaggio3.js)
       if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
-      const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t;
-      const gys = outer.map(p => H.ground(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys), top = gmax + h, bot = gmin - 0.6;
+      const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t, raised = B.zb !== undefined;
+      // a DBGT volume: the top of its walls is its own (zt), never under the ground round it; a raised one starts at its base (zb)
+      const gys = outer.map(p => H.ground(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys);
+      const top = B.zt !== undefined ? Math.max(B.zt, raised ? B.zb + 1 : gmax + Math.min(h, 2.2)) : gmax + h, bot = raised ? B.zb : gmin - 0.6;
+      const R = B.e !== undefined ? (k => hashRnd(B.e * 7 + k)) : (() => tRnd()), pcB = (a, k = 0) => COL(a[Math.floor(R(k) * a.length)]);
+      const colOr = (c, f) => { if (c) { try { return new THREE.Color(c); } catch (e) { } } return f(); };
       if (t === 9) {
         const ch = gmax + Math.max(h, 3.8);
         try { polyFill(canopyB, outer, holes, ch, 10, COL('#8d8a84')); } catch (e) { }
@@ -1309,15 +1360,19 @@ function* buildTileGen(T) {
         continue;
       }
       let kind, wallCol;
-      if (t === 1 || t === 2) { kind = 'plain'; wallCol = pc(PAL_IND); }
+      if (t === 1 || t === 2) { kind = 'plain'; wallCol = pcB(PAL_IND); }
       else if (t === 7) { kind = 'plain'; wallCol = COL('#eadcc0'); }
-      else if (t === 10) { kind = 'old'; wallCol = pc(['#f2e6cf', '#ece4d3', '#f0dcb0', '#e8c98a', '#e3b98f', '#dba08a', '#f5efe4', '#d9c7a3']); }
-      else if (t === 11) { kind = 'mod'; wallCol = pc(['#efc65a', '#e8b84a', '#f2d483', '#e6c06e']); } // schools: the classic Brianza yellow
-      else if (t === 4 || t === 3 || (t === 0 && area > 380) || t === 8) { kind = 'mod'; wallCol = pc(t === 8 ? ['#dcb98b', '#d6c09a'] : PAL_MOD); }
-      else { kind = 'old'; wallCol = pc(PAL_OLD); }
-      if (h < 4.2) kind = 'plain';
+      else if (t === 10) { kind = 'old'; wallCol = pcB(['#f2e6cf', '#ece4d3', '#f0dcb0', '#e8c98a', '#e3b98f', '#dba08a', '#f5efe4', '#d9c7a3']); }
+      else if (t === 11) { kind = 'mod'; wallCol = pcB(['#efc65a', '#e8b84a', '#f2d483', '#e6c06e']); } // schools: the classic Brianza yellow
+      else if (t === 4 || t === 3 || (t === 0 && area > 380) || t === 8) { kind = 'mod'; wallCol = pcB(t === 8 ? ['#dcb98b', '#d6c09a'] : PAL_MOD); }
+      else { kind = 'old'; wallCol = pcB(PAL_OLD); }
+      if (top - bot < 4.8 && !raised) kind = 'plain';
+      wallCol = colOr(B.wc, () => wallCol);
+      if (B.st) { kind = 'plain'; wallCol = B.st !== 1 ? pcB(['#a39a8b', '#9c9284', '#aaa08e']) : COL('#b9b6ae'); } // a ruin: bare stone and brick; a shell: concrete
       const b = wb[kind], tile = kind === 'old' ? 3.4 : kind === 'mod' ? 4.2 : 4;
-      const pitched = !holes.length && outer.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(outer) || (t === 10 && outer.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && h >= 5;
+      // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
+      const planes = roofPlanes(B), flatDbgt = B.rk === 4;
+      const pitched = planes ? true : !flatDbgt && !holes.length && outer.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(outer) || (t === 10 && outer.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && h >= 5;
       if (!b.ao) b.ao = [];
       for (const [ring, isHole] of [[outer, false], ...holes.map(hh => [hh, true])]) {
         const A = sArea(ring), nr = ring.length; let acc = 0;
@@ -1325,26 +1380,40 @@ function* buildTileGen(T) {
         const inner = i => { const p = E[(i - 1 + nr) % nr], e = E[i]; return p[3] * e[0] + p[4] * e[1] > 0.05 * e[2]; }; // the wall before turns towards this one: an inside corner
         for (let i = 0; i < nr; i++) {
           const a = ring[i], c = ring[(i + 1) % nr], [dx, dz, L, nx, nz] = E[i]; if (L < 0.05) continue;
-          const u0 = acc / tile, u1 = (acc + L) / tile; acc += L;
-          const v1 = h / 3.1, v0 = (bot - gmax) / 3.1, base = b.p.length / 3;
-          vtx(b, a[0], bot, a[1], nx, 0, nz, u0, v0, wallCol); vtx(b, c[0], bot, c[1], nx, 0, nz, u1, v0, wallCol);
-          vtx(b, c[0], top, c[1], nx, 0, nz, u1, v1, wallCol); vtx(b, a[0], top, a[1], nx, 0, nz, u0, v1, wallCol);
-          // occlusion: height over the ground, depth under the eaves, distance from the inside corners at either end (linear along the wall, so exact per pixel)
-          const ga = H.ground(a[0], a[1]), gc = H.ground(c[0], c[1]), ht = pitched ? top - bot : 99, ia = inner(i) ? 0 : 99, ic = inner((i + 1) % nr) ? 0 : 99;
-          b.ao.push(bot - ga, ht, ia, ic + L, bot - gc, ht, ia + L, ic, top - gc, pitched ? 0 : 99, ia + L, ic, top - ga, pitched ? 0 : 99, ia, ic + L);
-          if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
+          const ia = inner(i) ? 0 : 99, ic = inner((i + 1) % nr) ? 0 : 99, ts = planes && !isHole ? roofBreaks(B, a, c) : [0, 1], v0 = (bot - gmax) / 3.1;
+          for (let k = 1; k < ts.length; k++) { // the wall in pieces where the roof over it changes slope (a gable end), each piece straight on top
+            const s0 = ts[k - 1] * L, s1 = ts[k] * L, ax = a[0] + dx * ts[k - 1], az = a[1] + dz * ts[k - 1], cx = a[0] + dx * ts[k], cz = a[1] + dz * ts[k];
+            const ya = top + (planes ? roofAt(B, ax, az) : 0), yc = top + (planes ? roofAt(B, cx, cz) : 0), u0 = (acc + s0) / tile, u1 = (acc + s1) / tile, base = b.p.length / 3;
+            vtx(b, ax, bot, az, nx, 0, nz, u0, v0, wallCol); vtx(b, cx, bot, cz, nx, 0, nz, u1, v0, wallCol);
+            vtx(b, cx, yc, cz, nx, 0, nz, u1, (yc - gmax) / 3.1, wallCol); vtx(b, ax, ya, az, nx, 0, nz, u0, (ya - gmax) / 3.1, wallCol);
+            // occlusion: height over the ground, depth under the eaves, distance from the inside corners at either end (linear along the wall, so exact per pixel)
+            const ga = raised ? bot - 3 : H.ground(ax, az), gc = raised ? bot - 3 : H.ground(cx, cz);
+            b.ao.push(bot - ga, pitched ? ya - bot : 99, ia + s0, ic + L - s0, bot - gc, pitched ? yc - bot : 99, ia + s1, ic + L - s1, yc - gc, pitched ? 0 : 99, ia + s1, ic + L - s1, ya - ga, pitched ? 0 : 99, ia + s0, ic + L - s0);
+            if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
+            if (B.st === 2) { // a ruin has no roof: the inside of its walls shows from above
+              const bi = b.p.length / 3;
+              vtx(b, ax, bot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, bot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, (yc - gmax) / 3.1, wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, (ya - gmax) / 3.1, wallCol);
+              b.ao.push(bot - ga, 99, 99, 99, bot - gc, 99, 99, 99, yc - gc, 99, 99, 99, ya - ga, 99, 99, 99);
+              if (nx * (-dz) + nz * dx > 0) b.i.push(bi, bi + 2, bi + 1, bi, bi + 3, bi + 2); else b.i.push(bi, bi + 1, bi + 2, bi, bi + 2, bi + 3);
+            }
+          }
+          const u0 = acc / tile; acc += L;
           if (kind === 'old') { // stone sills under the painted windows (middle of each bay, 0.9-1 m up each 3.1 m floor), from the first floor: the ground floor is shops
-            const ux = dx / L, uz = dz / L;
+            const ux = dx / L, uz = dz / L, fl = raised ? bot - 3.1 : gmax;
             for (let n = Math.ceil((u0 * tile + 0.7) / tile - 0.5); (n + 0.5) * tile - u0 * tile <= L - 0.7; n++) {
               const s = (n + 0.5) * tile - u0 * tile, sx = a[0] + ux * s, sz = a[1] + uz * s;
-              for (let k = 1; gmax + 3.1 * k + 2.5 <= top - 0.2; k++) addSill(sillB, sx, gmax + 3.1 * k + 0.96, sz, ux, uz, nx, nz);
+              for (let k = 1; fl + 3.1 * k + 2.5 <= top - 0.2; k++) if (fl + 3.1 * k > bot + 0.5) addSill(sillB, sx, fl + 3.1 * k + 0.96, sz, ux, uz, nx, nz);
             }
           }
         }
-        for (let i = 0; i < nr; i++) aoGround(aoB, ring, E, i, inner(i));
+        if (!raised) for (let i = 0; i < nr; i++) aoGround(aoB, ring, E, i, inner(i));
       }
-      if (pitched) {
-        const [cx, cz] = centroid(outer), rh = Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12), col = pc(ROOF_COTTO);
+      if (raised) soffit(roofB, outer, holes, bot, COL('#9a958c'));
+      if (B.cu) domeFaces(roofB, B.cu, COL('#8e928c')); // lead grey: the DSM does not say the colour
+      if (B.st === 2) continue;
+      if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
+      else if (pitched) {
+        const [cx, cz] = centroid(outer), rh = Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
         for (let i = 0; i < outer.length; i++) {
           const a = outer[i], c = outer[(i + 1) % outer.length];
           const v1 = new THREE.Vector3(a[0], top, a[1]), v2 = new THREE.Vector3(c[0], top, c[1]), v3 = new THREE.Vector3(cx, top + rh, cz);
@@ -1353,22 +1422,32 @@ function* buildTileGen(T) {
           vtx(roofB, v1.x, v1.y, v1.z, n.x, n.y, n.z, 0, 0, col); vtx(roofB, v2.x, v2.y, v2.z, n.x, n.y, n.z, 0, 0, col); vtx(roofB, v3.x, v3.y, v3.z, n.x, n.y, n.z, 0, 0, col);
           triUp(roofB, base, base + 1, base + 2);
         }
-      } else { try { polyFill(roofB, outer, holes, top, 10, pc(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT)); } catch (e) { } }
+      } else { try { polyFill(roofB, outer, holes, top, 10, B.st === 1 ? COL('#a9a6a0') : colOr(B.rcol, () => pcB(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT, 1))); } catch (e) { } }
+    }
+    // the entrances of the DBGT (ACC_INT, the middle of the opening): a door on the nearest wall within 1.5 m
+    for (const [X, Z] of d.ai || []) {
+      const x = X / 10, z = Z / 10; let best = null;
+      BLD.each(x - 2, z - 2, x + 2, z + 2, Bb => { if (Bb.lm || Bb.big || Bb.t === 9 || Bb.zb !== undefined || Bb.st === 2) return; const P = Bb.pts; for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1.4) continue; const dd = segDist(x, z, a[0], a[1], c[0], c[1]); if (dd < 1.5 && (!best || dd < best.d)) best = { d: dd, a, c, L, B: Bb }; } });
+      if (!best) continue;
+      const { a, c, L } = best, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L; let nx = uz, nz = -ux; const s = clamp((x - a[0]) * ux + (z - a[1]) * uz, 0.7, L - 0.7), px = a[0] + ux * s, pz = a[1] + uz * s;
+      if (inPoly(px + nx * 0.2, pz + nz * 0.2, best.B.pts)) { nx = -nx; nz = -nz; }
+      if (inBuilding(px + nx * 0.6, pz + nz * 0.6)) continue; // a party wall
+      const gy = H.ground(px, pz), o = 0.04, k0 = doorB.p.length / 3, col = COL('#4b3a2c');
+      for (const [ss, yy] of [[-0.6, 0], [0.6, 0], [0.6, 2.3], [-0.6, 2.3]]) vtx(doorB, px + ux * ss + nx * o, gy + yy, pz + uz * ss + nz * o, nx, 0, nz, 0, 0, col);
+      if (nx * (-uz) + nz * ux > 0) doorB.i.push(k0, k0 + 1, k0 + 2, k0, k0 + 2, k0 + 3); else doorB.i.push(k0, k0 + 2, k0 + 1, k0, k0 + 3, k0 + 2);
     }
     for (const k of ['old', 'mod', 'plain']) if (wb[k].i.length) mkMesh(wb[k], MAT[k], 10, 'cast', G).geometry.setAttribute('aoD', new THREE.Float32BufferAttribute(wb[k].ao, 4));
     if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
-    put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
+    put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast'); put(doorB, MAT.roof, 10);
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildLandmarks, buildPiazze, buildPlazas, buildStairwells, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
+  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
   { const s = srndT; yield 'trees'; srndT = s; }
   // trees and street lamps
-  // a tree of the data where a landmark plants its own by hand (the row of conifers of Parco Fusetti, PLAZAS in landmarks3.js: 6 of its 10
-  // stand within 2.5 m of a DBGT tree, the same trees) is drawn once, by the landmark
-  T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4) && !PLAZAS.some(q => (q.trees || []).some(([a, b]) => hyp(a - x, b - z) < 2.5)));
+  T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {
     const n = T.tr.length, trunks = new THREE.InstancedMesh(TREE_G.trunk, MAT.trunk, n), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, n);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();

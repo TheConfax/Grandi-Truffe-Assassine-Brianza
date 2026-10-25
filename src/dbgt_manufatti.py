@@ -294,6 +294,10 @@ class Manufatti:
             try: g = Polygon(b['p']).buffer(0)
             except Exception: keep.append(b); continue
             hit, inside = None, []
+            if b.get('dbgt'):  # a volume of the DBGT (dbgt_edifici.py) always stays: a manufatto on it is part of it and is not added
+                for i in mt.query(g):
+                    if g.intersection(mine[i]['g']).area > 0.5: mine[i]['dentro'] = 'volume DBGT'
+                keep.append(b); continue
             for i in mt.query(g):
                 o = mine[i]; a = g.intersection(o['g']).area
                 if a > DUP_BLD * g.area: hit = o; break
