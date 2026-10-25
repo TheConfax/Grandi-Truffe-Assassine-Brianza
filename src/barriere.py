@@ -98,6 +98,77 @@ def passaggi(L, vie):
     return out
 
 
+# ---- double dividers (Carlo, 25/10: "muro doppio, ci sono dentro"; via Santi Aimo e Vermondo, a fence beside the wall narrows the street):
+# the DBGT draws two lines for one boundary (a wall and the foot of its bank, a wall and the fence on its top, the two edges of a strip of yard
+# one metre wide) and OSM adds its own. Where two dividers run side by side within DOPPIO_D for DOPPIO_L or more, one stays: the stronger kind
+# (a wall over a fence over a hedge); of the same kind the one farther from the street, so the passage is not narrowed. The other is cut only
+# along the stretches that run parallel (a divider that crosses another keeps its two halves), and what remains stays a divider
+DOPPIO_D = 2.3    # two dividers nearer than this (axis to axis) are one boundary (the two walls of a 2 m shoulder strip in Meda are 2.0-2.15 apart; a real alley is wider)
+DOPPIO_L = 3.0    # ... for at least this many metres
+DOPPIO_COS = 0.9  # and running the same way (|cos| of the angle between them)
+FORZA = {1: 0, 4: 0, 6: 1, 5: 2, 2: 3, 7: 4, 3: 5}   # the lower, the stronger
+FUSI = {'coppie': 0, 'metri_tolti': 0.0, 'linee_toccate': 0}
+
+
+def fondi_doppi(items, dist_strada):
+    """items: [(pts, kind, height)]; dist_strada(LineString) -> distance of the line from the nearest carriageway. Returns the new list"""
+    from shapely.strtree import STRtree
+    n = len(items)
+    L = [LineString(p) if len(p) >= 2 else None for p, k, h in items]
+    key = []
+    for i in range(n):
+        if L[i] is None: key.append((9, 0, i)); continue
+        key.append((FORZA.get(items[i][1], 3), -round(dist_strada(L[i]), 1), -L[i].length, i))
+    order = sorted((i for i in range(n) if L[i] is not None), key=lambda i: key[i])
+    rank = {i: r for r, i in enumerate(order)}
+    tree = STRtree([L[i] for i in order]); surv = {}
+    out = [None] * n
+    for i in order:
+        li = L[i]; pts = shapely.get_coordinates(shapely.segmentize(li, 0.5)); m = len(pts)
+        if m < 2: surv[i] = [li]; continue
+        mid = (pts[:-1] + pts[1:]) / 2; P = shapely.points(mid)
+        dr = np.diff(pts, axis=0); nn = np.hypot(*dr.T); nn[nn == 0] = 1; dr = dr / nn[:, None]
+        mark = np.zeros(len(mid), bool)
+        for jj in tree.query(li.buffer(DOPPIO_D)):
+            j = order[jj]
+            if rank[j] >= rank[i] or j not in surv: continue
+            for M in surv[j]:
+                d = shapely.distance(M, P); c = d < DOPPIO_D
+                if not c.any(): continue
+                pr = shapely.line_locate_point(M, P[c])
+                a = shapely.get_coordinates(shapely.line_interpolate_point(M, np.maximum(pr - 0.3, 0)))
+                b = shapely.get_coordinates(shapely.line_interpolate_point(M, np.minimum(pr + 0.3, M.length)))
+                dm = b - a; nm = np.hypot(*dm.T); nm[nm == 0] = 1; dm = dm / nm[:, None]
+                ok = np.abs((dm * dr[c]).sum(1)) > DOPPIO_COS
+                mark[np.nonzero(c)[0][ok]] = True
+        # runs of marked half-metres of at least DOPPIO_L are removed; shorter ones stay (a corner, a crossing)
+        cut = np.zeros(len(mid), bool); s = None
+        for q in range(len(mid) + 1):
+            if q < len(mid) and mark[q]:
+                if s is None: s = q
+            elif s is not None:
+                if nn[s:q].sum() >= DOPPIO_L: cut[s:q] = True
+                s = None
+        if not cut.any(): surv[i] = [li]; continue
+        FUSI['linee_toccate'] += 1; FUSI['metri_tolti'] += float(nn[cut].sum())
+        pieces = []; s = None
+        for q in range(len(mid) + 1):
+            if q < len(mid) and not cut[q]:
+                if s is None: s = q
+            elif s is not None:
+                run = pts[s:q + 1]
+                if len(run) >= 2 and nn[s:q].sum() > 1.0: pieces.append(LineString(run).simplify(0.05))
+                s = None
+        surv[i] = pieces
+    FUSI['coppie'] = FUSI['linee_toccate']
+    res = []
+    for i in range(n):
+        if L[i] is None: continue
+        if i in surv and surv[i] == [L[i]]: res.append(items[i])
+        else:
+            for pc in surv.get(i, []): res.append((list(pc.coords), items[i][1], items[i][2]))
+    return res
+
 # ---- building sites (Carlo, 26/10): the game fences each OSM building site (landuse=construction) with its hoarding panels along the edge.
 # Where a wall or fence of the map (DBGT or OSM, any kind) already runs along that edge, the two used to stand side by side: there the
 # divider becomes hoarding, on the line of the divider (it is surveyed, the site is drawn by hand), and the edge beside it gets none. A

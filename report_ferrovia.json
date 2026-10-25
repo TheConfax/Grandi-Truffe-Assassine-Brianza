@@ -42,7 +42,7 @@
    "2": 279,
    "3": 11
   },
-  "tempo_s": 0.8
+  "tempo_s": 0.6
  },
  "banchine": {
   "tagliate": 2,
@@ -65,8 +65,8 @@
    "metri": 82.5
   },
   "muri_e_recinzioni": {
-   "n": 6,
-   "metri": 23.7
+   "n": 5,
+   "metri": 20.5
   }
  },
  "lontano_dai_binari": {
@@ -219,6 +219,6 @@
   "cartelli_di_paese": {
    "n": 16
   },
-  "tempo_s": 6.7
+  "tempo_s": 6.0
  }
 }
