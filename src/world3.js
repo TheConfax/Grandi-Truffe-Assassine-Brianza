@@ -65,6 +65,16 @@ function inBed(T, x, z) {
   for (const q of T.sfP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
   return false;
 }
+// a point on hard standing, not on a lawn: a road, a pavement, or a paved area, yard, footway or square of the tile (the surfaces the DBGT and OSM
+// give; the cells of S keep no record of them, so the polygons are decoded once per tile). The volanti of the caserme park only on these
+function hardAt(x, z) {
+  const k = H.kind(x, z); if (k === 'road' || k === 'side' || k === 'plat') return true;
+  const T = TILES[tileOf(x, z)]; if (!T) return false;
+  if (!T.hardP) { const d = T.d, mk = q => { const o = dec(q.p); return { o, k: (q.k || []).map(dec), b: bbox(o) }; };
+    T.hardP = [...(d.a || []).filter(a => a.t !== 5 && a.t !== 6 && a.t !== 18 && !(a.t <= 3 || a.t >= 11 && a.t !== 17)), ...(d.cv || []), ...(d.pz || []), ...(d.ft || []), ...(d.as || [])].filter(q => q.p).map(mk); }
+  for (const q of T.hardP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
+  return false;
+}
 function nearAsph(x, z, m, key) { if (onAsph(x, z, key)) return true; if (!(m > 0)) return false; const e = m + 0.25; return onAsph(x + e, z, key) || onAsph(x - e, z, key) || onAsph(x, z + e, key) || onAsph(x, z - e, key); }
 function nearDeckCarr(x, z, y, m) { return nearAsph(x, z, m, 'ap') && H.deckAt(x, z).some(o => Math.abs(o.top - y) < 1.5); } // in the carriageway of a bridge at this level (tiles[t].ap) // the bit grid is 0.5 m: m past the edge, not on the cell
 function onAnyRoad(x, z, m) { if (m >= 0 && onAsph(x, z)) return true; let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && atGrade(s) && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
@@ -1804,11 +1814,18 @@ for (const p of D.pois) {
     const s = (inside ? 0 : d) - Math.min(Math.sqrt(Math.abs(sArea(b.pts))), 30) * 0.3;
     if ((inside || d < 35) && b.h >= 3 && s < bs) { bs = s; B = b; }
   });
+  // the front the build opened the fence at (pois[].fr, src/build_data.py): the building that has that wall, and no other front is looked for
+  let FR = null;
+  if (p.fr) {
+    const mx = (p.fr[0] + p.fr[2]) / 2, mz = (p.fr[1] + p.fr[3]) / 2; let bd = 1.5;
+    BLD.each(mx - 3, mz - 3, mx + 3, mz + 3, b => { for (let i = 0; i < b.pts.length; i++) { const a = b.pts[i], c = b.pts[(i + 1) % b.pts.length], d = segDist(mx, mz, a[0], a[1], c[0], c[1]); if (d < bd && b.h >= 3) { bd = d; B = b; FR = p.fr; } } });
+  }
   if (!B) continue;
   // the front: a long wall looking onto a street, with nothing in between
   let F = null;
   for (let i = 0; i < B.pts.length; i++) {
-    const a = B.pts[i], c = B.pts[(i + 1) % B.pts.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 5) continue;
+    let a = B.pts[i], c = B.pts[(i + 1) % B.pts.length]; if (FR) { a = [FR[0], FR[1]]; c = [FR[2], FR[3]]; if (i) break; }
+    const L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 5) continue;
     const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L;
     if (inPoly(mx + nx * 0.3, mz + nz * 0.3, B.pts)) { nx = -nx; nz = -nz; }
     if (inPoly(mx + nx * 0.3, mz + nz * 0.3, B.pts)) continue;
@@ -1830,7 +1847,8 @@ for (const p of D.pois) {
   const out = Math.atan2(st.nx, st.nz), along = Math.atan2(st.rx, st.rz);
   if (depth >= 6.5) for (const k of [3.4, -3.4, 6.3, -6.3, 9.2, -9.2]) { if (Math.abs(k) > F.L / 2 + 3) continue; const [x, z] = st.at(k, 3.55); st.spots.push({ x, z, h: out }); }
   else if (depth >= 3.2) for (const k of [4.4, -4.4, 10, -10]) { if (Math.abs(k) > F.L / 2 + 2) continue; const [x, z] = st.at(k, 1.55); st.spots.push({ x, z, h: along }); }
-  if (F.road && F.road.s.r.w >= 7 && F.road.s.r.c >= 2) { // kerb by the station: on the side of the building, along the road
+  st.road = F.road ? { w: F.road.s.r.w, c: F.road.s.r.c, t: F.road.t } : null;
+  if (F.road && F.road.s.r.w >= 5.5 && F.road.s.r.c >= 2) { // kerb by the station (a street of 5.5 m is enough: the volante stands half on the kerb): on the side of the building, along the road
     const s = F.road.s, sx = s.b[0] - s.a[0], sz = s.b[1] - s.a[1], SL = hyp(sx, sz) || 1, ex = sx / SL, ez = sz / SL;
     const t0 = (st.x - s.a[0]) * ex + (st.z - s.a[1]) * ez; let ox = -ez, oz = ex; if ((st.x - s.a[0]) * ox + (st.z - s.a[1]) * oz < 0) { ox = -ox; oz = -oz; }
     for (const k of [5.5, -5.5, 11]) { const t = t0 + k; if (t < 4 || t > SL - 4) continue; const off = s.r.w / 2 - 1.15; st.spots.push({ x: s.a[0] + ex * t + ox * off, z: s.a[1] + ez * t + oz * off, h: Math.atan2(ex, ez), kerb: true }); }
