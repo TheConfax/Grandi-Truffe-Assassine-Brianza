@@ -13,6 +13,29 @@ function lsAxis(P) { // the long axis of a polygon, and its extent along and acr
   const s = Q.map(q => q[0]), v = Q.map(q => q[1]);
   return { cx, cz, ux, uz, nx, nz, Q, s0: Math.min(...s), s1: Math.max(...s), v0: Math.min(...v), v1: Math.max(...v), at: (a, b) => [cx + ux * a + nx * b, cz + uz * a + nz * b] };
 }
+// minimum-area rectangle of a polygon, as a frame like lsAxis: long axis u, centred, s in -a..a (the long sides run along u), v in -b..b
+function lsRect(P) {
+  const pts = P.map(p => [p[0], p[1]]).sort((p, q) => p[0] - q[0] || p[1] - q[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+  for (const p of pts) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  const Hu = lo.slice(0, -1).concat(up.slice(0, -1)); let best = null;
+  for (let i = 0; i < Hu.length; i++) {
+    const a = Hu[i], c = Hu[(i + 1) % Hu.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1e-6) continue;
+    const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L; let s0 = 1e18, s1 = -1e18, v0 = 1e18, v1 = -1e18;
+    for (const p of Hu) { const s = p[0] * ux + p[1] * uz, v = -p[0] * uz + p[1] * ux; if (s < s0) s0 = s; if (s > s1) s1 = s; if (v < v0) v0 = v; if (v > v1) v1 = v; }
+    const ar = (s1 - s0) * (v1 - v0); if (!best || ar < best.ar) best = { ar, ux, uz, s0, s1, v0, v1 };
+  }
+  if (!best) return null;
+  let { ux, uz, s0, s1, v0, v1 } = best;
+  if (s1 - s0 < v1 - v0) { [ux, uz, s0, s1, v0, v1] = [-uz, ux, v0, v1, -s1, -s0]; }
+  const nx = -uz, nz = ux, sm = (s0 + s1) / 2, vm = (v0 + v1) / 2, cx = ux * sm + nx * vm, cz = uz * sm + nz * vm;
+  return { cx, cz, ux, uz, nx, nz, s0: -(s1 - s0) / 2, s1: (s1 - s0) / 2, v0: -(v1 - v0) / 2, v1: (v1 - v0) / 2, at: (a, b) => [cx + ux * a + nx * b, cz + uz * a + nz * b] };
+}
+// test hook (window.__CAMPI, set by a test page only): what each pitch put where, in the frame of its rectangle
+function lsAud(rec, tipo, x, z) {
+  if (!rec) return; const R = rec.rc; if (!R) return; const da = x - R[0], dz = z - R[1], a = da * R[2] + dz * R[3], b = -da * R[3] + dz * R[2];
+  rec.it.push([tipo, +x.toFixed(2), +z.toFixed(2), inPoly(x, z, rec.P) ? 0 : 1, onAnyRoad(x, z, 0.2) ? 1 : 0, R[5] - Math.abs(b) < R[4] - Math.abs(a) ? 1 : 0]); /* tipo, x, z, fuori dal campo, su strada, sul lato lungo */
+}
 function lsSpans(Q, v) { // where the line across at v runs inside the polygon (in axis coordinates)
   const xs = []; for (let i = 0; i < Q.length; i++) { const a = Q[i], b = Q[(i + 1) % Q.length]; if ((a[1] > v) !== (b[1] > v)) xs.push(a[0] + (v - a[1]) / (b[1] - a[1]) * (b[0] - a[0])); }
   xs.sort((p, q) => p - q); const out = []; for (let i = 0; i + 1 < xs.length; i += 2) out.push([xs[i], xs[i + 1]]); return out;
@@ -199,7 +222,7 @@ function* buildPaesaggio(T, G) {
     } else if (kind === 'cani') { // a dog run: a mesh fence with a way in on the side nearest a street, a bench and a bin inside
       let gate = 0, gd = 1e9; P.forEach((p, i) => { const q = P[(i + 1) % P.length], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let d = 1e9; ROADSEG.each(mx - 30, mz - 30, mx + 30, mz + 30, s => { d = Math.min(d, segDist(mx, mz, s.a[0], s.a[1], s.b[0], s.b[1])); }); if (d < gd && hyp(q[0] - p[0], q[1] - p[1]) > 3) { gd = d; gate = i; } });
       lsFence(net, solid, P, 1.2, gate, '#3e4a42');
-      const [bx, bz] = A.at(A.s0 * 0.4, A.v0 * 0.4); if (inPoly(bx, bz, P)) { const gy = H.ground(bx, bz), ry = Math.atan2(A.ux, A.uz); box(1.8, 0.07, 0.42, bx, gy + 0.45, bz, '#7a5a3c', ry); box(1.8, 0.36, 0.06, bx - Math.cos(ry) * 0.2 * 0, gy + 0.78, bz, '#7a5a3c', ry); cyl(0.22, 0.6, bx + Math.sin(ry) * 1.4, gy + 0.6, bz + Math.cos(ry) * 1.4, '#3d5a3a'); }
+      const [bx, bz] = A.at(A.s0 * 0.4, A.v0 * 0.4); if (inPoly(bx, bz, P)) { const gy = H.ground(bx, bz), ry = Math.atan2(A.ux, A.uz); const qx = bx + Math.sin(ry) * 1.4, qz = bz + Math.cos(ry) * 1.4; parkProps(G, 'panchina', [[bx, bz, ry, gy]]); parkProps(G, 'cestino', [[qx, qz, ry, H.ground(qx, qz)]]); } // knocked down like the street lamps (landmarks3.js)
     } else if (kind.startsWith('pista')) { // an athletics track: six red lanes inside the oval, white lines between them
       if (area < 1500 || !isConvex(P)) continue;
       const ring = k => P.map(([x, z]) => { const dx = cx - x, dz = cz - z, l = hyp(dx, dz) || 1; return [x + dx / l * k * 1.22, z + dz / l * k * 1.22]; }), outer = ring(0), inner = ring(6), RED = COL(kind.endsWith('grass') ? '#6b8f3e' : '#b5543f');
@@ -344,9 +367,14 @@ function* buildPaesaggio(T, G) {
   }
   T.lsDone = true;
 }
-// ---- pitches: the lines of the game the map says, goals, hoops, a net; clay courts go red, sand goes sand
-function lsPitch(A, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
-  const W = COL('#f4f2ea'), Ls = A.s1 - A.s0, Wv = A.v1 - A.v0, sm = (A.s0 + A.s1) / 2, vm = (A.v0 + A.v1) / 2, ry = Math.atan2(A.ux, A.uz);
+// a net that is a net: thin pale threads on clear cloth (goals, hoops, tennis and volleyball), unlike the dark fence mesh
+const LS_RETE = new THREE.MeshLambertMaterial({ map: canvasTex(32, 32, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#eceff0'; g.fillRect(0, 0, w, 3); g.fillRect(0, 0, 3, h); }), alphaTest: 0.12, side: THREE.DoubleSide, color: 0xffffff });
+// ---- pitches: the lines of the game the map says, and the gear of that game in its place (frame = the minimum rectangle of the polygon):
+// goals at the middle of the two SHORT sides, on the end line, net behind them and inside the polygon; hoops on the short sides too;
+// a net across the middle of a tennis or volleyball court. Only the sport the map names (the first of a list), nothing mixed on top of it
+function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
+  const A = lsRect(P); if (!A) return;
+  const W = COL('#f4f2ea'), Ls = A.s1 - A.s0, Wv = A.v1 - A.v0, sm = 0, vm = 0;
   if (Ls < 6 || Wv < 4) return;
   const S = (a, b) => A.at(sm + a, vm + b), line = (a0, b0, a1, b1, w = 0.1) => lsLine(lines, A, sm + a0, vm + b0, sm + a1, vm + b1, w, W);
   const rect = (hl, hw) => { line(-hl, -hw, hl, -hw); line(hl, -hw, hl, hw); line(hl, hw, -hl, hw); line(-hl, hw, -hl, -hw); };
@@ -354,37 +382,73 @@ function lsPitch(A, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
   const gyAt = (a, b) => { const [x, z] = S(a, b); return [x, H.ground(x, z), z]; };
   const surf = { clay: '#c0663f', sand: '#e2cf9a', grass: null, artificial_turf: '#5e9a4a', asphalt: '#6e7378', concrete: '#9a9a96', tartan: '#b5523c' }[surface];
   if (surf) { try { const sb = VBuf(); polyFill(sb, P, [], 0.05, 10, COL(surf)); mkMesh(sb, MAT.mark, 2, false, G); } catch (e) { } }
-  const hl = Ls / 2 - 0.6, hw = Wv / 2 - 0.6;
-  if (sport === 'soccer' || sport === 'five-a-side') {
+  const rec = window.__CAMPI ? { sport, surface, P, rc: [A.cx, A.cz, A.ux, A.uz, A.s1, A.v1], it: [] } : null; if (rec) window.__CAMPI.push(rec);
+  const F0 = lmFrame(new THREE.Matrix4()), gnet = Buf(), V3 = THREE.Vector3, Y = new V3(0, 1, 0);
+  const geo = (g, col) => F0.geo(solid, g, null, COL(col));
+  const tube = (p, q, r, col, seg = 6) => { const dx = q[0] - p[0], dy = q[1] - p[1], dz = q[2] - p[2], L = Math.hypot(dx, dy, dz); if (L < 1e-3) return; const g = new THREE.CylinderGeometry(r, r, L, seg); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(Y, new V3(dx / L, dy / L, dz / L)))); g.translate((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2); geo(g, col); };
+  const quad = (a, b, c, d) => { /* a net panel: corners in order, the thread grid laid by metres (cell 0.2 m) */
+    const i = gnet.p.length / 3, e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+    let nx = e1[1] * e2[2] - e1[2] * e2[1], ny = e1[2] * e2[0] - e1[0] * e2[2], nz = e1[0] * e2[1] - e1[1] * e2[0]; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+    const dist = (p, q) => Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) / 0.2, wb = dist(a, b), wc = dist(d, c), hh = dist(a, d);
+    vtx(gnet, a[0], a[1], a[2], nx, ny, nz, 0, 0); vtx(gnet, b[0], b[1], b[2], nx, ny, nz, wb, 0); vtx(gnet, c[0], c[1], c[2], nx, ny, nz, wc, hh); vtx(gnet, d[0], d[1], d[2], nx, ny, nz, 0, hh); gnet.i.push(i, i + 1, i + 2, i, i + 2, i + 3);
+  };
+  const free = (x, z) => inPoly(x, z, P) && !onAnyRoad(x, z, 0.2);
+  /* a goal on the end line at (s, 0): its back points away from the pitch; w wide, h high, d0 deep at the foot, d1 deep at the top */
+  const goal = (e, s, w, h, d0, d1, r) => {
+    const [cx, , cz] = gyAt(s, 0), bx = A.ux * e, bz = A.uz * e, ax = A.nx, az = A.nz, hw_ = w / 2;
+    const at = (o, back, y) => { const x = cx + ax * o + bx * back, z = cz + az * o + bz * back; return [x, H.ground(x, z) + y, z]; };
+    const chk = [at(-hw_, 0, 0), at(hw_, 0, 0), at(-hw_, d0, 0), at(hw_, d0, 0), at(0, d0, 0)];
+    if (!chk.every(p => free(p[0], p[2]))) return false;
+    const pl = at(-hw_, 0, 0), pr = at(hw_, 0, 0), plt = at(-hw_, 0, h), prt = at(hw_, 0, h), tl = at(-hw_, d1, h), tr = at(hw_, d1, h), bl = at(-hw_, d0, 0), br = at(hw_, d0, 0);
+    const BAR = '#f4f2ea', RAIL = '#d3d7da', rr = r * 0.55;
+    tube(pl, plt, r, BAR, 8); tube(pr, prt, r, BAR, 8); tube(plt, prt, r, BAR, 8); /* two posts and the crossbar, round and white */
+    tube(plt, tl, rr, RAIL); tube(prt, tr, rr, RAIL); tube(tl, tr, rr, RAIL); /* the top frame going back */
+    tube(tl, bl, rr, RAIL); tube(tr, br, rr, RAIL); /* the back stays, down to the ground */
+    tube(pl, bl, rr, RAIL); tube(pr, br, rr, RAIL); tube(bl, br, rr, RAIL); /* the ground frame */
+    quad(pl, plt, tl, bl); quad(pr, prt, tr, br); quad(tl, tr, br, bl); quad(plt, prt, tr, tl); /* the net: two sides, the back, the roof */
+    solidAt(pl[0], pl[2], r + 0.05, h); solidAt(pr[0], pr[2], r + 0.05, h);
+    lsAud(rec, 'porta', cx, cz); return true;
+  };
+  const hw = Wv / 2 - 0.6;
+  if (sport === 'soccer' || sport === 'five-a-side' || sport === 'futsal' || sport === 'handball') {
+    const big = sport === 'soccer' && Wv >= 45, gw = Math.min(big ? 7.32 : 3, Wv * 0.5), gh = big ? 2.44 : 2, d0 = big ? 2.0 : 1.1, d1 = big ? 0.9 : 0.5, hl = Ls / 2 - 0.5 - d0;
+    if (hl < 3) return;
     rect(hl, hw); line(0, -hw, 0, hw); circle(0, 0, Math.min(9.15, hw * 0.3));
-    const pd = Math.min(16.5, hl * 0.3), pw = Math.min(20.15, hw * 0.6), gw = Math.min(7.32, Math.max(3, hw * 0.35)), gh = gw > 5 ? 2.44 : 2;
+    const pd = Math.min(16.5, hl * 0.3), pw = Math.min(20.15, hw * 0.6);
     for (const e of [-1, 1]) {
       line(e * hl, -pw, e * (hl - pd), -pw); line(e * (hl - pd), -pw, e * (hl - pd), pw); line(e * (hl - pd), pw, e * hl, pw);
-      const [gx, gy, gz] = gyAt(e * (hl + 0.05), 0), side = [Math.sin(ry), Math.cos(ry)], across = [Math.sin(ry + Math.PI / 2), Math.cos(ry + Math.PI / 2)];
-      for (const o of [-1, 1]) { box(0.12, gh, 0.12, gx + across[0] * o * gw / 2, gy + gh / 2, gz + across[1] * o * gw / 2, '#f4f2ea'); box(0.06, gh, 0.06, gx + across[0] * o * gw / 2 + side[0] * e * 1.5, gy + gh / 2, gz + across[1] * o * gw / 2 + side[1] * e * 1.5, '#d9dcde'); solidAt(gx + across[0] * o * gw / 2, gz + across[1] * o * gw / 2, 0.12, gh); }
-      box(gw + 0.12, 0.12, 0.12, gx, gy + gh, gz, '#f4f2ea', ry + Math.PI / 2); box(gw, 0.05, 1.5, gx + side[0] * e * 0.75, gy + gh, gz + side[1] * e * 0.75, '#e8e8e8', ry + Math.PI / 2);
-      const net = Buf(); for (const [p0, p1] of [[[-gw / 2, 0], [gw / 2, 0]]]) { const off = 1.5 * e, j = 0; void p0; void p1; void j; const pts = [[-gw / 2, 0], [gw / 2, 0], [gw / 2, gh], [-gw / 2, gh]].map(([o, y]) => [gx + across[0] * o + side[0] * off, gy + y, gz + across[1] * o + side[1] * off]); const i = net.p.length / 3; for (const p of pts) vtx(net, p[0], p[1], p[2], side[0], 0, side[1], (p[0] - gx) / 1, p[1] / 1); net.i.push(i, i + 1, i + 2, i, i + 2, i + 3); }
-      mkMesh(net, MAT.net, 11, false, G);
+      for (let k = 0; k < 4; k++) if (goal(e, e * (hl - 0.5 * k), gw, gh, d0, d1, big ? 0.06 : 0.05)) break; /* if the back falls outside the polygon, the goal moves in a little */
     }
-  } else if (sport === 'basketball' || sport === 'multi') {
-    const cl = Math.min(14, hl), cw = Math.min(7.5, hw); rect(cl, cw); line(0, -cw, 0, cw); circle(0, 0, 1.8);
+  } else if (sport === 'basketball' || sport === 'multi') { /* a generic multi-sport court gets just the two hoops */
+    const cl = Math.min(14, Ls / 2 - 1.5 - 1.0), cw = Math.min(7.5, hw); if (cl < 4) return;
+    rect(cl, cw); line(0, -cw, 0, cw); circle(0, 0, 1.8);
     for (const e of [-1, 1]) {
       line(e * cl, -2.45, e * (cl - 5.8), -2.45); line(e * (cl - 5.8), -2.45, e * (cl - 5.8), 2.45); line(e * (cl - 5.8), 2.45, e * cl, 2.45); circle(e * (cl - 5.8), 0, 1.8, e > 0 ? Math.PI / 2 : -Math.PI / 2, e > 0 ? Math.PI * 1.5 : Math.PI / 2);
       const [px, py, pz] = gyAt(e * (cl + 1.0), 0), [bx, , bz] = gyAt(e * (cl - 1.2), 0), [rx, , rz] = gyAt(e * (cl - 1.6), 0);
-      cyl(0.08, 3.4, px, py + 1.7, pz, '#3a3d40', 8); box(0.1, 0.1, 2.2, (px + bx) / 2, py + 3.3, (pz + bz) / 2, '#3a3d40', ry); box(0.05, 1.05, 1.8, bx, py + 3.4, bz, '#f4f2ea', ry);
-      F0geo(solid, new THREE.TorusGeometry(0.23, 0.02, 6, 16).rotateX(Math.PI / 2).translate(rx, py + 3.05, rz), '#e86a2a'); solidAt(px, pz, 0.15, 3.5);
+      if (!free(px, pz) || !free(bx, bz)) continue;
+      cyl(0.08, 3.5, px, py + 1.75, pz, '#3a3d40', 8); /* the pole behind the baseline */
+      tube([px, py + 3.3, pz], [bx, py + 3.3, bz], 0.04, '#3a3d40'); /* the arm to the board */
+      box(1.8, 1.05, 0.05, bx, py + 3.45, bz, '#f4f2ea', Math.atan2(-A.ux, -A.uz)); /* the board faces along the court: wide across it, thin along it */
+      geo(new THREE.TorusGeometry(0.23, 0.02, 6, 16).rotateX(Math.PI / 2).translate(rx, py + 3.05, rz), '#e86a2a'); /* the rim */
+      for (let k = 0; k < 10; k++) { const t0 = k / 10 * TAU, t1 = (k + 1) / 10 * TAU; quad([rx + Math.cos(t0) * 0.23, py + 3.05, rz + Math.sin(t0) * 0.23], [rx + Math.cos(t1) * 0.23, py + 3.05, rz + Math.sin(t1) * 0.23], [rx + Math.cos(t1) * 0.14, py + 2.65, rz + Math.sin(t1) * 0.14], [rx + Math.cos(t0) * 0.14, py + 2.65, rz + Math.sin(t0) * 0.14]); } /* the cord net under it */
+      solidAt(px, pz, 0.15, 3.5); lsAud(rec, 'canestro', px, pz);
     }
-  } else if (sport === 'tennis') {
-    const cl = Math.min(11.885, hl), cw = Math.min(5.485, hw), sw = cw * 4.115 / 5.485; rect(cl, cw); line(-cl, -sw, cl, -sw); line(-cl, sw, cl, sw);
-    for (const e of [-1, 1]) line(e * cl * 6.4 / 11.885, -sw, e * cl * 6.4 / 11.885, sw); line(-cl * 6.4 / 11.885, 0, cl * 6.4 / 11.885, 0);
-    lsNet(A, sm, vm, cw + 0.9, 1.07, 0.95, G, box);
-  } else if (sport === 'volleyball' || sport === 'beachvolleyball') {
-    const cl = Math.min(9, hl), cw = Math.min(4.5, hw); rect(cl, cw); line(0, -cw, 0, cw); lsNet(A, sm, vm, cw + 0.6, 2.43, 1.0, G, box);
-  } else if (sport === 'boules' || sport === 'bowls') { // the boards round a bocce court
-    const [ax, , az] = gyAt(0, 0); void ax; void az;
+  } else if (sport === 'tennis' || sport === 'volleyball' || sport === 'beachvolleyball') {
+    const ten = sport === 'tennis', cl = Math.min(ten ? 11.885 : 9, Ls / 2 - 0.6), cw = Math.min(ten ? 5.485 : 4.5, hw);
+    if (ten) { const sw = cw * 4.115 / 5.485; rect(cl, cw); line(-cl, -sw, cl, -sw); line(-cl, sw, cl, sw); for (const e of [-1, 1]) line(e * cl * 6.4 / 11.885, -sw, e * cl * 6.4 / 11.885, sw); line(-cl * 6.4 / 11.885, 0, cl * 6.4 / 11.885, 0); }
+    else { rect(cl, cw); line(0, -cw, 0, cw); }
+    /* the net across the middle of the court, from one post to the other, dividing it in two halves: 0.914 m at the centre and 1.07 m at the posts for tennis, 2.43 m for volleyball */
+    const half = Math.min(cw + (ten ? 0.9 : 0.6), Wv / 2 - 0.2), post = ten ? 1.07 : 2.55, N_ = 8, top = t => ten ? 0.914 + (1.07 - 0.914) * (t / half) ** 2 : 2.43, bot = t => ten ? 0.03 : 2.43 - 1.0;
+    const pt = (t, y) => { const [x, z] = S(0, t); return [x, H.ground(x, z) + y, z]; };
+    if (free(...S(0, -half)) && free(...S(0, half))) {
+      for (const o of [-half, half]) { const [x, , z] = pt(o, 0); tube(pt(o, 0), pt(o, post), 0.05, '#3a3d40', 8); solidAt(x, z, 0.1, post); lsAud(rec, 'rete', x, z); }
+      for (let k = 0; k < N_; k++) { const t0 = -half + 2 * half * k / N_, t1 = -half + 2 * half * (k + 1) / N_; quad(pt(t0, bot(t0)), pt(t1, bot(t1)), pt(t1, top(t1)), pt(t0, top(t0))); tube(pt(t0, top(t0)), pt(t1, top(t1)), 0.025, '#f4f2ea'); }
+    }
+  } else if (sport === 'boules' || sport === 'bowls') { /* the boards round a bocce court */
+    const hl = Ls / 2 - 0.6;
     for (const [a0, b0, a1, b1] of [[-hl, -hw, hl, -hw], [-hl, hw, hl, hw], [-hl, -hw, -hl, hw], [hl, -hw, hl, hw]]) { const [x0, y0, z0] = gyAt(a0, b0), [x1, , z1] = gyAt(a1, b1); box(hyp(x1 - x0, z1 - z0) + 0.2, 0.3, 0.12, (x0 + x1) / 2, y0 + 0.15, (z0 + z1) / 2, '#8a6a4a', Math.atan2(x1 - x0, z1 - z0) - Math.PI / 2); }
   }
-  function F0geo(b, g, col) { lmFrame(new THREE.Matrix4()).geo(b, g, null, COL(col)); }
+  if (gnet.i.length) mkMesh(gnet, LS_RETE, 11, false, G);
 }
 // what the information boards say: write the lines here (one string per board, picked by place); empty, they show a map of the town
 const PANNELLI = [];
@@ -422,11 +486,4 @@ function lsTower(solid, x, z, r, h, solidAt) {
   F0.geo(solid, new THREE.CylinderGeometry(R, R, h * 0.14, 18).translate(x, gy + Hs + h * 0.17, z), null, COL('#d4cfc3'));
   F0.geo(solid, new THREE.CylinderGeometry(R * 0.2, R * 1.02, h * 0.05, 18).translate(x, gy + h * 0.985, z), null, COL('#8f8b84'));
   solidAt(x, z, R * 0.36, h);
-}
-function lsNet(A, sm, vm, half, postH, netH, G, box, y0 = 0) { // posts at the sides, the net across the middle
-  const ry = Math.atan2(A.ux, A.uz), [ax, az] = A.at(sm, vm - half), [bx, bz] = A.at(sm, vm + half), ga = H.ground(ax, az), gb = H.ground(bx, bz);
-  box(0.08, postH + y0, 0.08, ax, ga + (postH + y0) / 2, az, '#3a3d40'); box(0.08, postH + y0, 0.08, bx, gb + (postH + y0) / 2, bz, '#3a3d40');
-  const net = Buf(), top = Math.min(ga, gb) + y0 + postH, i = 0; void i; void ry;
-  vtx(net, ax, top - netH, az, A.ux, 0, A.uz, 0, 0); vtx(net, bx, top - netH, bz, A.ux, 0, A.uz, half * 2, 0); vtx(net, bx, top, bz, A.ux, 0, A.uz, half * 2, netH); vtx(net, ax, top, az, A.ux, 0, A.uz, 0, netH); net.i.push(0, 1, 2, 0, 2, 3);
-  mkMesh(net, MAT.net, 11, false, G); box(0.03, 0.06, half * 2, (ax + bx) / 2, top, (az + bz) / 2, '#f4f2ea', ry);
 }

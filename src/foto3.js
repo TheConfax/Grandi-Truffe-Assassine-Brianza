@@ -3,7 +3,7 @@
 // (tex/*.jpg, made from the originals by the script in the commit): same palette, real asphalt cracks, blades of grass, paving joints.
 // The texture object stays the same, so every material using it follows; repeat turns the UV scale the surface was drawn with
 // (metres per repeat) into the size of the photo (metres)
-const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 1.8], [porfidoTex, 'porfido', 4 / 1]];
+const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 1.8], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
 {
   const ld = new THREE.TextureLoader();
   for (const [t, f, r] of FOTO_TEX) ld.load('tex/' + f + '.jpg', img => { t.image = img.image; t.repeat.set(r, r); t.needsUpdate = true; });
