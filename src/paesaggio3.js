@@ -196,7 +196,7 @@ function* buildPaesaggio(T, G) {
     } else if (kind === 'cani') { // a dog run: a mesh fence with a way in on the side nearest a street, a bench and a bin inside
       let gate = 0, gd = 1e9; P.forEach((p, i) => { const q = P[(i + 1) % P.length], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let d = 1e9; ROADSEG.each(mx - 30, mz - 30, mx + 30, mz + 30, s => { d = Math.min(d, segDist(mx, mz, s.a[0], s.a[1], s.b[0], s.b[1])); }); if (d < gd && hyp(q[0] - p[0], q[1] - p[1]) > 3) { gd = d; gate = i; } });
       lsFence(net, solid, P, 1.2, gate, '#3e4a42');
-      const [bx, bz] = A.at(A.s0 * 0.4, A.v0 * 0.4); if (inPoly(bx, bz, P)) { const gy = H.ground(bx, bz), ry = Math.atan2(A.ux, A.uz); box(1.8, 0.07, 0.42, bx, gy + 0.45, bz, '#7a5a3c', ry); box(1.8, 0.36, 0.06, bx - Math.cos(ry) * 0.2 * 0, gy + 0.78, bz, '#7a5a3c', ry); cyl(0.22, 0.6, bx + Math.sin(ry) * 1.4, gy + 0.6, bz + Math.cos(ry) * 1.4, '#3d5a3a'); }
+      const [bx, bz] = A.at(A.s0 * 0.4, A.v0 * 0.4); if (inPoly(bx, bz, P)) { const gy = H.ground(bx, bz), ry = Math.atan2(A.ux, A.uz); const qx = bx + Math.sin(ry) * 1.4, qz = bz + Math.cos(ry) * 1.4; parkProps(G, 'panchina', [[bx, bz, ry, gy]]); parkProps(G, 'cestino', [[qx, qz, ry, H.ground(qx, qz)]]); } // knocked down like the street lamps (landmarks3.js)
     } else if (kind.startsWith('pista')) { // an athletics track: six red lanes inside the oval, white lines between them
       if (area < 1500 || !isConvex(P)) continue;
       const ring = k => P.map(([x, z]) => { const dx = cx - x, dz = cz - z, l = hyp(dx, dz) || 1; return [x + dx / l * k * 1.22, z + dz / l * k * 1.22]; }), outer = ring(0), inner = ring(6), RED = COL(kind.endsWith('grass') ? '#6b8f3e' : '#b5543f');

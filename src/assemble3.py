@@ -50,13 +50,13 @@ const flatMat""", """  parent.add(m); return m;
 const flatMat""")
 
 # ---- world: replace everything from "the world" to "audio" with the tiled world + level-aware collisions
-world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read()
+world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
 function collideStatic(p, r, y) {
   let nx = 0, nz = 0, hit = false;
   WALLS.each(p.x - r - 1, p.z - r - 1, p.x + r + 1, p.z + r + 1, s => {
-    if (s.y0 !== undefined && (y === undefined || y < s.y0 || y > s.y1)) return;
+    if (s.off || s.y0 !== undefined && (y === undefined || y < s.y0 || y > s.y1)) return; /* s.off: a barrier piece broken through (sfondabili3.js) */
     if (s.dyn && !s.on) return;
     if (s.r) { const dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz), R = r + s.r; if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; hit = true; } return; }
     if (s.dyn && !s.on) return;
@@ -71,7 +71,7 @@ function collideStatic(p, r, y) {
 function rayWalls(ax, az, bx, bz, solidOnly) {
   let best = 1; const dx = bx - ax, dz = bz - az;
   WALLS.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => {
-    if (s.r || s.dyn || s.deckw || (solidOnly && s.two)) return; const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
+    if (s.r || s.dyn || s.off || s.deckw || (solidOnly && s.two)) return; const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
     const t = ((s.ax - ax) * ez - (s.az - az) * ex) / den, u = ((s.ax - ax) * dz - (s.az - az) * dx) / den;
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < best) best = t;
   });
@@ -240,7 +240,7 @@ rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z
 rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
-rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
+rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
 rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
@@ -270,7 +270,7 @@ rep("if (traffic.length < 22 && rnd() < dt * 2) spawnTraffic(true);", "if (traff
 rep("    for (const g of LX) if (g.bars && (g.closed || g.ang < 0.7)) for (const b of g.bars) for (const [x, z] of b.probe) check(x, z);",
     "    for (const g of LX) if (g.bars && (g.closed || g.ang < 0.7)) for (const b of g.bars) for (const [x, z] of b.probe) check(x, z);\n    if (v.ai && !v.ai.cop) SIGG.each(v.x - 30, v.z - 30, v.x + 30, v.z + 30, sg => { if (sigState(axisOf(fx, fz)) === 'g') return; const ox = sg.x - v.x, oz = sg.z - v.z, ahead = ox * fx + oz * fz, side = Math.abs(ox * fz - oz * fx); if (ahead > sg.w / 2 + 3 && ahead < 32 && side < sg.w / 2 + 4) block = Math.min(block, ahead - sg.w / 2 - 1); });")
 rep("  updTrain(dt); updCrossings(dt);", "  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains();")
-rep("    v.step(dt); v.collide();", "    v.step(dt); gateHits(v); fuelHits(v); propHits(v); v.collide();")
+rep("    v.step(dt); v.collide();", "    v.step(dt); gateHits(v); fuelHits(v); propHits(v); barHits(v); v.collide();")
 # no spawning on top of the player; tougher cars
 rep("  const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off, e);", "  if (a == null || VEH.some(o => hyp(o.x - N[a][0], o.z - N[a][1]) < 9)) return null;\n  const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off, e);")
 rep("  const e = pick(WALK[a]); if (!e) return; const side", "  if (a == null) return; const e = pick(WALK[a]); if (!e) return; const side")
