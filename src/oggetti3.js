@@ -179,12 +179,17 @@ function buildOggetti(T, G) {
   T.ogDone = true;
 }
 
-// ---------------------------------------------------------------- manufatti of the DBGT (dbgt_manufatti.py, tiles[t].mf): plain shapes, no detail
-// k 1 a round tank or silo (MN_IND 07, 0702): a cylinder of radius r and height h, flat top; k 2 the same not round: the footprint raised to h;
-// k 3 an open basin (MN_IND 11): concrete walls up to h, the water 12 cm under the rim. Heights from the DSM where it sees them. Solid
+// ---------------------------------------------------------------- manufatti of the DBGT (dbgt_manufatti.py, tiles[t].mf)
+// k 1 a round tank or silo (MN_IND 07, 0702): a drum of sheet metal of radius r up to the low cone of its top (h is the top, the DSM's p90),
+// a cage ladder up the side, a rail round the top, catwalks between neighbours of the same yard (the four silos of via Cadorna in the photo);
+// k 2 the same not round: a horizontal tank on two saddles if long and low, else the footprint raised to h; k 3 an open basin (MN_IND 11):
+// concrete walls up to h, the water 12 cm under the rim. Colours as the 2018-19 orthophoto shows them (m walls, t top, a water, b rim;
+// src/manufatti_foto.json), else light metal and plain concrete. Heights from the DSM where it sees them. Solid
+let MF_SILOS = null; // the round silos of every tile, for the catwalks between them
+const mfRise = (r, h) => Math.min(1.5, 0.25 * r, h * 0.12); // the cone on top of a silo
 function buildManufatti(T, G) {
   const list = T.d.mf || []; if (!list.length) return;
-  const b = Buf(), F = lmFrame(new THREE.Matrix4()), METAL = COL('#b9bdc0'), CONC = COL('#aaa59b'), WATER = COL('#41687a'), solid = !T.mfDone;
+  const b = Buf(), F = lmFrame(new THREE.Matrix4()), CONC = COL('#aaa59b'), solid = !T.mfDone, STEEL = '#9aa0a5';
   const ring = (pts, y0, y1, col, walls) => { // walls of a ring of points from y0 to y1 (y per point), and their collision
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i], c = pts[(i + 1) % pts.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
@@ -192,20 +197,55 @@ function buildManufatti(T, G) {
       if (walls) WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(...y0) - 3, y1 });
     }
   };
+  const geo = (g, col) => F.geo(b, g, null, COL(col)), bx = (w, h, d, x, y, z, col, ry = 0) => geo(lmBox(w, h, d, x, y, z, ry), col);
+  const silos = [];
   for (const m of list) {
     const h = m.h / 10;
     if (m.k === 1) {
-      const x = m.c[0] / 10, z = m.c[1] / 10, r = m.r / 10, n = Math.max(10, Math.min(28, Math.round(r * 5))), pts = [];
-      for (let i = 0; i < n; i++) { const a = i * TAU / n; pts.push([x + Math.cos(a) * r, z + Math.sin(a) * r]); }
-      const gys = pts.map(p => H.ground(p[0], p[1])), top = H.ground(x, z) + h;
-      ring(pts, gys.map(g => g - 0.3), top, METAL, false); F.face(b, pts.map(p => [p[0], top, p[1]]), 2, METAL);
-      if (solid) WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: Math.min(...gys) - 3, y1: top });
+      const x = m.c[0] / 10, z = m.c[1] / 10, r = m.r / 10, n = Math.max(12, Math.min(28, Math.round(r * 6))), gy = H.ground(x, z), top = gy + h;
+      const rise = mfRise(r, h), eave = top - rise, wc = m.m || '#d8d7d2', tc = m.t || '#c8c9c9';
+      geo(new THREE.CylinderGeometry(r, r, eave - gy + 0.3, n, 1, true).translate(x, (eave + gy - 0.3) / 2, z), wc);
+      geo(new THREE.CylinderGeometry(r * 1.02, r * 1.02, 0.25, n, 1, true).translate(x, eave - 0.12, z), '#b4b6b6');
+      geo(new THREE.CylinderGeometry(Math.min(0.35, r * 0.2), r * 1.02, rise, n).translate(x, eave + rise / 2, z), tc);
+      if (h > 3.5 && r > 0.8) silos.push({ x, z, r, gy, eave, top });
+      if (solid) WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: gy - 3, y1: top });
+    } else if (m.k === 2) {
+      const pts = dec(m.p); if (pts.length < 3) continue;
+      const [cx, cz] = centroid(pts), gys = pts.map(p => H.ground(p[0], p[1])), top = H.ground(cx, cz) + h, A = lsAxis(pts), L = A.s1 - A.s0, W = A.v1 - A.v0;
+      if (L >= 1.8 * W && h <= 1.3 * W + 0.5) { // a horizontal tank on two saddles
+        const R = Math.min(W / 2, (top - Math.min(...gys)) / 2), yc = top - R, ry = Math.atan2(A.ux, A.uz);
+        const g = new THREE.CylinderGeometry(R, R, L - 0.2, 20).rotateX(Math.PI / 2).rotateY(ry).translate(A.cx, yc, A.cz); geo(g, m.m || '#d8d7d2');
+        const yb = Math.min(...gys); for (const f of [-0.3, 0.3]) { const [sx, sz] = A.at((A.s0 + A.s1) / 2 + f * L, (A.v0 + A.v1) / 2); bx(W * 0.8, yc - yb, 0.3, sx, (yc + yb) / 2, sz, '#8f949a', ry); }
+        if (solid) for (let i = 0; i < pts.length; i++) { const a = pts[i], c = pts[(i + 1) % pts.length], l = hyp(c[0] - a[0], c[1] - a[1]); if (l > 0.05) WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / l, nz: -(c[0] - a[0]) / l, two: true, y0: Math.min(...gys) - 3, y1: top }); }
+        continue;
+      }
+      ring(pts, gys.map(g => g - 0.3), top, COL(m.m || '#d8d7d2'), solid);
+      F.face(b, pts.map(p => [p[0], top, p[1]]), 2, COL(m.t || '#c8c9c9'));
     } else {
       const pts = dec(m.p); if (pts.length < 3) continue;
-      const [cx, cz] = centroid(pts), gys = pts.map(p => H.ground(p[0], p[1])), top = H.ground(cx, cz) + h;
-      ring(pts, gys.map(g => g - 0.3), top, m.k === 3 ? CONC : METAL, solid);
-      F.face(b, pts.map(p => [p[0], m.k === 3 ? top - 0.12 : top, p[1]]), 2, m.k === 3 ? WATER : METAL);
+      const [cx, cz] = centroid(pts), gys = pts.map(p => H.ground(p[0], p[1])), top = H.ground(cx, cz) + h, rim = m.b ? COL(m.b) : CONC;
+      ring(pts, gys.map(g => g - 0.3), top, rim, solid);
+      F.face(b, pts.map(p => [p[0], top - 0.12, p[1]]), 2, COL(m.a || '#41687a'));
     }
+  }
+  // ladders, rails, catwalks
+  for (const S of silos) {
+    const a = LS_HASH(S.x, S.z, 'scala') * TAU, ux = Math.cos(a), uz = Math.sin(a), ry = Math.atan2(ux, uz), o = S.r + 0.25;
+    for (const q of [-0.22, 0.22]) bx(0.05, S.eave - S.gy + 1, 0.05, S.x + ux * o - uz * q, (S.eave + S.gy + 1) / 2, S.z + uz * o + ux * q, STEEL);
+    for (let y = S.gy + 0.4; y < S.eave + 0.9; y += 0.6) bx(0.44, 0.03, 0.03, S.x + ux * o, y, S.z + uz * o, STEEL, ry);
+    for (let y = S.gy + 2.4; y < S.eave + 1; y += 1.2) geo(new THREE.TorusGeometry(0.3, 0.02, 3, 10, Math.PI).rotateX(Math.PI / 2).rotateY(ry).translate(S.x + ux * o, y, S.z + uz * o), STEEL);
+    const n = Math.max(10, Math.round(S.r * 4));
+    for (let i = 0; i < n; i++) { const t0 = i * TAU / n, t1 = (i + 1) * TAU / n, R = S.r * 0.98; lsRod(b, [S.x + Math.cos(t0) * R, S.eave + 1.0, S.z + Math.sin(t0) * R], [S.x + Math.cos(t1) * R, S.eave + 1.0, S.z + Math.sin(t1) * R], 0.025, STEEL); if (i % 2 === 0) lsRod(b, [S.x + Math.cos(t0) * R, S.eave, S.z + Math.sin(t0) * R], [S.x + Math.cos(t0) * R, S.eave + 1.0, S.z + Math.sin(t0) * R], 0.02, STEEL); }
+  }
+  // a catwalk from each silo of this tile to a neighbour of any tile (the four of via Cadorna stand on two tiles), drawn once: by the silo first in x
+  if (!MF_SILOS) { MF_SILOS = []; for (const T2 of TILES) for (const q of T2.d.mf || []) if (q.k === 1 && q.h > 35 && q.r > 8) { const x = q.c[0] / 10, z = q.c[1] / 10, r = q.r / 10, h = q.h / 10; MF_SILOS.push({ x, z, r, h }); } }
+  for (const A of silos) for (const Q of MF_SILOS) {
+    if (Q.x < A.x || (Q.x === A.x && Q.z <= A.z) || Math.abs(Q.x - A.x) > 14 || Math.abs(Q.z - A.z) > 14) continue;
+    const C = { x: Q.x, z: Q.z, r: Q.r, eave: H.ground(Q.x, Q.z) + Q.h - mfRise(Q.r, Q.h) };
+    const d = hyp(C.x - A.x, C.z - A.z), gap = d - A.r - C.r; if (gap < 0.2 || gap > 4 || Math.abs(A.eave - C.eave) > 2.5) continue;
+    const ux = (C.x - A.x) / d, uz = (C.z - A.z) / d, y = Math.min(A.eave, C.eave), mx = A.x + ux * (A.r + gap / 2), mz = A.z + uz * (A.r + gap / 2), ry = Math.atan2(ux, uz), L = gap + 0.6;
+    bx(0.8, 0.08, L, mx, y - 0.04, mz, '#8f949a', ry);
+    for (const q of [-0.4, 0.4]) { bx(0.04, 0.04, L, mx - uz * q, y + 1.0, mz + ux * q, STEEL, ry); bx(0.04, 1.0, 0.04, mx - uz * q, y + 0.5, mz + ux * q, STEEL); }
   }
   if (b.i.length) mkMesh(b, LMAT.trim, 10, 'cast', G);
   T.mfDone = true;

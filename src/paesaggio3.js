@@ -46,6 +46,8 @@ const LS_DOOR_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, polygonO
   g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, w, 3); g.fillRect(0, h - 3, w, 3); g.fillRect(0, 0, 2, h); g.fillRect(w - 2, 0, 2, h); g.fillStyle = '#555'; g.fillRect(w / 2 - 3, h * 0.55, 6, 3); }, false) });
 const LS_DOOR_COLS = ['#c9ccd1', '#9da1a6', '#b8ad95', '#6b7a6b', '#8a6a52', '#d9d6cf', '#7d8ea0'];
 const LS_GLASS = new THREE.MeshLambertMaterial({ color: 0xe4f0ee, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
+// the film of a plastic tunnel: milky, or the colour the photo shows (green shade cloth, the clear cover of a pool), per vertex
+const LS_FILM = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
 const LS_BALE_G = (() => { const g = new THREE.CylinderGeometry(0.75, 0.75, 1.2, 12); g.rotateZ(Math.PI / 2); g.translate(0, 0.75, 0); return g; })(), LS_BALE_M = lam(0xc9ab62);
 // a hoarding panel 1 m long (stretched to its length along x), 2 m high, with its post at one end; the colour comes per instance
 const LS_PANEL_G = (() => { const b = Buf(), F = lmFrame(new THREE.Matrix4()); F.geo(b, lmBox(1, 2, 0.05, 0, 1, 0), null, COL('#ffffff')); F.geo(b, lmBox(0.05, 2.1, 0.07, -0.5, 1.05, 0), null, COL('#8f949a'));
@@ -54,7 +56,7 @@ const LS_PANEL_M = new THREE.MeshLambertMaterial({ vertexColors: true }), LS_PAN
 const LS_POT_G = (() => { const g = new THREE.IcosahedronGeometry(0.32, 0); g.translate(0, 0.45, 0); return g; })();
 
 function* buildPaesaggio(T, G) {
-  const d = T.d, solid = Buf(), drape = Object.assign(VBuf(), { noclip: !!H.tile(T.t) }), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), F0 = lmFrame(new THREE.Matrix4());
+  const d = T.d, solid = Buf(), drape = Object.assign(VBuf(), { noclip: !!H.tile(T.t) }), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), film = Buf(), F0 = lmFrame(new THREE.Matrix4());
   const box = (w, h, dd, x, y, z, col, ry = 0) => F0.geo(solid, lmBox(w, h, dd, x, y, z, ry), null, COL(col));
   const cyl = (r, h, x, y, z, col, seg = 10) => F0.geo(solid, new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z), null, COL(col));
   const solids = [], bales = [], trees = [], pots = [], panels = [];
@@ -89,17 +91,20 @@ function* buildPaesaggio(T, G) {
     void gy;
   }
   yield 'garage';
-  // ---- greenhouses: glass walls and roof on a light frame, rows of plants inside
+  // ---- greenhouses: glass walls and roof on a light frame, rows of plants inside; a plastic tunnel where the DBGT greenhouse is one
+  // (B.mm.k 'tunnel', dbgt_manufatti.py _modello: the photo, or a narrow rectangle)
   for (const B of T.bld) {
     if (B.g !== 2 || B.lm) continue;
-    const P = B.pts, n = P.length, gys = P.map(p => H.ground(p[0], p[1])), g0 = Math.min(...gys), top = Math.max(...gys) + Math.max(2.4, B.h), Ax = lsAxis(P);
+    if (B.mm && B.mm.k === 'tunnel') { lsTunnel(B, film, solid, box); continue; }
+    const P = B.pts, n = P.length, gys = P.map(p => H.ground(p[0], p[1])), g0 = Math.min(...gys), Ax = lsAxis(P);
+    const ridge0 = n <= 5 && isConvex(P), rh0 = ridge0 ? Math.min(1.6, (Ax.v1 - Ax.v0) * 0.25) : 0, top = Math.max(...gys) + Math.max(2.2, B.h - (B.mm ? rh0 : 0)); // a DBGT greenhouse: B.h is the ridge
     for (let i = 0; i < n; i++) {
       const a = P[i], c = P[(i + 1) % n], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.2) continue; const j = glass.p.length / 3;
       vtx(glass, a[0], g0 - 0.3, a[1], 0, 0, 1, 0, 0); vtx(glass, c[0], g0 - 0.3, c[1], 0, 0, 1, 0, 0); vtx(glass, c[0], top, c[1], 0, 0, 1, 0, 0); vtx(glass, a[0], top, a[1], 0, 0, 1, 0, 0); glass.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
       for (let t = 0; t <= L; t += 2.2) { const x = a[0] + (c[0] - a[0]) * t / L, z = a[1] + (c[1] - a[1]) * t / L; box(0.06, top - g0 + 0.3, 0.06, x, (top + g0 - 0.3) / 2, z, '#dfe3e4'); }
     }
     // the roof: a ridge down the long axis when the plan is a plain box, flat otherwise
-    const ridge = n <= 5 && isConvex(P), rh = ridge ? Math.min(1.6, (Ax.v1 - Ax.v0) * 0.25) : 0;
+    const ridge = ridge0, rh = rh0;
     try { if (!ridge) { const rb = Buf(); polyFill(rb, P, [], top, 10, null); const j0 = glass.p.length / 3; for (let q = 0; q < rb.p.length; q += 3) vtx(glass, rb.p[q], rb.p[q + 1], rb.p[q + 2], 0, 1, 0, 0, 0); for (const q of rb.i) glass.i.push(j0 + q); }
       else { const vm = (Ax.v0 + Ax.v1) / 2; for (const vv of [Ax.v0, Ax.v1]) { const [ax, az] = Ax.at(Ax.s0, vv), [bx, bz] = Ax.at(Ax.s1, vv), [cx, cz] = Ax.at(Ax.s1, vm), [ex, ez] = Ax.at(Ax.s0, vm), j = glass.p.length / 3;
         vtx(glass, ax, top, az, 0, 1, 0, 0, 0); vtx(glass, bx, top, bz, 0, 1, 0, 0, 0); vtx(glass, cx, top + rh, cz, 0, 1, 0, 0, 0); vtx(glass, ex, top + rh, ez, 0, 1, 0, 0, 0); glass.i.push(j, j + 1, j + 2, j, j + 2, j + 3); }
@@ -235,8 +240,10 @@ function* buildPaesaggio(T, G) {
     const top = rows * 0.42 + 2.6, vb = face > 0 ? Ax.v0 + 0.15 : Ax.v1 - 0.15, [wx, wz] = Ax.at(sm, vb); box(Ls, top, 0.3, wx, gy + top / 2, wz, '#a9a398', ry);
     const [rx_, rz_] = Ax.at(sm, (Ax.v0 + Ax.v1) / 2 + face * 0.6); box(Ls + 0.4, 0.2, D_ + 1.4, rx_, gy + top, rz_, '#8f949a', ry);
   }
-  // water towers mapped as buildings
-  for (const B of T.bld) if (B.g === 4 && !B.lm) { const [x, z] = centroid(B.pts); lsTower(solid, x, z, Math.sqrt(Math.abs(sArea(B.pts)) / Math.PI), B.h, solidAt); }
+  // water towers mapped as buildings (the DBGT one with what the photos say, B.mm)
+  for (const B of T.bld) if (B.g === 4 && !B.lm) { const [x, z] = centroid(B.pts); lsTower(solid, x, z, Math.sqrt(Math.abs(sArea(B.pts)) / Math.PI), B.h, solidAt, B.mm); }
+  // the cabins of the DBGT (electric, gas): their walls and roof here, the collision is the building's
+  for (const B of T.bld) if (B.g === 5 && !B.lm) lsCabina(B, solid, box);
   // information boards: a map of the place on the board (the funny ones are in PANNELLI, to be written)
   const OI = OGG_KINDS.indexOf('pannello'), boards = (d.og || []).filter(o => o[0] === OI);
   if (boards.length) {
@@ -313,6 +320,7 @@ function* buildPaesaggio(T, G) {
   if (solid.i.length) mkMesh(solid, LMAT.trim, 10, 'cast', G);
   if (doors.i.length) mkMesh(doors, LS_DOOR_MAT, 10, false, G);
   if (glass.i.length) mkMesh(glass, LS_GLASS, 12, false, G);
+  if (film.i.length) mkMesh(film, LS_FILM, 12, false, G);
   const o3 = new THREE.Object3D(), inst = (geo, mat, list, sc, colOf) => {
     if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length); im.castShadow = true;
     list.forEach(([x, z, r], i) => { o3.position.set(x, H.ground(x, z), z); o3.rotation.set(0, r || 0, 0); const k = sc ? sc(x, z) : 1; o3.scale.set(k, k, k); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); if (colOf) im.setColorAt(i, COL(colOf(x, z))); });
@@ -411,14 +419,126 @@ function lsRail(solid, P, gate, box) {
     }
   }
 }
-// a water tower: shaft, a cone up to the tank, the tank, its roof; r is the radius of the tank, h the height
-function lsTower(solid, x, z, r, h, solidAt) {
-  const F0 = lmFrame(new THREE.Matrix4()), gy = H.ground(x, z), R = clamp(r, 2.5, 9), Hs = h * 0.72;
-  F0.geo(solid, new THREE.CylinderGeometry(R * 0.3, R * 0.36, Hs, 14).translate(x, gy + Hs / 2, z), null, COL('#c9c4b8'));
-  F0.geo(solid, new THREE.CylinderGeometry(R, R * 0.3, h * 0.1, 18).translate(x, gy + Hs + h * 0.05, z), null, COL('#bdb7a9'));
-  F0.geo(solid, new THREE.CylinderGeometry(R, R, h * 0.14, 18).translate(x, gy + Hs + h * 0.17, z), null, COL('#d4cfc3'));
-  F0.geo(solid, new THREE.CylinderGeometry(R * 0.2, R * 1.02, h * 0.05, 18).translate(x, gy + h * 0.985, z), null, COL('#8f8b84'));
-  solidAt(x, z, R * 0.36, h);
+// a water tower: a shaft, the tank on it shaped like a bowl ("a fungo") widening to r, a short band, the low cone of its roof; r is the radius
+// of the tank, h the height. The tower of Meda (MN_IND 12, x -336 z -1775) after the 2015 and 2018-19 orthophotos: the tank is a disc of 16 m
+// (its shadow too, barely longer: a bowl, no tall drum), the roof a low cone of white and red segments (mm.s), the shaft's shadow 3 m wide
+// (mm.f). Colours not seen (shaft, tank) stay a plain concrete
+function lsTower(solid, x, z, r, h, solidAt, mm) {
+  const F0 = lmFrame(new THREE.Matrix4()), gy = H.ground(x, z), R = clamp(r, 2.5, 9), rs = mm && mm.f ? mm.f / 2 : Math.max(1.2, R * 0.24);
+  const yb = h * 0.7, yc = h * 0.86, rise = Math.min(3, R * 0.3), yr = h - rise, CONC = '#c9c4b8', geo = (g, col) => F0.geo(solid, g, null, COL(col));
+  geo(new THREE.CylinderGeometry(rs, rs * 1.06, yb + 0.5, 16).translate(x, gy + yb / 2 - 0.25, z), CONC);
+  geo(new THREE.CylinderGeometry(R, rs, yc - yb, 28, 1, true).translate(x, gy + (yb + yc) / 2, z), '#c2bdb1');
+  geo(new THREE.CylinderGeometry(R, R, yr - yc, 28, 1, true).translate(x, gy + (yc + yr) / 2, z), '#d2cdc1');
+  geo(new THREE.CylinderGeometry(R * 1.03, R * 1.03, 0.35, 28, 1, true).translate(x, gy + yr - 0.1, z), '#b9b4a9');
+  const S = mm && mm.s, n = S ? S[2] : 1;
+  for (let i = 0; i < n; i++) geo(new THREE.CylinderGeometry(0.5, R * 1.03, rise, Math.max(2, Math.ceil(28 / n)), 1, true, i * TAU / n, TAU / n).translate(x, gy + yr + rise / 2, z), S ? S[i % 2] : '#8f8b84');
+  geo(new THREE.CylinderGeometry(0.5, 0.5, 0.6, 10).translate(x, gy + h + 0.3, z), '#8f8b84');
+  geo(lmBox(1.0, 2.2, 0.12, x, gy + 1.1, z + rs * 1.04), '#5d6166');
+  solidAt(x, z, rs * 1.06, h);
+}
+// a rod of r between two points in world coordinates (tubes of the greenhouses, rails)
+function lsRod(b, a, c, r, col, seg = 4) {
+  const v = new THREE.Vector3(c[0] - a[0], c[1] - a[1], c[2] - a[2]), L = v.length(); if (L < 0.01) return;
+  const g = new THREE.CylinderGeometry(r, r, L, seg).translate(0, L / 2, 0);
+  g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.normalize())));
+  lmFrame(new THREE.Matrix4()).geo(b, g.translate(a[0], a[1], a[2]), null, COL(col));
+}
+// a plastic tunnel on the rectangle of a DBGT greenhouse (MN_IND 13, mm.k 'tunnel'): hoops of galvanised tube every metre and a half, the
+// film over them (milky, or the colour the photo shows, mm.c), a door frame in each end, rows of plants inside. As high as the DSM saw it,
+// no higher than its width allows (the typical 3.3 m was too tall for the 3 m tunnels of the allotments)
+function lsTunnel(B, film, solid, box) {
+  const P = B.pts, A = lsAxis(P), gys = P.map(p => H.ground(p[0], p[1])), base = Math.min(...gys), W = A.v1 - A.v0, vm = (A.v0 + A.v1) / 2, NA = 12;
+  const hT = clamp(Math.max(...gys) + B.h - base, 1.6, 0.7 * W + 0.6), FC = COL(B.mm.c || '#e9eeeb'), TUBE = '#c9cdd0', y0 = base - 0.15;
+  const arc = []; for (let j = 0; j <= NA; j++) { const t = Math.PI * j / NA; arc.push([vm - Math.cos(t) * W / 2, Math.sin(t) * hT, -Math.cos(t) / (W / 2), Math.sin(t) / hT]); }
+  const W3 = (s, v, y) => { const [x, z] = A.at(s, v); return [x, y0 + y, z]; };
+  for (let j = 0; j < NA; j++) {
+    const a = arc[j], c = arc[j + 1], nv = (a[2] + c[2]) / 2, ny = (a[3] + c[3]) / 2, l = hyp(nv, ny) || 1, nx = A.nx * nv / l, nz = A.nz * nv / l, i = film.p.length / 3;
+    for (const [s, q] of [[A.s0, a], [A.s1, a], [A.s1, c], [A.s0, c]]) { const p = W3(s, q[0], q[1]); vtx(film, p[0], p[1], p[2], nx, ny / l, nz, 0, 0, FC); }
+    film.i.push(i, i + 1, i + 2, i, i + 2, i + 3);
+  }
+  for (const [s, sg] of [[A.s0, -1], [A.s1, 1]]) {
+    const c0 = W3(s, vm, 0), i0 = film.p.length / 3; vtx(film, c0[0], c0[1], c0[2], A.ux * sg, 0, A.uz * sg, 0, 0, FC);
+    for (const q of arc) { const p = W3(s, q[0], q[1]); vtx(film, p[0], p[1], p[2], A.ux * sg, 0, A.uz * sg, 0, 0, FC); }
+    for (let j = 0; j < NA; j++) film.i.push(i0, i0 + 1 + j, i0 + 2 + j);
+    for (const o of [-0.6, 0.6]) lsRod(solid, W3(s, vm + o, 0), W3(s, vm + o, Math.min(2.0, hT * 0.85)), 0.03, TUBE);
+    lsRod(solid, W3(s, vm - 0.6, Math.min(2.0, hT * 0.85)), W3(s, vm + 0.6, Math.min(2.0, hT * 0.85)), 0.03, TUBE);
+  }
+  const L = A.s1 - A.s0, k = Math.max(1, Math.round(L / 1.5));
+  for (let q = 0; q <= k; q++) { const s = A.s0 + L * q / k; for (let j = 0; j < NA; j += 2) lsRod(solid, W3(s, arc[j][0], arc[j][1]), W3(s, arc[j + 2][0], arc[j + 2][1]), 0.025, TUBE); }
+  lsRod(solid, W3(A.s0, vm, hT), W3(A.s1, vm, hT), 0.025, TUBE);
+  for (let v = A.v0 + 0.9; v < A.v1 - 0.6; v += 1.3) if (A.s1 - A.s0 > 2.5) { const [x1, z1] = A.at((A.s0 + A.s1) / 2, v); box(A.s1 - A.s0 - 1.6, 0.45, 0.6, x1, base + 0.22, z1, '#4f7a35', Math.atan2(A.ux, A.uz) - Math.PI / 2); }
+}
+// a polygon grown by d (mitred corners, at most 3 d)
+function lsGrow(P, d) {
+  const sg = sArea(P) < 0 ? -1 : 1, n = P.length, out = [];
+  for (let i = 0; i < n; i++) {
+    const a = P[(i + n - 1) % n], b = P[i], c = P[(i + 1) % n], l1 = hyp(b[0] - a[0], b[1] - a[1]) || 1, l2 = hyp(c[0] - b[0], c[1] - b[1]) || 1;
+    const n1 = [(b[1] - a[1]) / l1 * sg, -(b[0] - a[0]) / l1 * sg], n2 = [(c[1] - b[1]) / l2 * sg, -(c[0] - b[0]) / l2 * sg], mx = n1[0] + n2[0], mz = n1[1] + n2[1], ml = hyp(mx, mz) || 1;
+    const k = Math.min(3, 1 / Math.max(0.33, (mx * n1[0] + mz * n1[1]) / ml)) * d; out.push([b[0] + mx / ml * k, b[1] + mz / ml * k]);
+  }
+  return out;
+}
+// a cabin of the DBGT (MN_IND 01 electric, 02 water, 03 gas; dbgt_manufatti.py _modello), after the 2018-19 orthophoto: plastered prefab
+// walls, a grey door of sheet metal and louvred grilles on the side that looks onto open ground, the roof colour the photo shows (mm.t) or
+// the type's (most of the roofs of Meda are grey). 'el' the low box with a flat slab; 'torre' the tall ENEL tower (6-12 m on 10-40 m2):
+// a low hipped roof, louvres high up, the medium-voltage line coming in through three insulators on a bracket under the eaves (in the
+// photos the lines reach some of them); 'gas' a box under a low pitched roof of sheet metal, louvres in a row along both long walls
+function lsCabina(B, solid, box) {
+  const P = B.pts, n = P.length, mm = B.mm || {}, k = mm.k || 'el', A = sArea(P), area = Math.abs(A), F0 = lmFrame(new THREE.Matrix4());
+  const gys = P.map(p => H.ground(p[0], p[1])), g0 = Math.min(...gys), top = Math.max(...gys) + B.h, Ax = lsAxis(P);
+  const rect = n <= 6 && isConvex(P) && area > 0.85 * (Ax.s1 - Ax.s0) * (Ax.v1 - Ax.v0);
+  const kind = k === 'gas' && !rect ? 'el' : k, rise = kind === 'torre' ? Math.min(1.1, 0.22 * Math.sqrt(area)) : kind === 'gas' ? Math.min(0.8, 0.09 * (Ax.v1 - Ax.v0)) : 0;
+  const eave = kind === 'el' ? top - 0.25 : top - rise, WALL = COL(mm.m || '#d5cfc2'), BASE = COL('#a9a59c');
+  const ROOF = mm.t || (kind === 'torre' ? '#8b8d8f' : kind === 'gas' ? '#a7a9a9' : '#727478'), METAL = '#7d8288', GRILLE = '#55595e';
+  const walls = [];
+  for (let i = 0; i < n; i++) {
+    const a = P[i], c = P[(i + 1) % n], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
+    F0.face(solid, [[a[0], g0 - 0.3, a[1]], [c[0], g0 - 0.3, c[1]], [c[0], g0 + 0.3, c[1]], [a[0], g0 + 0.3, a[1]]], 2, BASE);
+    F0.face(solid, [[a[0], g0 + 0.3, a[1]], [c[0], g0 + 0.3, c[1]], [c[0], eave, c[1]], [a[0], eave, a[1]]], 2, WALL);
+    let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (A < 0) { nx = -nx; nz = -nz; }
+    const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, open = !inBuilding(mx + nx * 1.5, mz + nz * 1.5) && !inBuilding(mx + nx * 3, mz + nz * 3);
+    let road = 0; ROADSEG.each(mx - 20, mz - 20, mx + 20, mz + 20, s => { if (atGrade(s) && segDist(mx + nx * 3, mz + nz * 3, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 10) road = 1; });
+    walls.push({ a, c, L, nx, nz, ux: (c[0] - a[0]) / L, uz: (c[1] - a[1]) / L, ry: Math.atan2(c[0] - a[0], c[1] - a[1]) - Math.PI / 2, score: L * (open ? 2 : 0.5) + (open ? 3 * road : 0) });
+  }
+  if (!walls.length) return;
+  // a thing on a wall: centred at t along it, y above the ground, d out of it
+  const on = (W, t, y, w, h, d, col) => { const x = W.a[0] + W.ux * t + W.nx * d / 2, z = W.a[1] + W.uz * t + W.nz * d / 2; box(w, h, d, x, g0 + y, z, col, W.ry); };
+  const grille = (W, t, y, w, h) => { on(W, t, y, w, h, 0.05, GRILLE); for (let q = 1; q < 4; q++) on(W, t, y - h / 2 + h * q / 4, w * 0.92, 0.035, 0.08, '#8a8f94'); };
+  const front = walls.slice().sort((p, q) => q.score - p.score)[0], wallH = eave - g0;
+  // the roof
+  if (kind === 'el') {
+    const G = lsGrow(P, 0.12), RC = COL(ROOF), EDGE = COL('#b9b4a8');
+    try { polyFill(solid, G, [], top, 10, RC); } catch (e) { }
+    for (let i = 0; i < G.length; i++) { const a = G[i], c = G[(i + 1) % G.length]; F0.face(solid, [[a[0], eave, a[1]], [c[0], eave, c[1]], [c[0], top, c[1]], [a[0], top, a[1]]], 2, EDGE); }
+  } else if (kind === 'torre') {
+    const G = lsGrow(P, 0.25), [cx, cz] = centroid(P), RC = COL(ROOF);
+    for (let i = 0; i < G.length; i++) { const a = G[i], c = G[(i + 1) % G.length]; F0.face(solid, [[a[0], eave, a[1]], [c[0], eave, c[1]], [cx, top, cz]], 2, RC); }
+    F0.geo(solid, new THREE.CylinderGeometry(0.05, 0.12, 0.6, 6).translate(cx, top + 0.25, cz), null, COL('#5d6166'));
+  } else {
+    const G = lsGrow([Ax.at(Ax.s0, Ax.v0), Ax.at(Ax.s1, Ax.v0), Ax.at(Ax.s1, Ax.v1), Ax.at(Ax.s0, Ax.v1)], 0.2), vm = (Ax.v0 + Ax.v1) / 2, RC = COL(ROOF);
+    const r0 = Ax.at(Ax.s0 - 0.2, vm), r1 = Ax.at(Ax.s1 + 0.2, vm);
+    F0.face(solid, [[G[0][0], eave, G[0][1]], [G[1][0], eave, G[1][1]], [r1[0], top, r1[1]], [r0[0], top, r0[1]]], 2, RC);
+    F0.face(solid, [[G[2][0], eave, G[2][1]], [G[3][0], eave, G[3][1]], [r0[0], top, r0[1]], [r1[0], top, r1[1]]], 2, RC);
+    for (const ss of [Ax.s0, Ax.s1]) { const p = Ax.at(ss, Ax.v0), q = Ax.at(ss, Ax.v1), m = Ax.at(ss, vm); F0.face(solid, [[p[0], eave, p[1]], [q[0], eave, q[1]], [m[0], top - 0.05, m[1]]], 2, WALL); }
+  }
+  // doors and grilles
+  if (kind === 'torre') {
+    on(front, front.L / 2, 1.1, Math.min(1.1, front.L - 0.6), 2.2, 0.06, METAL);
+    for (const W of walls) if (W.L > 1.5) grille(W, W.L / 2, wallH - 1.2, 0.7, 0.9);
+    const back = walls.slice().sort((p, q) => (p.nx * front.nx + p.nz * front.nz) - (q.nx * front.nx + q.nz * front.nz))[0], y = wallH - 0.5;
+    if (back.L > 2) {
+      on(back, back.L / 2, y, Math.min(2.4, back.L - 0.4), 0.12, 0.7, METAL);
+      for (const o of [-0.8, 0, 0.8]) { const t = back.L / 2 + o * Math.min(1, (back.L - 0.6) / 2.4), x = back.a[0] + back.ux * t + back.nx * 0.6, z = back.a[1] + back.uz * t + back.nz * 0.6; F0.geo(solid, new THREE.CylinderGeometry(0.07, 0.09, 0.4, 6).translate(x, g0 + y + 0.26, z), null, COL('#d9d4c8')); }
+    }
+  } else if (kind === 'gas') {
+    const ends = walls.filter(W => Math.abs(W.ux * Ax.ux + W.uz * Ax.uz) < 0.5).sort((p, q) => q.score - p.score);
+    if (ends.length) on(ends[0], ends[0].L / 2, 1.05, Math.min(1.8, ends[0].L - 0.6), 2.1, 0.06, METAL);
+    for (const W of walls) if (Math.abs(W.ux * Ax.ux + W.uz * Ax.uz) > 0.5 && W.L > 2) { const m = Math.floor((W.L - 0.6) / 1.6); for (let q = 0; q < m; q++) grille(W, (W.L - m * 1.6) / 2 + 0.8 + q * 1.6, wallH - 0.5, 0.8, 0.45); }
+  } else {
+    const nd = front.L >= 4.5 ? 2 : 1;
+    for (let q = 0; q < nd; q++) { const t = front.L * (q + 0.5) / nd; on(front, t, 1.1, Math.min(1.2, front.L / nd - 0.5), 2.2, 0.06, METAL); grille(front, t, 1.55, Math.min(0.9, front.L / nd - 0.7), 0.5); }
+    for (const W of walls) if (W !== front && W.L > 1.8 && wallH > 2.2) grille(W, W.L / 2, wallH - 0.45, 0.9, 0.4);
+  }
 }
 function lsNet(A, sm, vm, half, postH, netH, G, box, y0 = 0) { // posts at the sides, the net across the middle
   const ry = Math.atan2(A.ux, A.uz), [ax, az] = A.at(sm, vm - half), [bx, bz] = A.at(sm, vm + half), ga = H.ground(ax, az), gb = H.ground(bx, bz);

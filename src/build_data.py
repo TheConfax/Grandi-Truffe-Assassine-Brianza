@@ -1593,6 +1593,8 @@ for b in buildings + (ED.alti if ED else []):
     elif b.get('bt') == 'greenhouse': rec['g'] = 2  # glass
     elif b.get('bt') == 'grandstand': rec['g'] = 3  # stepped seats under a roof
     elif b.get('wt'): rec['g'] = 4  # a water tower mapped as a building
+    elif b.get('mn') in ('01', '02', '03'): rec['g'] = 5  # a cabin of the DBGT (dbgt_manufatti.py): its own model in paesaggio3.js
+    if b.get('mm'): rec['mm'] = b['mm']  # the model of a manufatto and what the photos say of it (src/manufatti_foto.json)
     push(tid(*c), 'b', rec)
 for k_, pts in land:  # one polygon per piece of land, simplified, in the tile of its middle
     try: g_ = Polygon(pts).buffer(0).simplify(0.3, preserve_topology=True)
