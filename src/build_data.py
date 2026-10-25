@@ -1614,7 +1614,14 @@ def _strada(xs, zs):
     r_ = shapely.contains_xy(asph, xs, zs)
     if _mvt is not None: r_[_mvt.query(shapely.points(xs, zs), predicate='within')[0]] = True
     return r_
-_nb = _cantieri([g_ for k_, g_ in _ls if k_ == 'cantiere'], bar_out + [(f_, 'fe', 0) for f_ in fences], [(g_[0] / 10, g_[1] / 10, g_[2] / 10, g_[3] / 10) for g_ in gate_out], _crep, _strada)
+_vg = [(r['line'], r['w']) for r in raw_roads if flat(r) and r['line'].length > 0.1]; _vgt = STRtree([v_[0] for v_ in _vg]) if _vg else None
+def _senza(x_, z_):  # = paesaggio3.js: onAnyRoad(0.6) (a street at grade, w/2 + 0.6 from its axis), nearAsph(0.3) (asphalt 0.55 m away), inBuilding(0.3)
+    p_ = Point(x_, z_)
+    if _vgt is not None and any(_vg[j][0].distance(p_) < _vg[j][1] / 2 + 0.6 for j in _vgt.query(p_.buffer(15))): return True
+    if _strada(np.array([x_, x_ + 0.55, x_ - 0.55, x_, x_]), np.array([z_, z_, z_, z_ + 0.55, z_ - 0.55])).any(): return True
+    return bool(len(_bt_senza.query(p_.buffer(0.3), predicate='intersects')))
+_bt_senza = STRtree(btree_geoms)
+_nb = _cantieri([g_ for k_, g_ in _ls if k_ == 'cantiere'], bar_out + [(f_, 'fe', 0) for f_ in fences], [(g_[0] / 10, g_[1] / 10, g_[2] / 10, g_[3] / 10) for g_ in gate_out], _crep, _strada, _senza)
 bar_out, fences, _cf = [b_ for b_ in _nb[0] if b_[1] != 'fe'], [b_[0] for b_ in _nb[0] if b_[1] == 'fe'], _nb[1]
 _cf = iter(_cf); _cw = []
 log('cantieri: divisori sostituiti dai pannelli', _crep)
@@ -1654,10 +1661,11 @@ def push_lines(key_, lines, extra=None):
     for i, pts in enumerate(lines):
         L = LineString(pts)
         if L.length < 0.5: continue
-        # every tile the line crosses: sampled along it every 50 m (the corners of its buffer alone sit by its vertices, and a 300 m span of
-        # wire crossing a tile with no pylon in it lost that piece: a hole in the middle of the span)
-        on_ = [L.interpolate(d_) for d_ in range(0, int(L.length) + 1, 50)] + [Point(pts[-1])]
-        for t in set(tid(*p) for p in L.buffer(1).exterior.coords) | {tid(*pts[0])} | {tid(p_.x, p_.y) for p_ in on_}:
+        # every tile the line crosses: all the tiles of its box it meets (the corners of its buffer alone sit by its vertices, and a 300 m span
+        # of wire crossing a tile with no pylon in it lost that piece; sampled every 50 m, a 25 m railway fence cutting the corner of a tile
+        # lost its 20 m there: x -871 z 465)
+        x0_, z0_, x1_, z1_ = L.bounds; t0_, t1_ = tid(x0_, z0_), tid(x1_, z1_)
+        for t in sorted(t_ for t_ in {i_ + ntx * j_ for i_ in range(t0_ % ntx, t1_ % ntx + 1) for j_ in range(t0_ // ntx, t1_ // ntx + 1)} if L.intersects(tbox(t_))):
             c = L.intersection(tbox(t))
             for part in (list(c.geoms) if hasattr(c, 'geoms') else [c]):
                 if isinstance(part, LineString) and part.length > 0.3:

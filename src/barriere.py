@@ -105,7 +105,7 @@ def passaggi(L, vie):
 C_DIST = 4.0     # a divider this near the edge and parallel to it is the site's fence (via Cadorna: 1.3 and 2.5-2.9 m; x 1540 z -265: 3.6-3.9)
 C_EXT = 5.0      # once it is, it goes on being so while it stays this near (no zigzag where it drifts round C_DIST)
 C_COPY = 1.0     # two parallel dividers this near each other along the edge are one, mapped twice (an OSM fence on a DBGT one, the railway fence)
-C_FREE = 0.5     # the game leaves out the hoarding this near a carriageway (paesaggio3.js: onAnyRoad 0.6, nearAsph 0.3)
+C_SMOOTH = 4.0   # a stretch of edge where the game leaves the hoarding out, widened this much each way
 C_ROAD = 1.0     # not across a street: more than this much carriageway between the divider and the edge, they are two sides of it
 C_ANG = math.cos(math.radians(30))   # parallel: within 30 degrees
 C_STEP = 0.5
@@ -130,12 +130,12 @@ def _runs(flags, step, length, closed=False):
     return out
 
 
-def cantieri(polys, bars, gates, rep, strada=None):
+def cantieri(polys, bars, gates, rep, strada=None, senza=None):
     """polys: the building sites as the game gets them (Polygons); bars: the dividers [(pts, kind, h)]; gates: [(x0, z0, x1, z1)] in m.
     Returns the new bars (the replaced stretches taken out) and for each site (h, w): h the stretches of its edge that still get the
     hoarding of the game (filtered against streets and buildings there), w the lines of the dividers it replaces (drawn as they are), or
     None where no divider runs along the edge (the game goes round the polygon as before). strada(xs, zs): True where a point is in a
-    carriageway"""
+    carriageway; senza(x, z): True where the game leaves the hoarding out (paesaggio3.js: by a street or in a building)"""
     from shapely.ops import substring
     from shapely.strtree import STRtree
     import os
@@ -155,9 +155,9 @@ def cantieri(polys, bars, gates, rep, strada=None):
         near = [i for i in near if lines[i].distance(C) <= C_EXT]
         if not near: out.append(None); continue
         # each sample of a divider: near the edge, parallel to it, and the nearest parallel divider to that point of the edge
-        R, FL = [], []
+        R, FL, K = [], [], []
         for i in sorted(near):
-            L = lines[i]; n = max(2, int(math.ceil(L.length / C_STEP)) + 1); st = L.length / (n - 1); fl = []
+            L = lines[i]; n = max(2, int(math.ceil(L.length / C_STEP)) + 1); st = L.length / (n - 1); fl = []; sz = [False] * n
             for k in range(n):   # 0 no, 1 near (C_EXT), 2 nearer (C_DIST), 3 a copy of a nearer divider (within C_COPY of it): it goes with it
                 s = k * st; p = L.interpolate(s); dd = C.distance(p)
                 if dd > C_EXT: fl.append(0); continue
@@ -172,12 +172,18 @@ def cantieri(polys, bars, gates, rep, strada=None):
                             if abs(u2[0] * v[0] + u2[1] * v[1]) >= C_ANG:
                                 if L2.distance(p) <= C_COPY: copia = True
                                 else: ok = False; break
-                if ok and strada is not None and strada(np.array([f.x, f.x - v[1] * C_FREE, f.x + v[1] * C_FREE]), np.array([f.y, f.y + v[0] * C_FREE, f.y - v[0] * C_FREE])).any():
-                    ok = False   # the game draws no hoarding on that edge (on or by the carriageway): there the divider is the only one, it stays
+                if ok and senza is not None and senza(f.x, f.y): sz[k] = True
                 if ok and strada is not None and dd > C_ROAD:
                     m_ = max(2, int(dd / 0.25)); t_ = np.linspace(0, 1, m_)
                     ok = float(np.count_nonzero(strada(p.x + (f.x - p.x) * t_, p.y + (f.y - p.y) * t_))) * dd / m_ <= C_ROAD
                 fl.append(0 if not ok else 3 if copia else 2 if dd <= C_DIST else 1)
+            # the game draws no hoarding on the edge on or by a street (and leaves gaps where it is borderline): there the divider stays, over
+            # the whole stretch where the edge comes that near now and then, and the edge beside it gets no hoarding either (no panels and
+            # mesh by turns, no two dividers): it is the only one
+            w_ = int(round(C_SMOOTH / st)); zs = [any(sz[max(0, k - w_):k + w_ + 1]) for k in range(n)]
+            for r in _runs([zs[k] and fl[k] in (1, 2) for k in range(n)], st, L.length):
+                if r[1] - r[0] >= C_MIN: K.append(substring(L, r[0], r[1]))
+            fl = [0 if zs[k] else fl[k] for k in range(n)]
             FL.append((i, L, n, st, fl))
         for i, L, n, st, fl in FL:   # the divider along the edge becomes hoarding on its own line
             runs = [r for r in _runs([v_ in (1, 2) for v_ in fl], st, L.length) if sum(1 for k in range(n) if fl[k] == 2 and r[0] <= k * st <= r[1]) >= 2]
@@ -195,21 +201,21 @@ def cantieri(polys, bars, gates, rep, strada=None):
             c3 = [fl[k] == 3 and Rt0 is not None and any(R[j].distance(L.interpolate(k * st)) <= C_COPY + 0.05 for j in Rt0.query(L.interpolate(k * st).buffer(C_COPY + 0.05))) for k in range(n)]
             for r in _runs(c3, st, L.length):
                 if r[1] - r[0] >= C_MIN: cut.setdefault(i, []).append(r); rep['metri_copie'] += r[1] - r[0]
-        if not R: out.append(None); continue
-        # the edge: no hoarding where a replaced divider runs beside it (its foot inside that stretch) or across a gate
+        if not R and not K: out.append(None); continue
+        # the edge: no hoarding where a replaced divider runs beside it (its foot inside that stretch), or one kept by a street, or across a gate
         n = max(8, int(math.ceil(C.length / C_STEP))); st = C.length / n; cov = []
-        Rt = STRtree(R)
+        RK = R + K; Rt = STRtree(RK); rep['metri_tenuti_lungo_strade'] = rep.get('metri_tenuti_lungo_strade', 0.0) + sum(k_.length for k_ in K)
         for k in range(n):
             s = (k + 0.5) * st; q = C.interpolate(s); v = _dir(C, s); c = False
             for j in Rt.query(q.buffer(C_EXT + 0.3)):
-                W = R[j]; sw = W.project(q)
+                W = RK[j]; sw = W.project(q)
                 if 0.05 < sw < W.length - 0.05 and W.distance(q) <= C_EXT + 0.3:
                     u = _dir(W, sw)
                     if abs(u[0] * v[0] + u[1] * v[1]) >= C_ANG: c = True; break
             if not c and gtree is not None:
                 for j in gtree.query(q.buffer(C_EXT + 0.5)):
                     g = G[j]; sg = g.project(q)
-                    if -0.3 < sg < g.length + 0.3 and g.distance(q) <= C_EXT + 0.5 and any(W.distance(g) < 2.0 for W in R): c = True; break
+                    if -0.3 < sg < g.length + 0.3 and g.distance(q) <= C_EXT + 0.5 and any(W.distance(g) < 2.0 for W in RK): c = True; break
             cov.append(c)
         free = _runs([not c for c in cov], st, C.length, closed=True)
         H = []
@@ -247,6 +253,7 @@ def cantieri(polys, bars, gates, rep, strada=None):
             rep['metri_sostituiti'] += m_; rep['metri_per_tipo'][str(k)] = rep['metri_per_tipo'].get(str(k), 0.0) + m_
             if a - s0 > 0.05: nb.append((list(substring(L, s0, a).coords), k, h))
             s0 = max(s0, b)
-    for k_ in ('metri_sostituiti', 'metri_copie', 'metri_bordo_tolti', 'metri_bordo'): rep[k_] = round(rep[k_])
+    rep.setdefault('metri_tenuti_lungo_strade', 0.0)
+    for k_ in ('metri_sostituiti', 'metri_copie', 'metri_bordo_tolti', 'metri_bordo', 'metri_tenuti_lungo_strade'): rep[k_] = round(rep[k_])
     rep['metri_per_tipo'] = {k_: round(v_) for k_, v_ in sorted(rep['metri_per_tipo'].items())}
     return nb, out
