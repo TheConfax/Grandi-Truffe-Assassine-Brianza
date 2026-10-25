@@ -1290,6 +1290,7 @@ function* buildTileGen(T) {
       try { const base = md.p.length / 3; polyFill(md, densify(o, 4), k.map(h => densify(h, 4)), 0, 4); for (let i = base * 3; i < md.p.length; i += 3) md.p[i + 1] = yAt(md.p[i], md.p[i + 2]) + 0.12; } catch (e) { }
     }
     barTile(T, B, G); put(md, MAT.median, 9); put(mdS, MAT.median, 9); put(mdG, MAT.grass, 9); put(mdK, MAT.kerb, 9); // the barrier meshes and posts, every piece whole again
+    rotondeTile(T, put, G); /* the aiuole of the roundabouts over their islands (rotonde3.js) */
   }
   yield 'railway';
   // railway & fences
