@@ -1594,11 +1594,25 @@ for b in buildings + (ED.alti if ED else []):
     elif b.get('bt') == 'grandstand': rec['g'] = 3  # stepped seats under a roof
     elif b.get('wt'): rec['g'] = 4  # a water tower mapped as a building
     push(tid(*c), 'b', rec)
+_ls = []
 for k_, pts in land:  # one polygon per piece of land, simplified, in the tile of its middle
     try: g_ = Polygon(pts).buffer(0).simplify(0.3, preserve_topology=True)
     except Exception: continue
     if g_.is_empty or g_.geom_type != 'Polygon' or g_.area < 8 or not inside((g_.centroid.x, g_.centroid.y), 0): continue
-    push(tid(g_.centroid.x, g_.centroid.y), 'ls', {'p': enc(list(g_.exterior.coords)[:-1]), 's': k_})
+    _ls.append((k_, g_))
+# a building site's hoarding takes the place of the wall or fence of the map along its edge (Carlo, 26/10; src/barriere.py cantieri): the
+# divider goes, the hoarding stands on its line; h: the stretches of the edge that keep the game's hoarding, w: the lines of the replaced dividers
+from barriere import cantieri as _cantieri
+_crep = {}
+bar_out, _cf = _cantieri([g_ for k_, g_ in _ls if k_ == 'cantiere'], bar_out, [(g_[0] / 10, g_[1] / 10, g_[2] / 10, g_[3] / 10) for g_ in gate_out], _crep)
+_cf = iter(_cf); _cw = []
+log('cantieri: divisori sostituiti dai pannelli', _crep)
+for k_, g_ in _ls:
+    rec = {'p': enc(list(g_.exterior.coords)[:-1]), 's': k_}
+    if k_ == 'cantiere':
+        f_ = next(_cf)
+        if f_ is not None: rec['h'] = [enc(h_) for h_ in f_[0]]; rec['w'] = [enc(w_) for w_ in f_[1]]; _cw += f_[1]
+    push(tid(g_.centroid.x, g_.centroid.y), 'ls', rec)
 def polys_of(g, tol=0.15, min_area=0.5):
     g = g.simplify(tol, preserve_topology=True)
     out = []
@@ -1709,7 +1723,7 @@ if ED:  # the buildings of the DBGT: entrances, checks, report
     ED.controlli(buildings, _Pp); out.setdefault('report', {})['edifici'] = ED.sintesi()
     json.dump(ED.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_edifici.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 if STR:  # the checks of docs/motore.md 7: a summary in brianza.json, the whole report beside it
-    STR.controlli(raw_roads, nodes, oggetti=[(o[1] / 10, o[2] / 10) for o in ogg if OGG[o[0]] not in OGG_ON_ROAD], lampioni=lamps, cartelli=cartelli, barriere=[b_[0] for b_ in bar_out],
+    STR.controlli(raw_roads, nodes, oggetti=[(o[1] / 10, o[2] / 10) for o in ogg if OGG[o[0]] not in OGG_ON_ROAD], lampioni=lamps, cartelli=cartelli, barriere=[b_[0] for b_ in bar_out] + _cw,
                   edifici=[P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], alberi=trees, attraversamenti=crossings)
     out.setdefault('report', {})['strade'] = STR.sintesi()
     json.dump(STR.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_strade.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
@@ -1717,6 +1731,7 @@ if FER:  # trains against platforms, buildings and carriageways; the report besi
     FER.controlli(*_fer_ctl_a, pronto=_fer_ctl_f.result())  # = FER.controlli(trains, [g for at, g in area_geoms if at == 5], [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], [g for g, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else [], cartelli), measured on a thread since the town signs
     out.setdefault('report', {})['ferrovia'] = FER.sintesi()
     json.dump(FER.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_ferrovia.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=str)
+out.setdefault('report', {})['cantieri'] = _crep  # the dividers the building sites' hoarding replaces (src/barriere.py cantieri)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
 log('written', dst, len(s) // 1024, 'KB', 'tiles', ntx, 'x', ntz, 'roads', len(out_roads), 'nodes', len(NODES))
