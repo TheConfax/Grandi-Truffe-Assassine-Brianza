@@ -118,8 +118,9 @@ for (const T of TILES) {
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
   for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const br of d.ba || []) {
-    const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h, v: br.v }); // follow the ground, not long chords
-    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2); WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }); }
+    const sp = BAR_PANEL[br.t], pts = resample(dec(br.p), sp ? sp.len : 4), rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
+    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2), s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
+    if (sp || br.t === 3) barPieces(T, rec, segs);
   }
   for (const q of d.sd || []) {
     const o = dec(q.p), k = q.k.map(dec), bb = bbox(o); if (o.length < 3) continue;
@@ -1254,32 +1255,23 @@ function* buildTileGen(T) {
   yield 'walls';
   // walls, fences, hedges and the expressway median
   {
-    const wl = Buf(), ft = Buf(), hd = Buf(), md = Buf(), posts = [], wlP = [Buf(), Buf()], bars = Buf(), mesh = Buf(), rly = Buf(), wood = Buf();
+    const B = barBufs(), md = Buf(); // the walls, fences and hedges (sfondabili3.js barDraw): each piece a car can break knows where it is in them
     for (const br of T.ba || []) {
-      const pts = br.pts; let acc = 0;
-      // one look per property (br.v, from the build: the building the divider belongs to), else per divider: plaster or concrete, a
-      // higher or lower base, bars or mesh on top
-      const hv = br.v != null ? br.v : (Math.sin(pts[0][0] * 12.9898 + pts[0][1] * 78.233) * 43758.5453) % 1, hh = Math.abs(hv), base = br.t === 2 ? 0.35 + (hh * 7 % 1) * 0.6 : 0.5;
-      const wallB = br.t === 2 && hh < 0.6 ? wlP[hh < 0.3 ? 0 : 1] : wl, railB = br.t === 2 && (hh * 13 % 1) < 0.55 ? bars : ft;
+      // the slabs closed at their ends (Carlo, 26/10: a hedge or a wall open at its end showed its empty inside): the two ends of the barrier and
+      // both sides of a corner of more than 15 degrees, where the two slabs leave a notch between them
+      const pts = br.pts, lk = barLook(br), ring = hyp(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 0.05, sk = [];
+      for (let k = 1; k < pts.length; k++) if (hyp(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]) >= 0.05) sk.push(k);
+      const capAt = new Map(); let acc = 0;
+      sk.forEach((k, j) => {
+        const turn = (p, q) => { const ax = pts[p][0] - pts[p - 1][0], az = pts[p][1] - pts[p - 1][1], bx = pts[q][0] - pts[q - 1][0], bz = pts[q][1] - pts[q - 1][1]; return (ax * bx + az * bz) / (hyp(ax, az) * hyp(bx, bz)) < 0.966; };
+        const prev = j > 0 ? sk[j - 1] : ring ? sk[sk.length - 1] : 0, next = j < sk.length - 1 ? sk[j + 1] : ring ? sk[0] : 0;
+        capAt.set(k, (!prev || turn(prev, k) ? 1 : 0) | (!next || turn(k, next) ? 2 : 0));
+      });
       for (let k = 1; k < pts.length; k++) {
         const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
-        const ga = H.ground(a[0], a[1]), gc = H.ground(c[0], c[1]), ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux;
-        const slab = (b, th, y0a, y0c, y1a, y1c) => { // thin vertical slab, both faces + cap
-          for (const sd of [1, -1]) { const b0 = b.p.length / 3, ox = nx * th * sd, oz = nz * th * sd; vtx(b, a[0] + ox, y0a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 0); vtx(b, c[0] + ox, y0c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 0); vtx(b, c[0] + ox, y1c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 1); vtx(b, a[0] + ox, y1a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3, b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); }
-          const b0 = b.p.length / 3; vtx(b, a[0] + nx * th, y1a, a[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] + nx * th, y1c, c[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] - nx * th, y1c, c[1] - nz * th, 0, 1, 0, 0, 1); vtx(b, a[0] - nx * th, y1a, a[1] - nz * th, 0, 1, 0, 0, 1); triUp(b, b0, b0 + 1, b0 + 2); triUp(b, b0, b0 + 2, b0 + 3);
-        };
-        const panel = (b, y0, y1, rep) => { const b0 = b.p.length / 3; vtx(b, a[0], ga + y0, a[1], nx, 0, nz, acc / rep, 0); vtx(b, c[0], gc + y0, c[1], nx, 0, nz, (acc + L) / rep, 0); vtx(b, c[0], gc + y1, c[1], nx, 0, nz, (acc + L) / rep, 1); vtx(b, a[0], ga + y1, a[1], nx, 0, nz, acc / rep, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
-        const postsEvery = (step, y0) => { for (let s0 = 0; s0 < L; s0 += step) posts.push([a[0] + ux * s0, a[1] + uz * s0, ga + (gc - ga) * s0 / L + y0, br.h - y0]); };
-        if (br.t === 1 || br.t === 4) slab(wl, 0.14, ga - 0.3, gc - 0.3, ga + br.h, gc + br.h);
-        else if (br.t === 3) slab(hd, 0.45, ga - 0.2, gc - 0.2, ga + br.h, gc + br.h);
-        else if (br.t === 5) { panel(mesh, 0, br.h, 2.6); postsEvery(2.5, 0); } // wire mesh on posts, from the ground
-        else if (br.t === 6) { slab(wl, 0.1, ga - 0.3, gc - 0.3, ga + 0.3, gc + 0.3); panel(rly, 0.3, br.h, 2.6); postsEvery(2.5, 0.3); } // by the railway: a concrete kerb, tall panels
-        else if (br.t === 7) { for (const y of [0.45, 0.95]) slab(wood, 0.04, ga + y, gc + y, ga + y + 0.12, gc + y + 0.12); for (let s0 = 0; s0 < L; s0 += 2.5) { const x = a[0] + ux * s0, z = a[1] + uz * s0, gy = ga + (gc - ga) * s0 / L; addBox(wood, x, gy + 0.6, z, 0.12, 1.2, 0.12, null); } } // post and rail
-        else { // muretto + cancellata, the Brianza classic
-          slab(wallB, 0.12, ga - 0.3, gc - 0.3, ga + base, gc + base);
-          panel(railB, base, br.h, railB === bars ? 1.2 : 2.6);
-          postsEvery(2.6, base);
-        }
+        const cap = capAt.get(k), pc = br.pc && br.pc[k]; if (pc && pc.k0 === k) { pc.m = barMark(B); pc.acc0 = acc; pc.cap = cap; }
+        barDraw(B, br, lk, a, c, acc, cap);
+        if (pc && pc.k1 === k) Object.assign(pc, barMarkEnd(B, pc.m));
         acc += L;
       }
     }
@@ -1296,13 +1288,8 @@ function* buildTileGen(T) {
       const o = dec(q.p), k = q.k.map(dec), yAt = (x, z) => { let best = null, bd = 1e9; DECKG.each(x - 8, z - 8, x + 8, z + 8, s => { const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.ax) * ex + (z - s.az) * ez) / L2, 0, 1), dd = hyp(x - s.ax - ex * t, z - s.az - ez * t); if (dd < bd && dd < s.hw + 7) { bd = dd; best = lerp(s.ya, s.yb, t); } }); return best === null ? H.ground(x, z) : best; };
       try { const base = md.p.length / 3; polyFill(md, densify(o, 4), k.map(h => densify(h, 4)), 0, 4); for (let i = base * 3; i < md.p.length; i += 3) md.p[i + 1] = yAt(md.p[i], md.p[i + 2]) + 0.12; } catch (e) { }
     }
-    put(wl, MAT.wall, 10, 'cast'); put(ft, MAT.railing, 10); put(hd, MAT.hedge, 10, 'cast'); put(md, MAT.median, 9); put(mdS, MAT.median, 9); put(mdG, MAT.grass, 9); put(mdK, MAT.kerb, 9);
-    put(wlP[0], MAT.wallPlaster, 10, 'cast'); put(wlP[1], MAT.wallOchre, 10, 'cast'); put(bars, MAT.bars, 10); put(mesh, MAT.mesh, 10); put(rly, MAT.railPanel, 10); put(wood, MAT.wood, 10, 'cast');
-    if (posts.length) { // [x, z, foot, length]
-      const pg = new THREE.BoxGeometry(0.06, 1, 0.06); pg.translate(0, 0.5, 0);
-      const pm = new THREE.InstancedMesh(pg, MAT.post, posts.length), mtx = new THREE.Matrix4(), sc = new THREE.Vector3(), qq = new THREE.Quaternion(), pp = new THREE.Vector3();
-      posts.forEach(([x, z, y, h], i) => { mtx.compose(pp.set(x, y, z), qq, sc.set(1, Math.max(0.1, h), 1)); pm.setMatrixAt(i, mtx); }); G.add(pm);
-    }
+    barTile(T, B, G); put(md, MAT.median, 9); put(mdS, MAT.median, 9); put(mdG, MAT.grass, 9); put(mdK, MAT.kerb, 9); // the barrier meshes and posts, every piece whole again
+    rotondeTile(T, put, G); /* the aiuole of the roundabouts over their islands (rotonde3.js) */
   }
   yield 'railway';
   // railway & fences

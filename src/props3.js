@@ -52,4 +52,5 @@ function updProps(dt) {
     if (o.position.y < gy) { o.position.y = gy; d.vy *= -0.25; d.vx *= 0.6; d.vz *= 0.6; d.spin.multiplyScalar(0.5); }
     if (d.t > 4) PROP_DEBRIS.splice(i, 1);
   }
+  updBarriere(dt); // the fence panels broken through and their bits (sfondabili3.js)
 }

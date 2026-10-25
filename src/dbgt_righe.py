@@ -6,13 +6,14 @@
 #     best), the longest first. OSM says what runs on them: the ways matched on EL_STR of class 0-2 (lanes, oneway, class)
 #   - each carriageway gets a reference line: the middle of its ordinary carriageway (AC_VEI 01, 0101-0105; on a bridge SED 02 and at grade
 #     past its ends as one) measured across the axis every metre, smoothed; across that line every metre again: the two edges (on the raster,
-#     then exactly on the boundary of the same union), smoothed (running median and gaussian). An edge that opens (the mouth of a side street,
+#     then exactly on the boundary of the same union), smoothed over 5 m (LISCIA, held on the asphalt: _liscia). An edge that opens (the mouth of a side street,
 #     a ramp leaving or joining: more than 0.6 m past the opening from below over 61 m of its distances) is carried across from where it runs
 #   - the ways in a cross section are the OSM axes crossing it alongside; its lanes are their OSM lanes (one-way without lanes: 1; two-way:
 #     lanes:forward/backward, lanes, else 1 + 1), each the same share of the width between the edges; between two lanes of one way a dashed
 #     line, between the two directions a centre line (continuous with 4 lanes or more, or between two ways OSM draws apart; dashed
 #     otherwise) on the EL_STR axis, the middle of the carriageway for the DBGT, when it is near the share of the lanes. Each line keeps its
-#     place by name (C, L1, R1...) where the lanes change, moving over a few metres. Edge lines 0.35 m inside the edge on the streets of class
+#     place by name (C, L1, R1...) where the lanes change; where it jumps or the carriageway widens it goes across from where it is sure
+#     before to where it is sure after (SALTO, ALLARGA). Edge lines 0.35 m inside the edge on the streets of class
 #     0-1 (primary to tertiary and the ramps), where that edge runs on; the DBGT does not say which streets have them, the residential ones get
 #     none (the game had none)
 #   - the roundabouts (AC_VEI 0206): edge lines round the ring and its islands, not across the mouths of the arms
@@ -34,6 +35,12 @@ PASSO = 1.0         # samples along a stroke
 RMAX = 20.0         # rays across the carriageway
 GAP = 25           # the lines go on where both edges open for up to this many metres
 LANE_MIN = 2.4      # narrower lanes are merged
+LISCIA = 5.0        # the edges and the lines between the lanes smoothed over this (gaussian sigma, m): the boundary of AC_VEI has vertices
+                    # off its curve by 0.5-0.85 m (Carlo 26/10, the ramp of the Milano-Meda at x 48 z 422), with 2 m the lines copied them
+DENTRO = 0.2        # an edge smoothed out past the edge measured by more than this is held back: the edge line stays 0.15 m on the asphalt
+ALLARGA = 0.05      # the carriageway widening (or narrowing) by more than this per metre: the lines go across it from where it does not
+ALLARGA_MAX = 40    # over at most this many metres
+SALTO = 12          # a line that jumps across goes over from this many metres before the jump to as many after
 
 
 def _resample(xy, step):
@@ -90,6 +97,17 @@ def _bends(p):
     if len(p) < 3: return np.zeros(0)
     d = np.diff(p, axis=0); a = np.arctan2(d[:, 1], d[:, 0]); t = np.abs((np.diff(a) + np.pi) % (2 * np.pi) - np.pi)
     return np.degrees(t)
+
+
+def _liscia(d, sig=LISCIA, lim=None):
+    """d smoothed (a running median over 2 sigma, then gaussian sigma), held under lim (the edges: under the edge measured + DENTRO) by
+    smoothing again what is under it, a few times, so the line stays on the asphalt and smooth"""
+    e = gaussian_filter1d(median_filter(d, 2 * int(sig) + 1, mode='nearest'), sig, mode='nearest')
+    if lim is None: return e
+    for _ in range(4):
+        if (e <= lim + 0.02).all(): break
+        e = gaussian_filter1d(np.minimum(e, lim), sig / 2, mode='nearest')
+    return np.minimum(e, lim + 0.02)
 
 
 def corsie(r):
@@ -245,7 +263,7 @@ def righe(STR, raw_roads, nodes, log=print):
                 v = good & (d <= base + 0.6)
                 if v.sum() < 4: return None
                 ds = np.interp(np.arange(n), np.where(v)[0], d[v])
-                out.append((gaussian_filter1d(median_filter(ds, 7, mode='nearest'), 2.0, mode='nearest'), v))
+                out.append((_liscia(ds, LISCIA, ds + DENTRO), v))
             (dls, vl), (drs, vr) = out
             return dls, drs, vl, vr, ok & (vl | vr) & (dls + drs >= 2.4), lv, ok
         # 1. the reference: the middle of the carriageway across the OSM axis, smoothed
@@ -352,10 +370,23 @@ def righe(STR, raw_roads, nodes, log=print):
                 for j, kd in enumerate(kinds):
                     nm = 'D%d' % (j + 1) if c0 is None else 'C' if j == c0 else ('L%d' % (c0 - j) if j < c0 else 'R%d' % (j - c0)) if kd == 'S' else 'C%d' % j
                     o, t_ = ids[nm]; o[i] = pos[j]; t_[i] = kd
+            # where the carriageway widens or narrows (a ramp joins, a lane begins: more than ALLARGA per metre, over up to ALLARGA_MAX m) the
+            # place of a line measured there moves with it; and where a line jumps (the lanes OSM gives change from one way to the next: the
+            # centre line from the EL_STR axis to the share of the lanes and back, 3 m across). There the line goes across from where it is
+            # sure before to where it is sure after, at least SALTO m either side of the jump (Carlo 26/10 at x 48 z 422: the centre line made
+            # an S, jumping three times in 60 m where a ramp joins)
+            wa = np.abs(np.gradient(Ws)) > ALLARGA; unsafe = np.zeros(n, bool)
+            for i0, i1 in _runs(wa):
+                if i1 - i0 <= ALLARGA_MAX: unsafe[max(0, i0 - 3):i1 + 3] = True
             for nm, (o, t_) in ids.items():
                 m = _fill_gaps(~np.isnan(o), 8)
                 for i0, i1 in _runs(m, 6):
-                    idx = np.arange(i0, i1); g = ~np.isnan(o[idx])
+                    idx = np.arange(i0, i1); g = ~np.isnan(o[idx]); og = o[idx][g]; jg = idx[g]
+                    un = unsafe[idx].copy()
+                    for q in np.where(np.abs(np.diff(og)) > 0.4)[0]:   # a jump between two samples where the line is
+                        un[max(0, jg[q] - i0 - SALTO):jg[q + 1] - i0 + SALTO + 1] = True
+                    gs = g & ~un
+                    if gs.sum() >= 2: g = gs
                     oo = np.interp(idx, idx[g], o[idx][g]); oo = gaussian_filter1d(median_filter(oo, 5, mode='nearest'), 4.0, mode='nearest')
                     kd = Counter(x for x in t_[i0:i1] if x).most_common(1)[0][0]
                     off = np.zeros(n); off[idx] = oo

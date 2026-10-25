@@ -53,13 +53,13 @@ const flatMat""", """  parent.add(m); return m;
 const flatMat""")
 
 # ---- world: replace everything from "the world" to "audio" with the tiled world + level-aware collisions
-world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read()
+world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'rotonde3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
 function collideStatic(p, r, y) {
   let nx = 0, nz = 0, hit = false;
   WALLS.each(p.x - r - 1, p.z - r - 1, p.x + r + 1, p.z + r + 1, s => {
-    if (s.y0 !== undefined && (y === undefined || y < s.y0 || y > s.y1)) return;
+    if (s.off || s.y0 !== undefined && (y === undefined || y < s.y0 || y > s.y1)) return; /* s.off: a barrier piece broken through (sfondabili3.js) */
     if (s.dyn && !s.on) return;
     if (s.r) { const dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz), R = r + s.r; if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; hit = true; } return; }
     if (s.dyn && !s.on) return;
@@ -74,7 +74,7 @@ function collideStatic(p, r, y) {
 function rayWalls(ax, az, bx, bz, solidOnly) {
   let best = 1; const dx = bx - ax, dz = bz - az;
   WALLS.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => {
-    if (s.r || s.dyn || s.deckw || (solidOnly && s.two)) return; const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
+    if (s.r || s.dyn || s.off || s.deckw || (solidOnly && s.two)) return; const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
     const t = ((s.ax - ax) * ez - (s.az - az) * ex) / den, u = ((s.ax - ax) * dz - (s.az - az) * dx) / den;
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < best) best = t;
   });
@@ -101,6 +101,7 @@ rep("const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4);", "const pp = { x: P
 rep("const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35);", "const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35, p.y + 0.4);")
 
 # ---- traffic speeds per road class + spawn heights
+rep("const v = new Vehicle(kind, col, q0[0], q0[1], Math.atan2(q1[0] - q0[0], q1[1] - q0[1]));", "if (!carFree(MODELS[kind], q0[0], q0[1], Math.atan2(q1[0] - q0[0], q1[1] - q0[1]), H.node(a))) return null; /* not born in a wall (parkTile) */ const v = new Vehicle(kind, col, q0[0], q0[1], Math.atan2(q1[0] - q0[0], q1[1] - q0[1]));")
 rep("v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to]], cruise: Math.min(v.maxV * 0.8, base * mood), blocked: 0, ignore: 0 }; v.sleep = false;",
     "v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to, e.sp]], cruise: Math.min(v.maxV * 0.8, base * mood), mood, kind, blocked: 0, ignore: 0 }; v.sleep = false; v.y = H.node(a); v.sync();")
 rep("ai.q.push([p0[0], p0[1], -1], [p1[0], p1[1], e.to]);", "ai.q.push([p0[0], p0[1], -1, e.sp], [p1[0], p1[1], e.to, e.sp]);")
@@ -111,15 +112,30 @@ rep("while (heap.length) { const [d, u] = pop(); if (d > dist[u]) continue;", "w
 
 # ---- parked cars: spawned per tile around the player
 a = s.index("function spawnParked() {"); b = s.index("// ---------------------------------------------------------------- wanted level & police")
-s = s[:a] + """function parkTile(T) {
+s = s[:a] + """// a car standing still (parked, or just spawned in the traffic) keeps 0.2 m from every wall that does not move: the walls of buildings, the
+// fences and walls of the DBGT on the edge of the carriageway (src/barriere.py), guardrails, and 0.1 m from posts and trunks. Gates and the pieces broken through (sfondabili3.js) open
+function carFree(spec, x, z, h, y) {
+  const rad = spec.W / 2 + 0.02, co = Math.max(0.2, spec.L / 2 - rad), fx = Math.sin(h) * co, fz = Math.cos(h) * co, yy = y + 0.4, cs = [[x + fx, z + fz], [x - fx, z - fz]]; let ok = true;
+  WALLS.each(x - co - rad - 1.5, z - co - rad - 1.5, x + co + rad + 1.5, z + co + rad + 1.5, s => {
+    if (!ok || s.dyn || s.off || (s.y0 !== undefined && (yy < s.y0 || yy > s.y1))) return;
+    for (const c of cs) if (s.r ? hyp(c[0] - s.x, c[1] - s.z) < s.r + rad + 0.1 : segDist(c[0], c[1], s.ax, s.az, s.bx, s.bz) < rad + 0.2) { ok = false; return; }
+  });
+  return ok;
+}
+// the cars of the tiles around one just built checked again against what it brought (its posts, benches, pillars): one that stands in them goes
+function parkCheck(T) {
+  const x0 = T.cx - TS / 2 - 8, x1 = T.cx + TS / 2 + 8, z0 = T.cz - TS / 2 - 8, z1 = T.cz + TS / 2 + 8;
+  for (const v of VEH.slice()) if (v.parkedTile && v.parkedTile !== T && v.driver === null && !v.moved && v !== P.car && v.speed < 0.1 && v.x > x0 && v.x < x1 && v.z > z0 && v.z < z1 && !carFree(v.spec, v.x, v.z, v.h, v.y)) v.remove();
+}
+function parkTile(T) {
   T.parked = []; srndT = 77 + T.t * 131;
-  const add = (m, x, z, h) => { const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.y = H.surface(x, z); v.sync(); T.parked.push(v); };
+  const add = (m, x, z, h, src) => { const y = H.surface(x, z); if (!carFree(MODELS[m], x, z, h, y)) return false; const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.src = src; v.y = y; v.sync(); T.parked.push(v); return true; };
   // car parks with painted stalls: about half of them taken, a car in each and never in the yellow one; lots without stalls keep a few loose cars
   let inStalls = 0;
   for (const st of T.stalls || []) {
     if (st.dis || inStalls >= 14 || tRnd() > 0.45 || VEH.some(v => hyp(v.x - st.x, v.z - st.z) < 2.2)) continue;
     let m = pickModel(PARKED_MIX, tRnd); if (m === 'ape' || m === 'bici') m = 'hatch';
-    add(m, st.x + (tRnd() - 0.5) * 0.25, st.z + (tRnd() - 0.5) * 0.25, st.h + (tRnd() - 0.5) * 0.05); inStalls++;
+    if (add(m, st.x + (tRnd() - 0.5) * 0.25, st.z + (tRnd() - 0.5) * 0.25, st.h + (tRnd() - 0.5) * 0.05, 'stallo')) inStalls++;
   }
   for (const a of T.d.a || []) if (a.t === 4) {
     const o = dec(a.p), ar = Math.abs(sArea(o)); if (ar < 120) continue;
@@ -129,7 +145,7 @@ s = s[:a] + """function parkTile(T) {
     for (let k = 0; k < 30 && placed < n; k++) {
       const x = cx + (tRnd() - 0.5) * Math.sqrt(ar) * 1.2, z = cz + (tRnd() - 0.5) * Math.sqrt(ar) * 1.2;
       if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;
-      add(pickModel(PARKED_MIX, tRnd), x, z, ang + Math.PI / 2 + (tRnd() < 0.5 ? Math.PI : 0)); placed++;
+      if (add(pickModel(PARKED_MIX, tRnd), x, z, ang + Math.PI / 2 + (tRnd() < 0.5 ? Math.PI : 0), 'piazzale')) placed++;
     }
   }
   // along the streets where OSM maps the parking: about half the spaces taken
@@ -137,7 +153,7 @@ s = s[:a] + """function parkTile(T) {
   for (const st of T.streetStalls || []) {
     if (inStreet >= 16 || tRnd() > 0.5 || VEH.some(v => hyp(v.x - st.x, v.z - st.z) < 2.5)) continue;
     let m = pickModel(PARKED_MIX, tRnd); if (m === 'ape' || m === 'bici' || (st.kind === 1 && (m === 'van' || m === 'suv'))) m = 'hatch';
-    add(m, st.x, st.z, st.h + (tRnd() - 0.5) * 0.04); inStreet++;
+    if (add(m, st.x, st.z, st.h + (tRnd() - 0.5) * 0.04, 'via')) inStreet++;
   }
   let kerb = 0;
   for (const ri of T.d.rp || []) {
@@ -146,19 +162,23 @@ s = s[:a] + """function parkTile(T) {
       const a = N[r.g[k - 1]], b = N[r.g[k]], L = hyp(b[0] - a[0], b[1] - a[1]); if (L < 22 || tRnd() > 0.22) continue;
       if (tileOf((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) !== T.t) continue;
       const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, rx = -uz, rz = ux, s = 6 + tRnd() * (L - 12), side = tRnd() < 0.5 ? 1 : -1;
-      const cx0 = a[0] + ux * s, cz0 = a[1] + uz * s, free = clearance(cx0, cz0, rx * side, rz * side, 12), half = Math.min(r.w / 2, free - 0.3), off = half + 0.35;
-      if (free < half + 1.35 || off < r.lane + 1.9) continue;
+      const cx0 = a[0] + ux * s, cz0 = a[1] + uz * s, free = clearance(cx0, cz0, rx * side, rz * side, 12), half = Math.min(r.w / 2, free - 0.3);
+      /* half on the sidewalk; where a fence or a wall stands on the edge of the carriageway (src/barriere.py), on the road along it, 0.25 m off */
+      const fence = rayWalls(cx0, cz0, cx0 + rx * side * 12, cz0 + rz * side * 12, false) * 12, lane = Math.max(r.lane, ...(side > 0 ? (r.lf ? [r.lf[k - 1] / 100, r.lf[k] / 100] : []) : (r.lb ? [r.lb[k - 1] / 100, r.lb[k] / 100] : [])));
+      const m = pickModel(PARKED_MIX, tRnd); if (m === 'van' || m === 'suv') continue;
+      const off = Math.min(half + 0.35, fence - MODELS[m].W / 2 - 0.27);
+      if (free < half + 1.35 || off < lane + 1.9) continue;
       const x = cx0 + rx * off * side, z = cz0 + rz * off * side;
       if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;
-      const m = pickModel(PARKED_MIX, tRnd); if (m === 'van' || m === 'suv') continue;
-      add(m, x, z, Math.atan2(ux, uz) + (side < 0 ? Math.PI : 0)); kerb++;
+      if (add(m, x, z, Math.atan2(ux, uz) + (side < 0 ? Math.PI : 0), 'bordo')) kerb++;
     }
   }
   parkCaserme(T);
 }
 function parkTick() {
   for (const T of TILES) {
-    if (!T.parked && T.built && T.dist < 260) parkTile(T);
+    if (T.ready && T.pkChk !== T.group) { T.pkChk = T.group; parkCheck(T); } /* built again: its posts and benches are back in WALLS */
+    if (!T.parked && T.ready && T.dist < 260) parkTile(T);
     else if (T.parked && T.dist > 480) {
       for (const v of T.parked) if (v.driver === null && v !== P.car && v.speed < 0.1 && VEH.includes(v) && !(v.moved)) v.remove();
       T.parked = null;
@@ -243,7 +263,7 @@ rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z
 rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
-rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
+rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
 rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
@@ -273,7 +293,7 @@ rep("if (traffic.length < 22 && rnd() < dt * 2) spawnTraffic(true);", "if (traff
 rep("    for (const g of LX) if (g.bars && (g.closed || g.ang < 0.7)) for (const b of g.bars) for (const [x, z] of b.probe) check(x, z);",
     "    for (const g of LX) if (g.bars && (g.closed || g.ang < 0.7)) for (const b of g.bars) for (const [x, z] of b.probe) check(x, z);\n    if (v.ai && !v.ai.cop) SIGG.each(v.x - 30, v.z - 30, v.x + 30, v.z + 30, sg => { if (sigState(axisOf(fx, fz)) === 'g') return; const ox = sg.x - v.x, oz = sg.z - v.z, ahead = ox * fx + oz * fz, side = Math.abs(ox * fz - oz * fx); if (ahead > sg.w / 2 + 3 && ahead < 32 && side < sg.w / 2 + 4) block = Math.min(block, ahead - sg.w / 2 - 1); });")
 rep("  updTrain(dt); updCrossings(dt);", "  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains();")
-rep("    v.step(dt); v.collide();", "    v.step(dt); gateHits(v); fuelHits(v); propHits(v); v.collide();")
+rep("    v.step(dt); v.collide();", "    v.step(dt); gateHits(v); fuelHits(v); propHits(v); barHits(v); v.collide();")
 # no spawning on top of the player; tougher cars
 rep("  const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off, e);", "  if (a == null || VEH.some(o => hyp(o.x - N[a][0], o.z - N[a][1]) < 9)) return null;\n  const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off, e);")
 rep("  const e = pick(WALK[a]); if (!e) return; const side", "  if (a == null) return; const e = pick(WALK[a]); if (!e) return; const side")
