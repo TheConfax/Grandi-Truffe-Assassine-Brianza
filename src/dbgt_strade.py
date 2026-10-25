@@ -584,6 +584,12 @@ def _pct(a, ps=(50, 90, 99)):
 def _link(x, z): return '?x=%.0f&z=%.0f' % (x, z)
 
 
+def _corsie_osm(r):
+    """(lanes with the way, against it) from OSM, as the markings count them (dbgt_righe.corsie; imported here: it imports this module)"""
+    from dbgt_righe import corsie
+    return corsie(r)
+
+
 class Strade:
     """the streets of the comuni with a DBGT, for build_data.py"""
 
@@ -807,8 +813,9 @@ class Strade:
         (verifica 24/10). Samples every passo m across the ordinary carriageway (a sample where it opens to the side, wider than 1.25 times
         the way's median or 1.3 times its width, is not one): its middle c and width W, running medians over 15 m, at each node the value
         along the way there (a node more than 6 m from any sample, in a junction, keeps the old lane). Two-way: each direction
-        0.2 W right of the middle (W the p25 over 15 m), at least 0.9 m, at most W / 2 - 1 m, 0.3-2 m; one-way: the middle. Where another street
-        with traffic runs alongside in the same carriageway it ends halfway between the two axes (bound)"""
+        in the middle of its own half (W the p25 over 15 m), of its rightmost lane where OSM gives that way more than one, at most W / 2 - 1 m;
+        one-way: the middle, or the middle of its rightmost lane. Where another street with traffic runs alongside in the same carriageway it
+        ends halfway between the two axes (bound). r['_mid']: the middle of the carriageway at each node, for corsie_ia.py"""
         nl = 0; nsh = 0
         # the axes of the other streets with traffic: a carriageway two of them run in (two one-way carriageways OSM draws where the DBGT has
         # one, a street and its parallel ramp) is shared at the line halfway between their axes, else both lanes went to its middle, one on
@@ -836,7 +843,7 @@ class Strade:
                 else: bl[i_] = min(bl[i_], -s__ / 2)
             return br, bl
         for ri, r in enumerate(raw_roads):
-            r.pop('lf', None); r.pop('lb', None)
+            r.pop('lf', None); r.pop('lb', None); r.pop('_mid', None)
             if r['c'] > 3 or r.get('dbgt') != 'str' or len(r['refs']) < 2: continue
             xy = np.array([nodes[n_] for n_ in r['refs']]); P, U, Sx = [], [], []
             cum = np.r_[0, np.cumsum(np.hypot(*np.diff(xy, axis=0).T))]
@@ -861,17 +868,22 @@ class Strade:
             cn, Wn = np.interp(cum, Sx[vi], sm(c)), np.interp(cum, Sx[vi], sm(Wd))
             Wq = np.interp(cum, Sx[vi], np.array([np.percentile(Wd[vi[max(0, j - 7):j + 8]], 25) for j in range(len(vi))]))   # the narrower part of the 15 m
             lane0 = 0.0 if r['o'] else min(r['w'] * 0.24, r['mh'] * 0.5)
-            # 0.2 W right of the middle (W the p25 over 15 m), 0.9 at least (two cars side by side), the car's body inside (W / 2 - 1 m), 0.3-2 m. Capped at the old lane as well
-            # (min(0.24 w, mh / 2), mh the p5 of the room) the two lanes of 5-6 m streets came 1.6-1.8 m apart, the cars of the two ways one on
-            # the other (verifica 24/10: Via Como, 5.8 m, lanes 1.68 m apart for 1 km); 0.22 W and 0.25 W put more lanes within half a lane
-            # of the edge (3.4 and 6.4% of the samples, 2.4% so) for fewer close lanes on the narrowest streets
-            hl = np.clip(np.minimum(0.5 * Wq - 1.0, np.maximum(0.2 * Wq, 0.9)), 0.3, 2.0)
-            out = [np.clip(cn, -4.0, 4.0)] if r['o'] else [np.clip(cn + hl, 0.3, 5.0), np.clip(hl - cn, 0.3, 5.0)]
+            # each way in the middle of its own lane (26/10): two-way, its half of the carriageway (W the p25 over 15 m) shared among the
+            # lanes OSM gives it that way (dbgt_righe.corsie, 1 without lanes tags), the rightmost; one-way, the whole width so. The car's
+            # body inside (1 m from the edge). Before it was 0.2 W right of the middle, 0.9-2 m: on 4-5 m streets 1.0-1.5 m from the edge,
+            # 0.4 m from the walls the DBGT puts on it once they stood on the edge (25/10). Walls, fences and buildings come after, for
+            # every comune (src/corsie_ia.py)
+            nf_, nb_ = _corsie_osm(r)
+            if r['o']: hl = np.clip(np.minimum(0.5 * Wq - 0.5 * Wq / nf_, 0.5 * Wq - 1.0), 0.0, 5.0)
+            else: hl, hlb = (np.clip(np.minimum(0.5 * Wq - 0.25 * Wq / k_, 0.5 * Wq - 1.0), 0.3, 5.0) for k_ in (nf_, nb_))
+            out = [np.clip(cn + hl, -4.0, 5.0)] if r['o'] else [np.clip(cn + hl, 0.3, 5.0), np.clip(hlb - cn, 0.3, 5.0)]
             far = np.abs(cum[:, None] - Sx[vi][None, :]).min(1) > 6.0   # a node in a junction, away from any ordinary carriageway: the old lane
             for o in out: o[far] = lane0
+            mid = np.where(far, 0.0, cn)   # the middle of the carriageway right of the axis at each node (corsie_ia: two-way lanes keep off it)
             if all(np.abs(o - lane0).max() < 0.1 for o in out): continue
             r['lf'] = [int(round(v * 100)) for v in out[0]]
             if not r['o']: r['lb'] = [int(round(v * 100)) for v in out[1]]
+            r['_mid'] = [round(float(v), 2) for v in mid]
             nl += 1
         s.rep['corsie_locali'] = dict(vie=nl, carreggiate_condivise=nsh)
         s.log('dbgt strade: corsie IA dalla carreggiata, vie %d (carreggiata condivisa con un altra via %d)' % (nl, nsh))

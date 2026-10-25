@@ -982,6 +982,30 @@ if dbt_pc:
         if any(_main_r[k].distance(L_.interpolate(s_)) < 2 for k in _mrt.query(L_.interpolate(s_).buffer(2))): continue
         hb_ = barriers[_dbi[j_]][2]; pc_gates.append(((a_.x, a_.y), (b_.x, b_.y), round(min(2.2, max(1.2, hb_)), 1), barriers[_dbi[j_]][1]))
     log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates))
+# police stations (amenity=police): the door looks onto the street, so the barrier between them opens there, as wide as the door and its canopy
+# (src/barriere.py facciata_su_strada; the game finds the same front, and takes it from the POI: pois[].fr). Where no front looks onto a street
+# nothing is opened
+from barriere import facciata_su_strada, apertura_ingresso
+pol_fronts = {}
+_polp = [nodes[r_] for r_, t_ in ntags.items() if t_.get('amenity') == 'police'] + [centroid(ring(refs_)) for wid_, (refs_, t_) in ways.items() if t_.get('amenity') == 'police' and refs_[0] == refs_[-1] and len(ring(refs_)) >= 3]
+if _polp:
+    _bt2 = STRtree([g for b_, g in _bl]); _st2 = [(r['line'], r['w']) for r in raw_roads if r['c'] <= 5 and flat(r) and r['line'].length > 0.1]
+    for p_ in _polp:
+        if not inside(p_, -15): continue
+        P_ = Point(p_); best_ = None
+        for j_ in _bt2.query(P_.buffer(40)):
+            b_, g_ = _bl[j_]
+            if b_['h'] < 3 or g_.geom_type != 'Polygon': continue
+            ins_ = g_.contains(P_); d_ = 0 if ins_ else g_.exterior.distance(P_)
+            sc_ = d_ - min(g_.area ** 0.5, 30) * 0.3
+            if (ins_ or d_ < 35) and (best_ is None or sc_ < best_[0]): best_ = (sc_, g_)
+        if best_ is None: continue
+        g_ = best_[1]; near_ = [o_ for o_ in (_bl[k_][1] for k_ in _bt2.query(g_.buffer(46))) if o_ is not g_]
+        f_ = facciata_su_strada(g_, near_, [(l_, w_) for l_, w_ in _st2 if l_.distance(g_) < 50])
+        if f_ is None: log('caserma senza facciata su una strada', p_); continue
+        a_, c_, mx_, mz_, nx_, nz_, t_ = f_
+        pc_cuts.append(apertura_ingresso(mx_, mz_, nx_, nz_, t_)); pol_fronts[(round(p_[0], 1), round(p_[1], 1))] = [a_[0], a_[1], c_[0], c_[1]]
+    log('caserme: aperture nelle recinzioni davanti alla porta', len(pol_fronts), 'su', len(_polp))
 _bc_parts_f = presto(lambda: ([r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1], [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + ([g_ for g_ in (g.buffer(-0.3, join_style=2) for g in STR.carr_ponti) if not g_.is_empty] if STR else []) + ([g_.buffer(0.5) for g_ in (_Pp(b['p'], b.get('k', [])) for b in buildings if b.get('dbgt')) if g_ is not None] if ED else [])))  # the pieces the barriers are cut against (below), on a thread from here: all final
 # railway fill-in: along every track, wherever no fence or wall stands within 12 m on that side, a fence 4.2 m out from the outer track; open at
 # level crossings, platforms, buildings and the ends of the line (the corridor fences above only exist where OSM maps the railway land)
@@ -1262,6 +1286,7 @@ def add_poi(nm, kind, p):
     kk = (nm, kind, round(p[0] / 120), round(p[1] / 120))
     if not nm or kk in seen or not inside(p, -15): return
     seen.add(kk); pois.append({'n': nm, 'k': kind, 'x': round(p[0], 1), 'z': round(p[1], 1)})
+    if kind == 'polizia' and (round(p[0], 1), round(p[1], 1)) in pol_fronts: pois[-1]['fr'] = [round(v_, 1) for v_ in pol_fronts[(round(p[0], 1), round(p[1], 1))]]  # the front the build opened the fence at
 for r, t in ntags.items():
     if t.get('railway') == 'station': add_poi('Stazione di ' + t.get('name', ''), 'stazione', nodes[r])
     elif t.get('amenity') in KIND: add_poi(t.get('name'), KIND[t['amenity']], nodes[r])
@@ -1557,6 +1582,19 @@ log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1)
 trees = VERDE.alberi(trees, _n_tr, [_rbuf('flat0'), bunion, _rbuf('deck0')], railL, pspaces, roadsU, [side]); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
 VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 trees = MANUF.alberi(trees, VERDE.forest_u)
+# ---- the lanes of the AI cars away from walls, fences, gates and buildings, in every comune (src/corsie_ia.py): all of them are final here
+import corsie_ia
+_cia_n = [0]
+def _cia_id(): _cia_n[0] += 1; return 'ia%d' % _cia_n[0]
+_cia_ost = [b_[0] for b_ in bar_out] + list(fences) + [[(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)] for g_ in gate_out]
+_cia_ost += [list(b_['p']) + [b_['p'][0]] for b_ in buildings if b_.get('t') != 9 and len(b_['p']) >= 3] + [list(h_) + [h_[0]] for b_ in buildings if b_.get('t') != 9 for h_ in b_.get('k', []) if len(h_) >= 3]
+_cia_asf = [asph, _cv_f.result()] if STR else None  # the asphalt drawn (AC_VEI, the OSM ways without it) and the paved yards
+if os.environ.get('GTA_DUMP_CORSIE'):  # development of src/corsie_ia.py: its inputs, to work on it without the whole build
+    import pickle
+    pickle.dump(dict(raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], nodes=nodes, deckH=deckH, ostacoli=_cia_ost, asfalto=_cia_asf, cover=dbt_cover if STR else None), open(os.environ['GTA_DUMP_CORSIE'], 'wb'))
+_cia_rep = corsie_ia.corsie(raw_roads, nodes, deckH, _cia_ost, _cia_asf, dbt_cover if STR else None, _cia_id, log)
+if STR: STR.rep['corsie_ia'] = _cia_rep
+del _cia_ost, _cia_asf
 # ------------------------------------------------------------------ graph & tiles
 used_nodes = {}
 out_roads = []
@@ -1572,8 +1610,9 @@ for r in raw_roads:
     if r.get('pv'): rec['pv'] = 1  # over a yard of the DBGT (AC_VEI 0307): no AI traffic (src/dbgt_strade.py privati)
     if r.get('sg'): rec['sg'] = 1  # its markings are in tiles[].sg (dbgt_righe.py): none on its axis
     if r.get('w_osm') is not None: rec['wd'] = 1  # w is the carriageway of the DBGT (AC_VEI): the markings go by it, mh is the lanes' room
-    for k_ in ('lf', 'lb'):  # the AI lanes node by node from the carriageway of the DBGT (dbgt_strade.py corsie_locali)
+    for k_ in ('lf', 'lb'):  # the AI lanes node by node: from the carriageway of the DBGT (dbgt_strade.py corsie_locali), away from the obstacles (corsie_ia.py)
         if r.get(k_) and len(r[k_]) == len(r['refs']): rec[k_] = r[k_]
+    if r.get('nt'): rec['nt'] = r['nt']  # the segments k (g[k-1] to g[k]) without AI traffic (corsie_ia.py)
     out_roads.append(rec)
 q = lambda v: int(round(v * 10))
 NODES = [[q(nodes[ref][0]), q(nodes[ref][1]), q(deckH[ref]) if ref in deckH else -32768] for ref in node_list]
@@ -1596,6 +1635,8 @@ for b in buildings + (ED.alti if ED else []):
     elif b.get('bt') == 'greenhouse': rec['g'] = 2  # glass
     elif b.get('bt') == 'grandstand': rec['g'] = 3  # stepped seats under a roof
     elif b.get('wt'): rec['g'] = 4  # a water tower mapped as a building
+    elif b.get('mn') in ('01', '02', '03'): rec['g'] = 5  # a cabin of the DBGT (dbgt_manufatti.py): its own model in paesaggio3.js
+    if b.get('mm'): rec['mm'] = b['mm']  # the model of a manufatto and what the photos say of it (src/manufatti_foto.json)
     push(tid(*c), 'b', rec)
 _ls = []
 for k_, pts in land:  # one polygon per piece of land, simplified, in the tile of its middle

@@ -49,6 +49,8 @@ RESA = {'01': CABINA, '02': CABINA, '03': CABINA, '07': CONT, '0703': CONT, '070
 # heights accepted from the DSM (m): outside these the reading is something else (a tree over a cabin, a roof next to it)
 LIM = {CABINA: (2.0, 12.0), SERRA: (2.0, 8.0), TORRE: (10.0, 60.0), CONT: (2.0, 30.0), VASCA: (0.0, 6.0)}
 VASCA_RIM = 0.3      # a basin the DSM sees at ground level: a low concrete rim, the water just under it
+TORRE_CAB = 6.0      # m: an electric cabin this high on a plan of 40 m2 at most is a tower cabin
+TUNNEL_W = 9.0       # m: a rectangular greenhouse at most this wide and 1.8 times as long is a plastic tunnel, unless the photo says otherwise
 TONDO = 0.85         # 4 pi A / P^2 above this: a round tank or silo (a cylinder), else a prism
 DUP_OSM = 0.3        # a manufatto this much inside a bigger OSM building is part of it (the building stays, the manufatto is not added)
 DUP_BLD = 0.5        # an OSM building this much on a manufatto is that manufatto (it goes, the DBGT shape comes in)
@@ -64,6 +66,11 @@ CLEAR, MOVE = 0.4, 3.0  # as dbgt_verde.py: a trunk off a manufatto, moved at mo
 ALB_BLD = 3.0        # DSM pixels this close to a DBGT building and as high as its roof are the roof (2008 and 2015 are a metre or two apart)
 WIRE_R, WIRE_R_MT, PYL_R = 9.0, 3.0, 5.0  # m: around a high-voltage line (its outer conductors are 6.5 m off the axis), a minor line, a pylon
 VASCA_TERRA = 0.5    # a basin whose DSM median is under this is in the ground (a rim), whatever stands around it
+INTERRATO = 1.5      # a container the DSM does not see, its p90 under this: in the ground (0702 of x -431 z -75, a paved strip in the photo)
+FOTO_R = 3.0         # m: a line of src/manufatti_foto.json is the manufatto of the same code whose centre is this close
+DOPPIA = 0.5         # a cabin more than this much inside a bigger one is part of it (none in Meda: the two gas cabins of x 274 z -76 touch)
+try: FOTO = json.load(open(os.path.join(HERE, 'manufatti_foto.json'), encoding='utf-8'))['oggetti']
+except Exception: FOTO = []
 
 
 def _geom(b): f = b[3]; return wkb.loads(bytes(b[8 + [0, 32, 48, 48, 64][(f >> 1) & 7]:]))
@@ -240,9 +247,14 @@ class Manufatti:
     # ---------------------------------------------------------------- heights of the manufatti from DSM - DTM
     def _misura(self):
         G = self.grid; per = defaultdict(list); occ = [o['g'] for o in self.ind] + self.blds; ot = STRtree(occ) if occ else None
+        for o in self.ind:  # what the photos say of it (src/manufatti_foto.json), if anything
+            c = o['g'].centroid; fs = [f for f in FOTO if f['ty'] == o['ty'] and math.hypot(f['x'] - c.x, f['z'] - c.y) < FOTO_R]
+            o['foto'] = min(fs, key=lambda f: math.hypot(f['x'] - c.x, f['z'] - c.y)) if fs else {}
         for o in self.ind:
             g, kind = o['g'], RESA.get(o['ty'])
             o['kind'] = kind; o['tondo'] = 4 * math.pi * g.area / max(1e-6, g.length ** 2) >= TONDO
+            # a greenhouse the 2018-19 photo no longer shows (src/manufatti_foto.json): not drawn
+            if kind == SERRA and o['foto'].get('forma') == 'assente': o['kind'] = None; o['seen'] = 'assente nella foto 2018-19'; o['h_dsm'] = None; continue
             if G is None or not G.ok or kind is None: o['h_dsm'] = None; continue
             gi = g.buffer(-0.4) if g.buffer(-0.4).area > 0.4 * g.area else g
             X, Z = _pts_in(gi); hv = G.at(G.N, X, Z)
@@ -259,8 +271,11 @@ class Manufatti:
             # a basin in the ground: the DSM sees the ground over most of it (at x 1633 z 15 p90 0.0 with something higher around: it got
             # the 2.8 m walls of the typical basin)
             if kind == VASCA and p50 < VASCA_TERRA: o['h_dsm'] = 0.0; o['seen'] = 'a terra'
+            elif o['foto'].get('dsm') == 'no': o['h_dsm'] = None; o['seen'] = 'no, chiome sopra (foto)'
             elif stands and lo <= h <= hi: o['h_dsm'] = round(float(h), 1); o['seen'] = 'dsm'; per[o['ty']].append(h)
             else: o['h_dsm'] = None; o['seen'] = 'no'
+            # a container the DSM sees as ground is under it (a buried tank: the photo shows a paved strip, no 2 m box)
+            if kind == CONT and o['h_dsm'] is None and (p90 if p90 is not None else 99) < INTERRATO: o['kind'] = None; o['seen'] = 'interrato'
         # the typical height is the one of the same code (MN_IND_TY): the serbatoio 0702 of x -431 z -75, flat ground in the DSM, took the
         # 10.9 m of the silos 07; a code with nothing seen takes the lowest height of its kind
         self.typ = {k: round(float(np.median(v)), 1) for k, v in per.items()}
@@ -269,11 +284,14 @@ class Manufatti:
             if k is None: continue
             if o.get('h_dsm') is not None: o['h'] = o['h_dsm']
             else: o['h'] = self.typ.get(o['ty'], LIM[k][0])
+            # a small cabin the DSM does not see is a cabinet, no taller than its side and half a metre (a 4 m2 one of gas took 3.8 m)
+            if k == CABINA and o.get('h_dsm') is None: o['h'] = round(min(o['h'], max(LIM[k][0], math.sqrt(o['g'].area) + 0.5)), 1)
         rep = defaultdict(lambda: Counter())
         for o in self.ind: rep[o['ty']][o.get('seen', 'tipo non disegnato')] += 1
         self.rep['altezze_manufatti'] = {'per_tipo': {t: dict(c) for t, c in rep.items()}, 'altezza_tipica_se_il_dsm_non_vede': self.typ,
                                         'per_oggetto': [{'ty': o['ty'], 'x': round(o['g'].centroid.x, 1), 'z': round(o['g'].centroid.y, 1), 'm2': round(o['g'].area, 1), 'h': o.get('h'),
-                                                         'dsm_p50': o.get('p50'), 'dsm_p90': o.get('p90'), 'intorno': o.get('ring'), 'visto': o.get('seen')} for o in self.ind]}
+                                                         'dsm_p50': o.get('p50'), 'dsm_p90': o.get('p90'), 'intorno': o.get('ring'), 'visto': o.get('seen'),
+                                                         'foto': o['foto'].get('nota') if o['foto'] else None} for o in self.ind]}
 
     # ---------------------------------------------------------------- buildings: cabins, greenhouses, water tower
     def edifici(self, buildings, cantieri=()):
@@ -288,6 +306,13 @@ class Manufatti:
             self.rep['manufatti_nei_cantieri_osm'] = [{'ty': o['ty'], 'x': round(o['g'].centroid.x, 1), 'z': round(o['g'].centroid.y, 1)} for o in gone_c]
         mine = [o for o in self.ind if o['kind'] in (CABINA, SERRA, TORRE)]
         if not mine: return buildings
+        # a cabin mostly inside a bigger cabin is part of it
+        cab = sorted([o for o in mine if o['kind'] == CABINA], key=lambda o: -o['g'].area); doppie = 0
+        for i, o in enumerate(cab):
+            if o['kind'] is None: continue
+            for q in cab[i + 1:]:
+                if q['kind'] is not None and q['g'].intersection(o['g']).area > DOPPIA * q['g'].area: q['kind'] = None; q['seen'] = 'dentro una cabina piu grande'; doppie += 1
+        mine = [o for o in mine if o['kind'] is not None]
         # a building mostly on a manufatto (more than half of it) is that manufatto and goes; a manufatto inside a bigger building stays
         # out and the building stays (the 30% of the smaller of the two took away an industrial building of 8481 m2 at x 1402 z -1088
         # for its 53 m2 transformer cabin, and five more of 184-1664 m2)
@@ -314,14 +339,41 @@ class Manufatti:
         for o in mine:
             pts = [(round(x, 2), round(z, 2)) for x, z in list(o['g'].exterior.coords)[:-1]]
             holes = [[(round(x, 2), round(z, 2)) for x, z in list(i.coords)[:-1]] for i in o['g'].interiors if Polygon(i).area > 0.5]
-            if o['kind'] == CABINA: rec = {'p': pts, 'h': o['h'], 't': 1, 'ht': True, 'lv': None, 'bt': 'service', 'mn': o['ty']}
-            elif o['kind'] == SERRA: rec = {'p': pts, 'h': o['h'], 't': 1, 'ht': True, 'lv': None, 'bt': 'greenhouse', 'mn': o['ty']}
-            else: rec = {'p': pts, 'h': o['h'], 't': 0, 'ht': True, 'lv': None, 'bt': 'yes', 'wt': True, 'mn': o['ty']}
+            if o['kind'] == CABINA: rec = {'p': pts, 'h': o['h'], 't': 1, 'ht': True, 'lv': None, 'bt': 'service', 'mn': o['ty'], 'mm': self._modello(o)}
+            elif o['kind'] == SERRA: rec = {'p': pts, 'h': o['h'], 't': 1, 'ht': True, 'lv': None, 'bt': 'greenhouse', 'mn': o['ty'], 'mm': self._modello(o)}
+            else: rec = {'p': pts, 'h': o['h'], 't': 0, 'ht': True, 'lv': None, 'bt': 'yes', 'wt': True, 'mn': o['ty'], 'mm': self._modello(o)}
             if holes: rec['k'] = holes
             keep.append(rec); self.new_blds.append(o)
-        self.rep['edifici'] = {'aggiunti': dict(Counter(o['kind'] for o in mine)), 'osm_tolti_doppi': dict(gone), 'dentro_edifici_osm_tenuti': dict(dentro)}
+        self.rep['edifici'] = {'aggiunti': dict(Counter(o['kind'] for o in mine)), 'osm_tolti_doppi': dict(gone), 'dentro_edifici_osm_tenuti': dict(dentro),
+                               'cabine_dentro_cabine': doppie, 'modelli': dict(Counter('%s %s' % (o['kind'], self._modello(o)['k']) for o in mine))}
         self.log('dbgt manufatti: edifici aggiunti', dict(Counter(o['kind'] for o in mine)), 'edifici OSM doppi tolti', dict(gone), 'manufatti dentro edifici OSM', dict(dentro))
         return keep
+
+    # ---------------------------------------------------------------- the model of a cabin, greenhouse, water tower (paesaggio3.js)
+    def _modello(self, o):
+        """mm of the building record: k the model, and what the photos say (src/manufatti_foto.json), else the rule of the type.
+        Cabins: 'el' electric (01, 02 water), 'gas' (03), 'torre' an electric cabin at least TORRE_CAB high on a small plan (the tall
+        ENEL towers with the line coming in at the top); t roof colour, m walls. Greenhouses: 'tunnel' (an arched plastic tunnel) or
+        'vetro' (glass under a ridge), c the colour of the film. Tower: s the roof's alternating colours and how many, f the shaft."""
+        f, g = o.get('foto') or {}, o['g']
+        if o['kind'] == CABINA:
+            k = 'gas' if o['ty'] == '03' else 'torre' if o['h'] >= TORRE_CAB and g.area <= 40 else 'el'
+            mm = {'k': k}
+            if f.get('tetto'): mm['t'] = f['tetto']
+            if f.get('muri'): mm['m'] = f['muri']
+            return mm
+        if o['kind'] == SERRA:
+            r = g.minimum_rotated_rectangle; xs, zs = r.exterior.coords.xy; a, b = math.dist((xs[0], zs[0]), (xs[1], zs[1])), math.dist((xs[1], zs[1]), (xs[2], zs[2]))
+            w, L = min(a, b), max(a, b); rect = g.area > 0.85 * r.area
+            k = f.get('forma') or ('tunnel' if rect and w <= TUNNEL_W and L >= 1.8 * w else 'vetro')
+            if k == 'tunnel' and not rect: k = 'vetro'  # a tunnel needs a rectangle
+            mm = {'k': k}
+            if f.get('telo'): mm['c'] = f['telo']
+            return mm
+        mm = {'k': 'torre'}
+        if f.get('spicchi'): mm['s'] = f['spicchi']
+        if f.get('fusto'): mm['f'] = f['fusto']
+        return mm
 
     # ---------------------------------------------------------------- areas: yards (AATT), ponds, car parks
     def aree(self, area_geoms, land):
@@ -599,10 +651,15 @@ class Manufatti:
             d = os.path.join(os.path.dirname(HERE), 'terreno')
             try: idx = json.load(open(os.path.join(d, 'indice.json'), encoding='utf-8'))['tiles']
             except Exception: idx = {}
+            pk = None  # since the fast start the tiles are in terreno/pacco.bin (src/terreno_pacco.py): offset and length per tile in indice.json
+            try:
+                ii = json.load(open(os.path.join(d, 'indice.json'), encoding='utf-8')).get('pacco'); pk = (open(os.path.join(d, ii['file']), 'rb').read(), ii['tile']) if ii else None
+            except Exception: pk = None
             for k in idx:
                 try:
                     import gzip
-                    b = open(os.path.join(d, k + '.bin.gz'), 'rb').read()
+                    if pk is not None and k in pk[1]: o_, n_ = pk[1][k]; b = pk[0][o_:o_ + n_]
+                    else: b = open(os.path.join(d, k + '.bin.gz'), 'rb').read()
                     if b[:2] == b'\x1f\x8b': b = gzip.decompress(b)
                     if b[:4] != b'GTAS': continue
                     st, n = b[5], int.from_bytes(b[6:8], 'little'); base = float(np.frombuffer(b, '<f4', 1, 8)[0])
@@ -638,6 +695,9 @@ class Manufatti:
             if o['kind'] == CONT and o['tondo']: rec = {'k': 1, 'c': [q(c.x), q(c.y)], 'r': q(math.sqrt(g.area / math.pi)), 'h': q(o['h'])}
             elif o['kind'] == CONT: rec = {'k': 2, 'p': enc(list(g.simplify(0.1).exterior.coords)[:-1]), 'h': q(o['h'])}
             else: rec = {'k': 3, 'p': enc(list(g.simplify(0.1).exterior.coords)[:-1]), 'h': q(max(VASCA_RIM, o['h']))}
+            f = o.get('foto') or {}  # colours from the photos: m walls, t top (containers); a water, b rim (basins)
+            for k_, kf in (('m', 'colore'), ('t', 'tetto'), ('a', 'acqua'), ('b', 'bordo')):
+                if f.get(kf): rec[k_] = f[kf]
             res.append((t, 'mf', rec)); self.mf.append(rec)
         # car parks cut on the tiles like the areas
         for p in self.pk:
