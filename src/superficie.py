@@ -44,6 +44,8 @@ FINE_BUF = 20.0  # a tile is fine (2 m) when one of the features is within this 
 DENS = 2.0       # polygon rings are densified to this before the TIN (a nearly constrained Delaunay)
 KERB_TOL = 0.3   # a sidewalk or area edge point this close to a carriageway takes the carriageway height (no step along the kerb)
 KERB_MAX = 1.0   # ... unless the two differ by more than this (a wall, not a kerb)
+KERB_LID = 0.5   # ... but not where the LiDAR sees no wall: the edge point this far off it, the carriageway within it (a wrong DBGT Z)
+PED_LID = 1.0    # the other edge points of sidewalks and road areas this far under the LiDAR (not by a bridge) take the LiDAR
 ZW_MARG = 0.1    # the water level stays this much under the ring of the bed (the water's edge) and the bed edge this much over the water
 ALV_D, ALV_G = 1.5, 1.0   # the bed is dug from the water level: 1:1 from the edge (like the banks outside) down to ALV_D under the water
 ALV_GIU = 1.0    # the water's edge in a bed is at most this under the ring (where a low bank downstream holds the level down)
@@ -430,17 +432,30 @@ class Superficie:
         keys = list(rings); allp = np.vstack([rings[k][0] for k in keys]); own = np.repeat(np.arange(len(keys)), [len(rings[k][0]) for k in keys])
         mp = [s.vei[i]['P'] for i in masters]; mt = shapely.STRtree(mp); pg = shapely.points(allp)
         pi, mi = mt.query(pg, predicate='dwithin', distance=KERB_TOL)
+        zall = np.concatenate([rings[k][1] for k in keys]); lp = s.L_at(allp[:, 0], allp[:, 1]); s.kerb_falsi = 0
+        dbr = ndimage.distance_transform_edt(~s.BR, sampling=SF) if s.BR.any() else np.full(s.BR.shape, 1e9)   # (by a bridge the DTM is filled across the deck: no LiDAR rule there)
+        rr = np.clip(np.round((allp[:, 1] - s.R.z0) / SF).astype(int), 0, s.R.nz - 1); cc = np.clip(np.round((allp[:, 0] - s.R.x0) / SF).astype(int), 0, s.R.nx - 1); lontano = dbr[rr, cc] > NEAR_BR
         if len(pi):
             dd = shapely.distance(pg[pi], np.array(mp, dtype=object)[mi]); o = np.lexsort((dd, pi)); pi, mi = pi[o], mi[o]
             first = np.concatenate(([True], pi[1:] != pi[:-1])); pi, mi = pi[first], mi[first]
             zsn = np.empty(len(pi))
             for m in np.unique(mi):
                 k = mi == m; r = s.vei[masters[m]]; zsn[k] = s.road(r, allp[pi[k], 0], allp[pi[k], 1])
-            zall = np.concatenate([rings[k][1] for k in keys]); s.kerb_dz = zsn - zall[pi]; ok = np.abs(s.kerb_dz) <= KERB_MAX
+            s.kerb_dz = zsn - zall[pi]; ok = np.abs(s.kerb_dz) <= KERB_MAX
+            # bordi lisci: a "wall" the LiDAR does not see (the edge point off it by more than KERB_LID, the carriageway on it, no bridge within NEAR_BR) is a wrong Z
+            # of the DBGT, not a wall: the sidewalk of largo Europa had its kerb vertices 1.1-1.3 m under the road and the LiDAR (AC_PED 87),
+            # and the narrow trench along the kerb came out on the 2 m lattice as teeth (S up and down 0.6 m every 2.8 m)
+            fal = ~ok & lontano[pi] & (np.abs(zall[pi] - lp[pi]) > KERB_LID) & (np.abs(zsn - lp[pi]) <= KERB_LID); s.kerb_falsi = int(fal.sum()); ok |= fal
             s.kerb_lontani = int((~ok).sum()); zall[pi[ok]] = zsn[ok]; pi = pi[ok]
-            st = np.concatenate(([0], np.cumsum([len(rings[k][0]) for k in keys])))
-            for n, k in enumerate(keys): rings[k][1] = zall[st[n]:st[n + 1]]
         else: s.kerb_dz = np.zeros(0); s.kerb_lontani = 0
+        # bordi lisci: the other edge points of sidewalks, cycle lanes and road areas more than PED_LID under the LiDAR, away from the
+        # bridges (the DTM is filled across the decks), take the LiDAR: on the other side of largo Europa the AC_PED by the building had
+        # its outer vertices 2.5 m under the LiDAR, a trench along the wall. Not those over it: the ramps up to a footbridge stand on
+        # structures the DTM leaves out (the ramps of PONTE 9, 30-40 m from the bridge, lost their abutments)
+        sec_pt = np.repeat(np.array([k[0] != 'AC_VEI' for k in keys]), [len(rings[k][0]) for k in keys]); snap = np.zeros(len(allp), bool); snap[pi] = True
+        lon = sec_pt & ~snap & (zall < lp - PED_LID) & lontano; s.ped_lidar = int(lon.sum()); s.ped_lidar_dz = zall[lon] - lp[lon]; zall[lon] = lp[lon]
+        st = np.concatenate(([0], np.cumsum([len(rings[k][0]) for k in keys])))
+        for n, k in enumerate(keys): rings[k][1] = zall[st[n]:st[n + 1]]
         s.nkerb = int(len(pi))
         kv = [k for k in rings if k[0] == 'AC_VEI']; tv = dict(zip(kv, in_parallelo(lambda k: Tin(*rings[k]), kv)))
         for (nm, i), (P_, Z_) in rings.items():
@@ -484,7 +499,7 @@ class Superficie:
             w, m = s.raster(P)
             if w is not None: s.INT[w[0]:w[1], w[2]:w[3]] |= m
         s.t['strade'] = round(time.time() - t0, 1)
-        s.log('strade: carreggiate %s, nodi fissi %d, sotto ponti %d, bordi agganciati %d' % (nst, int((s.RANK > 0).sum()), int(s.BR.sum()), s.nkerb))
+        s.log('strade: carreggiate %s, nodi fissi %d, sotto ponti %d, bordi agganciati %d (muri che il LiDAR non vede %d), punti di marciapiedi e aree al LiDAR %d' % (nst, int((s.RANK > 0).sum()), int(s.BR.sum()), s.nkerb, s.kerb_falsi, s.ped_lidar))
 
     def road(s, r, x, z):  # carriageway height at the points: blended axes, the polygon TIN taking over farther than AX_NEAR from them
         if r['js'] is None: return r['tin'](x, z)
@@ -1268,7 +1283,7 @@ def main(argv=None):
                             elenco_10m=sorted('%d_%d' % t for t, v in s.passo.items() if v == SC)),
                parametri=dict(K=K, fascia_m=BAND, frangia_m=FRINGE, asse_proprio_m=AX_OWN, asse_vicino_m=AX_NEAR, fusione_assi_m=s.blend, lisciatura_assi_m=AX_SIGMA, livello_m=LEVEL, dz_elenco_m=DZ_WARN, dz_tetto_m=DZ_CAP,
                               vicino_ponte_m=NEAR_BR, raccordo_tetto_m=RAMP, buffer_passo_fine_m=FINE_BUF, infittimento_m=DENS, aggancio_cordolo_m=KERB_TOL, acqua_sotto_anello_m=ZW_MARG, fondo_sotto_acqua_m=ALV_D, sponda_sotto_acqua=ALV_G, quanto_10m=Q5),
-               dbgt=dict(offset_m=s.info['offset']['valore'], assi_lisciati_quanto_si_muovono=pct(np.abs(s.AX.dz_liscio)), carreggiate=s.nst, bordi_agganciati=s.nkerb, bordi_non_agganciati_oltre_1m=s.kerb_lontani, scarto_aggancio=pct(np.abs(s.kerb_dz)), aree_interne_al_lidar=len(s.interne), alvei_bruciati=s.nalveo, ferrovia_fuori_sedi_punti=s.ferro_fuori),
+               dbgt=dict(offset_m=s.info['offset']['valore'], assi_lisciati_quanto_si_muovono=pct(np.abs(s.AX.dz_liscio)), carreggiate=s.nst, bordi_agganciati=s.nkerb, bordi_non_agganciati_oltre_1m=s.kerb_lontani, bordi_muro_non_visto_dal_lidar=s.kerb_falsi, punti_marciapiedi_aree_al_lidar=s.ped_lidar, punti_al_lidar_scarto=pct(np.abs(s.ped_lidar_dz)) if s.ped_lidar else None, scarto_aggancio=pct(np.abs(s.kerb_dz)), aree_interne_al_lidar=len(s.interne), alvei_bruciati=s.nalveo, ferrovia_fuori_sedi_punti=s.ferro_fuori),
                lidar=dict(buchi=s.nbuchi, nota='nessun buco nel riquadro: TINITALY non serve qui'),
                superficie=dict(nodi_fissi=int(s.FIX.sum()), sotto_ponti=int(s.BR.sum()), nodi_impalcato_da_fase3=int(s.AIR.sum()), nodi_tetto=int(s.CAP.sum()), nodi_tombino_tenuti=int(s.TOMB.sum()), nodi_alveo_al_lidar=int(s.ALVCOP.sum()), nodi_scarpata=int(s.SCARP.sum()),
                                bordo_fascia_ancora_mosso=s.bordo_banda, dentro_ponte_a_livello_impalcato=int(s.ALTO.sum()), sotto_ponti_riempiti=s.n_sotto, sotto_ponti_modo=s.sotto_modo, sotto_ponti_abbassati_m=pct(-s.sotto_dz) if len(s.sotto_dz) else None, carreggiata_meno_lidar=pct(dz, (10, 50, 90)), ritocchi=s.nrit,
