@@ -1647,11 +1647,40 @@ for b in buildings + (ED.alti if ED else []):
     elif b.get('mn') in ('01', '02', '03'): rec['g'] = 5  # a cabin of the DBGT (dbgt_manufatti.py): its own model in paesaggio3.js
     if b.get('mm'): rec['mm'] = b['mm']  # the model of a manufatto and what the photos say of it (src/manufatti_foto.json)
     push(tid(*c), 'b', rec)
+_ls = []
 for k_, pts in land:  # one polygon per piece of land, simplified, in the tile of its middle
     try: g_ = Polygon(pts).buffer(0).simplify(0.3, preserve_topology=True)
     except Exception: continue
     if g_.is_empty or g_.geom_type != 'Polygon' or g_.area < 8 or not inside((g_.centroid.x, g_.centroid.y), 0): continue
-    push(tid(g_.centroid.x, g_.centroid.y), 'ls', {'p': enc(list(g_.exterior.coords)[:-1]), 's': k_})
+    _ls.append((k_, g_))
+# a building site's hoarding takes the place of the wall or fence of the map along its edge (Carlo, 26/10; src/barriere.py cantieri): the
+# divider goes, the hoarding stands on its line; h: the stretches of the edge that keep the game's hoarding, w: the lines of the replaced dividers
+from barriere import cantieri as _cantieri
+_crep = {}
+# the railway fences of the game (fences, kind 'fe' here) as well: a site along the tracks has its hoarding, not the railway fence (todo.md, the station);
+# not across a street (strada: the carriageways, OSM and DBGT)
+import shapely; shapely.prepare(asph)
+def _strada(xs, zs):
+    r_ = shapely.contains_xy(asph, xs, zs)
+    if _mvt is not None: r_[_mvt.query(shapely.points(xs, zs), predicate='within')[0]] = True
+    return r_
+_vg = [(r['line'], r['w']) for r in raw_roads if flat(r) and r['line'].length > 0.1]; _vgt = STRtree([v_[0] for v_ in _vg]) if _vg else None
+def _senza(x_, z_):  # = paesaggio3.js: onAnyRoad(0.6) (a street at grade, w/2 + 0.6 from its axis), nearAsph(0.3) (asphalt 0.55 m away), inBuilding(0.3)
+    p_ = Point(x_, z_)
+    if _vgt is not None and any(_vg[j][0].distance(p_) < _vg[j][1] / 2 + 0.6 for j in _vgt.query(p_.buffer(15))): return True
+    if _strada(np.array([x_, x_ + 0.55, x_ - 0.55, x_, x_]), np.array([z_, z_, z_, z_ + 0.55, z_ - 0.55])).any(): return True
+    return bool(len(_bt_senza.query(p_.buffer(0.3), predicate='intersects')))
+_bt_senza = STRtree(btree_geoms)
+_nb = _cantieri([g_ for k_, g_ in _ls if k_ == 'cantiere'], bar_out + [(f_, 'fe', 0) for f_ in fences], [(g_[0] / 10, g_[1] / 10, g_[2] / 10, g_[3] / 10) for g_ in gate_out], _crep, _strada, _senza)
+bar_out, fences, _cf = [b_ for b_ in _nb[0] if b_[1] != 'fe'], [b_[0] for b_ in _nb[0] if b_[1] == 'fe'], _nb[1]
+_cf = iter(_cf); _cw = []
+log('cantieri: divisori sostituiti dai pannelli', _crep)
+for k_, g_ in _ls:
+    rec = {'p': enc(list(g_.exterior.coords)[:-1]), 's': k_}
+    if k_ == 'cantiere':
+        f_ = next(_cf)
+        if f_ is not None: rec['h'] = [enc(h_) for h_ in f_[0]]; rec['w'] = [enc(w_) for w_ in f_[1]]; _cw += f_[1]
+    push(tid(g_.centroid.x, g_.centroid.y), 'ls', rec)
 def polys_of(g, tol=0.15, min_area=0.5):
     g = g.simplify(tol, preserve_topology=True)
     out = []
@@ -1682,10 +1711,11 @@ def push_lines(key_, lines, extra=None):
     for i, pts in enumerate(lines):
         L = LineString(pts)
         if L.length < 0.5: continue
-        # every tile the line crosses: sampled along it every 50 m (the corners of its buffer alone sit by its vertices, and a 300 m span of
-        # wire crossing a tile with no pylon in it lost that piece: a hole in the middle of the span)
-        on_ = [L.interpolate(d_) for d_ in range(0, int(L.length) + 1, 50)] + [Point(pts[-1])]
-        for t in set(tid(*p) for p in L.buffer(1).exterior.coords) | {tid(*pts[0])} | {tid(p_.x, p_.y) for p_ in on_}:
+        # every tile the line crosses: all the tiles of its box it meets (the corners of its buffer alone sit by its vertices, and a 300 m span
+        # of wire crossing a tile with no pylon in it lost that piece; sampled every 50 m, a 25 m railway fence cutting the corner of a tile
+        # lost its 20 m there: x -871 z 465)
+        x0_, z0_, x1_, z1_ = L.bounds; t0_, t1_ = tid(x0_, z0_), tid(x1_, z1_)
+        for t in sorted(t_ for t_ in {i_ + ntx * j_ for i_ in range(t0_ % ntx, t1_ % ntx + 1) for j_ in range(t0_ // ntx, t1_ // ntx + 1)} if L.intersects(tbox(t_))):
             c = L.intersection(tbox(t))
             for part in (list(c.geoms) if hasattr(c, 'geoms') else [c]):
                 if isinstance(part, LineString) and part.length > 0.3:
@@ -1766,7 +1796,7 @@ if ED:  # the buildings of the DBGT: entrances, checks, report
     ED.controlli(buildings, _Pp); out.setdefault('report', {})['edifici'] = ED.sintesi()
     json.dump(ED.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_edifici.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 if STR:  # the checks of docs/motore.md 7: a summary in brianza.json, the whole report beside it
-    STR.controlli(raw_roads, nodes, oggetti=[(o[1] / 10, o[2] / 10) for o in ogg if OGG[o[0]] not in OGG_ON_ROAD], lampioni=lamps, cartelli=cartelli, barriere=[b_[0] for b_ in bar_out],
+    STR.controlli(raw_roads, nodes, oggetti=[(o[1] / 10, o[2] / 10) for o in ogg if OGG[o[0]] not in OGG_ON_ROAD], lampioni=lamps, cartelli=cartelli, barriere=[b_[0] for b_ in bar_out] + _cw,
                   edifici=[P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], alberi=trees, attraversamenti=crossings)
     out.setdefault('report', {})['strade'] = STR.sintesi()
     json.dump(STR.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_strade.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
@@ -1774,6 +1804,7 @@ if FER:  # trains against platforms, buildings and carriageways; the report besi
     FER.controlli(*_fer_ctl_a, pronto=_fer_ctl_f.result())  # = FER.controlli(trains, [g for at, g in area_geoms if at == 5], [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], [g for g, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else [], cartelli), measured on a thread since the town signs
     out.setdefault('report', {})['ferrovia'] = FER.sintesi()
     json.dump(FER.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_ferrovia.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=str)
+out.setdefault('report', {})['cantieri'] = _crep  # the dividers the building sites' hoarding replaces (src/barriere.py cantieri)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
 log('written', dst, len(s) // 1024, 'KB', 'tiles', ntx, 'x', ntz, 'roads', len(out_roads), 'nodes', len(NODES))

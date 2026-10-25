@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo polizia-locale · dopo 0e51284 · assemblato 25/10 17:28 · porta ' + location.port;
+    const txt = 'locale · ramo rotonde-2 · dopo 4f15a50 · assemblato 25/10 18:02 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3297,7 +3297,10 @@ function buildSignals(T, G) {
     }
     if (nearAsph(x, z, 0.6)) continue; // still on it: no shelter in the road
     if (inBuilding(x, z, 0.6)) continue;
-    const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = Math.atan2(ux, uz); G.add(root);
+    // the open side (+x, bench and sign side) looks at the nearest carriageway, whichever kerb the stop was drawn on; the back (glass) to the pavement
+    let tx = 0, tz = 0, td = 1e9; ROADSEG.each(x - 15, z - 15, x + 15, z + 15, sg => { if (sg.r.c > 3) return; const ex = sg.b[0] - sg.a[0], ez = sg.b[1] - sg.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - sg.a[0]) * ex + (z - sg.a[1]) * ez) / L2, 0, 1), qx = sg.a[0] + ex * t - x, qz = sg.a[1] + ez * t - z, d = hyp(qx, qz); if (d < td) { td = d; tx = qx; tz = qz; } });
+    const yaw = td < 15 && td > 0.05 ? Math.atan2(-tz, tx) : Math.atan2(ux, uz);
+    const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = yaw; G.add(root);
     const glass = new THREE.MeshLambertMaterial({ color: 0x9fb7c4, transparent: true, opacity: 0.45 });
     const roof = new THREE.Mesh(boxG(1.6, 0.08, 3.4), lam(0x5a6068)); roof.position.set(0, 2.45, 0); roof.castShadow = true; root.add(roof);
     const back = new THREE.Mesh(boxG(0.05, 2.0, 3.2), glass); back.position.set(-0.75, 1.3, 0); root.add(back);
@@ -3380,32 +3383,53 @@ const fogliaTex = canvasTex(128, 128, (g, w, h) => { /* leaves in greys: the col
 const RO_MAT = {
   ciottoli: flatMat({ map: ciottoliTex }), fiori: new THREE.MeshLambertMaterial({ map: fioriTex, side: THREE.DoubleSide }),
   bordo: new THREE.MeshLambertMaterial({ color: 0xe6e2d8, side: THREE.DoubleSide }), terra: new THREE.MeshLambertMaterial({ map: groundTex, color: 0x8a6e55 }),
-  arbusti: new THREE.MeshLambertMaterial({ map: fogliaTex, color: 0x4a6a2c, side: THREE.DoubleSide }), cespuglio: new THREE.MeshLambertMaterial({ map: fogliaTex })
+  cespuglio: new THREE.MeshLambertMaterial({ map: fogliaTex }),
+  fascia: flatMat({ map: concreteTex, color: 0xe2ded4 }), prato: new THREE.MeshLambertMaterial({ map: grassTex }) // the band of worked concrete of the base; the lawn of its dome
 };
+// the base (model B, docs/rotonde.md): the lawn a low dome, rings of the outline scaled towards its middle, cu m higher there than at the edge
+// (3 cm over the band); a point's height over the island top, for the shrubs on it
+function roDome(o, cu, b) {
+  let cx = 0, cz = 0; for (const p of o) { cx += p[0]; cz += p[1]; } cx /= o.length; cz /= o.length;
+  const Rm = Math.sqrt(Math.abs(sArea(o)) / Math.PI), N = Math.max(3, Math.ceil(Rm / 1.5)), up = s => 0.03 + cu * (1 - s * s), d = densify(o, 1.5), nd = d.length;
+  if (b) {
+    const i0 = b.p.length / 3;
+    for (let k = 0; k < N; k++) {
+      const s = 1 - k / N;
+      for (const p of d) { const x = cx + (p[0] - cx) * s, z = cz + (p[1] - cz) * s, L = hyp(p[0] - cx, p[1] - cz) || 1, g = 2 * cu * s / Rm, nx = g * (p[0] - cx) / L, nz = g * (p[1] - cz) / L, nl = Math.hypot(nx, 1, nz); vtx(b, x, streetY(x, z) + MED_H + up(s), z, nx / nl, 1 / nl, nz / nl, x / 9, z / 9); }
+    }
+    const ic = b.p.length / 3; vtx(b, cx, streetY(cx, cz) + MED_H + up(0), cz, 0, 1, 0, cx / 9, cz / 9);
+    for (let k = 0; k < N; k++) for (let j = 0; j < nd; j++) {
+      const a = i0 + k * nd + j, a2 = i0 + k * nd + (j + 1) % nd;
+      if (k === N - 1) triUp(b, a, a2, ic); else { const c1 = a + nd, c2 = a2 + nd; triUp(b, a, a2, c2); triUp(b, a, c2, c1); }
+    }
+  }
+  return (x, z) => up(Math.min(1, hyp(x - cx, z - cz) / Rm));
+}
 function rotondeTile(T, put, G) {
   if (!T.fine || !T.d.ro) return;
-  const an = FBuf(), cem = FBuf(), pr = FBuf(), pv = FBuf(), kb = Buf(), bo = Buf(), boT = FBuf(), fiT = FBuf(), fiS = Buf(), arT = FBuf(), arS = Buf(), te = FBuf(), bush = [];
+  const an = FBuf(), cem = FBuf(), fa = FBuf(), cu = Buf(), pr = FBuf(), pv = FBuf(), kb = Buf(), bo = Buf(), boT = FBuf(), fiT = FBuf(), fiS = Buf(), te = FBuf(), bush = [];
   const top = (x, z) => streetY(x, z) + MED_H, onLawn = (x, z) => top(x, z) + RO_RAISE, white = COL('#ffffff');
   for (const r of T.d.ro) {
-    const raised = !!(r.pr && r.pr.length), base = raised ? MED_H + RO_RAISE : MED_H, yb = raised ? onLawn : top;
+    const raised = !!(r.pr && r.pr.length) && !r.cu, base = raised ? MED_H + RO_RAISE : MED_H; let yb = raised ? onLawn : top;
     try {
       for (const q of r.an || []) polyFill(r.am === 2 ? cem : an, dec(q.p), q.k.map(dec), MED_H, 4);
-      for (const q of r.pr || []) { const o = dec(q.p); polyFill(pr, o, q.k.map(dec), MED_H + RO_RAISE, 9, white); kerbRing(kb, o, RO_RAISE, top); } // the lawn behind its kerb
+      for (const q of r.fa || []) polyFill(fa, dec(q.p), q.k.map(dec), MED_H, 3);
+      if (r.cu) for (const q of r.pr || []) { const h = roDome(dec(q.p), r.cu, cu); yb = (x, z) => top(x, z) + h(x, z); } // the base: a dome behind the band, no kerb
+      else for (const q of r.pr || []) { const o = dec(q.p); polyFill(pr, o, q.k.map(dec), MED_H + RO_RAISE, 9, white); kerbRing(kb, o, RO_RAISE, top); } // the lawn behind its kerb
       for (const q of r.pv || []) polyFill(pv, dec(q.p), q.k.map(dec), MED_H, 4);
       for (const q of r.mz || []) { // a crescent: the white stone edge, inside it flowers, shrubs or soil
         const o = dec(q.p), ins = (q.i || []).map(dec), hb = q.t === 'f' ? 0.1 : 0.18; /* the edge: its outer face and its top, 0.2 m wide (the white arcs of the aerial photo) */
         kerbRing(bo, o, hb, yb); polyFill(boT, o, ins, base + hb, 4);
         for (const n of ins) {
           if (q.t === 'f') { polyFill(fiT, n, [], base + 0.25, 1.2); kerbRing(fiS, n, 0.25, yb); }
-          else if (q.t === 'a') { polyFill(arT, n, [], base + 0.45, 2); kerbRing(arS, n, 0.45, yb); }
-          else { polyFill(te, n, [], base + 0.06, 3); kerbRing(bo, n, hb, yb); } /* soil under the edge: its inner face shows */
+          else { polyFill(te, n, [], base + 0.06, 3); kerbRing(bo, n, hb, yb); } /* soil under the edge (its inner face shows); the shrubs on it are in r.cs */
         }
       }
     } catch (e) { }
     for (const c of r.cs || []) { const x = c[0] / 10, z = c[1] / 10; bush.push([x, yb(x, z), z, c[2] / 10, c[3] / 10, c[4]]); }
   }
-  put(an, RO_MAT.ciottoli, 10); put(cem, MAT.median, 10); put(pr, MAT.grass, 10); put(pv, MAT.piazza, 10); put(kb, MAT.kerb, 10);
-  put(bo, RO_MAT.bordo, 10, 'cast'); put(boT, RO_MAT.bordo, 10); put(fiT, RO_MAT.fiori, 10); put(fiS, RO_MAT.fiori, 10); put(arT, RO_MAT.arbusti, 10, 'cast'); put(arS, RO_MAT.arbusti, 10, 'cast'); put(te, RO_MAT.terra, 10);
+  put(an, RO_MAT.ciottoli, 10); put(fa, RO_MAT.fascia, 10); put(cu, RO_MAT.prato, 10, 'cast'); put(cem, MAT.median, 10); put(pr, MAT.grass, 10); put(pv, MAT.piazza, 10); put(kb, MAT.kerb, 10);
+  put(bo, RO_MAT.bordo, 10, 'cast'); put(boT, RO_MAT.bordo, 10); put(fiT, RO_MAT.fiori, 10); put(fiS, RO_MAT.fiori, 10); put(te, RO_MAT.terra, 10);
   if (bush.length) { // round bushes: a squashed ball each, sunk a little into the lawn
     const geo = new THREE.IcosahedronGeometry(1, 2), im = new THREE.InstancedMesh(geo, RO_MAT.cespuglio, bush.length), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
     bush.forEach(([x, y, z, hw, h, col], i) => { m4.compose(p.set(x, y + h * 0.42, z), qq, sc.set(hw, h / 2, hw)); im.setMatrixAt(i, m4); im.setColorAt(i, COL(col)); });
@@ -4732,7 +4756,8 @@ function ngFront(s, C) {
     sign(c, qz(C.sign, -lw / 2, sy, lw / 2, sy + sh, 0.03));
   }
   if (stype === 'tar' || ext.has('targ')) {
-    const dx = doors.length ? doors[0][1] + 0.3 : 0.6, xx = dx + 0.25 > hw ? (doors.length ? doors[0][0] - 0.3 : -0.6) : dx, n = stype === 'tar' ? 2 : 1;
+    // flat on the facade beside the door, clear of the stone pilaster of a street door (0.25 m wide, 0.12 m off the leaf): the plaque must not sink into it
+    const gap = m.d === 'p' ? 0.48 : 0.3, dx = doors.length ? doors[0][1] + gap : 0.6, xx = dx + 0.25 > hw + (m.d === 'p' ? 0.4 : 0) ? (doors.length ? doors[0][0] - gap : -0.6) : dx, n = stype === 'tar' ? 2 : 1;
     for (let i = 0; i < n; i++) {
       const c = cell(0.42, 0.3, (g, w, h) => { g.fillStyle = bg || '#c9a85a'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; g.strokeRect(2, 2, w - 4, h - 4); ngText(g, i ? s.label : main, w / 2, h * 0.42, w * 0.85, h * 0.3, NG_FONT.serif, fg); if (!i) ngText(g, s.label, w / 2, h * 0.75, w * 0.85, h * 0.16, NG_FONT.sans, fg); });
       sign(c, qz(C.sign, xx - 0.21, 1.35 - i * 0.36, xx + 0.21, 1.65 - i * 0.36, 0.11)); box(0.44, 0.32, 0.02, xx, 1.5 - i * 0.36, 0.1, '#8a6a3a');
@@ -5143,11 +5168,14 @@ function* buildPaesaggio(T, G) {
         void gy;
       }
     } else if (kind === 'cantiere') { // the hoarding round it (not across streets), containers, a sand heap, a tower crane on the big ones
-      for (let i = 0; i < P.length; i++) {
-        const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5) continue;
+      // L0.w: the walls and fences of the map along its edge, which the hoarding replaces on their own line (the build took them out, src/barriere.py
+      // cantieri): drawn as they are, they already keep off the carriageway; L0.h: the rest of the edge, which gets the hoarding as before
+      const runs = L0.w ? [...(L0.h || []).map(q => [dec(q), 1]), ...L0.w.map(q => [dec(q), 0])] : [[[...P, P[0]], 1]];
+      for (const [R, filt] of runs) for (let i = 0; i + 1 < R.length; i++) {
+        const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < (filt ? 0.5 : 0.05)) continue;
         for (let t = 0; t < L; t += 2.5) {
           const t1 = Math.min(L, t + 2.5), x0 = a[0] + (c[0] - a[0]) * t / L, z0 = a[1] + (c[1] - a[1]) * t / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-          if (onAnyRoad(mx, mz, 0.6) || nearAsph(mx, mz, 0.3) || onAsph(x0, z0) || onAsph(x1, z1) || inBuilding(mx, mz, 0.3)) continue; // the drawn carriageway too (AC_VEI), ends included
+          if (filt && (onAnyRoad(mx, mz, 0.6) || nearAsph(mx, mz, 0.3) || onAsph(x0, z0) || onAsph(x1, z1) || inBuilding(mx, mz, 0.3))) continue; /* the drawn carriageway too (AC_VEI), ends included */
           const g0 = H.ground(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); // a panel of its own: it goes over when rammed
           box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8');
         }
