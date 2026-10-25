@@ -168,11 +168,14 @@ function* buildPaesaggio(T, G) {
         void gy;
       }
     } else if (kind === 'cantiere') { // the hoarding round it (not across streets), containers, a sand heap, a tower crane on the big ones
-      for (let i = 0; i < P.length; i++) {
-        const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5) continue;
+      // L0.w: the walls and fences of the map along its edge, which the hoarding replaces on their own line (the build took them out, src/barriere.py
+      // cantieri): drawn as they are, they already keep off the carriageway; L0.h: the rest of the edge, which gets the hoarding as before
+      const runs = L0.w ? [...(L0.h || []).map(q => [dec(q), 1]), ...L0.w.map(q => [dec(q), 0])] : [[[...P, P[0]], 1]];
+      for (const [R, filt] of runs) for (let i = 0; i + 1 < R.length; i++) {
+        const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < (filt ? 0.5 : 0.05)) continue;
         for (let t = 0; t < L; t += 2.5) {
           const t1 = Math.min(L, t + 2.5), x0 = a[0] + (c[0] - a[0]) * t / L, z0 = a[1] + (c[1] - a[1]) * t / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-          if (onAnyRoad(mx, mz, 0.6) || nearAsph(mx, mz, 0.3) || onAsph(x0, z0) || onAsph(x1, z1) || inBuilding(mx, mz, 0.3)) continue; // the drawn carriageway too (AC_VEI), ends included
+          if (filt && (onAnyRoad(mx, mz, 0.6) || nearAsph(mx, mz, 0.3) || onAsph(x0, z0) || onAsph(x1, z1) || inBuilding(mx, mz, 0.3))) continue; /* the drawn carriageway too (AC_VEI), ends included */
           const g0 = H.ground(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); // a panel of its own: it goes over when rammed
           box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8');
         }
