@@ -1,5 +1,5 @@
 {
- "nota": "Le aiuole delle rotonde di Meda (docs/rotonde.md), lette da src/rotonde.py. Ogni rotonda: x, z = un punto dentro l isola centrale (MAN_TR del DBGT) in metri del gioco; modello A-E (docs/rotonde.md); anello = [larghezza m o null se e il MAN_TR stesso ad anello, materiale ciottoli|cemento]; mezzelune = [[angolo gradi atan2(dz, dx), apertura gradi, raggio m dal baricentro, larghezza m, contenuto f fiori rossi|a arbusti|t terra]]; cespugli = [[angolo, raggio m, mezza larghezza m, altezza m, colore]]. Tutto letto sulla foto aerea 2018-19 della Regione (e per la A sulla foto Street View di Carlo): niente di inventato, dove non si vede resta la B (solo prato e cordolo).",
+ "nota": "Le aiuole delle rotonde di Meda (docs/rotonde.md), lette da src/rotonde.py. Ogni rotonda: x, z = un punto dentro l isola centrale (MAN_TR del DBGT) in metri del gioco; modello A-E (docs/rotonde.md); anello = [larghezza m o null se e il MAN_TR stesso ad anello, materiale ciottoli|cemento]; mezzelune = [[angolo gradi atan2(dz, dx), apertura gradi, raggio m dal baricentro, larghezza m, contenuto f fiori rossi|a arbusti fitti|t terra con arbusti radi, facoltativo il colore degli arbusti]]; cespugli = [[angolo, raggio m, mezza larghezza m, altezza m, colore]]. Tutto letto sulla foto aerea 2018-19 della Regione (e per la A sulla foto Street View di Carlo): niente di inventato, dove non si vede resta la B (solo prato e cordolo).",
  "rotonde": [
   {"x": 121, "z": -8, "nome": "via Cadorna, uscita della Milano-Meda", "modello": "A",
    "anello": [null, "ciottoli"],
@@ -34,7 +34,7 @@
    "perche": "foto aerea: anello di ciottoli largo 1,7 m (il MAN_TR e l anello, il centro un AR_VRD), prato al centro, niente altro"},
   {"x": -550, "z": -679, "nome": "rotonda grande a ovest", "modello": "C",
    "anello": null,
-   "mezzelune": [[-77, 38, 12.2, 1.4, "a"], [180, 64, 8.0, 1.4, "a"], [55, 36, 11.0, 1.4, "a"]],
+   "mezzelune": [[-77, 38, 12.2, 1.4, "a", "#6f7f35"], [180, 64, 8.0, 1.4, "a", "#6f7f35"], [55, 36, 11.0, 1.4, "a", "#6f7f35"]],
    "cespugli": [],
    "perche": "foto aerea: prato con cordolo, macchia di alberi al centro (2 nei dati), tre mezzelune bordate di bianco piantate ad arbusti bassi; niente anello"},
   {"x": 1907, "z": -651, "nome": "piazzola di giro in fondo a una strada senza uscita", "modello": "E",

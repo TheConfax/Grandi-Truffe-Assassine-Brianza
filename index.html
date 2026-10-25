@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo ferrovia-solida · dopo c0bdfd3 · assemblato 25/10 14:13 · porta ' + location.port;
+    const txt = 'locale · ramo rotonde-2 · dopo 13397da · assemblato 25/10 16:51 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3350,32 +3350,53 @@ const fogliaTex = canvasTex(128, 128, (g, w, h) => { /* leaves in greys: the col
 const RO_MAT = {
   ciottoli: flatMat({ map: ciottoliTex }), fiori: new THREE.MeshLambertMaterial({ map: fioriTex, side: THREE.DoubleSide }),
   bordo: new THREE.MeshLambertMaterial({ color: 0xe6e2d8, side: THREE.DoubleSide }), terra: new THREE.MeshLambertMaterial({ map: groundTex, color: 0x8a6e55 }),
-  arbusti: new THREE.MeshLambertMaterial({ map: fogliaTex, color: 0x4a6a2c, side: THREE.DoubleSide }), cespuglio: new THREE.MeshLambertMaterial({ map: fogliaTex })
+  cespuglio: new THREE.MeshLambertMaterial({ map: fogliaTex }),
+  fascia: flatMat({ map: concreteTex, color: 0xe2ded4 }), prato: new THREE.MeshLambertMaterial({ map: grassTex }) // the band of worked concrete of the base; the lawn of its dome
 };
+// the base (model B, docs/rotonde.md): the lawn a low dome, rings of the outline scaled towards its middle, cu m higher there than at the edge
+// (3 cm over the band); a point's height over the island top, for the shrubs on it
+function roDome(o, cu, b) {
+  let cx = 0, cz = 0; for (const p of o) { cx += p[0]; cz += p[1]; } cx /= o.length; cz /= o.length;
+  const Rm = Math.sqrt(Math.abs(sArea(o)) / Math.PI), N = Math.max(3, Math.ceil(Rm / 1.5)), up = s => 0.03 + cu * (1 - s * s), d = densify(o, 1.5), nd = d.length;
+  if (b) {
+    const i0 = b.p.length / 3;
+    for (let k = 0; k < N; k++) {
+      const s = 1 - k / N;
+      for (const p of d) { const x = cx + (p[0] - cx) * s, z = cz + (p[1] - cz) * s, L = hyp(p[0] - cx, p[1] - cz) || 1, g = 2 * cu * s / Rm, nx = g * (p[0] - cx) / L, nz = g * (p[1] - cz) / L, nl = Math.hypot(nx, 1, nz); vtx(b, x, streetY(x, z) + MED_H + up(s), z, nx / nl, 1 / nl, nz / nl, x / 9, z / 9); }
+    }
+    const ic = b.p.length / 3; vtx(b, cx, streetY(cx, cz) + MED_H + up(0), cz, 0, 1, 0, cx / 9, cz / 9);
+    for (let k = 0; k < N; k++) for (let j = 0; j < nd; j++) {
+      const a = i0 + k * nd + j, a2 = i0 + k * nd + (j + 1) % nd;
+      if (k === N - 1) triUp(b, a, a2, ic); else { const c1 = a + nd, c2 = a2 + nd; triUp(b, a, a2, c2); triUp(b, a, c2, c1); }
+    }
+  }
+  return (x, z) => up(Math.min(1, hyp(x - cx, z - cz) / Rm));
+}
 function rotondeTile(T, put, G) {
   if (!T.fine || !T.d.ro) return;
-  const an = FBuf(), cem = FBuf(), pr = FBuf(), pv = FBuf(), kb = Buf(), bo = Buf(), boT = FBuf(), fiT = FBuf(), fiS = Buf(), arT = FBuf(), arS = Buf(), te = FBuf(), bush = [];
+  const an = FBuf(), cem = FBuf(), fa = FBuf(), cu = Buf(), pr = FBuf(), pv = FBuf(), kb = Buf(), bo = Buf(), boT = FBuf(), fiT = FBuf(), fiS = Buf(), te = FBuf(), bush = [];
   const top = (x, z) => streetY(x, z) + MED_H, onLawn = (x, z) => top(x, z) + RO_RAISE, white = COL('#ffffff');
   for (const r of T.d.ro) {
-    const raised = !!(r.pr && r.pr.length), base = raised ? MED_H + RO_RAISE : MED_H, yb = raised ? onLawn : top;
+    const raised = !!(r.pr && r.pr.length) && !r.cu, base = raised ? MED_H + RO_RAISE : MED_H; let yb = raised ? onLawn : top;
     try {
       for (const q of r.an || []) polyFill(r.am === 2 ? cem : an, dec(q.p), q.k.map(dec), MED_H, 4);
-      for (const q of r.pr || []) { const o = dec(q.p); polyFill(pr, o, q.k.map(dec), MED_H + RO_RAISE, 9, white); kerbRing(kb, o, RO_RAISE, top); } // the lawn behind its kerb
+      for (const q of r.fa || []) polyFill(fa, dec(q.p), q.k.map(dec), MED_H, 3);
+      if (r.cu) for (const q of r.pr || []) { const h = roDome(dec(q.p), r.cu, cu); yb = (x, z) => top(x, z) + h(x, z); } // the base: a dome behind the band, no kerb
+      else for (const q of r.pr || []) { const o = dec(q.p); polyFill(pr, o, q.k.map(dec), MED_H + RO_RAISE, 9, white); kerbRing(kb, o, RO_RAISE, top); } // the lawn behind its kerb
       for (const q of r.pv || []) polyFill(pv, dec(q.p), q.k.map(dec), MED_H, 4);
       for (const q of r.mz || []) { // a crescent: the white stone edge, inside it flowers, shrubs or soil
         const o = dec(q.p), ins = (q.i || []).map(dec), hb = q.t === 'f' ? 0.1 : 0.18; /* the edge: its outer face and its top, 0.2 m wide (the white arcs of the aerial photo) */
         kerbRing(bo, o, hb, yb); polyFill(boT, o, ins, base + hb, 4);
         for (const n of ins) {
           if (q.t === 'f') { polyFill(fiT, n, [], base + 0.25, 1.2); kerbRing(fiS, n, 0.25, yb); }
-          else if (q.t === 'a') { polyFill(arT, n, [], base + 0.45, 2); kerbRing(arS, n, 0.45, yb); }
-          else { polyFill(te, n, [], base + 0.06, 3); kerbRing(bo, n, hb, yb); } /* soil under the edge: its inner face shows */
+          else { polyFill(te, n, [], base + 0.06, 3); kerbRing(bo, n, hb, yb); } /* soil under the edge (its inner face shows); the shrubs on it are in r.cs */
         }
       }
     } catch (e) { }
     for (const c of r.cs || []) { const x = c[0] / 10, z = c[1] / 10; bush.push([x, yb(x, z), z, c[2] / 10, c[3] / 10, c[4]]); }
   }
-  put(an, RO_MAT.ciottoli, 10); put(cem, MAT.median, 10); put(pr, MAT.grass, 10); put(pv, MAT.piazza, 10); put(kb, MAT.kerb, 10);
-  put(bo, RO_MAT.bordo, 10, 'cast'); put(boT, RO_MAT.bordo, 10); put(fiT, RO_MAT.fiori, 10); put(fiS, RO_MAT.fiori, 10); put(arT, RO_MAT.arbusti, 10, 'cast'); put(arS, RO_MAT.arbusti, 10, 'cast'); put(te, RO_MAT.terra, 10);
+  put(an, RO_MAT.ciottoli, 10); put(fa, RO_MAT.fascia, 10); put(cu, RO_MAT.prato, 10, 'cast'); put(cem, MAT.median, 10); put(pr, MAT.grass, 10); put(pv, MAT.piazza, 10); put(kb, MAT.kerb, 10);
+  put(bo, RO_MAT.bordo, 10, 'cast'); put(boT, RO_MAT.bordo, 10); put(fiT, RO_MAT.fiori, 10); put(fiS, RO_MAT.fiori, 10); put(te, RO_MAT.terra, 10);
   if (bush.length) { // round bushes: a squashed ball each, sunk a little into the lawn
     const geo = new THREE.IcosahedronGeometry(1, 2), im = new THREE.InstancedMesh(geo, RO_MAT.cespuglio, bush.length), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
     bush.forEach(([x, y, z, hw, h, col], i) => { m4.compose(p.set(x, y + h * 0.42, z), qq, sc.set(hw, h / 2, hw)); im.setMatrixAt(i, m4); im.setColorAt(i, COL(col)); });
