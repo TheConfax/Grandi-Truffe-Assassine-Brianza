@@ -2,7 +2,7 @@ import re
 import os
 import subprocess as _sp, datetime as _dt
 _git = lambda *a: (_sp.run(['git', '-C', os.path.dirname(os.path.dirname(os.path.abspath(__file__))), *a], capture_output=True, text=True).stdout.strip() or '?')
-BUILD_BR, BUILD_SHA, BUILD_AT = _git('rev-parse', '--abbrev-ref', 'HEAD'), _git('rev-parse', '--short', 'HEAD'), _dt.datetime.now().strftime('%d/%m %H:%M')  # the local version line
+BUILD_BR, BUILD_SHA, BUILD_AT = os.environ.get('GTA_RAMO') or _git('rev-parse', '--abbrev-ref', 'HEAD'),_git('rev-parse', '--short', 'HEAD'), _dt.datetime.now().strftime('%d/%m %H:%M')  # the local version line
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 s = open(os.path.join(HERE, 'game.src.html'), encoding='utf-8').read()
 def rep(old, new, cnt=1):
