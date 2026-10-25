@@ -102,7 +102,7 @@ def passaggi(L, vie):
 # one metre wide) and OSM adds its own. Where two dividers run side by side within DOPPIO_D for DOPPIO_L or more, one stays: the stronger kind
 # (a wall over a fence over a hedge); of the same kind the one farther from the street, so the passage is not narrowed. The other is cut only
 # along the stretches that run parallel (a divider that crosses another keeps its two halves), and what remains stays a divider
-DOPPIO_D = 2.0    # two dividers nearer than this (axis to axis) are one boundary
+DOPPIO_D = 2.3    # two dividers nearer than this (axis to axis) are one boundary (the two walls of a 2 m shoulder strip in Meda are 2.0-2.15 apart; a real alley is wider)
 DOPPIO_L = 3.0    # ... for at least this many metres
 DOPPIO_COS = 0.9  # and running the same way (|cos| of the angle between them)
 FORZA = {1: 0, 4: 0, 6: 1, 5: 2, 2: 3, 7: 4, 3: 5}   # the lower, the stronger
