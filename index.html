@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo polizia-locale · dopo 0e51284 · assemblato 25/10 17:28 · porta ' + location.port;
+    const txt = 'locale · ramo pensiline · dopo 22a67da · assemblato 25/10 17:51 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3297,7 +3297,10 @@ function buildSignals(T, G) {
     }
     if (nearAsph(x, z, 0.6)) continue; // still on it: no shelter in the road
     if (inBuilding(x, z, 0.6)) continue;
-    const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = Math.atan2(ux, uz); G.add(root);
+    // the open side (+x, bench and sign side) looks at the nearest carriageway, whichever kerb the stop was drawn on; the back (glass) to the pavement
+    let tx = 0, tz = 0, td = 1e9; ROADSEG.each(x - 15, z - 15, x + 15, z + 15, sg => { if (sg.r.c > 3) return; const ex = sg.b[0] - sg.a[0], ez = sg.b[1] - sg.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - sg.a[0]) * ex + (z - sg.a[1]) * ez) / L2, 0, 1), qx = sg.a[0] + ex * t - x, qz = sg.a[1] + ez * t - z, d = hyp(qx, qz); if (d < td) { td = d; tx = qx; tz = qz; } });
+    const yaw = td < 15 && td > 0.05 ? Math.atan2(-tz, tx) : Math.atan2(ux, uz);
+    const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = yaw; G.add(root);
     const glass = new THREE.MeshLambertMaterial({ color: 0x9fb7c4, transparent: true, opacity: 0.45 });
     const roof = new THREE.Mesh(boxG(1.6, 0.08, 3.4), lam(0x5a6068)); roof.position.set(0, 2.45, 0); roof.castShadow = true; root.add(roof);
     const back = new THREE.Mesh(boxG(0.05, 2.0, 3.2), glass); back.position.set(-0.75, 1.3, 0); root.add(back);
@@ -4732,7 +4735,8 @@ function ngFront(s, C) {
     sign(c, qz(C.sign, -lw / 2, sy, lw / 2, sy + sh, 0.03));
   }
   if (stype === 'tar' || ext.has('targ')) {
-    const dx = doors.length ? doors[0][1] + 0.3 : 0.6, xx = dx + 0.25 > hw ? (doors.length ? doors[0][0] - 0.3 : -0.6) : dx, n = stype === 'tar' ? 2 : 1;
+    // flat on the facade beside the door, clear of the stone pilaster of a street door (0.25 m wide, 0.12 m off the leaf): the plaque must not sink into it
+    const gap = m.d === 'p' ? 0.48 : 0.3, dx = doors.length ? doors[0][1] + gap : 0.6, xx = dx + 0.25 > hw + (m.d === 'p' ? 0.4 : 0) ? (doors.length ? doors[0][0] - gap : -0.6) : dx, n = stype === 'tar' ? 2 : 1;
     for (let i = 0; i < n; i++) {
       const c = cell(0.42, 0.3, (g, w, h) => { g.fillStyle = bg || '#c9a85a'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; g.strokeRect(2, 2, w - 4, h - 4); ngText(g, i ? s.label : main, w / 2, h * 0.42, w * 0.85, h * 0.3, NG_FONT.serif, fg); if (!i) ngText(g, s.label, w / 2, h * 0.75, w * 0.85, h * 0.16, NG_FONT.sans, fg); });
       sign(c, qz(C.sign, xx - 0.21, 1.35 - i * 0.36, xx + 0.21, 1.65 - i * 0.36, 0.11)); box(0.44, 0.32, 0.02, xx, 1.5 - i * 0.36, 0.1, '#8a6a3a');

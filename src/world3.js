@@ -2006,7 +2006,10 @@ function buildSignals(T, G) {
     }
     if (nearAsph(x, z, 0.6)) continue; // still on it: no shelter in the road
     if (inBuilding(x, z, 0.6)) continue;
-    const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = Math.atan2(ux, uz); G.add(root);
+    // the open side (+x, bench and sign side) looks at the nearest carriageway, whichever kerb the stop was drawn on; the back (glass) to the pavement
+    let tx = 0, tz = 0, td = 1e9; ROADSEG.each(x - 15, z - 15, x + 15, z + 15, sg => { if (sg.r.c > 3) return; const ex = sg.b[0] - sg.a[0], ez = sg.b[1] - sg.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - sg.a[0]) * ex + (z - sg.a[1]) * ez) / L2, 0, 1), qx = sg.a[0] + ex * t - x, qz = sg.a[1] + ez * t - z, d = hyp(qx, qz); if (d < td) { td = d; tx = qx; tz = qz; } });
+    const yaw = td < 15 && td > 0.05 ? Math.atan2(-tz, tx) : Math.atan2(ux, uz);
+    const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = yaw; G.add(root);
     const glass = new THREE.MeshLambertMaterial({ color: 0x9fb7c4, transparent: true, opacity: 0.45 });
     const roof = new THREE.Mesh(boxG(1.6, 0.08, 3.4), lam(0x5a6068)); roof.position.set(0, 2.45, 0); roof.castShadow = true; root.add(roof);
     const back = new THREE.Mesh(boxG(0.05, 2.0, 3.2), glass); back.position.set(-0.75, 1.3, 0); root.add(back);

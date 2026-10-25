@@ -794,7 +794,8 @@ function ngFront(s, C) {
     sign(c, qz(C.sign, -lw / 2, sy, lw / 2, sy + sh, 0.03));
   }
   if (stype === 'tar' || ext.has('targ')) {
-    const dx = doors.length ? doors[0][1] + 0.3 : 0.6, xx = dx + 0.25 > hw ? (doors.length ? doors[0][0] - 0.3 : -0.6) : dx, n = stype === 'tar' ? 2 : 1;
+    // flat on the facade beside the door, clear of the stone pilaster of a street door (0.25 m wide, 0.12 m off the leaf): the plaque must not sink into it
+    const gap = m.d === 'p' ? 0.48 : 0.3, dx = doors.length ? doors[0][1] + gap : 0.6, xx = dx + 0.25 > hw + (m.d === 'p' ? 0.4 : 0) ? (doors.length ? doors[0][0] - gap : -0.6) : dx, n = stype === 'tar' ? 2 : 1;
     for (let i = 0; i < n; i++) {
       const c = cell(0.42, 0.3, (g, w, h) => { g.fillStyle = bg || '#c9a85a'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; g.strokeRect(2, 2, w - 4, h - 4); ngText(g, i ? s.label : main, w / 2, h * 0.42, w * 0.85, h * 0.3, NG_FONT.serif, fg); if (!i) ngText(g, s.label, w / 2, h * 0.75, w * 0.85, h * 0.16, NG_FONT.sans, fg); });
       sign(c, qz(C.sign, xx - 0.21, 1.35 - i * 0.36, xx + 0.21, 1.65 - i * 0.36, 0.11)); box(0.44, 0.32, 0.02, xx, 1.5 - i * 0.36, 0.1, '#8a6a3a');
