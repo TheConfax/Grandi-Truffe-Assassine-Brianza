@@ -271,27 +271,31 @@ class Ferrovia:
         s.rep['corridoio'] = dict(sd_fer_allargata_m2=round(s.U_sede.buffer(FENCE_OUT, join_style=2).area), corridoio_nel_comune_m2=round(U.intersection(inner).area))
         return unary_union([corridor.difference(inner), U.intersection(inner)])
 
-    def lontano_dai_binari(s, items, rail_lines, nome, get=lambda b: b, put=lambda b, pts: pts):
+    def lontano_dai_binari(s, items, rail_lines, nome, get=lambda b: b, put=lambda b, pts: pts, margin=0.2):
         """inside the cover no fence or wall nearer than BODY_CLEAR to the middle of an at-grade track, along it or across it: the train
         (2.94 m wide, its cars overhanging on the curves) would run through it. OSM fences drawn on the track, DBGT dividers between the
-        tracks of the station 1.36 m from one of them, the edge of a narrow rail bed"""
+        tracks of the station 1.36 m from one of them, the edge of a narrow rail bed. A divider never disappears (Carlo, 25/10): what runs
+        along the track nearer than that moves out to BODY_CLEAR + margin (barriere.sul_confine); only where it goes across it opens"""
+        from barriere import sul_confine
         ponti = getattr(s, 'Z_ponti', None)
         if ponti is None: s.via_dai_binari([], [], '_'); ponti = s.Z_ponti
         rl = [p for l in rail_lines for p in _parts(l.difference(ponti) if not ponti.is_empty else l) if p.geom_type == 'LineString']
         if not rl: return items
         Z = unary_union([l.buffer(BODY_CLEAR, cap_style=2) for l in rl]).intersection(s.cover); shapely.prepare(Z)
-        out = []; nc = 0; lost = 0.0
+        ZP = [p for p in _parts(Z)]; ZT = STRtree(ZP) if ZP else None
+        out = []; nc = 0; lost = 0.0; mv = 0.0
         for b in items:
             pts = get(b)
             if len(pts) < 2: out.append(b); continue
             L = LineString(pts)
             if not Z.intersects(L): out.append(b); continue
-            rest = L.difference(Z)
-            if L.length - rest.length < 0.05: out.append(b); continue
-            nc += 1; lost += L.length - rest.length
-            for p in _parts(rest):
-                if p.geom_type == 'LineString' and p.length > 1.0: out.append(put(b, list(p.coords)))
-        s.rep.setdefault('lontano_dai_binari', {})[nome] = dict(n=nc, metri=round(lost, 1), distanza_m=BODY_CLEAR)
+            loc = unary_union([ZP[j] for j in ZT.query(L.buffer(margin + 1))])
+            parts, m = sul_confine(L, loc, margin)
+            nc += 1; mv += m
+            kept = [p for p in parts if p.length > 1.0]
+            out += [put(b, list(p.coords)) for p in kept]
+            lost += max(0.0, L.length - sum(p.length for p in kept))
+        s.rep.setdefault('lontano_dai_binari', {})[nome] = dict(n=nc, metri_spostati=round(mv, 1), metri_aperti=round(lost, 1), distanza_m=BODY_CLEAR)
         return out
 
     def banchine(s, area_geoms, rail_lines):
@@ -306,17 +310,21 @@ class Ferrovia:
         s.rep['banchine'] = dict(tagliate=ncut, m2_tolti=round(lost, 1), distanza_dal_mezzo_del_binario_m=CLEAR)
         return out
 
-    def fuori_dalle_carreggiate(s, lines, carr):
-        """fence lines minus the carriageways (with a margin)"""
+    def fuori_dalle_carreggiate(s, lines, carr, margin=0.15):
+        """fence lines out of the streets: what runs in one moves onto its edge, margin outside (a divider never disappears, Carlo 25/10:
+        the fence between viale Francia and the tracks); where a street goes across the fence it opens (barriere.sul_confine)"""
         if not carr: return lines
-        U = unary_union(carr); shapely.prepare(U); out = []; cut = 0
+        from barriere import sul_confine
+        T = STRtree(carr); out = []; nm = 0; mv = 0.0; lost = 0.0
         for f in lines:
-            L = LineString(f)
-            if not U.intersects(L): out.append(f); continue
-            cut += 1
-            for p in _parts(L.difference(U)):
-                if p.geom_type == 'LineString' and p.length > 2: out.append(list(p.coords))
-        s.rep['recinzioni_tagliate_sulle_carreggiate'] = cut
+            L = LineString(f); j = T.query(L.buffer(margin + 1))
+            if not len(j): out.append(f); continue
+            parts, m = sul_confine(L, unary_union([carr[k] for k in j]), margin)
+            if m: nm += 1; mv += m
+            kept = [p for p in parts if p.length > 2]
+            lost += max(0.0, L.length - sum(p.length for p in kept))
+            out += [list(p.coords) for p in kept]
+        s.rep['recinzioni_spostate_fuori_dalle_carreggiate'] = dict(n=nm, metri_spostati=round(mv, 1), metri_aperti=round(lost, 1))
         return out
 
     def via_dai_ponti(s, lines):
