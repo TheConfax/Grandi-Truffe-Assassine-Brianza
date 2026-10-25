@@ -440,7 +440,7 @@ const H = (() => {
           for (const s of [c, c + 3]) {
             const a = I[s] * 3, b = I[s + 1] * 3, e = I[s + 2] * 3, den = (P[b + 2] - P[e + 2]) * (P[a] - P[e]) + (P[e] - P[b]) * (P[a + 2] - P[e + 2]);
             const l1 = ((P[b + 2] - P[e + 2]) * (x - P[e]) + (P[e] - P[b]) * (z - P[e + 2])) / den, l2 = ((P[e + 2] - P[a + 2]) * (x - P[e]) + (P[a] - P[e]) * (z - P[e + 2])) / den, l3 = 1 - l1 - l2;
-            if (l1 >= -1e-5 && l2 >= -1e-5 && l3 >= -1e-5) { y = l1 * P[a + 1] + l2 * P[b + 1] + l3 * P[e + 1]; break; }
+            if (l1 >= -1e-3 && l2 >= -1e-3 && l3 >= -1e-3) { y = l1 * P[a + 1] + l2 * P[b + 1] + l3 * P[e + 1]; break; } /* 1e-3, not 1e-5: east of x 1000 the float32 positions are off by 1e-4 m and a point on the diagonal fell in neither triangle (collaudo 25/10: 6 tile "Infinity") */
           }
           if (y === null) { mx = Infinity; continue; }
           mx = Math.max(mx, Math.abs(y - H.base(x, z)));
