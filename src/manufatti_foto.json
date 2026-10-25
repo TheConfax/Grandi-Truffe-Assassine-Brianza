@@ -1,0 +1,657 @@
+{
+"fonte": "ortofoto 2018-19 Regione Lombardia (BaseMap/Ortofoto2018_2019) e, per i dubbi, 2015 (ortofoto2015UTM32N); src/manufatti_foto.py",
+"tetti_delle_cabine": {
+"foto": 36,
+"pixel misti": 14,
+"chiome sopra": 5,
+"in ombra": 1
+},
+"oggetti": [
+{
+"ty": "12",
+"x": -335.7,
+"z": -1774.6,
+"nota": "copertura conica a spicchi bianchi e rossi; fusto sottile dall ombra",
+"spicchi": [
+"#ece9e2",
+"#c8664a",
+16
+],
+"fusto": 3.2
+},
+{
+"ty": "07",
+"x": 1760.3,
+"z": -478.8,
+"nota": "serbatoio blu",
+"colore": "#4a80b4",
+"tetto": "#3f78b0"
+},
+{
+"ty": "07",
+"x": 1289.0,
+"z": 593.7,
+"nota": "scuro",
+"colore": "#6c6e70",
+"tetto": "#55585b"
+},
+{
+"ty": "07",
+"x": 1223.0,
+"z": 545.0,
+"nota": "cima color ruggine",
+"tetto": "#9a6c58"
+},
+{
+"ty": "07",
+"x": 867.3,
+"z": -900.2,
+"nota": "via Cadorna: quattro silos color crema, cime coniche con le giunture arrugginite, passerelle tra le cime",
+"colore": "#e2dccd",
+"tetto": "#cdb89c"
+},
+{
+"ty": "07",
+"x": 874.5,
+"z": -895.8,
+"nota": "via Cadorna",
+"colore": "#e2dccd",
+"tetto": "#cdb89c"
+},
+{
+"ty": "07",
+"x": 871.1,
+"z": -907.8,
+"nota": "via Cadorna",
+"colore": "#e2dccd",
+"tetto": "#cdb89c"
+},
+{
+"ty": "07",
+"x": 878.0,
+"z": -904.2,
+"nota": "via Cadorna",
+"colore": "#e2dccd",
+"tetto": "#cdb89c"
+},
+{
+"ty": "07",
+"x": -880.1,
+"z": -241.1,
+"nota": "tre silos bianchi, cime arrugginite",
+"tetto": "#cbb3a4"
+},
+{
+"ty": "07",
+"x": -883.1,
+"z": -243.2,
+"nota": "",
+"tetto": "#cbb3a4"
+},
+{
+"ty": "07",
+"x": -883.5,
+"z": -246.1,
+"nota": "",
+"tetto": "#cbb3a4"
+},
+{
+"ty": "13",
+"x": 1479.1,
+"z": 515.9,
+"nota": "2015: telaio scoperto; 2018-19: coperto dalla vegetazione",
+"forma": "assente"
+},
+{
+"ty": "13",
+"x": 1467.3,
+"z": 510.0,
+"nota": "come la vicina",
+"forma": "assente"
+},
+{
+"ty": "13",
+"x": 922.2,
+"z": -98.8,
+"nota": "nel 2015 c era, nel 2018-19 no",
+"forma": "assente"
+},
+{
+"ty": "13",
+"x": -991.6,
+"z": -1795.1,
+"nota": "orti, niente al suo posto",
+"forma": "assente"
+},
+{
+"ty": "13",
+"x": 1024.8,
+"z": 519.2,
+"nota": "tunnel con telo verde scuro",
+"forma": "tunnel",
+"telo": "#2f6b66"
+},
+{
+"ty": "13",
+"x": 1347.6,
+"z": 567.3,
+"nota": "tunnel con telo verde",
+"forma": "tunnel",
+"telo": "#4a7360"
+},
+{
+"ty": "13",
+"x": -909.8,
+"z": -1332.8,
+"nota": "copertura trasparente di una piscina",
+"forma": "tunnel",
+"telo": "#dcecef"
+},
+{
+"ty": "13",
+"x": 1302.0,
+"z": 786.7,
+"nota": "copertura di una piscina",
+"forma": "tunnel",
+"telo": "#c4e6ec"
+},
+{
+"ty": "13",
+"x": 248.3,
+"z": -1290.2,
+"nota": "telo bianco",
+"forma": "tunnel",
+"telo": "#e8e8e2"
+},
+{
+"ty": "13",
+"x": -680.2,
+"z": -950.0,
+"nota": "telo grigio sporco",
+"forma": "tunnel",
+"telo": "#a49e92"
+},
+{
+"ty": "13",
+"x": 1359.0,
+"z": 568.7,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": 47.0,
+"z": -2082.6,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": -647.4,
+"z": -1076.1,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": 164.4,
+"z": -1988.9,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": -504.4,
+"z": -628.6,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": -385.6,
+"z": -1331.5,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": 41.1,
+"z": -2065.4,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": 118.5,
+"z": -2038.2,
+"nota": "2015",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": -424.7,
+"z": -1419.7,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": -384.3,
+"z": -1327.8,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": 75.8,
+"z": -1248.3,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": -435.0,
+"z": -1404.1,
+"nota": "",
+"forma": "tunnel"
+},
+{
+"ty": "13",
+"x": -863.8,
+"z": -459.3,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": 995.5,
+"z": 868.7,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": 133.5,
+"z": -1995.4,
+"nota": "a capanna",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": -1019.0,
+"z": -1757.8,
+"nota": "a capanna",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": 229.5,
+"z": -1380.1,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": 35.1,
+"z": -1239.5,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": -176.8,
+"z": -1988.0,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": 912.6,
+"z": -92.7,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": 596.7,
+"z": 357.7,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": 419.8,
+"z": 861.2,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": -912.0,
+"z": -1831.5,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": 1157.5,
+"z": 782.3,
+"nota": "",
+"forma": "vetro"
+},
+{
+"ty": "13",
+"x": 298.9,
+"z": -1237.3,
+"nota": "serra di vetro a capanna sotto gli alberi: i 7,3 m del DSM 2008 sono le chiome",
+"forma": "vetro",
+"dsm": "no"
+},
+{
+"ty": "01",
+"x": 739.5,
+"z": -622.0,
+"nota": "cabina a torre, muri color sabbia, tetto scuro",
+"muri": "#cfbf9e",
+"tetto": "#5f5654"
+},
+{
+"ty": "01",
+"x": 789.3,
+"z": -1605.3,
+"nota": "attaccata a una casa, tetto di coppi",
+"tetto": "#9a4a3c"
+},
+{
+"ty": "11",
+"x": 1645.6,
+"z": -1038.6,
+"nota": "piscina",
+"acqua": "#5fb8d6",
+"bordo": "#e8e2d4"
+},
+{
+"ty": "11",
+"x": 473.1,
+"z": -1367.8,
+"nota": "piscina",
+"acqua": "#5fb8d6",
+"bordo": "#e8e2d4"
+},
+{
+"ty": "11",
+"x": -507.1,
+"z": 553.8,
+"nota": "piscina",
+"acqua": "#5fb8d6",
+"bordo": "#e8e2d4"
+},
+{
+"ty": "11",
+"x": 1632.5,
+"z": 14.8,
+"nota": "piscina coperta da un telo chiaro",
+"acqua": "#a9d6de",
+"bordo": "#e8e2d4"
+},
+{
+"ty": "11",
+"x": 1879.5,
+"z": -448.9,
+"nota": "stagno tondo, acqua verde scura",
+"acqua": "#4c5a3e"
+},
+{
+"ty": "03",
+"x": -1212.4,
+"z": -1434.1,
+"tetto": "#696967",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "03",
+"x": -1206.9,
+"z": -1431.1,
+"tetto": "#6c6c6b",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 549.7,
+"z": -34.8,
+"tetto": "#464549",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": -325.5,
+"z": -511.1,
+"tetto": "#96948e",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 328.7,
+"z": 355.6,
+"tetto": "#51504f",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": -688.2,
+"z": -1001.6,
+"tetto": "#7c8284",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1423.1,
+"z": -940.2,
+"tetto": "#70716a",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "03",
+"x": 273.9,
+"z": -78.1,
+"tetto": "#bab9b6",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1018.8,
+"z": -187.2,
+"tetto": "#5e5a56",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 680.0,
+"z": -1238.9,
+"tetto": "#b0b0ac",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1606.9,
+"z": -986.3,
+"tetto": "#acadac",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 500.4,
+"z": 287.1,
+"tetto": "#5e5b58",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 341.1,
+"z": 323.1,
+"tetto": "#5d5e5f",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 279.1,
+"z": 562.8,
+"tetto": "#828470",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": -813.4,
+"z": -1271.2,
+"tetto": "#5f5d5e",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 788.7,
+"z": -1297.7,
+"tetto": "#736e6a",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1949.0,
+"z": -618.8,
+"tetto": "#6f6c6c",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 103.7,
+"z": 521.4,
+"tetto": "#7d7c7a",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 83.1,
+"z": -1269.7,
+"tetto": "#999d9f",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1902.4,
+"z": -570.9,
+"tetto": "#959391",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1614.5,
+"z": -206.3,
+"tetto": "#777b7b",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "03",
+"x": -410.6,
+"z": -136.7,
+"tetto": "#77746d",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 729.5,
+"z": 650.7,
+"tetto": "#77736f",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1834.8,
+"z": -863.2,
+"tetto": "#a6a7a6",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1881.4,
+"z": -637.2,
+"tetto": "#908d8b",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1262.4,
+"z": -607.7,
+"tetto": "#777171",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": -690.7,
+"z": 524.9,
+"tetto": "#a2a29d",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1837.3,
+"z": -435.6,
+"tetto": "#979794",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 547.6,
+"z": -1721.0,
+"tetto": "#919594",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": -392.0,
+"z": 479.9,
+"tetto": "#6d6968",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1591.4,
+"z": 60.0,
+"tetto": "#534f52",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1251.2,
+"z": 555.5,
+"tetto": "#413f3f",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 94.2,
+"z": -214.3,
+"tetto": "#555350",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": 1719.8,
+"z": -789.2,
+"tetto": "#8d8d8e",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": -573.9,
+"z": -36.5,
+"tetto": "#676767",
+"nota": "tetto dalla foto"
+},
+{
+"ty": "01",
+"x": -271.3,
+"z": -58.7,
+"tetto": "#9e9f9f",
+"nota": "tetto dalla foto"
+}
+]
+}

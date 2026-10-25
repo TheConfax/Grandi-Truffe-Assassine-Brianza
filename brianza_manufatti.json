@@ -35,8 +35,10 @@
  "altezze_manufatti": {
   "per_tipo": {
    "13": {
-    "no": 32,
-    "dsm": 4
+    "assente nella foto 2018-19": 4,
+    "no": 28,
+    "dsm": 3,
+    "no, chiome sopra (foto)": 1
    },
    "03": {
     "no": 4,
@@ -55,7 +57,7 @@
     "no": 4
    },
    "0702": {
-    "no": 1
+    "interrato": 1
    },
    "12": {
     "dsm": 1
@@ -65,7 +67,7 @@
    "03": 3.8,
    "11": 2.8,
    "07": 10.9,
-   "13": 3.3,
+   "13": 2.6,
    "01": 3.6,
    "12": 39.1
   },
@@ -75,22 +77,24 @@
     "x": -991.6,
     "z": -1795.1,
     "m2": 14.0,
-    "h": 3.3,
-    "dsm_p50": 0.0,
-    "dsm_p90": 0.0,
-    "intorno": 0.0,
-    "visto": "no"
+    "h": null,
+    "dsm_p50": null,
+    "dsm_p90": null,
+    "intorno": null,
+    "visto": "assente nella foto 2018-19",
+    "foto": "orti, niente al suo posto"
    },
    {
     "ty": "13",
     "x": -1019.0,
     "z": -1757.8,
     "m2": 32.1,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.0,
     "dsm_p90": 0.09,
     "intorno": 0.04,
-    "visto": "no"
+    "visto": "no",
+    "foto": "a capanna"
    },
    {
     "ty": "03",
@@ -101,7 +105,8 @@
     "dsm_p50": 4.28,
     "dsm_p90": 4.36,
     "intorno": 4.38,
-    "visto": "no"
+    "visto": "no",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "03",
@@ -112,18 +117,20 @@
     "dsm_p50": 4.01,
     "dsm_p90": 4.33,
     "intorno": 1.7,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": -912.0,
     "z": -1831.5,
     "m2": 5.0,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.01,
     "dsm_p90": 0.04,
     "intorno": 0.11,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "11",
@@ -134,7 +141,8 @@
     "dsm_p50": 1.92,
     "dsm_p90": 2.56,
     "intorno": 1.29,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "07",
@@ -145,7 +153,8 @@
     "dsm_p50": 13.6,
     "dsm_p90": 14.21,
     "intorno": 1.59,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "cima color ruggine"
    },
    {
     "ty": "13",
@@ -156,18 +165,20 @@
     "dsm_p50": 2.41,
     "dsm_p90": 2.74,
     "intorno": 0.3,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "telo bianco"
    },
    {
     "ty": "13",
     "x": -385.6,
     "z": -1331.5,
     "m2": 18.2,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 1.0,
     "dsm_p90": 1.24,
     "intorno": 0.0,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -178,7 +189,8 @@
     "dsm_p50": 8.39,
     "dsm_p90": 8.43,
     "intorno": 1.98,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -189,18 +201,20 @@
     "dsm_p50": 7.65,
     "dsm_p90": 7.71,
     "intorno": 0.88,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": 1467.3,
     "z": 510.0,
     "m2": 8.8,
-    "h": 3.3,
-    "dsm_p50": 1.78,
-    "dsm_p90": 3.65,
-    "intorno": 0.56,
-    "visto": "no"
+    "h": null,
+    "dsm_p50": null,
+    "dsm_p90": null,
+    "intorno": null,
+    "visto": "assente nella foto 2018-19",
+    "foto": "come la vicina"
    },
    {
     "ty": "07",
@@ -211,29 +225,32 @@
     "dsm_p50": 10.25,
     "dsm_p90": 10.44,
     "intorno": 1.99,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "scuro"
    },
    {
     "ty": "13",
     "x": -504.4,
     "z": -628.6,
     "m2": 20.9,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.44,
     "dsm_p90": 1.16,
     "intorno": 0.1,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "13",
     "x": 118.5,
     "z": -2038.2,
     "m2": 17.5,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.93,
     "dsm_p90": 1.35,
     "intorno": 1.11,
-    "visto": "no"
+    "visto": "no",
+    "foto": "2015"
    },
    {
     "ty": "01",
@@ -244,7 +261,8 @@
     "dsm_p50": 3.66,
     "dsm_p90": 3.74,
     "intorno": 0.29,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "11",
@@ -255,18 +273,20 @@
     "dsm_p50": 3.27,
     "dsm_p90": 3.52,
     "intorno": 0.01,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "13",
     "x": 47.0,
     "z": -2082.6,
     "m2": 39.3,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.07,
     "dsm_p90": 0.51,
     "intorno": 0.0,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -277,7 +297,8 @@
     "dsm_p50": 5.27,
     "dsm_p90": 8.8,
     "intorno": 0.02,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -288,18 +309,20 @@
     "dsm_p50": 7.65,
     "dsm_p90": 9.74,
     "intorno": 6.07,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": 133.5,
     "z": -1995.4,
     "m2": 35.1,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 1.46,
     "dsm_p90": 1.84,
     "intorno": 0.0,
-    "visto": "no"
+    "visto": "no",
+    "foto": "a capanna"
    },
    {
     "ty": "01",
@@ -310,18 +333,20 @@
     "dsm_p50": 2.57,
     "dsm_p90": 2.64,
     "intorno": 0.04,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": -680.2,
     "z": -950.0,
     "m2": 32.6,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.64,
     "dsm_p90": 1.89,
     "intorno": 0.12,
-    "visto": "no"
+    "visto": "no",
+    "foto": "telo grigio sporco"
    },
    {
     "ty": "07",
@@ -332,7 +357,8 @@
     "dsm_p50": 10.71,
     "dsm_p90": 13.09,
     "intorno": 2.83,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -343,7 +369,8 @@
     "dsm_p50": 11.64,
     "dsm_p90": 11.84,
     "intorno": 0.03,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "cabina a torre, muri color sabbia, tetto scuro"
    },
    {
     "ty": "01",
@@ -354,18 +381,20 @@
     "dsm_p50": 2.39,
     "dsm_p90": 6.41,
     "intorno": 0.01,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "13",
     "x": 1302.0,
     "z": 786.7,
     "m2": 18.7,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.12,
     "dsm_p90": 3.08,
     "intorno": 0.03,
-    "visto": "no"
+    "visto": "no",
+    "foto": "copertura di una piscina"
    },
    {
     "ty": "07",
@@ -376,7 +405,8 @@
     "dsm_p50": 9.9,
     "dsm_p90": 10.31,
     "intorno": 1.47,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "via Cadorna"
    },
    {
     "ty": "11",
@@ -387,7 +417,8 @@
     "dsm_p50": 3.08,
     "dsm_p90": 3.52,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "03",
@@ -398,7 +429,8 @@
     "dsm_p50": 3.51,
     "dsm_p90": 3.76,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "07",
@@ -409,7 +441,8 @@
     "dsm_p50": 6.96,
     "dsm_p90": 12.88,
     "intorno": 0.02,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tre silos bianchi, cime arrugginite"
    },
    {
     "ty": "01",
@@ -420,7 +453,8 @@
     "dsm_p50": 7.7,
     "dsm_p90": 7.87,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "07",
@@ -431,7 +465,8 @@
     "dsm_p50": 10.53,
     "dsm_p90": 14.12,
     "intorno": 3.11,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": ""
    },
    {
     "ty": "11",
@@ -442,7 +477,8 @@
     "dsm_p50": 0.01,
     "dsm_p90": 0.1,
     "intorno": 0.19,
-    "visto": "a terra"
+    "visto": "a terra",
+    "foto": "stagno tondo, acqua verde scura"
    },
    {
     "ty": "07",
@@ -453,7 +489,8 @@
     "dsm_p50": 9.8,
     "dsm_p90": 11.05,
     "intorno": 0.19,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "07",
@@ -464,7 +501,8 @@
     "dsm_p50": 8.51,
     "dsm_p90": 10.79,
     "intorno": 5.22,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "via Cadorna"
    },
    {
     "ty": "01",
@@ -475,7 +513,8 @@
     "dsm_p50": 2.76,
     "dsm_p90": 3.68,
     "intorno": 1.42,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "11",
@@ -486,7 +525,8 @@
     "dsm_p50": 0.0,
     "dsm_p90": 0.0,
     "intorno": 0.0,
-    "visto": "a terra"
+    "visto": "a terra",
+    "foto": "piscina"
    },
    {
     "ty": "01",
@@ -497,29 +537,32 @@
     "dsm_p50": 8.28,
     "dsm_p90": 8.36,
     "intorno": 1.49,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": 1157.5,
     "z": 782.3,
     "m2": 24.9,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 1.17,
     "dsm_p90": 1.4,
     "intorno": 0.02,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "13",
     "x": 922.2,
     "z": -98.8,
     "m2": 19.4,
-    "h": 3.3,
-    "dsm_p50": 1.03,
-    "dsm_p90": 1.4,
-    "intorno": 0.49,
-    "visto": "no"
+    "h": null,
+    "dsm_p50": null,
+    "dsm_p90": null,
+    "intorno": null,
+    "visto": "assente nella foto 2018-19",
+    "foto": "nel 2015 c era, nel 2018-19 no"
    },
    {
     "ty": "01",
@@ -530,7 +573,8 @@
     "dsm_p50": 5.29,
     "dsm_p90": 6.7,
     "intorno": 2.65,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "attaccata a una casa, tetto di coppi"
    },
    {
     "ty": "01",
@@ -541,7 +585,8 @@
     "dsm_p50": 1.96,
     "dsm_p90": 3.65,
     "intorno": 0.67,
-    "visto": "no"
+    "visto": "no",
+    "foto": null
    },
    {
     "ty": "01",
@@ -552,7 +597,8 @@
     "dsm_p50": 0.0,
     "dsm_p90": 0.02,
     "intorno": 0.0,
-    "visto": "no"
+    "visto": "no",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -563,7 +609,8 @@
     "dsm_p50": 8.2,
     "dsm_p90": 8.35,
     "intorno": 0.25,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -574,7 +621,8 @@
     "dsm_p50": 2.64,
     "dsm_p90": 2.72,
     "intorno": 0.04,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -585,29 +633,32 @@
     "dsm_p50": 2.87,
     "dsm_p90": 5.42,
     "intorno": 0.16,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": 298.9,
     "z": -1237.3,
     "m2": 25.4,
-    "h": 7.3,
+    "h": 2.6,
     "dsm_p50": 7.33,
     "dsm_p90": 8.38,
     "intorno": 0.69,
-    "visto": "dsm"
+    "visto": "no, chiome sopra (foto)",
+    "foto": "serra di vetro a capanna sotto gli alberi: i 7,3 m del DSM 2008 sono le chiome"
    },
    {
     "ty": "13",
     "x": 35.1,
     "z": -1239.5,
     "m2": 21.6,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.06,
     "dsm_p90": 0.33,
     "intorno": 0.18,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "07",
@@ -618,18 +669,20 @@
     "dsm_p50": 11.88,
     "dsm_p90": 13.91,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": ""
    },
    {
     "ty": "13",
     "x": 419.8,
     "z": 861.2,
     "m2": 10.9,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.0,
     "dsm_p90": 0.8,
     "intorno": 0.17,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "07",
@@ -640,7 +693,8 @@
     "dsm_p50": 13.38,
     "dsm_p90": 14.37,
     "intorno": 3.51,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -651,7 +705,8 @@
     "dsm_p50": 7.44,
     "dsm_p90": 7.91,
     "intorno": 1.56,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -662,7 +717,8 @@
     "dsm_p50": 3.4,
     "dsm_p90": 4.27,
     "intorno": 0.08,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -673,18 +729,20 @@
     "dsm_p50": 2.61,
     "dsm_p90": 2.77,
     "intorno": 0.15,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": 995.5,
     "z": 868.7,
     "m2": 36.9,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 1.56,
     "dsm_p90": 1.96,
     "intorno": 0.18,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "11",
@@ -695,7 +753,8 @@
     "dsm_p50": 2.49,
     "dsm_p90": 3.46,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -706,7 +765,8 @@
     "dsm_p50": 3.04,
     "dsm_p90": 8.87,
     "intorno": 0.01,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -717,7 +777,8 @@
     "dsm_p50": 4.68,
     "dsm_p90": 5.57,
     "intorno": 0.45,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "11",
@@ -728,7 +789,8 @@
     "dsm_p50": 0.01,
     "dsm_p90": 0.26,
     "intorno": 0.01,
-    "visto": "a terra"
+    "visto": "a terra",
+    "foto": "piscina"
    },
    {
     "ty": "03",
@@ -739,7 +801,8 @@
     "dsm_p50": 5.83,
     "dsm_p90": 11.57,
     "intorno": 8.25,
-    "visto": "no"
+    "visto": "no",
+    "foto": null
    },
    {
     "ty": "07",
@@ -750,7 +813,8 @@
     "dsm_p50": 8.05,
     "dsm_p90": 8.52,
     "intorno": 3.37,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "via Cadorna"
    },
    {
     "ty": "07",
@@ -761,7 +825,8 @@
     "dsm_p50": 15.82,
     "dsm_p90": 16.26,
     "intorno": 2.08,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "serbatoio blu"
    },
    {
     "ty": "01",
@@ -772,18 +837,20 @@
     "dsm_p50": 2.6,
     "dsm_p90": 3.14,
     "intorno": 0.15,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "13",
     "x": 1359.0,
     "z": 568.7,
     "m2": 27.3,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 1.08,
     "dsm_p90": 1.41,
     "intorno": 0.06,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -794,29 +861,32 @@
     "dsm_p50": 2.83,
     "dsm_p90": 5.62,
     "intorno": 1.39,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "03",
     "x": 179.8,
     "z": 41.6,
     "m2": 8.9,
-    "h": 3.8,
+    "h": 3.5,
     "dsm_p50": 5.95,
     "dsm_p90": 7.76,
     "intorno": 7.46,
-    "visto": "no"
+    "visto": "no",
+    "foto": null
    },
    {
     "ty": "13",
     "x": 41.1,
     "z": -2065.4,
     "m2": 18.1,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.8,
     "dsm_p90": 1.47,
     "intorno": 0.07,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -827,18 +897,20 @@
     "dsm_p50": 2.76,
     "dsm_p90": 2.83,
     "intorno": 0.01,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "0702",
     "x": -430.7,
     "z": -75.2,
     "m2": 20.2,
-    "h": 2.0,
+    "h": null,
     "dsm_p50": 0.2,
     "dsm_p90": 1.15,
     "intorno": 0.02,
-    "visto": "no"
+    "visto": "interrato",
+    "foto": null
    },
    {
     "ty": "07",
@@ -849,7 +921,8 @@
     "dsm_p50": 5.51,
     "dsm_p90": 6.13,
     "intorno": 0.63,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -860,7 +933,8 @@
     "dsm_p50": 5.1,
     "dsm_p90": 7.77,
     "intorno": 0.02,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -871,7 +945,8 @@
     "dsm_p50": 3.32,
     "dsm_p90": 3.54,
     "intorno": 0.41,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -882,7 +957,8 @@
     "dsm_p50": 7.88,
     "dsm_p90": 7.96,
     "intorno": 0.4,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -893,7 +969,8 @@
     "dsm_p50": 2.87,
     "dsm_p90": 3.2,
     "intorno": 0.99,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "07",
@@ -904,7 +981,8 @@
     "dsm_p50": 9.01,
     "dsm_p90": 9.82,
     "intorno": 1.14,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -915,7 +993,8 @@
     "dsm_p50": 8.49,
     "dsm_p90": 8.53,
     "intorno": 0.03,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "07",
@@ -926,18 +1005,20 @@
     "dsm_p50": 7.98,
     "dsm_p90": 8.07,
     "intorno": 0.15,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "03",
     "x": -410.6,
     "z": -136.7,
     "m2": 4.0,
-    "h": 3.8,
+    "h": 2.5,
     "dsm_p50": 0.58,
     "dsm_p90": 1.36,
     "intorno": 1.15,
-    "visto": "no"
+    "visto": "no",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "12",
@@ -948,7 +1029,8 @@
     "dsm_p50": 37.72,
     "dsm_p90": 39.11,
     "intorno": 0.06,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "copertura conica a spicchi bianchi e rossi; fusto sottile dall ombra"
    },
    {
     "ty": "01",
@@ -959,18 +1041,20 @@
     "dsm_p50": 2.73,
     "dsm_p90": 2.92,
     "intorno": 0.23,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": 912.6,
     "z": -92.7,
     "m2": 14.6,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.0,
     "dsm_p90": 0.0,
     "intorno": 0.01,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -981,7 +1065,8 @@
     "dsm_p50": 0.0,
     "dsm_p90": 0.01,
     "intorno": 0.0,
-    "visto": "no"
+    "visto": "no",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -992,18 +1077,20 @@
     "dsm_p50": 2.43,
     "dsm_p90": 2.7,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": -176.8,
     "z": -1988.0,
     "m2": 15.8,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.0,
     "dsm_p90": 0.03,
     "intorno": 0.04,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -1014,7 +1101,8 @@
     "dsm_p50": 7.77,
     "dsm_p90": 7.82,
     "intorno": 0.73,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "11",
@@ -1025,7 +1113,8 @@
     "dsm_p50": 0.0,
     "dsm_p90": 0.01,
     "intorno": 0.98,
-    "visto": "a terra"
+    "visto": "a terra",
+    "foto": "piscina coperta da un telo chiaro"
    },
    {
     "ty": "01",
@@ -1036,29 +1125,32 @@
     "dsm_p50": 3.55,
     "dsm_p90": 3.62,
     "intorno": 0.02,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": 1479.1,
     "z": 515.9,
     "m2": 179.6,
-    "h": 3.3,
-    "dsm_p50": 0.03,
-    "dsm_p90": 0.26,
-    "intorno": 1.06,
-    "visto": "no"
+    "h": null,
+    "dsm_p50": null,
+    "dsm_p90": null,
+    "intorno": null,
+    "visto": "assente nella foto 2018-19",
+    "foto": "2015: telaio scoperto; 2018-19: coperto dalla vegetazione"
    },
    {
     "ty": "01",
     "x": -913.2,
     "z": -346.3,
     "m2": 9.2,
-    "h": 3.6,
+    "h": 3.5,
     "dsm_p50": 11.4,
     "dsm_p90": 13.07,
     "intorno": 11.3,
-    "visto": "no"
+    "visto": "no",
+    "foto": null
    },
    {
     "ty": "01",
@@ -1069,18 +1161,20 @@
     "dsm_p50": 3.86,
     "dsm_p90": 5.01,
     "intorno": 1.88,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": -978.2,
     "z": -396.9,
     "m2": 14.5,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.53,
     "dsm_p90": 0.97,
     "intorno": 0.02,
-    "visto": "no"
+    "visto": "no",
+    "foto": null
    },
    {
     "ty": "07",
@@ -1091,18 +1185,20 @@
     "dsm_p50": 9.72,
     "dsm_p90": 10.27,
     "intorno": 2.4,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "via Cadorna: quattro silos color crema, cime coniche con le giunture arrugginite, passerelle tra le cime"
    },
    {
     "ty": "13",
     "x": -909.8,
     "z": -1332.8,
     "m2": 52.6,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.0,
     "dsm_p90": 0.08,
     "intorno": 0.93,
-    "visto": "no"
+    "visto": "no",
+    "foto": "copertura trasparente di una piscina"
    },
    {
     "ty": "11",
@@ -1113,7 +1209,8 @@
     "dsm_p50": 0.0,
     "dsm_p90": 0.09,
     "intorno": 0.26,
-    "visto": "a terra"
+    "visto": "a terra",
+    "foto": "piscina"
    },
    {
     "ty": "07",
@@ -1124,40 +1221,44 @@
     "dsm_p50": 6.68,
     "dsm_p90": 7.74,
     "intorno": 0.09,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "13",
     "x": -647.4,
     "z": -1076.1,
     "m2": 31.4,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.0,
     "dsm_p90": 0.01,
     "intorno": 0.0,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "13",
     "x": -863.8,
     "z": -459.3,
     "m2": 45.5,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.14,
     "dsm_p90": 1.3,
     "intorno": 0.07,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "13",
     "x": -424.7,
     "z": -1419.7,
     "m2": 14.0,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 1.02,
     "dsm_p90": 1.46,
     "intorno": 0.3,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "11",
@@ -1168,7 +1269,8 @@
     "dsm_p50": 14.35,
     "dsm_p90": 18.35,
     "intorno": 1.07,
-    "visto": "no"
+    "visto": "no",
+    "foto": null
    },
    {
     "ty": "07",
@@ -1179,7 +1281,8 @@
     "dsm_p50": 15.82,
     "dsm_p90": 16.95,
     "intorno": 1.65,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "07",
@@ -1190,7 +1293,8 @@
     "dsm_p50": 11.23,
     "dsm_p90": 12.13,
     "intorno": 1.41,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -1201,7 +1305,8 @@
     "dsm_p50": 2.62,
     "dsm_p90": 2.71,
     "intorno": 0.11,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
@@ -1212,18 +1317,20 @@
     "dsm_p50": 2.59,
     "dsm_p90": 2.94,
     "intorno": 0.02,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tunnel con telo verde"
    },
    {
     "ty": "13",
     "x": 596.7,
     "z": 357.7,
     "m2": 14.4,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.06,
     "dsm_p90": 3.03,
     "intorno": 0.0,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "11",
@@ -1234,18 +1341,20 @@
     "dsm_p50": 0.54,
     "dsm_p90": 2.14,
     "intorno": 0.06,
-    "visto": "no"
+    "visto": "no",
+    "foto": null
    },
    {
     "ty": "13",
     "x": -384.3,
     "z": -1327.8,
     "m2": 13.3,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.87,
     "dsm_p90": 1.11,
     "intorno": 0.02,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -1256,7 +1365,8 @@
     "dsm_p50": 7.83,
     "dsm_p90": 9.59,
     "intorno": 3.28,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -1267,7 +1377,8 @@
     "dsm_p50": 7.89,
     "dsm_p90": 9.74,
     "intorno": 2.22,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -1278,18 +1389,20 @@
     "dsm_p50": 8.19,
     "dsm_p90": 8.4,
     "intorno": 0.31,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": -435.0,
     "z": -1404.1,
     "m2": 9.6,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 5.84,
     "dsm_p90": 7.8,
     "intorno": 11.55,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -1300,7 +1413,8 @@
     "dsm_p50": 2.52,
     "dsm_p90": 2.7,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -1311,7 +1425,8 @@
     "dsm_p50": 7.66,
     "dsm_p90": 8.11,
     "intorno": 1.96,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "01",
@@ -1322,7 +1437,8 @@
     "dsm_p50": 7.04,
     "dsm_p90": 8.18,
     "intorno": 5.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -1333,18 +1449,20 @@
     "dsm_p50": 3.12,
     "dsm_p90": 3.48,
     "intorno": 1.27,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
     "x": 229.5,
     "z": -1380.1,
     "m2": 31.6,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.18,
     "dsm_p90": 0.65,
     "intorno": 0.14,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -1355,7 +1473,8 @@
     "dsm_p50": 7.43,
     "dsm_p90": 7.67,
     "intorno": 1.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -1366,7 +1485,8 @@
     "dsm_p50": 3.08,
     "dsm_p90": 3.54,
     "intorno": 0.11,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "07",
@@ -1377,29 +1497,32 @@
     "dsm_p50": 2.4,
     "dsm_p90": 2.81,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": null
    },
    {
     "ty": "13",
     "x": 164.4,
     "z": -1988.9,
     "m2": 22.2,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 1.36,
     "dsm_p90": 1.8,
     "intorno": 0.1,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "13",
     "x": 75.8,
     "z": -1248.3,
     "m2": 11.6,
-    "h": 3.3,
+    "h": 2.6,
     "dsm_p50": 0.0,
     "dsm_p90": 0.01,
     "intorno": 0.1,
-    "visto": "no"
+    "visto": "no",
+    "foto": ""
    },
    {
     "ty": "01",
@@ -1410,7 +1533,8 @@
     "dsm_p50": 2.55,
     "dsm_p90": 2.62,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -1421,7 +1545,8 @@
     "dsm_p50": 2.78,
     "dsm_p90": 2.86,
     "intorno": 0.0,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "01",
@@ -1432,7 +1557,8 @@
     "dsm_p50": 2.81,
     "dsm_p90": 3.8,
     "intorno": 0.08,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tetto dalla foto"
    },
    {
     "ty": "13",
@@ -1443,7 +1569,8 @@
     "dsm_p50": 3.98,
     "dsm_p90": 4.37,
     "intorno": 0.11,
-    "visto": "dsm"
+    "visto": "dsm",
+    "foto": "tunnel con telo verde scuro"
    }
   ]
  },
@@ -1456,7 +1583,7 @@
  ],
  "edifici": {
   "aggiunti": {
-   "serra": 36,
+   "serra": 32,
    "cabina": 55,
    "torre": 1
   },
@@ -1468,6 +1595,15 @@
   },
   "dentro_edifici_osm_tenuti": {
    "01 in yes": 1
+  },
+  "cabine_dentro_cabine": 0,
+  "modelli": {
+   "serra vetro": 14,
+   "cabina gas": 6,
+   "serra tunnel": 18,
+   "cabina torre": 16,
+   "cabina el": 33,
+   "torre torre": 1
   }
  },
  "parcheggi_dbgt_m2_sotto_parcheggi_osm_con_posti_propri": 1489,
