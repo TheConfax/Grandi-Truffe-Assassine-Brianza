@@ -19,6 +19,9 @@ rep('<script id="mapdata" type="application/json">/*__MAP__*/</script>\n', '')
 rep("""<script>
 'use strict';""", """<script type="module">""")
 rep("const D = JSON.parse(document.getElementById('mapdata').textContent);", """const goBtn = document.getElementById('go');
+/* avvio veloce: l'indice e il pacco del terreno (src/terreno_pacco.py) partono insieme a brianza.json, e i tile si decomprimono in parallelo mentre il resto si legge; altezze3.js li prende da qui */
+const TERR_IND = fetch('terreno/indice.json').then(r => r.ok ? r.json() : null).catch(() => null);
+const TERR_BIN = TERR_IND.then(async j => { if (!j || j.ver !== 1 || !j.pacco) return null; try { const r = await fetch('terreno/' + j.pacco.file); if (!r.ok) return null; const b = new Uint8Array(await r.arrayBuffer()), m = new Map(); for (const k in j.pacco.tile) { const [o, l] = j.pacco.tile[k]; m.set(k, new Response(new Blob([b.subarray(o, o + l)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer().catch(() => null)); } return m; } catch (e) { return null; } });
 goBtn.disabled = true; goBtn.textContent = 'CARICO LA BRIANZA…';
 const D = await (async () => {
   const res = await fetch('brianza.json'); const total = +res.headers.get('content-length') || 0;
@@ -258,7 +261,7 @@ rep("const drag = (0.15 + (thr ? 0 : 0.45 + 0.0004 * v * v)) * dt + (i.hand ? 7 
 rep("const yawMax = (i.hand ? 22 : 13 + S.grip * 0.4) / Math.max(4, Math.abs(v));", "const yawMax = (i.hand ? 26 : 30) / Math.max(4, Math.abs(v));")
 rep("v += 9.81 * Math.sin(this.slope) * dt; // gravity on hills", "v += 9.81 * Math.sin(this.slope) * 0.6 * dt; // gravity on hills")
 rep("if (ty > this.y + 0.08 && this === P.car && this.speed > 6) shake = Math.max(shake, 0.12);", "if (ty - this.y > 0.09 && ty - this.y < 0.2 && this === P.car && this.speed > 6) shake = Math.max(shake, 0.12);")
-rep("      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>", "      <div><kbd>PAD</kbd> controller DualSense o Xbox</div>\n      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>")
+rep("      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>", "      <div><kbd>PAD</kbd> controller DualSense o Xbox · START o ✕/A per iniziare</div>\n      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>")
 rep("P.nitro = Math.max(0, P.nitro - 30 * dt);", "P.nitro = Math.max(0, P.nitro - 24 * dt);")
 # expressways get more traffic
 rep("  const a = near ? nodeInRing(TRAF_NODES, P.x, P.z, 90, 260, true) : pick(TRAF_NODES);", "  const a = near ? nodeInRing(rnd() < 0.35 ? EXPRESS_NODES : TRAF_NODES, P.x, P.z, 90, 300, true) : pick(TRAF_NODES);")
@@ -290,7 +293,7 @@ function pollPad() {
   if (edge(5)) camMode = (camMode + 1) % 2;
   if (edge(11)) reportSpot();
   if (edge(8)) toggleBig();
-  if (edge(9)) togglePause();
+  const e9 = edge(9); if (!running) { if ((e9 || edge(0)) && !goBtn.disabled) startGame(); } else if (e9) togglePause(); /* title screen: START or cross/A start the game like Enter */
   if (!GP.seen) {
     GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id);
     const L = GP.ps ? { t: 'R2', b: 'L2', h: '✕', o: '○', s: '□', y: '△', c: 'R1', m: 'Create', p: 'Options', r: 'R3' } : { t: 'RT', b: 'LT', h: 'A', o: 'B', s: 'X', y: 'Y', c: 'RB', m: 'View', p: 'Menu', r: 'R3' };
@@ -332,7 +335,7 @@ rep("""  const n = nearestNode(TRAF_NODES, STATION.x, STATION.z), e = TRAF[n][0]
   const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
   const h = Math.atan2(FO[0] - sx, FO[1] - sz);
   const mine = new Vehicle('sport', '#d0141a', sx, sz, h); mine.moved = true;""")
-rep("  tileTick(STATION.x, STATION.z, 0, 420);\n  for (const T of TILES) T.dist = hyp(T.cx - STATION.x, T.cz - STATION.z);", "  tileTick(STATION.x + 190, STATION.z + 66, 0, 420);\n  for (const T of TILES) T.dist = hyp(T.cx - STATION.x - 190, T.cz - STATION.z - 66);")
+rep("  tileTick(STATION.x, STATION.z, 0, 420);\n  for (const T of TILES) T.dist = hyp(T.cx - STATION.x, T.cz - STATION.z);", "  tileTick(STATION.x + 190, STATION.z + 66, 0, 260); /* avvio veloce: solo i tile attorno alla partenza prima del pulsante, gli altri entro 420 m si costruiscono sotto la schermata iniziale (12 ms a fotogramma) */\n  for (const T of TILES) T.dist = hyp(T.cx - STATION.x - 190, T.cz - STATION.z - 66);")
 # title: everything yellow, only G T A in red
 rep("#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ink);", "#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ocra);")
 rep("#start h1 { font-family: var(--display);", "#start h1 { color: var(--ocra) !important; font-family: var(--display);")

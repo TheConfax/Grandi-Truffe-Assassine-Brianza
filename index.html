@@ -139,7 +139,7 @@ body:not(.debug) .dbg { display: none !important; }
       <div><kbd>F</kbd> sali / scendi / ruba</div>
       <div><kbd>C</kbd> dietro l'auto / dall'alto</div>
       <div><kbd>M</kbd> mappa di Meda</div>
-      <div><kbd>PAD</kbd> controller DualSense o Xbox</div>
+      <div><kbd>PAD</kbd> controller DualSense o Xbox · START o ✕/A per iniziare</div>
       <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>
       <div><kbd>N</kbd> avanti di 2 ore</div>
       <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>
@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo righe · dopo b1ad114 · assemblato 25/10 05:36 · porta ' + location.port;
+    const txt = 'locale · ramo avvio · dopo c88b3b3 · assemblato 25/10 12:47 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -176,6 +176,9 @@ body:not(.debug) .dbg { display: none !important; }
 //  GRANDI TRUFFE ASSASSINE · BRIANZA · open-world driving on the real OSM map of Meda (MB)
 // =====================================================================
 const goBtn = document.getElementById('go');
+/* avvio veloce: l'indice e il pacco del terreno (src/terreno_pacco.py) partono insieme a brianza.json, e i tile si decomprimono in parallelo mentre il resto si legge; altezze3.js li prende da qui */
+const TERR_IND = fetch('terreno/indice.json').then(r => r.ok ? r.json() : null).catch(() => null);
+const TERR_BIN = TERR_IND.then(async j => { if (!j || j.ver !== 1 || !j.pacco) return null; try { const r = await fetch('terreno/' + j.pacco.file); if (!r.ok) return null; const b = new Uint8Array(await r.arrayBuffer()), m = new Map(); for (const k in j.pacco.tile) { const [o, l] = j.pacco.tile[k]; m.set(k, new Response(new Blob([b.subarray(o, o + l)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer().catch(() => null)); } return m; } catch (e) { return null; } });
 goBtn.disabled = true; goBtn.textContent = 'CARICO LA BRIANZA…';
 const D = await (async () => {
   const res = await fetch('brianza.json'); const total = +res.headers.get('content-length') || 0;
@@ -448,7 +451,7 @@ function riverCut(x, z) { // old engine only (the tiles without .bin, outside Me
 }
 // the new engine's files: which tiles have a .bin, the decks, the pits and the water level (terreno/indice.json, src/terreno_gioco.py);
 // without it the whole map runs on the old engine
-const TERRENO = await (async () => { try { const r = await fetch('terreno/indice.json'); if (!r.ok) return null; const j = await r.json(); return j && j.ver === 1 ? j : null; } catch (e) { return null; } })();
+const TERRENO = await TERR_IND.then(j => j && j.ver === 1 ? j : null); // started with brianza.json (assemble3.py)
 const H = (() => {
   const TSZ = META.tile, HW = META.hw, HHt = META.hh, NX = META.ntx, NZ = META.ntz, B0 = TER.base, LOAD_R = 1150;
   const STEP = new Uint8Array(NX * NZ), FT = new Array(NX * NZ).fill(null), LS = new Uint8Array(NX * NZ); // LS: 0 not asked, 1 coming, 2 here, 3 failed
@@ -458,8 +461,9 @@ const H = (() => {
   async function load(t) {
     LS[t] = 1; const tx = t % NX, tz = Math.floor(t / NX);
     try {
-      const r = await fetch(`terreno/${tx}_${tz}.bin.gz`); if (!r.ok) throw new Error('HTTP ' + r.status);
-      let b = new Uint8Array(await r.arrayBuffer());
+      let b = null; const pk = await TERR_BIN, pm = pk && pk.get(tx + '_' + tz); // terreno/pacco.bin: already unpacked, in parallel
+      if (pm) { const ab = await pm; if (ab) b = new Uint8Array(ab); }
+      if (!b) { const r = await fetch(`terreno/${tx}_${tz}.bin.gz`); if (!r.ok) throw new Error('HTTP ' + r.status); b = new Uint8Array(await r.arrayBuffer()); } // one .bin.gz at a time, the old way
       if (b[0] === 0x1f && b[1] === 0x8b) b = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
       const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
       if (b[0] !== 71 || b[1] !== 84 || b[2] !== 65 || b[3] !== 83 || b[4] !== 1) throw new Error('non è un GTAS 1');
@@ -5910,7 +5914,7 @@ function pollPad() {
   if (edge(8)) toggleBig();
   if (edge(4)) skipTime(2);
   if (edge(12)) toggleRadio();
-  if (edge(9)) togglePause();
+  const e9 = edge(9); if (!running) { if ((e9 || edge(0)) && !goBtn.disabled) startGame(); } else if (e9) togglePause(); /* title screen: START or cross/A start the game like Enter */
   if (!GP.seen) {
     GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id);
     const L = GP.ps ? { t: 'R2', b: 'L2', h: '✕', o: '○', s: '□', y: '△', c: 'R1', m: 'Create', p: 'Options', r: 'R3' } : { t: 'RT', b: 'LT', h: 'A', o: 'B', s: 'X', y: 'Y', c: 'RB', m: 'View', p: 'Menu', r: 'R3' };
@@ -7071,7 +7075,7 @@ function startSpot() { // the parking on via Yuri Gagarin in Meda, facing the fo
   return [sx, sz, Math.atan2(FO[0] - sx, FO[1] - sz)];
 }
 function setupWorld(saved) {
-  tileTick(STATION.x + 190, STATION.z + 66, 0, 420);
+  tileTick(STATION.x + 190, STATION.z + 66, 0, 260); /* avvio veloce: solo i tile attorno alla partenza prima del pulsante, gli altri entro 420 m si costruiscono sotto la schermata iniziale (12 ms a fotogramma) */
   for (const T of TILES) T.dist = hyp(T.cx - STATION.x - 190, T.cz - STATION.z - 66);
   parkTick();
   for (let i = 0; i < 16; i++) spawnTraffic(false);
