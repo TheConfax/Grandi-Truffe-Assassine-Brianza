@@ -1,6 +1,6 @@
 # Sotto terra a Meda: censimento e proposta per il motore
 
-Indagine del 25/10/2026 (ramo `sottoterra`), dopo che Carlo ha trovato la falla: il motore non sa disegnare niente sotto la superficie, perché il terreno è una griglia di quote unica (`S`, `docs/motore.md` 1.1). Qui c'è l'elenco di quello che sta sotto terra a Meda (autorimesse e parcheggi interrati, rampe, sottopassi, gallerie), quali fonti lo vedono, cosa c'è oggi nel gioco in quel punto, e una proposta in due tappe. Non ho toccato né il gioco né la build: ho solo letto dati e codice. La scelta spetta a Carlo.
+La tappa 1 è fatta (26/10): vedi la sezione "Tappa 1 fatta" qui sotto. Indagine del 25/10/2026 (ramo `sottoterra`), dopo che Carlo ha trovato la falla: il motore non sa disegnare niente sotto la superficie, perché il terreno è una griglia di quote unica (`S`, `docs/motore.md` 1.1). Qui c'è l'elenco di quello che sta sotto terra a Meda (autorimesse e parcheggi interrati, rampe, sottopassi, gallerie), quali fonti lo vedono, cosa c'è oggi nel gioco in quel punto, e una proposta in due tappe. Non ho toccato né il gioco né la build: ho solo letto dati e codice. La scelta spetta a Carlo.
 
 ## In breve
 
@@ -10,6 +10,135 @@ Indagine del 25/10/2026 (ramo `sottoterra`), dopo che Carlo ha trovato la falla:
 - **Via Mazzini** non è spianata ma il contrario. Il LiDAR del 2008 ha visto lo scavo di un cantiere, profondo 6-9 m. Nel 2015 al suo posto ci sono un palazzo nuovo con piscina, un giardino con le prese d'aria dell'autorimessa (OSM `parking=underground`) e un cortile a piano strada (DBGT). Il gioco disegna ancora lo scavo del 2008: una conca di 5-8 m con prato e vialetti drappeggiati sopra. È lo "smashato" che ha visto Carlo.
 - **Via Gagarin** ha una fossa del LiDAR di 152 m², profonda fino a 5,6 m, a 1,5 m dal passo carraio. Una parte sta sotto una copertura (il DSM del 2008 vede un tetto sopra): è coerente con la rampa a spirale vista da Carlo. Il DBGT lì ha solo tre cortiletti a piano strada, e né il DBGT né OSM segnano l'interrato. Nel gioco c'è una conca morbida accanto allo spigolo dell'edificio.
 - **Proposta.** La tappa 1 tiene la griglia unica: rampe e ingressi diventano oggetti "fossa" con muri e serranda, la quota della rampa si brucia in `S` e le celle si tagliano come per le superfici. Il costo è medio e funziona solo sui casi controllati, circa 100-140. La tappa 2 porta parcheggi percorribili sotto la superficie: servono un livello in più in `H`, collisioni con l'altezza (oggi sono 2D), soffitti e telecamera. Il costo è grande e il rischio di rompere la fisica in tutto il gioco è reale. La sezione "Proposta" ha i dettagli, la sezione "Da decidere" le scelte per Carlo.
+
+## Tappa 1 fatta (26/10, ramo `buche-rampe`): buche irragionevoli tolte, rampe disegnate
+
+Un'analisi sola, `src/sottoterra.py`, chiamata da `superficie.py` dopo le strade e prima del "tetto" (`Superficie.sottoterra`), più `src/sottoterra.json` con quello che ho guardato a vista. Decisioni di Carlo del 26/10: dove LiDAR 2008 e DBGT 2015 non sono d'accordo perché nel frattempo si è costruito vince il 2015; rampe solo con due fonti e attaccate a un passo carraio; i dubbi non si decidono da soli.
+
+**La regola delle buche irragionevoli.** Una buca è una depressione chiusa del LiDAR sul reticolo di `S` (2 m): riempita fino al punto di traboccamento, i nodi più di 1 m sotto, almeno 3 (12 m²), dentro Meda. Si toglie quando il DBGT 2015 la smentisce: almeno metà dei suoi nodi visibili ha sopra una superficie del DBGT (carreggiata, cortile 0307, parcheggio, marciapiede, area stradale: la quota della superficie, o la TIN del suo anello per i cortili lasciati al LiDAR) più di 1 m sopra il LiDAR, oppure un edificio che il DSM 2008 non vedeva (DSM − DTM sotto 2 m: costruito dopo il volo). I nodi sotto un edificio che c'era già nel 2008 non contano né per né contro (pieghe del filtro del DTM, seminterrati). Non si toglie: entro 6 m da un alveo, entro 12 m da un ponte o dalla galleria, accanto alla ferrovia, dove il DBGT stesso sta in fondo alla buca (su almeno il 30% dei nodi la sua quota è entro 1 m dal LiDAR: trincee, sottopassi, cortili ribassati veri), dove c'è una fossa che può essere una rampa (disegnata, dubbia, o stretta, in discesa e con un passo carraio entro 25 m senza che l'abbia guardata) e dove l'ho segnata come dubbia. Togliere vuol dire che il terreno di base `L` della buca diventa una membrana armonica (Laplace) fra il LiDAR intorno e le quote del DBGT dentro, mai sotto il LiDAR: il DBGT entro i 3 m del "tetto" vince da solo, i cortili interni prendono la loro quota, i giardini e gli edifici nuovi il piano raccordato.
+
+Numeri (Meda): 1104 buche; tolte 370 (42 690 nodi di `L`, alzati di 0,88 m a metà, 2,81 al 90%, 9,0 al massimo, a via Mazzini); restano 486 senza DBGT sopra (verde, sotto gli alberi, sotto edifici del 2008), 113 accanto a una rampa possibile, 104 col DBGT in fondo, 22 vicino a un fiume, 4 vicino a un ponte, 5 guardate e dubbie. Campione sull'ortofoto (le 9 più grandi e 27 a caso fra le 370): 31 giuste (edifici e capannoni costruiti dopo il 2008, cortili, vialetti, parcheggi), 5 dubbie (tolte dalla regola e messe nell'elenco qui sotto, B1-B5). Su tutto, una su sette potrebbe essere vera: è il prezzo di una regola generale.
+
+I casi di Carlo: via Mazzini (x 118 z −445) suolo 21,6 → 29,5, a piano strada, il cortile e il palazzo stanno sul piano e non nella conca; x 510 z −448 in via Gagarin (cortile 0307 3453, buca di 4 m sotto l'angolo di un edificio del 2008) 27,3 → 30,9; via Pietro Orsi x 507,2 z −719,7 28,1 → 32,7 e x 505,3 z −703,8 30,0 → 32,2 (buche del LiDAR sotto l'area pedonale e il porticato del complesso). Restano come prima, e perché: via Pietro Orsi x 484,9 z −731,6 (suolo 32,5, due nodi fino a 31,0): è un pozzo stretto (1-2 m) di 3-5 m nel cortile verde interno del complesso, dove il DBGT non ha quote; sembra una bocca di lupo o una scala vera, non una buca da togliere. Dietro via Indipendenza x 608 z −166 era una buca (tolta: 30,5 con il vialetto che scendeva, ora piano a 30,5-31); la "spazzatura strana" sono pezzetti di recinzione del DBGT rimasti soli nel vialetto, non terreno. x 591 z −172 (suolo 28,3 contro 30,8): resta, è una fossa di 32 m² accanto al muro dell'edificio, sotto la gronda (DSM alto), senza superficie del DBGT sopra: per la regola non c'è niente che la smentisca. Via Isonzo x 554,1 z −246,2: 26,4 → 30,1, tolta (parcheggio 0301 a piano strada sopra una buca del LiDAR di 4,6 m). Il capannone di x 1666 z −1009 (costruito sullo scavo del 2008) ora sta a 40,7 invece che 34,6. I tre punti dell'indagine di x 158 z −739, x −96 z −960, x 252 z −809 non sono buche: sono parchi di ville coperti da un cortile 0307 enorme, dove la TIN dell'anello del DBGT taglia per aria il pendio; lì il LiDAR ha ragione e non si tocca.
+
+**Le rampe.** Le fosse del LiDAR a 1 m (918, nucleo oltre 1 m, almeno 15 m², profonde almeno 1,5 m) con la forma di una rampa (stretta, in discesa da una testa), un volume interrato del DBGT o un parcheggio interrato di OSM vicino: 154, guardate tutte sull'ortofoto 2018-19 (`sottoterra.json`, 166 righe compresi i 9 di prima). Seconda fonte: il volume interrato `UN_VOL_POR 08` entro 8 m, OSM entro 25 m, l'ortofoto, Carlo per Gagarin; in più il passo carraio entro 25 m dalla testa. Ne sono uscite 29, ne disegno 26: tre sono finite fra i dubbi perché in fondo il LiDAR è profondo meno di 1,2 m. Ogni rampa segue la fossa: la linea di mezzo dalla testa al punto più profondo della parte non coperta da edifici (dove la fossa del LiDAR passa sotto un tetto la rampa si ferma: via Gagarin), lisciata a 1,5 m; larghezza costante, la mediana della fossa (3-6,5 m), stretta dove toccherebbe un edificio del DBGT o del gioco; bocca allungata di 1,5 m verso la testa; fondo dal DTM, sempre in discesa (regressione isotonica), mai più ripido del 25%, alla bocca al livello del suolo. Lunghe 7-22 m (mediana 12,7), alla serranda 1,3-3,2 m sotto il suolo (mediana 2,5). In `terreno/indice.json` `pits`: i due lati con la quota del fondo, le celle di `S` che la rampa prende e i triangoli del suolo intorno in quelle celle.
+
+Nel gioco (`altezze3.js`, `world3.js`): dentro il contorno della rampa `H.base`, `H.ground` e `H.surface` danno il fondo (i triangoli della striscia fra i due lati), fuori `S`; la mesh del terreno lascia le celle della rampa, che disegna `buildPits`: il fondo in cemento, il suolo intorno con l'aspetto dello strato che copre la cella, i muri dal fondo fino a 1 m sopra il suolo lungo i due lati (muro di contenimento e parapetto insieme, più bassi vicino alla bocca), una serranda chiusa in fondo (alta 2,4 m, grigia a doghe, senza scritte) col muro sopra; muri e serranda sono in `WALLS` (a due facce, con la fascia di quota), l'auto si ferma sulla serranda. Le recinzioni e i muri dei dati che passano dentro una rampa (il DBGT disegna i muri della rampa vera, il contorno del LiDAR è un po' più largo) si tagliano lì; alberi e auto parcheggiate non nascono dentro una rampa. I cancelli dei passi carrai restano dove sono: in alcune rampe chiudono la bocca.
+
+| # | x | z | lunga | larga | fondo sotto il suolo alla porta | fonti | guida dalla bocca | da 3 m prima |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 524 | -1680 | 11,1 m | 2,8-3,3 m | 1,3 m | LiDAR, DBGT volume interrato a 0 m, ortofoto 2018-19 | alla serranda | non entra |
+| 1 | 732 | -1494 | 12,3 m | 6,2-6,5 m | 2,8 m | LiDAR, ortofoto 2018-19 | non entra | non entra |
+| 2 | 127 | -1401 | 12,2 m | 3,9-4,1 m | 2,6 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 3 | -586 | -1328 | 12,0 m | 6,5 m | 2,7 m | LiDAR, ortofoto 2018-19 | alla serranda | non entra |
+| 4 | -704 | -1251 | 12,6 m | 4,1 m | 2,1 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 5 | 836 | -1249 | 11,1 m | 3,9 m | 2,1 m | LiDAR, DBGT volume interrato a 2 m, ortofoto 2018-19 | alla serranda | non entra |
+| 6 | -755 | -1205 | 7,8 m | 6,5 m | 1,7 m | LiDAR, ortofoto 2018-19 | non entra | non entra |
+| 7 | 436 | -1014 | 9,9 m | 5,3 m | 1,5 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 8 | 189 | -1011 | 7,3 m | 5,9 m | 1,9 m | LiDAR, DBGT volume interrato a 0 m, ortofoto 2018-19 | alla serranda | alla serranda |
+| 9 | 812 | -944 | 9,4 m | 4,3-5,8 m | 2,2 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 10 | 890 | -809 | 17,4 m | 4,8-5,2 m | 2,6 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 11 | 487 | -701 | 16,3 m | 5,0-5,4 m | 2,5 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 12 | 588 | -698 | 15,9 m | 4,0-4,2 m | 3,2 m | LiDAR, ortofoto 2018-19 | alla serranda | non entra |
+| 13 | 1510 | -619 | 12,9 m | 5,6-5,9 m | 2,6 m | LiDAR, ortofoto 2018-19 | alla serranda | non entra |
+| 14 | 540 | -496 | 14,4 m | 3,7-5,2 m | 2,6 m | LiDAR, Carlo (nel gioco e dal vero) | alla serranda | alla serranda |
+| 15 | 100 | -479 | 12,0 m | 4,3-5,3 m | 2,5 m | LiDAR, OSM parcheggio interrato, ortofoto 2018-19 | alla serranda | non entra |
+| 16 | -277 | -469 | 13,5 m | 6,5 m | 2,2 m | LiDAR, OSM parcheggio interrato, ortofoto 2018-19 | alla serranda | alla serranda |
+| 17 | -185 | -242 | 13,6 m | 6,5 m | 2,6 m | LiDAR, DBGT volume interrato a 0 m, ortofoto 2018-19 | alla serranda | alla serranda |
+| 18 | -363 | -251 | 16,7 m | 5,5 m | 2,7 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 19 | 754 | -228 | 18,2 m | 4,2-5,7 m | 2,7 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 20 | 1418 | 719 | 18,1 m | 5,8 m | 3,0 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 21 | 1454 | 745 | 13,5 m | 6,5 m | 2,6 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 22 | 1343 | 782 | 12,8 m | 4,0 m | 2,1 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 23 | 1334 | 803 | 12,4 m | 5,6 m | 2,4 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 24 | 1320 | 846 | 11,4 m | 5,6 m | 2,2 m | LiDAR, ortofoto 2018-19 | alla serranda | non entra |
+| 25 | 1114 | 912 | 21,6 m | 5,8-6,5 m | 2,9 m | LiDAR, ortofoto 2018-19 | alla serranda | non entra |
+
+"Non entra" da 3 m prima: la bocca è chiusa da qualcosa dei dati (il cancello del passo carraio, una recinzione sul confine della proprietà, l'angolo di un edificio); dalla bocca stessa due non scendono (1 e 6: il cancello del passo carraio sulla bocca).
+
+**Controlli** (prima = `dev` rifatto con la stessa build, dopo = il ramo): C4 198 luoghi, 31 con almeno 5 nodi, fuori soglia → 135 e 15, dentro la soglia (i cortili e i parcheggi cambiati fra il 2008 e il 2015 erano la maggior parte); C5 0,005 m al massimo, C6 nessun asse sopra il 18% (triangoli sopra il 18% 905 → 798), C7 0,000, C10 0 non monotone, 0 sopra le sponde, uguali a prima. `S` prima e dopo: 40 212 nodi mossi, 39 157 dentro i nodi riempiti, 1055 entro 10 m da loro (le scarpate di raccordo e il "tetto" che non tira più giù), nessuno oltre 10 m (al massimo 1,49 m fuori dai riempiti). `H.check` su 201 tile 0,0003 m, raggi 0,0001; `H.checkPits` su 26 rampe e 300 punti l'una: 0,000 m, nessun buco. Salti di ruota oltre 0,2 m su tutte le corsie delle tile di S (2860 lati, 321 km, una ruota ogni 0,233 m): 329 → 282, nessuno nuovo (41 spariti, fra cui i due di via Mazzini). Guida con la fisica vera: 24 rampe su 26 dalla bocca fino alla serranda (l'auto si ferma a 2,1-2,3 m dal centro della serranda, cioè col muso contro), salto massimo 0,078 m per frame, l'auto sta al più 0,27 m sotto il fondo sul ciglio della bocca (il ritardo di sempre su un dosso).
+
+**Elenco dei dubbi** (da guardare con Carlo; restano come oggi, conche morbide). Fosse del LiDAR a 1 m con la forma o le fonti di una rampa, non disegnate:
+
+| # | x | z | fossa nel LiDAR 2008 | DBGT 2015 | OSM | perché è un dubbio (ortofoto 2018-19) |
+|---|---|---|---|---|---|---|
+| 1 | -580 | -1643 | 76 m², 3,3 m, 15 × 6,7 m | - | - | rampa a vista, ma nessun passo carraio entro 25 m |
+| 2 | 663 | -1611 | 97 m², 2,6 m, 15 × 4,1 m | passo carraio a 18 m, 53% sotto un edificio | - | non si capisce se è una rampa |
+| 3 | 724 | -1584 | 118 m², 2,5 m, 15 × 4,1 m | passo carraio a 12 m, 64% sotto un edificio | - | non si capisce se è una rampa |
+| 4 | -32 | -1476 | 22 m², 2,1 m, 12 × 3,7 m | passo carraio a 9 m | - | non si capisce se è una rampa |
+| 5 | -753 | -1431 | 115 m², 2,4 m, 17 × 5,6 m | passo carraio a 12 m, 31% sotto un edificio | - | non si capisce se è una rampa |
+| 6 | 781 | -1380 | 19 m², 2,1 m, 9 × 4,1 m | - | - | rampa a vista, ma nessun passo carraio entro 25 m |
+| 7 | 137 | -1367 | 188 m², 2,2 m, 20 × 5,2 m | passo carraio a 10 m, 47% sotto un edificio | - | non si capisce se è una rampa |
+| 8 | 1123 | -1348 | 102 m², 2,7 m, 20 × 4,1 m | passo carraio a 3 m, 40% sotto un edificio | - | non si capisce se è una rampa |
+| 9 | 182 | -1329 | 175 m², 1,8 m, 41 × 5,6 m | volume interrato a 0 m, passo carraio a 13 m | - | striscia scura lungo la casa, ma la fossa del LiDAR va nel giardino (36 m): forma non chiara |
+| 10 | -895 | -1286 | 56 m², 1,9 m, 7 × 3,2 m | 77% sotto un edificio | - | non si capisce se è una rampa |
+| 11 | 848 | -1260 | 161 m², 2,3 m, 14 × 6,0 m | volume interrato a 0 m, passo carraio a 14 m, 34% sotto un edificio | - | non si capisce se è una rampa |
+| 12 | 1014 | -1234 | 59 m², 3,3 m, 20 × 4,1 m | - | - | rampa a vista, ma nessun passo carraio entro 25 m |
+| 13 | -617 | -1192 | 46 m², 2,4 m, 19 × 5,2 m | passo carraio a 18 m | - | corsello fra due edifici |
+| 14 | 1079 | -1178 | 69 m², 2,1 m, 22 × 2,6 m | passo carraio a 13 m, 38% sotto un edificio | - | non si capisce se è una rampa |
+| 15 | 92 | -1141 | 31 m², 2,7 m, 15 × 4,1 m | volume interrato a 0 m, passo carraio a 9 m | - | non si capisce se è una rampa |
+| 16 | 951 | -1107 | 586 m², 2,3 m, 68 × 5,4 m | volume interrato a 0 m, passo carraio a 19 m, 44% sotto un edificio | - | non si capisce se è una rampa |
+| 17 | -626 | -1088 | 137 m², 3,8 m, 21 × 5,6 m | passo carraio a 16 m | - | non si capisce se è una rampa |
+| 18 | 709 | -974 | 53 m², 3,3 m, 17 × 5,2 m | passo carraio a 9 m | - | non si capisce se è una rampa |
+| 19 | 954 | -900 | 78 m², 3,8 m, 48 × 6,7 m | volume interrato a 0 m, 64% sotto un edificio | - | non si capisce se è una rampa |
+| 20 | 938 | -875 | 66 m², 4,5 m, 42 × 5,9 m | volume interrato a 0 m, 75% sotto un edificio | - | non si capisce se è una rampa |
+| 21 | 945 | -848 | 1315 m², 4,4 m, 109 × 10,0 m | volume interrato a 0 m, passo carraio a 5 m, 51% sotto un edificio | - | non si capisce se è una rampa |
+| 22 | 702 | -736 | 85 m², 3,2 m, 13 × 5,2 m | passo carraio a 14 m, 51% sotto un edificio | - | striscia lungo l'edificio |
+| 23 | 33 | -673 | 203 m², 6,1 m, 30 × 4,1 m | passo carraio a 8 m | - | non si capisce se è una rampa |
+| 24 | -369 | -652 | 624 m², 3,7 m, 45 × 2,6 m | volume interrato a 0 m, passo carraio a 18 m, 77% sotto un edificio | - | non si capisce se è una rampa |
+| 25 | -23 | -647 | 26 m², 2,2 m, 9 × 4,1 m | passo carraio a 6 m | - | non si capisce se è una rampa |
+| 26 | 127 | -611 | 56 m², 2,9 m, 17 × 5,6 m | passo carraio a 10 m | - | non si capisce se è una rampa |
+| 27 | 847 | -606 | 710 m², 2,3 m, 58 × 5,6 m | volume interrato a 0 m, passo carraio a 10 m, 60% sotto un edificio | - | non si capisce se è una rampa |
+| 28 | -913 | -547 | 287 m², 3,7 m, 32 × 5,6 m | volume interrato a 0 m, passo carraio a 11 m, 38% sotto un edificio | - | non si capisce se è una rampa |
+| 29 | 983 | -530 | 33 m², 2,3 m, 10 × 5,2 m | - | - | rampa a vista, ma nessun passo carraio entro 25 m |
+| 30 | 483 | -523 | 64 m², 2,5 m, 18 × 5,6 m | - | - | non si capisce se è una rampa |
+| 31 | 761 | -511 | 70 m², 3,0 m, 21 × 4,1 m | - | - | non si capisce se è una rampa |
+| 32 | 1648 | -471 | 28 m², 2,9 m, 15 × 3,7 m | passo carraio a 7 m | - | non si capisce se è una rampa |
+| 33 | -77 | -459 | 49 m², 2,5 m, 18 × 4,1 m | volume interrato a 0 m, passo carraio a 7 m | - | non si capisce se è una rampa |
+| 34 | -1063 | -425 | 189 m², 1,8 m, 48 × 3,7 m | volume interrato a 0 m, passo carraio a 14 m, 37% sotto un edificio | - | non si capisce se è una rampa |
+| 35 | 968 | -360 | 20 m², 1,9 m, 15 × 4,1 m | volume interrato a 6 m, passo carraio a 20 m | - | in fondo è profonda solo 0.8 m |
+| 36 | 944 | -354 | 76 m², 1,9 m, 11 × 4,7 m | volume interrato a 3 m, passo carraio a 1 m, 56% sotto un edificio | - | non si capisce se è una rampa |
+| 37 | 959 | -348 | 24 m², 1,9 m, 20 × 3,7 m | volume interrato a 0 m, passo carraio a 12 m | - | non si capisce se è una rampa |
+| 38 | -610 | -327 | 115 m², 2,6 m, 20 × 4,7 m | volume interrato a 0 m, passo carraio a 2 m, 40% sotto un edificio | - | non si capisce se è una rampa |
+| 39 | 482 | -312 | 512 m², 3,1 m, 38 × 6,7 m | volume interrato a 0 m, passo carraio a 15 m, 51% sotto un edificio | - | non si capisce se è una rampa |
+| 40 | 509 | -276 | 23 m², 2,9 m, 9 × 3,7 m | passo carraio a 6 m | - | non si capisce se è una rampa |
+| 41 | 1832 | -204 | 52 m², 1,7 m, 19 × 7,4 m | passo carraio a 16 m | - | vialetto in discesa verso la casa, senza muri |
+| 42 | 778 | -202 | 58 m², 2,8 m, 18 × 5,2 m | passo carraio a 18 m | - | non si capisce se è una rampa |
+| 43 | 996 | -156 | 83 m², 2,1 m, 17 × 5,2 m | - | - | striscia lungo l'edificio |
+| 44 | 966 | -128 | 33 m², 2,0 m, 10 × 3,7 m | 47% sotto un edificio | - | non si capisce se è una rampa |
+| 45 | 998 | -9 | 36 m², 2,8 m, 14 × 5,2 m | - | parcheggio interrato | rampa a vista, ma nessun passo carraio entro 25 m |
+| 46 | 960 | 153 | 28 m², 2,2 m, 10 × 3,7 m | passo carraio a 12 m | - | non si capisce se è una rampa |
+| 47 | -678 | 187 | 121 m², 3,5 m, 34 × 4,1 m | volume interrato a 0 m, passo carraio a 10 m | - | non si capisce se è una rampa |
+| 48 | 1656 | 285 | 50 m², 2,1 m, 13 × 4,1 m | passo carraio a 4 m | - | non si capisce se è una rampa |
+| 49 | 1043 | 296 | 77 m², 3,0 m, 24 × 5,2 m | - | - | non si capisce se è una rampa |
+| 50 | 1090 | 304 | 50 m², 2,7 m, 14 × 4,1 m | passo carraio a 8 m | - | non si capisce se è una rampa |
+| 51 | 308 | 317 | 138 m², 2,1 m, 20 × 1,9 m | volume interrato a 0 m, passo carraio a 3 m, 71% sotto un edificio | - | non si capisce se è una rampa |
+| 52 | 1476 | 361 | 16 m², 2,1 m, 11 × 3,7 m | passo carraio a 13 m | - | non si capisce se è una rampa |
+| 53 | 582 | 366 | 159 m², 3,8 m, 28 × 5,6 m | passo carraio a 4 m | - | non si capisce se è una rampa |
+| 54 | 983 | 484 | 96 m², 3,3 m, 32 × 4,1 m | - | - | rampa a vista, ma nessun passo carraio entro 25 m |
+| 55 | 1014 | 486 | 39 m², 2,1 m, 11 × 5,2 m | volume interrato a 0 m, 36% sotto un edificio | - | non si capisce se è una rampa |
+| 56 | 1138 | 703 | 3367 m², 2,4 m, 111 × 7,4 m | volume interrato a 0 m, passo carraio a 6 m, 50% sotto un edificio | - | non si capisce se è una rampa |
+| 57 | 306 | 714 | 348 m², 3,0 m, 29 × 7,4 m | volume interrato a 0 m, passo carraio a 6 m | - | non si capisce se è una rampa |
+| 58 | 80 | 721 | 52 m², 1,7 m, 16 × 3,7 m | passo carraio a 13 m | - | non si capisce se è una rampa |
+| 59 | 76 | 744 | 46 m², 2,2 m, 14 × 4,1 m | passo carraio a 7 m | - | non si capisce se è una rampa |
+| 60 | 38 | 746 | 49 m², 2,2 m, 12 × 3,7 m | volume interrato a 0 m, 51% sotto un edificio | - | non si capisce se è una rampa |
+| 61 | 771 | 766 | 160 m², 3,2 m, 24 × 2,2 m | volume interrato a 0 m, passo carraio a 2 m | - | corsello curvo: il LiDAR scende verso la strada, la parte profonda e allo sbocco sul marciapiede |
+| 62 | 324 | 780 | 56 m², 2,2 m, 10 × 3,7 m | volume interrato a 0 m, passo carraio a 4 m, 82% sotto un edificio | - | in fondo è profonda solo 0.3 m |
+| 63 | 376 | 817 | 44 m², 2,5 m, 12 × 4,1 m | volume interrato a 0 m, passo carraio a 13 m | - | in fondo è profonda solo 0.7 m |
+| 64 | 377 | 839 | 169 m², 2,4 m, 22 × 5,6 m | volume interrato a 6 m, passo carraio a 18 m, 40% sotto un edificio | - | non si capisce se è una rampa |
+| 65 | 961 | 873 | 28 m², 2,6 m, 13 × 3,7 m | - | - | rampa a vista, ma nessun passo carraio entro 25 m |
+
+| buca | x | z | fossa nel LiDAR (2 m) | DBGT sopra la fossa | ortofoto 2018-19 |
+|---|---|---|---|---|---|
+| B1 | 858 | -1279 | 84 m², 2,5 m | 24% dei nodi, 1,6 m sopra il LiDAR | corpo curvo attaccato all edificio (come Gagarin?) |
+| B2 | -796 | -1188 | 84 m², 2,3 m | 33% dei nodi, 2,4 m sopra il LiDAR | rettangolo chiaro fra due case (piscina o bocca di lupo?) |
+| B3 | 1129 | -995 | 300 m², 2,2 m | 36% dei nodi, 2,2 m sopra il LiDAR | corsello scuro fra due edifici, forse una rampa |
+| B4 | 755 | -965 | 92 m², 2,8 m | 87% dei nodi, 2,9 m sopra il LiDAR | cortile in ombra fra edifici, forse ribassato |
+| B5 | 1066 | -479 | 2532 m², 4,4 m | 32% dei nodi, 3,1 m sopra il LiDAR | prato ribassato fra due muri (forse vero) |
+
+Le buche B1-B5 sono quelle del campione che la regola toglierebbe e che sull'ortofoto non sono chiare: restano come oggi.
+
+**Aperti.** (1) Le fosse con la forma di una rampa che non ho guardato (circa 400 piccole e strette, di solo LiDAR) restano come oggi e proteggono la loro buca dalla regola. (2) La regola sbaglia forse una buca su sette (campione): le 370 sono in `sottoterra_casi.json` dell'uscita di `superficie.py`. (3) Il fondo delle rampe viene dal DTM 2008 e da un'isotonica: in alcune il primo metro è più ripido del resto. (4) In 10 rampe da fuori non si entra (cancello, recinzione, edificio sulla bocca). (5) La tappa 2 (le autorimesse dove si entra) non è fatta.
 
 ## Le due segnalazioni di Carlo
 
