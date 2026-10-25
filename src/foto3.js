@@ -8,6 +8,22 @@ const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [g
   const ld = new THREE.TextureLoader();
   for (const [t, f, r] of FOTO_TEX) ld.load('tex/' + f + '.jpg', img => { t.image = img.image; t.repeat.set(r, r); t.needsUpdate = true; });
 }
+// incolti: the grass photo dried out (yellower, paler), the earth photo through soft irregular blotches, a few darker tufts; composed once
+// on a canvas when both photos are in (one repeat of incoltoTex, world3.js, is 8 m)
+Promise.all(['prato', 'terreno'].map(f => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = 'tex/' + f + '.jpg'; }))).then(([pr, te]) => {
+  if (!pr || !te) return;
+  const N = 512, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d');
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) g.drawImage(pr, i * N / 4, j * N / 4, N / 4, N / 4); // the grass photo is 2 m: four times across the 8 m
+  g.globalCompositeOperation = 'multiply'; g.fillStyle = '#e8d49a'; g.fillRect(0, 0, N, N); // dried: yellower
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = .18; g.fillStyle = '#c8bb88'; g.fillRect(0, 0, N, N); g.globalAlpha = 1; // and paler
+  const m = document.createElement('canvas'); m.width = m.height = N; const mg = m.getContext('2d'); let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < 26; k++) { const x = r() * N, y = r() * N, rad = 18 + r() * 70; for (const [dx, dy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N]]) { const gr = mg.createRadialGradient(x + dx, y + dy, rad * .2, x + dx, y + dy, rad); gr.addColorStop(0, 'rgba(0,0,0,.95)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); mg.fillStyle = gr; mg.beginPath(); mg.ellipse(x + dx, y + dy, rad, rad * (.5 + r() * .5), r() * 3, 0, Math.PI * 2); mg.fill(); } }
+  const e = document.createElement('canvas'); e.width = e.height = N; const eg = e.getContext('2d');
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) eg.drawImage(te, i * N / 2, j * N / 2, N / 2, N / 2); // the earth photo, 4 m
+  eg.globalCompositeOperation = 'destination-in'; eg.drawImage(m, 0, 0); g.drawImage(e, 0, 0); // bare earth in the blotches, blended at the edges
+  g.globalAlpha = .35; g.strokeStyle = '#4d5226'; g.lineWidth = 1.4; for (let k = 0; k < 900; k++) { const x = r() * N, y = r() * N; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - .5) * 5, y - 3 - r() * 6); g.stroke(); } g.globalAlpha = 1; // tufts
+  incoltoTex.image = cv; incoltoTex.needsUpdate = true;
+});
 // output in sRGB, through a filmic curve: highlights roll off instead of clipping
 renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
 // the sky: three's Preetham model (Sky.js r128, loaded beside three.min.js), with the sun's disc and the glow round it, the blue

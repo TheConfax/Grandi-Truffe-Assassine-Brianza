@@ -542,6 +542,11 @@ const MAT = {
   trunk: new THREE.MeshLambertMaterial({ color: 0x5a4636, map: barkTex }), crown: new THREE.MeshLambertMaterial({ map: TREE_LEAF, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true }), lamp: lam(0x4a4d52), lampHead: lam(0xf4f1e6, { emissive: 0x6a6040, emissiveIntensity: 0.4 }),
 };
 // the same looks writing their depth, for the cells a layer owns in a tile of S (cellOwners): drawn with the ground, in its place
+// incolti (DBGT PS_INC 04): dry grass with patches of bare earth and darker tufts; drawn here, then foto3.js composes it from the photos of
+// grass and earth (incoltoFoto). One repeat is 8 m (UV every 12 m, repeat 1.5)
+const incoltoTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#9c9a58'; g.fillRect(0, 0, w, h); noise(g, w, h, 7000, 0.45, ['#8a8a4a', '#b0aa6a', '#7a7a40', '#a89c60']); g.globalAlpha = .5; g.fillStyle = '#7d6643'; for (let i = 0; i < 14; i++) { g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 8 + rnd() * 26, 6 + rnd() * 18, rnd() * 3, 0, TAU); g.fill(); } g.globalAlpha = 1; });
+incoltoTex.repeat.set(1.5, 1.5);
+Object.assign(MAT, { incolto: flatMat({ map: incoltoTex }), incoltoS: new THREE.MeshLambertMaterial({ map: incoltoTex }) });
 Object.assign(MAT, { aattS: new THREE.MeshLambertMaterial({ color: 0xb9b5ac }), aatt: flatMat({ color: 0xb9b5ac }), grassS: new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }), pavedS: new THREE.MeshLambertMaterial({ vertexColors: true, map: asphaltTex }), waterS: new THREE.MeshLambertMaterial({ color: 0x45738c }),
   piazzaS: new THREE.MeshLambertMaterial({ map: porfidoTex }), cortileS: new THREE.MeshLambertMaterial({ color: CORTILE_COL }), footS: new THREE.MeshLambertMaterial({ color: 0xc8b89c }), asphS: new THREE.MeshLambertMaterial({ map: asphaltTex }) });
 // the rail bed of the DBGT (SD_FER, tiles[t].sf): the gravel of the ballast without the sleepers, which each track draws over it
@@ -938,7 +943,8 @@ function cellOwners(T, F) {
   const cover = (o, k, rank, st, street) => { if (o.length < 3) return; H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && underFree(w))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
-    if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
+    if (a.t === 18) cover(outer, holes, 1, S('i', MAT.incoltoS, 12)); // incolti (DBGT PS_INC 04): dry grass and bare earth
+    else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
     else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
     else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
@@ -1007,13 +1013,14 @@ function* buildTileGen(T) {
   yield 'landuse';
   // land use
   {
-    const gB = VBuf(), pB = VBuf(), yB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
-    gB.rk = 1; pB.rk = 1.1; yB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
+    const gB = VBuf(), iB = VBuf(), pB = VBuf(), yB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
+    gB.rk = 1; iB.rk = 1; pB.rk = 1.1; yB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
     for (const a of d.a || []) {
       const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5) continue; // platforms are built raised, with their furniture
       if (T.fine && waterInBed(a, outer, holes, T)) continue; // water inside the bed: the water level below draws it
       try {
-        if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
+        if (a.t === 18) polyFill(iB, outer, holes, 0.02 * fy, 12);
+        else if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
         else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
@@ -1022,7 +1029,7 @@ function* buildTileGen(T) {
     }
     const cB = FBuf(); cB.rk = 1.2; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 10); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): their own paving, no traffic
     const sB = FBuf(); sB.rk = 1.3; for (const q of d.sf || []) { try { polyFill(sB, dec(q.p), q.k.map(dec), 0.03 * fy, 3); } catch (e) { } } // the rail bed (DBGT SD_FER)
-    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {
