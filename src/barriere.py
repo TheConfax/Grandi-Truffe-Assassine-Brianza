@@ -70,7 +70,9 @@ def sul_confine(L, Z, margin=0.2, fermi=None):
     seg = np.hypot(*np.diff(pts, axis=0).T); moved = float(seg[sh[1:] | sh[:-1]].sum())
     if moved: k = int(dsp.argmax()); SPOSTAMENTI.append((float(dsp[k]), float(pts[k, 0]), float(pts[k, 1])))
     d = np.hypot(*np.diff(new, axis=0).T)
-    cut = np.nonzero(d > JUMP)[0]
+    # a moved stretch whose middle falls back in the zone cuts across it (the tip of a narrow strip of carriageway): opened there too
+    mid = (new[:-1] + new[1:]) / 2; back = shapely.contains_xy(Z, mid[:, 0], mid[:, 1]) & (ins[:-1] | ins[1:])
+    cut = np.nonzero((d > JUMP) | back)[0]
     out = []
     for a, b in zip(np.r_[0, cut + 1], np.r_[cut + 1, len(new)]):
         run = new[a:b]
