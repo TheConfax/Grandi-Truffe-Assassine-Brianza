@@ -42,6 +42,8 @@ Il mondo intero dal DBGT: forma e quota di tutto ciò che si vede (terreno, stra
 - [ ] Edifici fotorealistici in serie, dopo: tipi brianzoli fatti con parametri, attributi di ogni edificio dalle foto di Mapillary, colori dei tetti dall'ortofoto, i pezzi forti rifatti a mano dagli screenshot di Carlo (idee del 24/10)
 - [ ] Alla fine di tutto, dopo la mappa estesa: **più attività** (Carlo, 26/10). OSM ha i negozi e i bar più in vista, ma non studi professionali, uffici e piccole aziende (esempi cercati: Gimar, Studio legale Fossati, assenti). Fonte possibile: le attività di Overture Maps (nome e indirizzo), da vedere se ne aggiungono abbastanza
 
+- [x] Polizia Locale di Meda e caserme (25/10, ramo `polizia-locale`): volanti solo su suolo duro (non sul prato), recinzione aperta davanti alla porta di ogni stazione di polizia. Aperto: 420 cortili/parcheggi del DBGT sembrano sbarrati da ogni lato verso la strada (lettura grezza); il DBGT non dà l'accesso, da guardare con le foto. Dettagli in `docs/motore.md`, ultima sezione.
+
 ## Priorità: parcheggi veri da OSM
 Prima di tutto il resto: vedi la sezione **Parcheggi** in fondo. I dati sono già in `data/osm/maplarge.osm`, non serve aspettare Overpass.
 

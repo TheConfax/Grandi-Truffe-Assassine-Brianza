@@ -6,7 +6,7 @@ EL_DIV_TY (Specifiche di contenuto regionali, p. 173): 02 cancellata, 04 filo sp
 almost all their fences under 18, Meda its garden borders and the rim of a fountain), so for those the place decides."""
 import numpy as np
 import shapely
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 
 KIND_H = {1: 2.0, 2: 1.5, 3: 1.7, 4: 1.2, 5: 1.8, 6: 2.0, 7: 1.2}
 SPECIFIC = {'02': 2, '04': 5, '13': 5, '19': 3}
@@ -95,3 +95,38 @@ def passaggi(L, vie):
         if x.is_empty: continue
         out.append(x.buffer(min(PASSO, max(0.8, w / 2)), quad_segs=3))
     return out
+
+
+# ---- the way in to a building of the public (police station): the door looks onto the street, so the barrier between them opens there
+# (Carlo, 27/10: the Polizia Locale of Meda stood behind a fence with no way in). The front is picked as the game picks it (world3.js, CASERME):
+# a long wall with nothing between it and a street (class up to 5), the nearest street and the longest wall winning
+FRONT_MAX = 45.0   # how far from the wall the street may be
+FRONT_W = 2.0      # half the width of the opening: the door and its canopy are 3.6 m wide
+
+
+def facciata_su_strada(B, altri, strade):
+    """B: the building polygon; altri: the other buildings (shapely, near B); strade: [(LineString, width)] of the streets at grade, class
+    up to 5. Returns (a, c, mx, mz, nx, nz, t): the front wall's ends, its middle, the outward normal and the distance to the street's
+    edge, or None when no wall looks onto a street"""
+    ring = list(B.exterior.coords)[:-1]; best = None
+    for i in range(len(ring)):
+        a, c = ring[i], ring[(i + 1) % len(ring)]; L = ((c[0] - a[0]) ** 2 + (c[1] - a[1]) ** 2) ** 0.5
+        if L < 5: continue
+        mx, mz = (a[0] + c[0]) / 2, (a[1] + c[1]) / 2; nx, nz = (c[1] - a[1]) / L, -(c[0] - a[0]) / L
+        if B.contains(Point(mx + nx * 0.3, mz + nz * 0.3)): nx, nz = -nx, -nz
+        if B.contains(Point(mx + nx * 0.3, mz + nz * 0.3)): continue
+        road = None; t = 1.0
+        while t <= FRONT_MAX and road is None:
+            p = Point(mx + nx * t, mz + nz * t)
+            if t > 1.5 and any(o.contains(p) for o in altri): break
+            if any(l.distance(p) < w / 2 for l, w in strade): road = t
+            t += 0.75
+        score = (road if road else 80) - min(L, 24) * 0.5
+        if best is None or score < best[0]: best = (score, a, c, mx, mz, nx, nz, road)
+    if best is None or best[7] is None: return None
+    return best[1:]
+
+
+def apertura_ingresso(mx, mz, nx, nz, t):
+    """the opening in the barriers: from the door out to the edge of the street"""
+    return LineString([(mx + nx * 0.2, mz + nz * 0.2), (mx + nx * max(0.5, t - 0.3), mz + nz * max(0.5, t - 0.3))]).buffer(FRONT_W, cap_style=2)
