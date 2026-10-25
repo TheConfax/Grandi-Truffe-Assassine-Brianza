@@ -1,0 +1,218 @@
+{
+ "assi": {
+  "passaggi_a_livello_osm_sugli_assi": 7,
+  "vie_osm_abbinate": 29,
+  "nodi_spostati": 210,
+  "nodi_su_giunzione_el_fer": 0,
+  "nodi_nuovi_lungo_gli_assi": 305,
+  "spostamento_nodi_m": {
+   "p50": 0.22,
+   "p90": 0.51,
+   "p99": 0.67,
+   "max": 0.74,
+   "n": 210
+  },
+  "binari_solo_dbgt": {
+   "n": 2,
+   "metri": 349
+  },
+  "scarto_dagli_assi_el_fer_m": {
+   "prima": {
+    "p50": 0.3,
+    "p90": 0.51,
+    "p99": 0.67,
+    "max": 0.83,
+    "n": 8866
+   },
+   "dopo": {
+    "p50": 0.0,
+    "p90": 0.01,
+    "p99": 0.03,
+    "max": 0.03,
+    "n": 8866
+   },
+   "nota": "binari OSM disegnati, ogni 1 m dentro il comune, dal piu vicino asse EL_FER"
+  },
+  "scambi": {
+   "giunzioni_el_fer_con_3_o_piu_elementi": 6,
+   "gz_fer": 8
+  },
+  "binari_paralleli_ogni_25_m": {
+   "1": 91,
+   "2": 279,
+   "3": 11
+  },
+  "tempo_s": 0.8
+ },
+ "banchine": {
+  "tagliate": 2,
+  "m2_tolti": 49.2,
+  "distanza_dal_mezzo_del_binario_m": 1.65
+ },
+ "corridoio": {
+  "sd_fer_allargata_m2": 35492,
+  "corridoio_nel_comune_m2": 44997
+ },
+ "recinzioni_tagliate_sulle_carreggiate": 12,
+ "recinzioni_tolte_vicino_ai_ponti": 8,
+ "aperti_sui_binari": {
+  "recinzioni_ferrovia": {
+   "n": 7,
+   "metri": 82.5
+  },
+  "muri_e_recinzioni": {
+   "n": 2,
+   "metri": 5.0
+  }
+ },
+ "lontano_dai_binari": {
+  "recinzioni": {
+   "n": 8,
+   "metri": 666.1,
+   "distanza_m": 1.6
+  },
+  "muri_e_divisori": {
+   "n": 6,
+   "metri": 122.8,
+   "distanza_m": 1.6
+  }
+ },
+ "confini": {
+  "pezzi_lim_com": 13,
+  "metri_lim_com": 1461,
+  "pezzi_usati": 4,
+  "metri_usati": 31,
+  "scarto_da_osm_m": {
+   "p50": 0.02,
+   "p90": 0.66,
+   "p99": 0.98,
+   "max": 1.02,
+   "n": 15
+  },
+  "pezzi": [
+   {
+    "comune": "Meda",
+    "metri": 5,
+    "dal_bordo_del_dbgt_max_m": 0.1
+   },
+   {
+    "comune": "Meda",
+    "metri": 8,
+    "dal_bordo_del_dbgt_max_m": 0.1
+   },
+   {
+    "comune": "Meda",
+    "metri": 214,
+    "dal_bordo_del_dbgt_max_m": 15.7
+   },
+   {
+    "comune": "Meda",
+    "metri": 240,
+    "dal_bordo_del_dbgt_max_m": 10.7
+   },
+   {
+    "comune": "Meda",
+    "metri": 15,
+    "dal_bordo_del_dbgt_max_m": 1.0
+   },
+   {
+    "comune": "Meda",
+    "metri": 103,
+    "dal_bordo_del_dbgt_max_m": 16.5
+   },
+   {
+    "comune": "Meda",
+    "metri": 263,
+    "dal_bordo_del_dbgt_max_m": 21.6
+   },
+   {
+    "comune": "Meda",
+    "metri": 79,
+    "dal_bordo_del_dbgt_max_m": 8.4
+   },
+   {
+    "comune": "Meda",
+    "metri": 14,
+    "dal_bordo_del_dbgt_max_m": 3.6
+   },
+   {
+    "comune": "Meda",
+    "metri": 3,
+    "dal_bordo_del_dbgt_max_m": 0.7
+   },
+   {
+    "comune": "Meda",
+    "metri": 26,
+    "dal_bordo_del_dbgt_max_m": 4.1
+   },
+   {
+    "comune": "Meda",
+    "metri": 182,
+    "dal_bordo_del_dbgt_max_m": 28.8
+   },
+   {
+    "comune": "Meda",
+    "metri": 308,
+    "dal_bordo_del_dbgt_max_m": 28.3
+   }
+  ],
+  "regola": "un pezzo LIM_COM entra solo se sta entro 2 m dal bordo del DBGT (copertura_completa); altrimenti OSM (confini_comuni.json)"
+ },
+ "massicciata": {
+  "sd_fer_a_raso_m2": 24569,
+  "disegnata_m2": 36696,
+  "aggiunta_lungo_i_binari_m2": 13089
+ },
+ "controlli": {
+  "treni": [
+   {
+    "treno": 0,
+    "stazioni": [
+     "Seveso",
+     "Cabiate",
+     "Meda"
+    ],
+    "metri_nel_comune": 2634,
+    "banchine_m2": 0.0,
+    "banchine_dove": [],
+    "edifici_m2": 0.0,
+    "edifici_dove": [],
+    "carreggiate_m2": 0.3,
+    "carreggiate_dove": [
+     "?x=21&z=-267"
+    ]
+   },
+   {
+    "treno": 1,
+    "stazioni": [
+     "Camnago-Lentate"
+    ],
+    "metri_nel_comune": 2922,
+    "banchine_m2": 0.0,
+    "banchine_dove": [],
+    "edifici_m2": 0.0,
+    "edifici_dove": [],
+    "carreggiate_m2": 0.0,
+    "carreggiate_dove": []
+   }
+  ],
+  "passaggi_a_livello": {
+   "dbgt_ac_vei_0104": 6,
+   "osm_sugli_assi": 7,
+   "osm_dentro_un_area_dbgt": 7,
+   "elenco": [
+    "?x=668&z=-965",
+    "?x=848&z=-1401",
+    "?x=322&z=-478",
+    "?x=325&z=-475",
+    "?x=583&z=-764",
+    "?x=-144&z=-157",
+    "?x=37&z=-275"
+   ]
+  },
+  "cartelli_di_paese": {
+   "n": 16
+  },
+  "tempo_s": 6.2
+ }
+}

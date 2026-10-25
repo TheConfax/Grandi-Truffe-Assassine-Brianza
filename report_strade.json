@@ -471,7 +471,7 @@
    "vms": 48,
    "cic": 25
   },
-  "tempo_s": 1.9,
+  "tempo_s": 4.4,
   "anelli_osm": {
    "n": 3,
    "dove": [
@@ -485,7 +485,7 @@
    "differenza_dalla_larghezza_osm_m": {
     "p10": -1.75,
     "p50": 0.75,
-    "p90": 4.0
+    "p90": 4.02
    }
   }
  },
@@ -494,17 +494,32 @@
   "carreggiate_condivise": 91
  },
  "superfici": {
-  "osm_tenute_vie": 79,
+  "osm_tenute_vie": 78,
   "asfalto_m2": 860353,
-  "cortili_m2": 975020,
+  "cortili_m2": 1040177,
   "marciapiedi_m2": 62647,
   "piazze_m2": 44081,
   "vialetti_m2": 31976,
   "isole_m2": 15408,
-  "tempo_s": 28.4,
-  "cortili_nei_cantieri_m2": 14123
+  "tempo_s": 41.9,
+  "cortili_nei_cantieri_m2": 14143
  },
  "controlli": {
+  "oggetti_in_carreggiata": {
+   "n": 0,
+   "di": 374,
+   "dove": []
+  },
+  "lampioni_in_carreggiata": {
+   "n": 0,
+   "di": 91,
+   "dove": []
+  },
+  "alberi_in_carreggiata": {
+   "n": 0,
+   "di": 78089,
+   "dove": []
+  },
   "pali_dei_cartelli_in_carreggiata": {
    "n": 0,
    "di": 32,
@@ -516,29 +531,8 @@
    "dove": []
   },
   "edifici_su_carreggiata": {
-   "n": 361,
-   "dove": [
-    "?x=495&z=-728",
-    "?x=-614&z=-395",
-    "?x=1533&z=731",
-    "?x=770&z=-1588",
-    "?x=669&z=-1520",
-    "?x=720&z=-1504",
-    "?x=814&z=-1663",
-    "?x=-1051&z=-311",
-    "?x=417&z=-242",
-    "?x=92&z=-822",
-    "?x=26&z=-784",
-    "?x=112&z=-820",
-    "?x=-141&z=-866",
-    "?x=-156&z=-857",
-    "?x=-30&z=-745",
-    "?x=100&z=-809",
-    "?x=-128&z=-850",
-    "?x=1623&z=254",
-    "?x=1057&z=-9",
-    "?x=442&z=851"
-   ]
+   "n": 0,
+   "dove": []
   },
   "corsie_dentro_ac_vei": {
    "campioni": 48666,
@@ -549,7 +543,7 @@
     "strettoia": 552,
     "incrocio": 170
    },
-   "auto_fuori": 956,
+   "auto_fuori": 955,
    "nota_auto": "la linea della corsia a meno di 0,9 m (mezza auto) dal bordo o fuori",
    "margine_m": {
     "p1": -0.59,
@@ -591,31 +585,31 @@
   },
   "corsie_di_fronte": {
    "n": 113,
-   "campioni": 124687,
+   "campioni": 124649,
    "vie_diverse": 113,
    "stessa_via": 3490,
    "nota": "punti di corsia (1 m) con una corsia di verso opposto a meno di 1.8 m, lontano dagli incroci",
    "dove": [
-    "?x=1896&z=-643",
+    "?x=-293&z=-967",
     "?x=256&z=-1253",
-    "?x=530&z=-184",
-    "?x=863&z=55",
-    "?x=406&z=-414",
-    "?x=255&z=-1254",
-    "?x=267&z=450",
-    "?x=188&z=-1281",
-    "?x=407&z=-414",
-    "?x=253&z=-1255",
+    "?x=189&z=-1279",
     "?x=185&z=-1282",
-    "?x=407&z=-414",
-    "?x=250&z=-1257",
+    "?x=-293&z=-967",
+    "?x=187&z=-1281",
+    "?x=410&z=-411",
+    "?x=256&z=-1253",
     "?x=409&z=-412",
-    "?x=1331&z=659",
-    "?x=408&z=-413",
+    "?x=-292&z=-967",
+    "?x=254&z=-1255",
+    "?x=251&z=-1256",
     "?x=410&z=-412",
-    "?x=863&z=55",
-    "?x=248&z=-1258",
-    "?x=1332&z=658"
+    "?x=409&z=-412",
+    "?x=-289&z=-967",
+    "?x=405&z=-415",
+    "?x=-374&z=-262",
+    "?x=253&z=-1255",
+    "?x=1332&z=658",
+    "?x=1332&z=657"
    ]
   },
   "traffico_nei_cortili": {
@@ -623,18 +617,18 @@
    "metri": 36,
    "nota": "vie con traffico IA per 12 m o piu sopra un cortile AC_VEI 0307",
    "dove": [
-    "?x=398&z=-967",
+    "?x=397&z=-968",
     "?x=1425&z=-188"
    ]
   },
   "osm_senza_dbgt": {
-   "n": 79,
-   "metri": 6385,
+   "n": 78,
+   "metri": 6354,
    "per_classe": {
     "service": 27,
     "path": 13,
-    "steps": 6,
     "cycleway": 2,
+    "steps": 5,
     "footway": 24,
     "unclassified": 1,
     "track": 2,
@@ -666,11 +660,6 @@
      "classe": "service",
      "m": 15,
      "link": "?x=-111&z=-857"
-    },
-    {
-     "classe": "steps",
-     "m": 27,
-     "link": "?x=79&z=-777"
     },
     {
      "classe": "cycleway",
@@ -869,22 +858,22 @@
     },
     {
      "classe": "footway",
-     "m": 25,
-     "link": "?x=726&z=-31"
+     "m": 24,
+     "link": "?x=725&z=-30"
     },
     {
      "classe": "footway",
      "m": 20,
-     "link": "?x=733&z=-41"
+     "link": "?x=732&z=-40"
     },
     {
      "classe": "footway",
-     "m": 6,
+     "m": 5,
      "link": "?x=732&z=-45"
     },
     {
      "classe": "footway",
-     "m": 6,
+     "m": 5,
      "link": "?x=737&z=-41"
     },
     {
@@ -904,7 +893,7 @@
     },
     {
      "classe": "footway",
-     "m": 15,
+     "m": 14,
      "link": "?x=571&z=908"
     },
     {
@@ -941,6 +930,11 @@
      "classe": "service",
      "m": 28,
      "link": "?x=-625&z=104"
+    },
+    {
+     "classe": "service",
+     "m": 9,
+     "link": "?x=-643&z=100"
     }
    ]
   },
@@ -1264,7 +1258,7 @@
    "iou": 0.993
   },
   "asfalto_contro_ac_vei": {
-   "disegnato_m2": 855515,
+   "disegnato_m2": 855457,
    "dbgt_m2": 848777,
    "iou": 0.992
   },
@@ -1276,6 +1270,6 @@
   "attraversamenti": {
    "n": 497
   },
-  "tempo_s": 13.8
+  "tempo_s": 14.7
  }
 }

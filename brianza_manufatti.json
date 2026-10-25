@@ -1457,18 +1457,17 @@
  "edifici": {
   "aggiunti": {
    "serra": 36,
-   "cabina": 49,
+   "cabina": 55,
    "torre": 1
   },
   "osm_tolti_doppi": {
    "cabina (service)": 1,
-   "cabina (yes)": 14,
+   "cabina (yes)": 11,
    "serra (greenhouse)": 2,
    "cabina (garage)": 1
   },
   "dentro_edifici_osm_tenuti": {
-   "01 in yes": 4,
-   "01 in industrial": 3
+   "01 in yes": 1
   }
  },
  "parcheggi_dbgt_m2_sotto_parcheggi_osm_con_posti_propri": 1489,
@@ -1612,7 +1611,7 @@
   "torre_acqua_osm_oggetto_tolta": 1
  },
  "alberi": {
-  "dentro": 24615,
+  "dentro": 24645,
   "spostati_fuori_dai_manufatti": 0,
   "tolti_dentro_i_manufatti": 0,
   "altezza_tipica_se_il_dsm_non_vede": {
@@ -1620,27 +1619,27 @@
    "fuori": 8.4
   },
   "pixel_vicino_ai_fili_aperti_3x3": 93261,
-  "non_visti_sotto_le_linee_con_altezza_fuori_bosco": 97,
+  "non_visti_sotto_le_linee_con_altezza_fuori_bosco": 98,
   "chioma_su_altezza_tipica": 0.44,
   "tutti": {
-   "n": 24615,
-   "visti_dal_dsm": 21457,
+   "n": 24645,
+   "visti_dal_dsm": 21477,
    "h_p10_p50_p90": [
     4.22,
     11.67,
     21.67
    ],
    "chioma_p10_p50_p90": [
-    2.16,
-    5.12,
+    2.13,
+    5.11,
     8.5
    ]
   },
   "nei_boschi_dbgt": {
-   "n": 11118,
-   "visti_dal_dsm": 9973,
+   "n": 11126,
+   "visti_dal_dsm": 9979,
    "h_p10_p50_p90": [
-    7.01,
+    7.0,
     16.21,
     24.5
    ],
@@ -1651,12 +1650,12 @@
    ]
   },
   "fuori_dai_boschi": {
-   "n": 13497,
-   "visti_dal_dsm": 11484,
+   "n": 13519,
+   "visti_dal_dsm": 11498,
    "h_p10_p50_p90": [
-    3.59,
+    3.6,
     8.39,
-    15.92
+    15.91
    ],
    "chioma_p10_p50_p90": [
     2.0,
