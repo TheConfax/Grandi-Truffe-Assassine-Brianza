@@ -115,10 +115,10 @@ for (const T of TILES) {
       }
     }
   }
-  for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
+  for (const f of d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) T.fe.push(q); // fences follow the ground every 3 m (walls and collisions are built later)
   for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
-  for (const br of d.ba || []) {
-    const sp = BAR_PANEL[br.t], pts = resample(dec(br.p), sp ? sp.len : 4), rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
+  for (const br of d.ba || []) for (const pts of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) {
+    const sp = BAR_PANEL[br.t], rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2), s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
     if (sp || br.t === 3) barPieces(T, rec, segs);
   }
@@ -998,6 +998,13 @@ function buildPits(T, G) {
     { const L2 = hyp(rx - lx, rz - lz) || 1; WALLS.add(Math.min(lx, rx), Math.min(lz, rz), Math.max(lx, rx), Math.max(lz, rz), { ax: lx, az: lz, bx: rx, bz: rz, nx: (rz - lz) / L2, nz: -(rx - lx) / L2, two: true, y0: Math.min(ly, ry) - 3, y1: Math.max(dl, dr) + PIT_PAR, pit: p.id, porta: true }); }
     for (const [b, mt] of [[Wb, MAT.pitWall], [D, MAT.pitDoor]]) if (b.i.length) { const M = mkMesh(b, mt, 0, 'cast'); scene.remove(M); G.add(M); p.meshes.push(M); }
   }
+}
+// a fence or a wall of the data that runs inside a ramp (the DBGT draws the ramp's own walls, and the LiDAR outline is a little wider): cut
+// out, the ramp's walls and parapet stand there. The polyline in the runs of segments whose middle is out of every ramp
+function pitSplit(pts) {
+  if (!H.PITS.length) return [pts]; const out = []; let cur = [pts[0]];
+  for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k]; if (H.inPit((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, 0.15)) { if (cur.length > 1) out.push(cur); cur = [c]; } else cur.push(c); }
+  if (cur.length > 1) out.push(cur); return out;
 }
 const STY = {};
 function cellOwners(T, F) {

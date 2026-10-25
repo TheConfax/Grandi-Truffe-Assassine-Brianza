@@ -340,8 +340,9 @@ const H = (() => {
   const PITS = [], PG = new Grid(8), PCELL = new Map();
   for (const q of TERRENO ? TERRENO.pits : []) {
     if (q.tipo !== 'rampa') continue;
-    const tri = new Float64Array(q.tri.length); for (let i = 0; i < tri.length; i += 3) { tri[i] = q.tri[i]; tri[i + 1] = q.tri[i + 1]; tri[i + 2] = q.tri[i + 2] - B0; }
-    const o = { id: PITS.length, src: q, tri, imp: q.imp, sx: q.sx.map(([x, z, y]) => [x, z, y - B0]), dx: q.dx.map(([x, z, y]) => [x, z, y - B0]), anello: q.anello, porta_h: q.porta_h || 2.4, c: q.c, bb: [Math.min(...q.imp.map(v => v[0])), Math.min(...q.imp.map(v => v[1])), Math.max(...q.imp.map(v => v[0])), Math.max(...q.imp.map(v => v[1]))] };
+    const n = q.sx.length, tri = new Float64Array((n - 1) * 18), imp = q.sx.map(v => [v[0], v[1]]).concat(q.dx.slice().reverse().map(v => [v[0], v[1]])); // the strip between the two sides, as src/sottoterra.py
+    for (let k = 0, i = 0; k < n - 1; k++) for (const t of [[q.sx[k], q.sx[k + 1], q.dx[k + 1]], [q.sx[k], q.dx[k + 1], q.dx[k]]]) for (const v of t) { tri[i++] = v[0]; tri[i++] = v[1]; tri[i++] = v[2] - B0; }
+    const o = { id: PITS.length, src: q, tri, imp, sx: q.sx.map(([x, z, y]) => [x, z, y - B0]), dx: q.dx.map(([x, z, y]) => [x, z, y - B0]), anello: q.anello, porta_h: q.porta_h || 2.4, c: q.c, bb: [Math.min(...imp.map(v => v[0])), Math.min(...imp.map(v => v[1])), Math.max(...imp.map(v => v[0])), Math.max(...imp.map(v => v[1]))] };
     PITS.push(o);
     for (let i = 0; i < tri.length; i += 9) PG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i });
     for (const k in q.celle) { let l = PCELL.get(k); if (!l) PCELL.set(k, l = []); for (const w of q.celle[k]) l.push(w); }

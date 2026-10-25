@@ -398,7 +398,7 @@ class Sottoterra:
 
     # ----- the ramps as objects (terreno/indice.json pits), on the final S of the tiles (s.sup.HQ: the same cm the game reads)
     def fosse(s):
-        t0 = time.time(); sup = s.sup; R = sup.R; G = sup.HQ / 100.0
+        t0 = time.time(); sup = s.sup; R = s.R = sup.R; G = sup.HQ / 100.0
         import superficie as sf
         Sat = lambda x, z: sf.tri_interp(G, R, np.atleast_1d(np.asarray(x, float)), np.atleast_1d(np.asarray(z, float)))
         etree = shapely.STRtree(s.edifici); s.pits = []; s.rampe_scartate = []
@@ -418,6 +418,7 @@ class Sottoterra:
         k = max(2, len(d) // 5)
         if d[:k].mean() > d[-k:].mean(): P, d, w = P[::-1], d[::-1], w[::-1]   # from the shallow end down
         # along the centre line every 0.5 m, smoothed (the curve of the pit, not the 1 m pixel steps)
+        if p.get('pc') is not None and np.hypot(*(P[-1] - p['pc'])) < np.hypot(*(P[0] - p['pc'])): return 'il LiDAR scende verso il passo carraio, non verso l edificio'
         sv = np.concatenate(([0], np.cumsum(np.hypot(*np.diff(P, axis=0).T)))); L0 = sv[-1]
         if L0 < 4: return 'centro linea troppo corto'
         ns = int(np.ceil(L0 / 0.5)) + 1; st = np.linspace(0, L0, ns)
@@ -428,6 +429,7 @@ class Sottoterra:
         # the mouth goes on 1.5 m back along the line (the pit of the LiDAR starts 0.3 m deep), unless that is in a building
         def tang(a, b): v = C[b] - C[a]; return v / max(np.hypot(*v), 1e-9)
         dentro = lambda q: any(s.edifici[j].contains(Point(*q)) for j in etree.query(Point(*q)))
+        dentro_b = lambda q: any(s.edifici[j].distance(Point(*q)) < 0.2 for j in etree.query(Point(*q).buffer(0.2)))
         t0_ = tang(min(3, len(C) - 1), 0); ext = []
         for e in (0.5, 1.0, 1.5):
             q = C[0] + t0_ * e
@@ -437,8 +439,9 @@ class Sottoterra:
         # the end goes on to a facade within 1.5 m (the door on the wall of the building)
         t1_ = tang(max(0, len(C) - 4), len(C) - 1); add = []
         for e in np.arange(0.5, 1.51, 0.5):
-            q = C[-1] + t1_ * e; add.append(q)
+            q = C[-1] + t1_ * e
             if dentro(q): break
+            add.append(q)
         else: add = []
         if add: C = np.vstack((C, add)); W = np.concatenate((W, np.full(len(add), W[-1])))
         sv = np.concatenate(([0], np.cumsum(np.hypot(*np.diff(C, axis=0).T)))); L = sv[-1]
@@ -446,6 +449,20 @@ class Sottoterra:
         T = np.gradient(C, axis=0); T /= np.maximum(np.hypot(*T.T), 1e-9)[:, None]; N = np.column_stack((-T[:, 1], T[:, 0]))
         ang = np.unwrap(np.arctan2(T[:, 1], T[:, 0])); curv = np.abs(np.gradient(ang, sv))
         rad = 1 / np.maximum(ndimage.maximum_filter1d(curv, 7), 1e-6); W = np.minimum(W, 1.8 * rad)
+        # each side stops 0.2 m short of a building (the outline of the LiDAR pit, smoothed and widened, went into the walls)
+        facc = np.array([any(s.edifici[j].distance(Point(*q)) < 0.6 for j in etree.query(Point(*q).buffer(0.6))) for q in C])   # at the facade (the door): as it is
+        facc |= (sv > L - 3.0) | (sv < 2.0)   # ... and the mouth, where the walls are low
+        def lato(sg):
+            h = W / 2
+            for k in range(len(C)):
+                if facc[k]: continue
+                while h[k] > 1.0 and dentro_b(C[k] + sg * N[k] * h[k]): h[k] -= 0.25
+            return h
+        hl, hr = lato(1), lato(-1)
+        if getattr(s, 'dbg', False): p['_dbg'] = (C.copy(), hl.copy(), hr.copy(), facc.copy(), W.copy())
+        if min(hl[~facc].min() if (~facc).any() else 9, hr[~facc].min() if (~facc).any() else 9) < 1.0 or (hl + hr)[~facc].min() < 2.4: return 'stretta fra gli edifici'
+        hl, hr = ndimage.minimum_filter1d(hl, 3), ndimage.minimum_filter1d(hr, 3)
+        W = hl + hr; C = C + N * ((hl - hr) / 2)[:, None]
         if W.min() < 2.5: return 'curva troppo stretta per la larghezza'
         # the floor: the DTM of the open pit by the nearest station, monotone down (isotonic), from the ground at the mouth, at most PEND_MAX
         op = p['_op']; rr, cc = np.nonzero(op); px, pz = M.xz(rr + r0, cc + c0); zz = M.dtm[rr + r0, cc + c0].astype(float)
@@ -469,7 +486,7 @@ class Sottoterra:
         gend = float(Sat(*C[-1])[0]); prof = gend - f[-1]
         if prof < 1.2: return 'in fondo e profonda solo %.1f m' % prof
         # cells of S the ramp takes (any 2 m cell its outline touches) and the ground of those cells outside it, cut on the cell triangles
-        sf_ = sys.modules['superficie']; TS_ = sf_.TILE; st = R.st; nct = int(TS_ / st)
+        sf_ = sys.modules["superficie"]; R = s.R; TS_ = sf_.TILE; st = R.st; nct = int(TS_ / st)
         bx0, bz0, bx1, bz1 = poly.bounds; i0, i1 = int(np.floor((bx0 + sf_.HW) / st)), int(np.floor((bx1 + sf_.HW) / st)); j0, j1 = int(np.floor((bz0 + sf_.HH) / st)), int(np.floor((bz1 + sf_.HH) / st))
         celle, anello = {}, []; shapely.prepare(poly)
         for J in range(j0, j1 + 1):
@@ -486,14 +503,10 @@ class Sottoterra:
                         if t.area < 1e-6 or not rest.buffer(1e-6).contains(t.centroid): continue
                         flat += [round(float(v), 3) for v in cxy.ravel()]
                 if flat: anello.append([key, int(wloc), flat])
-        tri = []
-        for q in range(len(C) - 1):
-            a, b, c, d_ = (Lft[q], yl[q]), (Lft[q + 1], yl[q + 1]), (Rgt[q + 1], yr[q + 1]), (Rgt[q], yr[q])
-            for A, B, Cc in ((a, b, c), (a, c, d_)): tri += [round(float(v), 3) for v in (A[0][0], A[0][1], A[1], B[0][0], B[0][1], B[1], Cc[0][0], Cc[0][1], Cc[1])]
         v = p.get('vista') or {}
         r3 = lambda A, y: [[round(float(x), 3), round(float(z), 3), round(float(h), 3)] for (x, z), h in zip(A, y)]
         return dict(tipo='rampa', c=[round(float(C[len(C) // 2][0]), 1), round(float(C[len(C) // 2][1]), 1)], fonti=p['fonti'], nota=v.get('nota', ''),
-                    imp=[[round(float(x), 3), round(float(z), 3)] for x, z in np.asarray(poly.exterior.coords)[:-1]], tri=tri, sx=r3(Lft, yl), dx=r3(Rgt, yr),
+                    sx=r3(Lft, yl), dx=r3(Rgt, yr),   # the game rebuilds the outline (sx, then dx backwards) and the floor (the strip between them)
                     lung=round(float(L), 1), larg=[round(float(W.min()), 1), round(float(W.max()), 1)], prof=round(prof, 2), bocca=round(g0, 2), fondo=round(float(f[-1]), 2),
                     pc=p.get('pc'), pc_m=p.get('pc_m'), celle=celle, anello=anello, porta_h=PORTA_H)
 
