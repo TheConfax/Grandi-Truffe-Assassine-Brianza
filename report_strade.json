@@ -493,6 +493,31 @@
   "vie": 479,
   "carreggiate_condivise": 91
  },
+ "righe": {
+  "strade": 604,
+  "strade_con_righe": 491,
+  "carreggiate": 451,
+  "righe": 1193,
+  "km": 90.1,
+  "per_tipo": {
+   "tratteggio": 606,
+   "bordo": 573,
+   "mezzeria": 14
+  },
+  "su_ponte": 33,
+  "pieghe_oltre_15": 27,
+  "pieghe_oltre_5": 1263,
+  "piega_max": 23.0,
+  "pieghe_oltre_15_strade": 0,
+  "piega_max_strade": 10.0,
+  "bordi_delle_rotatorie": 85,
+  "punti_doppi_tolti": 101,
+  "punti_fuori_tolti": 82,
+  "campioni_fuori_carreggiata": 1,
+  "campioni": 181429,
+  "sezioni": 81328,
+  "sezioni_disegnate": 71309
+ },
  "superfici": {
   "osm_tenute_vie": 78,
   "asfalto_m2": 860353,
@@ -501,7 +526,7 @@
   "piazze_m2": 44081,
   "vialetti_m2": 31976,
   "isole_m2": 15408,
-  "tempo_s": 34.6,
+  "tempo_s": 25.4,
   "cortili_nei_cantieri_m2": 14143
  },
  "muri_sul_confine": {
@@ -1282,6 +1307,6 @@
   "attraversamenti": {
    "n": 497
   },
-  "tempo_s": 17.8
+  "tempo_s": 3.5
  }
 }
