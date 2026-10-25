@@ -10,13 +10,13 @@ from shapely.geometry import Polygon, LineString, box
 from pyproj import Transformer
 from scipy import ndimage, sparse
 import scipy.sparse.linalg
-from concurrent.futures import ThreadPoolExecutor
 from scipy.spatial import cKDTree
 from scipy.interpolate import LinearNDInterpolator
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import dbgt_quote as dq
+from presto import in_parallelo   # the TINs on all the cores (src/presto.py)
 from dbgt_quote import DATA, KX, KZ, LAT0, LON0, FT_RAW, FT_NONE
 
 # map frame, as src/build.py and the game: tile i,j has its corner at (-META.hw + i*TILE, -META.hh + j*TILE)
@@ -158,14 +158,6 @@ class Tin:  # Delaunay of the points (dense rings: almost the constrained one), 
         bad = np.isnan(h)
         if bad.any(): h[bad] = s.z[s.kd.query(np.column_stack((x[bad], z[bad])))[1]]
         return h
-
-
-def in_parallelo(fn, items):
-    """[fn(x) for x in items] on threads, in order. Only for work that releases the GIL (qhull, GEOS) and has no side effects: each item is
-    computed exactly as in the loop, only at the same time as the others"""
-    items = list(items)
-    if len(items) < 2: return [fn(x) for x in items]
-    with ThreadPoolExecutor(min(16, os.cpu_count() or 4)) as ex: return list(ex.map(fn, items))
 
 
 def tin_di(L, i, ok_fn, extra=None):

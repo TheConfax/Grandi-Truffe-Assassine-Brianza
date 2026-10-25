@@ -156,13 +156,15 @@ class Verde:
             'siepi', len(self.hedge), 'copertura', self.rep['copertura'], '%.0fs' % (time.time() - t0))
 
     # ---------------------------------------------------------------- areas and land
-    def aree(self, area_geoms, land):
-        """area_geoms [(type, geom)], land [(kind, pts)] of build_data.py -> the same lists with the DBGT green inside the cover."""
+    def aree(self, area_geoms, land, cons=None):
+        """area_geoms [(type, geom)], land [(kind, pts)] of build_data.py -> the same lists with the DBGT green inside the cover. cons: the
+        building sites below, already computed (build_data.py starts that union on a thread)"""
         cv, free = self.cover, self.free
         if cv.is_empty: return area_geoms, land
         # an OSM building site (landuse=construction) is newer than the survey (Meda 2015): no DBGT green or trees inside it. The site by the
         # Milano-Meda at x 100 z 140 with its crane was lawns and a wood in the DBGT, cut out of the dark soil it looked like a patchwork
-        cons = unary_union([g.intersection(cv) for at, g in area_geoms if at == 7 and g.intersects(cv)]); self.cons = cons; prepare(cons)
+        if cons is None: cons = unary_union([g.intersection(cv) for at, g in area_geoms if at == 7 and g.intersects(cv)])
+        self.cons = cons; prepare(cons)
         if not cons.is_empty:
             ncut = Counter()
             def nocons(L, key):

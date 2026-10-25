@@ -32,6 +32,7 @@ from pyproj import Transformer
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import dbgt_quote as dq
+from presto import in_parallelo   # (src/presto.py)
 
 FREE_D = 3.0       # an OSM building with no DBGT building within this distance stays (docs/motore.md 7)
 FAR_MIN, FAR_SH = 30.0, 0.25   # ... and one whose part farther than FREE_D from every DBGT building is this big (m2, share of it) is not the
@@ -284,20 +285,23 @@ class Edifici:
         self.carr_t = STRtree(self.carr) if self.carr else None
         # heights: the base rings of the ground volumes against the LiDAR on the same ring give the comune's offset (DBGT - DTM)
         self.lid = dq.Lidar(self.lidar_dir)
+        # the LiDAR on the base ring of every volume, in one call (point by point the same bilinear: one call per volume was 15 s)
+        rings = [np.asarray(v['p'].exterior.coords) for v in self.vol]; ro = np.cumsum([0] + [len(r) for r in rings])
+        rg = self.lid.at(np.concatenate([r[:, 0] for r in rings]), np.concatenate([r[:, 1] for r in rings])) if rings else np.zeros(0)
         dz = []
-        for v in self.vol:
+        for k, v in enumerate(self.vol):
             if v['por'] != '01' or v['zmin'] is None: continue
-            r = np.asarray(v['p'].exterior.coords); g = self.lid.at(r[:, 0], r[:, 1])
+            g = rg[ro[k]:ro[k + 1]]
             if np.isfinite(g).sum() >= 3: v['gmed'] = float(np.nanmedian(g)); dz.append(v['zmin'] - v['gmed'])
         dz = np.asarray(dz); self.off = float(np.median(dz)) if len(dz) else 0.0
         self.rep['offset_dbgt_lidar'] = dict(valore=round(self.off, 3), p10=round(float(np.percentile(dz, 10)), 2) if len(dz) else None, p90=round(float(np.percentile(dz, 90)), 2) if len(dz) else None, n=int(len(dz)))
-        for v in self.vol:
+        for k, v in enumerate(self.vol):
             if v['zmin'] is None:  # no height on the ring: the LiDAR under it
-                r = np.asarray(v['p'].exterior.coords); g = self.lid.at(r[:, 0], r[:, 1]); v['zmin'] = float(np.nanmedian(g)) + self.off if np.isfinite(g).any() else None
+                g = rg[ro[k]:ro[k + 1]]; v['zmin'] = float(np.nanmedian(g)) + self.off if np.isfinite(g).any() else None
             v['z0'] = None if v['zmin'] is None else v['zmin'] - self.off      # base, m a.s.l. on the LiDAR
             if v['z0'] is not None and v['por'] in ('02', '03', '04', '05', '06', '07', '09'):
                 if 'gmed' not in v:
-                    r = np.asarray(v['p'].exterior.coords); g = self.lid.at(r[:, 0], r[:, 1]); v['gmed'] = float(np.nanmedian(g)) if np.isfinite(g).any() else v['z0']
+                    g = rg[ro[k]:ro[k + 1]]; v['gmed'] = float(np.nanmedian(g)) if np.isfinite(g).any() else v['z0']
                 v['alto'] = v['z0'] - v['gmed'] > RAISED
         self.rep['edifici_dbgt'] = len(self.ed); self.rep['volumi'] = len(self.vol); self.rep['accessi'] = len(self.acc)
         log('dbgt edifici: edifici', len(self.ed), 'volumi', len(self.vol), 'accessi', len(self.acc), 'offset %+.2f m' % self.off, '%.0fs' % (time.time() - t0))
@@ -544,13 +548,14 @@ class Edifici:
         res = self._dsm([job(k, r, r['p']) for k, r in enumerate(recs) if r['bt'] not in ('roof',) and r.get('st') != 1])
         # the wings of the irregular volumes, in a second round
         wings, wj = {}, []
-        for k, r in enumerate(recs):
-            f = res.get(k)
-            if not f or f.get('m') != 'irregolare' or r.get('k') or r.get('st'): continue
+        def ali_di(k):  # the wings of volume k (None when it is not irregular): on all the cores (src/presto.py), used in order below
+            r = recs[k]; f = res.get(k)
+            if not f or f.get('m') != 'irregolare' or r.get('k') or r.get('st'): return None
             p = Polygon(r['p']).buffer(0)
-            if p.geom_type != 'Polygon': continue
-            ps = ali(p)
-            if len(ps) < 2: continue
+            return ali(p) if p.geom_type == 'Polygon' else None
+        for k, ps in enumerate(in_parallelo(ali_di, range(len(recs)))):
+            if ps is None or len(ps) < 2: continue
+            r = recs[k]
             wings[k] = ps
             for n, q in enumerate(ps): wj.append(job((k, n), r, np.asarray(q.exterior.coords)[:-1]))
         wres = self._dsm(wj)
