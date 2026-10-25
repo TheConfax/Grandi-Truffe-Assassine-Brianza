@@ -1,6 +1,6 @@
 # Regole per Claude
 
-- **Ramo `motore`**: qui si rifà il fondo del motore (un modello unico del mondo: terreno, strade, ponti, acqua). Si prova solo in locale, non va su GitHub Pages. Se sei su questo ramo committa e pusha qui, non su `main`; il piano e dove siamo sono in `todo.md`, sezione "Motore nuovo".
+- **Motore nuovo**: dal 25/10/2026 è in `main` e si lavora lì. Il ramo `motore` non si usa più. Il piano e dove siamo sono in `todo.md`, sezione "Motore nuovo".
 - **Fotorealismo**: il ramo `fotorealismo` è entrato in `main` il 23/10/2026 e non si usa più. La grafica realistica si continua su `main`; le note sono in `todo.md`, sezione "Fotorealismo".
 
 - Sei autorizzato a fare commit e push direttamente su `main`, senza chiedere. Niente rami a parte, niente richieste di conferma.
