@@ -601,6 +601,11 @@ class Strade:
         s.cortili = [g for g, a in base if a['zon'] in CORTILE]
         s.carr = [g for g, a in D['vei'] if a['zon'] not in NON_CARR]      # bridges too: nothing stands in a carriageway
         s.tronco = [g for g, a in D['vei'] if a['zon'] in TRONCO]
+        # for the dividers (build_data.py, barriere.sul_confine): the streets at grade (01 carriageway, 02 junctions and roundabouts) are the
+        # zone a wall moves out of onto the edge; a lay-by, a parking lane or a shoulder (04-08, 95) is the other side of that edge, as a yard
+        # is; on a bridge (SED 02) a wall at ground level cannot stand and the deck has its own parapets
+        s.strade_raso = [g for g, a in D['vei'] if a['zon'][:2] in ('01', '02') and a.get('sed') in ('01', None)]
+        s.carr_ponti = [g for g, a in D['vei'] if a.get('sed') not in ('01', None) and a['zon'] not in NON_CARR]
         ped = [(g, a) for g, a in D['ped'] if a.get('sed') in ('01', None)]
         s.marciapiedi = [g for g, a in ped if a['zon'] in PED_STEP]
         s.piazze = [g for g, a in ped if a['zon'] in PED_PIAZZA or a['zon'] not in PED_STEP + PED_VIALE]
@@ -616,9 +621,8 @@ class Strade:
         s.T_carr = STRtree(s.carr)
         bb = cover.bounds; bb = (bb[0] - 40, bb[1] - 40, bb[2] + 40, bb[3] + 40)
         s.R = Raster(bb); s.CV = s.R.draw(s.carr); s.TR = s.R.draw(s.tronco)
-        # the unions of the DBGT layers alone used further on (superfici, carreggiate(-0.3), controlli), on threads from now: nothing changes them
-        s._pronte = dict(tutto3=presto(lambda: _u([g.buffer(3.0, quad_segs=2) for g in s.tutto])), tutto=presto(_u, s.tutto),
-                         carr_m03=presto(s._carreggiate_meno, -0.3), inner=presto(s.U_carr.buffer, -0.3), isole=presto(_u, s.isole), cortili=presto(_u, s.cortili),
+        # the unions of the DBGT layers alone used further on (superfici), on threads from now: nothing changes them
+        s._pronte = dict(tutto3=presto(lambda: _u([g.buffer(3.0, quad_segs=2) for g in s.tutto])), tutto=presto(_u, s.tutto), isole=presto(_u, s.isole), cortili=presto(_u, s.cortili),
                          aree_m2=presto(lambda: [round(_u(g).area) for g in (s.asfalto, s.marciapiedi, s.piazze, s.vialetti)]))
         log('dbgt strade: strati letti in %.0f s, assi %d, carreggiate %d, cortili %d, marciapiedi %d, piazze e passaggi %d, vialetti ciclabili e sterrati %d, isole %d' % (
             time.time() - t0, len(D['str']), len(s.asfalto), len(s.cortili), len(s.marciapiedi), len(s.piazze), len(s.vialetti), len(s.isole)))
@@ -872,19 +876,33 @@ class Strade:
         s.rep['corsie_locali'] = dict(vie=nl, carreggiate_condivise=nsh)
         s.log('dbgt strade: corsie IA dalla carreggiata, vie %d (carreggiata condivisa con un altra via %d)' % (nl, nsh))
 
-    def carreggiate(s, buf=0.0):
+    def carreggiate(s, buf=0.0, strade=False):
         """the carriageway pieces inside the comuni (buffered): nothing stands or is built in them. Shrunk, the union is shrunk (shrinking
-        each piece left a strip along the edges between two pieces where a wall crossing the street survived)"""
-        if buf < 0:
-            f = getattr(s, '_pronte', {}).pop('carr_m03', None) if buf == -0.3 else None   # started at the reading of the layers
-            return f.result() if f is not None else s._carreggiate_meno(buf)
-        return [g.buffer(buf, join_style=2) if buf else g for g in s.carr]
+        each piece left a strip along the edges between two pieces where a wall crossing the street survived). strade: only the streets at
+        grade (strade_raso), the zone the dividers move out of"""
+        if strade:
+            if not hasattr(s, 'U_raso'): s.U_raso = _u(s.strade_raso)
+            if not buf: return list(s.strade_raso)
+        if buf < 0:  # cut in 50 m squares: united the network is one polygon as big as the town, and cutting a wall against it is slow
+            U = (s.U_raso if strade else s.U_carr).buffer(buf, join_style=2); x0, z0, x1, z1 = U.bounds; out = []
+            sq = [box(x, z, x + 50, z + 50) for x in np.arange(x0, x1, 50) for z in np.arange(z0, z1, 50)]
+            for b, g in zip(sq, shapely.intersection(U, np.array(sq, dtype=object))): out += [p for p in _parts(g) if p.area > 0.5]
+            return out
+        return [g.buffer(buf, join_style=2) if buf else g for g in (s.strade_raso if strade else s.carr)]
 
-    def _carreggiate_meno(s, buf):  # cut in 50 m squares: united the network is one polygon as big as the town, and cutting a wall against it is slow
-        U = s.U_carr.buffer(buf, join_style=2); x0, z0, x1, z1 = U.bounds; out = []
-        sq = [box(x, z, x + 50, z + 50) for x in np.arange(x0, x1, 50) for z in np.arange(z0, z1, 50)]
-        for b, g in zip(sq, shapely.intersection(U, np.array(sq, dtype=object))): out += [p for p in _parts(g) if p.area > 0.5]
-        return out
+    def bordi_interni(s, buf=0.3):
+        """the edges two streets at grade share (strade_raso, as the DBGT cuts them), buffered: a divider standing on one is on the line
+        between two zones and stays there (a wall between a street and the service road beside it, x 1567 z −998 at Meda); where a street runs
+        through it, the way opens it (barriere.passaggi)"""
+        if not hasattr(s, '_bi'):
+            P = s.strade_raso; T = STRtree(P) if P else None; E = []
+            for i, g in enumerate(P):
+                for j in T.query(g.buffer(0.1)):
+                    if j <= i: continue
+                    x = g.boundary.intersection(P[j].buffer(0.05))
+                    if x.length > 1: E.append(x)
+            s._bi = _u([e.buffer(buf, cap_style=2) for e in E]); shapely.prepare(s._bi)
+        return s._bi
 
     # ---- 2. the surfaces
     def superfici(s, raw_roads, asph, pedz, side, foot, median, bunion):
@@ -1002,8 +1020,10 @@ class Strade:
             x, z, ux, uz, w = c[0] / 10, c[1] / 10, c[2], c[3], c[4]; rx, rz, off = -uz, ux, w / 2 + 1.2
             posts += [(x - ux * 3 + rx * off, z - uz * 3 + rz * off), (x + ux * 3 - rx * off, z + uz * 3 - rz * off)]
         m = dentro(posts); rep['pali_dei_cartelli_in_carreggiata'] = dict(n=int(m.sum()), di=len(posts), dove=elenco(posts, m))
-        # barriers: length inside the carriageway (deeper than 0.3 m)
-        f = getattr(s, '_pronte', {}).pop('inner', None); inner = f.result() if f is not None else s.U_carr.buffer(-0.3); shapely.prepare(inner); nb, lb, dove = 0, 0.0, []
+        # barriers: length inside a street at grade (deeper than 0.3 m). Not the lay-bys, parking lanes and shoulders (AC_VEI 04-08, 95): a
+        # wall moved out of the street stands on their edge (barriere.sul_confine), and on the edges two streets share (bordi_interni)
+        if not hasattr(s, 'U_raso'): s.U_raso = _u(s.strade_raso)
+        inner = s.U_raso.buffer(-0.3).difference(s.bordi_interni()); shapely.prepare(inner); nb, lb, dove = 0, 0.0, []
         for pts in barriere:
             if len(pts) < 2: continue
             L = LineString(pts)
@@ -1133,5 +1153,5 @@ class Strade:
 
     def sintesi(s):
         c = s.rep.get('controlli', {}); a = s.rep.get('assi', {})
-        return dict(vie_abbinate=a.get('vie_abbinate'), nodi_spostati=a.get('nodi_spostati'), spostamento_nodi_m=a.get('spostamento_nodi_m'),
+        return dict(vie_abbinate=a.get('vie_abbinate'), nodi_spostati=a.get('nodi_spostati'), spostamento_nodi_m=a.get('spostamento_nodi_m'), muri_sul_confine=s.rep.get('muri_sul_confine'),
                     **{k: {kk: vv for kk, vv in v.items() if kk not in ('dove', 'elenco')} for k, v in c.items() if isinstance(v, dict)})
