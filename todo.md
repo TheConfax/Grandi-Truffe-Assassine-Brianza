@@ -157,6 +157,12 @@ Le foto sono in Viaggiare in Brianza (guide di Meda e Seveso).
 - [ ] Pensiline delle banchine tutte uguali tra le stazioni; il sottopasso non si percorre
 - [ ] Parco Fusetti: aiuola e panchine generiche, da confrontare con una foto
 
+## Rotonde
+- [x] Aiuole nelle 10 rotonde di Meda con un'isola del DBGT, 5 modelli dalle foto (A 1, B 1, C 2, D 1, E 5): `docs/rotonde.md`, `src/rotonde.json`, `src/rotonde.py`, `src/rotonde3.js` (26/10)
+- [ ] Via Cadorna e largo Terragni: gli alberi della foto non sono nei dati; il cartello di legno "Meda" di via Cadorna non c'è
+- [ ] Piazzola di giro a x 1783 z −1049: prato e cordolo nella foto, ma il DBGT non ha l'isola; rotonda a x 1814 z 84 fuori dal DBGT di Meda
+- [ ] Il prato rialzato (12 cm), le mezzelune e i cespugli si disegnano ma non si calpestano: chi cammina sul prato ci affonda
+
 ## Idee per dopo
 - [ ] "Scopri la Brianza": cartello con nome e due righe di storia avvicinandosi a un monumento, icone sulla mappa grande, contatore dei monumenti scoperti salvato
 - [ ] Missioni legate ai luoghi veri (fiori al Santuario prima delle campane, consegna in Municipio)

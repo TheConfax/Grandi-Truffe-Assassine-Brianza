@@ -1663,6 +1663,9 @@ for t in range(ntx * ntz):
     bx = tbox(t)
     if not median.intersects(bx): continue
     for p_ in polys_of(median.intersection(bx), 0.2, 3): push(t, 'md', p_)
+import rotonde  # the aiuole of the roundabouts of Meda (src/rotonde.py, docs/rotonde.md): their islands filled, what stands on them in tiles[].ro
+ROT = rotonde.Rotonde(STR.isole, log) if STR else None
+if ROT: STR.md_dbgt = ROT.riempi(STR.md_dbgt); ROT.push_tiles(tid, polys_of, push, q)
 if STR: STR.togli_cortili(VERDE.cons, _cv_f.result()); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
 if RIGHE: dbgt_righe.push_tiles(RIGHE, ntx * ntz, tbox, push)  # the road markings (sg)
 if FER:  # the rail bed (sf)
@@ -1703,6 +1706,7 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'trains': [{'p': enc(t['pts']), 'st': t['st'], 'stn': t['stn'], 'h': [q(coordH[key(p_)]) if key(p_) in coordH else -32768 for p_ in t['pts']]} for t in trains],
        'pois': pois, 'ng': negozi, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index],
        'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0)]}
+if ROT: out.setdefault('report', {})['rotonde'] = ROT.rep
 if ED:  # the buildings of the DBGT: entrances, checks, report
     for x_, z_ in ED.acc:
         if inside((x_, z_), 0): push(tid(x_, z_), 'ai', [q(x_), q(z_)])
