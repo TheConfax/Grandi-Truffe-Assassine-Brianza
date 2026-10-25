@@ -10,6 +10,7 @@ from shapely.geometry import Polygon, LineString, box
 from pyproj import Transformer
 from scipy import ndimage, sparse
 import scipy.sparse.linalg
+from concurrent.futures import ThreadPoolExecutor
 from scipy.spatial import cKDTree
 from scipy.interpolate import LinearNDInterpolator
 
@@ -157,6 +158,14 @@ class Tin:  # Delaunay of the points (dense rings: almost the constrained one), 
         bad = np.isnan(h)
         if bad.any(): h[bad] = s.z[s.kd.query(np.column_stack((x[bad], z[bad])))[1]]
         return h
+
+
+def in_parallelo(fn, items):
+    """[fn(x) for x in items] on threads, in order. Only for work that releases the GIL (qhull, GEOS) and has no side effects: each item is
+    computed exactly as in the loop, only at the same time as the others"""
+    items = list(items)
+    if len(items) < 2: return [fn(x) for x in items]
+    with ThreadPoolExecutor(min(16, os.cpu_count() or 4)) as ex: return list(ex.map(fn, items))
 
 
 def tin_di(L, i, ok_fn, extra=None):
@@ -397,9 +406,11 @@ class Superficie:
         okz = lambda z, ft: ~np.isnan(z)
         # carriageways: own axes (blended), else an axis within 8 m (not for the inner areas ZON 0307), else the TIN of the vertices
         V = D['AC_VEI']; s.vei = {}; s.interne = []; nst = dict(asse=0, asse_vicino=0, tin=0, interne=0, scartati=0)
+        def poly_tin(i): tv = tin_di(V, i, okz); return poly(V, i), (Tin(*tv) if tv is not None else None)
+        ii = [i for i in range(len(V['off']) - 1) if sed_ok(V, i)]; pt = dict(zip(ii, in_parallelo(poly_tin, ii)))   # the TINs at the same time, used in order below
         for i in range(len(V['off']) - 1):
             if not sed_ok(V, i): continue
-            P = poly(V, i); tv = tin_di(V, i, okz); tin = Tin(*tv) if tv is not None else None
+            P, tin = pt.pop(i)
             js = AX.cand(P.buffer(AX_OWN)); how = 'asse'
             if len(js) and tin is not None:
                 mx, mz = (AX.A[js] + AX.B[js]).T / 2; js = js[np.abs((AX.za[js] + AX.zb[js]) / 2 - tin(mx, mz)) < LEVEL]
@@ -439,9 +450,10 @@ class Superficie:
             for n, k in enumerate(keys): rings[k][1] = zall[st[n]:st[n + 1]]
         else: s.kerb_dz = np.zeros(0); s.kerb_lontani = 0
         s.nkerb = int(len(pi))
+        kv = [k for k in rings if k[0] == 'AC_VEI']; tv = dict(zip(kv, in_parallelo(lambda k: Tin(*rings[k]), kv)))
         for (nm, i), (P_, Z_) in rings.items():
             if nm == 'AC_VEI':
-                r = s.vei[i]; r['tin'] = Tin(P_, Z_); s.burn(r['P'], R_VEI, C_VEIT, i, r['tin'])
+                r = s.vei[i]; r['tin'] = tv.pop((nm, i)); s.burn(r['P'], R_VEI, C_VEIT, i, r['tin'])
         # rail beds: like the carriageways, on their own EL_FER axes (smoothed the same way), else the TIN of the ring
         Sd, AXF = D['SD_FER'], s.AXF; s.ferro = {}
         for i in range(len(Sd['off']) - 1):
@@ -466,12 +478,14 @@ class Superficie:
         if ar and len(gxy):
             ii, jj = shapely.STRtree([poly(D['AR_STR'], i) for _, i in ar]).query(shapely.points(gxy), predicate='within')
             for a_, b_ in zip(ii, jj): gz_in.setdefault(ar[b_], []).append(a_)
+        def ped_tin(k):
+            P_, Z_ = rings[k]; sel = gz_in.get(k)
+            if sel: P_, Z_ = np.vstack((P_, gxy[sel])), np.concatenate((Z_, gzz[sel]))
+            return poly(D[k[0]], k[1]), Tin(P_, Z_)
         for nm, cls in (('AC_PED', C_PED), ('AC_CIC', C_PED), ('AR_STR', C_AREA)):
-            L = D[nm]
-            for k, (P_, Z_) in [(k, v) for k, v in rings.items() if k[0] == nm]:
-                sel = gz_in.get(k)
-                if sel: P_, Z_ = np.vstack((P_, gxy[sel])), np.concatenate((Z_, gzz[sel]))
-                s.burn(poly(L, k[1]), R_PED, cls, k[1], Tin(P_, Z_))
+            ks = [k for k in rings if k[0] == nm]
+            for k, (P_, T_) in zip(ks, in_parallelo(ped_tin, ks)):
+                s.burn(P_, R_PED, cls, k[1], T_)
         s.alveo()
         s.INT = np.zeros(s.RANK.shape, bool)
         for P in s.interne:
@@ -526,7 +540,7 @@ class Superficie:
             if not len(sel): return lambda x, z: np.full(len(x), np.nan)
             kd = cKDTree(pts[sel]); zs = zz[sel]
             def f(x, z):
-                d, j = kd.query(np.column_stack((x, z))); return np.where(d <= WMAX, zs[j], np.nan)
+                d, j = kd.query(np.column_stack((x, z)), workers=-1); return np.where(d <= WMAX, zs[j], np.nan)
             return f
         s.nalveo = 0; s.ZOLD = None; s.secco = 0; zwk = [zwn_for(k) for k in range(len(s.alvei))]
         def quota(P, edge, zwn, x, z):   # (water's edge, bed) at the points
@@ -1122,7 +1136,7 @@ def copertura_acqua(G, R, celle, serie, AU=None, wmax=12.0, sub=4):
     does (a cell joins when the water is over S at one of its corners, at most wmax out), the wet cells more than 1 m outside the bed."""
     pts = np.vstack([np.asarray(q['p'], float) for q in serie]); zz = np.concatenate([np.asarray(q['zw'], float) for q in serie]); kd = cKDTree(pts)
     def zw_at(x, z):
-        d, j = kd.query(np.column_stack((x, z))); return np.where(d <= wmax, zz[np.minimum(j, len(zz) - 1)], np.nan)
+        d, j = kd.query(np.column_stack((x, z)), workers=-1); return np.where(d <= wmax, zz[np.minimum(j, len(zz) - 1)], np.nan)   # every node of the lattice: on all the cores (the same answer point by point)
     rr, cc = np.nonzero(celle); u = (np.arange(sub) + 0.5) / sub; U, V = np.meshgrid(u, u)
     x = (R.x0 + (cc[:, None] + U.ravel()[None]) * R.st).ravel(); z = (R.z0 + (rr[:, None] + V.ravel()[None]) * R.st).ravel()
     wet = (zw_at(x, z) > tri_interp(G, R, x, z)).reshape(len(rr), -1).mean(1)
@@ -1137,7 +1151,7 @@ def copertura_acqua(G, R, celle, serie, AU=None, wmax=12.0, sub=4):
         cx, cz = R.x0 + (ec + 0.5) * R.st, R.z0 + (er + 0.5) * R.st
         far = shapely.distance(AU, shapely.points(cx, cz)) > 1.0
         out['celle_bagnate_oltre_1m_fuori_alveo'] = int(far.sum())
-        far &= kd.query(np.column_stack((cx, cz)))[0] > 3.0     # the water that goes on along the axis where the polygon has a gap is the river
+        far &= kd.query(np.column_stack((cx, cz)), workers=-1)[0] > 3.0     # the water that goes on along the axis where the polygon has a gap is the river
         out['di_cui_fuori_dall_asse_oltre_3m'] = int(far.sum())
         M = np.zeros(celle.shape, bool); M[er[far], ec[far]] = True; lab, nl = ndimage.label(M, np.ones((3, 3), bool))
         if nl:
@@ -1247,6 +1261,9 @@ def main(argv=None):
     osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_v2.pkl'))
     s.t['osm'] = round(time.time() - t0, 1); log('osm: %d oggetti per decidere il passo' % len(osm))
     s.tessere(osm)
+    # the same steps as costruisci() with its defaults: impalcati.py, run after this in the same process (terreno_gioco.py --rigenera), takes
+    # this surface instead of computing it all again (it was half the time of the terrain)
+    if a.margine == 250.0 and a.blend == BLEND and a.comune not in _S: _S[a.comune] = s
     tdir = os.path.join(a.out, 'terreno'); t0 = time.time(); peso = s.scrivi(tdir); s.t['scrittura'] = round(time.time() - t0, 1)
     rep, punti = controlli(s, tdir)
     if not a.no_png: t0 = time.time(); immagini(s, a.out); s.t['immagini'] = round(time.time() - t0, 1)

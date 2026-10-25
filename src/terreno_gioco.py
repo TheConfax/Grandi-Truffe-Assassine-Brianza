@@ -5,7 +5,7 @@
 # Until brianza.json carries decks, rv.zw and meta.ver = 2 (the build, phase 7-8) these are read from here; the game falls back to the
 # old engine where a tile has no .bin.
 #   python src/terreno_gioco.py --da DIR            pack the outputs of superficie.py / impalcati.py found in DIR
-#   python src/terreno_gioco.py --da DIR --rigenera run superficie.py and impalcati.py into DIR first (about 1.5 min for Meda)
+#   python src/terreno_gioco.py --da DIR --rigenera run superficie.py and impalcati.py into DIR first (under 1 min for Meda: impalcati.py reuses the surface superficie.py just made)
 import os, sys, json, gzip, glob, re, argparse, struct, io
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
