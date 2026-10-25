@@ -250,19 +250,15 @@ rep("best.driver = 'player'; best.sleep = false; P.car = best;", "best.driver = 
 rep("Le vie vere di Meda, dalla stazione a Piazza della Chiesa. Ruba un'auto, fai le consegne per i locali del centro e semina la Polizia Locale.",
     "Meda, Seveso, Barlassina, Baruccana e Cabiate con le loro strade vere, i dislivelli veri e la Milano-Meda sopraelevata. Ruba un'auto, fai le consegne per i locali e semina la Polizia Locale.")
 rep("banner('Stazione di Meda', 'MEDA · BRIANZA');", "banner('Stazione di Meda', 'BRIANZA');")
-# ---- driving model: arcade by default (real top speeds), G toggles a realistic model
+# ---- driving model: one, the arcade one (real top speeds); the realistic model and its G key are gone (Carlo, 25/10)
 rep("const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = S.acc * (bst ? 1.7 : 1), top = this.maxV * (bst ? 1.15 : 1);",
-    "const S = this.spec, arc = DRIVE_MODE === 'arcade', dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = (arc ? Math.min(12, S.acc * 2.1) : S.acc) * (bst ? 1.7 : 1), top = this.maxV * (bst ? 1.15 : 1);")
-rep("if (i.brk > 0) { if (v > 0.5) v -= 11 * dt * i.brk;", "if (i.brk > 0) { if (v > 0.5) v -= (arc ? 21 : 11) * dt * i.brk;")
-rep("const drag = (0.15 + (thr ? 0 : 0.45 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);", "const drag = (0.15 + (thr ? 0 : (arc ? 1.6 : 0.45) + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);")
-rep("const yawMax = (i.hand ? 22 : 13 + S.grip * 0.4) / Math.max(4, Math.abs(v));", "const yawMax = (i.hand ? 26 : arc ? 30 : 13 + S.grip * 0.4) / Math.max(4, Math.abs(v));")
-rep("v += 9.81 * Math.sin(this.slope) * dt; // gravity on hills", "v += 9.81 * Math.sin(this.slope) * (arc ? 0.6 : 1) * dt; // gravity on hills")
+    "const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = Math.min(12, S.acc * 2.1) * (bst ? 2.4 : 1), top = this.maxV * (bst ? 1.3 : 1);")
+rep("if (i.brk > 0) { if (v > 0.5) v -= 11 * dt * i.brk;", "if (i.brk > 0) { if (v > 0.5) v -= 21 * dt * i.brk;")
+rep("const drag = (0.15 + (thr ? 0 : 0.45 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);", "const drag = (0.15 + (thr ? 0 : 1.6 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);")
+rep("const yawMax = (i.hand ? 22 : 13 + S.grip * 0.4) / Math.max(4, Math.abs(v));", "const yawMax = (i.hand ? 26 : 30) / Math.max(4, Math.abs(v));")
+rep("v += 9.81 * Math.sin(this.slope) * dt; // gravity on hills", "v += 9.81 * Math.sin(this.slope) * 0.6 * dt; // gravity on hills")
 rep("if (ty > this.y + 0.08 && this === P.car && this.speed > 6) shake = Math.max(shake, 0.12);", "if (ty - this.y > 0.09 && ty - this.y < 0.2 && this === P.car && this.speed > 6) shake = Math.max(shake, 0.12);")
-rep("const VEH = [];", "const VEH = [];\nlet DRIVE_MODE = 'arcade';\ntry { DRIVE_MODE = localStorage.getItem('medaDrive') || 'arcade'; } catch (e) { }")
-rep("  if (e.code === 'KeyU') {", "  if (e.code === 'KeyG') { DRIVE_MODE = DRIVE_MODE === 'arcade' ? 'real' : 'arcade'; try { localStorage.setItem('medaDrive', DRIVE_MODE); } catch (er) { } toast(DRIVE_MODE === 'arcade' ? 'Guida arcade' : 'Guida realistica'); }\n  if (e.code === 'KeyU') {")
-rep("<p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>U</kbd> audio</p>", "<p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>G</kbd> guida arcade/realistica · <kbd>H</kbd> clacson · <kbd>U</kbd> audio</p>")
-rep("      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>", "      <div><kbd>G</kbd> guida arcade / realistica</div>\n      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>")
-rep("acc = (arc ? Math.min(12, S.acc * 2.1) : S.acc) * (bst ? 1.7 : 1), top = this.maxV * (bst ? 1.15 : 1);", "acc = (arc ? Math.min(12, S.acc * 2.1) : S.acc) * (bst ? 2.4 : 1), top = this.maxV * (bst ? 1.3 : 1);")
+rep("      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>", "      <div><kbd>PAD</kbd> controller DualSense o Xbox</div>\n      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>")
 rep("P.nitro = Math.max(0, P.nitro - 30 * dt);", "P.nitro = Math.max(0, P.nitro - 24 * dt);")
 # expressways get more traffic
 rep("  const a = near ? nodeInRing(TRAF_NODES, P.x, P.z, 90, 260, true) : pick(TRAF_NODES);", "  const a = near ? nodeInRing(rnd() < 0.35 ? EXPRESS_NODES : TRAF_NODES, P.x, P.z, 90, 300, true) : pick(TRAF_NODES);")
@@ -312,7 +308,6 @@ rep("    const want = K.turbo && K.up && v.health > 0 && P.nitro > 1;", "    con
 rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);", "const fwdIn = K.up ? 1 : K.down ? -0.5 : GP.fwd > 0.3 || GP.thr > 0.3 ? Math.max(GP.fwd, GP.thr) : GP.fwd < -0.3 ? -0.5 : 0, sp = fwdIn * (K.hand || K.turbo || GP.turbo > 0.5 ? 7.2 : 4.2);")
 rep("((K.horn && P.mode === 'car') ? 0.12", "(((K.horn || GP.horn > 0.5) && P.mode === 'car') ? 0.12")
 rep("  if (running && !paused) { acc += dt;", "  pollPad();\n  if (running && !paused) { acc += dt;")
-rep("      <div><kbd>G</kbd> guida arcade / realistica</div>", "      <div><kbd>G</kbd> guida arcade / realistica</div>\n      <div><kbd>PAD</kbd> controller DualSense o Xbox</div>")
 rep("<p>Premi <kbd>P</kbd> per riprendere</p>", "<p id=\"padline\" hidden></p><p>Premi <kbd>P</kbd> per riprendere</p>")
 # get out at any speed: you tumble out and the car rolls on
 rep("    const v = P.car; if (v.speed > 5) { toast('Frena prima di scendere'); return; }", "    const v = P.car, fast = v.speed > 6;")
@@ -356,7 +351,7 @@ rep("a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "a.impact(-rv * 0.8, -nx, -nz);
 rep("  remove() { scene.remove(this.m.g);", "  remove() { scene.remove(this.m.g); if (this.m.bm) this.m.bm.geometry.dispose();")
 rep('<div id="nitro"', '<div id="clock">18:00</div><div id="nitro"')
 rep("#health i {", "#clock { font-family: var(--display); font-size: 20px; letter-spacing: .06em; color: var(--ink); opacity: .9; margin-top: 4px; text-shadow: 0 2px 0 rgba(0,0,0,.4); }\n#health i {")
-rep("  if (e.code === 'KeyG') {", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyG') {")
+rep("  if (e.code === 'KeyU') {", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyU') {")
 rep("      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>", "      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>\n      <div><kbd>N</kbd> avanti di 2 ore</div>")
 rep("<kbd>H</kbd> clacson · <kbd>U</kbd> audio</p>", "<kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>U</kbd> audio</p>")
 rep("  if (edge(8)) toggleBig();", "  if (edge(8)) toggleBig();\n  if (edge(4)) skipTime(2);")
@@ -537,9 +532,8 @@ rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='
 rep("// ---------------------------------------------------------------- renderer\n", open(os.path.join(HERE, 'foto3_colori.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- renderer\n")
 rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>')  # the sky of foto3.js
 rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
-rep("13 + S.grip * 0.4) / Math.max(4, Math.abs(v));", "13 + S.grip * (1 - 0.3 * WX.wet) * 0.4) / Math.max(4, Math.abs(v));") # wet tyres slide earlier
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
-rep("v -= (arc ? 21 : 11) * dt * i.brk;", "v -= (arc ? 21 : 11) * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
+rep("v -= 21 * dt * i.brk;", "v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
 rep("updGlow();", "updGlow(); updSkyFx(running && !paused ? dt : 0);")
 rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true) };")
 
@@ -596,4 +590,68 @@ rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePe
     "  }\n}")
 rep("function startGame() {\n  if (running) return; running = true;",
     "function startGame() {\n  if (running) return; running = true; if (START !== STATION) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car */")
+# ---- jumps (Carlo, 25/10: "the car is glued to the ground"): every car on its wheels follows the ground as before, and a ballistic shadow of it
+# rides the bed (S and the decks, without kerbs, sidewalks and bumps). Where the bed drops away faster than gravity can follow (v^2/R > g on
+# a crest, the top of a ramp taken fast) the shadow lifts; once it would rise more than JUMP_MIN above the bed the car takes off with its
+# speed, flies under gravity and lands on what is under it (a deck if it is above it). docs/motore.md, "Salti"
+rep("const VEH = [];", """const VEH = [];
+try { localStorage.removeItem('medaDrive'); } catch (e) { } /* the realistic driving model is gone, so is its saved switch */
+const JUMP_MIN = 0.08, JUMP_V = 17, GRAV = 9.81; /* a crest that lifts the shadow less than JUMP_MIN m keeps the car on its wheels, and so does any speed under JUMP_V m/s (61 km/h): the small waves of S and town driving stay as they were */
+function vehBed(x, z, cy) { // what a car flies over and lands on: S and the decks under cy + 0.8, without the step layer (kerbs, sidewalks, bumps) that only jolts it
+  if (H.fineAt(x, z)) { let y = H.base(x, z); for (const o of H.deckAt(x, z)) if (o.top > y && o.top <= cy + 0.8) y = o.top; return y; }
+  const full = H.surface(x, z, cy), st = onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : bumpAt(x, z); if (!st) return full;
+  const rc = H.rivCut(x, z), flat = H.base(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + st; return Math.abs(full - flat) < 1e-4 ? full - st : full; /* old engine: the step comes off unless a deck won */
+}""")
+rep("    const i = this.inp, fx = Math.sin(this.h), fz = Math.cos(this.h), rx = fz, rz = -fx;\n",
+    "    if (this.air) { this.stepAir(dt); return; }\n    const i = this.inp, fx = Math.sin(this.h), fz = Math.cos(this.h), rx = fz, rz = -fx;\n")
+rep("    this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, Math.atan2(yb - yf, this.co * 2), 0.35);", "    this.vert(cf, cb, yf, yb, ty);")
+rep("  wheelie(dt, v, thr, i) {", """  stepAir(dt) { // off its wheels: no grip, no engine, no brakes, the speed it took off with less a little air drag; the steering turns the car a little, not its path (as in GTA)
+    const i = this.inp, k = 1 - 0.0004 * this.speed * dt;
+    this.steer = lerp(this.steer, i.steer, 1 - Math.exp(-10 * dt)); this.vx *= k; this.vz *= k;
+    this.h = wrapA(this.h + this.steer * 0.6 * dt); this.x += this.vx * dt; this.z += this.vz * dt;
+    this.spin += (this.fwdSpeed + (i.thr > 0 && this.health > 0 ? 8 : 0)) * dt / this.spec.wr; this.drift = 0;
+    this.roll = lerp(this.roll, 0, 0.04); this.pitch = lerp(this.pitch, 0, 0.1);
+  }
+  vert(cf, cb, yf, yb, ty) { // the height of the car over the ground under its axles (cf, cb; yf, yb the ground there, ty their mean): on the wheels or in the air
+    const dt = 1 / 60, co = this.co, gs = Math.atan2(yb - yf, co * 2), fs = this.fwdSpeed, gv = -fs * Math.tan(gs);
+    if (this.sus || this.susV) { this.susV += (-240 * this.sus - 20 * this.susV) * dt; this.sus = clamp(this.sus + this.susV * dt, -0.2, 0.12); if (Math.abs(this.sus) < 1e-3 && Math.abs(this.susV) < 0.02) this.sus = this.susV = 0; } /* the springs after a landing, drawn on the body */
+    if (this.air) {
+      this.vy -= GRAV * dt; this.y += this.vy * dt; this.airT += dt; this.airTop = Math.max(this.airTop, this.y - ty);
+      const sn = Math.sin(this.slope), axle = this.y - co * sn <= yf || this.y + co * sn <= yb;
+      if (this.y > ty && !axle) { this.slope = clamp(lerp(this.slope, -Math.atan2(this.vy, Math.max(6, Math.abs(fs))) * Math.sign(fs || 1) * 0.6, 0.035), -0.6, 0.6); return; } /* still flying: the nose follows the path down, slowly */
+      const hit = gv - this.vy; /* how fast it meets the ground */
+      this.air = false; this.y = Math.max(this.y, Math.min(ty + 0.5, Math.max(ty, yf + co * sn, yb - co * sn))); this.vy = this.bedV = gv; /* the wheel that touches first stays on the ground, the other comes down with the springs */ this._gb = undefined;
+      if (!this.spec.two) this.susV = -Math.min(hit, 14) * 0.3;
+      this.lastJump = { t: this.airT, h: this.airTop, d: hyp(this.x - this.air0[0], this.z - this.air0[1]), hit, v: this.speed };
+      if (this === P.car) { shake = Math.max(shake, Math.min(0.9, hit / 14)); if (hit > 2.5 && hit <= 7) sfxCrash(hit); }
+      if (hit > 7) this.impact(hit * 0.7);
+    }
+    const kick = (this.vy || 0) > (this.bedV || 0) + 2; /* thrown up from outside (an explosion) */
+    this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, gs, 0.35);
+    // the shadow rides the bed under the two axles, eased as the body is (a wheelbase and the springs smooth the small waves of S away)
+    const gb = (vehBed(cf[0], cf[1], this.y) + vehBed(cb[0], cb[1], this.y)) / 2, mv = this._gb === undefined ? 1e9 : hyp(this.x - this._bx, this.z - this._bz);
+    if (mv > 8) { this.by = this.sy = gb; this.svy = this.bedV = this.air === false && !kick ? this.vy : gv; }
+    else {
+      const d = gb - this._gb, stp = Math.abs(d) > mv * 0.5 + 0.05; if (stp) { this.by += d; this.sy += d; } /* a step in the bed (a deck joint, the edge of a tile) carries the shadow along, it is no slope */
+      const nb = lerp(this.by, gb, 0.35); this.bedV = (nb - this.by) / dt; this.by = nb;
+      // ground steeper than 20 % under the wheels is no street but a hump or a bank of S (a street over an embankment it should pass under, the
+      // sag of the Milano-Meda where a deck is missing): there and for half a second after the car keeps to the ground as before, no ski jump
+      if (Math.abs(this.bedV) > 0.2 * this.speed + 0.3 || (!stp && mv > 0.05 && Math.abs(d) > 0.2 * mv)) this.steepT = 0.5; else if (this.steepT > 0) this.steepT -= dt;
+      this.svy -= GRAV * dt; this.sy += this.svy * dt; if (this.sy <= this.by || this.steepT > 0) { this.sy = this.by; this.svy = this.bedV; }
+    }
+    // off the wheels: the shadow has left the bed by JUMP_MIN, the car is going faster than JUMP_V and is not still catching up with a climb;
+    // it leaves with the shadow's vertical speed, at most a launch of about 11 degrees (a 20 % ramp)
+    if (kick || (this.sy - this.by > JUMP_MIN && this.speed > JUMP_V && this.y > ty - 0.03)) {
+      this.air = true; this.airT = 0; this.airTop = 0; this.air0 = [this.x, this.z]; this.jumps = (this.jumps || 0) + 1; this._gb = undefined;
+      if (!kick) { this.vy = Math.min(this.svy, 0.2 * this.speed); this.y = Math.max(this.y, ty + 0.01); this.slope = gs; } /* both wheels just over the ground they leave */
+      return;
+    }
+    this.vy = this.bedV; this._bx = this.x; this._bz = this.z; this._gb = gb;
+  }
+  wheelie(dt, v, thr, i) {""")
+rep("    m.body.rotation.z = this.roll; m.body.rotation.x = this.pitch;", "    m.body.rotation.z = this.roll; m.body.rotation.x = this.pitch; if (!this.spec.two) m.body.position.y = this.sus || 0;")
+rep("if (v.driver === null && v.speed < 0.05 && !v.inp.thr)", "if (v.driver === null && v.speed < 0.05 && !v.inp.thr && !v.air && !(v.vy > 1))")
+rep("if (Math.abs(v.x - p.x) > 4 || Math.abs(v.z - p.z) > 4) continue;", "if (Math.abs(v.x - p.x) > 4 || Math.abs(v.z - p.z) > 4 || v.y - p.y > 1.4) continue; /* a car flying over, or on the bridge above */")
+rep("if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4) continue;", "if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4) continue;")
+rep("const a = VEH[i], b = VEH[j]; if (a.sleep && b.sleep) continue;", "const a = VEH[i], b = VEH[j]; if (a.sleep && b.sleep) continue; if (Math.abs(a.y - b.y) > 1.5) continue; /* one over the other: in the air, or on a bridge over the road */")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
