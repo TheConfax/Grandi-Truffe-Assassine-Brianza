@@ -27,7 +27,7 @@ function riverCut(x, z) { // old engine only (the tiles without .bin, outside Me
 }
 // the new engine's files: which tiles have a .bin, the decks, the pits and the water level (terreno/indice.json, src/terreno_gioco.py);
 // without it the whole map runs on the old engine
-const TERRENO = await (async () => { try { const r = await fetch('terreno/indice.json'); if (!r.ok) return null; const j = await r.json(); return j && j.ver === 1 ? j : null; } catch (e) { return null; } })();
+const TERRENO = await TERR_IND.then(j => j && j.ver === 1 ? j : null); // started with brianza.json (assemble3.py)
 const H = (() => {
   const TSZ = META.tile, HW = META.hw, HHt = META.hh, NX = META.ntx, NZ = META.ntz, B0 = TER.base, LOAD_R = 1150;
   const STEP = new Uint8Array(NX * NZ), FT = new Array(NX * NZ).fill(null), LS = new Uint8Array(NX * NZ); // LS: 0 not asked, 1 coming, 2 here, 3 failed
@@ -37,8 +37,9 @@ const H = (() => {
   async function load(t) {
     LS[t] = 1; const tx = t % NX, tz = Math.floor(t / NX);
     try {
-      const r = await fetch(`terreno/${tx}_${tz}.bin.gz`); if (!r.ok) throw new Error('HTTP ' + r.status);
-      let b = new Uint8Array(await r.arrayBuffer());
+      let b = null; const pk = await TERR_BIN, pm = pk && pk.get(tx + '_' + tz); // terreno/pacco.bin: already unpacked, in parallel
+      if (pm) { const ab = await pm; if (ab) b = new Uint8Array(ab); }
+      if (!b) { const r = await fetch(`terreno/${tx}_${tz}.bin.gz`); if (!r.ok) throw new Error('HTTP ' + r.status); b = new Uint8Array(await r.arrayBuffer()); } // one .bin.gz at a time, the old way
       if (b[0] === 0x1f && b[1] === 0x8b) b = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
       const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
       if (b[0] !== 71 || b[1] !== 84 || b[2] !== 65 || b[3] !== 83 || b[4] !== 1) throw new Error('non è un GTAS 1');

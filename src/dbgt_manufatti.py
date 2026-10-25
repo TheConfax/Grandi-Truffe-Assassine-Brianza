@@ -57,7 +57,9 @@ TOWER_MIN_DSM = 20.0  # a lattice pylon: the DSM catches its top only now and th
 ALB_R = 2.5          # tree height: highest DSM - DTM within this of the point (the DBGT point is the middle of the crown)
 ALB_SEEN = 2.5       # below this the DSM does not see a tree there (planted after 2008, or nothing standing)
 ALB_H = (3.0, 35.0)  # m
-ALB_D = (2.0, 16.0)  # crown diameter, m
+ALB_D = (2.0, 18.0)  # crown diameter, m
+ALB_CMIN, ALB_CFR, ALB_CR = 2.0, 0.25, 10.0  # crown: canopy pixels at least this high (m, and times the height), at most this far from the tree (m)
+ALB_SPORGE = 1.5     # m a crown may reach over a building's wall
 CLEAR, MOVE = 0.4, 3.0  # as dbgt_verde.py: a trunk off a manufatto, moved at most this far
 ALB_BLD = 3.0        # DSM pixels this close to a DBGT building and as high as its roof are the roof (2008 and 2015 are a metre or two apart)
 WIRE_R, WIRE_R_MT, PYL_R = 9.0, 3.0, 5.0  # m: around a high-voltage line (its outer conductors are 6.5 m off the axis), a minor line, a pylon
@@ -479,6 +481,7 @@ class Manufatti:
         T = np.asarray([t[:2] for t in trees], float).reshape(-1, 2)
         if cv.is_empty or not len(T): return trees
         ins = shapely.contains_xy(cv, T[:, 0], T[:, 1]); idx = np.where(ins)[0]; P = T[idx].copy()
+        if not len(P): return trees
         # off the manufatti (cabins, tanks, basins, greenhouses: buildings the verde did not know)
         V = [o['g'] for o in self.ind if o.get('kind')]
         n_mv = n_rm = 0; keep = np.ones(len(P), bool)
@@ -499,6 +502,8 @@ class Manufatti:
             # no roofs: the DSM of 2008 and the DBGT of 2015 are a metre or two apart, a tree by a wall took the roof (x 97 z -269: 31.5 m
             # by a 29.5 m building). Grid.mask had its rows upside down and masked nothing; the roof is cut with its spill (Grid.roofs)
             N = np.where(G.roofs(self.blds, 0.5, ALB_BLD), np.nan, G.N) if self.blds else G.N.copy()
+            # for the crown only the buildings themselves (+0.5 m) are taken off: the roof's spill of 3 m took the crowns beside the walls
+            Nc = np.where(self.bld_mask, np.nan, G.N) if self.blds and self.bld_mask is not None else G.N.copy()
             # no wires and no pylons: the DSM catches the conductors of a high-voltage line as rows one pixel wide, 20-35 m up (a tree under
             # the line at x -509 z 23 took 31.2 m from them). Near the lines an opening of 3 x 3 pixels takes away what is thinner than that
             # (wires, cross arms), the crowns stay; within PYL_R of a pylon nothing is read
@@ -511,9 +516,9 @@ class Manufatti:
             if zone:
                 Mz = G.mask([p for z_ in zone for p in _polys(z_.intersection(cv.buffer(10)))])
                 No = grey_opening(np.where(np.isfinite(N), N, 0.0), size=(3, 3)); self.n_wire_px = int(Mz.sum())
-                N = np.where(Mz & np.isfinite(N), np.minimum(N, No), N)
+                N = np.where(Mz & np.isfinite(N), np.minimum(N, No), N); Nc = np.where(Mz & np.isfinite(Nc), np.minimum(Nc, No), Nc)
             tw = [Point(t['x'], t['z']).buffer(PYL_R) for t in getattr(self, 'towers', [])]
-            if tw: N = np.where(G.mask(tw), np.nan, N)
+            if tw: Mt = G.mask(tw); N = np.where(Mt, np.nan, N); Nc = np.where(Mt, np.nan, Nc)
             # window of ALB_R m around each point, in pixels (they are 0.78 x 1.1 m)
             ri, ci = int(math.ceil(ALB_R / G.mz)), int(math.ceil(ALB_R / G.mx))
             offs = [(dr, dc) for dr in range(-ri, ri + 1) for dc in range(-ci, ci + 1) if math.hypot(dr * G.mz, dc * G.mx) <= ALB_R]
@@ -526,7 +531,8 @@ class Manufatti:
             k = np.argmax(Vf, 1); hmax = Vf[np.arange(len(P)), k]; hmax[allnan] = np.nan
             seen = np.isfinite(hmax) & (hmax >= ALB_SEEN)
             pr = r + np.array([o[0] for o in offs])[k]; pc = c + np.array([o[1] for o in offs])[k]
-            # crown: along 8 directions from the top, how far before DSM - DTM falls under half the height (or rises into a taller crown)
+            # crown, 1: along 8 directions from the top, how far before DSM - DTM falls under half the height (or rises into a taller crown).
+            # Alone it gave crowns of 0.44 times the height, 0.61 times what the 2018-19 orthophoto shows (verifica del 26/10): now only where 2 sees nothing
             dirs = [(math.cos(a), math.sin(a)) for a in np.linspace(0, 2 * math.pi, 8, endpoint=False)]; steps = np.arange(0.5, 8.01, 0.5)
             px, pz = G.xz(pr, pc); px, pz = np.asarray(px), np.asarray(pz)
             thr = np.maximum(1.5, 0.5 * hmax)
@@ -538,13 +544,25 @@ class Manufatti:
                     stop = ~done & (~np.isfinite(v) | (v < thr) | (v > hmax + 1.0))
                     rad_[stop] = s - 0.25; done |= stop
                 radii[:, di] = rad_
-            D = 2 * np.median(radii, 1) + 0.5
+            D_r = 2 * np.median(radii, 1) + 0.5
+            # crown, 2 (26/10, Carlo: "alberi ridicolmente stretti"): the canopy pixels (DSM - DTM at least max(ALB_CMIN, ALB_CFR h) and at most
+            # h + 1.5) that have this tree as the nearest within ALB_CR, D = 2 sqrt(area / pi). A tree alone takes its whole crown, in a row
+            # or a wood the crowns share the canopy and touch, as they do (the cut at 1.3 times the nearest tree is gone). On 42 trees read on
+            # the orthophoto: mean error -1.2 m (0.84 of the true width; the trees have grown since 2008), before -3.4 m
+            from scipy.spatial import cKDTree
+            okc = np.isfinite(Nc) & (Nc >= ALB_CMIN); Rc, Cc = np.nonzero(okc); vc = Nc[Rc, Cc]; Xc, Zc = G.xz(Rc, Cc)
+            dd, kk = cKDTree(P).query(np.c_[np.asarray(Xc), np.asarray(Zc)], distance_upper_bound=ALB_CR)
+            m_ = np.isfinite(dd); kk, vc = kk[m_], vc[m_]; hk = np.where(seen & keep, hmax, np.nan)[kk]
+            good = np.isfinite(hk) & (vc >= np.maximum(ALB_CMIN, ALB_CFR * hk)) & (vc <= hk + 1.5)
+            D_v = 2 * np.sqrt(np.bincount(kk[good], minlength=len(P)) * G.mx * G.mz / math.pi)
+            n_ray = int((seen & keep & (D_r > D_v)).sum())
+            D = np.maximum(D_v, D_r)
             H = hmax
+        else: n_ray = 0
         from scipy.spatial import cKDTree
         nn = cKDTree(P).query(P, k=2)[0][:, 1] if len(P) > 1 else np.full(len(P), 10.0)
         H = np.where(seen, np.clip(H, *ALB_H), np.nan)
-        D = np.where(seen, np.minimum(D, np.maximum(3.0, 1.3 * nn)), np.nan)
-        D = np.where(seen, np.clip(np.clip(D, 0.3 * H, 1.2 * H), *ALB_D), np.nan)
+        D = np.where(seen, np.clip(np.clip(D, 0.2 * H, 1.5 * H), *ALB_D), np.nan)
         inb = shapely.contains_xy(boschi, P[:, 0], P[:, 1]) if boschi is not None and not boschi.is_empty else np.zeros(len(P), bool)
         # the trees the DSM does not see take the typical height of the seen ones in the same setting: in a wood the wood's, outside the
         # street and garden trees' (the median of all, 11.5 m, was the woods' pulling up the young trees planted after 2008)
@@ -555,11 +573,17 @@ class Manufatti:
         self.htyp_ctx = {'nei_boschi': round(float(HT[inb][0]), 1) if inb.any() else None, 'fuori': round(float(HT[~inb][0]), 1) if (~inb).any() else None}
         # under a line the strip is kept low (the DSM sees it so): a tree there it does not see is not a tree of the wood around it
         HT[wz & inb] = HT[~inb][0] if (~inb).any() else HT[wz & inb]; RT[wz & inb] = RT[~inb][0] if (~inb).any() else RT[wz & inb]
-        H = np.where(seen, H, HT); D = np.where(seen, D, np.clip(np.minimum(RT * HT, np.maximum(3.0, 1.3 * nn)), *ALB_D))
+        H = np.where(seen, H, HT); D = np.where(seen, D, np.clip(np.minimum(RT * HT, np.maximum(3.0, 2.0 * nn)), *ALB_D))
+        # a crown reaches at most ALB_SPORGE over a building's wall (the game draws it round: wider it would go through the wall)
+        dB = np.full(len(P), 99.0)
+        if self.blds and len(P):
+            ii, dist = STRtree(self.blds).query_nearest(shapely.points(P), return_distance=True, max_distance=ALB_CR, all_matches=False); dB[ii[0]] = dist
+        cap = np.maximum(ALB_D[0], 2 * (dB + ALB_SPORGE)); n_cap = int((keep & (D > cap)).sum()); D = np.minimum(D, cap)
         def st(m): return {'n': int(m.sum()), 'visti_dal_dsm': int((m & seen).sum()), 'h_p10_p50_p90': [_pct(H[m & seen], q) for q in (10, 50, 90)], 'chioma_p10_p50_p90': [_pct(D[m & seen], q) for q in (10, 50, 90)]}
         self.rep['alberi'] = {'dentro': int(len(P)), 'spostati_fuori_dai_manufatti': n_mv, 'tolti_dentro_i_manufatti': n_rm, 'altezza_tipica_se_il_dsm_non_vede': self.htyp_ctx,
                               'pixel_vicino_ai_fili_aperti_3x3': getattr(self, 'n_wire_px', 0), 'non_visti_sotto_le_linee_con_altezza_fuori_bosco': int((wz & inb & ~seen).sum()),
-                              'chioma_su_altezza_tipica': round(rtyp, 2), 'tutti': st(keep), 'nei_boschi_dbgt': st(keep & inb), 'fuori_dai_boschi': st(keep & ~inb)}
+                              'chioma_su_altezza_tipica': round(rtyp, 2), 'chioma_dal_raggio_dove_i_pixel_non_bastano': n_ray, 'chiome_strette_dagli_edifici': n_cap,
+                              'chioma_su_altezza_p10_p50_p90_visti': [_pct((D / H)[keep & seen], q) for q in (10, 50, 90)], 'tutti': st(keep), 'nei_boschi_dbgt': st(keep & inb), 'fuori_dai_boschi': st(keep & ~inb)}
         self.log('dbgt manufatti: alberi', len(P), 'visti dal DSM', int(seen.sum()), 'altezza tipica', self.htyp_ctx, 'spostati fuori dai manufatti', n_mv, 'tolti', n_rm)
         out = [tuple(t[:2]) for t in T[~ins]]
         for i in np.where(keep)[0]: out.append((float(P[i, 0]), float(P[i, 1]), round(float(H[i]), 1), round(float(D[i]), 1)))
