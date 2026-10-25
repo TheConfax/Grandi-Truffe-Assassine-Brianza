@@ -42,7 +42,7 @@
    "2": 279,
    "3": 11
   },
-  "tempo_s": 0.8
+  "tempo_s": 0.3
  },
  "banchine": {
   "tagliate": 2,
@@ -53,7 +53,11 @@
   "sd_fer_allargata_m2": 35492,
   "corridoio_nel_comune_m2": 44997
  },
- "recinzioni_tagliate_sulle_carreggiate": 12,
+ "recinzioni_spostate_fuori_dalle_carreggiate": {
+  "n": 3,
+  "metri_spostati": 49.8,
+  "metri_aperti": 3.7
+ },
  "recinzioni_tolte_vicino_ai_ponti": 8,
  "aperti_sui_binari": {
   "recinzioni_ferrovia": {
@@ -61,19 +65,21 @@
    "metri": 82.5
   },
   "muri_e_recinzioni": {
-   "n": 2,
-   "metri": 5.0
+   "n": 6,
+   "metri": 23.7
   }
  },
  "lontano_dai_binari": {
   "recinzioni": {
    "n": 8,
-   "metri": 666.1,
+   "metri_spostati": 607.3,
+   "metri_aperti": 0.8,
    "distanza_m": 1.6
   },
   "muri_e_divisori": {
-   "n": 6,
-   "metri": 122.8,
+   "n": 8,
+   "metri_spostati": 91.2,
+   "metri_aperti": 5.7,
    "distanza_m": 1.6
   }
  },
@@ -213,6 +219,6 @@
   "cartelli_di_paese": {
    "n": 16
   },
-  "tempo_s": 6.2
+  "tempo_s": 6.5
  }
 }
