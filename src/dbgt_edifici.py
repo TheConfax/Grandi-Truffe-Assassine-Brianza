@@ -321,13 +321,28 @@ class Edifici:
             if big is None or big.area < MIN_VOL: v['via'] = True; gone += 1
             else: v['p'] = big; cut += 1
             touched.add(v['ed'])
+        # two ground volumes of the same building on top of each other (3 at Meda: a tower of 72 m2 drawn inside the 3206 m2 block round it,
+        # x 1077 z 48): the lower one is cut off the higher, 5 cm round, so that their walls on a shared facade do not flicker
+        same = 0
+        for i, v in enumerate(vs):
+            if v.get('via') or v['por'] != '01': continue
+            top = (v['zmin'] or 0) + v['av']
+            for j in t.query(v['p'], predicate='intersects'):
+                w = vs[j]
+                if j == i or w.get('via') or w['por'] != '01' or w['ed'] != v['ed']: continue
+                wt = (w['zmin'] or 0) + w['av']
+                if wt < top or (wt == top and j < i) or w['p'].intersection(v['p']).area <= 1.0: continue
+                ps = _parts(v['p'].difference(w['p'].buffer(0.05)))
+                big = max(ps, key=lambda q: q.area) if ps else None
+                if big is None or big.area < MIN_VOL: v['via'] = True; gone += 1; break   # (the ground plan stays: the union is the same)
+                v['p'] = big; same += 1
         if gone:
             keep = [k for k, v in enumerate(vs) if not v.get('via')]; ren = {k: n for n, k in enumerate(keep)}
             self.vol = [vs[k] for k in keep]
             for e in self.ed: e['vols'] = [ren[k] for k in e['vols'] if k in ren]
         for k in touched:  # its ground plan is the volumes that stay
             e = self.ed[k]; e['is'] = unary_union([self.vol[j]['p'] for j in e['vols']]) if e['vols'] else GeometryCollection()
-        self.rep['aggiornamenti_dbgt'] = dict(volumi_superati=gone, volumi_tagliati=cut)
+        self.rep['aggiornamenti_dbgt'] = dict(volumi_superati=gone, volumi_tagliati=cut, volumi_dello_stesso_edificio_tagliati=same)
         self.log('dbgt edifici: volumi superati da un aggiornamento', gone, 'tagliati', cut)
 
     # ---------------------------------------------------------------- OSM against the DBGT
@@ -337,7 +352,10 @@ class Edifici:
         t0 = time.time()
         # a DBGT building with only underground volumes (UN_VOL_POR 08: the garages under a garden or a yard) is not drawn and is not what
         # stands on top: an OSM building over it is something the DBGT does not have (verifica 24/10, x -558 z -587)
-        geo = [e['is'] if any(self.vol[j]['por'] != '08' for j in e['vols']) else GeometryCollection() for e in self.ed]
+        # what the DBGT has of a building is its ground plan and all its volumes above ground: the raised ones too (the ceiling of a
+        # portico, UN_VOL_POR 03, is outside the ground plan, and an OSM building drawn over the whole block came back as a solid box
+        # filling the portico under the DBGT's raised volume: 8 at Meda, 1431 m2, verifica 2 del 24/10, x 188 z -519)
+        geo = [unary_union([e['is']] + [self.vol[j]['p'] for j in e['vols'] if self.vol[j]['por'] != '08']) if any(self.vol[j]['por'] != '08' for j in e['vols']) else GeometryCollection() for e in self.ed]
         ok = [i for i, g in enumerate(geo) if not g.is_empty]
         dt = STRtree([geo[i] for i in ok]); confs = [c for c in self.comuni if c is not None]
         conf_u = unary_union(confs) if confs else GeometryCollection(); prepare(conf_u)
@@ -363,7 +381,9 @@ class Edifici:
                             if sh > 0.2 and sh > best.get(i, (0,))[0]: best[i] = (sh, b.get('tg') or {}, b)
                         continue
                     # its part off the DBGT buildings stays (newer than the survey, or something the DBGT does not have)
-                    ps = [q for q in _parts(g.difference(nu.buffer(0.1))) if q.area >= 10]
+                    # (less the strips under 1.8 m wide along the DBGT walls: the same building drawn 1-2 m off by OSM, verifica 2 del 24/10, x 232 z -296)
+                    rest = g.difference(nu.buffer(0.1)); rest = rest.buffer(-0.9, join_style='mitre').buffer(0.9, join_style='mitre').intersection(rest)
+                    ps = [q for q in _parts(rest) if q.area >= 10]
                     if not ps: cnt['osm_sostituiti'] += 1; continue
                     cnt['osm_in_parte_senza_dbgt'] += 1
                     for k, q in enumerate(sorted(ps, key=lambda q: -q.area)):
@@ -701,10 +721,12 @@ class Edifici:
         osm = [(b, P(b['p'], b.get('k', []))) for b in buildings if not b.get('dbgt')]
         osm = [(b, g) for b, g in osm if g is not None and near_c.intersects(g)]
         ot = STRtree([g for b, g in osm]) if osm else None
-        dg = [(b, P(b['p'], b.get('k', []))) for b in buildings if b.get('dbgt')]; dg = [(b, g) for b, g in dg if g is not None]
+        # the DBGT volumes: on the ground, and the raised ones (only for the doubles: a portico's ceiling over a carriageway is right)
+        dg = [(b, P(b['p'], b.get('k', []))) for b in buildings if b.get('dbgt')] + [(b, P(b['p'], b.get('k', []))) for b in getattr(self, 'alti', [])]
+        dg = [(b, g) for b, g in dg if g is not None]
         dt = STRtree([g for b, g in dg]) if dg else None
         for k, (b, g) in enumerate(dg + [(b, g) for b, g in osm if b.get('osm_solo')]):
-            if self.carr_t is not None:
+            if self.carr_t is not None and 'zb' not in b:
                 a = sum(self.carr[j].intersection(g).area for j in self.carr_t.query(g, predicate='intersects'))
                 if a > 1.0: c = g.centroid; on.append([round(c.x, 1), round(c.y, 1), round(a, 1), 'dbgt' if b.get('dbgt') else 'osm'])
             if not b.get('dbgt'): continue

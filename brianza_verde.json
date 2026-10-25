@@ -3851,9 +3851,9 @@
   "sparsi_osm_dentro": 17484,
   "sparsi_osm_tenuti": 0,
   "sparsi_boschi_dbgt": 13287,
-  "su_superfici_vietate": 752,
+  "su_superfici_vietate": 751,
   "esito": {
-   "spostati": 486,
+   "spostati": 485,
    "restano_in_aiuola": 30,
    "tolti": 205,
    "bosco": 31
