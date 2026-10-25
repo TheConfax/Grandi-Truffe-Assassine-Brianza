@@ -1604,7 +1604,15 @@ for k_, pts in land:  # one polygon per piece of land, simplified, in the tile o
 # divider goes, the hoarding stands on its line; h: the stretches of the edge that keep the game's hoarding, w: the lines of the replaced dividers
 from barriere import cantieri as _cantieri
 _crep = {}
-bar_out, _cf = _cantieri([g_ for k_, g_ in _ls if k_ == 'cantiere'], bar_out, [(g_[0] / 10, g_[1] / 10, g_[2] / 10, g_[3] / 10) for g_ in gate_out], _crep)
+# the railway fences of the game (fences, kind 'fe' here) as well: a site along the tracks has its hoarding, not the railway fence (todo.md, the station);
+# not across a street (strada: the carriageways, OSM and DBGT)
+import shapely; shapely.prepare(asph)
+def _strada(xs, zs):
+    r_ = shapely.contains_xy(asph, xs, zs)
+    if _mvt is not None: r_[_mvt.query(shapely.points(xs, zs), predicate='within')[0]] = True
+    return r_
+_nb = _cantieri([g_ for k_, g_ in _ls if k_ == 'cantiere'], bar_out + [(f_, 'fe', 0) for f_ in fences], [(g_[0] / 10, g_[1] / 10, g_[2] / 10, g_[3] / 10) for g_ in gate_out], _crep, _strada)
+bar_out, fences, _cf = [b_ for b_ in _nb[0] if b_[1] != 'fe'], [b_[0] for b_ in _nb[0] if b_[1] == 'fe'], _nb[1]
 _cf = iter(_cf); _cw = []
 log('cantieri: divisori sostituiti dai pannelli', _crep)
 for k_, g_ in _ls:
