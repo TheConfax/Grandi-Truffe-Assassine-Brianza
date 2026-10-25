@@ -849,6 +849,9 @@ if STR: STR.mezze(raw_roads, nodes)  # and the lanes of the AI cars segment by s
 RIGHE = None
 if STR:  # the road markings from the edges of the carriageway AC_VEI (src/dbgt_righe.py)
     import dbgt_righe
+    if os.environ.get('GTA_DUMP_RIGHE'):  # development of src/dbgt_righe.py: its input, to work on the lines without the whole build
+        import pickle
+        pickle.dump(dict(STR={k: getattr(STR, k) for k in ('R', 'D', 'cover', 'U_carr')}, nodes=nodes, raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads]), open(os.environ['GTA_DUMP_RIGHE'], 'wb'))
     RIGHE, STR.rep['righe'] = dbgt_righe.righe(STR, raw_roads, nodes, log)
 bunion = _bunion.result()
 prepare(bunion)
