@@ -1025,7 +1025,7 @@ function buildPits(T, G) {
 // out, the ramp's walls and parapet stand there. The polyline in the runs of segments whose middle is out of every ramp
 function pitSplit(pts) {
   if (!H.PITS.length) return [pts]; const out = []; let cur = [pts[0]];
-  for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k]; if (H.inPit((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, 0.15)) { if (cur.length > 1) out.push(cur); cur = [c]; } else cur.push(c); }
+  for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k]; let inn = false; for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) if (H.inPit(a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, 0.15)) inn = true; if (inn) { if (cur.length > 1) out.push(cur); cur = [c]; } else cur.push(c); }
   if (cur.length > 1) out.push(cur); return out;
 }
 const STY = {};

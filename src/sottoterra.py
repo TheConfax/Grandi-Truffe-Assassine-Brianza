@@ -154,6 +154,26 @@ def osm_sotto(path, area, cache=None):
     return out
 
 
+def edifici_gioco(sup):
+    """the footprints of the buildings brianza.json gives the game (DBGT volumes and OSM) near the comune, not the raised ones (porticos,
+    passages: one drives under them)"""
+    bj = os.path.join(HERE, '..', 'brianza.json')
+    if not os.path.exists(bj): return []
+    import superficie as sf
+    B = json.load(open(bj, encoding='utf-8')); m = B['meta']; ntx = m['ntx']; x0, z0, x1, z1 = sup.conf.buffer(60).bounds; out = []
+    dec = lambda a: np.cumsum(np.asarray(a, float).reshape(-1, 2), axis=0) / 10
+    for ti, T in enumerate(B['tiles']):
+        if not T or not T.get('b'): continue
+        bx, bz = -m['hw'] + (ti % ntx) * sf.TILE, -m['hh'] + (ti // ntx) * sf.TILE
+        if bx > x1 or bx + sf.TILE < x0 or bz > z1 or bz + sf.TILE < z0: continue
+        for b in T['b']:
+            if 'zb' in b: continue
+            o = dec(b['p'])
+            if len(o) >= 3:
+                g = Polygon(o); out.append(g if g.is_valid else g.buffer(0))
+    return out
+
+
 def viste(path=None):
     f = path or os.path.join(HERE, 'sottoterra.json')
     return json.load(open(f, encoding='utf-8')).get('viste', []) if os.path.exists(f) else []
@@ -184,7 +204,7 @@ class Sottoterra:
         s.F1, s.D1 = riempi(M.dtm)
         s.ex = dbgt_extra(sup.gpkg)
         s.osm = osm_sotto(os.path.join(DATA, 'osm', 'maplarge.osm'), conf.buffer(60), getattr(s, 'cache_osm', None))
-        s.edifici = list(sup.edifici) + s.ex['emin']
+        s.edifici = list(sup.edifici) + s.ex['emin'] + edifici_gioco(sup)   # what the game draws too (brianza.json): the ramp keeps off its walls
         s.vis = viste()
         cores, n = ndimage.label(s.D1 > R_CORE, np.ones((3, 3), bool))
         pa = M.px * M.pz; out = []
@@ -425,7 +445,8 @@ class Sottoterra:
         C = np.column_stack((np.interp(st, sv, P[:, 0]), np.interp(st, sv, P[:, 1]))); W = np.interp(st, sv, w)
         sig = LISCIA / 0.5
         C = np.column_stack([ndimage.gaussian_filter1d(C[:, j], sig, mode='nearest') for j in (0, 1)])
-        W = np.clip(ndimage.gaussian_filter1d(W, 2 * sig, mode='nearest'), W_MIN, W_MAX)
+        k0, k1 = len(W) // 5, max(len(W) // 5 + 1, 4 * len(W) // 5)
+        W = np.full(len(W), float(np.clip(np.median(W[k0:k1]), W_MIN, W_MAX)))   # walls parallel: one width, the middle of the pit's
         # the mouth goes on 1.5 m back along the line (the pit of the LiDAR starts 0.3 m deep), unless that is in a building
         def tang(a, b): v = C[b] - C[a]; return v / max(np.hypot(*v), 1e-9)
         dentro = lambda q: any(s.edifici[j].contains(Point(*q)) for j in etree.query(Point(*q)))
@@ -456,11 +477,11 @@ class Sottoterra:
             h = W / 2
             for k in range(len(C)):
                 if facc[k]: continue
-                while h[k] > 1.0 and dentro_b(C[k] + sg * N[k] * h[k]): h[k] -= 0.25
+                while h[k] - 0.25 >= 0.95 and dentro_b(C[k] + sg * N[k] * h[k]): h[k] -= 0.25
             return h
         hl, hr = lato(1), lato(-1)
         if getattr(s, 'dbg', False): p['_dbg'] = (C.copy(), hl.copy(), hr.copy(), facc.copy(), W.copy())
-        if min(hl[~facc].min() if (~facc).any() else 9, hr[~facc].min() if (~facc).any() else 9) < 1.0 or (hl + hr)[~facc].min() < 2.4: return 'stretta fra gli edifici'
+        if min(hl[~facc].min() if (~facc).any() else 9, hr[~facc].min() if (~facc).any() else 9) < 0.95 or (hl + hr)[~facc].min() < 2.4: return 'stretta fra gli edifici'
         hl, hr = ndimage.minimum_filter1d(hl, 3), ndimage.minimum_filter1d(hr, 3)
         W = hl + hr; C = C + N * ((hl - hr) / 2)[:, None]
         if W.min() < 2.5: return 'curva troppo stretta per la larghezza'
