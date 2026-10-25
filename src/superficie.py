@@ -613,6 +613,15 @@ class Superficie:
         s.log('acqua: %d serie, %d punti; sotto il bordo dell alveo per la monotonia %s, sopra %s' % (s.acqua_info['serie'], s.acqua_info['punti'], s.acqua_info['trascinati'], s.acqua_info['rialzati']))
         return out
 
+    # ----- 3c. sotto terra (src/sottoterra.py, docs/sottoterra.md): the buche of the LiDAR 2008 where the DBGT 2015 has street level or a new
+    # building are filled in L (the DBGT wins and the cap below no longer pulls it down), and so is the ground over the ramps, which become
+    # pits (fosse(), after the tiles)
+    def sottoterra(s, cache_dir=None):
+        import sottoterra as stt
+        s.sotto = stt.Sottoterra(s, log=lambda *a: s.log('sottoterra:', *a))
+        if cache_dir: os.makedirs(cache_dir, exist_ok=True); s.sotto.cache_osm = os.path.join(cache_dir, 'cache_osm_sotto.pkl')
+        t0 = time.time(); s.sotto.analizza(); s.t['sottoterra'] = round(time.time() - t0, 1)
+
     # ----- 4. the cap on the LiDAR, and the deck parts left as ground
     def tetto(s):
         FIX = s.RANK > 0; RT = np.isin(s.CLS, ROADTYPE) & FIX
@@ -940,12 +949,12 @@ _S = {}
 def costruisci(comune='Meda', margine=250.0, blend=BLEND, osm=True, cache_dir=None):
     """The whole surface of the comune + margine, all steps (about 40 s for Meda); cached per comune."""
     if comune in _S: return _S[comune]
-    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.tetto(); s.ritocchi(); s.vie(); s.raccordi()
+    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); s.tetto(); s.ritocchi(); s.vie(); s.raccordi()
     ob = None
     if osm:
         lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
         ob = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(cache_dir, 'cache_osm_v2.pkl') if cache_dir else None)
-    s.tessere(ob); _S[comune] = s; return s
+    s.tessere(ob); s.sotto.fosse(); _S[comune] = s; return s
 
 
 def build_S(tile, comune='Meda'):
@@ -1247,12 +1256,12 @@ def main(argv=None):
     AX_SIGMA = a.sigma
     s = Superficie(a.comune, margine=a.margine, blend=a.blend)
     log('tessere da fare %d (tx %d..%d, tz %d..%d), griglia %dx%d' % (len(s.tiles), s.i0, s.i1, s.j0, s.j1, s.R.nx, s.R.nz))
-    s.base(); s.dbgt(); s.strade(); s.tetto(); s.ritocchi(); s.vie(); s.raccordi()
+    s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); s.tetto(); s.ritocchi(); s.vie(); s.raccordi()
     t0 = time.time()
     lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
     osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_v2.pkl'))
     s.t['osm'] = round(time.time() - t0, 1); log('osm: %d oggetti per decidere il passo' % len(osm))
-    s.tessere(osm)
+    s.tessere(osm); s.sotto.fosse(); s.sotto.scrivi(a.out)
     # the same steps as costruisci() with its defaults: impalcati.py, run after this in the same process (terreno_gioco.py --rigenera), takes
     # this surface instead of computing it all again (it was half the time of the terrain)
     if a.margine == 250.0 and a.blend == BLEND and a.comune not in _S: _S[a.comune] = s
@@ -1273,7 +1282,7 @@ def main(argv=None):
                superficie=dict(nodi_fissi=int(s.FIX.sum()), sotto_ponti=int(s.BR.sum()), nodi_impalcato_da_fase3=int(s.AIR.sum()), nodi_tetto=int(s.CAP.sum()), nodi_tombino_tenuti=int(s.TOMB.sum()), nodi_alveo_al_lidar=int(s.ALVCOP.sum()), nodi_scarpata=int(s.SCARP.sum()),
                                bordo_fascia_ancora_mosso=s.bordo_banda, dentro_ponte_a_livello_impalcato=int(s.ALTO.sum()), sotto_ponti_riempiti=s.n_sotto, sotto_ponti_modo=s.sotto_modo, sotto_ponti_abbassati_m=pct(-s.sotto_dz) if len(s.sotto_dz) else None, carreggiata_meno_lidar=pct(dz, (10, 50, 90)), ritocchi=s.nrit,
                                vie_disegnate=dict(s.nvie, definizione='nodi liberi dentro asfalto e marciapiedi disegnati (brianza.json as, sd) entro %.0f m da una carreggiata DBGT della stessa via, portati alla sua quota' % VIA_MAX, quota_meno_lidar=pct(s.vie_dz, (1, 10, 50, 90, 99)), luoghi_oltre_1_5m=len(s.vie_luoghi), elenco=s.vie_luoghi[:40])),
-               C9_peso=peso, **rep, punti_da_guardare=punti, tempi_s=dict(s.t, totale=tot))
+               sottoterra=s.sotto.rep, C9_peso=peso, **rep, punti_da_guardare=punti, tempi_s=dict(s.t, totale=tot))
     ok = all(rep[c].get('ok', True) for c in ('C4', 'C5', 'C6', 'C7', 'C10'))
     out['esito'] = {c: rep[c].get('ok') for c in ('C4', 'C5', 'C6', 'C7', 'C10')}
     json.dump(out, open(os.path.join(a.out, 'report_fase2.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=float)

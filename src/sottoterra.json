@@ -1,0 +1,1173 @@
+{
+"nota": "Casi del sotto terra guardati a vista (src/sottoterra.py): esito rampa, dubbio o no per la fossa del LiDAR con il centro piu vicino (entro 6 m). Ortofoto AGEA 2018-19 della Regione (BaseMap/Ortofoto2018_2019), guardata il 26/10/2026; rampa = si vede una rampa con i suoi muri; dubbio = non si capisce (da guardare con Carlo); no = non e una rampa. forza: la forma del LiDAR si tiene anche se non e dritta. tipo buca: una buca che la regola toglierebbe, guardata a campione; dubbio = resta come oggi.",
+"viste": [
+{
+"x": 662.7,
+"z": -1610.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 723.9,
+"z": -1584.2,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -32.5,
+"z": -1476.0,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -753.4,
+"z": -1431.1,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 137.3,
+"z": -1366.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 1122.7,
+"z": -1348.4,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -894.7,
+"z": -1285.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 848.2,
+"z": -1260.3,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -617.1,
+"z": -1191.6,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello fra due edifici"
+},
+{
+"x": 1079.2,
+"z": -1177.9,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 91.5,
+"z": -1141.2,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 951.1,
+"z": -1106.9,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -626.2,
+"z": -1087.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 709.1,
+"z": -974.0,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 954.4,
+"z": -900.1,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 937.7,
+"z": -874.7,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 944.6,
+"z": -847.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 702.1,
+"z": -735.6,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "striscia lungo l edificio"
+},
+{
+"x": 33.1,
+"z": -672.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -369.0,
+"z": -651.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -22.8,
+"z": -647.2,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 127.1,
+"z": -610.7,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 847.3,
+"z": -605.5,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -912.8,
+"z": -547.1,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 482.6,
+"z": -523.1,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 761.1,
+"z": -510.6,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 1648.3,
+"z": -471.3,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -76.9,
+"z": -459.3,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -1063.0,
+"z": -424.6,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 944.3,
+"z": -353.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 958.8,
+"z": -348.3,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -609.5,
+"z": -327.4,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 482.1,
+"z": -312.1,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 509.3,
+"z": -275.9,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 1831.9,
+"z": -204.5,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "vialetto in discesa verso la casa, senza muri"
+},
+{
+"x": 778.3,
+"z": -201.9,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 996.4,
+"z": -156.2,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "striscia lungo l edificio"
+},
+{
+"x": 965.8,
+"z": -127.7,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 960.2,
+"z": 153.1,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": -678.0,
+"z": 186.6,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 1656.2,
+"z": 285.4,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 1042.6,
+"z": 296.0,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 1090.2,
+"z": 304.1,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 307.7,
+"z": 316.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 1476.5,
+"z": 360.6,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 582.2,
+"z": 365.7,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 1014.5,
+"z": 486.2,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 1138.0,
+"z": 703.3,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 306.4,
+"z": 714.1,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 79.5,
+"z": 720.7,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 75.8,
+"z": 744.4,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 38.1,
+"z": 745.5,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 377.1,
+"z": 838.8,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "non si capisce se e una rampa"
+},
+{
+"x": 163.0,
+"z": -1447.1,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -79.6,
+"z": -1420.9,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 858.5,
+"z": -1279.5,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1054.9,
+"z": -1230.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 570.0,
+"z": -1184.0,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 555.8,
+"z": -1160.1,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 977.4,
+"z": -1120.5,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 960.6,
+"z": -881.4,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "giardino sopra un volume interrato, nessuna rampa"
+},
+{
+"x": -439.1,
+"z": -871.4,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 352.1,
+"z": -723.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -291.5,
+"z": -687.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1178.6,
+"z": -649.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 17.3,
+"z": -641.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1361.7,
+"z": -621.0,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1127.2,
+"z": -595.2,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -959.8,
+"z": -568.7,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -1085.0,
+"z": -563.5,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1002.6,
+"z": -549.5,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -204.2,
+"z": -538.4,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -897.1,
+"z": -527.4,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -873.1,
+"z": -495.8,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -296.7,
+"z": -480.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 155.2,
+"z": -466.8,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 462.7,
+"z": -456.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -495.1,
+"z": -445.8,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 106.1,
+"z": -434.9,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 142.4,
+"z": -417.9,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1029.5,
+"z": -402.0,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -703.9,
+"z": -334.9,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -394.9,
+"z": -332.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 518.0,
+"z": -303.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 486.0,
+"z": -282.9,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 965.7,
+"z": -271.2,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -186.3,
+"z": -258.7,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 929.4,
+"z": -213.7,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 439.4,
+"z": -204.5,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 805.4,
+"z": -66.4,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1191.0,
+"z": -55.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1566.0,
+"z": -54.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 991.7,
+"z": -52.1,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 943.7,
+"z": -50.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1014.1,
+"z": -13.2,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1046.7,
+"z": 130.9,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -695.4,
+"z": 178.8,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 686.4,
+"z": 222.1,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1462.6,
+"z": 230.1,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 612.9,
+"z": 368.4,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1230.7,
+"z": 497.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": -699.7,
+"z": 502.1,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 92.1,
+"z": 519.2,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 231.3,
+"z": 524.0,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1295.3,
+"z": 528.2,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1293.7,
+"z": 571.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 458.0,
+"z": 575.0,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 646.5,
+"z": 589.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 482.7,
+"z": 660.9,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 649.9,
+"z": 696.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1315.4,
+"z": 739.1,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 732.7,
+"z": 748.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1359.9,
+"z": 755.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 109.8,
+"z": 756.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1162.8,
+"z": 772.1,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1431.4,
+"z": 778.2,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 343.2,
+"z": 785.2,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1257.7,
+"z": 788.6,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1280.1,
+"z": 804.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 324.7,
+"z": 805.7,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 363.6,
+"z": 818.3,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 738.5,
+"z": 847.2,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 1249.0,
+"z": 863.2,
+"esito": "no",
+"fonte": "ortofoto 2018-19",
+"nota": "non e una rampa (sotto un tetto, nel verde o uno scavo)"
+},
+{
+"x": 524.8,
+"z": -1684.1,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "vialetto curvo lungo la casa, accanto al volume interrato"
+},
+{
+"x": -579.9,
+"z": -1642.7,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa curva con muri in un prato con prese d aria"
+},
+{
+"x": 734.9,
+"z": -1497.6,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello fra due edifici dalla strada"
+},
+{
+"x": 125.5,
+"z": -1403.1,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa con muri lungo l edificio"
+},
+{
+"x": 781.4,
+"z": -1380.4,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa dalla strada fra siepe e casa"
+},
+{
+"x": 182.3,
+"z": -1329.2,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "striscia scura lungo la casa, accanto al volume interrato"
+},
+{
+"x": -584.0,
+"z": -1326.1,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello dalla strada verso l edificio"
+},
+{
+"x": -706.7,
+"z": -1252.9,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa lungo l edificio"
+},
+{
+"x": 840.0,
+"z": -1246.3,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa lungo l edificio dalla strada, giardino con prese d aria"
+},
+{
+"x": 1013.6,
+"z": -1233.5,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa lungo un muro verso l edificio"
+},
+{
+"x": -758.7,
+"z": -1214.0,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa curva dalla strada (anche nel censimento)"
+},
+{
+"x": 437.8,
+"z": -1012.3,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello fra due edifici dalla strada"
+},
+{
+"x": 189.8,
+"z": -1008.9,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa con un auto, accanto al volume interrato"
+},
+{
+"x": 809.8,
+"z": -942.5,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa curva con muri da un parcheggio"
+},
+{
+"x": 886.0,
+"z": -811.1,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa dalla strada fra due case"
+},
+{
+"x": 484.7,
+"z": -702.3,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello ribassato lungo l edificio"
+},
+{
+"x": 592.1,
+"z": -693.8,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa lungo l edificio dal parcheggio"
+},
+{
+"x": 1506.9,
+"z": -613.5,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa fra due edifici"
+},
+{
+"x": 983.3,
+"z": -529.9,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa in fondo a un cortile con prese d aria"
+},
+{
+"x": 537.9,
+"z": -494.6,
+"esito": "rampa",
+"fonte": "Carlo (nel gioco e dal vero)",
+"nota": "rampa a spirale, in parte coperta; dall ortofoto non si vede",
+"forza": true
+},
+{
+"x": 98.1,
+"z": -482.2,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "striscia pavimentata fra edifici (OSM parcheggio interrato)"
+},
+{
+"x": -273.7,
+"z": -473.2,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa coperta da una tettoia nel parcheggio (OSM parcheggio interrato)"
+},
+{
+"x": 967.5,
+"z": -360.1,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa curva fra due palazzine"
+},
+{
+"x": -359.2,
+"z": -249.3,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa curva dalla strada"
+},
+{
+"x": -178.8,
+"z": -246.6,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "vialetto curvo che scende verso il volume interrato"
+},
+{
+"x": 751.1,
+"z": -231.0,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa in un prato con prese d aria"
+},
+{
+"x": 998.2,
+"z": -8.7,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa curva verso l edificio"
+},
+{
+"x": 983.2,
+"z": 484.4,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa dal parcheggio con muri"
+},
+{
+"x": 1416.2,
+"z": 722.6,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa fra due edifici dal parcheggio"
+},
+{
+"x": 1452.2,
+"z": 748.0,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa dal parcheggio dentro l edificio"
+},
+{
+"x": 771.4,
+"z": 766.3,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello curvo verso il volume interrato"
+},
+{
+"x": 323.5,
+"z": 780.1,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "striscia lungo la casa dal passo carraio, volume interrato accanto"
+},
+{
+"x": 1345.5,
+"z": 782.9,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello ribassato in fondo al parcheggio"
+},
+{
+"x": 1336.9,
+"z": 804.2,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello ribassato in fondo al parcheggio"
+},
+{
+"x": 375.8,
+"z": 816.9,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa fra due case verso il volume interrato"
+},
+{
+"x": 1322.8,
+"z": 847.5,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello ribassato in fondo al parcheggio"
+},
+{
+"x": 961.0,
+"z": 872.8,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa curva lungo l edificio dal parcheggio"
+},
+{
+"x": 1113.8,
+"z": 915.4,
+"esito": "rampa",
+"fonte": "ortofoto 2018-19",
+"nota": "rampa curva (anche nel censimento)"
+},
+{
+"tipo": "buca",
+"x": 1065.5,
+"z": -479.4,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "prato ribassato fra due muri (forse vero)"
+},
+{
+"tipo": "buca",
+"x": -795.6,
+"z": -1187.6,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "rettangolo chiaro fra due case (piscina o bocca di lupo?)"
+},
+{
+"tipo": "buca",
+"x": 755.4,
+"z": -965.4,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "cortile in ombra fra edifici, forse ribassato"
+},
+{
+"tipo": "buca",
+"x": 858.5,
+"z": -1279.4,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "corpo curvo attaccato all edificio (come Gagarin?)"
+},
+{
+"tipo": "buca",
+"x": 1128.6,
+"z": -995.0,
+"esito": "dubbio",
+"fonte": "ortofoto 2018-19",
+"nota": "corsello scuro fra due edifici, forse una rampa"
+}
+]
+}

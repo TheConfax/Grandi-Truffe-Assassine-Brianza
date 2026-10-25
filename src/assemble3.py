@@ -110,7 +110,7 @@ rep("while (heap.length) { const [d, u] = pop(); if (d > dist[u]) continue;", "w
 a = s.index("function spawnParked() {"); b = s.index("// ---------------------------------------------------------------- wanted level & police")
 s = s[:a] + """function parkTile(T) {
   T.parked = []; srndT = 77 + T.t * 131;
-  const add = (m, x, z, h) => { const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.y = H.surface(x, z); v.sync(); T.parked.push(v); };
+  const add = (m, x, z, h) => { if (H.inPit(x, z, 1.5)) return; const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.y = H.surface(x, z); v.sync(); T.parked.push(v); };
   // car parks with painted stalls: about half of them taken, a car in each and never in the yellow one; lots without stalls keep a few loose cars
   let inStalls = 0;
   for (const st of T.stalls || []) {

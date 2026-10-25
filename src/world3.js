@@ -116,7 +116,7 @@ for (const T of TILES) {
     }
   }
   for (const f of d.fe || []) T.fe.push(resample(dec(f.p), 3)); // fences follow the ground every 3 m (walls and collisions are built later)
-  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
+  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const br of d.ba || []) {
     const pts = resample(dec(br.p), 4); (T.ba || (T.ba = [])).push({ pts, t: br.t, h: br.h, v: br.v }); // follow the ground, not long chords
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2); WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }); }
@@ -935,12 +935,76 @@ function* drawBarriers(T, grail, pil) {
 // as the draw order: grass 1, paved 1.1, water 2, footway 3, piazza 4, asphalt 5, pedestrian street 5.1), FT.own the rank and FT.sty its look.
 // That layer draws the cell in place of the ground, the polygons cut on the grid only draw the cells their outline crosses: a meadow costs
 // the triangles of the ground and no more. A street surface under a free deck (the bridge's own top is drawn) keeps the ground
+// ---- ramps of the underground garages (docs/sottoterra.md, tappa 1; altezze3.js PITS). A ramp takes the cells of S its outline touches:
+// here its tile draws, in those of its cells, the ground outside the outline (anello: triangles of the build, at S, with the look of the
+// layer that covers the cell), and the tile of its middle draws the ramp: the floor (its triangles, H.base inside the outline), the walls
+// from the floor up to 1 m over S along both sides (retaining wall and parapet in one, lower where the drop is small near the mouth), a
+// closed door at the end with a wall over it, and the same walls in WALLS (two-sided, with their height band): the car stops at the door
+const doorTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#8d9093'; g.fillRect(0, 0, w, h); g.fillStyle = '#6f7275'; for (let y = 0; y < h; y += 8) g.fillRect(0, y, w, 2); g.fillStyle = 'rgba(255,255,255,.18)'; for (let y = 3; y < h; y += 8) g.fillRect(0, y, w, 1); });
+Object.assign(MAT, { pitFloor: new THREE.MeshLambertMaterial({ map: concreteTex, color: 0xa29e96 }), pitWall: new THREE.MeshLambertMaterial({ map: concreteTex, color: 0xc4c0b8, side: THREE.DoubleSide }), pitDoor: new THREE.MeshLambertMaterial({ map: doorTex, side: THREE.DoubleSide }) });
+const PIT_PAR = 1.0; // parapet over the ground
+function pitLook(T, x, z) { // the look of the highest layer of the tile over the point (cellOwners), or null: bare ground
+  let best = null;
+  for (const [o, k, rank, st] of T.layers || []) if ((!best || rank >= best[0]) && inPoly(x, z, o) && !k.some(h => inPoly(x, z, h))) best = [rank, st];
+  return best ? best[1] : null;
+}
+function buildPits(T, G) {
+  const key = (T.t % NTX) + '_' + Math.floor(T.t / NTX);
+  for (const p of H.PITS) {
+    p.meshes = p.meshes || [];
+    // the ground of this tile's cells around the ramp
+    const byLook = new Map();
+    for (const [k, w, f] of p.anello) {
+      if (k !== key) continue;
+      for (let i = 0; i < f.length; i += 6) {
+        const xs = [f[i], f[i + 2], f[i + 4]], zs = [f[i + 1], f[i + 3], f[i + 5]], cx = (xs[0] + xs[1] + xs[2]) / 3, cz = (zs[0] + zs[1] + zs[2]) / 3, sy = pitLook(T, cx, cz);
+        let B = byLook.get(sy); if (!B) byLook.set(sy, B = Buf());
+        const ys = xs.map((x, q) => H.baseS(x, zs[q])), vs = sy ? sy.vs : 10, i0 = B.p.length / 3;
+        for (let q = 0; q < 3; q++) vtx(B, xs[q], ys[q], zs[q], 0, 1, 0, xs[q] / vs, zs[q] / vs, sy ? sy.col : null);
+        triUp(B, i0, i0 + 1, i0 + 2);
+      }
+    }
+    for (const [sy, B] of byLook) { const M = mkMesh(B, sy ? sy.m : MAT.terrainS, -2, false); scene.remove(M); G.add(M); M.userData.suolo = true; p.meshes.push(M); }
+    if (tileOf(p.c[0], p.c[1]) !== T.t || p.built) continue;
+    p.built = true;
+    // the floor
+    const F = Buf(), tr = p.tri;
+    for (let i = 0; i < tr.length; i += 9) {
+      const i0 = F.p.length / 3; for (let q = 0; q < 3; q++) vtx(F, tr[i + q * 3], tr[i + q * 3 + 2], tr[i + q * 3 + 1], 0, 1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4);
+      triUp(F, i0, i0 + 1, i0 + 2);
+    }
+    const MF = mkMesh(F, MAT.pitFloor, -2, false); scene.remove(MF); G.add(MF); MF.userData.suolo = true; p.meshes.push(MF);
+    // walls and parapets along the two sides, the door at the end
+    const Wb = Buf(), D = Buf(), quad = (b, a, c, ya0, ya1, yc0, yc1, u0, u1) => { const dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1, nx = dz / L, nz = -dx / L, i0 = b.p.length / 3; vtx(b, a[0], ya0, a[1], nx, 0, nz, u0, ya0 / 2); vtx(b, c[0], yc0, c[1], nx, 0, nz, u1, yc0 / 2); vtx(b, c[0], yc1, c[1], nx, 0, nz, u1, yc1 / 2); vtx(b, a[0], ya1, a[1], nx, 0, nz, u0, ya1 / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); };
+    for (const side of [p.sx, p.dx]) {
+      let u = 0;
+      for (let k = 1; k < side.length; k++) {
+        const [ax, az, ay] = side[k - 1], [bx, bz, by] = side[k], L = hyp(bx - ax, bz - az) || 1;
+        const pts = H.cutLine(ax, az, bx, bz, H.baseS); let lo = 1e9, hi = -1e9, deep = false;
+        for (let q = 1; q < pts.length; q++) {
+          const A = pts[q - 1], C = pts[q], fa = ay + (by - ay) * hyp(A[0] - ax, A[1] - az) / L, fc = ay + (by - ay) * hyp(C[0] - ax, C[1] - az) / L, da = A[2] - fa, dc = C[2] - fc;
+          if (Math.max(da, dc) < 0.25) continue; deep = true;
+          const ta = A[2] + Math.min(PIT_PAR, Math.max(0, da)), tc = C[2] + Math.min(PIT_PAR, Math.max(0, dc)); lo = Math.min(lo, fa, fc); hi = Math.max(hi, ta, tc);
+          const ua = u + hyp(A[0] - ax, A[1] - az) / 2, uc = u + hyp(C[0] - ax, C[1] - az) / 2; quad(Wb, A, C, Math.min(fa, A[2]), ta, Math.min(fc, C[2]), tc, ua, uc);
+        }
+        u += L / 2;
+        if (deep) { const L2 = hyp(bx - ax, bz - az); WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L2, nz: -(bx - ax) / L2, two: true, y0: lo - 3, y1: hi, pit: p.id }); }
+      }
+    }
+    const [lx, lz, ly] = p.sx[p.sx.length - 1], [rx, rz, ry] = p.dx[p.dx.length - 1], dl = H.baseS(lx, lz), dr = H.baseS(rx, rz), ph = p.porta_h;
+    quad(D, [lx, lz], [rx, rz], ly, Math.min(ly + ph, Math.max(dl, ly + 0.5)), ry, Math.min(ry + ph, Math.max(dr, ry + 0.5)), 0, hyp(rx - lx, rz - lz) / 2.5);
+    if (dl + PIT_PAR > ly + ph || dr + PIT_PAR > ry + ph) quad(Wb, [lx, lz], [rx, rz], ly + ph, Math.max(ly + ph, dl + PIT_PAR), ry + ph, Math.max(ry + ph, dr + PIT_PAR), 0, hyp(rx - lx, rz - lz) / 2);
+    { const L2 = hyp(rx - lx, rz - lz) || 1; WALLS.add(Math.min(lx, rx), Math.min(lz, rz), Math.max(lx, rx), Math.max(lz, rz), { ax: lx, az: lz, bx: rx, bz: rz, nx: (rz - lz) / L2, nz: -(rx - lx) / L2, two: true, y0: Math.min(ly, ry) - 3, y1: Math.max(dl, dr) + PIT_PAR, pit: p.id, porta: true }); }
+    for (const [b, mt] of [[Wb, MAT.pitWall], [D, MAT.pitDoor]]) if (b.i.length) { const M = mkMesh(b, mt, 0, 'cast'); scene.remove(M); G.add(M); p.meshes.push(M); }
+  }
+}
 const STY = {};
 function cellOwners(T, F) {
   const c = F.n - 1, own = F.own = new Float32Array(c * c), sty = F.sty = new Array(c * c).fill(null), d = T.d, uf = new Int8Array(c * c);
   const underFree = w => { if (!uf[w]) { const i = w % c, j = (w - i) / c; let f = false; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x = F.x0 + (i + a) * F.st, z = F.z0 + (j + b) * F.st; if (H.overFree(x, z, H.base(x, z)) > H.base(x, z) + 0.01) f = true; } uf[w] = f ? 1 : 2; } return uf[w] === 1; };
   const S = (k, m, vs, col) => { const key = k + (col ? col.getHexString() : ''); return STY[key] || (STY[key] = { m, vs, col: col || null }); };
-  const cover = (o, k, rank, st, street) => { if (o.length < 3) return; H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && underFree(w))) return; own[w] = rank; sty[w] = st; }); };
+  const lay = T.layers = []; // [outer, holes, rank, look]: the look of a cell a ramp takes (pitLook)
+  const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && underFree(w))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
     if (a.t === 18) cover(outer, holes, 1, S('i', MAT.incoltoS, 12)); // incolti (DBGT PS_INC 04): dry grass and bare earth
@@ -982,6 +1046,7 @@ function* buildTileGen(T) {
     const setV = (k, x, y, z) => { pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z; uv[k * 2] = x / 10; uv[k * 2 + 1] = z / 10; };
     H.onTri(T.t, (ax, ay, az, bx, by, bz, cx, cy, cz, a, b, c) => {
       setV(a, ax, ay, az); setV(b, bx, by, bz); setV(c, cx, cy, cz); const w = tri++ >> 1;
+      if (FT.pc && FT.pc[w]) { T.cellMesh[w] = 255; return; } // a cell a ramp takes: buildPits draws it
       if (!own[w]) { if (tri & 1) T.cellIdx[w] = q; idx[q++] = a; idx[q++] = c; idx[q++] = b; return; } // wound to face up
       // one buffer per look (STY shares one object per material and colour); k: its mesh in [terrMesh, ...ownMeshes]. No strings or arrays per
       // triangle: built that way this slice took 40-60 ms in the town centre (a stutter while driving), now about as long as the bare terrain
@@ -1001,6 +1066,7 @@ function* buildTileGen(T) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx.subarray(0, q), 1)); g.computeBoundingSphere();
     // phase 5: the mesh writes its own depth (the surfaces on it are cut on its cells and win by polygonOffset), so no depth mask under it
     const m = new THREE.Mesh(g, MAT.terrainS); m.renderOrder = -2; m.receiveShadow = true; G.add(m); T.terrMesh = m; T.st = st;
+    if (H.PITS.length) buildPits(T, G);
   } else {
     // beside a tile of S its edge nodes are S (H.vis takes the neighbour's on the shared edge): every 2 m, as S, or the edge would crack
     const st = (d.rv || []).length || H.nearFine(T.t) ? 2 : TER.step, nn = Math.round(TS / st), b = Buf(), w = nn + 1; T.st = st;

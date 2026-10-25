@@ -46,7 +46,7 @@ const H = (() => {
       if (Math.round(TSZ / st) + 1 !== n || b.length < 12 + 2 * n * n) throw new Error('misure sbagliate');
       for (let k = 0; k < n * n; k++) { const q = dv.getUint16(12 + 2 * k, true); y[k] = q === 65535 ? farH(x0 + (k % n) * st, z0 + Math.floor(k / n) * st) : (base * 100 + q) / 100 - B0; } // 65535: empty, the old ground
       const mo = 12 + 2 * n * n, m = b.length >= mo + (n - 1) * (n - 1) ? b.slice(mo, mo + (n - 1) * (n - 1)) : null;
-      FT[t] = { t, st, n, x0, z0, y, m }; LS[t] = 2;
+      FT[t] = { t, st, n, x0, z0, y, m, pc: pitCells(tx, tz, n - 1) }; LS[t] = 2;
       for (const f of onLoad) f(t);
     } catch (e) { LS[t] = 3; console.warn('terreno ' + tx + '_' + tz + ': ' + e.message + ' (resta il motore vecchio)'); }
   }
@@ -159,6 +159,7 @@ const H = (() => {
       const i0 = clamp(Math.floor((rx0 - F.x0) / st), 0, c - 1), i1 = clamp(Math.floor((rx1 - F.x0) / st), 0, c - 1);
       for (let i = i0; i <= i1; i++) {
         if (mk && !mk[j * c + i]) continue;
+        if (F.pc && F.pc[j * c + i]) continue; // a cell a ramp takes: world3.js draws it (buildPits)
         const X0 = F.x0 + i * st, Q = half(half(Rw, 1, 0, -X0), -1, 0, X0 + st); if (Q.length < 3) continue;
         const k = j * n + i, h00 = Y[k], h10 = Y[k + 1], h01 = Y[k + n], h11 = Y[k + n + 1];
         const A = tidy(half(Q, 1, -1, Z0 - X0)); // u >= v
@@ -240,7 +241,7 @@ const H = (() => {
       xs.sort((p, q) => p - q);
       for (let s = 0; s + 1 < xs.length; s += 2) {
         const ia = Math.max(0, Math.ceil((xs[s] - X0) / st - 0.5)), ib = Math.min(c - 1, Math.floor((xs[s + 1] - X0) / st - 0.5));
-        for (let i = ia; i <= ib; i++) if (!mk[j * c + i]) cb(j * c + i);
+        for (let i = ia; i <= ib; i++) if (!mk[j * c + i] && !(F.pc && F.pc[j * c + i])) cb(j * c + i);
       }
     }
   }
@@ -332,6 +333,31 @@ const H = (() => {
     }
     const v = NDK.get(i); return v === undefined ? null : v;
   }
+  // pits (docs/sottoterra.md, tappa 1): ramps of the underground garages, from src/sottoterra.py. Each takes the 2 m cells of S its outline
+  // touches (F.pc, a flag per cell); inside its outline its floor triangles are the ground (H.base, H.ground, H.surface), outside it S. The
+  // terrain mesh leaves those cells out, world3.js draws the floor, the ground of the cells around it (anello), the walls and the door
+  const PITS = [], PG = new Grid(8), PCELL = new Map();
+  for (const q of TERRENO ? TERRENO.pits : []) {
+    if (q.tipo !== 'rampa') continue;
+    const tri = new Float64Array(q.tri.length); for (let i = 0; i < tri.length; i += 3) { tri[i] = q.tri[i]; tri[i + 1] = q.tri[i + 1]; tri[i + 2] = q.tri[i + 2] - B0; }
+    const o = { id: PITS.length, src: q, tri, imp: q.imp, sx: q.sx.map(([x, z, y]) => [x, z, y - B0]), dx: q.dx.map(([x, z, y]) => [x, z, y - B0]), anello: q.anello, porta_h: q.porta_h || 2.4, c: q.c, bb: [Math.min(...q.imp.map(v => v[0])), Math.min(...q.imp.map(v => v[1])), Math.max(...q.imp.map(v => v[0])), Math.max(...q.imp.map(v => v[1]))] };
+    PITS.push(o);
+    for (let i = 0; i < tri.length; i += 9) PG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i });
+    for (const k in q.celle) { let l = PCELL.get(k); if (!l) PCELL.set(k, l = []); for (const w of q.celle[k]) l.push(w); }
+  }
+  function pitCells(tx, tz, c) { const l = PCELL.get(tx + '_' + tz); if (!l) return null; const a = new Uint8Array(c * c); for (const w of l) a[w] = 1; return a; }
+  function pitY(x, z) { // the floor of a pit at (x, z), or null outside every floor
+    let y = null;
+    PG.each(x, z, x, z, ({ p, i }) => {
+      if (y !== null) return; const T = p.tri, ax = T[i], az = T[i + 1], bx = T[i + 3], bz = T[i + 4], cx = T[i + 6], cz = T[i + 7];
+      const den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(den) < 1e-12) return;
+      const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / den, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / den, l3 = 1 - l1 - l2;
+      if (l1 < -1e-7 || l2 < -1e-7 || l3 < -1e-7) return; y = l1 * T[i + 2] + l2 * T[i + 5] + l3 * T[i + 8];
+    });
+    return y;
+  }
+  const pitIn = (F, x, z) => { if (!F.pc) return null; const c = F.n - 1, i = clamp(Math.floor((x - F.x0) / F.st), 0, c - 1), j = clamp(Math.floor((z - F.z0) / F.st), 0, c - 1); return F.pc[j * c + i] ? pitY(x, z) : null; };
+  const onG = (F, x, z) => { const p = pitIn(F, x, z); return p !== null ? p : onF(F, x, z); }; // S, or the floor of a ramp
   // the step of the old engine (tiles without .bin): the sidewalks and platforms the tile draws raised; world3.js fills them in later
   const oldStep = (x, z) => { try { return onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : 0; } catch (e) { return 0; } }; // (before world3.js has its grids: 0)
   // water level (docs/motore.md 1.3): zw along the DBGT river axes, every 2 m; elsewhere the lowest S across an OSM river + 0.3
@@ -353,20 +379,23 @@ const H = (() => {
   }
   const KIND = [null, 'road', 'side', 'green', 'river', 'slope', 'rail'];
   const H = {
-    B0, DECKS, onLoad, farH, deckAt, water,
+    B0, DECKS, PITS, onLoad, farH, deckAt, water,
+    baseS(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); }, // S alone, without the ramps (their walls stand on it)
+    pitAt(x, z) { const F = fineAt(x, z); return F ? pitIn(F, x, z) : null; }, // the floor of a ramp here, or null
+    inPit(x, z, m = 0) { for (const p of PITS) { if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) continue; if (inPoly(x, z, p.imp)) return p; if (m > 0) for (let k = 0; k < p.imp.length; k++) { const a = p.imp[k], b = p.imp[(k + 1) % p.imp.length]; if (segDist(x, z, a[0], a[1], b[0], b[1]) < m) return p; } } return null; }, // within m of a ramp: no tree, car or bench there
     fine: t => !!FT[t], tile: t => FT[t], has: t => STEP[t] > 0,
     fineAt: (x, z) => !!fineAt(x, z),
-    base(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); },
+    base(x, z) { const F = fineAt(x, z); return F ? onG(F, x, z) : oldG(x, z); },
     // the ground as drawn (docs/motore.md 3): S + step, the cover of a sidewalk, a platform or a median where the point is on one; in a tile
     // without .bin the old ground and its sidewalks and platforms (onSide, onPlatform of world3.js). What draws the step itself (the sides
     // of a platform, the kerbs) or drapes a surface takes H.base
-    ground(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) + step(x, z) : oldG(x, z) + oldStep(x, z); },
-    vis(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z) - rivCut(x, z); }, // the old drawn ground cut the river into the grid
+    ground(x, z) { const F = fineAt(x, z); if (!F) return oldG(x, z) + oldStep(x, z); const p = pitIn(F, x, z); return p !== null ? p : onF(F, x, z) + step(x, z); },
+    vis(x, z) { const F = fineAt(x, z); return F ? onG(F, x, z) : oldG(x, z) - rivCut(x, z); }, // the old drawn ground cut the river into the grid
     rivCut, fadeW, // the old engine near S: how deep its river cut is, how much of S it takes
     inRiver: (x, z) => riverCut(x, z) > 0, // within an OSM river (its axis and width), wherever: the tiles of S use it to find the water mapped in the bed
     // what the street surfaces drape on: S, or the top of a deck nothing but water or field passes under (the asphalt of a bridge over the
     // Seveso stays on the bridge). Transitional: phase 5 clips them on the grid and on the decks
-    street(x, z) { const F = fineAt(x, z); if (!F) return oldG(x, z); const g = onF(F, x, z); for (const o of deckAt(x, z)) if (o.d.free && o.top > g) return o.top; return g; },
+    street(x, z) { const F = fineAt(x, z); if (!F) return oldG(x, z); const g = onG(F, x, z); for (const o of deckAt(x, z)) if (o.d.free && o.top > g) return o.top; return g; },
     // the top of a deck nothing but water or field passes under, where it stands over y (the street surfaces of a bridge over the Seveso)
     overFree(x, z, y) { for (const o of deckAt(x, z)) if (o.d.free && o.top > y) y = o.top; return y; },
     step, stepAt, clipPoly, clipTri, coverCells, cutLine, joinPieces, anyFine: () => !!TERRENO,
@@ -375,6 +404,7 @@ const H = (() => {
     addStep(kind, h, o, k) { if (o.length < 3) return; const s = { kind, h, o, k: k || [], bb: bbox(o) }; STG.add(s.bb[0], s.bb[1], s.bb[2], s.bb[3], s); },
     surface(x, z, cy) {
       const F = fineAt(x, z); if (!F) return H.oldSurface(x, z, cy);
+      const pf = pitIn(F, x, z); if (pf !== null) return pf; // down a ramp: its floor
       const sh = step(x, z); let y = onF(F, x, z) + (sh || bumpAt(x, z)); // the step layer: the sidewalks, platforms and medians as drawn
       if (cy === undefined) return y;
       for (const o of deckAt(x, z)) if (o.top > y && o.top <= cy + 0.8) y = o.top;
@@ -432,9 +462,11 @@ const H = (() => {
       const R = () => { rnd2 = (rnd2 * 16807) % 2147483647; return rnd2 / 2147483647; };
       for (const T of TILES) {
         const F = FT[T.t], m = T.terrMesh; if (!F || !m || !T.ready) continue;
-        const meshes = [m, ...(T.ownMeshes || [])], n = F.n; let mx = 0, mr = 0, nr = 0; // the cells a surface layer owns are drawn by its mesh (world3.js, H.own)
+        const meshes = [m, ...(T.ownMeshes || [])], n = F.n; let mx = 0, mr = 0, nr = 0, np_ = 0; // the cells a surface layer owns are drawn by its mesh (world3.js, H.own)
         for (let q = 0; q < 1000; q++) {
-          const x = F.x0 + R() * TSZ, z = F.z0 + R() * TSZ, i = clamp(Math.floor((x - F.x0) / F.st), 0, n - 2), j = clamp(Math.floor((z - F.z0) / F.st), 0, n - 2), w = j * (n - 1) + i, M = meshes[T.cellMesh ? T.cellMesh[w] : 0], c = T.cellIdx ? T.cellIdx[w] : w * 6;
+          const x = F.x0 + R() * TSZ, z = F.z0 + R() * TSZ, i = clamp(Math.floor((x - F.x0) / F.st), 0, n - 2), j = clamp(Math.floor((z - F.z0) / F.st), 0, n - 2), w = j * (n - 1) + i;
+          if (F.pc && F.pc[w]) { np_++; continue; } /* a cell of a ramp: H.checkPits */
+          const M = meshes[T.cellMesh ? T.cellMesh[w] : 0], c = T.cellIdx ? T.cellIdx[w] : w * 6;
           const P = M.geometry.attributes.position.array, I = M.geometry.index.array;
           let y = null;
           for (const s of [c, c + 3]) {
@@ -446,12 +478,32 @@ const H = (() => {
           mx = Math.max(mx, Math.abs(y - H.base(x, z)));
         }
         for (const M of meshes) M.updateMatrixWorld();
-        for (let q = 0; q < 20; q++) { const x = F.x0 + R() * TSZ, z = F.z0 + R() * TSZ; ray.set(o.set(x, 1e4, z), dn); const h = ray.intersectObjects(meshes, false)[0]; if (h) { mr = Math.max(mr, Math.abs(h.point.y - H.base(x, z))); nr++; } }
-        res.push({ tile: (T.t % NX) + '_' + Math.floor(T.t / NX), passo: F.st, punti: 1000, scarto_max_m: +mx.toFixed(4), raggi: nr, scarto_raggi_m: +mr.toFixed(4) });
+        for (let q = 0; q < 20; q++) { const x = F.x0 + R() * TSZ, z = F.z0 + R() * TSZ; if (F.pc && F.pc[clamp(Math.floor((z - F.z0) / F.st), 0, n - 2) * (n - 1) + clamp(Math.floor((x - F.x0) / F.st), 0, n - 2)]) continue; ray.set(o.set(x, 1e4, z), dn); const h = ray.intersectObjects(meshes, false)[0]; if (h) { mr = Math.max(mr, Math.abs(h.point.y - H.base(x, z))); nr++; } }
+        res.push({ tile: (T.t % NX) + '_' + Math.floor(T.t / NX), passo: F.st, punti: 1000 - np_, punti_rampe: np_, scarto_max_m: +mx.toFixed(4), raggi: nr, scarto_raggi_m: +mr.toFixed(4) });
       }
       const max = res.reduce((a, r) => Math.max(a, r.scarto_max_m), 0), maxr = res.reduce((a, r) => Math.max(a, r.scarto_raggi_m), 0);
       console.table(res); console.log(`H.check (G1): ${res.length} tile, scarto massimo mesh - H.base ${max.toFixed(3)} m, sui raggi ${maxr.toFixed(3)} m`);
       return { tile: res.length, scarto_max_m: max, scarto_raggi_m: maxr, righe: res };
+    },
+    // G1 for the ramps: random points of the cells each ramp takes, a vertical ray on what world3.js drew there (floor and ground around:
+    // p.meshes, userData.suolo) against H.base; expected 0.000 m, and no point in no mesh (a hole)
+    checkPits(nper = 300) {
+      const ray = new THREE.Raycaster(), dn = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3(); let rnd2 = 777; const R = () => { rnd2 = (rnd2 * 16807) % 2147483647; return rnd2 / 2147483647; };
+      const out = [];
+      for (const p of PITS) {
+        if (!p.meshes || !p.meshes.length) { out.push({ id: p.id, c: p.c, costruita: false }); continue; }
+        const suolo = p.meshes.filter(M => M.userData.suolo); for (const M of suolo) M.updateMatrixWorld();
+        const cells = []; for (const k in p.src.celle) { const [tx, tz] = k.split('_').map(Number), F = FT[tx + NX * tz]; if (F) for (const w of p.src.celle[k]) cells.push([F, w]); }
+        let mx = 0, buchi = 0, n = 0;
+        for (let q = 0; q < nper; q++) {
+          const [F, w] = cells[Math.floor(R() * cells.length)], c = F.n - 1, i = w % c, j = (w - i) / c, x = F.x0 + (i + 0.02 + 0.96 * R()) * F.st, z = F.z0 + (j + 0.02 + 0.96 * R()) * F.st;
+          ray.set(o.set(x, 1e4, z), dn); const h = ray.intersectObjects(suolo, false)[0]; n++;
+          if (!h) { buchi++; continue; } mx = Math.max(mx, Math.abs(h.point.y - H.base(x, z)));
+        }
+        out.push({ id: p.id, c: p.c, punti: n, scarto_max_m: +mx.toFixed(4), buchi });
+      }
+      const max = out.reduce((a, r) => Math.max(a, r.scarto_max_m || 0), 0), buchi = out.reduce((a, r) => a + (r.buchi || 0), 0);
+      console.log('H.checkPits: ' + out.length + ' rampe, scarto massimo ' + max.toFixed(4) + ' m, punti senza mesh ' + buchi); return { rampe: out.length, scarto_max_m: max, buchi, righe: out };
     },
   };
   function near(t) { const i = t % NX, j = Math.floor(t / NX), o = []; for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const I = i + a, J = j + b; if (I >= 0 && J >= 0 && I < NX && J < NZ) o.push(I + NX * J); } return o; }

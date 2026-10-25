@@ -54,8 +54,11 @@ def main(argv=None):
     if os.path.exists(fa):
         for s in json.load(open(fa, encoding='utf-8')):
             acqua.append(dict(p=[v for q in s['p'] for v in (r2(q[0]), r2(q[1]))], zw=[r2(v) for v in s['zw']]))
+    pits = dk.get('pits', [])
+    ff = os.path.join(a.da, 'fosse_meda.json')   # the ramps of src/sottoterra.py (docs/sottoterra.md, tappa 1)
+    if os.path.exists(ff): pits = pits + json.load(open(ff, encoding='utf-8'))['fosse']
     ind = dict(ver=1, fase=4, comune=a.comune, nota='docs/motore.md fase 4: quote in m sul mare; il gioco toglie terrain.base di brianza.json',
-               tiles=tiles, decks=decks, pits=dk.get('pits', []), acqua=acqua)
+               tiles=tiles, decks=decks, pits=pits, acqua=acqua)
     open(os.path.join(a.out, 'indice.json'), 'w', encoding='utf-8').write(json.dumps(ind, ensure_ascii=False, separators=(',', ':')))
     print('terreno: %d tile (%s), %.1f MB in gzip; impalcati %d, fosse %d, assi d acqua %d; indice %.0f KB' % (
         len(tiles), {s: sum(1 for v in tiles.values() if v == s) for s in sorted(set(tiles.values()))}, peso / 1e6, len(decks), len(ind['pits']), len(acqua),
