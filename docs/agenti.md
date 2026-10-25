@@ -26,4 +26,5 @@ Leggi questo, `CLAUDE.md` e solo le parti di `docs/motore.md` che servono al tuo
 
 ## Chiusura
 - Rapporto corto: cosa hai cambiato, numeri prima/dopo, problemi aperti, domande per Carlo.
+- L'ultimo `index.html` prima di unire in `dev` si assembla con `GTA_RAMO=dev python src/assemble3.py`, così la riga della versione in basso dice "ramo dev" e non il nome del tuo ramo.
 - Unione in `dev`, tag `archivio/<ramo>`, cancellazione di ramo e worktree: come dice il compito (dal prossimo giro le unioni le fa l'agente di build a fine giro).
