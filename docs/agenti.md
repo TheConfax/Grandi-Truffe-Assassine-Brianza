@@ -14,6 +14,7 @@ Leggi questo, `CLAUDE.md` e solo le parti di `docs/motore.md` che servono al tuo
 - Build e terreno solo col gettone (vedi `CLAUDE.md`).
 - Niente dati inventati: forme e quote dal DBGT, nomi e attributi da OSM, aspetto da ortofoto o foto; dove non si sa, neutro. Niente regole o coordinate scritte per un comune: regole generali.
 - Un muro non sparisce mai: se va tolto da un posto si sposta sul confine.
+- Niente di attraversabile (Carlo, 25/10): ogni oggetto solido che metti nel mondo o si sfascia quando lo prendi o ti ferma. Mai un oggetto che l'auto o il pedone passa come un fantasma.
 - Il gioco di Carlo su http://127.0.0.1:8013/ resta acceso. Porta tua, spenta alla fine. Non chiudere processi non tuoi; chiudi i tuoi browser di prova.
 - Commit in italiano scritti in un file (`git commit -F`), ultima riga `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Nelle righe lunghe a più istruzioni usa `/* */`, mai `//` a metà riga.
