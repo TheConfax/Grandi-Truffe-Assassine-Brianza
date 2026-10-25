@@ -65,6 +65,16 @@ function inBed(T, x, z) {
   for (const q of T.sfP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
   return false;
 }
+// a point on hard standing, not on a lawn: a road, a pavement, or a paved area, yard, footway or square of the tile (the surfaces the DBGT and OSM
+// give; the cells of S keep no record of them, so the polygons are decoded once per tile). The volanti of the caserme park only on these
+function hardAt(x, z) {
+  const k = H.kind(x, z); if (k === 'road' || k === 'side' || k === 'plat') return true;
+  const T = TILES[tileOf(x, z)]; if (!T) return false;
+  if (!T.hardP) { const d = T.d, mk = q => { const o = dec(q.p); return { o, k: (q.k || []).map(dec), b: bbox(o) }; };
+    T.hardP = [...(d.a || []).filter(a => a.t !== 5 && a.t !== 6 && a.t !== 18 && !(a.t <= 3 || a.t >= 11 && a.t !== 17)), ...(d.cv || []), ...(d.pz || []), ...(d.ft || []), ...(d.as || [])].filter(q => q.p).map(mk); }
+  for (const q of T.hardP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
+  return false;
+}
 function nearAsph(x, z, m, key) { if (onAsph(x, z, key)) return true; if (!(m > 0)) return false; const e = m + 0.25; return onAsph(x + e, z, key) || onAsph(x - e, z, key) || onAsph(x, z + e, key) || onAsph(x, z - e, key); }
 function nearDeckCarr(x, z, y, m) { return nearAsph(x, z, m, 'ap') && H.deckAt(x, z).some(o => Math.abs(o.top - y) < 1.5); } // in the carriageway of a bridge at this level (tiles[t].ap) // the bit grid is 0.5 m: m past the edge, not on the cell
 function onAnyRoad(x, z, m) { if (m >= 0 && onAsph(x, z)) return true; let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && atGrade(s) && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + m) f = true; }); return f; }
@@ -89,7 +99,7 @@ for (const T of TILES) {
   for (const B of d.b || []) {
     const outer = dec(B.p); if (outer.length < 3) continue;
     const holes = (B.k || []).map(dec).filter(h => h.length >= 3), bb = bbox(outer);
-    const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g }; // g: 1 garages, 2 greenhouse (paesaggio3.js)
+    const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g, mm: B.mm }; // g: 1 garages, 2 greenhouse, 3 stand, 4 water tower, 5 cabin; mm the model of a DBGT manufatto (paesaggio3.js)
     // a volume of the DBGT (src/dbgt_edifici.py): zt the top of its walls and zb its raised base (a portico, a passage, an overhang) above
     // terrain.base, e its building, rk/rf/rc its roof (planes over the top of the walls), wc/rcol the colours OSM gives, st its state in the
     // 2015 survey when OSM does not say otherwise (2 a ruin with no roof over it in the DSM: bare walls only; 3 a ruin with its roof; 1 under
@@ -105,6 +115,7 @@ for (const T of TILES) {
     if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }); } continue; }
     BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
     if (B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
+    if (B.g === 4) continue; // a water tower: its plan is the tank up in the air, the solid is its shaft (paesaggio3.js lsTower)
     const gys = outer.map(p => H.ground(p[0], p[1])), by0 = Math.min(...gys) - 3, by1 = Math.max(Math.max(...gys) + B.h, B.zt !== undefined ? B.zt + roofTop(rec) : -1e9) + 3;
     for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) {
       const A = sArea(ring);
@@ -1381,7 +1392,7 @@ function* buildTileGen(T) {
     const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf(), doorB = Buf();
     let nb = 0;
     for (const B of T.bld) {
-      if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower (paesaggio3.js)
+      if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower, cabin (paesaggio3.js)
       if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
       const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t, raised = B.zb !== undefined;
       // a DBGT volume: the top of its walls is its own (zt), never under the ground round it; a raised one starts at its base (zb)
@@ -1803,11 +1814,18 @@ for (const p of D.pois) {
     const s = (inside ? 0 : d) - Math.min(Math.sqrt(Math.abs(sArea(b.pts))), 30) * 0.3;
     if ((inside || d < 35) && b.h >= 3 && s < bs) { bs = s; B = b; }
   });
+  // the front the build opened the fence at (pois[].fr, src/build_data.py): the building that has that wall, and no other front is looked for
+  let FR = null;
+  if (p.fr) {
+    const mx = (p.fr[0] + p.fr[2]) / 2, mz = (p.fr[1] + p.fr[3]) / 2; let bd = 1.5;
+    BLD.each(mx - 3, mz - 3, mx + 3, mz + 3, b => { for (let i = 0; i < b.pts.length; i++) { const a = b.pts[i], c = b.pts[(i + 1) % b.pts.length], d = segDist(mx, mz, a[0], a[1], c[0], c[1]); if (d < bd && b.h >= 3) { bd = d; B = b; FR = p.fr; } } });
+  }
   if (!B) continue;
   // the front: a long wall looking onto a street, with nothing in between
   let F = null;
   for (let i = 0; i < B.pts.length; i++) {
-    const a = B.pts[i], c = B.pts[(i + 1) % B.pts.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 5) continue;
+    let a = B.pts[i], c = B.pts[(i + 1) % B.pts.length]; if (FR) { a = [FR[0], FR[1]]; c = [FR[2], FR[3]]; if (i) break; }
+    const L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 5) continue;
     const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L;
     if (inPoly(mx + nx * 0.3, mz + nz * 0.3, B.pts)) { nx = -nx; nz = -nz; }
     if (inPoly(mx + nx * 0.3, mz + nz * 0.3, B.pts)) continue;
@@ -1829,7 +1847,8 @@ for (const p of D.pois) {
   const out = Math.atan2(st.nx, st.nz), along = Math.atan2(st.rx, st.rz);
   if (depth >= 6.5) for (const k of [3.4, -3.4, 6.3, -6.3, 9.2, -9.2]) { if (Math.abs(k) > F.L / 2 + 3) continue; const [x, z] = st.at(k, 3.55); st.spots.push({ x, z, h: out }); }
   else if (depth >= 3.2) for (const k of [4.4, -4.4, 10, -10]) { if (Math.abs(k) > F.L / 2 + 2) continue; const [x, z] = st.at(k, 1.55); st.spots.push({ x, z, h: along }); }
-  if (F.road && F.road.s.r.w >= 7 && F.road.s.r.c >= 2) { // kerb by the station: on the side of the building, along the road
+  st.road = F.road ? { w: F.road.s.r.w, c: F.road.s.r.c, t: F.road.t } : null;
+  if (F.road && F.road.s.r.w >= 5.5 && F.road.s.r.c >= 2) { // kerb by the station (a street of 5.5 m is enough: the volante stands half on the kerb): on the side of the building, along the road
     const s = F.road.s, sx = s.b[0] - s.a[0], sz = s.b[1] - s.a[1], SL = hyp(sx, sz) || 1, ex = sx / SL, ez = sz / SL;
     const t0 = (st.x - s.a[0]) * ex + (st.z - s.a[1]) * ez; let ox = -ez, oz = ex; if ((st.x - s.a[0]) * ox + (st.z - s.a[1]) * oz < 0) { ox = -ox; oz = -oz; }
     for (const k of [5.5, -5.5, 11]) { const t = t0 + k; if (t < 4 || t > SL - 4) continue; const off = s.r.w / 2 - 1.15; st.spots.push({ x: s.a[0] + ex * t + ox * off, z: s.a[1] + ez * t + oz * off, h: Math.atan2(ex, ez), kerb: true }); }
@@ -1987,7 +2006,10 @@ function buildSignals(T, G) {
     }
     if (nearAsph(x, z, 0.6)) continue; // still on it: no shelter in the road
     if (inBuilding(x, z, 0.6)) continue;
-    const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = Math.atan2(ux, uz); G.add(root);
+    // the open side (+x, bench and sign side) looks at the nearest carriageway, whichever kerb the stop was drawn on; the back (glass) to the pavement
+    let tx = 0, tz = 0, td = 1e9; ROADSEG.each(x - 15, z - 15, x + 15, z + 15, sg => { if (sg.r.c > 3) return; const ex = sg.b[0] - sg.a[0], ez = sg.b[1] - sg.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - sg.a[0]) * ex + (z - sg.a[1]) * ez) / L2, 0, 1), qx = sg.a[0] + ex * t - x, qz = sg.a[1] + ez * t - z, d = hyp(qx, qz); if (d < td) { td = d; tx = qx; tz = qz; } });
+    const yaw = td < 15 && td > 0.05 ? Math.atan2(-tz, tx) : Math.atan2(ux, uz);
+    const gy = H.surface(x, z), root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = yaw; G.add(root);
     const glass = new THREE.MeshLambertMaterial({ color: 0x9fb7c4, transparent: true, opacity: 0.45 });
     const roof = new THREE.Mesh(boxG(1.6, 0.08, 3.4), lam(0x5a6068)); roof.position.set(0, 2.45, 0); roof.castShadow = true; root.add(roof);
     const back = new THREE.Mesh(boxG(0.05, 2.0, 3.2), glass); back.position.set(-0.75, 1.3, 0); root.add(back);
