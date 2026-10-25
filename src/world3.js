@@ -321,7 +321,7 @@ for (const td of D.tiles) for (const r of td.rl || []) {
       const x0 = lerp(A[0], B[0], s / n), z0 = lerp(A[1], B[1], s / n), x1 = lerp(A[0], B[0], (s + 1) / n), z1 = lerp(A[1], B[1], (s + 1) / n), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
       if (H.fineAt(mx, mz)) continue; // in a tile of S: the parapets of the railway decks (sBarriers)
       const y = lerp(hs[k - 1], hs[k], (s + 0.5) / n), g = H.ground(mx, mz); if (y - g < 1.0 || onAnyRoad(mx, mz, 3.0) || nearLowRail(mx, mz, 4.5)) continue;
-      for (const sd of [1, -1]) { const ax = x0 + rx * 2.3 * sd, az = z0 + rz * 2.3 * sd, bx = x1 + rx * 2.3 * sd, bz = z1 + rz * 2.3 * sd; WALLS.add(ax, az, bx, bz, { ax, az, bx, bz, nx: rx * sd, nz: rz * sd, two: true, y0: g - 3, y1: y + 1 }); }
+      for (const sd of [1, -1]) { const ax = x0 + rx * 2.3 * sd, az = z0 + rz * 2.3 * sd, bx = x1 + rx * 2.3 * sd, bz = z1 + rz * 2.3 * sd; if (onAnyRoad((ax + bx) / 2, (az + bz) / 2, 1.5) || onAnyRoad(ax, az, 1.0) || onAnyRoad(bx, bz, 1.0)) continue; /* each side on its own: across a street crossing at a slant one side stood in it (x 264 z -1248, verifica 26/10) */ WALLS.add(ax, az, bx, bz, { ax, az, bx, bz, nx: rx * sd, nz: rz * sd, two: true, y0: g - 3, y1: y + 1 }); }
     }
   }
 }
@@ -427,6 +427,7 @@ const LX = [];
 const TRAF = N.map(() => []), DRIVE = N.map(() => []), WALK = N.map(() => []);
 for (const r of D.roads) {
   if (r.t) continue;
+  const nt = r.nt ? new Set(r.nt) : null; /* r.nt: the segments k without AI traffic, a lane there would be too close to a wall or off the asphalt (src/corsie_ia.py) */
   for (let k = 1; k < r.g.length; k++) {
     const a = r.g[k - 1], b = r.g[k], L = hyp(N[b][0] - N[a][0], N[b][1] - N[a][1]);
     const ok = inLim(N[a][0], N[a][1], 2) && inLim(N[b][0], N[b][1], 2), open = r.d || !inBuilding((N[a][0] + N[b][0]) / 2, (N[a][1] + N[b][1]) / 2, 0);
@@ -434,12 +435,22 @@ for (const r of D.roads) {
     if (r.c <= 5 && ok && open) { DRIVE[a].push({ to: b, L }); DRIVE[b].push({ to: a, L }); }
     // r.lf / r.lb: the lane right of the axis at each node, forward and backward, in cm (src/dbgt_strade.py corsie_locali: from the carriageway AC_VEI, not the axis); d2 the change along the edge (edgePts)
     const fa = r.lf ? r.lf[k - 1] / 100 : r.lane, fb = r.lf ? r.lf[k] / 100 : r.lane, ba = r.lb ? r.lb[k] / 100 : r.lane, bb = r.lb ? r.lb[k - 1] / 100 : r.lane;
-    if (r.c <= 3 && ok && open && !r.pv) { TRAF[a].push({ to: b, L, off: fa, d2: fb - fa, sp: r.sp || 10, w: r.w, o: !!r.o, x: !!r.x }); if (!r.o) TRAF[b].push({ to: a, L, off: ba, d2: bb - ba, sp: r.sp || 10, w: r.w, o: false, x: !!r.x }); }
+    if (r.c <= 3 && ok && open && !r.pv && !(nt && nt.has(k))) { TRAF[a].push({ to: b, L, off: fa, d2: fb - fa, sp: r.sp || 10, w: r.w, o: !!r.o, x: !!r.x }); if (!r.o) TRAF[b].push({ to: a, L, off: ba, d2: bb - ba, sp: r.sp || 10, w: r.w, o: false, x: !!r.x }); }
   }
 }
 const nodesWith = adj => N.map((_, i) => i).filter(i => adj[i].length);
 const TRAF_NODES = nodesWith(TRAF), DRIVE_NODES = nodesWith(DRIVE), WALK_NODES = nodesWith(WALK);
 const ADJ_OF = new Map([[TRAF_NODES, TRAF], [DRIVE_NODES, DRIVE], [WALK_NODES, WALK]]);
+// the cul-de-sacs of the traffic: leaves pruned round by round from the network (undirected), each node the round it went in (the rest
+// Infinity). The AI cars do not go deeper into one when another way goes on: at its end they turn round, and there they stuck on the walls
+// (verifica 26/10: three cars for minutes at the end of a street at x 112 z -1544); one that starts in it drives out
+const TRAF_RANK = (() => {
+  const nb = N.map(() => new Set()); for (let a = 0; a < N.length; a++) for (const e of TRAF[a]) { nb[a].add(e.to); nb[e.to].add(a); }
+  const rank = new Float64Array(N.length).fill(Infinity), deg = nb.map(s => s.size); let cur = []; for (let i = 0; i < N.length; i++) if (deg[i] === 1) cur.push(i);
+  for (let r = 1; cur.length; r++) { const nx = []; for (const i of cur) { if (rank[i] !== Infinity) continue; rank[i] = r; for (const j of nb[i]) if (rank[j] === Infinity && --deg[j] === 1) nx.push(j); } cur = nx; }
+  return rank;
+})();
+const outward = (a, opts) => { if (opts.length < 2) return opts; const o = opts.filter(e => !(TRAF_RANK[e.to] < TRAF_RANK[a])); return o.length ? o : opts; };
 function nearestNode(list, x, z) {
   const adj = ADJ_OF.get(list);
   for (const R of [25, 60, 150, 400, 1200, 6000]) {
