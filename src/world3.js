@@ -1491,9 +1491,13 @@ function* buildTileGen(T) {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
     T.tr.forEach(([x, z, th, td], i) => {
       const k = 0.75 + tRnd() * 0.6, gy = H.ground(x, z);
-      if (th) { // height th and crown diameter td from the DSM: the crown model is about 5.4 m across and 4.5 m high, its top 2.5 m over its origin; the trunk reaches the origin
-        const sx = td / 5.4 * (0.94 + tRnd() * 0.12), hc = Math.max(1.2, Math.min(0.6 * th, 2.0 * td, th - 1.5)), sy = hc / 4.5 * (0.95 + tRnd() * 0.1), yc = th - 2.5 * sy, tw = clamp(Math.sqrt(th / 7), 0.7, 1.8);
-        q.identity(); m.compose(p.set(x, gy, z), q, s.set(tw, Math.max(0.3, yc / 4.6), tw)); trunks.setMatrixAt(i, m);
+      if (th) { // height th and crown diameter td from the DSM (dbgt_manufatti.py): the crown model is about 5.4 m across and 4.5 m high, its bottom 2 m under its origin and its top 2.5 m over it
+        // the crown takes 65% of the height on a broad tree (td at least 0.55 th), 85% on a narrow one (a cypress, a spruce: td at most 0.35 th), on a broad one at least 2 m off the ground
+        // and lower where it is much wider than tall. The trunk (4.4 m, its three branches from 2.6 to 4.3 m) grows so that the branches start a fifth of the way up the crown and stay inside it:
+        // stretched to the middle of the crown they stuck out bare under a small crown (Carlo, 26/10: "scope")
+        const sl = clamp((td / th - 0.35) / 0.2, 0, 1), yb = Math.min(th - 1.2, Math.max(0.5 + 1.5 * sl, Math.min((0.15 + 0.2 * sl) * th, th - 0.55 * td))), hc = th - yb;
+        const sx = td / 5.4 * (0.94 + tRnd() * 0.12), sy = hc / 4.5 * (0.95 + tRnd() * 0.1), yc = th - 2.5 * sy, tw = clamp(Math.min(Math.sqrt(th / 7), 0.4 * td), 0.5, 1.8);
+        q.identity(); m.compose(p.set(x, gy, z), q, s.set(tw, Math.max(0.3, Math.min((yb + 0.2 * hc) / 2.6, (th - 0.15 * hc) / 4.4)), tw)); trunks.setMatrixAt(i, m);
         q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + yc, z), q, s.set(sx, sy, sx * (0.94 + tRnd() * 0.12))); crowns.setMatrixAt(i, m);
       } else {
       q.identity(); m.compose(p.set(x, gy, z), q, s.set(k, k, k)); trunks.setMatrixAt(i, m);
