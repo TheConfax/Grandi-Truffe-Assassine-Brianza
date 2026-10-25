@@ -454,7 +454,8 @@ for wid, (refs, t) in ways.items():
             raw_roads.append({'refs': run, 'w': round(w, 1), 'wx': bool(num(t.get('width'))) and num(t.get('width')) <= 30, 'c': RCLASS[hw], 'hw': hw, 'n': nid(t.get('name') or t.get('ref')),
                               'o': t.get('oneway') in ('yes', '1') or hw in ('motorway', 'motorway_link') or t.get('junction') == 'roundabout',
                               'bridge': bridge, 'layer': layer, 'emb': t.get('embankment') == 'yes', 'tunnel': t.get('tunnel') in ('yes', 'covered') or layer < 0, 'under': t.get('tunnel') in ('yes', 'covered', 'building_passage') or layer < 0,
-                              'x': hw in ('motorway', 'trunk', 'motorway_link', 'trunk_link'), 'ms': num(t.get('maxspeed')) if str(t.get('maxspeed', '')).replace('.', '').isdigit() else None, 'pk': street_parking(t)})
+                              'x': hw in ('motorway', 'trunk', 'motorway_link', 'trunk_link'), 'ms': num(t.get('maxspeed')) if str(t.get('maxspeed', '')).replace('.', '').isdigit() else None, 'pk': street_parking(t),
+                              'ln': [num(t.get(k_)) for k_ in ('lanes', 'lanes:forward', 'lanes:backward')]})  # the lanes OSM maps: the markings (dbgt_righe.py)
     elif t.get('railway') == 'rail' and (t.get('tunnel') != 'yes' or sum(math.dist(nodes[a], nodes[b]) for a, b in zip(refs, refs[1:]) if a in nodes and b in nodes) < 200) and t.get('service') not in ('yard', 'siding', 'spur'):  # short rail tunnels (underpasses) stay as track at grade
         lay = num(t.get('layer')) or 0
         for run in clip_runs(refs, 300): rails.append([nodes[r] for r in run]); rail_raw.append({'refs': run, 'bridge': t.get('bridge') in ('yes', 'viaduct') or lay >= 1, 'emb': t.get('embankment') == 'yes', 'layer': lay, 'wid': wid, 't': t})
@@ -816,6 +817,10 @@ for r in raw_roads:
     r['mh'] = round(max(min(r['w'] / 2, md - 0.3), min(r['w'] / 2, 1.3)), 2)
     r['wk'] = round(max(r['mh'] + 0.45, min(r['w'] / 2 + 0.9, md - 0.55)), 2) if r['c'] <= 3 else (round(max(0.4, r['mh'] - 0.5), 2) if r['c'] <= 5 else 0)
 if STR: STR.mezze(raw_roads, nodes)  # and the lanes of the AI cars segment by segment from the carriageway
+RIGHE = None
+if STR:  # the road markings from the edges of the carriageway AC_VEI (src/dbgt_righe.py)
+    import dbgt_righe
+    RIGHE, STR.rep['righe'] = dbgt_righe.righe(STR, raw_roads, nodes, log)
 def rbuf(cond, extra):
     out = [r['line'].buffer(r['w'] / 2 + extra, quad_segs=5) for r in raw_roads if cond(r) and r['line'].length > 0.1]
     return unary_union(out) if out else GeometryCollection()
@@ -1476,6 +1481,7 @@ for r in raw_roads:
     if r.get('under'): rec['u'] = 1
     if r.get('pk'): rec['pk'] = r['pk']
     if r.get('pv'): rec['pv'] = 1  # over a yard of the DBGT (AC_VEI 0307): no AI traffic (src/dbgt_strade.py privati)
+    if r.get('sg'): rec['sg'] = 1  # its markings are in tiles[].sg (dbgt_righe.py): none on its axis
     if r.get('w_osm') is not None: rec['wd'] = 1  # w is the carriageway of the DBGT (AC_VEI): the markings go by it, mh is the lanes' room
     for k_ in ('lf', 'lb'):  # the AI lanes node by node from the carriageway of the DBGT (dbgt_strade.py corsie_locali)
         if r.get(k_) and len(r[k_]) == len(r['refs']): rec[k_] = r[k_]
@@ -1572,6 +1578,7 @@ for t in range(ntx * ntz):
     if not median.intersects(bx): continue
     for p_ in polys_of(median.intersection(bx), 0.2, 3): push(t, 'md', p_)
 if STR: STR.togli_cortili(VERDE.cons); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
+if RIGHE: dbgt_righe.push_tiles(RIGHE, ntx * ntz, tbox, push)  # the road markings (sg)
 if FER:  # the rail bed (sf)
     FER.disegno([LineString(p) for p in rails if len(p) >= 2], unary_union([asph, pedz, side, foot, platforms, bunion] + ([STR.cv] if STR else [])))
     FER.push_tiles(ntx * ntz, tbox, polys_of, push)
