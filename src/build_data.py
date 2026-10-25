@@ -691,7 +691,7 @@ if dbt_roads:
         for a_, b_ in zip(r['refs'], r['refs'][1:]):
             L = max(0.5, math.dist(nodes[a_], nodes[b_])); cadj[a_].append((b_, L)); cadj[b_].append((a_, L))
         if r['bridge'] and not any(n_ in zh for n_ in r['refs']): _nobr.update(r['refs'])
-    _miss = [n_ for n_ in incov if n_ not in zh and n_ not in _nobr]; _fill = {}
+    _miss = [n_ for n_ in sorted(incov) if n_ not in zh and n_ not in _nobr]; _fill = {}  # in order of id: in the order of the set the fill (300 rounds, each node from its neighbours as they are) changed with PYTHONHASHSEED, a few heights by 1 dm from build to build
     for _ in range(300):
         for n_ in _miss:
             sw = sv = 0.0
