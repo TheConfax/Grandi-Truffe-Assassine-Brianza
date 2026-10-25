@@ -73,6 +73,17 @@ def _fill_gaps(mask, gap):
     return m
 
 
+def _morbida(p, lim=10.0):
+    """a line through a tight corner (a turn over lim degrees from one metre to the next): Chaikin's corner cutting, twice, so it turns
+    in steps of a few degrees, within a few centimetres of where it was"""
+    p = np.asarray(p, float)
+    for _ in range(2):
+        if len(p) < 3 or _bends(p).max() <= lim: break
+        q = np.empty((2 * (len(p) - 1), 2)); q[0::2] = 0.75 * p[:-1] + 0.25 * p[1:]; q[1::2] = 0.25 * p[:-1] + 0.75 * p[1:]
+        p = np.vstack((p[:1], q, p[-1:]))
+    return p
+
+
 def _bends(p):
     """the turns between consecutive segments of a polyline (degrees)"""
     p = np.asarray(p, float)
@@ -315,7 +326,8 @@ def righe(STR, raw_roads, nodes, log=print):
                 lvs = lvq[idx]; cut = [0] + [m for m in range(1, len(idx)) if lvs[m] != lvs[m - 1]] + [len(idx)]
                 for a_, b_ in zip(cut[:-1], cut[1:]):
                     if b_ - a_ < 3: continue
-                    lines.append(dict(ri=int(ri_), t=t, p=[(round(float(x), 2), round(float(z), 2)) for x, z in pts[a_:b_]], lev=int(lvs[a_])))
+                    q = _morbida(pts[a_:b_])
+                    lines.append(dict(ri=int(ri_), t=t, p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=int(lvs[a_])))
             # edges: where the edge runs on and the section has them
             has = np.array([x is not None and x[2] for x in sig])
             for nm, v, sgn in (('l', vl, -1), ('r', vr, 1)):
@@ -367,8 +379,9 @@ def righe(STR, raw_roads, nodes, log=print):
                 for part in getattr(ln, 'geoms', [ln]):
                     if part.geom_type != 'LineString' or part.length < 4: continue
                     q, _ = _resample(np.asarray(part.coords), PASSO)
-                    sg_ = min(2.0, part.length / 25)   # the line round a small island keeps its shape
+                    sg_ = 0.7   # the buffer already rounds it: more and it cut into the tips of the islands
                     if len(q) >= 5: q = np.column_stack((gaussian_filter1d(q[:, 0], sg_, mode='wrap' if part.is_closed else 'nearest'), gaussian_filter1d(q[:, 1], sg_, mode='wrap' if part.is_closed else 'nearest')))
+                    q = _morbida(q, 8.0) if len(q) >= 3 else q
                     lines.append(dict(ri=-1, t=0, p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=lev(a))); nan += 1
     # no line twice: a piece of a line within 1 m of a line drawn before it (by a longer carriageway: a ramp that drew a section the main
     # one draws too, from a reference of its own) is left out
@@ -386,6 +399,12 @@ def righe(STR, raw_roads, nodes, log=print):
         for i0, i1 in _runs(m, 4): kept.append(dict(l, p=l['p'][i0:i1]))
         for p in l['p']: grid[(int(p[0] // 4), int(p[1] // 4))].append(p)
     lines = kept
+    # and no line off the carriageway: a piece whose points fall outside AC_VEI (a line that cut the corner of a notch) is left out
+    kept = []; nfuori = 0
+    for l in lines:
+        p = np.array(l['p']); m = shapely.contains_xy(STR.U_carr, p[:, 0], p[:, 1]); nfuori += int((~m).sum())
+        for i0, i1 in _runs(m, 3): kept.append(dict(l, p=l['p'][i0:i1]))
+    lines = kept
     # the report: bends and lines off the carriageway
     bends = np.concatenate([_bends(l['p']) for l in lines]) if lines else np.zeros(0)
     out = 0; tot = 0; U = STR.U_carr
@@ -396,7 +415,7 @@ def righe(STR, raw_roads, nodes, log=print):
                per_tipo=dict(Counter(['bordo', 'mezzeria', 'tratteggio'][l['t']] for l in lines)), su_ponte=sum(1 for l in lines if l['lev'] == 2),
                pieghe_oltre_15=int((bends > 15).sum()), pieghe_oltre_5=int((bends > 5).sum()), piega_max=round(float(bends.max()), 1) if len(bends) else 0,
                pieghe_oltre_15_strade=int((bends_v > 15).sum()), piega_max_strade=round(float(bends_v.max()), 1) if len(bends_v) else 0,
-               bordi_delle_rotatorie=nan, punti_doppi_tolti=ndup, campioni_fuori_carreggiata=out, campioni=tot, sezioni=nsez, sezioni_disegnate=nlead)
+               bordi_delle_rotatorie=nan, punti_doppi_tolti=ndup, punti_fuori_tolti=nfuori, campioni_fuori_carreggiata=out, campioni=tot, sezioni=nsez, sezioni_disegnate=nlead)
     for ri in K: raw_roads[ri]['sg'] = True   # the game leaves out the old dashes on the axis of these (roads[].sg)
     log('dbgt righe: %s' % rep)
     return lines, rep
