@@ -99,7 +99,7 @@ for (const T of TILES) {
   for (const B of d.b || []) {
     const outer = dec(B.p); if (outer.length < 3) continue;
     const holes = (B.k || []).map(dec).filter(h => h.length >= 3), bb = bbox(outer);
-    const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g }; // g: 1 garages, 2 greenhouse (paesaggio3.js)
+    const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g, mm: B.mm }; // g: 1 garages, 2 greenhouse, 3 stand, 4 water tower, 5 cabin; mm the model of a DBGT manufatto (paesaggio3.js)
     // a volume of the DBGT (src/dbgt_edifici.py): zt the top of its walls and zb its raised base (a portico, a passage, an overhang) above
     // terrain.base, e its building, rk/rf/rc its roof (planes over the top of the walls), wc/rcol the colours OSM gives, st its state in the
     // 2015 survey when OSM does not say otherwise (2 a ruin with no roof over it in the DSM: bare walls only; 3 a ruin with its roof; 1 under
@@ -115,6 +115,7 @@ for (const T of TILES) {
     if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }); } continue; }
     BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
     if (B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
+    if (B.g === 4) continue; // a water tower: its plan is the tank up in the air, the solid is its shaft (paesaggio3.js lsTower)
     const gys = outer.map(p => H.ground(p[0], p[1])), by0 = Math.min(...gys) - 3, by1 = Math.max(Math.max(...gys) + B.h, B.zt !== undefined ? B.zt + roofTop(rec) : -1e9) + 3;
     for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) {
       const A = sArea(ring);
@@ -331,7 +332,7 @@ for (const td of D.tiles) for (const r of td.rl || []) {
       const x0 = lerp(A[0], B[0], s / n), z0 = lerp(A[1], B[1], s / n), x1 = lerp(A[0], B[0], (s + 1) / n), z1 = lerp(A[1], B[1], (s + 1) / n), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
       if (H.fineAt(mx, mz)) continue; // in a tile of S: the parapets of the railway decks (sBarriers)
       const y = lerp(hs[k - 1], hs[k], (s + 0.5) / n), g = H.ground(mx, mz); if (y - g < 1.0 || onAnyRoad(mx, mz, 3.0) || nearLowRail(mx, mz, 4.5)) continue;
-      for (const sd of [1, -1]) { const ax = x0 + rx * 2.3 * sd, az = z0 + rz * 2.3 * sd, bx = x1 + rx * 2.3 * sd, bz = z1 + rz * 2.3 * sd; WALLS.add(ax, az, bx, bz, { ax, az, bx, bz, nx: rx * sd, nz: rz * sd, two: true, y0: g - 3, y1: y + 1 }); }
+      for (const sd of [1, -1]) { const ax = x0 + rx * 2.3 * sd, az = z0 + rz * 2.3 * sd, bx = x1 + rx * 2.3 * sd, bz = z1 + rz * 2.3 * sd; if (onAnyRoad((ax + bx) / 2, (az + bz) / 2, 1.5) || onAnyRoad(ax, az, 1.0) || onAnyRoad(bx, bz, 1.0)) continue; /* each side on its own: across a street crossing at a slant one side stood in it (x 264 z -1248, verifica 26/10) */ WALLS.add(ax, az, bx, bz, { ax, az, bx, bz, nx: rx * sd, nz: rz * sd, two: true, y0: g - 3, y1: y + 1 }); }
     }
   }
 }
@@ -437,6 +438,7 @@ const LX = [];
 const TRAF = N.map(() => []), DRIVE = N.map(() => []), WALK = N.map(() => []);
 for (const r of D.roads) {
   if (r.t) continue;
+  const nt = r.nt ? new Set(r.nt) : null; /* r.nt: the segments k without AI traffic, a lane there would be too close to a wall or off the asphalt (src/corsie_ia.py) */
   for (let k = 1; k < r.g.length; k++) {
     const a = r.g[k - 1], b = r.g[k], L = hyp(N[b][0] - N[a][0], N[b][1] - N[a][1]);
     const ok = inLim(N[a][0], N[a][1], 2) && inLim(N[b][0], N[b][1], 2), open = r.d || !inBuilding((N[a][0] + N[b][0]) / 2, (N[a][1] + N[b][1]) / 2, 0);
@@ -444,12 +446,22 @@ for (const r of D.roads) {
     if (r.c <= 5 && ok && open) { DRIVE[a].push({ to: b, L }); DRIVE[b].push({ to: a, L }); }
     // r.lf / r.lb: the lane right of the axis at each node, forward and backward, in cm (src/dbgt_strade.py corsie_locali: from the carriageway AC_VEI, not the axis); d2 the change along the edge (edgePts)
     const fa = r.lf ? r.lf[k - 1] / 100 : r.lane, fb = r.lf ? r.lf[k] / 100 : r.lane, ba = r.lb ? r.lb[k] / 100 : r.lane, bb = r.lb ? r.lb[k - 1] / 100 : r.lane;
-    if (r.c <= 3 && ok && open && !r.pv) { TRAF[a].push({ to: b, L, off: fa, d2: fb - fa, sp: r.sp || 10, w: r.w, o: !!r.o, x: !!r.x }); if (!r.o) TRAF[b].push({ to: a, L, off: ba, d2: bb - ba, sp: r.sp || 10, w: r.w, o: false, x: !!r.x }); }
+    if (r.c <= 3 && ok && open && !r.pv && !(nt && nt.has(k))) { TRAF[a].push({ to: b, L, off: fa, d2: fb - fa, sp: r.sp || 10, w: r.w, o: !!r.o, x: !!r.x }); if (!r.o) TRAF[b].push({ to: a, L, off: ba, d2: bb - ba, sp: r.sp || 10, w: r.w, o: false, x: !!r.x }); }
   }
 }
 const nodesWith = adj => N.map((_, i) => i).filter(i => adj[i].length);
 const TRAF_NODES = nodesWith(TRAF), DRIVE_NODES = nodesWith(DRIVE), WALK_NODES = nodesWith(WALK);
 const ADJ_OF = new Map([[TRAF_NODES, TRAF], [DRIVE_NODES, DRIVE], [WALK_NODES, WALK]]);
+// the cul-de-sacs of the traffic: leaves pruned round by round from the network (undirected), each node the round it went in (the rest
+// Infinity). The AI cars do not go deeper into one when another way goes on: at its end they turn round, and there they stuck on the walls
+// (verifica 26/10: three cars for minutes at the end of a street at x 112 z -1544); one that starts in it drives out
+const TRAF_RANK = (() => {
+  const nb = N.map(() => new Set()); for (let a = 0; a < N.length; a++) for (const e of TRAF[a]) { nb[a].add(e.to); nb[e.to].add(a); }
+  const rank = new Float64Array(N.length).fill(Infinity), deg = nb.map(s => s.size); let cur = []; for (let i = 0; i < N.length; i++) if (deg[i] === 1) cur.push(i);
+  for (let r = 1; cur.length; r++) { const nx = []; for (const i of cur) { if (rank[i] !== Infinity) continue; rank[i] = r; for (const j of nb[i]) if (rank[j] === Infinity && --deg[j] === 1) nx.push(j); } cur = nx; }
+  return rank;
+})();
+const outward = (a, opts) => { if (opts.length < 2) return opts; const o = opts.filter(e => !(TRAF_RANK[e.to] < TRAF_RANK[a])); return o.length ? o : opts; };
 function nearestNode(list, x, z) {
   const adj = ADJ_OF.get(list);
   for (const R of [25, 60, 150, 400, 1200, 6000]) {
@@ -1380,7 +1392,7 @@ function* buildTileGen(T) {
     const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf(), doorB = Buf();
     let nb = 0;
     for (const B of T.bld) {
-      if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower (paesaggio3.js)
+      if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower, cabin (paesaggio3.js)
       if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
       const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t, raised = B.zb !== undefined;
       // a DBGT volume: the top of its walls is its own (zt), never under the ground round it; a raised one starts at its base (zb)

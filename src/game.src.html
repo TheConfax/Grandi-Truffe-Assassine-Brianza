@@ -1088,12 +1088,18 @@ function updTrain(dt) {
 
 // ---------------------------------------------------------------- spawning helpers
 // lane line: cars on the lane centre, two-wheelers on its right-hand side, never closer than 0.55 m to the kerb
-const laneOff = (S, e) => S.two ? Math.max(e.off, Math.min(e.off + (e.o ? 1.6 : 0.95), (e.w || 6) / 2 - 0.55)) : e.off;
+const laneOff = (S, e, a) => {
+  if (!S.two) return e.off; const o = Math.max(e.off, Math.min(e.off + (e.o ? 1.6 : 0.95), (e.w || 6) / 2 - 0.55)); if (o === e.off || a === undefined) return o;
+  /* right of the lane only where nothing stands within 0.9 m of that line: the lane itself keeps 1.2 m from walls, fences and buildings (src/corsie_ia.py) */
+  const [p0, p1] = edgePts(a, e.to, o, e); let hit = false;
+  for (let k = 0; k <= 4 && !hit; k++) { const x = p0[0] + (p1[0] - p0[0]) * k / 4, z = p0[1] + (p1[1] - p0[1]) * k / 4; WALLS.each(x - 0.9, z - 0.9, x + 0.9, z + 0.9, s => { if (!hit && !s.r && !s.dyn && !s.deckw && s.ax !== undefined && segDist(x, z, s.ax, s.az, s.bx, s.bz) < 0.9) hit = true; }); }
+  return hit ? e.off : o;
+};
 function spawnTraffic(near) {
   const a = near ? nodeInRing(TRAF_NODES, P.x, P.z, 90, 260, true) : pick(TRAF_NODES);
   const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off, e);
   let kind = pickModel(TRAFFIC_MIX); if (e.x && MODELS[kind].noX) kind = 'moto'; // no bikes or small scooters on the superstrada
-  const col = colorFor(kind), [q0, q1] = MODELS[kind].two ? edgePts(a, e.to, laneOff(MODELS[kind], e), e) : [p0, p1];
+  const col = colorFor(kind), [q0, q1] = MODELS[kind].two ? edgePts(a, e.to, laneOff(MODELS[kind], e, a), e) : [p0, p1];
   const v = new Vehicle(kind, col, q0[0], q0[1], Math.atan2(q1[0] - q0[0], q1[1] - q0[1]));
   const base = kind === 'ape' ? 6.5 : kind === 'van' ? 9 : kind === 'sport' ? 13 : 10.5, mood = rnd() < 0.13 ? 1.45 : 0.75 + rnd() * 0.45; // a few "schegge" in a hurry
   v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to]], cruise: Math.min(v.maxV * 0.8, base * mood), blocked: 0, ignore: 0 }; v.sleep = false;
@@ -1109,7 +1115,8 @@ function extendRoute(v) {
     if (prev < 0) prev = ai.q.length ? (last === ai.cur ? ai.prev : ai.cur) : ai.prev;
     let opts = TRAF[last].filter(e => e.to !== prev); if (!opts.length) opts = TRAF[last]; if (!opts.length) break;
     if (v.spec.noX && opts.some(e => !e.x)) opts = opts.filter(e => !e.x);
-    const e = pick(opts), [p0, p1] = edgePts(last, e.to, laneOff(v.spec, e), e);
+    opts = outward(last, opts); /* not into a cul-de-sac when another way goes on (world3.js TRAF_RANK) */
+    const e = pick(opts), [p0, p1] = edgePts(last, e.to, laneOff(v.spec, e, last), e);
     { const lq = ai.q.length ? ai.q[ai.q.length - 1] : [v.x, v.z]; ahead += hyp(p0[0] - lq[0], p0[1] - lq[1]) + hyp(p1[0] - p0[0], p1[1] - p0[1]); }
     ai.q.push([p0[0], p0[1], -1], [p1[0], p1[1], e.to]);
   }
