@@ -34,6 +34,7 @@ AGR_T = {'01': (13, 'frutteto'), '02': (13, 'frutteto'), '03': (13, 'frutteto'),
 # PS_INC (p. 308): 01 pascolo, 04 incolti, 05 radura. Le foto Mapillary degli incolti (via Vignazzola e le rampe della Milano-Meda) sono
 # scarpate e margini d'erba alta con qualche cespuglio: prato, senza alberi inventati
 PS_T = 1
+INC_T = 18        # PS_INC 04, incolti: area type 18 of the game (world3.js MAT.incolto)
 # ATTR_SP_TY (p. 163): 01 piscine; 02xx campi per sport; 08 piste; 95 altro (a Meda 23 su 38: campi da calcio, tennis, basket, pallavolo
 # secondo OSM, e la foto di un campo da tennis in terra rossa a x 1324 z -365). Lo sport e il fondo vengono dal campo OSM che lo copre
 SPORT_DBGT = {'0201': 'sport:soccer:', '0202': 'sport:tennis:', '0203': 'sport:soccer:', '0204': 'sport:basketball:', '0205': 'sport:boules:',
@@ -113,7 +114,7 @@ class Verde:
                     if k: self.land.append((k, p))
             for g, t in rows('select Shape, PS_INC_TY from PS_INC'):
                 cnt['PS_INC ' + str(t)] += 1
-                for p in _polys(g.buffer(0)): self.areas.append((PS_T, p))
+                for p in _polys(g.buffer(0)): self.areas.append((INC_T if t == '04' else PS_T, p))  # 04 incolti: their own ground (dry grass and bare earth), not the mown lawn
             for g, t in rows('select Shape, ATTR_SP_TY from ATTR_SP'):
                 cnt['ATTR_SP ' + str(t)] += 1
                 for p in _polys(g.buffer(0)): self.sport.append((t, p))
@@ -234,7 +235,7 @@ class Verde:
         for t, p in self.areas: by_t[t].append(p)
         for t, p in self.sport: by_t[6 if t.startswith('01') else 3].append(p)
         nadd = Counter(); x0, z0, x1, z1 = cv.bounds
-        for t in (1, 12, 11, 13, 3, 6):  # drawn in this order: pitches and pools over the lawns
+        for t in (1, 18, 12, 11, 13, 3, 6):  # drawn in this order: incolti (18) after the lawns, pitches and pools over them
             ps = by_t.get(t)
             if not ps: continue
             st = STRtree(ps)
