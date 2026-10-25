@@ -8,21 +8,24 @@ const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [g
   const ld = new THREE.TextureLoader();
   for (const [t, f, r] of FOTO_TEX) ld.load('tex/' + f + '.jpg', img => { t.image = img.image; t.repeat.set(r, r); t.needsUpdate = true; });
 }
-// incolti: the grass photo dried out (yellower, paler), the earth photo through soft irregular blotches, a few darker tufts; composed once
-// on a canvas when both photos are in (one repeat of incoltoTex, world3.js, is 8 m)
+// incolti: the grass photo dried out (half its green gone, towards straw), large soft patches a bit greener or paler, the ground photo
+// turned brown through irregular blotches (bare earth), a few dark tufts; composed once on a canvas when both photos are in, 16 m a repeat
 Promise.all(['prato', 'terreno'].map(f => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = 'tex/' + f + '.jpg'; }))).then(([pr, te]) => {
   if (!pr || !te) return;
-  const N = 512, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d');
-  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) g.drawImage(pr, i * N / 4, j * N / 4, N / 4, N / 4); // the grass photo is 2 m: four times across the 8 m
-  g.globalCompositeOperation = 'multiply'; g.fillStyle = '#e8d49a'; g.fillRect(0, 0, N, N); // dried: yellower
-  g.globalCompositeOperation = 'source-over'; g.globalAlpha = .18; g.fillStyle = '#c8bb88'; g.fillRect(0, 0, N, N); g.globalAlpha = 1; // and paler
-  const m = document.createElement('canvas'); m.width = m.height = N; const mg = m.getContext('2d'); let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  for (let k = 0; k < 26; k++) { const x = r() * N, y = r() * N, rad = 18 + r() * 70; for (const [dx, dy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N]]) { const gr = mg.createRadialGradient(x + dx, y + dy, rad * .2, x + dx, y + dy, rad); gr.addColorStop(0, 'rgba(0,0,0,.95)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); mg.fillStyle = gr; mg.beginPath(); mg.ellipse(x + dx, y + dy, rad, rad * (.5 + r() * .5), r() * 3, 0, Math.PI * 2); mg.fill(); } }
-  const e = document.createElement('canvas'); e.width = e.height = N; const eg = e.getContext('2d');
-  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) eg.drawImage(te, i * N / 2, j * N / 2, N / 2, N / 2); // the earth photo, 4 m
-  eg.globalCompositeOperation = 'destination-in'; eg.drawImage(m, 0, 0); g.drawImage(e, 0, 0); // bare earth in the blotches, blended at the edges
-  g.globalAlpha = .35; g.strokeStyle = '#4d5226'; g.lineWidth = 1.4; for (let k = 0; k < 900; k++) { const x = r() * N, y = r() * N; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - .5) * 5, y - 3 - r() * 6); g.stroke(); } g.globalAlpha = 1; // tufts
-  incoltoTex.image = cv; incoltoTex.needsUpdate = true;
+  const N = 1024, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'); let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const W9 = [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N], [N, N], [N, -N], [-N, N], [-N, -N]]; /* every blotch drawn with its copies across the edges: the texture tiles seamlessly */
+  const blob = (c, n, r0, r1, a) => { for (let k = 0; k < n; k++) { const x = r() * N, y = r() * N, rad = r0 + r() * (r1 - r0), ry = rad * (.45 + r() * .55), rot = r() * 3; for (const [dx, dy] of W9) { c.save(); c.translate(x + dx, y + dy); c.rotate(rot); c.scale(1, ry / rad); const gr = c.createRadialGradient(0, 0, rad * .15, 0, 0, rad); gr.addColorStop(0, 'rgba(0,0,0,' + a + ')'); gr.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = gr; c.fillRect(-rad, -rad, 2 * rad, 2 * rad); c.restore(); } } };
+  const masked = (fill, mask) => { const e = document.createElement('canvas'); e.width = e.height = N; const eg = e.getContext('2d'); fill(eg); eg.globalCompositeOperation = 'destination-in'; eg.drawImage(mask, 0, 0); return e; };
+  const maskOf = (...b) => { const m = document.createElement('canvas'); m.width = m.height = N; const mg = m.getContext('2d'); blob(mg, ...b); return m; };
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) g.drawImage(pr, i * N / 8, j * N / 8, N / 8, N / 8); /* the grass photo is 2 m: eight times across the 16 m */
+  g.globalCompositeOperation = 'saturation'; g.globalAlpha = .5; g.fillStyle = '#808080'; g.fillRect(0, 0, N, N); /* dried: half the green gone */
+  g.globalCompositeOperation = 'multiply'; g.globalAlpha = 1; g.fillStyle = '#ead9a6'; g.fillRect(0, 0, N, N); g.globalCompositeOperation = 'source-over'; /* towards straw */
+  const tone = (n, r0, r1, a, col, op) => { const t = masked(c => { c.fillStyle = col; c.fillRect(0, 0, N, N); }, maskOf(n, r0, r1, a)); g.globalCompositeOperation = op; g.drawImage(t, 0, 0); g.globalCompositeOperation = 'source-over'; };
+  tone(9, 160, 320, .25, '#a7b06a', 'multiply'); /* large patches a bit greener: no even carpet (paler ones showed the 16 m repeat from above) */
+  const earth = masked(c => { for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) c.drawImage(te, i * N / 4, j * N / 4, N / 4, N / 4); c.globalCompositeOperation = 'color'; c.fillStyle = '#7a6640'; c.fillRect(0, 0, N, N); }, maskOf(55, 16, 90, .95));
+  g.drawImage(earth, 0, 0); /* bare earth in the blotches (the ground photo, 4 m, turned brown), blended at the edges; some straw still shows through */
+  g.globalAlpha = .2; g.strokeStyle = '#4d5226'; g.lineWidth = 1.2; for (let k = 0; k < 3000; k++) { const x = r() * N, y = r() * N, a = r() * 6.3, l = 2 + r() * 4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); } g.globalAlpha = 1; /* tufts */
+  incoltoTex.image = cv; incoltoTex.repeat.set(.75, .75); incoltoTex.needsUpdate = true; /* 16 m a repeat (UV every 12 m) */
 });
 // output in sRGB, through a filmic curve: highlights roll off instead of clipping
 renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;

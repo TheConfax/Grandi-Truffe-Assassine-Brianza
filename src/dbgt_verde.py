@@ -233,7 +233,7 @@ class Verde:
         for t, p in self.areas: by_t[t].append(p)
         for t, p in self.sport: by_t[6 if t.startswith('01') else 3].append(p)
         nadd = Counter(); x0, z0, x1, z1 = cv.bounds
-        for t in (1, 12, 11, 13, 3, 6):  # drawn in this order: pitches and pools over the lawns
+        for t in (1, 18, 12, 11, 13, 3, 6):  # drawn in this order: incolti (18) after the lawns, pitches and pools over them
             ps = by_t.get(t)
             if not ps: continue
             st = STRtree(ps)

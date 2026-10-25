@@ -543,7 +543,7 @@ const MAT = {
 };
 // the same looks writing their depth, for the cells a layer owns in a tile of S (cellOwners): drawn with the ground, in its place
 // incolti (DBGT PS_INC 04): dry grass with patches of bare earth and darker tufts; drawn here, then foto3.js composes it from the photos of
-// grass and earth (incoltoFoto). One repeat is 8 m (UV every 12 m, repeat 1.5)
+// grass and earth (16 m a repeat there). This one repeats every 8 m (UV every 12 m, repeat 1.5)
 const incoltoTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#9c9a58'; g.fillRect(0, 0, w, h); noise(g, w, h, 7000, 0.45, ['#8a8a4a', '#b0aa6a', '#7a7a40', '#a89c60']); g.globalAlpha = .5; g.fillStyle = '#7d6643'; for (let i = 0; i < 14; i++) { g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 8 + rnd() * 26, 6 + rnd() * 18, rnd() * 3, 0, TAU); g.fill(); } g.globalAlpha = 1; });
 incoltoTex.repeat.set(1.5, 1.5);
 Object.assign(MAT, { incolto: flatMat({ map: incoltoTex }), incoltoS: new THREE.MeshLambertMaterial({ map: incoltoTex }) });
