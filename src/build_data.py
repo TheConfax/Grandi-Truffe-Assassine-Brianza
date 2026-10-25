@@ -1056,6 +1056,15 @@ for bi_, (pts, kind, hgt) in enumerate(barriers):
     if dbgt_: _mrep['dbgt'] += 1; _mrep['metri_dbgt'] += L0.length; _mrep['metri_tenuti'] += kept_
 _mrep = {k_: round(v_) for k_, v_ in _mrep.items()}
 if SPOSTAMENTI: _sp = np.array([a_[0] for a_ in SPOSTAMENTI]); _mrep['spostamento_m'] = dict(p50=round(float(np.percentile(_sp, 50)), 2), p90=round(float(np.percentile(_sp, 90)), 2), max=round(float(_sp.max()), 2))
+# two dividers side by side are one boundary: one stays (src/barriere.py fondi_doppi)
+from barriere import fondi_doppi, FUSI
+_nb0 = len(bar_out)
+def _dstr(L_):
+    if _mvt is None: return 99.0
+    m_ = L_.interpolate(0.5, normalized=True); return round(float(m_.distance(_mv[int(_mvt.nearest(m_))])), 1)
+bar_out = fondi_doppi(bar_out, _dstr)
+log('divisori doppi fusi: linee toccate', FUSI['linee_toccate'], 'metri tolti', round(FUSI['metri_tolti']), 'pezzi', _nb0, '->', len(bar_out))
+if STR: STR.rep['muri_doppi_fusi'] = dict(linee=FUSI['linee_toccate'], metri=round(FUSI['metri_tolti']))
 log('barriers', len(bar_out), 'of', len(barriers), 'gates', len(gates), 'divisori del DBGT', _mrep)
 if STR: STR.rep['muri_sul_confine'] = _mrep
 
