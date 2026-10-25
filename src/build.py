@@ -1,5 +1,5 @@
 """Rigenera brianza.json: controlla che in data/ ci sia tutto, poi lancia build_data.py con gli argomenti giusti.
-uso: python src/build.py [out.json]      (di default brianza.json nella cartella del repo; dura 4-10 minuti)
+uso: python src/build.py [out.json]      (di default brianza.json nella cartella del repo; dura circa 4 minuti per Meda)
 La cartella dei dati si può spostare con la variabile GTA_DATA. Le fonti sono descritte in docs/dati.md."""
 import os, sys, glob, subprocess
 
