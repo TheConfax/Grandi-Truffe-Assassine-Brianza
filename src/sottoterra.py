@@ -179,13 +179,16 @@ def viste(path=None):
     return json.load(open(f, encoding='utf-8')).get('viste', []) if os.path.exists(f) else []
 
 
-def spina(op, D, Z, head, pix):
+def spina(op, D, Z, head, pix, fondo=False):
     """the centre line of a pit: from the shallow head to the open pixel farthest along the pit, staying in the middle (cost 1/(distance
     to the edge)); dict(r, c pixel path, s distance along it, z the DTM on it, w the width there), or None when too short"""
     edt = ndimage.distance_transform_edt(op)
     g = MCP_Geometric(np.where(op, 1.0, np.inf)); dist, _ = g.find_costs([head])
-    dist = np.where(op & np.isfinite(dist), dist, -1); tail = np.unravel_index(np.argmax(dist), dist.shape)
-    if dist[tail] * pix < 4: return None
+    dist = np.where(op & np.isfinite(dist), dist, -1)
+    far = np.unravel_index(np.argmax(dist), dist.shape)
+    if dist[far] * pix < 4: return None
+    # the end: the farthest open pixel (the shape of the pit); for the drawing (fondo) the deepest one at least 4 m from the head, where the ramp goes under
+    dd = np.where(dist * pix >= 4, D, -1); tail = np.unravel_index(np.argmax(dd), dd.shape) if fondo and dd.max() > 0 else far
     m = MCP_Geometric(np.where(op, 1.0 / (edt + 0.5) ** 2 + 0.05, np.inf)); m.find_costs([head], [tail]); path = np.array(m.traceback(tail))
     rr, cc = path[:, 0], path[:, 1]
     sv = np.concatenate(([0.0], np.cumsum(np.hypot(np.diff(rr), np.diff(cc))))) * pix
@@ -272,7 +275,7 @@ class Sottoterra:
         p.update(r2=round(float(r2), 2), pend=round(float(-coef[1]), 3), salto=round(salto, 2), lung=round(float(t[-1]), 1), largh=round(float(np.median(w)), 1), mono=round(mono, 2))
         p['forma'] = bool(np.median(w) <= R_LARGA and p['area'] <= R_GRANDE and r2 >= R_R2 and R_PEND[0] <= -coef[1] <= R_PEND[1] and salto >= R_SALTO)
         if not p['forma']: p['perche'] = 'larga %.1f m, area %.0f, r2 %.2f, pendenza %.0f%%, salto %.1f m' % (np.median(w), p['area'], r2, -100 * coef[1], salto)
-        p['_sp'] = sp
+        p['_sp'] = spina(op, D, M.dtm[r0:r1, c0:c1], head, np.sqrt(M.px * M.pz), fondo=True) or sp   # the drawn ramp ends where it is deepest
         p['_op'] = op
 
     # ----- the verdicts of sottoterra.json: each to the pit with the nearest centre (within R_VISTA), one pit each
@@ -447,6 +450,12 @@ class Sottoterra:
         C = np.column_stack([ndimage.gaussian_filter1d(C[:, j], sig, mode='nearest') for j in (0, 1)])
         k0, k1 = len(W) // 5, max(len(W) // 5 + 1, 4 * len(W) // 5)
         W = np.full(len(W), float(np.clip(np.median(W[k0:k1]), W_MIN, W_MAX)))   # walls parallel: one width, the middle of the pit's
+        # where the pit goes on under a roof (DSM 2008 over the DTM by more than 2.5 m, at least 1.5 m on, after 3 m in the open) the ramp
+        # goes under ground: it stops there with its door (via Gagarin: the spiral is under the cover, the open part is the way down to it)
+        cov = (M.at(M.dsm, C[:, 0], C[:, 1]) - M.at(M.dtm, C[:, 0], C[:, 1])) > 2.5; ds_ = 0.5
+        if not cov[:int(3 / ds_)].any():
+            for k in range(int(3 / ds_), len(C) - 3):
+                if cov[k:k + 3].all(): C, W = C[:k + 1], W[:k + 1]; p['sotto_tetto'] = True; break
         # the mouth goes on 1.5 m back along the line (the pit of the LiDAR starts 0.3 m deep), unless that is in a building
         def tang(a, b): v = C[b] - C[a]; return v / max(np.hypot(*v), 1e-9)
         dentro = lambda q: any(s.edifici[j].contains(Point(*q)) for j in etree.query(Point(*q)))
@@ -481,7 +490,7 @@ class Sottoterra:
             return h
         hl, hr = lato(1), lato(-1)
         if getattr(s, 'dbg', False): p['_dbg'] = (C.copy(), hl.copy(), hr.copy(), facc.copy(), W.copy())
-        if min(hl[~facc].min() if (~facc).any() else 9, hr[~facc].min() if (~facc).any() else 9) < 0.95 or (hl + hr)[~facc].min() < 2.4: return 'stretta fra gli edifici'
+        if (~facc).any() and (min(hl[~facc].min(), hr[~facc].min()) < 0.95 or (hl + hr)[~facc].min() < 2.4): return 'stretta fra gli edifici'
         hl, hr = ndimage.minimum_filter1d(hl, 3), ndimage.minimum_filter1d(hr, 3)
         W = hl + hr; C = C + N * ((hl - hr) / 2)[:, None]
         if W.min() < 2.5: return 'curva troppo stretta per la larghezza'
