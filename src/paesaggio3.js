@@ -415,6 +415,10 @@ function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
     tube(pl, bl, rr, RAIL); tube(pr, br, rr, RAIL); tube(bl, br, rr, RAIL); /* the ground frame */
     quad(pl, plt, tl, bl); quad(pr, prt, tr, br); quad(tl, tr, br, bl); quad(plt, prt, tr, tl); /* the net: two sides, the back, the roof */
     solidAt(pl[0], pl[2], r + 0.05, h); solidAt(pr[0], pr[2], r + 0.05, h);
+    /* the net is a wall too (Carlo, 25/10: "niente di attraversabile"): the two sides and the back stop a car or a person, little discs every 0.4 m;
+       the mouth stays open, the frame stops what goes in */
+    const wall = (p, q, hh) => { const n = Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[2] - p[2]) / 0.4)); for (let k = 1; k <= n; k++) { const t = k / n; solidAt(p[0] + (q[0] - p[0]) * t, p[2] + (q[2] - p[2]) * t, 0.12, hh); } };
+    wall(pl, bl, h); wall(pr, br, h); wall(bl, br, h);
     lsAud(rec, 'porta', cx, cz); return true;
   };
   const hw = Wv / 2 - 0.6;
@@ -450,6 +454,7 @@ function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
     const pt = (t, y) => { const [x, z] = S(0, t); return [x, H.ground(x, z) + y, z]; };
     if (free(...S(0, -half)) && free(...S(0, half))) {
       for (const o of [-half, half]) { const [x, , z] = pt(o, 0); tube(pt(o, 0), pt(o, post), 0.05, '#3a3d40', 8); solidAt(x, z, 0.1, post); lsAud(rec, 'rete', x, z); }
+      { const n = Math.ceil(2 * half / 0.4); for (let k = 1; k < n; k++) { const [x, , z] = pt(-half + 2 * half * k / n, 0); solidAt(x, z, 0.1, ten ? 0.95 : 2.43); } } /* the net itself stops what goes into it (Carlo: niente di attraversabile) */
       for (let k = 0; k < N_; k++) { const t0 = -half + 2 * half * k / N_, t1 = -half + 2 * half * (k + 1) / N_; quad(pt(t0, bot(t0)), pt(t1, bot(t1)), pt(t1, top(t1)), pt(t0, top(t0))); tube(pt(t0, top(t0)), pt(t1, top(t1)), 0.025, '#f4f2ea'); }
     }
   } else if (sport === 'boules' || sport === 'bowls') { /* the boards round a bocce court */

@@ -83,6 +83,16 @@
    "distanza_m": 1.6
   }
  },
+ "recinzioni_dentro_l_area": {
+  "recinzioni": {
+   "linee_toccate": 0,
+   "metri_tolti": 0.0
+  },
+  "divisori_tipo_6": {
+   "linee_toccate": 5,
+   "metri_tolti": 570.2
+  }
+ },
  "confini": {
   "pezzi_lim_com": 13,
   "metri_lim_com": 1461,

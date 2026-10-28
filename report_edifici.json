@@ -23,9 +23,10 @@
   "UN_VOL_POR 08": 67
  },
  "aggiornamenti_dbgt": {
-  "volumi_superati": 8,
+  "volumi_superati": 9,
   "volumi_tagliati": 1,
-  "volumi_dello_stesso_edificio_tagliati": 3
+  "volumi_dello_stesso_edificio_tagliati": 3,
+  "volumi_dentro_un_altro_dello_stesso_edificio": 1
  },
  "offset_dbgt_lidar": {
   "valore": 0.095,
@@ -34,7 +35,7 @@
   "n": 7055
  },
  "edifici_dbgt": 5525,
- "volumi": 7557,
+ "volumi": 7556,
  "accessi": 3731,
  "osm": {
   "osm_sostituiti": 3617,
@@ -963,7 +964,7 @@
  "volumi_disegnati": {
   "a_terra": 7055,
   "alti_02": 28,
-  "alti_04": 198,
+  "alti_04": 197,
   "sotterranei": 67,
   "alti_03": 209
  },
@@ -1017,7 +1018,7 @@
   "non_dal_dsm": {
    "troppo_ripido": 141,
    "irregolare": 601,
-   "piccolo": 859,
+   "piccolo": 858,
    "basso": 260,
    "chiome": 24,
    "alto": 325,
@@ -1249,6 +1250,10 @@
     -1
    ]
   ]
+ },
+ "volumi_sovrapposti_stesso_edificio": {
+  "n": 0,
+  "dove": []
  },
  "su_carreggiata": {
   "n": 0,

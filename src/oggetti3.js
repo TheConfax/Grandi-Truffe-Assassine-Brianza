@@ -11,7 +11,7 @@ const OGG_SPEC = {
   traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8 },
   idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
   panchina: { r: 0.8, h: 0.9, knock: true }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: {},
-  telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true }, rastrelliera: {}, cassetta: { r: 0.22, h: 1.2, knock: true },
+  telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true }, rastrelliera: { r: 0.6, h: 0.8, knock: true }, cassetta: { r: 0.22, h: 1.2, knock: true },
   armadietti: { r: 1.0, h: 2.1 }, pannello: { r: 0.4, h: 2.3 }, picnic: { r: 0.9, h: 0.8, knock: true }, fitness: { r: 0.8, h: 2.3 }, torre_acqua: { r: 3.2, h: 28, scale: 28 }, lavaggio: {},
 };
 const OGG_GEO = (() => {

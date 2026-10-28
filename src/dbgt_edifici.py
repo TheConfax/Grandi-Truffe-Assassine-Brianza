@@ -340,13 +340,34 @@ class Edifici:
                 big = max(ps, key=lambda q: q.area) if ps else None
                 if big is None or big.area < MIN_VOL: v['via'] = True; gone += 1; break   # (the ground plan stays: the union is the same)
                 v['p'] = big; same += 1
+        # a volume inside another of the same building, in plan and in height, is the same space drawn twice with two materials (Carlo, 25/10, Piazza
+        # Vittorio Veneto x 86 z -791: edificio 2562, a tower with a ground volume 50.0-62.3 m and a raised one 52.0-62.3 m on the same plan, 18 m2): what
+        # is inside the other in height is cut off its plan (gone when nothing is left). A raised volume under a ceiling, a floor over a portico (they only
+        # touch in height) and volumes that only partly share their height stay
+        dentro = 0
+        def _zz(v): return (v['zmin'], v['zmin'] + v['av']) if v['zmin'] is not None else None
+        for i, v in enumerate(vs):
+            if v.get('via') or v['por'] == '08' or _zz(v) is None: continue
+            zv = _zz(v)
+            for j in t.query(v['p'], predicate='intersects'):
+                w = vs[j]
+                if j == i or w.get('via') or w['por'] == '08' or w['ed'] != v['ed'] or _zz(w) is None: continue
+                zw = _zz(w)
+                if zv[0] < zw[0] - 0.3 or zv[1] > zw[1] + 0.3 or w['p'].intersection(v['p']).area <= 1.0: continue
+                if v['por'] == '01' and w['por'] == '01': continue  # the ground pairs are the loop above's
+                ev, ew = zv[1] - zv[0], zw[1] - zw[0]
+                if not (ev < ew - 0.6 or (abs(ev - ew) <= 0.6 and ((v['por'] != '01' and w['por'] == '01') or (v['por'] == w['por'] and j < i)))): continue  # the smaller one yields
+                ps = _parts(v['p'].difference(w['p'].buffer(0.05)))
+                big = max(ps, key=lambda q: q.area) if ps else None
+                if big is None or big.area < MIN_VOL: v['via'] = True; gone += 1; dentro += 1; touched.add(v['ed']); break
+                v['p'] = big; dentro += 1; touched.add(v['ed'])
         if gone:
             keep = [k for k, v in enumerate(vs) if not v.get('via')]; ren = {k: n for n, k in enumerate(keep)}
             self.vol = [vs[k] for k in keep]
             for e in self.ed: e['vols'] = [ren[k] for k in e['vols'] if k in ren]
         for k in touched:  # its ground plan is the volumes that stay
             e = self.ed[k]; e['is'] = unary_union([self.vol[j]['p'] for j in e['vols']]) if e['vols'] else GeometryCollection()
-        self.rep['aggiornamenti_dbgt'] = dict(volumi_superati=gone, volumi_tagliati=cut, volumi_dello_stesso_edificio_tagliati=same)
+        self.rep['aggiornamenti_dbgt'] = dict(volumi_superati=gone, volumi_tagliati=cut, volumi_dello_stesso_edificio_tagliati=same, volumi_dentro_un_altro_dello_stesso_edificio=dentro)
         self.log('dbgt edifici: volumi superati da un aggiornamento', gone, 'tagliati', cut)
 
     # ---------------------------------------------------------------- OSM against the DBGT
@@ -743,6 +764,17 @@ class Edifici:
                 if j <= k or dg[j][0].get('e') == b.get('e'): continue
                 a = dg[j][1].intersection(g).area
                 if a > 1.0: c = g.centroid; d2.append([round(c.x, 1), round(c.y, 1), round(a, 1)])
+        # volumes of the SAME building that share plan (> 1 m2) and height (> 0.5 m): the same space drawn twice (check of 28/10, Piazza Vittorio Veneto)
+        ds = []
+        for k, (b, g) in enumerate(dg):
+            if 'zt' not in b or not b.get('dbgt'): continue
+            z0, z1 = b.get('zb', b['zt'] - b['h']), b['zt']
+            for j in dt.query(g, predicate='intersects'):
+                if j <= k or dg[j][0].get('e') != b.get('e') or 'zt' not in dg[j][0]: continue
+                w = dg[j][0]; a = dg[j][1].intersection(g).area
+                if a > 1.0 and min(z1, w['zt']) - max(z0, w.get('zb', w['zt'] - w['h'])) > 0.5: c = g.centroid; ds.append([round(c.x, 1), round(c.y, 1), round(a, 1), b.get('e')])
+        self.rep['volumi_sovrapposti_stesso_edificio'] = dict(n=len(ds), dove=ds[:50])
+        self.log('dbgt edifici: volumi dello stesso edificio sovrapposti in pianta e in altezza', len(ds), ds[:5])
         self.rep['su_carreggiata'] = dict(n=len(on), m2=round(sum(o[2] for o in on), 1), dove=sorted(on, key=lambda o: -o[2])[:50])
         self.rep['doppi_dbgt_osm'] = dict(n=dup, dove=dd[:50])
         self.rep['doppi_dbgt_dbgt'] = dict(n=len(d2), dove=d2[:50])
@@ -751,7 +783,7 @@ class Edifici:
     def sintesi(self):
         r = self.rep
         return dict(edifici_dbgt=r.get('edifici_dbgt'), volumi=r.get('volumi_disegnati'), osm=r.get('osm'), tetti=r.get('tetti'), su_carreggiata=r.get('su_carreggiata', {}).get('n'),
-                    doppi_dbgt_osm=r.get('doppi_dbgt_osm', {}).get('n'), doppi_dbgt_dbgt=r.get('doppi_dbgt_dbgt', {}).get('n'), aggiornamenti=r.get('aggiornamenti_dbgt'), accessi=r.get('accessi'), offset=r.get('offset_dbgt_lidar', {}).get('valore'),
+                    doppi_dbgt_osm=r.get('doppi_dbgt_osm', {}).get('n'), doppi_dbgt_dbgt=r.get('doppi_dbgt_dbgt', {}).get('n'), volumi_sovrapposti_stesso_edificio=r.get('volumi_sovrapposti_stesso_edificio', {}).get('n'), aggiornamenti=r.get('aggiornamenti_dbgt'), accessi=r.get('accessi'), offset=r.get('offset_dbgt_lidar', {}).get('valore'),
                     vie_negli_edifici={k: v for k, v in r.get('vie_negli_edifici', {}).items() if not k.startswith('dove')}, stato_2015=r.get('stato_2015'))
 
 

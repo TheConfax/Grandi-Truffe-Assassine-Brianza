@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 106eb16 · assemblato 25/10 19:23 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 57ed324 · assemblato 28/10 19:12 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1123,6 +1123,7 @@ function barHide(pc) { // its triangles out of the tile's meshes, its posts out 
 function barHits(v) {
   if (v.speed < BAR_MIN_H) return;
   const cs = v.circles(), R = v.rad + 0.15;
+  bushHits(v, cs, R);
   BARG.each(v.x - 5, v.z - 5, v.x + 5, v.z + 5, pc => {
     if (pc.off || !pc.M || !pc.T.ready || Math.abs(v.y - pc.gy) > 2.5) return;
     if (pc.hedge) { hedgeHit(pc, v, cs, R); return; }
@@ -1230,6 +1231,23 @@ function updBarriere(dt) {
   im.instanceMatrix.needsUpdate = true;
 }
 const _barUp = new THREE.Vector3(0, 1, 0), _barM = new THREE.Matrix4(), _barQ = new THREE.Quaternion(), _barZ = new THREE.Matrix4().makeScale(0, 0, 0), _barE = new THREE.Euler(), _barP = new THREE.Vector3(), _barS = new THREE.Vector3();
+
+// the shrubs of the roundabouts (rotonde3.js): solid until a car hits one fast enough, then crushed flat, a few leaves thrown, the car slowed
+const BUSH_G = new Grid(6), BUSH = { slow: 0.9, dmg: 0.6, bit: 0x4f7a3a };
+function bushHits(v, cs, R) {
+  BUSH_G.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, b => {
+    if (b.off || b.T.roIm !== b.im || !b.T.ready || Math.abs(v.y - b.y) > 2.5) return;
+    for (const c of cs) {
+      const dx = b.x - c[0], dz = b.z - c[1], d = hyp(dx, dz); if (d >= b.hw * 0.85 + R || d < 1e-6) continue;
+      if ((v.vx * dx + v.vz * dz) / d < BAR_VN_H) continue; // towards the shrub
+      b.off = true; b.w.off = true; const speed = v.speed;
+      const m = b.m.clone(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(); m.decompose(p, q, s); m.compose(p, q, s.set(s.x * 1.15, s.y * 0.12, s.z * 1.15)); b.im.setMatrixAt(b.i, m); b.im.instanceMatrix.needsUpdate = true;
+      v.vx *= BUSH.slow; v.vz *= BUSH.slow; v.health = Math.max(0, v.health - BUSH.dmg);
+      if (v === P.car) { sfxCrash(Math.min(4, 2 + speed * 0.1)); shake = Math.max(shake, 0.15); }
+      barBits(b.x, b.y + b.h * 0.5, b.z, v, BUSH.bit, 5); return;
+    }
+  });
+}
 
 // ---------------------------------------------------------------- road signs and road markings (segnaletica) from OpenStreetMap
 // SEGN (src/segnaletica.json, made from the OSM nodes and ways of the area): [kind, x, z, dx, dz, extra] where (dx, dz) is the way the traffic the sign
@@ -3556,11 +3574,32 @@ function rotondeTile(T, put, G) {
   }
   put(an, RO_MAT.ciottoli, 10); put(fa, RO_MAT.fascia, 10); put(cu, RO_MAT.prato, 10, 'cast'); put(cem, MAT.median, 10); put(pr, MAT.grass, 10); put(pv, MAT.piazza, 10); put(kb, MAT.kerb, 10);
   put(bo, RO_MAT.bordo, 10, 'cast'); put(boT, RO_MAT.bordo, 10); put(fiT, RO_MAT.fiori, 10); put(fiS, RO_MAT.fiori, 10); put(te, RO_MAT.terra, 10);
-  if (bush.length) { // round bushes: a squashed ball each, sunk a little into the lawn
-    const geo = new THREE.IcosahedronGeometry(1, 2), im = new THREE.InstancedMesh(geo, RO_MAT.cespuglio, bush.length), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
-    bush.forEach(([x, y, z, hw, h, col], i) => { m4.compose(p.set(x, y + h * 0.42, z), qq, sc.set(hw, h / 2, hw)); im.setMatrixAt(i, m4); im.setColorAt(i, COL(col)); });
+  if (bush.length) { // round shrubs: a lumpy clump of balls each (not one squashed ball: Carlo, 25/10, "sembrano meloni"), sunk a little into the lawn; the car breaks them (sfondabili3.js)
+    const im = new THREE.InstancedMesh(roCespugliGeo(), RO_MAT.cespuglio, bush.length), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), eu = new THREE.Euler();
+    T.roIm = im; if (!T.roWalls) T.roWalls = bush.map(([x, y, z, hw, h]) => { const w = { r: hw * 0.85, x, z, y0: y - 3, y1: y + h, off: false }; WALLS.add(x - w.r, z - w.r, x + w.r, z + w.r, w); return w; });
+    bush.forEach(([x, y, z, hw, h, col], i) => {
+      const w = T.roWalls[i]; w.off = false; qq.setFromEuler(eu.set(0, (x * 12.9 + z * 7.7) % 6.28, 0)); m4.compose(p.set(x, y - 0.05, z), qq, sc.set(hw, h, hw)); im.setMatrixAt(i, m4); im.setColorAt(i, COL(col));
+      BUSH_G.add(x - hw, z - hw, x + hw, z + hw, { T, im, i, x, y, z, hw, h, w, m: m4.clone(), off: false });
+    });
     im.castShadow = true; im.receiveShadow = true; G.add(im);
   }
+}
+/* a shrub in a unit box (x, z in -1..1, y in 0..1): a middle ball and four round it, a little lumpy, scaled by half width and height */
+let _roCesp = null;
+function roCespugliGeo() {
+  if (_roCesp) return _roCesp;
+  const parts = [[0, 0.5, 0, 0.78, 0.5], [0.52, 0.36, 0.18, 0.55, 0.36], [-0.45, 0.34, 0.3, 0.52, 0.34], [0.12, 0.33, -0.55, 0.5, 0.33], [-0.2, 0.3, -0.42, 0.42, 0.3]], pos = [];
+  parts.forEach(([cx, cy, cz, rh, rv], k) => {
+    const g = new THREE.IcosahedronGeometry(1, 1), a = g.attributes.position;
+    for (let i = 0; i < a.count; i++) {
+      let x = a.getX(i), y = a.getY(i), z = a.getZ(i); const n = 1 + 0.12 * Math.sin(x * 5.1 + k) * Math.cos(z * 4.3 + y * 3.7 + k * 2);
+      pos.push(cx + x * rh * n, Math.max(0.02, cy + y * rv * n), cz + z * rh * n);
+    }
+    g.dispose();
+  });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const uv = []; for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] * 1.5 + 0.5, pos[i + 1] * 1.5 + pos[i + 2] * 0.7);
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); _roCesp = g; return g;
 }
 
 // ---------------------------------------------------------------- materials and generators shared by the game (banchine, parcheggi, arredi dei parchi)
@@ -3846,7 +3885,7 @@ const OGG_SPEC = {
   traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8 },
   idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
   panchina: { r: 0.8, h: 0.9, knock: true }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: {},
-  telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true }, rastrelliera: {}, cassetta: { r: 0.22, h: 1.2, knock: true },
+  telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true }, rastrelliera: { r: 0.6, h: 0.8, knock: true }, cassetta: { r: 0.22, h: 1.2, knock: true },
   armadietti: { r: 1.0, h: 2.1 }, pannello: { r: 0.4, h: 2.3 }, picnic: { r: 0.9, h: 0.8, knock: true }, fitness: { r: 0.8, h: 2.3 }, torre_acqua: { r: 3.2, h: 28, scale: 28 }, lavaggio: {},
 };
 const OGG_GEO = (() => {
@@ -5541,6 +5580,10 @@ function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
     tube(pl, bl, rr, RAIL); tube(pr, br, rr, RAIL); tube(bl, br, rr, RAIL); /* the ground frame */
     quad(pl, plt, tl, bl); quad(pr, prt, tr, br); quad(tl, tr, br, bl); quad(plt, prt, tr, tl); /* the net: two sides, the back, the roof */
     solidAt(pl[0], pl[2], r + 0.05, h); solidAt(pr[0], pr[2], r + 0.05, h);
+    /* the net is a wall too (Carlo, 25/10: "niente di attraversabile"): the two sides and the back stop a car or a person, little discs every 0.4 m;
+       the mouth stays open, the frame stops what goes in */
+    const wall = (p, q, hh) => { const n = Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[2] - p[2]) / 0.4)); for (let k = 1; k <= n; k++) { const t = k / n; solidAt(p[0] + (q[0] - p[0]) * t, p[2] + (q[2] - p[2]) * t, 0.12, hh); } };
+    wall(pl, bl, h); wall(pr, br, h); wall(bl, br, h);
     lsAud(rec, 'porta', cx, cz); return true;
   };
   const hw = Wv / 2 - 0.6;
@@ -5576,6 +5619,7 @@ function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
     const pt = (t, y) => { const [x, z] = S(0, t); return [x, H.ground(x, z) + y, z]; };
     if (free(...S(0, -half)) && free(...S(0, half))) {
       for (const o of [-half, half]) { const [x, , z] = pt(o, 0); tube(pt(o, 0), pt(o, post), 0.05, '#3a3d40', 8); solidAt(x, z, 0.1, post); lsAud(rec, 'rete', x, z); }
+      { const n = Math.ceil(2 * half / 0.4); for (let k = 1; k < n; k++) { const [x, , z] = pt(-half + 2 * half * k / n, 0); solidAt(x, z, 0.1, ten ? 0.95 : 2.43); } } /* the net itself stops what goes into it (Carlo: niente di attraversabile) */
       for (let k = 0; k < N_; k++) { const t0 = -half + 2 * half * k / N_, t1 = -half + 2 * half * (k + 1) / N_; quad(pt(t0, bot(t0)), pt(t1, bot(t1)), pt(t1, top(t1)), pt(t0, top(t0))); tube(pt(t0, top(t0)), pt(t1, top(t1)), 0.025, '#f4f2ea'); }
     }
   } else if (sport === 'boules' || sport === 'bowls') { /* the boards round a bocce court */
@@ -7827,5 +7871,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
+window.__G = { WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
 </script>
