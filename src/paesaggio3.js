@@ -423,7 +423,9 @@ function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
   };
   const hw = Wv / 2 - 0.6;
   if (sport === 'soccer' || sport === 'five-a-side' || sport === 'futsal' || sport === 'handball') {
-    const big = sport === 'soccer' && Wv >= 45, gw = Math.min(big ? 7.32 : 3, Wv * 0.5), gh = big ? 2.44 : 2, d0 = big ? 2.0 : 1.1, d1 = big ? 0.9 : 0.5, hl = Ls / 2 - 0.5 - d0;
+    /* goals by the pitch width: 11-a-side 7.32 x 2.44 from 45 m, 7-a-side 6 x 2 from 25 m, five-a-side 3 x 2 below */
+    const big = sport === 'soccer' && Wv >= 45, seven = sport === 'soccer' && !big && Wv >= 25;
+    const gw = Math.min(big ? 7.32 : seven ? 6 : 3, Wv * 0.5), gh = big ? 2.44 : 2, d0 = big ? 2.0 : seven ? 1.5 : 1.1, d1 = big ? 0.9 : seven ? 0.7 : 0.5, hl = Ls / 2 - 0.5 - d0;
     if (hl < 3) return;
     rect(hl, hw); line(0, -hw, 0, hw); circle(0, 0, Math.min(9.15, hw * 0.3));
     const pd = Math.min(16.5, hl * 0.3), pw = Math.min(20.15, hw * 0.6);
