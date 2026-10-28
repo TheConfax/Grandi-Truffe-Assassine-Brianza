@@ -20,11 +20,13 @@ rep("""<script>
 'use strict';""", """<script type="module">""")
 rep("const D = JSON.parse(document.getElementById('mapdata').textContent);", """const goBtn = document.getElementById('go');
 /* avvio veloce: l'indice e il pacco del terreno (src/terreno_pacco.py) partono insieme a brianza.json, e i tile si decomprimono in parallelo mentre il resto si legge; altezze3.js li prende da qui */
-const TERR_IND = fetch('terreno/indice.json').then(r => r.ok ? r.json() : null).catch(() => null);
-const TERR_BIN = TERR_IND.then(async j => { if (!j || j.ver !== 1 || !j.pacco) return null; try { const r = await fetch('terreno/' + j.pacco.file); if (!r.ok) return null; const b = new Uint8Array(await r.arrayBuffer()), m = new Map(); for (const k in j.pacco.tile) { const [o, l] = j.pacco.tile[k]; m.set(k, new Response(new Blob([b.subarray(o, o + l)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer().catch(() => null)); } return m; } catch (e) { return null; } });
+/* i dati si leggono sempre ricontrollati col server (cache 'no-cache': 304 se non sono cambiati), mai dalla cache del browser senza chiedere (28/10: il server locale non dice Cache-Control e Chrome teneva per ore il terreno vecchio, cosi Carlo vedeva viale Francia e via Maroncelli come prima) */
+const FRESCO = { cache: 'no-cache' };
+const TERR_IND = fetch('terreno/indice.json', FRESCO).then(r => r.ok ? r.json() : null).catch(() => null);
+const TERR_BIN = TERR_IND.then(async j => { if (!j || j.ver !== 1 || !j.pacco) return null; try { const r = await fetch('terreno/' + j.pacco.file, FRESCO); if (!r.ok) return null; const b = new Uint8Array(await r.arrayBuffer()), m = new Map(); for (const k in j.pacco.tile) { const [o, l] = j.pacco.tile[k]; m.set(k, new Response(new Blob([b.subarray(o, o + l)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer().catch(() => null)); } return m; } catch (e) { return null; } });
 goBtn.disabled = true; goBtn.textContent = 'CARICO LA BRIANZA…';
 const D = await (async () => {
-  const res = await fetch('brianza.json'); const total = +res.headers.get('content-length') || 0;
+  const res = await fetch('brianza.json', FRESCO); const total = +res.headers.get('content-length') || 0;
   if (!res.body || !total) return res.json();
   const rd = res.body.getReader(), chunks = []; let got = 0;
   for (;;) { const { done, value } = await rd.read(); if (done) break; chunks.push(value); got += value.length; goBtn.textContent = `CARICO LA BRIANZA… ${Math.round(got / total * 100)}%`; }

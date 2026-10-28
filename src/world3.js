@@ -126,11 +126,11 @@ for (const T of TILES) {
       }
     }
   }
-  for (const f of d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) T.fe.push(q); // fences follow the ground every 3 m (walls and collisions are built later)
+  for (const f of d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) T.fe.push(barFeet(q)); // fences follow the ground every 3 m (walls and collisions are built later)
   for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const br of d.ba || []) for (const pts of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) {
-    const sp = BAR_PANEL[br.t], rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
-    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2), s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
+    const sp = BAR_PANEL[br.t], rec = { pts: barFeet(pts), t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
+    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
     if (sp || br.t === 3) barPieces(T, rec, segs);
   }
   for (const q of d.sd || []) {
@@ -320,7 +320,7 @@ for (const r of D.roads) if (r.d) {
 // railway fences: solid, following the ground, never across the track
 for (const T of TILES) {
   T.fe = T.fe.map(pts => pts.filter((p, i) => true)).map(pts => { const out = [], cur = []; for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (nearLowRail(mx, mz, 2.0)) { if (cur.length > 1) out.push(cur.slice()); cur.length = 0; continue; } if (!cur.length) cur.push(a); cur.push(c); } if (cur.length > 1) out.push(cur); return out; }).flat();
-  for (const pts of T.fe) for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2); WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + 2.2 }); }
+  for (const pts of T.fe) for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = (barFoot(a) + barFoot(c)) / 2; WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + 2.2 }); }
 }
 // elevated railway: the embankment / viaduct sides are solid (open where a street passes underneath)
 for (const td of D.tiles) for (const r of td.rl || []) {
@@ -1192,12 +1192,17 @@ function* buildTileGen(T) {
         if (!r.e || !r.e[ei] || !F) continue;
         const L = hyp(F[0] - E[0], F[1] - E[1]) || 1, ux = (F[0] - E[0]) / L, uz = (F[1] - E[1]) / L, nx = -uz, nz = ux, g = H.ground(E[0], E[1]), W = r.w + 0.3;
         if (T.fine) { // new engine: the headwall from under the water to the ground over the culvert, the dark mouth above the water
-          let lo = 1e9, hi = -1e9; for (let q = -1; q <= 1.001; q += 0.25) { const y = H.base(E[0] + nx * W * q, E[1] + nz * W * q); lo = Math.min(lo, y); hi = Math.max(hi, y); }
-          const top = Math.max(hi, H.base(E[0] - ux * 3, E[1] - uz * 3)), hw = H.water(E[0], E[1]), wy = hw !== null ? hw : lo + 0.3; if (top - lo < 0.6) continue; // the bed goes on at grade: no culvert to see
-          quadV(head, E[0] - nx * W, E[1] - nz * W, E[0] + nx * W, E[1] + nz * W, lo - 0.5, top + 0.25, ux, uz);
-          const ow = r.w * 0.78, mh = Math.min(1.5, top - wy - 0.3), mx = E[0] + ux * 0.03, mz = E[1] + uz * 0.03;
+          // where the bed of S really ends along the line (28/10, viale Francia): the end of the OSM line could lie metres inside the open bed (behind
+          // the wall a hole in the street, the bed going on under the fill) or up on the fill (in front of the wall a grass pyramid of the cells)
+          const E0 = E, bs = s => H.base(E0[0] + ux * s, E0[1] + uz * s); let bed = 1e9; for (let s = 2; s <= 8; s += 0.5) bed = Math.min(bed, bs(s));
+          let s0 = 0; if (bs(0) < bed + 0.4) { while (s0 > -10 && bs(s0 - 0.5) < bed + 0.4) s0 -= 0.5; } else { while (s0 < 6 && bs(s0) >= bed + 0.4) s0 += 0.5; }
+          const Q = [E0[0] + ux * s0, E0[1] + uz * s0];
+          let lo = 1e9, hi = -1e9; for (let q = -1; q <= 1.001; q += 0.25) { const y = H.base(Q[0] + nx * W * q, Q[1] + nz * W * q); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+          const top = Math.max(hi, H.base(Q[0] - ux * 3, Q[1] - uz * 3)), hw = H.water(Q[0], Q[1]), wy = hw !== null ? hw : lo + 0.3; if (top - lo < 0.6) continue; // the bed goes on at grade: no culvert to see
+          quadV(head, Q[0] - nx * W, Q[1] - nz * W, Q[0] + nx * W, Q[1] + nz * W, lo - 0.5, top + 0.25, ux, uz);
+          const ow = r.w * 0.78, mh = Math.min(1.5, top - wy - 0.3), mx = Q[0] + ux * 0.03, mz = Q[1] + uz * 0.03;
           if (mh > 0.25) quadV(mouth, mx - nx * ow, mz - nz * ow, mx + nx * ow, mz + nz * ow, wy, wy + mh, ux, uz);
-          if (RIVER_RAIL) { const par = new THREE.Mesh(boxG(2 * W + 0.3, 0.8, 0.3), lam(0xa9a397)); par.position.set(E[0] - ux * 0.15, top + 0.4 + 0.25, E[1] - uz * 0.15); par.rotation.y = Math.atan2(-nz, nx); par.castShadow = true; G.add(par); } // the slab over the mouth lay across the junction of via Varese (x 563 z -1738)
+          if (RIVER_RAIL) { const par = new THREE.Mesh(boxG(2 * W + 0.3, 0.8, 0.3), lam(0xa9a397)); par.position.set(Q[0] - ux * 0.15, top + 0.4 + 0.25, Q[1] - uz * 0.15); par.rotation.y = Math.atan2(-nz, nx); par.castShadow = true; G.add(par); } // the slab over the mouth lay across the junction of via Varese (x 563 z -1738)
           continue;
         }
         quadV(head, E[0] - nx * W, E[1] - nz * W, E[0] + nx * W, E[1] + nz * W, g - RIV_D - 0.2, g + 0.25, ux, uz);
@@ -1441,21 +1446,21 @@ function* buildTileGen(T) {
     }
     if (ebal.i.length) { const m1 = new THREE.MeshLambertMaterial({ map: ballastTex }); put(ebal, m1, 9); put(esteel, MAT.rail, 10); put(eside, MAT.deckSide, 10, 'cast'); }
     put(bal, MAT.ballast, 7); put(steel, MAT.steel, 8);
-    const wall = FBuf(), net = FBuf(), WH = 0.9, NH = 2.0, TK = 0.13, posts = [];
+    const wall = Buf(), net = Buf(), WH = 0.9, NH = 2.0, TK = 0.13, posts = []; /* on the foot of the barriers (barFoot, sfondabili3.js), no longer draped on the cells: on a bank they went up and down like a saw */
     for (const pts of T.fe) {
       let acc = 0, nextPost = 0;
       for (let k = 1; k < pts.length; k++) {
         const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
-        const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux, u0 = acc / 2, u1 = (acc + L) / 2;
+        const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux, u0 = acc / 2, u1 = (acc + L) / 2, fa = barFoot(a), fc = barFoot(c), la = barLo(a) - 0.3, lc = barLo(c) - 0.3;
         for (const sd of [1, -1]) {
           const ox = nx * TK * sd, oz = nz * TK * sd, base = wall.p.length / 3;
-          vtx(wall, a[0] + ox, 0, a[1] + oz, nx * sd, 0, nz * sd, u0, 0); vtx(wall, c[0] + ox, 0, c[1] + oz, nx * sd, 0, nz * sd, u1, 0);
-          vtx(wall, c[0] + ox, WH, c[1] + oz, nx * sd, 0, nz * sd, u1, 0.9); vtx(wall, a[0] + ox, WH, a[1] + oz, nx * sd, 0, nz * sd, u0, 0.9);
+          vtx(wall, a[0] + ox, la, a[1] + oz, nx * sd, 0, nz * sd, u0, 0); vtx(wall, c[0] + ox, lc, c[1] + oz, nx * sd, 0, nz * sd, u1, 0);
+          vtx(wall, c[0] + ox, fc + WH, c[1] + oz, nx * sd, 0, nz * sd, u1, 0.9); vtx(wall, a[0] + ox, fa + WH, a[1] + oz, nx * sd, 0, nz * sd, u0, 0.9);
           wall.i.push(base, base + 1, base + 2, base, base + 2, base + 3, base, base + 2, base + 1, base, base + 3, base + 2);
         }
-        { const base = wall.p.length / 3; vtx(wall, a[0] + nx * TK, WH, a[1] + nz * TK, 0, 1, 0, u0, 1); vtx(wall, c[0] + nx * TK, WH, c[1] + nz * TK, 0, 1, 0, u1, 1); vtx(wall, c[0] - nx * TK, WH, c[1] - nz * TK, 0, 1, 0, u1, 0.95); vtx(wall, a[0] - nx * TK, WH, a[1] - nz * TK, 0, 1, 0, u0, 0.95); triUp(wall, base, base + 1, base + 2); triUp(wall, base, base + 2, base + 3); }
-        { const base = net.p.length / 3; vtx(net, a[0], WH, a[1], nx, 0, nz, acc / 2.6, 0); vtx(net, c[0], WH, c[1], nx, 0, nz, (acc + L) / 2.6, 0); vtx(net, c[0], NH, c[1], nx, 0, nz, (acc + L) / 2.6, 1); vtx(net, a[0], NH, a[1], nx, 0, nz, acc / 2.6, 1); net.i.push(base, base + 1, base + 2, base, base + 2, base + 3); }
-        while (nextPost <= acc + L) { const t = (nextPost - acc) / L; posts.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t]); nextPost += 2.6; }
+        { const base = wall.p.length / 3; vtx(wall, a[0] + nx * TK, fa + WH, a[1] + nz * TK, 0, 1, 0, u0, 1); vtx(wall, c[0] + nx * TK, fc + WH, c[1] + nz * TK, 0, 1, 0, u1, 1); vtx(wall, c[0] - nx * TK, fc + WH, c[1] - nz * TK, 0, 1, 0, u1, 0.95); vtx(wall, a[0] - nx * TK, fa + WH, a[1] - nz * TK, 0, 1, 0, u0, 0.95); triUp(wall, base, base + 1, base + 2); triUp(wall, base, base + 2, base + 3); }
+        { const base = net.p.length / 3; vtx(net, a[0], fa + WH, a[1], nx, 0, nz, acc / 2.6, 0); vtx(net, c[0], fc + WH, c[1], nx, 0, nz, (acc + L) / 2.6, 0); vtx(net, c[0], fc + NH, c[1], nx, 0, nz, (acc + L) / 2.6, 1); vtx(net, a[0], fa + NH, a[1], nx, 0, nz, acc / 2.6, 1); net.i.push(base, base + 1, base + 2, base, base + 2, base + 3); }
+        while (nextPost <= acc + L) { const t = (nextPost - acc) / L; posts.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, fa + (fc - fa) * t]); nextPost += 2.6; }
         acc += L;
       }
     }
@@ -1463,7 +1468,7 @@ function* buildTileGen(T) {
     if (posts.length) {
       const pg = new THREE.BoxGeometry(0.07, NH - WH, 0.07); pg.translate(0, (NH + WH) / 2, 0);
       const pm = new THREE.InstancedMesh(pg, MAT.post, posts.length), mtx = new THREE.Matrix4();
-      posts.forEach(([x, z], i) => { mtx.makeTranslation(x, H.ground(x, z), z); pm.setMatrixAt(i, mtx); }); pm.castShadow = true; G.add(pm);
+      posts.forEach(([x, z, y], i) => { mtx.makeTranslation(x, y, z); pm.setMatrixAt(i, mtx); }); pm.castShadow = true; G.add(pm);
     }
   }
   yield 'buildings';
