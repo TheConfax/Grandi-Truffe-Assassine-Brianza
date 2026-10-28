@@ -1215,10 +1215,28 @@ if not _fz.is_empty:
     log('divisori sul bordo delle fontane tolti', _nb - len(bar_out))
 if FER: bar_out = FER.via_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_recinzioni', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
 if FER: bar_out = FER.lontano_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_divisori', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
+CAPO_STRADA, CAPO_LUNGO = 10.0, 10.0  # m: the end of a platform divider within CAPO_STRADA of a street at grade stays, CAPO_LUNGO m of it
 if FER:  # the DBGT railway dividers (kind 6) between a platform and a track or between two tracks: not on the boundary of the railway land, taken away
     _k6 = [b_ for b_ in bar_out if b_[1] == 6]
     log('controllo: metri di divisori ferroviari (tipo 6) dentro l area ferroviaria PRIMA', FER.metri_dentro(_E_fer, [b_[0] for b_ in _k6])[0])
     bar_out = [b_ for b_ in bar_out if b_[1] != 6] + FER.dentro_l_area(_k6, _E_fer, 'divisori_tipo_6', get=lambda b_: b_[0], put=lambda b_, pts_: (pts_, b_[1], b_[2]))
+    # the end of a platform at a crossing or a street (Carlo, 28/10, via Pace x 580 z -752: "manca un muretto a chiudere li"): the divider between platform and track that
+    # runs into a street was taken away with the rest and the platform stayed open to the track. The first CAPO_LUNGO m of it from an end that is within CAPO_STRADA m of
+    # an asphalt at grade stay (a cap; the rest of the platform edge stays open to the track, as Carlo wanted at the station of Meda)
+    from shapely.ops import substring as _subs
+    _zona_s = asph.buffer(CAPO_STRADA); prepare(_zona_s); _capi = []
+    for b_ in _k6:
+        _L = LineString(b_[0])
+        if _L.length < 1 or not _L.intersects(_E_fer): continue
+        for _a, _b in ((0.0, min(CAPO_LUNGO, _L.length)), (max(0.0, _L.length - CAPO_LUNGO), _L.length)):
+            _c = _subs(_L, _a, _b)
+            _end = Point(_c.coords[0] if _a == 0.0 else _c.coords[-1])
+            if not _zona_s.contains(_end): continue
+            _x = _c.intersection(_E_fer)
+            for _p in getattr(_x, 'geoms', [_x]):
+                if _p.geom_type == 'LineString' and _p.length >= 0.8: _capi.append((list(_p.coords), b_[1], b_[2]))
+    bar_out += _capi; _capi_m = round(sum(LineString(c_[0]).length for c_ in _capi), 1)
+    log('CONTROLLO chiusure dei divisori ferroviari alla strada (tratti, metri):', len(_capi), _capi_m, [(round(c_[0][0][0]), round(c_[0][0][1])) for c_ in _capi[:6]])
 
 # ---- rivers: merge the OSM pieces, then cut them where a road / railway / building passes over (a bridge or culvert mouth)
 from shapely.ops import linemerge
@@ -1627,7 +1645,7 @@ if FER:  # the trains against platforms, buildings and carriageways (FER.control
 log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1), 'parcheggi con capienza', len(plots), 'strade con sosta', sum(1 for r in raw_roads if r.get('pk')))
 trees = VERDE.alberi(trees, _n_tr, [_rbuf('flat0'), bunion, _rbuf('deck0')], railL, pspaces, roadsU, [side]); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
 VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
-trees = MANUF.alberi(trees, VERDE.forest_u)
+trees = MANUF.alberi(trees, VERDE.forest_u, isole=STR.isole if STR else ())
 # ---- the lanes of the AI cars away from walls, fences, gates and buildings, in every comune (src/corsie_ia.py): all of them are final here
 import corsie_ia
 _cia_n = [0]
@@ -1850,6 +1868,12 @@ if FER:
 _ctl['paletti_e_blocchi_su_una_via'] = {'%s %s' % k_: v_ for k_, v_ in sorted(n_su_via.items())}
 log('CONTROLLO paletti e blocchi OSM su un nodo di una via: restano', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'restano'), 'spostati dalla regola vecchia', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'spostati_dalla_regola_vecchia'), 'spostati ora 0 per costruzione; sciolti spostati', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'sciolti_spostati'))
 _ctl['oggetti_senza_collisione'] = dict(_n_senza)
+_ctl['divisori_ferroviari_chiusi_alla_strada'] = {'tratti': len(_capi), 'metri': _capi_m} if FER else None
+_ctl['alberi_su_isole'] = MANUF.rep.get('alberi_isole')
+log('CONTROLLO alberi sulle isole stradali sotto', dbgt_manufatti.ALB_ISOLA, 'm (devono essere 0 dopo):', MANUF.rep.get('alberi_isole'))
+import prove_fisse  # the points of Carlo of 28/10 as fixed tests (src/prove_fisse.py)
+_ctl['prove_fisse'] = prove_fisse.prove(out)
+for _k_, _v_ in _ctl['prove_fisse'].items(): log('PROVA FISSA', _k_, 'OK' if _v_['ok'] else 'NON PASSA', _v_)
 out.setdefault('report', {})['controlli_28_10'] = _ctl
 out.setdefault('report', {})['cantieri'] = _crep  # the dividers the building sites' hoarding replaces (src/barriere.py cantieri)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)

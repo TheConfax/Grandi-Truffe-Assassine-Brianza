@@ -604,36 +604,51 @@ const TREE_G = (() => {
   for (let k = 0; k < 3; k++) { // branches from 2.6 m out to 1.2 m from the axis, a little under the crown's middle
     const a = k * TAU / 3 + 0.4, b = new THREE.CylinderGeometry(0.05, 0.09, 2.1, 4, 1, true); b.translate(0, 1.05, 0); b.rotateZ(-0.62); b.rotateY(a); b.translate(0, 2.6, 0); parts.push(b);
   }
-  let seed = 11; const r = () => (seed = seed * 16807 % 2147483647) / 2147483647;
-  const RX = 2.25, RY = 2.05, p = [], n = [], uv = [], co = [];
-  const nrm = (x, y, z) => { // a touch upwards: the sky lights the crown more than the ground. And the inside and the underside in the shade of the leaves (vertex colour)
-    const a = x / RX, b = y / RY, c = z / RX, q = Math.hypot(a, b, c), l = Math.hypot(a, b + 0.12, c) || 1, k = Math.min(1, 0.4 + 0.6 * q) * (0.74 + 0.13 * (b + 1)); co.push(k, k, k);
-    return [a / l, (b + 0.12) / l, c / l];
-  };
-  const cellUV = (cell, s, t) => [(cell % 2) * 0.5 + 0.006 + 0.488 * s, (cell >> 1) * 0.5 + 0.006 + 0.488 * t];
-  const quad = (c, A, B, cell) => { // centre, half sides: two triangles, normals from the crown's middle
-    const v = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => [c[0] + A[0] * s + B[0] * t, c[1] + A[1] * s + B[1] * t, c[2] + A[2] * s + B[2] * t, (s + 1) / 2, (t + 1) / 2]);
-    for (const i of [0, 1, 2, 0, 2, 3]) { const [x, y, z, s, t] = v[i]; p.push(x, y, z); n.push(...nrm(x, y, z)); uv.push(...cellUV(cell, s, t)); }
-  };
+  const RX = 2.25, RY = 2.05;
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], unit = a => { const l = Math.hypot(...a) || 1; return a.map(v => v / l); }, mul = (a, k) => a.map(v => v * k);
-  const NT = 14;
-  for (let i = 0; i < NT; i++) {
-    const y = 0.92 - 1.6 * (i + 0.5) / NT, rr = Math.sqrt(1 - y * y), ph = i * 2.39996 + r() * 0.5; // a Fibonacci shell, the bottom left open
-    const d = unit([Math.cos(ph) * rr, y, Math.sin(ph) * rr]), f = 0.6 + r() * 0.18, c = [d[0] * RX * f, d[1] * RY * f, d[2] * RX * f];
-    const e1 = unit(cross(d, Math.abs(d[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), e2 = cross(d, e1), w = r() * TAU, h = 0.9 + r() * 0.3;
-    const u = unit([e1[0] * Math.cos(w) + e2[0] * Math.sin(w), e1[1] * Math.cos(w) + e2[1] * Math.sin(w), e1[2] * Math.cos(w) + e2[2] * Math.sin(w)]), v = cross(d, u);
-    quad(c, mul(u, h), mul(v, h), i % 3); // facing out
-    quad(c, mul(d, h * 0.85), mul(v, h), (i + 1) % 3); // across, sticking out of the outline
-  }
-  const core = new THREE.IcosahedronGeometry(1, 0).attributes.position.array;
-  for (let i = 0; i < core.length; i += 9) { // each face takes the leaves projected along its own main axis: no streaks on the sides
-    const f = [0, 3, 6].map(j => [core[i + j], core[i + j + 1], core[i + j + 2]]), fn = cross(f[1].map((v, k) => v - f[0][k]), f[2].map((v, k) => v - f[0][k])).map(Math.abs);
-    const [ua, va] = fn[1] >= fn[0] && fn[1] >= fn[2] ? [0, 2] : fn[0] >= fn[2] ? [2, 1] : [0, 1];
-    for (const q of f) { const x = q[0] * RX * 0.66, y = q[1] * RY * 0.64, z = q[2] * RX * 0.66; p.push(x, y, z); n.push(...nrm(x, y, z)); uv.push(...cellUV(3, q[ua] * 0.5 + 0.5, q[va] * 0.5 + 0.5)); }
-  }
-  const crown = new THREE.BufferGeometry(); crown.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); crown.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); crown.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); crown.setAttribute('color', new THREE.Float32BufferAttribute(co, 3));
-  crown.computeBoundingSphere();
-  return { trunk: merge(parts), crown };
+  // the crown, three silhouettes (Carlo, 25/10: one lollipop is not enough for the small trees): 0 round, 1 egg (wide at the bottom, narrow at the top), 2 three puffs; sd: the seed of the tufts
+  const mkCrown = (shape, sd) => {
+    let seed = sd; const r = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+    const p = [], n = [], uv = [], co = [];
+    const nrm = (x, y, z) => { // a touch upwards: the sky lights the crown more than the ground. And the inside and the underside in the shade of the leaves (vertex colour)
+      const a = x / RX, b = y / RY, c = z / RX, q = Math.hypot(a, b, c), l = Math.hypot(a, b + 0.12, c) || 1, k = Math.min(1, 0.4 + 0.6 * q) * (0.74 + 0.13 * (b + 1)); co.push(k, k, k);
+      return [a / l, (b + 0.12) / l, c / l];
+    };
+    const cellUV = (cell, s, t) => [(cell % 2) * 0.5 + 0.006 + 0.488 * s, (cell >> 1) * 0.5 + 0.006 + 0.488 * t];
+    const quad = (c, A, B, cell) => { // centre, half sides: two triangles, normals from the crown's middle
+      const v = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => [c[0] + A[0] * s + B[0] * t, c[1] + A[1] * s + B[1] * t, c[2] + A[2] * s + B[2] * t, (s + 1) / 2, (t + 1) / 2]);
+      for (const i of [0, 1, 2, 0, 2, 3]) { const [x, y, z, s, t] = v[i]; p.push(x, y, z); n.push(...nrm(x, y, z)); uv.push(...cellUV(cell, s, t)); }
+    };
+    // a shell of NT tufts (a Fibonacci shell, the bottom left open) round (ox, oy, oz), k times the size of the full crown; wp(y): the width of the shell at height y
+    const shell = (NT, ox, oy, oz, k, wp) => {
+      for (let i = 0; i < NT; i++) {
+        const y = 0.92 - 1.6 * (i + 0.5) / NT, rr = Math.sqrt(1 - y * y), ph = i * 2.39996 + r() * 0.5, wy = wp(y);
+        const d = unit([Math.cos(ph) * rr, y, Math.sin(ph) * rr]), f = 0.6 + r() * 0.18, c = [ox + d[0] * RX * f * k * wy, oy + d[1] * RY * f * k, oz + d[2] * RX * f * k * wy];
+        const e1 = unit(cross(d, Math.abs(d[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), e2 = cross(d, e1), w = r() * TAU, h = (0.9 + r() * 0.3) * (0.55 + 0.45 * k);
+        const u = unit([e1[0] * Math.cos(w) + e2[0] * Math.sin(w), e1[1] * Math.cos(w) + e2[1] * Math.sin(w), e1[2] * Math.cos(w) + e2[2] * Math.sin(w)]), v = cross(d, u);
+        quad(c, mul(u, h), mul(v, h), i % 3); // facing out
+        quad(c, mul(d, h * 0.85), mul(v, h), (i + 1) % 3); // across, sticking out of the outline
+      }
+    };
+    // the solid leafy core: each face takes the leaves projected along its own main axis: no streaks on the sides
+    const core = (ox, oy, oz, kx, ky) => {
+      const ic = new THREE.IcosahedronGeometry(1, 0).attributes.position.array;
+      for (let i = 0; i < ic.length; i += 9) {
+        const f = [0, 3, 6].map(j => [ic[i + j], ic[i + j + 1], ic[i + j + 2]]), fn = cross(f[1].map((v, k) => v - f[0][k]), f[2].map((v, k) => v - f[0][k])).map(Math.abs);
+        const [ua, va] = fn[1] >= fn[0] && fn[1] >= fn[2] ? [0, 2] : fn[0] >= fn[2] ? [2, 1] : [0, 1];
+        for (const q of f) { const x = ox + q[0] * RX * kx, y = oy + q[1] * RY * ky, z = oz + q[2] * RX * kx; p.push(x, y, z); n.push(...nrm(x, y, z)); uv.push(...cellUV(3, q[ua] * 0.5 + 0.5, q[va] * 0.5 + 0.5)); }
+      }
+    };
+    if (shape === 1) { shell(14, 0, 0, 0, 1, y => 1.16 - 0.44 * (y + 0.68) / 1.6); core(0, -0.1, 0, 0.62, 0.64); }
+    else if (shape === 2) { for (let k = 0; k < 3; k++) { const a = 0.5 + k * TAU / 3, ox = Math.cos(a) * 0.95, oz = Math.sin(a) * 0.95, oy = k === 1 ? 0.3 : -0.2; shell(6, ox, oy, oz, 0.62, () => 1); core(ox, oy, oz, 0.41, 0.4); } core(0, -0.1, 0, 0.5, 0.5); }
+    else { shell(14, 0, 0, 0, 1, () => 1); core(0, 0, 0, 0.66, 0.64); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(co, 3));
+    g.computeBoundingSphere(); return g;
+  };
+  // the trunk of the small trees (TREE_SMALL): one plain tapered stem 1 m high, no branches, stretched to end inside the crown (the three branches of the tall model
+  // came out of the top of a small crown: Carlo, 25/10)
+  const stem = new THREE.CylinderGeometry(0.11, 0.2, 1, 7, 1, true); stem.translate(0, 0.5, 0);
+  return { trunk: merge(parts), crown: mkCrown(0, 11), trunkS: stem, crownS: [mkCrown(0, 23), mkCrown(1, 37), mkCrown(2, 51)] };
 })();
 // ambient occlusion (ramo fotorealismo). Walls darken near the ground, under the eaves of pitched roofs and into inside corners:
 // each wall vertex carries its height over the ground, its depth under the eaves and its distance from the corners at either
@@ -763,6 +778,8 @@ function kerbRing(b, ring, h, yf, flip) {
   }
 }
 const streetY = (x, z) => H.overFree(x, z, H.base(x, z)); // where the street surfaces and the step covers stand in a tile of S
+const TREE_SMALL = 7; /* m: a tree the DSM sees lower than this has the small model */
+const trHash = (x, z) => { const t = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return t - Math.floor(t); };
 const GREENS = ['#4f7a35', '#5d8a3b', '#6b8f3e', '#47703a', '#7f9a45', '#a08d3c'];
 function addBox(b, x, y, z, w, h, d, col, ry = 0) { // axis box rotated about y, into a buffer
   const c = Math.cos(ry), s = Math.sin(ry), P = (dx, dy, dz) => [x + dx * c + dz * s, y + dy, z - dx * s + dz * c];
@@ -1581,25 +1598,32 @@ function* buildTileGen(T) {
   // trees and street lamps
   T.tr = T.tr.filter(([x, z]) => !nearRail(x, z, 4));
   if (T.tr.length) {
-    const n = T.tr.length, trunks = new THREE.InstancedMesh(TREE_G.trunk, MAT.trunk, n), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, n);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
+    // the small trees (DSM height under TREE_SMALL) have their own models (Carlo, 25/10: "il modello degli alberi piccoli fa schifo"): a plain stem that ends inside the crown, the crown
+    // from 28% of the height and full, three silhouettes (round, egg, puffs). The tall ones and those with no measured height keep the old model. One pair of instanced meshes per model
+    const nV = [0, 0, 0, 0], tv = T.tr.map(([x, z, th]) => th && th < TREE_SMALL ? 1 + Math.floor(trHash(x, z) * 3) : 0); tv.forEach(v => nV[v]++); T.nSmall = nV[1] + nV[2] + nV[3];
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler(), cnt = [0, 0, 0, 0], VM = [];
+    for (let v = 0; v < 4; v++) if (nV[v]) VM[v] = [new THREE.InstancedMesh(v ? TREE_G.trunkS : TREE_G.trunk, MAT.trunk, nV[v]), new THREE.InstancedMesh(v ? TREE_G.crownS[v - 1] : TREE_G.crown, MAT.crown, nV[v])];
     T.tr.forEach(([x, z, th, td], i) => {
-      const k = 0.75 + tRnd() * 0.6, gy = H.ground(x, z);
-      if (th) { // height th and crown diameter td from the DSM (dbgt_manufatti.py): the crown model is about 5.4 m across and 4.5 m high, its bottom 2 m under its origin and its top 2.5 m over it
+      const v = tv[i], j = cnt[v]++, trunks = VM[v][0], crowns = VM[v][1], k = 0.75 + tRnd() * 0.6, gy = H.ground(x, z);
+      if (v) { // small tree: height th, crown td across (from the DSM), the crown model 5.4 m across and 4.5 m high, its bottom 2 m under its origin and its top 2.5 m over it
+        const yb = Math.max(0.8, 0.28 * th), hc = th - yb, D = clamp(td, 0.75 * hc, 1.6 * hc), sx = D / 5.4 * (0.94 + tRnd() * 0.12), sy = hc / 4.5 * (0.95 + tRnd() * 0.1), yc = th - 2.5 * sy, tw = clamp(0.35 + 0.06 * th, 0.5, 0.8);
+        q.identity(); m.compose(p.set(x, gy, z), q, s.set(tw, yb + 0.65 * hc, tw)); trunks.setMatrixAt(j, m); /* the stem ends at 65% of the crown: inside it */
+        q.setFromEuler(e.set((tRnd() - 0.5) * 0.15, tRnd() * TAU, 0)); m.compose(p.set(x, gy + yc, z), q, s.set(sx, sy, sx * (0.94 + tRnd() * 0.12))); crowns.setMatrixAt(j, m);
+      } else if (th) { // height th and crown diameter td from the DSM (dbgt_manufatti.py): the crown model is about 5.4 m across and 4.5 m high, its bottom 2 m under its origin and its top 2.5 m over it
         // the crown takes 65% of the height on a broad tree (td at least 0.55 th), 85% on a narrow one (a cypress, a spruce: td at most 0.35 th), on a broad one at least 2 m off the ground
         // and lower where it is much wider than tall. The trunk (4.4 m, its three branches from 2.6 to 4.3 m) grows so that the branches start a fifth of the way up the crown and stay inside it:
         // stretched to the middle of the crown they stuck out bare under a small crown (Carlo, 26/10: "scope")
         const sl = clamp((td / th - 0.35) / 0.2, 0, 1), yb = Math.min(th - 1.2, Math.max(0.5 + 1.5 * sl, Math.min((0.15 + 0.2 * sl) * th, th - 0.55 * td))), hc = th - yb;
         const sx = td / 5.4 * (0.94 + tRnd() * 0.12), sy = hc / 4.5 * (0.95 + tRnd() * 0.1), yc = th - 2.5 * sy, tw = clamp(Math.min(Math.sqrt(th / 7), 0.4 * td), 0.5, 1.8);
-        q.identity(); m.compose(p.set(x, gy, z), q, s.set(tw, Math.max(0.3, Math.min((yb + 0.2 * hc) / 2.6, (th - 0.15 * hc) / 4.4)), tw)); trunks.setMatrixAt(i, m);
-        q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + yc, z), q, s.set(sx, sy, sx * (0.94 + tRnd() * 0.12))); crowns.setMatrixAt(i, m);
+        q.identity(); m.compose(p.set(x, gy, z), q, s.set(tw, Math.max(0.3, Math.min((yb + 0.2 * hc) / 2.6, (th - 0.15 * hc) / 4.4)), tw)); trunks.setMatrixAt(j, m);
+        q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + yc, z), q, s.set(sx, sy, sx * (0.94 + tRnd() * 0.12))); crowns.setMatrixAt(j, m);
       } else {
-      q.identity(); m.compose(p.set(x, gy, z), q, s.set(k, k, k)); trunks.setMatrixAt(i, m);
-      q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + 3.4 * k + 1.2, z), q, s.set(k * (0.9 + tRnd() * 0.3), k * (1 + tRnd() * 0.4), k)); crowns.setMatrixAt(i, m);
+      q.identity(); m.compose(p.set(x, gy, z), q, s.set(k, k, k)); trunks.setMatrixAt(j, m);
+      q.setFromEuler(e.set((tRnd() - 0.5) * 0.25, tRnd() * TAU, 0)); m.compose(p.set(x, gy + 3.4 * k + 1.2, z), q, s.set(k * (0.9 + tRnd() * 0.3), k * (1 + tRnd() * 0.4), k)); crowns.setMatrixAt(j, m);
       }
-      crowns.setColorAt(i, COL(GREENS[Math.floor(tRnd() * GREENS.length)]));
+      crowns.setColorAt(j, COL(GREENS[Math.floor(tRnd() * GREENS.length)]));
     });
-    trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns);
+    for (const [trunks, crowns] of VM) if (trunks) { trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns); }
   }
   const LPS = (d.lp || []).map(([X, Z]) => [X / 10, Z / 10, 0]); LPS.push(...genLamps(T, d, LPS)); // [x, z, arm direction]
   if (LPS.length) { // one instance per lamp, so each can be knocked down on its own: pole and arm, head; the light pool and the glare go with it

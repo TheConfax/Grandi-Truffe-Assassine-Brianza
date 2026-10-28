@@ -61,6 +61,8 @@ ALB_SEEN = 2.5       # below this the DSM does not see a tree there (planted aft
 ALB_H = (3.0, 35.0)  # m
 ALB_D = (2.0, 18.0)  # crown diameter, m
 ALB_CMIN, ALB_CFR, ALB_CR = 2.0, 0.25, 10.0  # crown: canopy pixels at least this high (m, and times the height), at most this far from the tree (m)
+ALB_ISOLA = 6.0      # m: a tree of a road island that the DSM sees lower than this is a sapling of 2008 (see alberi)
+ALB_ISOLA_D = 0.5    # m: a tree this close to an island is on it
 ALB_SPORGE = 1.5     # m a crown may reach over a building's wall
 CLEAR, MOVE = 0.4, 3.0  # as dbgt_verde.py: a trunk off a manufatto, moved at most this far
 ALB_BLD = 3.0        # DSM pixels this close to a DBGT building and as high as its roof are the roof (2008 and 2015 are a metre or two apart)
@@ -526,7 +528,7 @@ class Manufatti:
         return out, new_pl
 
     # ---------------------------------------------------------------- trees: height and crown from DSM - DTM
-    def alberi(self, trees, boschi=None, vietati=()):
+    def alberi(self, trees, boschi=None, vietati=(), isole=()):
         """trees [(x, z)] of the whole map -> inside the cover (x, z, h, d) in metres: height and crown diameter from the DSM; trees standing
         in a manufatto move off it (at most 3 m) or go. Outside the cover unchanged."""
         cv, G = self.cover, self.grid
@@ -626,6 +628,19 @@ class Manufatti:
         # under a line the strip is kept low (the DSM sees it so): a tree there it does not see is not a tree of the wood around it
         HT[wz & inb] = HT[~inb][0] if (~inb).any() else HT[wz & inb]; RT[wz & inb] = RT[~inb][0] if (~inb).any() else RT[wz & inb]
         H = np.where(seen, H, HT); D = np.where(seen, D, np.clip(np.minimum(RT * HT, np.maximum(3.0, 2.0 * nn)), *ALB_D))
+        # trees on the islands of the roads (roundabout centres, splitter islands, medians: MAN_TR 01-03, `isole`): the DSM of 2008 sees many of them as saplings of
+        # 3-4 m (the roads were made after, or the trees were planted with them), but the DBGT of 2015 and the orthophoto of 2018-19 show grown trees (Carlo, 28/10:
+        # via Papa Giovanni XXIII, trees "minuscoli, ridicoli": the orthophoto has a crown of 6-8 m for each of the two that the DSM gives as 3.0 and 3.9 m).
+        # One of those under ALB_ISOLA takes the height and the crown of the trees of the islands that the DSM sees tall (median of the ones at least ALB_ISOLA)
+        isl = np.zeros(len(P), bool)
+        if len(isole) and len(P):
+            it = STRtree(list(isole)); a_, b_ = it.query(shapely.points(P), predicate='dwithin', distance=ALB_ISOLA_D); isl[np.unique(a_)] = True
+        grown = isl & seen & keep & (H < ALB_ISOLA); tall = isl & seen & keep & (H >= ALB_ISOLA)
+        if grown.any():
+            hi_ = float(np.median(H[tall])) if tall.sum() >= 5 else htyp; di_ = float(np.median(D[tall])) if tall.sum() >= 5 else float(np.clip(rtyp * htyp, *ALB_D))
+            H[grown] = hi_; D[grown] = di_
+        self.rep['alberi_isole'] = {'su_isole': int((isl & keep).sum()), 'visti_dal_dsm': int((isl & seen & keep).sum()), 'sotto_%g_m_prima' % ALB_ISOLA: int(grown.sum()), 'sotto_%g_m_dopo' % ALB_ISOLA: int((isl & seen & keep & (H < ALB_ISOLA)).sum()),
+                                    'altezza_e_chioma_date': [round(float(H[grown][0]), 1), round(float(D[grown][0]), 1)] if grown.any() else None}
         # a crown reaches at most ALB_SPORGE over a building's wall (the game draws it round: wider it would go through the wall)
         dB = np.full(len(P), 99.0)
         if self.blds and len(P):
