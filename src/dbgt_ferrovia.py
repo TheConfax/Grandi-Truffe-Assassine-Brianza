@@ -300,6 +300,40 @@ class Ferrovia:
         s.rep.setdefault('lontano_dai_binari', {})[nome] = dict(n=nc, metri_spostati=round(mv, 1), metri_aperti=round(lost, 1), distanza_m=BODY_CLEAR)
         return out
 
+    def area_interna(s, platforms, rail_lines, bed):
+        """the inside of the railway land, for the fences (Carlo, 25/10 sera, the station of Meda x 379 z -542): the rail bed drawn (`bed`, the
+        massicciata), the platforms and a 4.2 m strip along every at-grade track, inside the cover, shrunk by INNER_M. A railway fence stands only on the boundary
+        between that land and the rest; what is inside it (between a platform and a track, between two tracks) is a wall nobody asked for"""
+        parts = [bed, platforms] + [l.buffer(BED_HW, cap_style=2) for l in rail_lines]
+        A = unary_union([g for g in parts if g is not None and not g.is_empty]).intersection(s.cover).buffer(0.3).buffer(-0.3)
+        E = A.buffer(-INNER_M); shapely.prepare(E); return E
+
+    def dentro_l_area(s, items, E, nome, get=lambda b: b, put=lambda b, pts: pts):
+        """what of the fences lies inside E (area_interna) goes; the rest stays, cut in pieces longer than 1 m. A fence on the boundary stays: the
+        wall that is not inside is never touched"""
+        out = []; n = 0; lost = 0.0
+        for b in items:
+            pts = get(b)
+            if len(pts) < 2: out.append(b); continue
+            L = LineString(pts)
+            if not E.intersects(L): out.append(b); continue
+            inside = L.intersection(E).length
+            if inside < 0.3: out.append(b); continue
+            n += 1; rest = [p for p in _parts(L.difference(E)) if p.geom_type == 'LineString' and p.length > 1.0]
+            out += [put(b, list(p.coords)) for p in rest]; lost += inside
+        s.rep.setdefault('recinzioni_dentro_l_area', {})[nome] = dict(linee_toccate=n, metri_tolti=round(lost, 1))
+        s.log('dbgt ferrovia: recinzioni dentro l area ferroviaria tolte (%s): linee %d, metri %.0f' % (nome, n, lost))
+        return out
+
+    def metri_dentro(s, E, lines):
+        """the check: metres of fence inside E (should be 0 at the end of the build) and where the longest stretches are"""
+        tot = 0.0; dove = []
+        for pts in lines:
+            if len(pts) < 2: continue
+            x = LineString(pts).intersection(E)
+            if x.length > 0.3: tot += x.length; c = x.representative_point(); dove.append((round(x.length, 1), _link(c.x, c.y)))
+        dove.sort(reverse=True); return round(tot, 1), dove[:10]
+
     def banchine(s, area_geoms, rail_lines):
         """platforms (area type 5) clear of the middle of every track by CLEAR: an OSM platform that runs over a track is cut back"""
         tracks = unary_union([l.buffer(CLEAR, cap_style=2) for l in rail_lines]) if rail_lines else GeometryCollection()
@@ -496,4 +530,5 @@ BED_HW = 2.1      # the drawn rail bed at least this far either side of a track 
 STEP_COV = 2.0    # the coverage of an element is known every few metres: a free stretch is trimmed by this at each end
 CORR_CLOSE = 1.0  # the fence corridor: gaps narrower than twice this closed
 CORR_HOLE = 400.0 # ... and holes smaller than this (m2) filled
+INNER_M = 1.0    # the inside of the railway land for the fences: this far from its boundary
 BODY_CLEAR = 1.6  # no fence or wall nearer than this to the middle of an at-grade track (the train body is 2.94 m wide)

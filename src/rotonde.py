@@ -55,13 +55,13 @@ class Rotonde:
                 bed = [p for p in _poly(arco.intersection(dentro)) if p.area > 0.3]
                 mz += [(p, t) for p in bed]
                 if t in ('a', 't') and bed:
-                    passo, hw, h = (0.7, max(0.35, min(0.45, w / 2 - BORDO - 0.05)), 0.85) if t == 'a' else (1.5, max(0.3, min(0.35, w / 2 - BORDO - 0.05)), 0.55)
+                    passo, hw, h = (0.95, max(0.6, min(0.7, w / 2 + 0.2)), 1.05) if t == 'a' else (1.9, max(0.5, min(0.6, w / 2 + 0.1)), 0.8)   # 28/10, Carlo: "ridicolmente piccoli" (via Papa Giovanni XXIII): a real shrub is 1-1.4 m wide and grows over the white edge
                     n = max(1, int(math.radians(ap) * r / passo)); dent = unary_union(bed).buffer(-BORDO - hw * 0.4)
                     for k in range(n + 1):
                         q_ = math.radians(ang - ap / 2 + ap * (k + 0.5) / (n + 1)); x, z = c.x + r * math.cos(q_), c.y + r * math.sin(q_)
                         if dent.contains(Point(x, z)): arb.append((x, z, hw * (0.9 + 0.2 * ((k * 7) % 3) / 2), h * (0.9 + 0.1 * (k % 2)), col[0] if col else ('#3d5e27' if t == 'a' else '#4a6a2c')))
             v['mz'] = mz
-            v['cs'] = [(c.x + r * math.cos(math.radians(a)), c.y + r * math.sin(math.radians(a)), hw, h, col) for a, r, hw, h, col in e.get('cespugli', [])]
+            v['cs'] = [(c.x + r * math.cos(math.radians(a)), c.y + r * math.sin(math.radians(a)), hw, max(h, 0.9 * hw), col) for a, r, hw, h, col in e.get('cespugli', [])]   # a round shrub is never flatter than 0.9 of its half width (Carlo, 28/10: "sembrano meloni", via Cadorna)
             if e['modello'] == 'B':   # a clump of shrubs in the middle and three groups halfway to the edge (s1, e3, n1, medici, De Gasperi in the aerial photos)
                 R = math.sqrt(prato.area / math.pi); a0 = (e['x'] * 7.3 + e['z'] * 3.1) % 120; VERDI = ('#2f4a1c', '#7a762b', '#3d5e27', '#4f6b2a')
                 v['cs'].append((c.x, c.y, 1.0, 1.4, VERDI[0]))

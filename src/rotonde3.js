@@ -61,9 +61,30 @@ function rotondeTile(T, put, G) {
   }
   put(an, RO_MAT.ciottoli, 10); put(fa, RO_MAT.fascia, 10); put(cu, RO_MAT.prato, 10, 'cast'); put(cem, MAT.median, 10); put(pr, MAT.grass, 10); put(pv, MAT.piazza, 10); put(kb, MAT.kerb, 10);
   put(bo, RO_MAT.bordo, 10, 'cast'); put(boT, RO_MAT.bordo, 10); put(fiT, RO_MAT.fiori, 10); put(fiS, RO_MAT.fiori, 10); put(te, RO_MAT.terra, 10);
-  if (bush.length) { // round bushes: a squashed ball each, sunk a little into the lawn
-    const geo = new THREE.IcosahedronGeometry(1, 2), im = new THREE.InstancedMesh(geo, RO_MAT.cespuglio, bush.length), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
-    bush.forEach(([x, y, z, hw, h, col], i) => { m4.compose(p.set(x, y + h * 0.42, z), qq, sc.set(hw, h / 2, hw)); im.setMatrixAt(i, m4); im.setColorAt(i, COL(col)); });
+  if (bush.length) { // round shrubs: a lumpy clump of balls each (not one squashed ball: Carlo, 25/10, "sembrano meloni"), sunk a little into the lawn; the car breaks them (sfondabili3.js)
+    const im = new THREE.InstancedMesh(roCespugliGeo(), RO_MAT.cespuglio, bush.length), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), eu = new THREE.Euler();
+    T.roIm = im; if (!T.roWalls) T.roWalls = bush.map(([x, y, z, hw, h]) => { const w = { r: hw * 0.85, x, z, y0: y - 3, y1: y + h, off: false }; WALLS.add(x - w.r, z - w.r, x + w.r, z + w.r, w); return w; });
+    bush.forEach(([x, y, z, hw, h, col], i) => {
+      const w = T.roWalls[i]; w.off = false; qq.setFromEuler(eu.set(0, (x * 12.9 + z * 7.7) % 6.28, 0)); m4.compose(p.set(x, y - 0.05, z), qq, sc.set(hw, h, hw)); im.setMatrixAt(i, m4); im.setColorAt(i, COL(col));
+      BUSH_G.add(x - hw, z - hw, x + hw, z + hw, { T, im, i, x, y, z, hw, h, w, m: m4.clone(), off: false });
+    });
     im.castShadow = true; im.receiveShadow = true; G.add(im);
   }
+}
+/* a shrub in a unit box (x, z in -1..1, y in 0..1): a middle ball and four round it, a little lumpy, scaled by half width and height */
+let _roCesp = null;
+function roCespugliGeo() {
+  if (_roCesp) return _roCesp;
+  const parts = [[0, 0.5, 0, 0.78, 0.5], [0.52, 0.36, 0.18, 0.55, 0.36], [-0.45, 0.34, 0.3, 0.52, 0.34], [0.12, 0.33, -0.55, 0.5, 0.33], [-0.2, 0.3, -0.42, 0.42, 0.3]], pos = [];
+  parts.forEach(([cx, cy, cz, rh, rv], k) => {
+    const g = new THREE.IcosahedronGeometry(1, 1), a = g.attributes.position;
+    for (let i = 0; i < a.count; i++) {
+      let x = a.getX(i), y = a.getY(i), z = a.getZ(i); const n = 1 + 0.12 * Math.sin(x * 5.1 + k) * Math.cos(z * 4.3 + y * 3.7 + k * 2);
+      pos.push(cx + x * rh * n, Math.max(0.02, cy + y * rv * n), cz + z * rh * n);
+    }
+    g.dispose();
+  });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const uv = []; for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] * 1.5 + 0.5, pos[i + 1] * 1.5 + pos[i + 2] * 0.7);
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); _roCesp = g; return g;
 }

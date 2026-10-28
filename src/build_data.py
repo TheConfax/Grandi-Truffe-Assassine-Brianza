@@ -1023,6 +1023,11 @@ if FER and STR: fences = FER.fuori_dalle_carreggiate(fences, STR.carreggiate(0, 
 if FER: fences = FER.via_dai_ponti(fences)  # not hanging on the slopes under a railway bridge
 if FER: fences = FER.via_dai_binari(fences, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'recinzioni_ferrovia')  # never across a track
 if FER: fences = FER.lontano_dai_binari(fences, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'recinzioni')  # nor inside the train
+if FER:  # the railway fences only on the boundary of the railway land, nothing inside it (Carlo, 25/10: platform-track, track-track); the same on the DBGT dividers of kind 6 below
+    _rl_suolo = [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)]
+    _E_fer = FER.area_interna(platforms, _rl_suolo, _fer_f.result()[0])
+    log('controllo: metri di recinzione ferroviaria dentro l area ferroviaria PRIMA', FER.metri_dentro(_E_fer, fences)[0])
+    fences = FER.dentro_l_area(fences, _E_fer, 'recinzioni')
 # cemeteries are walled: perimeter wall wherever OSM has not drawn one (gates/paths open it like any other wall)
 _osm_bar_all = _osm_bar_all_f.result(); del _osm_bar_all_f
 ncw = 0
@@ -1210,6 +1215,10 @@ if not _fz.is_empty:
     log('divisori sul bordo delle fontane tolti', _nb - len(bar_out))
 if FER: bar_out = FER.via_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_recinzioni', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
 if FER: bar_out = FER.lontano_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_divisori', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
+if FER:  # the DBGT railway dividers (kind 6) between a platform and a track or between two tracks: not on the boundary of the railway land, taken away
+    _k6 = [b_ for b_ in bar_out if b_[1] == 6]
+    log('controllo: metri di divisori ferroviari (tipo 6) dentro l area ferroviaria PRIMA', FER.metri_dentro(_E_fer, [b_[0] for b_ in _k6])[0])
+    bar_out = [b_ for b_ in bar_out if b_[1] != 6] + FER.dentro_l_area(_k6, _E_fer, 'divisori_tipo_6', get=lambda b_: b_[0], put=lambda b_, pts_: (pts_, b_[1], b_[2]))
 
 # ---- rivers: merge the OSM pieces, then cut them where a road / railway / building passes over (a bridge or culvert mouth)
 from shapely.ops import linemerge
@@ -1473,11 +1482,21 @@ def off_carriageway(p):
             return (c_.x + nx * sd * (r['w'] / 2 + 0.9), c_.y + nz * sd * (r['w'] / 2 + 0.9)), True
     return p, False
 n_off_road = 0
-def add_ogg(k, p, t, along=None):
+# bollards and blocks OSM puts on a node of a way (a street, a lane, a path) stand there on purpose, to close it to cars (Carlo, 25/10, via San Martino:
+# the bollard moved 0.9 m past the edge ended up in the wall): they stay. The loose ones, off the ways, move out of the carriageway as before
+OGG_SU_VIA = ('paletto', 'blocco')
+_nodi_via = {n_ for refs_, t_ in ways.values() if t_.get('highway') for n_ in refs_}
+n_su_via = Counter()  # per kind: [stayed on its way node, would have been moved by the old rule]
+n_mossi = Counter()   # per kind: moved off the carriageway
+def add_ogg(k, p, t, along=None, nodo=None):
     global n_off_road
     if not inside(p, 0): return
     if k not in OGG_ON_ROAD and along is None:
-        p, moved_ = off_carriageway(p); n_off_road += moved_
+        if k in OGG_SU_VIA and nodo in _nodi_via:
+            n_su_via[k, 'restano'] += 1; n_su_via[k, 'spostati_dalla_regola_vecchia'] += off_carriageway(p)[1]
+        else:
+            p, moved_ = off_carriageway(p); n_off_road += moved_; n_mossi[k] += moved_
+            if k in OGG_SU_VIA: n_su_via[k, 'sciolti_spostati'] += moved_
     car = k in ('dosso', 'rallentatore', 'piattaforma')
     ang, r = (along, None) if along is not None else near_street(p, car, face=k in ('panchina', 'distributore', 'cassetta', 'ricarica', 'telecamera', 'fontanella', 'campana', 'armadietti', 'pannello', 'lavaggio'))
     if car and r is None and along is None: return  # a bump off the streets
@@ -1490,7 +1509,7 @@ def add_ogg(k, p, t, along=None):
     ogg.append([OGG.index(k), q(p[0]), q(p[1]), round(ang, 2), round(extra, 1)])
 for r_, t in ntags.items():
     k = ogg_kind(t)
-    if k: add_ogg(k, nodes[r_], t, pw_dir.get(r_) if k in ('traliccio', 'palo') else None)
+    if k: add_ogg(k, nodes[r_], t, pw_dir.get(r_) if k in ('traliccio', 'palo') else None, nodo=r_)
 for wid, (refs, t) in ways.items():
     k = ogg_kind(t)
     # water towers and car washes mapped as areas are drawn as land (paesaggio3.js)
@@ -1506,7 +1525,13 @@ for wid, (refs, t) in ways.items():
     if t.get('power') not in ('line', 'minor_line'): continue
     pts = [nodes[n_] for n_ in refs if n_ in nodes]
     if len(pts) >= 2: power_lines.append((pts, 28 if t['power'] == 'line' else 8.5))
-log('oggetti', len(ogg), dict(Counter(OGG[o[0]] for o in ogg)), 'linee elettriche', len(power_lines), 'spostati fuori dalla carreggiata', n_off_road)
+log('oggetti', len(ogg), dict(Counter(OGG[o[0]] for o in ogg)), 'linee elettriche', len(power_lines), 'spostati fuori dalla carreggiata', n_off_road, 'paletti e blocchi', {'%s %s' % k_: v_ for k_, v_ in sorted(n_su_via.items())})
+# check (28/10, Carlo: "niente di attraversabile"): the street furniture the game draws with no collision at all (OGG_SPEC of src/oggetti3.js with no
+# radius: its entry is `kind: {}`), on the whole map. A car wash gantry is meant to be driven through; the rest is a fault
+import re as _re
+_senza_coll = set(_re.findall(r'(\w+): \{\}', open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'oggetti3.js'), encoding='utf-8').read().split('OGG_SPEC', 1)[1].split('};', 1)[0]))
+_n_senza = Counter(OGG[o[0]] for o in ogg if OGG[o[0]] in _senza_coll)
+log('controllo: oggetti solidi senza collisione', sum(v_ for k_, v_ in _n_senza.items() if k_ != 'lavaggio'), dict(_n_senza), '(il lavaggio si attraversa apposta)')
 ogg, power_lines = MANUF.elettrico(ogg, power_lines, OGG)
 
 # ---- real parking: the spaces mapped one by one (a rectangle each, split when it says capacity > 1) and the capacity of the car parks
@@ -1817,6 +1842,15 @@ if FER:  # trains against platforms, buildings and carriageways; the report besi
     out.setdefault('report', {})['ferrovia'] = FER.sintesi()
     json.dump(FER.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_ferrovia.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=str)
 out.setdefault('report', {})['fiumi'] = dict(_fiumi_rep, pezzi=len(riv_out), bocche_di_tombino=sum(sum(c) for _, _, c in riv_out))  # src/fiumi.py, the cut at the drawn streets
+_ctl = {}  # the checks of 28/10 (todo.md: station fences, bollards, doubled volumes, things without collision), on the whole map; the rules are in the log lines above
+if FER:
+    _m, _dove = FER.metri_dentro(_E_fer, list(fences) + [b_[0] for b_ in bar_out if b_[1] == 6])
+    _ctl['recinzioni_ferrovia_dentro_l_area_m'] = _m; _ctl['recinzioni_ferrovia_dentro_l_area_dove'] = _dove
+    log('CONTROLLO recinzioni ferroviarie dentro l area ferroviaria (m, deve essere 0):', _m, _dove[:3])
+_ctl['paletti_e_blocchi_su_una_via'] = {'%s %s' % k_: v_ for k_, v_ in sorted(n_su_via.items())}
+log('CONTROLLO paletti e blocchi OSM su un nodo di una via: restano', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'restano'), 'spostati dalla regola vecchia', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'spostati_dalla_regola_vecchia'), 'spostati ora 0 per costruzione; sciolti spostati', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'sciolti_spostati'))
+_ctl['oggetti_senza_collisione'] = dict(_n_senza)
+out.setdefault('report', {})['controlli_28_10'] = _ctl
 out.setdefault('report', {})['cantieri'] = _crep  # the dividers the building sites' hoarding replaces (src/barriere.py cantieri)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
