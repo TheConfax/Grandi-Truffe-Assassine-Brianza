@@ -8,6 +8,8 @@
 #   A3 carreggiata, marciapiedi e piazze dipinti sul suolo sotto un impalcato (celle, impalcati)
 #   A4 parapetti e cordoli dei fiumi in bosco o in campagna (lontano da case e strade), e bocche di tombino lontane da una strada
 #   A5 tratti d'acqua OSM lontani dal fondo della valle del LiDAR
+#   A6 strade e binari sopra un corso d'acqua coperto (assi EL_IDR_TY 03 del DBGT, tombinati, sotto una carreggiata o un binario disegnati):
+#      quanti incroci, e in quanti la superficie sopra l'asse sta piu di 1 m sotto la strada intorno (strada o massicciata sfondata)
 # e le prove fisse delle segnalazioni di Carlo (viale Francia, via Maroncelli, Campaccio, via Varese) con le quote attese.
 #   python src/controlli_acqua.py [--terreno DIR] [--dati brianza.json] [--out report_acqua.json]
 # terreno_gioco.py lo chiama a fine corsa. Regole generali: nessuna coordinata fuori dalle prove fisse.
@@ -396,6 +398,51 @@ def a5_fondo_valle(m, lid):
     return dict(metri_controllati=round(tot), metri_lontani_dal_fondo=round(lon), sopra_il_fondo=pct(V), luoghi=luoghi(P, 6.0, V), n_luoghi=len(luoghi(P, 6.0, V, n=0))), P
 
 
+def assi_tombinati():
+    """the DBGT axes of kind 03 (fittizio: "sotterraneo o tombinato") of every comune in data/dbt, game metres"""
+    import sqlite3, dbgt_quote as dq
+    from pyproj import Transformer
+    tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True); out = []
+    base = os.path.join(dq.DATA, 'dbt')
+    for c in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+        f = os.path.join(base, c, 'dbgt.gpkg')
+        if not os.path.exists(f): continue
+        con = sqlite3.connect(f); L = dq._read_layer(con, tr, *dq.LAYERS['EL_IDR']); con.close()
+        if L is None: continue
+        for i in range(len(L['off']) - 1):
+            a, b = L['off'][i], L['off'][i + 1]
+            if L['attr']['ty'][i] == '03' and b - a >= 2: out.append((c, LineString(L['xy'][a:b])))
+    return out
+
+
+def a6_tombini_sotto_strade(m):
+    """where a covered watercourse (EL_IDR 03) passes under a drawn carriageway or a track: points every 0.5 m on the streets within 3 m
+    of the axis, S there against the median of S on the same streets 4-10 m off the axis. A crossing is 'sfondato' when a point stands more than SFONDO under
+    (the old viale Francia: carriageway at 29.6, bed at 26.1 right on the street). Decks that carry the street leave the point out"""
+    try: assi = assi_tombinati()
+    except Exception as e: return dict(errore=str(e)), np.zeros((0, 2))
+    inc, bad_all = [], []
+    for c, g in assi:
+        x = shapely.intersection(g, m.strade)
+        if x.is_empty: continue
+        for part in getattr(x, 'geoms', [x]):
+            if part.geom_type != 'LineString' or part.length < 1.0: continue
+            q = campioni(shapely.intersection(part.buffer(3.0), m.strade), 0.5)   # the culvert as wide as a canal (3 m each side of the axis), on the streets
+            if not len(q): continue
+            h = m.H(q[:, 0], q[:, 1]); tp = m.top(q[:, 0], q[:, 1])
+            ok = np.isfinite(h) & ~(np.isfinite(tp) & (tp > h + SOTTO_DK))
+            if not ok.any(): continue
+            ring = shapely.difference(shapely.intersection(m.strade, part.buffer(10.0)), part.buffer(4.0)); R = campioni(ring, 1.0)
+            if len(R) < 3: continue
+            hr = m.H(R[:, 0], R[:, 1]); ref = float(np.nanmedian(hr))
+            drop = ref - h[ok]; k = drop > SFONDO; mid = q[len(q) // 2]
+            inc.append(dict(comune=c, x=round(float(mid[0]), 1), z=round(float(mid[1]), 1), m=round(part.length, 1), strada=round(ref, 2), S_min=round(float(np.nanmin(h[ok])), 2), sfondato=bool(k.any()), link=link(*mid)))
+            if k.any(): bad_all.append(q[ok][k])
+    B = np.vstack(bad_all) if bad_all else np.zeros((0, 2))
+    sf = [i for i in inc if i['sfondato']]
+    return dict(incroci=len(inc), sfondati=len(sf), punti_sfondati=int(len(B)), luoghi_sfondati=sf[:20], incroci_elenco=inc[:60]), B
+
+
 # ---- the fixed tests: Carlo's reports (todo.md, 25/10 sera) with what is expected there
 PROVE = [
     dict(nome='viale Francia, strada e ferrovia sul fiume', box=(206, -406, 230, -370), tipo='sfondata',
@@ -448,10 +495,11 @@ def controlla(terreno, dati, out=None, log=print, ringhiere=None):
     rep['A3'], P3 = a3_dipinte_sotto(m)
     rep['A4'] = a4_parapetti(m, ringhiere, lid)
     rep['A5'], P5 = a5_fondo_valle(m, lid)
+    rep['A6'], P6 = a6_tombini_sotto_strade(m)
     rep['prove_fisse'] = prove_fisse(m, lid, P1, P2, P3, P5, rep)
     rep['sintesi'] = dict(acqua_sulle_strade_m2=rep['A1']['totale_m2'], acqua_sulle_strade_luoghi=rep['A1']['n_luoghi'], strade_sfondate_punti=rep['A2']['punti'], strade_sfondate_luoghi=rep['A2']['n_luoghi'], strade_sfondate_bordo_punti=rep['A2']['bordo_punti'],
                           dipinte_sotto_impalcati_celle=rep['A3']['dipinte'], dipinte_sotto_impalcati_ponti=len(rep['A3']['impalcati']), ringhiere_m=rep['A4']['ringhiere_m'], ringhiere_in_bosco_m=rep['A4']['ringhiere_in_bosco_o_campagna_m'],
-                          bocche_lontane_da_strade=rep['A4']['bocche_lontane_da_strade'], acqua_lontana_dal_fondo_m=rep['A5']['metri_lontani_dal_fondo'], acqua_lontana_dal_fondo_luoghi=rep['A5']['n_luoghi'],
+                          bocche_lontane_da_strade=rep['A4']['bocche_lontane_da_strade'], acqua_lontana_dal_fondo_m=rep['A5']['metri_lontani_dal_fondo'], acqua_lontana_dal_fondo_luoghi=rep['A5']['n_luoghi'], tombini_sotto_strade=rep['A6'].get('incroci'), tombini_sotto_strade_sfondati=rep['A6'].get('sfondati'),
                           prove_fisse_ok='%d su %d' % (sum(1 for p in rep['prove_fisse'] if p['ok']), len(rep['prove_fisse'])), tempo_s=round(time.time() - t0, 1))
     log('controlli acqua: %s' % rep['sintesi'])
     for p in rep['prove_fisse']: log('  prova fissa %s: %s' % (p['nome'], 'ok' if p['ok'] else 'NO ' + json.dumps({k: v for k, v in p.items() if k not in ('nome', 'attese', 'ok')}, ensure_ascii=False)[:300]))
@@ -460,7 +508,7 @@ def controlla(terreno, dati, out=None, log=print, ringhiere=None):
 
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(description='Controlli dell acqua e dei ponti (A1-A5 e prove fisse)')
+    ap = argparse.ArgumentParser(description='Controlli dell acqua e dei ponti (A1-A6 e prove fisse)')
     ap.add_argument('--terreno', default=os.path.join(ROOT, 'terreno')); ap.add_argument('--dati', default=os.path.join(ROOT, 'brianza.json'))
     ap.add_argument('--out', default=None); ap.add_argument('--ringhiere', choices=('si', 'no'), default=None)
     a = ap.parse_args()

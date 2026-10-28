@@ -1,7 +1,7 @@
 // the edge of the area drawn from the DBGT (docs/motore.md, section 7): a tall red see-through wall along the boundary of every active comune,
 // like the border of a Minecraft world, so you can tell when you leave the part made properly; the same line goes on the minimap and on the
 // big map (assemble3.py). The rings come from the COMUNE layer of each active DBGT (src/confine_dbgt.py -> confine_dbgt.json)
-const CONFINE = await (async () => { try { const r = await fetch('confine_dbgt.json'); if (!r.ok) return []; const j = await r.json(); return j && j.ver === 1 ? j.comuni : []; } catch (e) { return []; } })();
+const CONFINE = await (async () => { try { const r = await fetch('confine_dbgt.json', { cache: 'no-cache' }); if (!r.ok) return []; const j = await r.json(); return j && j.ver === 1 ? j.comuni : []; } catch (e) { return []; } })();
 {
   const WALL_H = 150, mat = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, fog: false });
   for (const c of CONFINE) {

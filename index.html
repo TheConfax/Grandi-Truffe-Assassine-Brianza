@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo d979ae5 · assemblato 28/10 20:15 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo cd55d4b · assemblato 28/10 20:40 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -177,11 +177,13 @@ body:not(.debug) .dbg { display: none !important; }
 // =====================================================================
 const goBtn = document.getElementById('go');
 /* avvio veloce: l'indice e il pacco del terreno (src/terreno_pacco.py) partono insieme a brianza.json, e i tile si decomprimono in parallelo mentre il resto si legge; altezze3.js li prende da qui */
-const TERR_IND = fetch('terreno/indice.json').then(r => r.ok ? r.json() : null).catch(() => null);
-const TERR_BIN = TERR_IND.then(async j => { if (!j || j.ver !== 1 || !j.pacco) return null; try { const r = await fetch('terreno/' + j.pacco.file); if (!r.ok) return null; const b = new Uint8Array(await r.arrayBuffer()), m = new Map(); for (const k in j.pacco.tile) { const [o, l] = j.pacco.tile[k]; m.set(k, new Response(new Blob([b.subarray(o, o + l)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer().catch(() => null)); } return m; } catch (e) { return null; } });
+/* i dati si leggono sempre ricontrollati col server (cache 'no-cache': 304 se non sono cambiati), mai dalla cache del browser senza chiedere (28/10: il server locale non dice Cache-Control e Chrome teneva per ore il terreno vecchio, cosi Carlo vedeva viale Francia e via Maroncelli come prima) */
+const FRESCO = { cache: 'no-cache' };
+const TERR_IND = fetch('terreno/indice.json', FRESCO).then(r => r.ok ? r.json() : null).catch(() => null);
+const TERR_BIN = TERR_IND.then(async j => { if (!j || j.ver !== 1 || !j.pacco) return null; try { const r = await fetch('terreno/' + j.pacco.file, FRESCO); if (!r.ok) return null; const b = new Uint8Array(await r.arrayBuffer()), m = new Map(); for (const k in j.pacco.tile) { const [o, l] = j.pacco.tile[k]; m.set(k, new Response(new Blob([b.subarray(o, o + l)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer().catch(() => null)); } return m; } catch (e) { return null; } });
 goBtn.disabled = true; goBtn.textContent = 'CARICO LA BRIANZA…';
 const D = await (async () => {
-  const res = await fetch('brianza.json'); const total = +res.headers.get('content-length') || 0;
+  const res = await fetch('brianza.json', FRESCO); const total = +res.headers.get('content-length') || 0;
   if (!res.body || !total) return res.json();
   const rd = res.body.getReader(), chunks = []; let got = 0;
   for (;;) { const { done, value } = await rd.read(); if (done) break; chunks.push(value); got += value.length; goBtn.textContent = `CARICO LA BRIANZA… ${Math.round(got / total * 100)}%`; }
@@ -463,7 +465,7 @@ const H = (() => {
     try {
       let b = null; const pk = await TERR_BIN, pm = pk && pk.get(tx + '_' + tz); // terreno/pacco.bin: already unpacked, in parallel
       if (pm) { const ab = await pm; if (ab) b = new Uint8Array(ab); }
-      if (!b) { const r = await fetch(`terreno/${tx}_${tz}.bin.gz`); if (!r.ok) throw new Error('HTTP ' + r.status); b = new Uint8Array(await r.arrayBuffer()); } // one .bin.gz at a time, the old way
+      if (!b) { const r = await fetch(`terreno/${tx}_${tz}.bin.gz`, { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status); b = new Uint8Array(await r.arrayBuffer()); } // one .bin.gz at a time, the old way
       if (b[0] === 0x1f && b[1] === 0x8b) b = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
       const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
       if (b[0] !== 71 || b[1] !== 84 || b[2] !== 65 || b[3] !== 83 || b[4] !== 1) throw new Error('non è un GTAS 1');
@@ -1047,13 +1049,37 @@ const BAR_KEYS = ['wl', 'ft', 'hd', 'wlP0', 'wlP1', 'bars', 'mesh', 'rly', 'wood
 const BAR_CAST = { wl: 'cast', hd: 'cast', wlP0: 'cast', wlP1: 'cast', wood: 'cast' };
 const barMats = () => ({ wl: MAT.wall, ft: MAT.railing, hd: MAT.hedge, wlP0: MAT.wallPlaster, wlP1: MAT.wallOchre, bars: MAT.bars, mesh: MAT.mesh, rly: MAT.railPanel, wood: MAT.wood });
 const BARG = new Grid(8), BAR_FLY = [], BAR_DOWN = [];
+// the foot of a barrier (28/10, viale Francia): on a bank the 2 m cells of S put the line half way down the slope, and a fence that followed the
+// ground there went up and down like a saw (along the canals, between a street and the ballast). Where within 1.5 m the ground is more than
+// 0.4 m higher and flat beyond (the top of the bank: a street, the ballast, a yard), the barrier stands on that top; p.lo is the lowest ground
+// within 0.7 m, down to which its wall (or a plinth, for the nets) goes, so it never floats. Kept on the point (the same for every piece)
+function barFoot(p) {
+  if (p.fy !== undefined) return p.fy;
+  const x = p[0], z = p[1], g0 = H.ground(x, z); let top = g0, lo = g0;
+  for (let i = 0; i < 8; i++) {
+    const c = Math.cos(i * Math.PI / 4), s = Math.sin(i * Math.PI / 4), g1 = H.ground(x + c * 1.5, z + s * 1.5); lo = Math.min(lo, H.ground(x + c * 0.7, z + s * 0.7));
+    if (g1 - g0 > 0.4 && g1 > top && Math.abs(H.ground(x + c * 2.5, z + s * 2.5) - g1) < 0.25) top = g1;
+  }
+  p.g0 = g0; p.fy = top; p.lo = lo; return top;
+}
+// the feet of a whole line: a point raised on a top more than 0.3 m over its neighbours is a corner of a cell, not a bank (it goes back to the
+// ground, or to the higher neighbour); then one point lower than both its neighbours by more than 0.3 m is a notch of the cells (it takes the lower neighbour)
+function barFeet(pts) {
+  const n = pts.length; for (const p of pts) barFoot(p);
+  const nb = k => Math.max(k > 0 ? pts[k - 1].fy : -1e9, k < n - 1 ? pts[k + 1].fy : -1e9);
+  const up = []; for (let k = 0; k < n; k++) { const m = nb(k); up.push(n > 1 && pts[k].fy > pts[k].g0 && pts[k].fy > m + 0.3 ? Math.max(pts[k].g0, m) : null); }
+  up.forEach((v, k) => { if (v !== null) pts[k].fy = v; });
+  for (let k = 1; k < n - 1; k++) { const m = Math.min(pts[k - 1].fy, pts[k + 1].fy); if (pts[k].fy < m - 0.3) pts[k].fy = m; }
+  return pts;
+}
+const barLo = p => (barFoot(p), Math.min(p.lo, p.fy));
 const barBufs = () => { const B = { posts: [] }; for (const k of BAR_KEYS) B[k] = Buf(); return B; };
 
 // the pieces of one barrier of tile T (rec as world3.js keeps it in T.ba, segs[k - 1] the collision segment of its segment k or null)
 function barPieces(T, rec, segs) {
   const sp = BAR_PANEL[rec.t], pts = rec.pts; rec.pc = [];
   const add = pc => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const s of pc.segs) { x0 = Math.min(x0, s.ax, s.bx); z0 = Math.min(z0, s.az, s.bz); x1 = Math.max(x1, s.ax, s.bx); z1 = Math.max(z1, s.az, s.bz); }
-    pc.gy = H.ground((x0 + x1) / 2, (z0 + z1) / 2); BARG.add(x0 - 0.5, z0 - 0.5, x1 + 0.5, z1 + 0.5, pc); (T.barPc || (T.barPc = [])).push(pc); for (let k = pc.k0; k <= pc.k1; k++) rec.pc[k] = pc; };
+    pc.gy = (barFoot(pts[pc.k0 - 1]) + barFoot(pts[pc.k1])) / 2; BARG.add(x0 - 0.5, z0 - 0.5, x1 + 0.5, z1 + 0.5, pc); (T.barPc || (T.barPc = [])).push(pc); for (let k = pc.k0; k <= pc.k1; k++) rec.pc[k] = pc; };
   if (!sp) { // a hedge: each segment on its own, cut where the car passes
     for (let k = 1; k < pts.length; k++) if (segs[k - 1]) add({ T, rec, t: 3, hedge: true, k0: k, k1: k, segs: [segs[k - 1]], seg: segs[k - 1], cut: [], subs: [] });
     return;
@@ -1077,7 +1103,7 @@ function barLook(br) {
 // one segment a→c of a barrier into the buffers B (acc: the length drawn before it, for the texture). cap: 1 its end at a closed, 2 at c (the
 // two ends of a barrier and the sides of a hole: a thick slab open at its end showed its empty inside, Carlo 26/10)
 function barDraw(B, br, lk, a, c, acc, cap = 0) {
-  const L = hyp(c[0] - a[0], c[1] - a[1]), ga = H.ground(a[0], a[1]), gc = H.ground(c[0], c[1]), ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux;
+  const L = hyp(c[0] - a[0], c[1] - a[1]), ga = barFoot(a), gc = barFoot(c), la = barLo(a), lc = barLo(c), plinth = ga - la > 0.25 || gc - lc > 0.25, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux;
   const slab = (b, th, y0a, y0c, y1a, y1c, cp = cap) => { // thin vertical slab, both faces + cap
     for (const sd of [1, -1]) { const b0 = b.p.length / 3, ox = nx * th * sd, oz = nz * th * sd; vtx(b, a[0] + ox, y0a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 0); vtx(b, c[0] + ox, y0c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 0); vtx(b, c[0] + ox, y1c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 1); vtx(b, a[0] + ox, y1a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3, b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); }
     const b0 = b.p.length / 3; vtx(b, a[0] + nx * th, y1a, a[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] + nx * th, y1c, c[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] - nx * th, y1c, c[1] - nz * th, 0, 1, 0, 0, 1); vtx(b, a[0] - nx * th, y1a, a[1] - nz * th, 0, 1, 0, 0, 1); triUp(b, b0, b0 + 1, b0 + 2); triUp(b, b0, b0 + 2, b0 + 3);
@@ -1085,14 +1111,14 @@ function barDraw(B, br, lk, a, c, acc, cap = 0) {
   };
   const panel = (b, y0, y1, rep) => { const b0 = b.p.length / 3; vtx(b, a[0], ga + y0, a[1], nx, 0, nz, acc / rep, 0); vtx(b, c[0], gc + y0, c[1], nx, 0, nz, (acc + L) / rep, 0); vtx(b, c[0], gc + y1, c[1], nx, 0, nz, (acc + L) / rep, 1); vtx(b, a[0], ga + y1, a[1], nx, 0, nz, acc / rep, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
   const postsEvery = (step, y0) => { for (let s0 = 0; s0 < L; s0 += step) B.posts.push([a[0] + ux * s0, a[1] + uz * s0, ga + (gc - ga) * s0 / L + y0, br.h - y0]); };
-  if (br.t === 1 || br.t === 4) slab(B.wl, 0.14, ga - 0.3, gc - 0.3, ga + br.h, gc + br.h);
-  else if (br.t === 3) slab(B.hd, 0.45, ga - 0.2, gc - 0.2, ga + br.h, gc + br.h);
-  else if (br.t === 5) { panel(B.mesh, 0, br.h, 2.6); postsEvery(2.5, 0); } // wire mesh on posts, from the ground
-  else if (br.t === 6) { slab(B.wl, 0.1, ga - 0.3, gc - 0.3, ga + 0.3, gc + 0.3, 3); panel(B.rly, 0.3, br.h, 2.6); postsEvery(2.5, 0.3); } // by the railway: a concrete kerb, tall panels
-  else if (br.t === 7) { for (const y of [0.45, 0.95]) slab(B.wood, 0.04, ga + y, gc + y, ga + y + 0.12, gc + y + 0.12); for (let s0 = 0; s0 < L; s0 += 2.5) { const x = a[0] + ux * s0, z = a[1] + uz * s0, gy = ga + (gc - ga) * s0 / L; addBox(B.wood, x, gy + 0.6, z, 0.12, 1.2, 0.12, null); } } // post and rail
+  if (br.t === 1 || br.t === 4) slab(B.wl, 0.14, la - 0.3, lc - 0.3, ga + br.h, gc + br.h);
+  else if (br.t === 3) slab(B.hd, 0.45, la - 0.2, lc - 0.2, ga + br.h, gc + br.h);
+  else if (br.t === 5) { if (plinth) slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); panel(B.mesh, 0, br.h, 2.6); postsEvery(2.5, 0); } // wire mesh on posts, from the ground
+  else if (br.t === 6) { slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga + 0.3, gc + 0.3, 3); panel(B.rly, 0.3, br.h, 2.6); postsEvery(2.5, 0.3); } // by the railway: a concrete kerb, tall panels
+  else if (br.t === 7) { if (plinth) slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); for (const y of [0.45, 0.95]) slab(B.wood, 0.04, ga + y, gc + y, ga + y + 0.12, gc + y + 0.12); for (let s0 = 0; s0 < L; s0 += 2.5) { const x = a[0] + ux * s0, z = a[1] + uz * s0, gy = ga + (gc - ga) * s0 / L; addBox(B.wood, x, gy + 0.6, z, 0.12, 1.2, 0.12, null); } } // post and rail
   else { // muretto + cancellata, the Brianza classic
     const wb = B[lk.wallK], rb = B[lk.railK];
-    slab(wb, 0.12, ga - 0.3, gc - 0.3, ga + lk.base, gc + lk.base);
+    slab(wb, 0.12, la - 0.3, lc - 0.3, ga + lk.base, gc + lk.base);
     panel(rb, lk.base, br.h, lk.railK === 'bars' ? 1.2 : 2.6);
     postsEvery(2.6, lk.base);
   }
@@ -1147,7 +1173,7 @@ function barFly(pc, v, speed) {
   const G = pc.T.group; if (!G) return;
   const B = barBufs(), pts = pc.rec.pts, lk = barLook(pc.rec); let acc = pc.acc0 || 0;
   for (let k = pc.k0; k <= pc.k1; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; barDraw(B, pc.rec, lk, a, c, acc, (k === pc.k0 ? 1 : 0) | (k === pc.k1 ? 2 : 0)); acc += L; }
-  const A = pts[pc.k0 - 1], C = pts[pc.k1], cx = (A[0] + C[0]) / 2, cz = (A[1] + C[1]) / 2, gy = H.ground(cx, cz), Lp = hyp(C[0] - A[0], C[1] - A[1]) || 1, ux = (C[0] - A[0]) / Lp, uz = (C[1] - A[1]) / Lp;
+  const A = pts[pc.k0 - 1], C = pts[pc.k1], cx = (A[0] + C[0]) / 2, cz = (A[1] + C[1]) / 2, gy = (barFoot(A) + barFoot(C)) / 2, Lp = hyp(C[0] - A[0], C[1] - A[1]) || 1, ux = (C[0] - A[0]) / Lp, uz = (C[1] - A[1]) / Lp;
   const o = new THREE.Group(), inner = new THREE.Group(), MT = barMats(); inner.position.set(-cx, -gy, -cz); o.add(inner); o.position.set(cx, gy, cz);
   for (const k of BAR_KEYS) if (B[k].i.length) mkMesh(B[k], MT[k], 10, BAR_CAST[k], inner);
   if (B.posts.length) { const pb = Buf(); for (const [x, z, y, h] of B.posts) addBox(pb, x, y + h / 2, z, 0.06, h, 0.06, null); mkMesh(pb, MAT.post, 10, 'cast', inner); }
@@ -1491,11 +1517,11 @@ for (const T of TILES) {
       }
     }
   }
-  for (const f of d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) T.fe.push(q); // fences follow the ground every 3 m (walls and collisions are built later)
+  for (const f of d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) T.fe.push(barFeet(q)); // fences follow the ground every 3 m (walls and collisions are built later)
   for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const br of d.ba || []) for (const pts of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) {
-    const sp = BAR_PANEL[br.t], rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
-    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2), s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
+    const sp = BAR_PANEL[br.t], rec = { pts: barFeet(pts), t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
+    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
     if (sp || br.t === 3) barPieces(T, rec, segs);
   }
   for (const q of d.sd || []) {
@@ -1685,7 +1711,7 @@ for (const r of D.roads) if (r.d) {
 // railway fences: solid, following the ground, never across the track
 for (const T of TILES) {
   T.fe = T.fe.map(pts => pts.filter((p, i) => true)).map(pts => { const out = [], cur = []; for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (nearLowRail(mx, mz, 2.0)) { if (cur.length > 1) out.push(cur.slice()); cur.length = 0; continue; } if (!cur.length) cur.push(a); cur.push(c); } if (cur.length > 1) out.push(cur); return out; }).flat();
-  for (const pts of T.fe) for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = H.ground((a[0] + c[0]) / 2, (a[1] + c[1]) / 2); WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: gy - 3, y1: gy + 2.2 }); }
+  for (const pts of T.fe) for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = (barFoot(a) + barFoot(c)) / 2; WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + 2.2 }); }
 }
 // elevated railway: the embankment / viaduct sides are solid (open where a street passes underneath)
 for (const td of D.tiles) for (const r of td.rl || []) {
@@ -2557,12 +2583,17 @@ function* buildTileGen(T) {
         if (!r.e || !r.e[ei] || !F) continue;
         const L = hyp(F[0] - E[0], F[1] - E[1]) || 1, ux = (F[0] - E[0]) / L, uz = (F[1] - E[1]) / L, nx = -uz, nz = ux, g = H.ground(E[0], E[1]), W = r.w + 0.3;
         if (T.fine) { // new engine: the headwall from under the water to the ground over the culvert, the dark mouth above the water
-          let lo = 1e9, hi = -1e9; for (let q = -1; q <= 1.001; q += 0.25) { const y = H.base(E[0] + nx * W * q, E[1] + nz * W * q); lo = Math.min(lo, y); hi = Math.max(hi, y); }
-          const top = Math.max(hi, H.base(E[0] - ux * 3, E[1] - uz * 3)), hw = H.water(E[0], E[1]), wy = hw !== null ? hw : lo + 0.3; if (top - lo < 0.6) continue; // the bed goes on at grade: no culvert to see
-          quadV(head, E[0] - nx * W, E[1] - nz * W, E[0] + nx * W, E[1] + nz * W, lo - 0.5, top + 0.25, ux, uz);
-          const ow = r.w * 0.78, mh = Math.min(1.5, top - wy - 0.3), mx = E[0] + ux * 0.03, mz = E[1] + uz * 0.03;
+          // where the bed of S really ends along the line (28/10, viale Francia): the end of the OSM line could lie metres inside the open bed (behind
+          // the wall a hole in the street, the bed going on under the fill) or up on the fill (in front of the wall a grass pyramid of the cells)
+          const E0 = E, bs = s => H.base(E0[0] + ux * s, E0[1] + uz * s); let bed = 1e9; for (let s = 2; s <= 8; s += 0.5) bed = Math.min(bed, bs(s));
+          let s0 = 0; if (bs(0) < bed + 0.4) { while (s0 > -10 && bs(s0 - 0.5) < bed + 0.4) s0 -= 0.5; } else { while (s0 < 6 && bs(s0) >= bed + 0.4) s0 += 0.5; }
+          const Q = [E0[0] + ux * s0, E0[1] + uz * s0];
+          let lo = 1e9, hi = -1e9; for (let q = -1; q <= 1.001; q += 0.25) { const y = H.base(Q[0] + nx * W * q, Q[1] + nz * W * q); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+          const top = Math.max(hi, H.base(Q[0] - ux * 3, Q[1] - uz * 3)), hw = H.water(Q[0], Q[1]), wy = hw !== null ? hw : lo + 0.3; if (top - lo < 0.6) continue; // the bed goes on at grade: no culvert to see
+          quadV(head, Q[0] - nx * W, Q[1] - nz * W, Q[0] + nx * W, Q[1] + nz * W, lo - 0.5, top + 0.25, ux, uz);
+          const ow = r.w * 0.78, mh = Math.min(1.5, top - wy - 0.3), mx = Q[0] + ux * 0.03, mz = Q[1] + uz * 0.03;
           if (mh > 0.25) quadV(mouth, mx - nx * ow, mz - nz * ow, mx + nx * ow, mz + nz * ow, wy, wy + mh, ux, uz);
-          if (RIVER_RAIL) { const par = new THREE.Mesh(boxG(2 * W + 0.3, 0.8, 0.3), lam(0xa9a397)); par.position.set(E[0] - ux * 0.15, top + 0.4 + 0.25, E[1] - uz * 0.15); par.rotation.y = Math.atan2(-nz, nx); par.castShadow = true; G.add(par); } // the slab over the mouth lay across the junction of via Varese (x 563 z -1738)
+          if (RIVER_RAIL) { const par = new THREE.Mesh(boxG(2 * W + 0.3, 0.8, 0.3), lam(0xa9a397)); par.position.set(Q[0] - ux * 0.15, top + 0.4 + 0.25, Q[1] - uz * 0.15); par.rotation.y = Math.atan2(-nz, nx); par.castShadow = true; G.add(par); } // the slab over the mouth lay across the junction of via Varese (x 563 z -1738)
           continue;
         }
         quadV(head, E[0] - nx * W, E[1] - nz * W, E[0] + nx * W, E[1] + nz * W, g - RIV_D - 0.2, g + 0.25, ux, uz);
@@ -2806,21 +2837,21 @@ function* buildTileGen(T) {
     }
     if (ebal.i.length) { const m1 = new THREE.MeshLambertMaterial({ map: ballastTex }); put(ebal, m1, 9); put(esteel, MAT.rail, 10); put(eside, MAT.deckSide, 10, 'cast'); }
     put(bal, MAT.ballast, 7); put(steel, MAT.steel, 8);
-    const wall = FBuf(), net = FBuf(), WH = 0.9, NH = 2.0, TK = 0.13, posts = [];
+    const wall = Buf(), net = Buf(), WH = 0.9, NH = 2.0, TK = 0.13, posts = []; /* on the foot of the barriers (barFoot, sfondabili3.js), no longer draped on the cells: on a bank they went up and down like a saw */
     for (const pts of T.fe) {
       let acc = 0, nextPost = 0;
       for (let k = 1; k < pts.length; k++) {
         const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
-        const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux, u0 = acc / 2, u1 = (acc + L) / 2;
+        const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux, u0 = acc / 2, u1 = (acc + L) / 2, fa = barFoot(a), fc = barFoot(c), la = barLo(a) - 0.3, lc = barLo(c) - 0.3;
         for (const sd of [1, -1]) {
           const ox = nx * TK * sd, oz = nz * TK * sd, base = wall.p.length / 3;
-          vtx(wall, a[0] + ox, 0, a[1] + oz, nx * sd, 0, nz * sd, u0, 0); vtx(wall, c[0] + ox, 0, c[1] + oz, nx * sd, 0, nz * sd, u1, 0);
-          vtx(wall, c[0] + ox, WH, c[1] + oz, nx * sd, 0, nz * sd, u1, 0.9); vtx(wall, a[0] + ox, WH, a[1] + oz, nx * sd, 0, nz * sd, u0, 0.9);
+          vtx(wall, a[0] + ox, la, a[1] + oz, nx * sd, 0, nz * sd, u0, 0); vtx(wall, c[0] + ox, lc, c[1] + oz, nx * sd, 0, nz * sd, u1, 0);
+          vtx(wall, c[0] + ox, fc + WH, c[1] + oz, nx * sd, 0, nz * sd, u1, 0.9); vtx(wall, a[0] + ox, fa + WH, a[1] + oz, nx * sd, 0, nz * sd, u0, 0.9);
           wall.i.push(base, base + 1, base + 2, base, base + 2, base + 3, base, base + 2, base + 1, base, base + 3, base + 2);
         }
-        { const base = wall.p.length / 3; vtx(wall, a[0] + nx * TK, WH, a[1] + nz * TK, 0, 1, 0, u0, 1); vtx(wall, c[0] + nx * TK, WH, c[1] + nz * TK, 0, 1, 0, u1, 1); vtx(wall, c[0] - nx * TK, WH, c[1] - nz * TK, 0, 1, 0, u1, 0.95); vtx(wall, a[0] - nx * TK, WH, a[1] - nz * TK, 0, 1, 0, u0, 0.95); triUp(wall, base, base + 1, base + 2); triUp(wall, base, base + 2, base + 3); }
-        { const base = net.p.length / 3; vtx(net, a[0], WH, a[1], nx, 0, nz, acc / 2.6, 0); vtx(net, c[0], WH, c[1], nx, 0, nz, (acc + L) / 2.6, 0); vtx(net, c[0], NH, c[1], nx, 0, nz, (acc + L) / 2.6, 1); vtx(net, a[0], NH, a[1], nx, 0, nz, acc / 2.6, 1); net.i.push(base, base + 1, base + 2, base, base + 2, base + 3); }
-        while (nextPost <= acc + L) { const t = (nextPost - acc) / L; posts.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t]); nextPost += 2.6; }
+        { const base = wall.p.length / 3; vtx(wall, a[0] + nx * TK, fa + WH, a[1] + nz * TK, 0, 1, 0, u0, 1); vtx(wall, c[0] + nx * TK, fc + WH, c[1] + nz * TK, 0, 1, 0, u1, 1); vtx(wall, c[0] - nx * TK, fc + WH, c[1] - nz * TK, 0, 1, 0, u1, 0.95); vtx(wall, a[0] - nx * TK, fa + WH, a[1] - nz * TK, 0, 1, 0, u0, 0.95); triUp(wall, base, base + 1, base + 2); triUp(wall, base, base + 2, base + 3); }
+        { const base = net.p.length / 3; vtx(net, a[0], fa + WH, a[1], nx, 0, nz, acc / 2.6, 0); vtx(net, c[0], fc + WH, c[1], nx, 0, nz, (acc + L) / 2.6, 0); vtx(net, c[0], fc + NH, c[1], nx, 0, nz, (acc + L) / 2.6, 1); vtx(net, a[0], fa + NH, a[1], nx, 0, nz, acc / 2.6, 1); net.i.push(base, base + 1, base + 2, base, base + 2, base + 3); }
+        while (nextPost <= acc + L) { const t = (nextPost - acc) / L; posts.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, fa + (fc - fa) * t]); nextPost += 2.6; }
         acc += L;
       }
     }
@@ -2828,7 +2859,7 @@ function* buildTileGen(T) {
     if (posts.length) {
       const pg = new THREE.BoxGeometry(0.07, NH - WH, 0.07); pg.translate(0, (NH + WH) / 2, 0);
       const pm = new THREE.InstancedMesh(pg, MAT.post, posts.length), mtx = new THREE.Matrix4();
-      posts.forEach(([x, z], i) => { mtx.makeTranslation(x, H.ground(x, z), z); pm.setMatrixAt(i, mtx); }); pm.castShadow = true; G.add(pm);
+      posts.forEach(([x, z, y], i) => { mtx.makeTranslation(x, y, z); pm.setMatrixAt(i, mtx); }); pm.castShadow = true; G.add(pm);
     }
   }
   yield 'buildings';
@@ -5791,7 +5822,7 @@ function lsCabina(B, solid, box) {
 // the edge of the area drawn from the DBGT (docs/motore.md, section 7): a tall red see-through wall along the boundary of every active comune,
 // like the border of a Minecraft world, so you can tell when you leave the part made properly; the same line goes on the minimap and on the
 // big map (assemble3.py). The rings come from the COMUNE layer of each active DBGT (src/confine_dbgt.py -> confine_dbgt.json)
-const CONFINE = await (async () => { try { const r = await fetch('confine_dbgt.json'); if (!r.ok) return []; const j = await r.json(); return j && j.ver === 1 ? j.comuni : []; } catch (e) { return []; } })();
+const CONFINE = await (async () => { try { const r = await fetch('confine_dbgt.json', { cache: 'no-cache' }); if (!r.ok) return []; const j = await r.json(); return j && j.ver === 1 ? j.comuni : []; } catch (e) { return []; } })();
 {
   const WALL_H = 150, mat = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, fog: false });
   for (const c of CONFINE) {

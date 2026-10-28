@@ -13,13 +13,37 @@ const BAR_KEYS = ['wl', 'ft', 'hd', 'wlP0', 'wlP1', 'bars', 'mesh', 'rly', 'wood
 const BAR_CAST = { wl: 'cast', hd: 'cast', wlP0: 'cast', wlP1: 'cast', wood: 'cast' };
 const barMats = () => ({ wl: MAT.wall, ft: MAT.railing, hd: MAT.hedge, wlP0: MAT.wallPlaster, wlP1: MAT.wallOchre, bars: MAT.bars, mesh: MAT.mesh, rly: MAT.railPanel, wood: MAT.wood });
 const BARG = new Grid(8), BAR_FLY = [], BAR_DOWN = [];
+// the foot of a barrier (28/10, viale Francia): on a bank the 2 m cells of S put the line half way down the slope, and a fence that followed the
+// ground there went up and down like a saw (along the canals, between a street and the ballast). Where within 1.5 m the ground is more than
+// 0.4 m higher and flat beyond (the top of the bank: a street, the ballast, a yard), the barrier stands on that top; p.lo is the lowest ground
+// within 0.7 m, down to which its wall (or a plinth, for the nets) goes, so it never floats. Kept on the point (the same for every piece)
+function barFoot(p) {
+  if (p.fy !== undefined) return p.fy;
+  const x = p[0], z = p[1], g0 = H.ground(x, z); let top = g0, lo = g0;
+  for (let i = 0; i < 8; i++) {
+    const c = Math.cos(i * Math.PI / 4), s = Math.sin(i * Math.PI / 4), g1 = H.ground(x + c * 1.5, z + s * 1.5); lo = Math.min(lo, H.ground(x + c * 0.7, z + s * 0.7));
+    if (g1 - g0 > 0.4 && g1 > top && Math.abs(H.ground(x + c * 2.5, z + s * 2.5) - g1) < 0.25) top = g1;
+  }
+  p.g0 = g0; p.fy = top; p.lo = lo; return top;
+}
+// the feet of a whole line: a point raised on a top more than 0.3 m over its neighbours is a corner of a cell, not a bank (it goes back to the
+// ground, or to the higher neighbour); then one point lower than both its neighbours by more than 0.3 m is a notch of the cells (it takes the lower neighbour)
+function barFeet(pts) {
+  const n = pts.length; for (const p of pts) barFoot(p);
+  const nb = k => Math.max(k > 0 ? pts[k - 1].fy : -1e9, k < n - 1 ? pts[k + 1].fy : -1e9);
+  const up = []; for (let k = 0; k < n; k++) { const m = nb(k); up.push(n > 1 && pts[k].fy > pts[k].g0 && pts[k].fy > m + 0.3 ? Math.max(pts[k].g0, m) : null); }
+  up.forEach((v, k) => { if (v !== null) pts[k].fy = v; });
+  for (let k = 1; k < n - 1; k++) { const m = Math.min(pts[k - 1].fy, pts[k + 1].fy); if (pts[k].fy < m - 0.3) pts[k].fy = m; }
+  return pts;
+}
+const barLo = p => (barFoot(p), Math.min(p.lo, p.fy));
 const barBufs = () => { const B = { posts: [] }; for (const k of BAR_KEYS) B[k] = Buf(); return B; };
 
 // the pieces of one barrier of tile T (rec as world3.js keeps it in T.ba, segs[k - 1] the collision segment of its segment k or null)
 function barPieces(T, rec, segs) {
   const sp = BAR_PANEL[rec.t], pts = rec.pts; rec.pc = [];
   const add = pc => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const s of pc.segs) { x0 = Math.min(x0, s.ax, s.bx); z0 = Math.min(z0, s.az, s.bz); x1 = Math.max(x1, s.ax, s.bx); z1 = Math.max(z1, s.az, s.bz); }
-    pc.gy = H.ground((x0 + x1) / 2, (z0 + z1) / 2); BARG.add(x0 - 0.5, z0 - 0.5, x1 + 0.5, z1 + 0.5, pc); (T.barPc || (T.barPc = [])).push(pc); for (let k = pc.k0; k <= pc.k1; k++) rec.pc[k] = pc; };
+    pc.gy = (barFoot(pts[pc.k0 - 1]) + barFoot(pts[pc.k1])) / 2; BARG.add(x0 - 0.5, z0 - 0.5, x1 + 0.5, z1 + 0.5, pc); (T.barPc || (T.barPc = [])).push(pc); for (let k = pc.k0; k <= pc.k1; k++) rec.pc[k] = pc; };
   if (!sp) { // a hedge: each segment on its own, cut where the car passes
     for (let k = 1; k < pts.length; k++) if (segs[k - 1]) add({ T, rec, t: 3, hedge: true, k0: k, k1: k, segs: [segs[k - 1]], seg: segs[k - 1], cut: [], subs: [] });
     return;
@@ -43,7 +67,7 @@ function barLook(br) {
 // one segment a→c of a barrier into the buffers B (acc: the length drawn before it, for the texture). cap: 1 its end at a closed, 2 at c (the
 // two ends of a barrier and the sides of a hole: a thick slab open at its end showed its empty inside, Carlo 26/10)
 function barDraw(B, br, lk, a, c, acc, cap = 0) {
-  const L = hyp(c[0] - a[0], c[1] - a[1]), ga = H.ground(a[0], a[1]), gc = H.ground(c[0], c[1]), ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux;
+  const L = hyp(c[0] - a[0], c[1] - a[1]), ga = barFoot(a), gc = barFoot(c), la = barLo(a), lc = barLo(c), plinth = ga - la > 0.25 || gc - lc > 0.25, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux;
   const slab = (b, th, y0a, y0c, y1a, y1c, cp = cap) => { // thin vertical slab, both faces + cap
     for (const sd of [1, -1]) { const b0 = b.p.length / 3, ox = nx * th * sd, oz = nz * th * sd; vtx(b, a[0] + ox, y0a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 0); vtx(b, c[0] + ox, y0c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 0); vtx(b, c[0] + ox, y1c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 1); vtx(b, a[0] + ox, y1a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3, b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); }
     const b0 = b.p.length / 3; vtx(b, a[0] + nx * th, y1a, a[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] + nx * th, y1c, c[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] - nx * th, y1c, c[1] - nz * th, 0, 1, 0, 0, 1); vtx(b, a[0] - nx * th, y1a, a[1] - nz * th, 0, 1, 0, 0, 1); triUp(b, b0, b0 + 1, b0 + 2); triUp(b, b0, b0 + 2, b0 + 3);
@@ -51,14 +75,14 @@ function barDraw(B, br, lk, a, c, acc, cap = 0) {
   };
   const panel = (b, y0, y1, rep) => { const b0 = b.p.length / 3; vtx(b, a[0], ga + y0, a[1], nx, 0, nz, acc / rep, 0); vtx(b, c[0], gc + y0, c[1], nx, 0, nz, (acc + L) / rep, 0); vtx(b, c[0], gc + y1, c[1], nx, 0, nz, (acc + L) / rep, 1); vtx(b, a[0], ga + y1, a[1], nx, 0, nz, acc / rep, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
   const postsEvery = (step, y0) => { for (let s0 = 0; s0 < L; s0 += step) B.posts.push([a[0] + ux * s0, a[1] + uz * s0, ga + (gc - ga) * s0 / L + y0, br.h - y0]); };
-  if (br.t === 1 || br.t === 4) slab(B.wl, 0.14, ga - 0.3, gc - 0.3, ga + br.h, gc + br.h);
-  else if (br.t === 3) slab(B.hd, 0.45, ga - 0.2, gc - 0.2, ga + br.h, gc + br.h);
-  else if (br.t === 5) { panel(B.mesh, 0, br.h, 2.6); postsEvery(2.5, 0); } // wire mesh on posts, from the ground
-  else if (br.t === 6) { slab(B.wl, 0.1, ga - 0.3, gc - 0.3, ga + 0.3, gc + 0.3, 3); panel(B.rly, 0.3, br.h, 2.6); postsEvery(2.5, 0.3); } // by the railway: a concrete kerb, tall panels
-  else if (br.t === 7) { for (const y of [0.45, 0.95]) slab(B.wood, 0.04, ga + y, gc + y, ga + y + 0.12, gc + y + 0.12); for (let s0 = 0; s0 < L; s0 += 2.5) { const x = a[0] + ux * s0, z = a[1] + uz * s0, gy = ga + (gc - ga) * s0 / L; addBox(B.wood, x, gy + 0.6, z, 0.12, 1.2, 0.12, null); } } // post and rail
+  if (br.t === 1 || br.t === 4) slab(B.wl, 0.14, la - 0.3, lc - 0.3, ga + br.h, gc + br.h);
+  else if (br.t === 3) slab(B.hd, 0.45, la - 0.2, lc - 0.2, ga + br.h, gc + br.h);
+  else if (br.t === 5) { if (plinth) slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); panel(B.mesh, 0, br.h, 2.6); postsEvery(2.5, 0); } // wire mesh on posts, from the ground
+  else if (br.t === 6) { slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga + 0.3, gc + 0.3, 3); panel(B.rly, 0.3, br.h, 2.6); postsEvery(2.5, 0.3); } // by the railway: a concrete kerb, tall panels
+  else if (br.t === 7) { if (plinth) slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); for (const y of [0.45, 0.95]) slab(B.wood, 0.04, ga + y, gc + y, ga + y + 0.12, gc + y + 0.12); for (let s0 = 0; s0 < L; s0 += 2.5) { const x = a[0] + ux * s0, z = a[1] + uz * s0, gy = ga + (gc - ga) * s0 / L; addBox(B.wood, x, gy + 0.6, z, 0.12, 1.2, 0.12, null); } } // post and rail
   else { // muretto + cancellata, the Brianza classic
     const wb = B[lk.wallK], rb = B[lk.railK];
-    slab(wb, 0.12, ga - 0.3, gc - 0.3, ga + lk.base, gc + lk.base);
+    slab(wb, 0.12, la - 0.3, lc - 0.3, ga + lk.base, gc + lk.base);
     panel(rb, lk.base, br.h, lk.railK === 'bars' ? 1.2 : 2.6);
     postsEvery(2.6, lk.base);
   }
@@ -113,7 +137,7 @@ function barFly(pc, v, speed) {
   const G = pc.T.group; if (!G) return;
   const B = barBufs(), pts = pc.rec.pts, lk = barLook(pc.rec); let acc = pc.acc0 || 0;
   for (let k = pc.k0; k <= pc.k1; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; barDraw(B, pc.rec, lk, a, c, acc, (k === pc.k0 ? 1 : 0) | (k === pc.k1 ? 2 : 0)); acc += L; }
-  const A = pts[pc.k0 - 1], C = pts[pc.k1], cx = (A[0] + C[0]) / 2, cz = (A[1] + C[1]) / 2, gy = H.ground(cx, cz), Lp = hyp(C[0] - A[0], C[1] - A[1]) || 1, ux = (C[0] - A[0]) / Lp, uz = (C[1] - A[1]) / Lp;
+  const A = pts[pc.k0 - 1], C = pts[pc.k1], cx = (A[0] + C[0]) / 2, cz = (A[1] + C[1]) / 2, gy = (barFoot(A) + barFoot(C)) / 2, Lp = hyp(C[0] - A[0], C[1] - A[1]) || 1, ux = (C[0] - A[0]) / Lp, uz = (C[1] - A[1]) / Lp;
   const o = new THREE.Group(), inner = new THREE.Group(), MT = barMats(); inner.position.set(-cx, -gy, -cz); o.add(inner); o.position.set(cx, gy, cz);
   for (const k of BAR_KEYS) if (B[k].i.length) mkMesh(B[k], MT[k], 10, BAR_CAST[k], inner);
   if (B.posts.length) { const pb = Buf(); for (const [x, z, y, h] of B.posts) addBox(pb, x, y + h / 2, z, 0.06, h, 0.06, null); mkMesh(pb, MAT.post, 10, 'cast', inner); }
