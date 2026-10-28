@@ -54,6 +54,7 @@ WMAX = 12.0      # a bed node takes zw of the nearest axis point within this (th
 VIA_MAX, VIA_OFF, VIA_DZ = 8.0, 4.5, 6.0   # drawn road: a free node this close to a DBGT carriageway, the carriageway within w/2 + VIA_OFF of the OSM axis, at most VIA_DZ under the LiDAR
 VIA_SU = 1.0     # ... and at most this over it (a fill beyond the DBGT carriageway: by point 22 the drawn Milano-Meda was raised 5.9 m where the DBGT stops, and with 2 m a fill on the steep LiDAR slope there made a wall of 2.6 m)
 VIA_BORDO = 2.83 # ... and the nodes within one cell diagonal of the drawn surface (the corners of every cell it touches)
+TORR_SU = 2.0    # an OSM stream point whose LiDAR stands more than this over its water is not in a valley: no bed dug there (acque)
 SOTTO_MAX = 0.01 # C10: share of the axis points with the water under the lowest S of the section (covered stretches excluded)
 Q5 = 0.05        # coarse tiles are stored in multiples of 5 cm: the fine border nodes interpolated between them are whole cm, no T crack
 # priority (docs/motore.md 4) as a rank: higher wins
@@ -701,7 +702,7 @@ class Superficie:
         s.nvie = dict(nodi=0, sotto_ponti=0); s.vie_dz = np.zeros(0); s.VIE = np.zeros(s.RANK.shape, bool); s.ZSOTTO = np.full(s.RANK.shape, np.nan)   # the ground under those deck parts: the drawn road
         bj = os.path.join(HERE, '..', 'brianza.json')
         if not os.path.exists(bj): return
-        t0 = time.time(); B = json.load(open(bj, encoding='utf-8')); m = B['meta']; ntx = m['ntx']
+        t0 = time.time(); B = s.B = json.load(open(bj, encoding='utf-8')); m = B['meta']; ntx = m['ntx']
         x0, x1, z0, z1 = s.R.x0, s.R.x0 + (s.R.nx - 1) * SF, s.R.z0, s.R.z0 + (s.R.nz - 1) * SF
         def dec(a):
             o = np.cumsum(np.asarray(a, float).reshape(-1, 2), axis=0) / 10; return o
@@ -748,6 +749,7 @@ class Superficie:
                 if 'zb' in b: continue   # a raised DBGT volume (portico, passage: dbgt_edifici.py): the road goes on under it
                 o = dec(b['p'])
                 if len(o) >= 3: case.append(Polygon(o))
+        s.case = case
         # by a PONTE, what the DBGT fixes at the level of the deck inside the drawn road is the bridge, not the ground: under the railway
         # bridge of via Milano the rail bed SD_FER runs 4 m past the PONTE where OSM draws the road and its sidewalks 4 m off the DBGT
         # carriageway, and the sidewalks climbed the embankment at both mouths. Those nodes become deck parts (AIR: impalcati.py hangs them on
@@ -804,6 +806,161 @@ class Superficie:
         s.vie_luoghi.sort(key=lambda c: -c['nodi'] * abs(c['dz_max']))
         s.t['vie'] = round(time.time() - t0, 1)
         s.log('vie disegnate: %d nodi liberi dentro asfalto e marciapiedi OSM portati alla quota della carreggiata DBGT (sotto i ponti %d), quota - LiDAR %s' % (s.nvie['nodi'], s.nvie['sotto_ponti'], pct(s.vie_dz, (1, 10, 50, 90, 99))))
+
+    # ----- 5c. water under the streets and the streams without a DBGT bed (fiumi-ponti, 28/10; todo.md "strade e ferrovia sfondate sul
+    # fiume", "i fiumi sono il problema più grosso"). Rule: what the game draws as solid ground at street level (asphalt, squares,
+    # sidewalks, footways, the rail bed and the tracks: brianza.json as, pz, sd, ft, sf, rl) is never dug by a watercourse; under it the water
+    # runs in a culvert (tombino), and only a bridge (PONTE) keeps the bed open under a street.
+    # (a) Culverts of the DBGT beds. Under viale Francia and the railway (x 216-224, z -400..-377) ALVEO_A 29 runs from one open channel to
+    # the other under the road, the verge and the tracks; the DBGT leaves the AC_VEI out over it, so the bed won (rank 6) and was dug 3.3 m
+    # into the road and between the road and the rails. The cap rule of step 4 (tetto) only sees a culvert where the road stands more than
+    # 3 m off the LiDAR, and the LiDAR here sees the road. Now a bed node inside a drawn street, or within one cell of it where a DBGT axis
+    # (EL_IDR) passes under that street, is a culvert: it takes the street's height (the nearest fixed street node within 6 m), and a bed
+    # node along an axis the DBGT calls fittizio (EL_IDR_TY 03: "sotterraneo o tombinato") and on no open axis is no bed (S from the LiDAR
+    # and the slopes). Not under or by a bridge (PONTE, the SED 02 surfaces, the deck parts of step 4): there the bed stays open under the deck.
+    # (b) Holes: a free node of a drawn street within 3 m of a watercourse more than 0.3 m under the street around (the median of the same
+    # streets 2-10 m away, off the water) takes that height: the road over a stream outside the DBGT, where S is the LiDAR of the valley.
+    # (c) The OSM streams with no DBGT bed (outside the DBGT, or where it has only the axis EL_IDR: Campaccio, via Varese) get a bed: along
+    # the line (brianza.json rv, already moved onto the bottom of the valley by build_data.py and cut at the streets) the water level is the
+    # lowest LiDAR across the line, made monotone downstream; the bed is dug 0.3 w under it, the banks rise 1:1 from the water's edge to the
+    # ground (earth and grass, no walls: the real walls are the barriers of the DBGT and OSM). Never under a drawn street, a building (+1.5 m)
+    # or a DBGT bed; not where the line still stands more than TORR_SU over the water (not in a valley). The water series go to the game
+    # with the DBGT ones (terreno/indice.json acqua), so the water is drawn the same way (the sheet over the bed, H.water)
+    def acque(s):
+        t0 = time.time(); sh = s.RANK.shape; s.nacque = {}; s.TOMBC = np.zeros(sh, bool); s.RIEMP = np.zeros(sh, bool); s.TORR = np.zeros(sh, bool); s.ACQ_OSM = []
+        B = getattr(s, 'B', None)
+        if B is None: return
+        m = B['meta']; ntx = m['ntx']; x0, x1, z0, z1 = s.R.x0, s.R.x0 + (s.R.nx - 1) * SF, s.R.z0, s.R.z0 + (s.R.nz - 1) * SF
+        dec = lambda a: np.cumsum(np.asarray(a, float).reshape(-1, 2), axis=0) / 10
+        KIND = {'as': C_VEIT, 'pz': C_AREA, 'sd': C_PED, 'ft': C_PED, 'sf': C_FER}
+        IN = {k: np.zeros(sh, bool) for k in KIND}; STB = np.zeros(sh, bool); rails, riv = [], []
+        for ti, T in enumerate(B['tiles']):
+            if not T: continue
+            tx, tz = ti % ntx, ti // ntx; bx, bz = -m['hw'] + tx * TILE, -m['hh'] + tz * TILE
+            if bx > x1 or bx + TILE < x0 or bz > z1 or bz + TILE < z0: continue
+            for k in KIND:
+                for a in T.get(k, []):
+                    o = dec(a['p'])
+                    if len(o) < 3: continue
+                    P = Polygon(o, [dec(h) for h in a.get('k', []) if len(h) >= 6])
+                    if not P.is_valid: P = P.buffer(0)
+                    w, mk = s.raster(P)
+                    if w is not None: IN[k][w[0]:w[1], w[2]:w[3]] |= mk
+                    w, mk = s.raster(P.buffer(VIA_BORDO, 4))
+                    if w is not None: STB[w[0]:w[1], w[2]:w[3]] |= mk
+            for r in T.get('rl', []):
+                p = dec(r['p'])
+                if len(p) >= 2: rails.append(LineString(p))
+            for r in T.get('rv', []):
+                p = dec(r['p'])
+                if len(p) >= 2: riv.append((LineString(p), float(r['w'])))
+        for g in rails:
+            w, mk = s.raster(g.buffer(1.5, cap_style=2))
+            if w is not None: IN['sf'][w[0]:w[1], w[2]:w[3]] |= mk
+            w, mk = s.raster(g.buffer(1.5 + VIA_BORDO, cap_style=2))
+            if w is not None: STB[w[0]:w[1], w[2]:w[3]] |= mk
+        ST = np.zeros(sh, bool)
+        for k in KIND: ST |= IN[k]
+        s.STRADE_DIS = ST; PB = s.BRP | s.BR | s.AIR; dp = ndimage.distance_transform_edt(~PB, sampling=SF) if PB.any() else np.full(sh, 1e9); ponte = dp <= 2.0   # under or by a bridge or a deck part: the bed stays open, the ground is the deck's business
+        BED0 = np.isin(s.CLS, (C_ALV, C_ARG)) & (s.RANK > 0)
+        # (a) the axes that pass under a drawn street, and the fittizio ones
+        E = s.D['EL_IDR']; ax03, ax01 = [], []
+        for i in range(len(E['off']) - 1):
+            a, b = E['off'][i], E['off'][i + 1]; xy = E['xy'][a:b]
+            if len(xy) >= 2: (ax03 if E['attr']['ty'][i] == '03' else ax01).append(LineString(xy))
+        sotto = np.zeros(sh, bool)
+        for g in ax03 + ax01:
+            q = shapely.get_coordinates(shapely.segmentize(g, 1.0)); ri = np.round((q[:, 1] - s.R.z0) / SF).astype(int); ci = np.round((q[:, 0] - s.R.x0) / SF).astype(int)
+            ok = (ri >= 0) & (ri < sh[0]) & (ci >= 0) & (ci < sh[1]); ri, ci = ri[ok], ci[ok]; k = ST[ri, ci] & ~ponte[ri, ci]; sotto[ri[k], ci[k]] = True
+        near_x = ndimage.distance_transform_edt(~sotto, sampling=SF) <= 4.0 if sotto.any() else np.zeros(sh, bool)
+        cov_st = BED0 & ~ponte & (ST | (STB & near_x))
+        m03, m01 = np.zeros(sh, bool), np.zeros(sh, bool)
+        for gs, M_, r_ in ((ax03, m03, 4.0), (ax01, m01, 2.0)):
+            for g in gs:
+                w, mk = s.raster(g.buffer(r_))
+                if w is not None: M_[w[0]:w[1], w[2]:w[3]] |= mk
+        cov_03 = BED0 & m03 & ~m01 & ~ponte & ~cov_st
+        strada = (s.RANK > 0) & np.isin(s.CLS, (C_VEI, C_VEIT, C_FER, C_PED, C_AREA)) & ~BED0
+        d, (ri, ci) = ndimage.distance_transform_edt(~strada, sampling=SF, return_indices=True)
+        rr, cc = np.nonzero(cov_st); good = d[rr, cc] <= 6.0
+        s.ZF[rr[good], cc[good]] = s.ZF[ri[rr[good], cc[good]], ci[rr[good], cc[good]]]; s.CLS[rr[good], cc[good]] = s.CLS[ri[rr[good], cc[good]], ci[rr[good], cc[good]]]
+        s.RANK[rr[good], cc[good]] = R_PED; s.FID[rr[good], cc[good]] = -1
+        lib = np.zeros(sh, bool); lib[rr[~good], cc[~good]] = True; lib |= cov_03
+        s.RANK[lib] = 0; s.CLS[lib] = C_NONE
+        s.TOMBC = cov_st | cov_03
+        s.nacque.update(tombini_sotto_le_strade=int(cov_st.sum()), tombini_alla_quota_della_strada=int(good.sum()), tombini_fittizi=int(cov_03.sum()), assi_sotto_le_strade_nodi=int(sotto.sum()))
+        # (b) holes of the drawn streets over a watercourse
+        WZ = ndimage.binary_dilation(BED0, iterations=2)
+        for g, w_ in riv:
+            w, mk = s.raster(g.buffer(w_ + 3.0))
+            if w is not None: WZ[w[0]:w[1], w[2]:w[3]] |= mk
+        H0 = np.where(s.RANK > 0, s.ZF, s.L)
+        cand = ST & WZ & (s.RANK == 0) & ~ponte
+        if cand.any():
+            rr, cc = np.nonzero(cand); ring = ST & ~WZ & ndimage.binary_dilation(cand, iterations=5)
+            r2, c2 = np.nonzero(ring)
+            if len(r2) >= 3:
+                kd = cKDTree(np.column_stack((r2, c2)) * SF); hr = H0[r2, c2]; ref = np.full(len(rr), np.nan)
+                for j, nb in enumerate(kd.query_ball_point(np.column_stack((rr, cc)) * SF, 10.0)):
+                    if len(nb) >= 3: ref[j] = np.median(hr[nb])
+                k = np.nan_to_num(ref - H0[rr, cc]) > 0.3; rr, cc, ref = rr[k], cc[k], ref[k]
+                cls = np.full(len(rr), C_VEIT)
+                for key in ('sf', 'ft', 'sd', 'pz', 'as'): cls = np.where(IN[key][rr, cc], KIND[key], cls)
+                s.ZF[rr, cc] = ref; s.RANK[rr, cc] = R_PED; s.CLS[rr, cc] = cls; s.FID[rr, cc] = -1; s.RIEMP[rr, cc] = True
+                s.nacque['buchi_riempiti'] = int(len(rr)); s.nacque['buchi_alzati_di'] = pct(ref - s.L[rr, cc])
+        # (c) the beds of the OSM streams
+        AUM = np.zeros(sh, bool)
+        w, mk = s.raster(s.AU.buffer(2.0))
+        if w is not None: AUM[w[0]:w[1], w[2]:w[3]] |= mk
+        CASE = np.zeros(sh, bool)
+        for P in s.case:
+            w, mk = s.raster(P.buffer(1.5, 2))
+            if w is not None: CASE[w[0]:w[1], w[2]:w[3]] |= mk
+        NO = STB | CASE | AUM | (s.RANK > 0) | s.AIR
+        lines = []
+        for w_ in sorted(set(w for _, w in riv)):
+            ml = shapely.line_merge(shapely.union_all([g for g, w in riv if w == w_]))
+            for g in getattr(ml, 'geoms', [ml]):
+                if g.geom_type == 'LineString' and g.length > 4: lines.append((g, w_))
+        nserie, scavati, fuori, dentro = 0, 0, 0, 0
+        for g, w_ in lines:
+            n = max(2, int(np.ceil(g.length / 2.0)) + 1); p = shapely.get_coordinates(shapely.line_interpolate_point(g, np.linspace(0, g.length, n)))
+            ok = (p[:, 0] > x0 + 4) & (p[:, 0] < x1 - 4) & (p[:, 1] > z0 + 4) & (p[:, 1] < z1 - 4)
+            ok &= ~shapely.contains_xy(s.AU.buffer(w_ + 2.0), p[:, 0], p[:, 1])
+            if ok.sum() < 3: continue
+            t = np.gradient(p, axis=0); t /= np.maximum(np.hypot(*t.T), 1e-9)[:, None]; nrm = np.column_stack((-t[:, 1], t[:, 0]))
+            offs = np.linspace(-(w_ + 1), w_ + 1, 9); Q = p[:, None, :] + offs[None, :, None] * nrm[:, None, :]
+            lmin = s.L_at(Q[..., 0].ravel(), Q[..., 1].ravel()).reshape(Q.shape[:2]).min(1); lc = s.L_at(p[:, 0], p[:, 1])
+            # downstream: the lower end
+            k0 = np.nonzero(ok)[0]; down = np.median(lmin[k0[:5]]) < np.median(lmin[k0[-5:]])
+            o = np.arange(n)[::-1] if down else np.arange(n)
+            zw = np.full(n, np.nan); kk = o[ok[o]]
+            zw[kk] = pava_dec(lmin[kk]) - 0.05
+            zs = zw.copy(); zs[kk] = np.convolve(np.pad(zw[kk], 2, mode='edge'), np.ones(5) / 5, 'valid'); zw = np.minimum(zs, lmin)
+            v_ = np.isfinite(zw) & (lc - zw <= TORR_SU); fuori += int((ok & ~v_).sum()); dentro += int((ok & v_).sum()); ok &= v_
+            if ok.sum() < 3: continue
+            # the series in runs of valid points, each with its points (for the game) and the bed
+            idx = np.nonzero(ok)[0]; cut = np.nonzero(np.diff(idx) > 1)[0] + 1
+            for run in np.split(idx, cut):
+                if len(run) < 3: continue
+                pr, zr = p[run], zw[run]; gl = LineString(pr); kd = cKDTree(pr)
+                win = s.R.win(gl.bounds, w_ + 3.0)
+                if win is None: continue
+                X, Z = s.R.xz(win); dd = shapely.distance(gl, shapely.points(X.ravel(), Z.ravel())).reshape(X.shape)
+                _, jn = kd.query(np.column_stack((X.ravel(), Z.ravel()))); zn = zr[jn].reshape(X.shape)
+                DEP = 0.3 * w_
+                zb = np.where(dd <= w_, zn - DEP * (1 - (dd / w_) ** 2), zn + 0.05 + (dd - w_))
+                r0, r1, c0, c1 = win; Lw = s.L[r0:r1, c0:c1]
+                sel = (dd <= w_ + 3.0) & ~NO[r0:r1, c0:c1] & (zb < Lw - 0.02)
+                if not sel.any(): continue
+                bed = sel & (dd <= w_)
+                s.ZF[r0:r1, c0:c1][sel] = zb[sel]; s.RANK[r0:r1, c0:c1][sel] = R_ALV; s.FID[r0:r1, c0:c1][sel] = -2
+                s.CLS[r0:r1, c0:c1][sel] = np.where(bed[sel], C_ALV, C_ARG); s.ZE[r0:r1, c0:c1][bed] = zn[bed] + 0.05; s.TORR[r0:r1, c0:c1] |= sel
+                scavati += int(sel.sum()); nserie += 1
+                s.ACQ_OSM.append(dict(p=np.round(pr, 1).tolist(), zw=np.round(zr, 2).tolist()))
+        s.nacque.update(torrenti_osm=len(lines), serie_osm=nserie, nodi_scavati=scavati, punti_in_valle=dentro, punti_fuori_valle=fuori)
+        s.t['acque'] = round(time.time() - t0, 1)
+        s.log('acque: %s' % s.nacque)
 
     def L_at(s, x, z): return tri_interp(s.L, s.R, x, z)
 
@@ -964,7 +1121,7 @@ _S = {}
 def costruisci(comune='Meda', margine=250.0, blend=BLEND, osm=True, cache_dir=None):
     """The whole surface of the comune + margine, all steps (about 40 s for Meda); cached per comune."""
     if comune in _S: return _S[comune]
-    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); s.tetto(); s.ritocchi(); s.vie(); s.raccordi()
+    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi()
     ob = None
     if osm:
         lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
@@ -1137,6 +1294,7 @@ def controlli(s, out_dir):
     # C10: water level along the river axes inside the bed
     rep['C10'], acqua, pw = acqua_fiume(s, H, IN)
     punti += pw
+    acqua = acqua + list(getattr(s, 'ACQ_OSM', []))   # the streams without a DBGT bed (acque): the game draws them the same way
     if acqua:  # what the game draws: share of the bed cells under the water, wet cells outside the bed
         cn = np.stack((s.NM[:-1, :-1], s.NM[:-1, 1:], s.NM[1:, :-1], s.NM[1:, 1:])); cnt = np.stack([(cn == v).sum(0) for v in range(1, 7)])
         cm = np.where(cnt.max(0) >= 2, cnt.argmax(0) + 1, 0)
@@ -1271,7 +1429,7 @@ def main(argv=None):
     AX_SIGMA = a.sigma
     s = Superficie(a.comune, margine=a.margine, blend=a.blend)
     log('tessere da fare %d (tx %d..%d, tz %d..%d), griglia %dx%d' % (len(s.tiles), s.i0, s.i1, s.j0, s.j1, s.R.nx, s.R.nz))
-    s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); s.tetto(); s.ritocchi(); s.vie(); s.raccordi()
+    s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi()
     t0 = time.time()
     lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
     osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_v2.pkl'))
@@ -1297,7 +1455,7 @@ def main(argv=None):
                superficie=dict(nodi_fissi=int(s.FIX.sum()), sotto_ponti=int(s.BR.sum()), nodi_impalcato_da_fase3=int(s.AIR.sum()), nodi_tetto=int(s.CAP.sum()), nodi_tombino_tenuti=int(s.TOMB.sum()), nodi_alveo_al_lidar=int(s.ALVCOP.sum()), nodi_scarpata=int(s.SCARP.sum()),
                                bordo_fascia_ancora_mosso=s.bordo_banda, dentro_ponte_a_livello_impalcato=int(s.ALTO.sum()), sotto_ponti_riempiti=s.n_sotto, sotto_ponti_modo=s.sotto_modo, sotto_ponti_abbassati_m=pct(-s.sotto_dz) if len(s.sotto_dz) else None, carreggiata_meno_lidar=pct(dz, (10, 50, 90)), ritocchi=s.nrit,
                                vie_disegnate=dict(s.nvie, definizione='nodi liberi dentro asfalto e marciapiedi disegnati (brianza.json as, sd) entro %.0f m da una carreggiata DBGT della stessa via, portati alla sua quota' % VIA_MAX, quota_meno_lidar=pct(s.vie_dz, (1, 10, 50, 90, 99)), luoghi_oltre_1_5m=len(s.vie_luoghi), elenco=s.vie_luoghi[:40])),
-               sottoterra=s.sotto.rep, C9_peso=peso, **rep, punti_da_guardare=punti, tempi_s=dict(s.t, totale=tot))
+               acque=getattr(s, 'nacque', {}), sottoterra=s.sotto.rep, C9_peso=peso, **rep, punti_da_guardare=punti, tempi_s=dict(s.t, totale=tot))
     ok = all(rep[c].get('ok', True) for c in ('C4', 'C5', 'C6', 'C7', 'C10'))
     out['esito'] = {c: rep[c].get('ok') for c in ('C4', 'C5', 'C6', 'C7', 'C10')}
     json.dump(out, open(os.path.join(a.out, 'report_fase2.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=float)

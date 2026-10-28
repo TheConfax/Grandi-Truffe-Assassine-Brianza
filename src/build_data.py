@@ -1219,6 +1219,12 @@ for w_ in sorted(set(w for p, w in rivers)):
     ml = linemerge([LineString(p) for p, w in rivers if w == w_ and len(p) >= 2])
     for l in (list(ml.geoms) if hasattr(ml, 'geoms') else [ml]):
         if isinstance(l, LineString) and l.length > 1: riv_lines.append((l, w_))
+# the OSM line onto the bottom of the valley of the LiDAR (src/fiumi.py): at the Campaccio it ran halfway up the hillside, and so did the water
+import fiumi
+riv_lines, _fiumi_rep = fiumi.al_fondo(riv_lines, vietate=unary_union([bunion, asph]), log=log, strade=unary_union([asph] + ([corridor] if not corridor.is_empty else [])))
+# the drawn streets (inside the DBGT the carriageway AC_VEI, often wider than the OSM band) a river crossing them is cut against too: no
+# water or culvert mouth on the asphalt (via Varese at the Campaccio, x 563 z -1738: the water ran across the junction)
+_disegnate = unary_union([g for g in (asph, pedz, side, corridor) if g is not None and not g.is_empty]); prepare(_disegnate)
 cut_src = []
 for r in raw_roads:
     if flat(r) and r['line'].length > 0.1:
@@ -1240,13 +1246,19 @@ for RL, w_ in riv_lines:
         for P0 in pts:
             ra = _dir_at(RL, P0); rb = _dir_at(cl, P0); sn = max(0.3, abs(ra[0] * rb[1] - ra[1] * rb[0]))
             zones.append(band.intersection(P0.buffer((half + w_ + 2) / sn)))
+            zones.append(_disegnate.intersection(P0.buffer((half + w_ + 2) / sn + 6)).buffer(0.5))   # the street as drawn there, and 0.5 m past its edge
         for E in (Point(RL.coords[0]), Point(RL.coords[-1])):  # a river end (culvert mouth) inside a road band
-            if cl.distance(E) < half + w_ + 1: zones.append(band.intersection(E.buffer(half + w_ + 8)))
+            if cl.distance(E) < half + w_ + 1: zones.append(band.intersection(E.buffer(half + w_ + 8))); zones.append(_disegnate.intersection(E.buffer(half + w_ + 8)).buffer(0.5))
     bl = [bgeoms_buf[i] for i in _bt.query(RL.buffer(w_))]
     cutz = unary_union(zones + bl) if zones or bl else GeometryCollection()
     rest = RL.difference(cutz)
     for part in (list(rest.geoms) if hasattr(rest, 'geoms') else [rest]):
         if not isinstance(part, LineString) or part.length < 4: continue
+        if not cutz.is_empty:   # an end cut at a street: the culvert goes on to the foot of the embankment (src/fiumi.py al_piede)
+            for ini in (True, False):
+                E = Point(part.coords[0] if ini else part.coords[-1])
+                if cutz.distance(E) < 1.0: part = fiumi.al_piede(part, ini, getattr(fiumi.al_fondo, 'lid', None))
+            if part.length < 4: continue
         caps = []
         for E in (Point(part.coords[0]), Point(part.coords[-1])):  # no headwall where a stream flows into another river
             caps.append(not any(o is not RL and o.distance(E) < 4 for o in all_riv) and inside((E.x, E.y), -2))
@@ -1804,6 +1816,7 @@ if FER:  # trains against platforms, buildings and carriageways; the report besi
     FER.controlli(*_fer_ctl_a, pronto=_fer_ctl_f.result())  # = FER.controlli(trains, [g for at, g in area_geoms if at == 5], [P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], [g for g, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else [], cartelli), measured on a thread since the town signs
     out.setdefault('report', {})['ferrovia'] = FER.sintesi()
     json.dump(FER.rep, open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_ferrovia.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=str)
+out.setdefault('report', {})['fiumi'] = dict(_fiumi_rep, pezzi=len(riv_out), bocche_di_tombino=sum(sum(c) for _, _, c in riv_out))  # src/fiumi.py, the cut at the drawn streets
 out.setdefault('report', {})['cantieri'] = _crep  # the dividers the building sites' hoarding replaces (src/barriere.py cantieri)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252

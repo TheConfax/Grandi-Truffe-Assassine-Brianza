@@ -6,6 +6,8 @@
 # old engine where a tile has no .bin.
 #   python src/terreno_gioco.py --da DIR            pack the outputs of superficie.py / impalcati.py found in DIR
 #   python src/terreno_gioco.py --da DIR --rigenera run superficie.py and impalcati.py into DIR first (under 1 min for Meda: impalcati.py reuses the surface superficie.py just made)
+# The cells under a deck where S is not a street get bit 7 of their material (the game paints no street there), and at the end the checks
+# of the water and the bridges (src/controlli_acqua.py) write report_acqua.json next to the terreno folder (--no-controlli skips them)
 import os, sys, json, gzip, glob, re, argparse, struct, io
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -25,7 +27,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description='Impacchetta S, impalcati e acqua per il gioco (fase 4)')
     ap.add_argument('--da', required=True, help='cartella con terreno/*.bin, decks_meda.json, acqua_fase2.json')
     ap.add_argument('--out', default=os.path.join(ROOT, 'terreno'))
-    ap.add_argument('--rigenera', action='store_true'); ap.add_argument('--comune', default='Meda')
+    ap.add_argument('--rigenera', action='store_true'); ap.add_argument('--no-controlli', action='store_true'); ap.add_argument('--comune', default='Meda')
     a = ap.parse_args(argv)
     if a.rigenera:
         sys.path.insert(0, HERE)
@@ -33,14 +35,9 @@ def main(argv=None):
         superficie.main(['--out', a.da, '--comune', a.comune, '--no-png', '--accetta'])
         impalcati.main(['--out', a.da, '--comune', a.comune, '--no-png', '--accetta'])
     os.makedirs(a.out, exist_ok=True)
-    tiles, peso = {}, 0
-    for f in sorted(glob.glob(os.path.join(a.da, 'terreno', '*.bin'))):
-        m = re.match(r'(\d+)_(\d+)\.bin$', os.path.basename(f))
-        if not m: continue
-        b = open(f, 'rb').read(); assert b[:4] == b'GTAS', f
-        ver, st, n = struct.unpack('<BBH', b[4:8]); assert ver == 1 and n == round(250 / st) + 1, (f, ver, st, n)
-        g = gz(b); open(os.path.join(a.out, os.path.basename(f) + '.gz'), 'wb').write(g); peso += len(g)
-        tiles['%s_%s' % m.groups()] = st
+    sys.path.insert(0, HERE)
+    import controlli_acqua as ca
+    from superficie import HW, HH, TILE
     dk = json.load(open(os.path.join(a.da, 'decks_meda.json'), encoding='utf-8'))
     decks = []
     for d in dk['decks']:
@@ -50,6 +47,17 @@ def main(argv=None):
         if d.get('fondo') is not None: e['fondo'] = r2(d['fondo'])
         if d.get('tn'): e['tn'] = d['tn']
         decks.append(e)
+    # the cells under a deck where S is not a street at its own level: bit 7 of the material (the game paints no street there; fiumi-ponti, 28/10)
+    tri, tree, _ = ca.triangoli_impalcati(decks, liberi=False); sotto = 0
+    tiles, peso = {}, 0
+    for f in sorted(glob.glob(os.path.join(a.da, 'terreno', '*.bin'))):
+        m = re.match(r'(\d+)_(\d+)\.bin$', os.path.basename(f))
+        if not m: continue
+        b = open(f, 'rb').read(); assert b[:4] == b'GTAS', f
+        ver, st, n = struct.unpack('<BBH', b[4:8]); assert ver == 1 and n == round(250 / st) + 1, (f, ver, st, n)
+        tx, tz = int(m.group(1)), int(m.group(2)); b, k = ca.segna_sotto_impalcati(b, -HW + tx * TILE, -HH + tz * TILE, tri, tree); sotto += k
+        g = gz(b); open(os.path.join(a.out, os.path.basename(f) + '.gz'), 'wb').write(g); peso += len(g)
+        tiles['%s_%s' % m.groups()] = st
     acqua = []
     fa = os.path.join(a.da, 'acqua_fase2.json')
     if os.path.exists(fa):
@@ -62,9 +70,11 @@ def main(argv=None):
                tiles=tiles, decks=decks, pits=pits, acqua=acqua)
     open(os.path.join(a.out, 'indice.json'), 'w', encoding='utf-8').write(json.dumps(ind, ensure_ascii=False, separators=(',', ':')))
     import terreno_pacco; terreno_pacco.impacchetta(a.out)  # i .bin.gz in un file solo (avvio veloce)
-    print('terreno: %d tile (%s), %.1f MB in gzip; impalcati %d, fosse %d, assi d acqua %d; indice %.0f KB' % (
+    print('terreno: %d tile (%s), %.1f MB in gzip; impalcati %d, fosse %d, assi d acqua %d; indice %.0f KB; celle sotto un impalcato senza strada %d' % (
         len(tiles), {s: sum(1 for v in tiles.values() if v == s) for s in sorted(set(tiles.values()))}, peso / 1e6, len(decks), len(ind['pits']), len(acqua),
-        os.path.getsize(os.path.join(a.out, 'indice.json')) / 1024))
+        os.path.getsize(os.path.join(a.out, 'indice.json')) / 1024, sotto))
+    if not a.no_controlli:   # the checks of the water and the bridges on what the game reads (src/controlli_acqua.py)
+        ca.controlla(a.out, os.path.join(ROOT, 'brianza.json'), os.path.join(os.path.dirname(os.path.abspath(a.out)), 'report_acqua.json'))
 
 
 if __name__ == '__main__':

@@ -47,7 +47,8 @@ const H = (() => {
       if (Math.round(TSZ / st) + 1 !== n || b.length < 12 + 2 * n * n) throw new Error('misure sbagliate');
       for (let k = 0; k < n * n; k++) { const q = dv.getUint16(12 + 2 * k, true); y[k] = q === 65535 ? farH(x0 + (k % n) * st, z0 + Math.floor(k / n) * st) : (base * 100 + q) / 100 - B0; } // 65535: empty, the old ground
       const mo = 12 + 2 * n * n, m = b.length >= mo + (n - 1) * (n - 1) ? b.slice(mo, mo + (n - 1) * (n - 1)) : null;
-      FT[t] = { t, st, n, x0, z0, y, m, pc: pitCells(tx, tz, n - 1) }; LS[t] = 2;
+      let ud = null; if (m) for (let k = 0; k < m.length; k++) if (m[k] & 128) { if (!ud) ud = new Uint8Array(m.length); ud[k] = 1; m[k] &= 127; } // bit 7: a cell under a deck where S is no street (terreno_gioco.py): no street paint there
+      FT[t] = { t, st, n, x0, z0, y, m, ud, pc: pitCells(tx, tz, n - 1) }; LS[t] = 2;
       for (const f of onLoad) f(t);
     } catch (e) { LS[t] = 3; console.warn('terreno ' + tx + '_' + tz + ': ' + e.message + ' (resta il motore vecchio)'); }
   }
@@ -263,7 +264,7 @@ const H = (() => {
   // triangles as they are; the others take the polygon's triangles cut on them and joined again. With a rank (a surface layer of the tile,
   // H.own) the whole cells are left to the layer that owns them, which draws them in place of the ground, and the pieces on a cell owned
   // by a layer as high or higher are hidden under it. false when no tile of S is under the polygon
-  function clipPoly(outer, holes, emit, rank) {
+  function clipPoly(outer, holes, emit, rank, street) { // street: a street surface, not drawn on the cells under a deck where S is no street (F.ud)
     const rings = [outer, ...holes], [bx0, bz0, bx1, bz1] = bbox(outer), [ti0, tj0, ti1, tj1] = tileRange(bx0, bz0, bx1, bz1);
     let any = false; for (let tj = tj0; tj <= tj1 && !any; tj++) for (let ti = ti0; ti <= ti1; ti++) if (FT[ti + NX * tj]) { any = true; break; }
     if (!any) return false;
@@ -274,12 +275,13 @@ const H = (() => {
       if (!F) { for (const f of faces) { const Q = tidy(inT(f) ? f.map(q => all[q]) : square(f.map(q => all[q]), X0, Z0, X1, Z1)); if (Q) emit(Q, false); } continue; }
       const st = F.st, n = F.n, c = n - 1, mk = F.mk || (F.mk = new Uint8Array(c * c)), marked = [], Y = F.y, own = rank !== undefined ? F.own : null;
       markOutline(F, X0, Z0, rings, mk, marked);
+      const ud = street ? F.ud : null;
       if (!own) wholeCells(F, X0, Z0, rings, bz0, bz1, mk, w => {
-        const i = w % c, j = (w - i) / c, x = X0 + i * st, z = Z0 + j * st, k = j * n + i;
+        if (ud && ud[w]) return; const i = w % c, j = (w - i) / c, x = X0 + i * st, z = Z0 + j * st, k = j * n + i;
         emit([[x, z, Y[k]], [x + st, z, Y[k + 1]], [x + st, z + st, Y[k + n + 1]]], true); emit([[x, z, Y[k]], [x + st, z + st, Y[k + n + 1]], [x, z + st, Y[k + n]]], true);
       });
       const byKey = new Map(); // the cells on the outline: the polygon's triangles cut on them, then joined again cell triangle by cell triangle
-      for (const f of faces) { const Q = inT(f) ? f.map(q => all[q]) : square(f.map(q => all[q]), X0, Z0, X1, Z1); if (Q.length >= 3) overCells(F, Q, (P, key) => { if (own && own[key >> 1] >= rank) return; const l = byKey.get(key); if (l) l.push(P); else byKey.set(key, [P]); }, mk); }
+      for (const f of faces) { const Q = inT(f) ? f.map(q => all[q]) : square(f.map(q => all[q]), X0, Z0, X1, Z1); if (Q.length >= 3) overCells(F, Q, (P, key) => { if ((own && own[key >> 1] >= rank) || (ud && ud[key >> 1])) return; const l = byKey.get(key); if (l) l.push(P); else byKey.set(key, [P]); }, mk); }
       for (const [key, l] of byKey) { const J = l.length > 1 ? joinPieces(F, key, l) : null; for (const P of J || l) emit(P, true); }
       for (const w of marked) mk[w] = 0;
     }
@@ -402,6 +404,7 @@ const H = (() => {
     overFree(x, z, y) { for (const o of deckAt(x, z)) if (o.d.free && o.top > y) y = o.top; return y; },
     step, stepAt, clipPoly, clipTri, coverCells, cutLine, joinPieces, anyFine: () => !!TERRENO,
     anyFineIn(x0, z0, x1, z1) { const [i0, j0, i1, j1] = tileRange(x0, z0, x1, z1); for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (FT[i + NX * j]) return true; return false; }, // a tile of S under the box
+    ud(x, z) { const F = fineAt(x, z); if (!F || !F.ud) return 0; const n = F.n, i = clamp(Math.floor((x - F.x0) / F.st), 0, n - 2), j = clamp(Math.floor((z - F.z0) / F.st), 0, n - 2); return F.ud[j * (n - 1) + i]; }, // under a deck where S is no street (terreno_gioco.py)
     mat(x, z) { const F = fineAt(x, z); if (!F || !F.m) return 0; const n = F.n, i = clamp(Math.floor((x - F.x0) / F.st), 0, n - 2), j = clamp(Math.floor((z - F.z0) / F.st), 0, n - 2); return F.m[j * (n - 1) + i]; }, // material of the cell (1 asphalt ... 4 river bed)
     addStep(kind, h, o, k) { if (o.length < 3) return; const s = { kind, h, o, k: k || [], bb: bbox(o) }; STG.add(s.bb[0], s.bb[1], s.bb[2], s.bb[3], s); },
     surface(x, z, cy) {

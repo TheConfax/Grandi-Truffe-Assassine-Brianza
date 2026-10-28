@@ -1,0 +1,322 @@
+{
+ "A1": {
+  "velo_m2": 0.0,
+  "strisce_osm_m2": 9.6,
+  "aree_osm_m2": 0.0,
+  "totale_m2": 9.6,
+  "luoghi": [
+   {
+    "punti": 17,
+    "x": -686.2,
+    "z": 1804.2,
+    "link": "?x=-686.2&z=1804.2"
+   },
+   {
+    "punti": 14,
+    "x": -1751.8,
+    "z": -1473.8,
+    "link": "?x=-1751.8&z=-1473.8"
+   },
+   {
+    "punti": 6,
+    "x": 1065.8,
+    "z": -2204.8,
+    "link": "?x=1065.8&z=-2204.8"
+   },
+   {
+    "punti": 2,
+    "x": 993.2,
+    "z": -2400.2,
+    "link": "?x=993.2&z=-2400.2"
+   },
+   {
+    "punti": 1,
+    "x": 987.8,
+    "z": -2406.2,
+    "link": "?x=987.8&z=-2406.2"
+   },
+   {
+    "punti": 1,
+    "x": -413.2,
+    "z": -2388.8,
+    "link": "?x=-413.2&z=-2388.8"
+   },
+   {
+    "punti": 1,
+    "x": -1330.2,
+    "z": 1479.8,
+    "link": "?x=-1330.2&z=1479.8"
+   }
+  ],
+  "n_luoghi": 7
+ },
+ "A2": {
+  "punti": 10,
+  "m2": 2.5,
+  "abbassamento": {
+   "n": 10,
+   "p50": 1.086,
+   "p90": 1.142,
+   "p99": 1.202,
+   "max": 1.208
+  },
+  "luoghi": [
+   {
+    "punti": 10,
+    "x": -257.8,
+    "z": 687.8,
+    "v": 1.21,
+    "link": "?x=-257.8&z=687.8"
+   }
+  ],
+  "n_luoghi": 1,
+  "punti_controllati": 7574,
+  "bordo_punti": 51,
+  "bordo_luoghi": 11
+ },
+ "A3": {
+  "celle_sotto_impalcati_con_strada_disegnata": 385,
+  "dipinte": 0,
+  "m2": 0.0,
+  "impalcati": [],
+  "impalcati_prima_della_regola": [
+   4,
+   5,
+   6,
+   7,
+   8,
+   10,
+   17
+  ],
+  "celle_segnate_sotto_impalcato": 1012,
+  "luoghi": []
+ },
+ "A4": {
+  "ringhiere_m": 0,
+  "ringhiere_in_bosco_o_campagna_m": 0,
+  "bocche_di_tombino": 46,
+  "bocche_lontane_da_strade": 18,
+  "luoghi_bocche_lontane": [
+   {
+    "x": 333.0,
+    "z": -2415.7,
+    "link": "?x=333.0&z=-2415.7"
+   },
+   {
+    "x": 335.8,
+    "z": -2414.0,
+    "link": "?x=335.8&z=-2414.0"
+   },
+   {
+    "x": 785.4,
+    "z": -2252.9,
+    "link": "?x=785.4&z=-2252.9"
+   },
+   {
+    "x": 787.0,
+    "z": -2244.2,
+    "link": "?x=787.0&z=-2244.2"
+   },
+   {
+    "x": 787.3,
+    "z": -2230.3,
+    "link": "?x=787.3&z=-2230.3"
+   },
+   {
+    "x": 16.1,
+    "z": -1886.4,
+    "link": "?x=16.1&z=-1886.4"
+   },
+   {
+    "x": 19.3,
+    "z": -1885.3,
+    "link": "?x=19.3&z=-1885.3"
+   },
+   {
+    "x": 825.4,
+    "z": -1670.7,
+    "link": "?x=825.4&z=-1670.7"
+   },
+   {
+    "x": 440.0,
+    "z": -698.9,
+    "link": "?x=440.0&z=-698.9"
+   },
+   {
+    "x": 437.9,
+    "z": -685.7,
+    "link": "?x=437.9&z=-685.7"
+   },
+   {
+    "x": -1330.8,
+    "z": -161.7,
+    "link": "?x=-1330.8&z=-161.7"
+   },
+   {
+    "x": -1233.9,
+    "z": -2.8,
+    "link": "?x=-1233.9&z=-2.8"
+   }
+  ]
+ },
+ "A5": {
+  "metri_controllati": 10544,
+  "metri_lontani_dal_fondo": 274,
+  "sopra_il_fondo": {
+   "n": 136,
+   "p50": 1.338,
+   "p90": 2.565,
+   "p99": 5.913,
+   "max": 5.994
+  },
+  "luoghi": [
+   {
+    "punti": 21,
+    "x": -350.3,
+    "z": -2437.0,
+    "v": 5.99,
+    "link": "?x=-350.3&z=-2437.0"
+   },
+   {
+    "punti": 8,
+    "x": 234.4,
+    "z": -2532.4,
+    "v": 1.42,
+    "link": "?x=234.4&z=-2532.4"
+   },
+   {
+    "punti": 8,
+    "x": 824.3,
+    "z": -2093.7,
+    "v": 2.02,
+    "link": "?x=824.3&z=-2093.7"
+   },
+   {
+    "punti": 7,
+    "x": -67.0,
+    "z": -2391.8,
+    "v": 1.69,
+    "link": "?x=-67.0&z=-2391.8"
+   },
+   {
+    "punti": 7,
+    "x": 1.7,
+    "z": -1890.3,
+    "v": 2.39,
+    "link": "?x=1.7&z=-1890.3"
+   },
+   {
+    "punti": 6,
+    "x": -482.1,
+    "z": -2479.7,
+    "v": 1.35,
+    "link": "?x=-482.1&z=-2479.7"
+   },
+   {
+    "punti": 6,
+    "x": -20.3,
+    "z": -2309.7,
+    "v": 2.51,
+    "link": "?x=-20.3&z=-2309.7"
+   },
+   {
+    "punti": 6,
+    "x": 203.7,
+    "z": -2189.9,
+    "v": 1.61,
+    "link": "?x=203.7&z=-2189.9"
+   },
+   {
+    "punti": 5,
+    "x": -51.7,
+    "z": -2373.3,
+    "v": 1.23,
+    "link": "?x=-51.7&z=-2373.3"
+   },
+   {
+    "punti": 4,
+    "x": -411.6,
+    "z": -2387.2,
+    "v": 1.17,
+    "link": "?x=-411.6&z=-2387.2"
+   },
+   {
+    "punti": 4,
+    "x": 266.7,
+    "z": -2477.3,
+    "v": 1.26,
+    "link": "?x=266.7&z=-2477.3"
+   },
+   {
+    "punti": 4,
+    "x": -6.0,
+    "z": -2276.8,
+    "v": 1.6,
+    "link": "?x=-6.0&z=-2276.8"
+   }
+  ],
+  "n_luoghi": 38
+ },
+ "prove_fisse": [
+  {
+   "nome": "viale Francia, strada e ferrovia sul fiume",
+   "attese": "nessun punto di carreggiata o binario piu di 1 m sotto la strada intorno; S(216,-377) e S(222,-392) alla quota della via (Carlo: alveo a 26,1 e 28,1 m)",
+   "link": "?x=218.0&z=-388.0",
+   "punti_sfondati": 0,
+   "quote": [
+    {
+     "x": 216,
+     "z": -377,
+     "S": 221.2,
+     "strada_intorno": 221.76
+    },
+    {
+     "x": 222,
+     "z": -392,
+     "S": 222.22,
+     "strada_intorno": 221.97
+    }
+   ],
+   "ok": true
+  },
+  {
+   "nome": "via Maroncelli, carreggiata dipinta sotto il cavalcavia",
+   "attese": "nessuna cella di asfalto, marciapiede o piazza dipinta sul suolo sotto l impalcato",
+   "link": "?x=1412.5&z=472.5",
+   "celle_dipinte": 0,
+   "ok": true
+  },
+  {
+   "nome": "Campaccio, torrente a mezza costa",
+   "attese": "il torrente OSM entro 1 m dal fondo della valle del LiDAR; nessuna ringhiera; nessuna bocca di tombino lontana dalla strada",
+   "link": "?x=25.0&z=-1860.0",
+   "punti_lontani_dal_fondo": 10,
+   "bocche_lontane": 2,
+   "ringhiere_m": 0,
+   "ok": false
+  },
+  {
+   "nome": "via Varese al Campaccio, acqua sopra l incrocio",
+   "attese": "nessuna acqua disegnata sopra la carreggiata; nessuna bocca di tombino sulla carreggiata",
+   "link": "?x=565.0&z=-1737.5",
+   "punti_acqua_su_strada": 0,
+   "ok": true
+  }
+ ],
+ "sintesi": {
+  "acqua_sulle_strade_m2": 9.6,
+  "acqua_sulle_strade_luoghi": 7,
+  "strade_sfondate_punti": 10,
+  "strade_sfondate_luoghi": 1,
+  "strade_sfondate_bordo_punti": 51,
+  "dipinte_sotto_impalcati_celle": 0,
+  "dipinte_sotto_impalcati_ponti": 0,
+  "ringhiere_m": 0,
+  "ringhiere_in_bosco_m": 0,
+  "bocche_lontane_da_strade": 18,
+  "acqua_lontana_dal_fondo_m": 274,
+  "acqua_lontana_dal_fondo_luoghi": 38,
+  "prove_fisse_ok": "3 su 4",
+  "tempo_s": 57.9
+ }
+}

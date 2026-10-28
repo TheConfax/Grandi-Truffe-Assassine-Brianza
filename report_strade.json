@@ -471,7 +471,7 @@
    "vms": 48,
    "cic": 25
   },
-  "tempo_s": 2.3,
+  "tempo_s": 2.8,
   "anelli_osm": {
    "n": 3,
    "dove": [
@@ -526,7 +526,7 @@
   "piazze_m2": 44081,
   "vialetti_m2": 31976,
   "isole_m2": 15408,
-  "tempo_s": 33.2,
+  "tempo_s": 28.0,
   "cortili_nei_cantieri_m2": 14143
  },
  "muri_doppi_fusi": {
@@ -1370,6 +1370,6 @@
   "attraversamenti": {
    "n": 497
   },
-  "tempo_s": 4.2
+  "tempo_s": 3.9
  }
 }

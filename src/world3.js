@@ -336,8 +336,13 @@ for (const td of D.tiles) for (const r of td.rl || []) {
     }
   }
 }
+// the railing along the OSM rivers (and its collision) and the parapet over a culvert mouth were made up by the game: in a tile of S the
+// banks are the ground (earth and grass, src/superficie.py acque) and the walls and fences the DBGT's and OSM's barriers (Carlo, 25/10: "nella
+// foresta mica ha i guardrail il fiume"). RIVER_RAIL = false: only the old tiles (no .bin) keep them, with their vertical cut
+const RIVER_RAIL = false;
 for (const td of D.tiles) for (const r of td.rv || []) {
   const pts = dec(r.p), W = r.w + 0.25;
+  if (!RIVER_RAIL && pts.length && H.has(tileOf(pts[0][0], pts[0][1]))) continue;
   for (let k = 1; k < pts.length; k++) {
     const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
     const nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L;
@@ -684,7 +689,7 @@ function clipFill(b, outer, holes, y, vScale, col) {
     const i0 = b.p.length / 3;
     for (let k = 0; k < P.length; k++) { const x = P[k][0], z = P[k][1]; let yy = y; if (fine) { yy += b.free ? H.overFree(x, z, P[k][2]) : P[k][2]; ab[i0 + k] = 1; } vtx(b, x, yy, z, 0, 1, 0, x / vScale, z / vScale, col); }
     for (let k = 1; k < P.length - 1; k++) triUp(b, i0, i0 + k, i0 + k + 1);
-  }, b.rk);
+  }, b.rk, b.street);
 }
 // a draped buffer before it becomes a mesh: in a tile of S every triangle (strips, ribbons, quads, discs) is cut on the cells and lies on S,
 // its attributes interpolated, its relative height kept; elsewhere, and for vertical faces, each vertex goes hf(x, z) up as before
@@ -722,6 +727,7 @@ function clipDrape(b, hf, ro, mat) {
     for (const [Q, f, F, key] of pieces) {
       if (!f) { const q0 = put([a, c, d, den], Q, null); for (let k = 1; k < Q.length - 1; k++) o.i.push(q0, q0 + k, q0 + k + 1); continue; }
       if (hide && F.own && F.own[key >> 1] > ro) continue;
+      if (b.street && F.ud && F.ud[key >> 1]) continue; // the paint of a street under a deck where S is no street (fiumi-ponti)
       if (sig === null) { const g = []; for (const [A, s, o0, m] of attrs) for (let e = o0; e < o0 + m; e++) { const va = A[a * s + e], vc = A[c * s + e], vd = A[d * s + e], gx = ((cz - dz) * (va - vd) + (dz - az) * (vc - vd)) / den, gz = ((dx - cx) * (va - vd) + (ax - dx) * (vc - vd)) / den; g.push(Math.round(gx * 1e4), Math.round(gz * 1e4), Math.round((vd - gx * (dx - F.x0) - gz * (dz - F.z0)) * 1e3)); } sig = g.join(','); }
       const gk = F.t + ':' + key + ':' + sig, l = groups.get(gk); if (l) l.p.push(Q); else groups.set(gk, { F, key, src: [a, c, d, den], p: [Q] });
     }
@@ -739,6 +745,7 @@ function kerbRing(b, ring, h, yf, flip) {
   const A = sArea(ring);
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02) continue;
+    if (H.ud((a[0] + c[0]) / 2, (a[1] + c[1]) / 2)) continue; // under a deck where S is no street: no kerb there
     let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (flip !== undefined && (A < 0) !== flip) { nx = -nx; nz = -nz; }
     const pts = H.cutLine(a[0], a[1], c[0], c[1], yf), keepP = [pts[0]];
     if (pts.length > 2) { // Douglas-Peucker on the profile, 1 cm
@@ -1034,7 +1041,7 @@ function cellOwners(T, F) {
   const underFree = w => { if (!uf[w]) { const i = w % c, j = (w - i) / c; let f = false; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x = F.x0 + (i + a) * F.st, z = F.z0 + (j + b) * F.st; if (H.overFree(x, z, H.base(x, z)) > H.base(x, z) + 0.01) f = true; } uf[w] = f ? 1 : 2; } return uf[w] === 1; };
   const S = (k, m, vs, col) => { const key = k + (col ? col.getHexString() : ''); return STY[key] || (STY[key] = { m, vs, col: col || null }); };
   const lay = T.layers = []; // [outer, holes, rank, look]: the look of a cell a ramp takes (pitLook)
-  const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && underFree(w))) return; own[w] = rank; sty[w] = st; }); };
+  const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && (underFree(w) || (F.ud && F.ud[w])))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
     if (a.t === 18) cover(outer, holes, 1, S('i', MAT.incoltoS, 12)); // incolti (DBGT PS_INC 04): dry grass and bare earth
@@ -1044,7 +1051,7 @@ function cellOwners(T, F) {
     else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
-  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('c', MAT.cortileS, 10)); // yards and drives of the DBGT (AC_VEI 0307)
+  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('c', MAT.cortileS, 10), true); // yards and drives of the DBGT (AC_VEI 0307)
   for (const q of d.sf || []) cover(dec(q.p), q.k.map(dec), 1.3, S('b', MAT.gravelS, 3)); // the rail bed of the DBGT (SD_FER a raso)
   for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, S('f', MAT.footS, 4), true);
   for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, S('a', MAT.asphS, 9), true);
@@ -1123,7 +1130,7 @@ function* buildTileGen(T) {
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
-    const cB = FBuf(); cB.rk = 1.2; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 10); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): their own paving, no traffic
+    const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 10); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): their own paving, no traffic
     const sB = FBuf(); sB.rk = 1.3; for (const q of d.sf || []) { try { polyFill(sB, dec(q.p), q.k.map(dec), 0.03 * fy, 3); } catch (e) { } } // the rail bed (DBGT SD_FER)
     { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
@@ -1135,9 +1142,9 @@ function* buildTileGen(T) {
         const nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L;
         if (T.fine) { // new engine: the bed and the banks are in S, the water is drawn below at its level zw; the railing follows the bank
           const bedNear = [[0, 0], [0.5, 0], [-0.5, 0], [0, 1]].some(([f, g]) => { const x = (a[0] + c[0]) / 2 + nx * r.w * f + (c[0] - a[0]) * g / 2, z = (a[1] + c[1]) / 2 + nz * r.w * f + (c[1] - a[1]) * g / 2; return H.mat(x, z) === 4; });
-          if (!bedNear) { const wa = H.water(a[0], a[1]), wc = H.water(c[0], c[1]); // an OSM river with no bed in S (outside the DBGT): the strip between its banks at H.water, as in phase 4
+          if (!bedNear && !onAnyRoad((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, r.w)) { const wa = H.water(a[0], a[1]), wc = H.water(c[0], c[1]); // an OSM river with no bed in S (where src/superficie.py could not dig one): the strip between its banks at H.water, as in phase 4; never on a street
             if (wa !== null && wc !== null) { const i0 = rv.p.length / 3; vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0); triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3); } }
-          for (const sd of [1, -1]) {
+          if (RIVER_RAIL) for (const sd of [1, -1]) {
             const ax = a[0] + nx * r.w * sd, az = a[1] + nz * r.w * sd, cx = c[0] + nx * r.w * sd, cz = c[1] + nz * r.w * sd, ya = H.ground(ax, az), yc = H.ground(cx, cz);
             if (!onAnyRoad((ax + cx) / 2, (az + cz) / 2, 1.5) && !inWater((ax + cx) / 2, (az + cz) / 2, (ya + yc) / 2)) { const r0 = rail.p.length / 3; vtx(rail, ax, ya + 0.75, az, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 0.75, cz, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 1.05, cz, nx, 0, nz, 0, 0); vtx(rail, ax, ya + 1.05, az, nx, 0, nz, 0, 0); rail.i.push(r0, r0 + 1, r0 + 2, r0, r0 + 2, r0 + 3); }
           }
@@ -1190,7 +1197,7 @@ function* buildTileGen(T) {
           quadV(head, E[0] - nx * W, E[1] - nz * W, E[0] + nx * W, E[1] + nz * W, lo - 0.5, top + 0.25, ux, uz);
           const ow = r.w * 0.78, mh = Math.min(1.5, top - wy - 0.3), mx = E[0] + ux * 0.03, mz = E[1] + uz * 0.03;
           if (mh > 0.25) quadV(mouth, mx - nx * ow, mz - nz * ow, mx + nx * ow, mz + nz * ow, wy, wy + mh, ux, uz);
-          const par = new THREE.Mesh(boxG(2 * W + 0.3, 0.8, 0.3), lam(0xa9a397)); par.position.set(E[0] - ux * 0.15, top + 0.4 + 0.25, E[1] - uz * 0.15); par.rotation.y = Math.atan2(-nz, nx); par.castShadow = true; G.add(par);
+          if (RIVER_RAIL) { const par = new THREE.Mesh(boxG(2 * W + 0.3, 0.8, 0.3), lam(0xa9a397)); par.position.set(E[0] - ux * 0.15, top + 0.4 + 0.25, E[1] - uz * 0.15); par.rotation.y = Math.atan2(-nz, nx); par.castShadow = true; G.add(par); } // the slab over the mouth lay across the junction of via Varese (x 563 z -1738)
           continue;
         }
         quadV(head, E[0] - nx * W, E[1] - nz * W, E[0] + nx * W, E[1] + nz * W, g - RIV_D - 0.2, g + 0.25, ux, uz);
@@ -1208,7 +1215,7 @@ function* buildTileGen(T) {
   yield 'streets';
   // street surfaces
   {
-    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; por.rk = 5.1; foot.rk = 3;
+    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; por.rk = 5.1; foot.rk = 3; asp.street = por.street = foot.street = sw.street = mark.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
     const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
     fill(d.as, asp, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fill(d.pz, por, 0.06 * fy, 4); fill(d.ft, foot, 0.045 * fy, 4);
