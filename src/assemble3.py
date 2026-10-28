@@ -253,7 +253,7 @@ rep("$('street').textContent = (st || 'Meda') + (TER ? ` · ${Math.round(TER.bas
 rep("const spot = D.pois.find(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')) || { x: 0, z: 0 };",
     "const cands = D.pois.filter(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')), spot = cands.sort((a, b) => hyp(a.x - P.x, a.z - P.z) - hyp(b.x - P.x, b.z - P.z))[0] || STATION;")
 rep("banner(kind === 'busted' ? 'Polizia Locale' : 'Stazione di Meda', 'DI NUOVO IN STRADA');", "banner(spot.n || 'Meda', 'DI NUOVO IN STRADA');")
-rep("const STATION = D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0 };", "const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };\nconst START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && Math.abs(x) < META.hw && Math.abs(z) < META.hh) return { x, z, n: 'Punto' }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */")
+rep("const STATION = D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0 };", "const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };\nconst START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && Math.abs(x) < META.hw && Math.abs(z) < META.hh) return { x, z, n: 'Punto', piedi: q.has('piedi') }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */")
 rep("""function setupWorld(saved) {
   spawnParked();""", """function setupWorld(saved) {
   tileTick(STATION.x, STATION.z, 0, 420);
@@ -609,10 +609,11 @@ rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePe
     "    for (const v of VEH.slice()) if (v !== mine && hyp(v.x - q0[0], v.z - q0[1]) < 7) v.remove();\n"
     "    mine.x = q0[0]; mine.z = q0[1]; mine.h = h2; P.x = mine.x + Math.cos(h2) * 2.4; P.z = mine.z - Math.sin(h2) * 2.4; P.h = h2;\n"
     "    tileTick(START.x, START.z, 0, 420); for (const T of TILES) T.dist = hyp(T.cx - START.x, T.cz - START.z);\n"
+    "    if (START.piedi) { P.x = START.x; P.z = START.z; } /* &piedi: on foot at the exact point, the car stays on the nearest lane */\n"
     "    P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync();\n"
     "  }\n}")
 rep("function startGame() {\n  if (running) return; running = true;",
-    "function startGame() {\n  if (running) return; running = true; if (START !== STATION) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car */")
+    "function startGame() {\n  if (running) return; running = true; if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */")
 # ---- jumps (Carlo, 25/10: "the car is glued to the ground"): every car on its wheels follows the ground as before, and a ballistic shadow of it
 # rides the bed (S and the decks, without kerbs, sidewalks and bumps). Where the bed drops away faster than gravity can follow (v^2/R > g on
 # a crest, the top of a ramp taken fast) the shadow lifts; once it would rise more than JUMP_MIN above the bed the car takes off with its

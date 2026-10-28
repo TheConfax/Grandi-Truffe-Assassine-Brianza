@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 2417c87 · assemblato 28/10 20:01 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo d979ae5 · assemblato 28/10 20:15 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -7805,7 +7805,7 @@ function updHud(dt) {
 
 // ---------------------------------------------------------------- boot
 const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };
-const START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && Math.abs(x) < META.hw && Math.abs(z) < META.hh) return { x, z, n: 'Punto' }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */
+const START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && Math.abs(x) < META.hw && Math.abs(z) < META.hh) return { x, z, n: 'Punto', piedi: q.has('piedi') }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */
 function startSpot() { // the parking on via Yuri Gagarin in Meda, facing the fountain
   const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
   const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
@@ -7829,6 +7829,7 @@ function setupWorld(saved) {
     for (const v of VEH.slice()) if (v !== mine && hyp(v.x - q0[0], v.z - q0[1]) < 7) v.remove();
     mine.x = q0[0]; mine.z = q0[1]; mine.h = h2; P.x = mine.x + Math.cos(h2) * 2.4; P.z = mine.z - Math.sin(h2) * 2.4; P.h = h2;
     tileTick(START.x, START.z, 0, 420); for (const T of TILES) T.dist = hyp(T.cx - START.x, T.cz - START.z);
+    if (START.piedi) { P.x = START.x; P.z = START.z; } /* &piedi: on foot at the exact point, the car stays on the nearest lane */
     P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync();
   }
 }
@@ -7874,7 +7875,7 @@ function frame(t) {
   if (ipol) interpEnd(ipol);
 }
 function startGame() {
-  if (running) return; running = true; if (START !== STATION) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
+  if (running) return; running = true; if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
   camInit = false; banner('Via Yuri Gagarin', 'MEDA'); setTimeout(() => { if (P.mode === 'foot') toast('Entra nella Ferari! (' + (GP.seen ? (GP.ps ? '△' : 'Y') : 'F') + ')'); }, 1600);
 }
 $('go').addEventListener('click', startGame);
