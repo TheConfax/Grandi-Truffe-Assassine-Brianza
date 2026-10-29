@@ -8,10 +8,15 @@ Regole generali, uguali per ogni comune e per ogni settore della mappa grande: n
      (c) il posto la conferma (stop, precedenza e rotatoria prima di un incrocio, indicazione di attraversamento vicino a uno di OSM),
      (d) un altro riconoscimento della stessa classe sta entro CONF_R_* (lo stesso oggetto visto da un altro passaggio) o, per lampioni e
      pali, c'e' un altro lampione/palo in fila entro 60-80 m (le file regolari non sono errori del riconoscitore), per i semafori ce ne sono
-     altri entro 40 m o uno di OSM.
+     altri entro 40 m o uno di OSM. I CARTELLI dal 29/10 (regola piu' larga, Carlo) entrano anche con un solo riconoscimento ('una_vista'): restano
+     tutte le altre regole (tipo noto, via giusta, bordo, verso, niente doppioni con OSM, niente carreggiata, edifici, muri, lotti privati, alberi).
   3. L'aggancio: il cartello sta sulla via giusta (entro larghezza/2 + SNAP_MAX m dall'asse e con la direzione della via coerente con
      quella del cartello), sul bordo della carreggiata, a destra di chi guida nel verso a cui parla, salvo dove Mapillary lo mette
      chiaramente sull'altro bordo. Gli altri oggetti, se cadono in carreggiata, si portano fuori col suo bordo; dentro un edificio no.
+  3b. Il posto e' pubblico e libero (Carlo, 29/10): un oggetto non sta in un lotto privato (dentro un cortile del DBGT, AC_VEI 0307, o oltre un
+     muro, una recinzione o una siepe rispetto alla via piu' vicina, a piu' di PRIV_BORDO m dal bordo della carreggiata) ne' nella chioma o nel tronco di
+     un albero (ALBERO_MIN, o 0.7 volte il raggio della chioma dove il DBGT la da'): un cartello scivola lungo la via fino a un posto libero, gli altri
+     oggetti si scartano.
   4. I doppioni: con OSM (stesso tipo vicino) e fra riconoscimenti di Mapillary stesso: uno solo. Fra OSM e Mapillary in contrasto vince OSM.
 Direzione: aligned_direction e' il verso in cui guarda la faccia del cartello; chi guida va nel verso opposto (verificato su 464 cartelli
 vicini a una via: nel 79% di quelli lontani dall'asse il cartello sta a destra di chi guida cosi')."""
@@ -47,6 +52,8 @@ FILA = (8.0, 60.0)    # un altro lampione fra 8 e 60 m
 FILA_PALI = 80.0
 SNAP_MAX = 8.0        # il cartello entro larghezza/2 + 8 m dall'asse della via
 ALLINEA = 0.6         # |coseno| minimo fra la faccia del cartello e la via
+PRIV_BORDO = 1.0       # un muro entro 1 m dal bordo della carreggiata e' il bordo del marciapiede, non un lotto privato
+ALBERO_MIN = 0.9       # raggio minimo attorno a un tronco (m); senza chioma nota 1.2 m
 DOPPIO_SEGNALE = 10.0 # un cartello di OSM dello stesso tipo entro 10 m (e verso simile) e' lo stesso
 DOPPIO_OGGETTO = 4.0
 DOPPIO_MLY = 12.0     # lo stesso cartello visto da piu' passaggi: stesso tipo, stesso verso, entro 12 m
@@ -77,10 +84,10 @@ def _vers(c):  # unit vector (dx, dz) of a compass bearing (north is -z)
     th = math.radians(c); return math.sin(th), -math.cos(th)
 
 
-def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps, ogg, OGG, osm_semafori, incroci, attraversamenti, barriere, near_street, fuori, log=print):
+def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps, ogg, OGG, osm_semafori, incroci, attraversamenti, barriere, near_street, fuori, log=print, cortili=None, alberi=None):
     """segs, segtree: i tratti di via (LineString di due punti, r) come _segs di build_data.py; STR: dbgt_strade.Strade o None; edifici: i
     poligoni degli edifici; osm_segn: i cartelli di OSM del gioco (segnaletica.json); lamps [[x, z]]; ogg le righe 'og' gia' fatte;
-    osm_semafori [(x, z)]; incroci [(ref, (x, z))] i nodi con 3 o piu' vie; attraversamenti [(x, z)] quelli di OSM; barriere [[(x, z), ...]] muri, recinzioni e siepi; near_street(p, face=) -> (angolo, via); fuori(p) -> (p, spostato).
+    osm_semafori [(x, z)]; incroci [(ref, (x, z))] i nodi con 3 o piu' vie; attraversamenti [(x, z)] quelli di OSM; barriere [[(x, z), ...]] muri, recinzioni e siepi; cortili: i poligoni (shapely) dei cortili privati del DBGT; alberi: [(x, z[, altezza, chioma])]; near_street(p, face=) -> (angolo, via); fuori(p) -> (p, spostato).
     Restituisce dict(sm=[[tipo, x, z, dx, dz, extra]], lp=[[x, z]], og=[[kind, x, z, ang, extra]], sf=[ref dei semafori nuovi], rep=report)"""
     O = _carica(data_dir, proj, inside); rep = collections.OrderedDict(); rep['oggetti_nel_riquadro'] = len(O)
     if not O: return dict(sm=[], lp=[], og=[], sf=[], rep=rep)
@@ -106,6 +113,34 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
         return False
     def strade_vicine(x, z, R):
         P = Point(x, z); return [segs[i] for i in segtree.query(P.buffer(R))]
+    cort = [g for g in (cortili or []) if g is not None and not g.is_empty]; ctree = STRtree(cort) if cort else None
+    TA = [tuple(a) for a in (alberi or [])]; atree = STRtree([Point(a[0], a[1]) for a in TA]) if TA else None
+    def in_albero(x, z):  # nel tronco o nella chioma (0.7 del raggio) di un albero
+        if atree is None: return False
+        P = Point(x, z)
+        for i in atree.query(P.buffer(6)):
+            a = TA[i]; r = max(ALBERO_MIN, 0.7 * a[3] / 2) if len(a) >= 4 and a[3] else 1.2
+            if len(a) >= 3 and a[2] and a[2] < 2.0: r = 0.6  # un alberello: solo il tronco
+            if math.hypot(a[0] - x, a[1] - z) < r: return True
+        return False
+    def privato(x, z):  # dentro un cortile privato, o dietro un muro/recinzione/siepe rispetto alla via piu' vicina
+        P = Point(x, z)
+        if ctree is not None and any(cort[i].contains(P) for i in ctree.query(P)): return True
+        if btree is None: return False
+        best = None
+        for L, r in strade_vicine(x, z, 40):
+            if r['c'] > 5 or r.get('tunnel'): continue
+            d = L.distance(P)
+            if best is None or d < best[0]: best = (d, L, r)
+        if best is None: return False
+        d, L, r = best; c = L.interpolate(L.project(P)); S = LineString([(c.x, c.y), (x, z)])
+        if S.length < 0.3: return False
+        for i in btree.query(S):
+            X = bl[i].intersection(S)
+            if X.is_empty: continue
+            for pt in (X.geoms if hasattr(X, 'geoms') else [X]):
+                if pt.geom_type == 'Point' and L.distance(pt) > r['w'] / 2 + PRIV_BORDO: return True
+        return False
 
     # ------------------------------------------------------------- (a) cartelli
     sc = collections.Counter(); senza_modello = collections.Counter(); conf = collections.Counter()
@@ -128,8 +163,7 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
         if o['v'] not in SEGNALI: senza_modello[o['v']] += 1; sc['tipo senza modello'] += 1; continue
         if o['a'] is None: sc['senza direzione'] += 1; continue
         vic = [p for p in classi[o['v']] if p is not o and math.hypot(p['x'] - o['x'], p['z'] - o['z']) < CONF_R_SEGNALE]
-        c = _conferma(o, vic) or contesto(o)
-        if c is None: sc['non confermato (un solo riconoscimento, vecchio, solo)'] += 1; continue
+        c = _conferma(o, vic) or contesto(o) or 'una_vista'  # dal 29/10 anche un solo riconoscimento (decisione di Carlo): contano le altre regole
         conf[c] += 1; o['k'], o['e'] = SEGNALI[o['v']]; o['c'] = c; cand.append(o)
     # doppioni fra riconoscimenti: stesso tipo (e stesso extra), entro 5 m e orientamento simile: uno, il piu' recente
     cand.sort(key=lambda o: o['u'], reverse=True); tenuti = []
@@ -168,7 +202,7 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
                 if fam and s[0] in FAMIGLIE and FAMIGLIE[s[0]] == fam and dd < 20 and stessa_dir and not uguale: skip = 'in contrasto con OSM (vince OSM)'; break
         if skip: sc[skip] += 1; continue
         # il posto: sul bordo, 0.9 m oltre, libero da altre vie e da edifici; se no, qualche metro piu' avanti o indietro
-        ok = None
+        ok = None; primo = None
         for sh in SPOSTI:
             qx, qz = c0.x + dx * sh, c0.y + dz * sh
             off = 0.5
@@ -176,9 +210,13 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
             if off >= hw + 6: continue
             off += 0.9; px, pz = qx + side * rn[0] * off, qz + side * rn[1] * off
             if in_carreggiata(px, pz) or in_edificio(px, pz, 0.4) or su_barriera(px, pz) or not inside((px, pz), 0): continue
+            if in_albero(px, pz): primo = primo or 'albero'; continue
+            if privato(px, pz): primo = primo or 'privato'; continue
             if any(math.hypot(s_[1] - px, s_[2] - pz) < SEPARA for s_ in sm): continue
+            if any(p_[0] == o['k'] and math.hypot(p_[1] - px, p_[2] - pz) < DOPPIO_SEGNALE and ((not (p_[3] or p_[4])) or p_[3] * dx + p_[4] * dz > 0.3) and (o['k'] != 'limite' or p_[5] == o['e']) for p_ in osm_segn): continue  # scivolando lungo la via non diventa il doppione di un cartello di OSM
             ok = (px, pz); break
-        if ok is None: sc['nessun posto libero sul bordo'] += 1; continue
+        if ok is None: sc['nessun posto libero sul bordo' + (' (%s)' % primo if primo else '')] += 1; continue
+        if primo: sc['spostato (era %s)' % ('dentro un albero' if primo == 'albero' else 'in un lotto privato')] += 1
         sm.append([o['k'], round(ok[0], 1), round(ok[1], 1), round(dx, 3), round(dz, 3)] + ([o['e']] if o['e'] is not None else []))
     rep['cartelli'] = dict(entrano=len(sm), per_tipo=dict(collections.Counter(s[0] for s in sm)), conferma=dict(conf), scartati=dict(sc),
                            senza_modello_prime=dict(senza_modello.most_common(12)), senza_modello_totale=sum(senza_modello.values()))
@@ -190,6 +228,7 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
     rep['cartelli']['sulla_carreggiata'] = sum(1 for s in sm if in_carreggiata(s[1], s[2]))
     rep['cartelli']['dentro_un_edificio'] = sum(1 for s in sm if in_edificio(s[1], s[2], 0.0))
     rep['cartelli']['su_una_barriera'] = sum(1 for s in sm if su_barriera(s[1], s[2], 0.3))
+    rep['cartelli']['in_lotto_privato'] = sum(1 for s in sm if privato(s[1], s[2])); rep['cartelli']['dentro_un_albero'] = sum(1 for s in sm if in_albero(s[1], s[2]))
 
     # ------------------------------------------------------------- (b) lampioni, semafori, pali, cestini
     def porta_fuori(o, sc_):
@@ -202,6 +241,8 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
         if in_carreggiata(*p): sc_['in carreggiata'] += 1; return None
         if in_edificio(*p, 0.3): sc_['dentro un edificio'] += 1; return None
         if su_barriera(*p, 0.3): sc_['su un muro o una recinzione'] += 1; return None
+        if in_albero(*p): sc_['dentro un albero (tronco o chioma)'] += 1; return None
+        if privato(*p): sc_['in un lotto privato (cortile o oltre un muro)'] += 1; return None
         if not inside(p, 0): return None
         return p
     def dedup(lista, R):  # un solo riconoscimento per posto (il piu' recente)
@@ -267,6 +308,7 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
             og_new.append([OGG.index(kind), int(round(p[0] * 10)), int(round(p[1] * 10)), round(ang, 2), 9.0 if kind == 'palo' else 0]); per[kind] += 1
     rep['altri_oggetti'] = dict(entrano=len(og_new), per_tipo=dict(per), scartati=dict(sco))
     rep['lampioni']['sulla_carreggiata'] = sum(1 for p in lpn if in_carreggiata(*p))
+    rep['lampioni']['in_lotto_privato_o_albero'] = sum(1 for p in lpn if privato(*p) or in_albero(*p)); rep['altri_oggetti']['in_lotto_privato_o_albero'] = sum(1 for r_ in og_new if privato(r_[1] / 10, r_[2] / 10) or in_albero(r_[1] / 10, r_[2] / 10))
     rep['altri_oggetti']['sulla_carreggiata'] = sum(1 for r_ in og_new if in_carreggiata(r_[1] / 10, r_[2] / 10))
     rep['altri_oggetti']['su_una_barriera'] = sum(1 for r_ in og_new if su_barriera(r_[1] / 10, r_[2] / 10, 0.3)); rep['lampioni']['su_una_barriera'] = sum(1 for p in lpn if su_barriera(p[0], p[1], 0.3))
     log('MAPILLARY cartelli', rep['cartelli']['entrano'], rep['cartelli']['per_tipo'], 'scartati', rep['cartelli']['scartati'], 'doppioni con OSM', dop, 'in carreggiata', rep['cartelli']['sulla_carreggiata'])
