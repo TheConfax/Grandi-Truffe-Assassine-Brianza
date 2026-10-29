@@ -3789,9 +3789,9 @@
   "libero_oltre_3m_ha": 1.18
  },
  "cantieri_osm": {
-  "m2": 87844,
+  "m2": 87616,
   "pezzi_dbgt_ritagliati": {
-   "aree": 63,
+   "aree": 62,
    "terreni": 5
   }
  },
@@ -3810,7 +3810,7 @@
    "piscina": 2
   },
   "dbgt_pezzi_per_tipo": {
-   "1": 3322,
+   "1": 3321,
    "3": 29,
    "6": 12,
    "11": 284,

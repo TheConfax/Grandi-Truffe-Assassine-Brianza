@@ -80,7 +80,7 @@ function buildPlatforms(T, G) {
     const [cx, cz] = centroid(P.o), st = PLAT_STATIONS.slice().sort((p, q) => hyp(p.x - cx, p.z - cz) - hyp(q.x - cx, q.z - cz))[0];
     if (!st || hyp(st.x - cx, st.z - cz) > 220) continue;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P.o) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
-    const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), proj = P.o.map(([x, z]) => (x - cx) * ux + (z - cz) * uz), s0 = Math.min(...proj) + 2, s1 = Math.max(...proj) - 2;
+    const ang = alignRowAxis(P, 0.5 * Math.atan2(2 * sxz, sxx - szz)), ux = Math.cos(ang), uz = Math.sin(ang), proj = P.o.map(([x, z]) => (x - cx) * ux + (z - cz) * uz), s0 = Math.min(...proj) + 2, s1 = Math.max(...proj) - 2;
     const name = (st.n || '').replace(/^Stazione di /, '').toUpperCase(), ry = Math.atan2(-uz, ux);
     const at = (s, v) => [cx + ux * s - uz * v, cz + uz * s + ux * v];
     let lastPost = null, stairs = false;
@@ -124,6 +124,78 @@ function buildPlatforms(T, G) {
 // roads) or a building; one yellow stall with the wheelchair per row of eight or more; T.stalls keeps every stall for the parked cars (parkTile);
 // on the bigger car parks lamp posts down the middle, a parking meter and the blue P sign
 const PSIGN_PROP = new Map(); /* the P plates already given a prop, by place: a rebuilt tile keeps the fallen ones fallen */
+/* smoothed car park rows: the axis follows the longest straight edge of the lot (kerb), not the principal axis; the rows of a run share one depth line,
+   and a stall with a corner on the pavement, a bed, a wall or outside the lot is dropped, not bent */
+function alignRowAxis(P, pca) {
+  let best = 0, bl = 0; const E = [];
+  for (let i = 0; i < P.length; i++) { const A = P[i], C = P[(i + 1) % P.length], L = hyp(C[0] - A[0], C[1] - A[1]); if (L < 6) continue; const a = Math.atan2(C[1] - A[1], C[0] - A[0]); E.push([a, L]); if (L > bl) { bl = L; best = a; } }
+  if (!bl) return pca;
+  let sx = 0, sz = 0; for (const [a, L] of E) { let d = a - best; d -= Math.round(d / (Math.PI / 2)) * (Math.PI / 2); if (Math.abs(d) < 0.09) { sx += Math.cos(4 * a) * L; sz += Math.sin(4 * a) * L; } } /* edges within 5 degrees of the longest one, modulo 90 degrees */
+  const m = Math.atan2(sz, sx) / 4; let d = m - pca; d -= Math.round(d / (Math.PI / 2)) * (Math.PI / 2);
+  return Math.abs(d) < 0.6 ? pca + d : pca; /* a lot whose edges are far from its long axis keeps it */
+}
+/* comb rows: one row of stalls leaning on each long straight side of the lot (nose to the inside), then a 6 m aisle and, on the longest side, double
+   rows back to back, parallel to it, aisle, and so on. Rows of other sides never overlap a stall or an aisle of another side: what would touch is dropped. */
+function lotSides(P) {
+  const n = P.length, ang = i => Math.atan2(P[(i + 1) % n][1] - P[i][1], P[(i + 1) % n][0] - P[i][0]), turn = i => { let d = ang(i) - ang((i + n - 1) % n); d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI; return Math.abs(d); };
+  let st = -1; for (let i = 0; i < n; i++) if (turn(i) > 0.07) { st = i; break; } if (st < 0) return [];
+  const out = []; let cur = null;
+  for (let k = 0; k < n; k++) { const i = (st + k) % n; let d = cur ? ang(i) - cur.ang : 0; d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI; if (!cur || Math.abs(d) > 0.12) { cur = { a: P[i], b: P[(i + 1) % n], ang: ang(i) }; out.push(cur); } else cur.b = P[(i + 1) % n]; }
+  return out.map(e => ({ a: e.a, b: e.b, L: hyp(e.b[0] - e.a[0], e.b[1] - e.a[1]) })).filter(e => e.L >= 10).sort((p, q) => q.L - p.L);
+}
+function rectHit(A, B) { /* oriented rects {x,z,ux,uz,hl,hd}: separating axis */
+  for (const R of [A, B]) for (const [ax, az] of [[R.ux, R.uz], [-R.uz, R.ux]]) {
+    const ra = A.hl * Math.abs(A.ux * ax + A.uz * az) + A.hd * Math.abs(-A.uz * ax + A.ux * az), rb = B.hl * Math.abs(B.ux * ax + B.uz * az) + B.hd * Math.abs(-B.uz * ax + B.ux * az);
+    if (Math.abs((B.x - A.x) * ax + (B.z - A.z) * az) > ra + rb - 0.02) return false;
+  }
+  return true;
+}
+function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; returns runs of {s,v0,v1,x,z,h,o} */
+  const sides = lotSides(P), runs = [], placed = []; if (!sides.length) return runs;
+  sides.forEach((sd, g) => {
+    let ux = (sd.b[0] - sd.a[0]) / sd.L, uz = (sd.b[1] - sd.a[1]) / sd.L; const mx = (sd.a[0] + sd.b[0]) / 2, mz = (sd.a[1] + sd.b[1]) / 2;
+    if (inPoly(mx - uz * 1.5, mz + ux * 1.5, P)) { /* (-uz, ux) is the inside */ } else if (inPoly(mx + uz * 1.5, mz - ux * 1.5, P)) { ux = -ux; uz = -uz; } else return;
+    const o = { x: 0, z: 0, ux, uz, nx: -uz, nz: ux };
+    /* origin at the start of the side in the direction u */
+    const fwd = (sd.b[0] - sd.a[0]) * ux + (sd.b[1] - sd.a[1]) * uz > 0, O = fwd ? sd.a : sd.b; o.x = O[0]; o.z = O[1];
+    const bands = []; /* [v0, v1, nose sign] */
+    bands.push([0.2, 5, 1]);
+    if (g === 0) for (let v = 11; v < 70; v += 15.6) bands.push([v, v + 4.8, -1], [v + 4.8, v + 9.6, 1]);
+    for (const [v0, v1, sg] of bands) {
+      let run = []; const ext = [1e9, -1e9], mine = [];
+      const flush = () => { if (run.length > 1) runs.push(run); run = []; }; /* a lone stall is not a car park (piazzetta of via Isonzo) */
+      for (let s = 1.25 + 0.0; s <= sd.L - 1.25 + 1e-6; s += 2.5) {
+        const vm = (v0 + v1) / 2, rc = { x: o.x + ux * s + o.nx * vm, z: o.z + uz * s + o.nz * vm, ux, uz, hl: 1.2, hd: (v1 - v0) / 2 - 0.05, g };
+        if (placed.some(r => r.g !== g && (!r.lane ? rectHit(rc, r) : rectHit(rc, r))) || !stallOK(o, s, v0, v1)) { flush(); continue; }
+        const st = { s, v0, v1, x: rc.x, z: rc.z, h: Math.atan2(o.nx * sg, o.nz * sg), o }; run.push(st); mine.push(rc); ext[0] = Math.min(ext[0], s); ext[1] = Math.max(ext[1], s);
+      }
+      flush();
+      for (const r of mine) placed.push(r);
+      if (mine.length) { const a = ext[0] - 1.25, b = ext[1] + 1.25, ln = 6, v = sg > 0 ? v1 + ln / 2 : v0 - ln / 2; placed.push({ x: o.x + ux * (a + b) / 2 + o.nx * v, z: o.z + uz * (a + b) / 2 + o.nz * v, ux, uz, hl: (b - a) / 2, hd: ln / 2 - 0.05, g, lane: true }); }
+    }
+  });
+  return runs;
+}
+/* Rows of stalls drawn by hand from the aerial photo (Regione Lombardia orthophoto) where the rule below, working on the whole OSM/DBGT area, got them wrong: via Isonzo (the piazzetta and the car park to the north), foto aerea, Carlo 29/10.
+   a, b: the back of the row (kerb, wall), first to last stall; lato: +1 the stalls are on the side (-uz, ux) of a->b, -1 on the other; n: stalls, 2.5 m wide, 4.8 deep, nose to the back, counted from a; ln: stalls that keep their line on the side of a left-out one; sin: stalls left out (the beds of the square stand there: the row is made of the stalls between them); dis: the stall of the disabled (-1 none); ang: angle of the stalls with the row, degrees (90 or missing: nose-in, 80 or so: herringbone), lean: +1 the stalls lean toward the end b, -1 toward a (of the pair as swapped when lato is -1); with ang the pitch grows to 2.5 / sin(ang) and the lines follow the stalls. An area holding a row of these gets no stalls of the rule. */
+const PARK_A_MANO = [
+  { a: [555.3, -233.1], b: [544.4, -216.3], lato: 1, n: 8, dis: 1 }, /* piazzetta of via Isonzo, row against the bed along the street (east) */
+  { a: [545.7, -247.7], b: [534.0, -231.4], lato: -1, n: 8, sin: [2, 3, 6], ln: [1], dis: 5 }, /* piazzetta of via Isonzo, row against the edge of the square with the beds (west) */
+  { a: [569.4, -265.5], b: [560.5, -253.5], lato: -1, n: 6, dis: -1 }, /* east side of the building of Muzic Planet */
+  { a: [548.4, -294.7], b: [567.8, -278.95], lato: 1, n: 10, dis: 1 }, /* north, along via Indipendenza, against the green strip */
+  /* via Gagarin and around, foto aerea (orthophoto 2018-19), Carlo 29/10: OSM has no parking:lane and no car park here */
+  { a: [483.4, -412.5], b: [512.7, -452.0], lato: 1, n: 19, dis: -1 }, /* west side, against the pavement of the Medateca, nose-in, from the crossing to the cross street */
+  { a: [494.3, -402.8], b: [526.7, -447.3], lato: 1, n: 22, dis: -1 }, /* south-east side, against the green strip between the lanes, from the roundabout to the crossing */
+  { a: [535.9, -457.9], b: [558.5, -489.0], lato: 1, n: 18, ang: 80, lean: 1, dis: -1 }, /* beyond the cross street, same strip, towards Ewiva: herringbone */
+  { a: [566.4, -461.8], b: [592.1, -442.0], lato: 1, n: 14, ang: 80, lean: -1, dis: -1 }, /* car park of viale Brianza, north-east row against the hedge */
+  { a: [590.05, -425.2], b: [562.15, -446.3], lato: 1, n: 14, sin: [0, 7, 8], dis: -1 }, /* car park of viale Brianza, south-west row, in front of the Amie building */
+];
+const PARK_A_MANO_STALLS = PARK_A_MANO.flatMap(r => {
+  const [a, b] = r.lato < 0 ? [r.b, r.a] : [r.a, r.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, out = [];
+  const an = (r.ang || 90) * Math.PI / 180, sa = Math.sin(an), ca = Math.cos(an) * (r.lean || 1), pitch = 2.5 / sa, ax = ux * ca + nx * sa, az = uz * ca + nz * sa; /* the axis of a stall, from its back */
+  for (let k = 0; k < r.n; k++) { const s = pitch * k + pitch / 2, ix = j => r.lato < 0 ? r.n - 1 - j : j, out0 = (r.sin || []).includes.bind(r.sin || []); if (out0(ix(k))) continue; out.push({ x: a[0] + ux * s + ax * 2.4, z: a[1] + uz * s + az * 2.4, ux: az, uz: -ax, h: Math.atan2(-ax, -az), dis: ix(k) === r.dis, l0: k === 0 || (r.ln || []).includes(ix(k)), l1: !out0(ix(k + 1)), y1: ix(k) === r.dis || ix(k + 1) === r.dis }); } /* each line drawn once, by the stall before it (yellow if either side is the disabled one); none on the side of a left-out stall, the bed is there; ux, uz: the width of the stall, for the lines */
+  return out;
+});
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf();
   T.stalls = []; T.streetStalls = [];
@@ -136,6 +208,12 @@ function buildParkingLines(T, G) {
     }
     const i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
   const outline = (x, z, ux, uz, l, w, col) => { quad(x, z, ux, uz, -l / 2, l / 2, -w / 2 - 0.06, -w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2, l / 2, w / 2 - 0.06, w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2 - 0.06, -l / 2 + 0.06, -w / 2, w / 2, col); quad(x, z, ux, uz, l / 2 - 0.06, l / 2 + 0.06, -w / 2, w / 2, col); };
+  for (const st of PARK_A_MANO_STALLS) { /* the rows by hand: each stall in the tile its centre falls in; first in T.stalls, so the cars of the tile (at most 14) park here before elsewhere */
+    if (tileOf(st.x, st.z) !== T.t) continue; const col = st.dis ? Y : W;
+    if (st.l0) quad(st.x, st.z, st.ux, st.uz, -1.31, -1.19, -2.4, 2.4, col); if (st.l1) quad(st.x, st.z, st.ux, st.uz, 1.19, 1.31, -2.4, 2.4, st.y1 ? Y : W);
+    if (st.dis) quad(st.x, st.z, st.ux, st.uz, -0.5, 0.5, -0.5, 0.5, BLUE);
+    T.stalls.push({ x: st.x, z: st.z, h: st.h, dis: st.dis });
+  }
   // the spaces OSM maps one by one: white lines, yellow with the blue square for the disabled
   const real = (T.d.ps || []).map(([X, Z, ang, L, Wd, kind]) => ({ x: X / 10, z: Z / 10, ang, L: clamp(L, 4, 7), W: clamp(Wd, 1.8, 3.5), kind }));
   for (const sp of real) {
@@ -164,43 +242,42 @@ function buildParkingLines(T, G) {
       }
     }
   }
-  for (const a of (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || [])) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
-    const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P);
+  /* two car park areas that overlap by more than half of the smaller one (an OSM lot kept whole over a DBGT one): stalls only in the bigger, never twice */
+  const lotsAll = (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || []).map(a => { const P = dec(a.p); let ar = 0; for (let i = 0; i < P.length; i++) { const A = P[i], C = P[(i + 1) % P.length]; ar += A[0] * C[1] - C[0] * A[1]; } return { a, P, ar: Math.abs(ar) / 2, bb: bbox(P) }; }).filter(l => l.P.length >= 3);
+  const lotsDup = new Set();
+  lotsAll.forEach((l, i) => { for (let j = 0; j < lotsAll.length; j++) { const m = lotsAll[j]; if (j === i || m.ar < l.ar || (m.ar === l.ar && j > i) || lotsDup.has(m)) continue;
+    if (l.bb[0] > m.bb[2] || l.bb[2] < m.bb[0] || l.bb[1] > m.bb[3] || l.bb[3] < m.bb[1]) continue;
+    let n = 0, h = 0; for (let x = l.bb[0] + 1; x < l.bb[2]; x += 2) for (let z = l.bb[1] + 1; z < l.bb[3]; z += 2) if (inPoly(x, z, l.P)) { n++; if (inPoly(x, z, m.P)) h++; }
+    if (n > 0 && h > n / 2) { lotsDup.add(l); break; } } });
+  for (const lot0 of lotsAll) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
+    if (lotsDup.has(lot0)) continue; const a = lot0.a, P = lot0.P; if (PARK_A_MANO_STALLS.some(st => inPoly(st.x, st.z, P))) continue; /* a row drawn by hand: no stalls of the rule in this area */
+    const [cx, cz] = centroid(P);
     // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
     const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
-    const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
+    const ang = alignRowAxis(P, 0.5 * Math.atan2(2 * sxz, sxx - szz)), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
     const S0 = Math.min(...proj) + 1.0, S1 = Math.max(...proj) - 1.0, lot = [];
+    const ok2 = (x, z) => inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3);
     const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3); };
     /* a stall only where it is free: no wall, hedge or kerb of a bed on its rectangle, no pavement under it (the porfido of an entrance), and a free aisle (3 m) in front of it, inside the lot or on a street (via del Cimitero, Carlo 29/10: stalls in a passage between two beds, ending on the porfido of the door) */
     const barNear = (x, z, r) => { let f = false; WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, o => { if (!f && o.ax !== undefined && o.y1 - o.y0 > 0.4 && segDist(x, z, o.ax, o.az, o.bx, o.bz) < r) f = true; }); return f; };
-    const stallFree = (s, v0, v1, row) => {
-      const at = v => [cx + ux * s + nx * v, cz + uz * s + nz * v], vm = (v0 + v1) / 2;
-      for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const x = cx + ux * (s + ds) + nx * v, z = cz + uz * (s + ds) + nz * v; if (barNear(x, z, 0.45)) return false; } /* not the ends: a fence closing the lot behind the stall is where cars park nose-in (Carlo 29/10) */
-      /* no check of the aisle in front: a strip of pavement or a kerb between the row and the lane emptied whole rows (via Gagarin, Carlo 29/10) */
-      return true;
+    const stallFree = (o, s, v0, v1) => { /* a stall boxed in, with a wall at one end and a bed or wall within 3 m past the other, has no way out (piazzetta of via Isonzo, Carlo 29/10) */
+      const barAt = (v, r) => [-0.9, 0, 0.9].some(ds => barNear(o.x + o.ux * (s + ds) + o.nx * v, o.z + o.uz * (s + ds) + o.nz * v, r));
+      const boxed = (vb, vf, d) => barAt(vb, 0.8) && [0.3, 1.3, 2.3].some(k => barAt(vf + d * k, 0.6));
+      return !(boxed(v0, v1, 1) || boxed(v1, v0, -1));
     };
-    const runs = [];
-    for (const row of [0, 1]) {
-      let run = [];
-      const flush = () => { if (run.length) runs.push(run); run = []; };
-      for (let s = S0 + 1.25; s <= S1 - 1.25; s += 2.5) {
-        const sec = lmSection(P, cx, cz, ux, uz, s), sa = lmSection(P, cx, cz, ux, uz, s - 1.2), sb = lmSection(P, cx, cz, ux, uz, s + 1.2);
-        if (!sec || !sa || !sb) { flush(); continue; }
-        const lo = Math.max(sec[0], sa[0], sb[0]), hi = Math.min(sec[1], sa[1], sb[1]), w = hi - lo;
-        if (w < 5 || (row === 1 && w < 10.5)) { flush(); continue; }
-        const v0 = row ? hi - 4.8 : lo + 0.2, v1 = row ? hi - 0.2 : lo + 4.8, vm = (v0 + v1) / 2;
-        if (!ok(s, vm) || !ok(s - 0.9, vm) || !ok(s + 0.9, vm) || !stallFree(s, v0, v1, row)) { flush(); continue; }
-        { const at = v => [cx + ux * s + nx * v, cz + uz * s + nz * v]; if (treeNear(...at(v0 + 1.2), 1.75) || treeNear(...at(v1 - 1.2), 1.75)) { flush(); continue; } } /* a tree of the car park in the stall: left free */
-        const x = cx + ux * s + nx * vm, z = cz + uz * s + nz * vm;
-        run.push({ s, v0, v1, x, z, h: Math.atan2(nx, nz) + (row ? 0 : Math.PI) }); // nose towards the aisle in the middle
-      }
-      flush();
-    }
+    const stallOK = (o, s, v0, v1) => {
+      const at = (ss, v) => [o.x + o.ux * ss + o.nx * v, o.z + o.uz * ss + o.nz * v], vm = (v0 + v1) / 2, [x, z] = at(s, vm);
+      if (!ok2(x, z) || !stallFree(o, s, v0, v1)) return false;
+      for (const ds of [-1.1, 1.1]) for (const v of [v0 + 0.15, v1 - 0.15]) { const [cx2, cz2] = at(s + ds, v); if (!inPoly(cx2, cz2, P) || inBuilding(cx2, cz2, 0.1)) return false; }
+      for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const [bx, bz] = at(s + ds, v); if (barNear(bx, bz, 0.45)) return false; }
+      return !(treeNear(...at(s, v0 + 1.2), 1.75) || treeNear(...at(s, v1 - 1.2), 1.75)); /* a tree of the car park in the stall: left free */
+    };
+    const runs = combRows(P, stallOK);
     let left = budget; // runs of free stalls side by side, up to the capacity: the lines between them, the yellow one every eighth
     for (const run0 of runs) {
       if (left <= 0) break; const run = run0.slice(0, left); left -= run.length; const yi = run.length >= 8 ? 1 : -1;
-      run.forEach((st, k) => { const col = k === yi ? Y : W; quad(cx, cz, ux, uz, st.s - 1.31, st.s - 1.19, st.v0, st.v1, col); quad(cx, cz, ux, uz, st.s + 1.19, st.s + 1.31, st.v0, st.v1, col); if (k === yi) { quad(cx, cz, ux, uz, st.s - 0.5, st.s + 0.5, (st.v0 + st.v1) / 2 - 0.5, (st.v0 + st.v1) / 2 + 0.5, BLUE); st.dis = true; } lot.push(st); });
+      run.forEach((st, k) => { const col = k === yi ? Y : W, o = st.o; quad(o.x, o.z, o.ux, o.uz, st.s - 1.31, st.s - 1.19, st.v0, st.v1, col); quad(o.x, o.z, o.ux, o.uz, st.s + 1.19, st.s + 1.31, st.v0, st.v1, col); if (k === yi) { quad(o.x, o.z, o.ux, o.uz, st.s - 0.5, st.s + 0.5, (st.v0 + st.v1) / 2 - 0.5, (st.v0 + st.v1) / 2 + 0.5, BLUE); st.dis = true; } lot.push(st); });
     }
     T.stalls.push(...lot);
     if (inLot.length >= 10) lot.push(...inLot); // the furniture below goes on the lots mapped space by space too

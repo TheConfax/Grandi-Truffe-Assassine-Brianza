@@ -353,7 +353,7 @@ def area_type(t):
     return None
 # cantieri finiti (Carlo 29/10): way OSM landuse=construction ormai superati, non si disegnano
 #   1396686491  Ewiva, via Gagarin: la stazione di ricarica c'e' gia' (Google Maps)
-CANTIERI_FINITI = {1396686491}
+CANTIERI_FINITI = {'1396686491'}  # ids as strings, as in ways
 areas = []
 for members, t in rels:
     if t.get('type') != 'multipolygon' or 'building' in t: continue
