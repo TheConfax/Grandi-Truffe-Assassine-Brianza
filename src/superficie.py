@@ -5,7 +5,7 @@
 #   python src/superficie.py [--out DIR] [--comune Meda] [--margine 250] [--blend 4] [--no-png] [--accetta]
 import os, sys, json, time, gzip, struct, zlib, pickle, argparse, sqlite3
 import xml.etree.ElementTree as ET
-import numpy as np, shapely
+import numpy as np, shapely, shapely.affinity
 from shapely.geometry import Polygon, LineString, box
 from pyproj import Transformer
 from scipy import ndimage, sparse
@@ -833,7 +833,7 @@ class Superficie:
         m = B['meta']; ntx = m['ntx']; x0, x1, z0, z1 = s.R.x0, s.R.x0 + (s.R.nx - 1) * SF, s.R.z0, s.R.z0 + (s.R.nz - 1) * SF
         dec = lambda a: np.cumsum(np.asarray(a, float).reshape(-1, 2), axis=0) / 10
         KIND = {'as': C_VEIT, 'pz': C_AREA, 'sd': C_PED, 'ft': C_PED, 'sf': C_FER}
-        IN = {k: np.zeros(sh, bool) for k in KIND}; STB = np.zeros(sh, bool); rails, riv = [], []
+        IN = {k: np.zeros(sh, bool) for k in KIND}; STB = np.zeros(sh, bool); SFB = np.zeros(sh, bool); SFW = np.zeros(sh, bool); rails, riv = [], []
         for ti, T in enumerate(B['tiles']):
             if not T: continue
             tx, tz = ti % ntx, ti // ntx; bx, bz = -m['hw'] + tx * TILE, -m['hh'] + tz * TILE
@@ -847,7 +847,12 @@ class Superficie:
                     w, mk = s.raster(P)
                     if w is not None: IN[k][w[0]:w[1], w[2]:w[3]] |= mk
                     w, mk = s.raster(P.buffer(VIA_BORDO, 4))
-                    if w is not None: STB[w[0]:w[1], w[2]:w[3]] |= mk
+                    if w is not None:
+                        STB[w[0]:w[1], w[2]:w[3]] |= mk
+                        if k == 'sf': SFW[w[0]:w[1], w[2]:w[3]] |= mk
+                    if k == 'sf':   # the cells whose middle is in the drawn rail bed (the node (r, c) is the corner of cell (r, c) nearest the origin)
+                        w, mk = s.raster(shapely.affinity.translate(P, -SF / 2, -SF / 2))
+                        if w is not None: SFB[w[0]:w[1], w[2]:w[3]] |= mk
             for r in T.get('rl', []):
                 p = dec(r['p'])
                 if len(p) >= 2: rails.append(LineString(p))
@@ -858,7 +863,9 @@ class Superficie:
             w, mk = s.raster(g.buffer(1.5, cap_style=2))
             if w is not None: IN['sf'][w[0]:w[1], w[2]:w[3]] |= mk
             w, mk = s.raster(g.buffer(1.5 + VIA_BORDO, cap_style=2))
-            if w is not None: STB[w[0]:w[1], w[2]:w[3]] |= mk
+            if w is not None: STB[w[0]:w[1], w[2]:w[3]] |= mk; SFW[w[0]:w[1], w[2]:w[3]] |= mk
+            w, mk = s.raster(shapely.affinity.translate(g.buffer(1.5, cap_style=2), -SF / 2, -SF / 2))
+            if w is not None: SFB[w[0]:w[1], w[2]:w[3]] |= mk
         ST = np.zeros(sh, bool)
         for k in KIND: ST |= IN[k]
         s.STRADE_DIS = ST; PB = s.BRP | s.BR | s.AIR; dp = ndimage.distance_transform_edt(~PB, sampling=SF) if PB.any() else np.full(sh, 1e9); ponte = dp <= 2.0   # under or by a bridge or a deck part: the bed stays open, the ground is the deck's business
@@ -889,6 +896,46 @@ class Superficie:
         s.RANK[lib] = 0; s.CLS[lib] = C_NONE
         s.TOMBC = cov_st | cov_03
         s.nacque.update(tombini_sotto_le_strade=int(cov_st.sum()), tombini_alla_quota_della_strada=int(good.sum()), tombini_fittizi=int(cov_03.sum()), assi_sotto_le_strade_nodi=int(sotto.sum()))
+        # (a2) the edge of the drawn rail bed (29/10, viale Francia: "la ferrovia è bucata ai bordi dei binari"). The game drapes the rail bed of
+        # the DBGT (brianza.json sf) and the tracks on S, and a cell its edge crosses takes the height of all four corners: where a corner
+        # outside the DBGT rail bed was a free node at the LiDAR or a node of a channel bed, the gravel sank into the cell (at the culvert of
+        # viale Francia a bed node 3.6 m under the rails, x 221 z -404: a hollow in the gravel by the canal). As vie() does for the drawn streets, the
+        # four corners of every cell whose middle is in the drawn rail bed (or within 1.5 m of a track) take the height of the nearest fixed
+        # rail node within 4 m (not every cell it touches, as vie(): the band past the edge then went 0-2.8 m out, and the fences along the
+        # rail bed, which climb onto a raised edge, went up and down; by a channel bed every cell it touches, the bank is there):
+        # the free nodes not more than VIA_DZ under or VIA_SU over the LiDAR (another level: not a fill on a hillside; within 4 m of a channel
+        # bed any height, the LiDAR there sees the channel), and the nodes of a bed
+        # not by a bridge whatever the drop (the bank of the channel stands at the edge of the rail bed, a wall in the next cell, as the
+        # culvert's headwall). A free node raised against a fixed neighbour that is not a bed nor the rail bed itself steeper than 2:3 + 0.3 m
+        # (another street at another level) goes back, and so on outwards
+        CASE0 = np.zeros(sh, bool)
+        for P in s.case:
+            w, mk = s.raster(P.buffer(1.5, 2))
+            if w is not None: CASE0[w[0]:w[1], w[2]:w[3]] |= mk
+        SFB = SFB | np.roll(SFB, 1, 0) | np.roll(SFB, 1, 1) | np.roll(np.roll(SFB, 1, 0), 1, 1)   # the four corners of those cells
+        BEDN = np.isin(s.CLS, (C_ALV, C_ARG)) & (s.RANK > 0)
+        FER = (s.RANK > 0) & (s.CLS == C_FER) & ~s.AIR & ~s.CAP
+        if FER.any():
+            d, (ri, ci) = ndimage.distance_transform_edt(~FER, sampling=SF, return_indices=True)
+            h = s.ZF[ri, ci]; dzL = h - s.L
+            banca = ndimage.distance_transform_edt(~BEDN, sampling=SF) <= 4.0 if BEDN.any() else np.zeros(sh, bool)   # the bank of a channel: the LiDAR sees the channel, not a hillside
+            libn = (SFB | (SFW & banca)) & (s.RANK == 0) & ~s.AIR & ~s.BR & ~s.ALVCOP & ~CASE0 & (d <= 4.0) & (dzL >= -VIA_DZ) & ((dzL <= VIA_SU) | banca)
+            bedn = SFW & BEDN & ~ponte & ~CASE0 & (d <= 4.0) & (h > s.ZF)
+            RAI = libn | bedn; old = (s.CLS.copy(), s.ZF.copy(), s.FID.copy(), s.RANK.copy())
+            s.ZF[RAI] = h[RAI]; s.RANK[RAI] = R_PED; s.CLS[RAI] = np.where(IN['sf'][RAI], C_FER, C_NONE); s.FID[RAI] = -1
+            nz_, nx_ = sh; tolti = 0
+            for _ in range(6):
+                bad = np.zeros(sh, bool); FX = (s.RANK > 0) & ~RAI & ~BEDN & ~FER
+                for dr in (-1, 0, 1):
+                    for dc in (-1, 0, 1):
+                        if not dr and not dc: continue
+                        a_ = (slice(max(0, dr), nz_ + min(0, dr)), slice(max(0, dc), nx_ + min(0, dc))); b_ = (slice(max(0, -dr), nz_ + min(0, -dr)), slice(max(0, -dc), nx_ + min(0, -dc)))
+                        bad[b_] |= libn[b_] & RAI[b_] & FX[a_] & (np.abs(np.nan_to_num(s.ZF[b_] - s.ZF[a_])) > np.hypot(dr, dc) * SF / K + 0.3)
+                if not bad.any(): break
+                tolti += int(bad.sum()); RAI &= ~bad
+                s.CLS[bad] = old[0][bad]; s.ZF[bad] = old[1][bad]; s.FID[bad] = old[2][bad]; s.RANK[bad] = old[3][bad]
+            s.BORDO_FER = RAI
+            s.nacque.update(bordo_ferrovia_nodi_liberi=int((RAI & libn).sum()), bordo_ferrovia_nodi_di_alveo=int((RAI & bedn).sum()), bordo_ferrovia_tolti_per_muro=tolti)
         # (b) holes of the drawn streets over a watercourse
         WZ = ndimage.binary_dilation(BED0, iterations=2)
         for g, w_ in riv:

@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------- road signs and road markings (segnaletica) from OpenStreetMap
+// ---------------------------------------------------------------- road signs and road markings (segnaletica) from OpenStreetMap and Mapillary (tile list sm)
 // SEGN (src/segnaletica.json, made from the OSM nodes and ways of the area): [kind, x, z, dx, dz, extra] where (dx, dz) is the way the traffic the sign
 // talks to is going (0, 0: along the nearest road). stop and dare (give way) where OSM maps them, limite where the maxspeed of the street changes,
 // vietato at the wrong end of one-way streets, and the signs mapped one by one (paese, via, transito, unico). Each stands on the right of the road
@@ -6,8 +6,26 @@
 const SEGN = /*__SEGN__*/[];
 const SEGN_DONE = new Set();
 const segTex = {}; const segTexIs = t => Object.values(segTex).some(p => p.some(m => m.map === t)); // shared across tiles: never freed
+// The real signs of the Italian Codice della Strada: tex/segnali.png, one atlas, rasterised from the SVG drawings of Wikimedia Commons (credits in docs/dati.md and in the credits line).
+// SEG_AT: name -> [x, y, w, h] in the atlas. A kind or a speed with no drawing there keeps the hand-drawn plate below.
+const SEG_AT = {"stop": [2, 2, 252, 252], "dare": [258, 2, 252, 222], "vietato": [514, 2, 252, 252], "transito": [770, 2, 252, 252], "destra": [1026, 2, 252, 252], "rotatoria": [2, 258, 252, 252], "sosta": [258, 258, 252, 252], "fermata": [514, 258, 252, 252], "dritto": [770, 258, 252, 252], "pesanti": [1026, 258, 252, 252], "pedoni": [2, 514, 252, 252], "parcheggio": [258, 514, 252, 252], "limite10": [514, 514, 252, 252], "limite20": [770, 514, 252, 252], "limite30": [1026, 514, 252, 252], "limite40": [2, 770, 252, 252], "limite50": [258, 770, 252, 252], "limite60": [514, 770, 252, 252], "limite70": [770, 770, 252, 252], "limite80": [1026, 770, 252, 252], "limite90": [2, 1026, 252, 252], "limite100": [258, 1026, 252, 252], "limite110": [514, 1026, 252, 252], "limite120": [770, 1026, 252, 252], "limite130": [1026, 1026, 252, 252], "unico_dx": [2, 1282, 240, 60], "unico_sx": [258, 1282, 240, 60]};
+const SEG_ATLAS = { img: null, redo: [] };
+{ const im = new Image(); im.onload = () => { SEG_ATLAS.img = im; SEG_ATLAS.redo.forEach(f => f()); }; im.src = 'tex/segnali.png'; }
+function segAtName(kind, extra) { const n = kind === 'limite' ? 'limite' + extra : kind === 'unico' ? (extra === 'sx' ? 'unico_sx' : 'unico_dx') : kind; return SEG_AT[n] ? n : null; }
+function segDims(kind, extra) { // width and height of the plate in metres (a real urban plate: 60 cm; the triangle 90 cm side; the one-way plate 90 cm wide)
+  const n = segAtName(kind, extra); if (!n) { const wide = kind === 'paese' || kind === 'via' || kind === 'unico'; return [kind === 'paese' ? 1.5 : kind === 'via' ? 1.3 : kind === 'unico' ? 0.9 : 0.75, kind === 'paese' ? 0.56 : kind === 'via' ? 0.48 : kind === 'unico' ? 0.45 : 0.75]; }
+  const [, , w, h] = SEG_AT[n], pw = kind === 'dare' ? 0.95 : kind === 'unico' ? 0.9 : 0.65; return [pw, pw * h / w];
+}
 function segTexOf(kind, extra) {
   const key = kind + '|' + (extra || ''); if (segTex[key]) return segTex[key];
+  const an = segAtName(kind, extra);
+  if (an) { // the real plate: a canvas the size of its cell, filled from the atlas as soon as it is loaded
+    const [sx, sy, sw, sh] = SEG_AT[an];
+    const paint = (g, back) => { g.clearRect(0, 0, sw, sh); if (!SEG_ATLAS.img) return; g.drawImage(SEG_ATLAS.img, sx, sy, sw, sh, 0, 0, sw, sh); if (back) { g.globalCompositeOperation = 'source-in'; g.fillStyle = '#8d9094'; g.fillRect(0, 0, sw, sh); g.globalCompositeOperation = 'source-over'; } }; /* the back: the same outline, bare grey metal */
+    const t = canvasTex(sw, sh, g => paint(g, false), false), bk = canvasTex(sw, sh, g => paint(g, true), false);
+    SEG_ATLAS.redo.push(() => { paint(t.image.getContext('2d'), false); t.needsUpdate = true; paint(bk.image.getContext('2d'), true); bk.needsUpdate = true; });
+    return (segTex[key] = [new THREE.MeshLambertMaterial({ map: t, alphaTest: 0.5 }), new THREE.MeshLambertMaterial({ map: bk, alphaTest: 0.5 })]);
+  }
   const wide = kind === 'paese' || kind === 'via' || kind === 'unico', W = wide ? 256 : 128, H = wide ? (kind === 'unico' ? 128 : 96) : 128;
   const t = canvasTex(W, H, (g, w, h) => {
     g.clearRect(0, 0, w, h); const cx = w / 2, cy = h / 2, R = 60;
@@ -23,7 +41,14 @@ function segTexOf(kind, extra) {
     else if (kind === 'rotatoria') { circ(R + 3, '#ffffff'); circ(R, '#1f4fa0'); g.strokeStyle = '#ffffff'; g.fillStyle = '#ffffff'; g.lineWidth = 9; // three arrows chasing each other anticlockwise
       for (let k = 0; k < 3; k++) { const a0 = k * TAU / 3 + 0.35, a1 = a0 + 1.45, r = 32; g.beginPath(); g.arc(cx, cy, r, -a1, -a0); g.stroke(); const hx = cx + Math.cos(-a1) * r, hy = cy + Math.sin(-a1) * r, tx = -Math.sin(-a1), ty = Math.cos(-a1);
         g.beginPath(); g.moveTo(hx - tx * 14 + Math.cos(-a1) * 11, hy - ty * 14 + Math.sin(-a1) * 11); g.lineTo(hx - tx * 14 - Math.cos(-a1) * 11, hy - ty * 14 - Math.sin(-a1) * 11); g.lineTo(hx + tx * 6, hy + ty * 6); g.closePath(); g.fill(); } }
-    else if (kind === 'unico') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f4fa0'; g.fillRect(5, 5, w - 10, h - 10); g.fillStyle = '#ffffff'; g.fillRect(40, cy - 12, w - 110, 24); g.beginPath(); g.moveTo(w - 70, cy - 36); g.lineTo(w - 30, cy); g.lineTo(w - 70, cy + 36); g.fill(); }
+    else if (kind === 'sosta' || kind === 'fermata') { circ(R + 3, '#ffffff'); circ(R, '#c8102e'); circ(R - 10, '#1f4fa0'); g.save(); g.beginPath(); g.arc(cx, cy, R - 10, 0, TAU); g.clip(); g.translate(cx, cy); g.fillStyle = '#c8102e'; /* no parking: one stripe; no stopping: a cross */
+      for (const a of kind === 'sosta' ? [-Math.PI / 4] : [-Math.PI / 4, Math.PI / 4]) { g.save(); g.rotate(a); g.fillRect(-70, -6, 140, 12); g.restore(); } g.restore(); }
+    else if (kind === 'dritto') { circ(R + 3, '#ffffff'); circ(R, '#1f4fa0'); g.fillStyle = '#ffffff'; g.fillRect(cx - 7, cy - 4, 14, 38); g.beginPath(); g.moveTo(cx - 22, cy - 2); g.lineTo(cx + 22, cy - 2); g.lineTo(cx, cy - 34); g.closePath(); g.fill(); }
+    else if (kind === 'pesanti') { circ(R + 3, '#ffffff'); circ(R, '#c8102e'); circ(R - 12, '#ffffff'); g.fillStyle = '#111111'; g.fillRect(cx - 30, cy - 14, 36, 24); g.fillRect(cx + 9, cy - 5, 21, 15); g.beginPath(); g.arc(cx - 16, cy + 13, 6, 0, TAU); g.arc(cx + 19, cy + 13, 6, 0, TAU); g.fill(); }
+    else if (kind === 'pedoni') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f4fa0'; g.fillRect(5, 5, w - 10, h - 10); g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(64, 16); g.lineTo(112, 108); g.lineTo(16, 108); g.closePath(); g.fill();
+      g.fillStyle = g.strokeStyle = '#1f4fa0'; g.lineWidth = 7; g.lineCap = 'round'; g.beginPath(); g.arc(64, 50, 7, 0, TAU); g.fill(); g.beginPath(); g.moveTo(64, 60); g.lineTo(64, 82); g.moveTo(64, 82); g.lineTo(54, 100); g.moveTo(64, 82); g.lineTo(76, 100); g.moveTo(64, 66); g.lineTo(52, 78); g.moveTo(64, 66); g.lineTo(76, 76); g.stroke(); } // the blue square with the white triangle and the walking figure
+    else if (kind === 'parcheggio') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f4fa0'; g.fillRect(5, 5, w - 10, h - 10); txt('P', 88, '#ffffff'); }
+    else if (kind === 'unico') { g.save(); if (extra === 'sx') { g.translate(w, 0); g.scale(-1, 1); } g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f4fa0'; g.fillRect(5, 5, w - 10, h - 10); g.fillStyle = '#ffffff'; g.fillRect(40, cy - 12, w - 110, 24); g.beginPath(); g.moveTo(w - 70, cy - 36); g.lineTo(w - 30, cy); g.lineTo(w - 70, cy + 36); g.fill(); g.restore(); }
     else if (kind === 'paese') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.strokeStyle = '#111111'; g.lineWidth = 6; g.strokeRect(6, 6, w - 12, h - 12); txt(String(extra || '').toUpperCase(), 40, '#111111'); }
     else if (kind === 'via') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.strokeStyle = '#2a2a2a'; g.lineWidth = 4; g.strokeRect(4, 4, w - 8, h - 8); txt(String(extra || ''), 30, '#1d1d1d', cy, '600'); }
   }, false);
@@ -77,7 +102,9 @@ function segLine(s, kind, dx, dz, hw, mk, lettering, WH) { // the stop line (tee
 }
 function buildSegnali(T, G) {
   const mk = FBuf(), lettering = FBuf(), WH = COL('#f2f0e8');
-  SEGN.forEach((s, idx) => {
+  if (T.d.sm && !T.d.smo) T.d.smo = T.d.sm.map((r, i) => { const s = r.slice(); s.i = i; s.place = { px: r[1], pz: r[2], dx: r[3], dz: r[4], hw: 0 }; return s; }); // the signs of Mapillary come with their place (src/mapillary_obj.py): on the kerb, facing the drivers
+  const LIST = SEGN.map((s, i) => [s, i]); for (const s of T.d.smo || []) LIST.push([s, 'm' + T.t + '_' + s.i]);
+  LIST.forEach(([s, idx]) => {
     const [kind, x, z] = s; if (tileOf(x, z) !== T.t) return;
     const { px, pz, dx, dz, hw } = segPlace(s); if (s.skip || inBuilding(px, pz, 0.3)) { segLine(s, kind, dx, dz, hw, mk, lettering, WH); return; } // a one-way lane through a courtyard: no post in the wall; no room for the post (the corner of a junction of the DBGT): the line and the STOP on the road all the same
     const gy = H.ground(px, pz), wide = kind === 'paese' || kind === 'via' || kind === 'unico';
@@ -86,8 +113,8 @@ function buildSegnali(T, G) {
       const root = new THREE.Group(); root.position.set(px, gy, pz); root.rotation.y = Math.atan2(-dx, -dz); G.add(root);
       for (const [k2, ox] of [['vietato', -0.33], ['destra', 0.33]]) { const [front, rear] = segTexOf(k2);
         const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1.35, 8), SEG_POLE); pole.position.set(ox, 0.67, 0); root.add(pole);
-        const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), front); pl.position.set(ox, 1.05, 0.05); root.add(pl);
-        const bk = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), rear); bk.position.set(ox, 1.05, 0.04); bk.rotation.y = Math.PI; bk.scale.x = -1; root.add(bk); }
+        const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), front); pl.position.set(ox, 1.05, 0.06); root.add(pl);
+        const bk = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), rear); bk.position.set(ox, 1.05, -0.06); bk.rotation.y = Math.PI; bk.scale.x = -1; root.add(bk); }
       if (s[5] && s[5].length >= 3) { // the island: a raised kerb all round, paved in porphyry
         const ring = s[5], top = FBuf(), side = FBuf(), KB = COL('#d9d5ca');
         try { polyFill(top, ring, [], 0.16, 3, COL('#9b8f86')); } catch (e) { }
@@ -97,11 +124,11 @@ function buildSegnali(T, G) {
       if (!SEGN_DONE.has(idx)) { SEGN_DONE.add(idx); s.prop = addProp({ x: px, z: pz, y: gy, r: 0.25, h: 1.6, obj: root }); } else if (s.prop) { s.prop.obj = root; if (s.prop.broken) root.rotation.x = -1.45; }
       return;
     }
-    const top = wide ? 2.5 : 2.3, pw = kind === 'paese' ? 1.5 : kind === 'via' ? 1.3 : kind === 'unico' ? 0.9 : 0.75, ph = kind === 'paese' ? 0.56 : kind === 'via' ? 0.48 : kind === 'unico' ? 0.45 : 0.75;
+    const top = wide ? 2.5 : 2.3, [pw, ph] = segDims(kind, s[5]);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, top + ph / 2, 8), SEG_POLE); pole.position.y = (top + ph / 2) / 2; pole.castShadow = true; root.add(pole);
     const [front, rear] = segTexOf(kind, s[5]), plate = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), front); plate.position.set(0, top, 0.06); root.add(plate);
-    if (kind === 'rotatoria' && s[5] === 'dare') { const [f2, r2] = segTexOf('dare'), p2 = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), f2); p2.position.set(0, top + 0.85, 0.06); root.add(p2); const b2 = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), r2); b2.position.set(0, top + 0.85, 0.05); b2.rotation.y = Math.PI; b2.scale.x = -1; root.add(b2); pole.scale.y = (top + 0.85 + ph / 2) / (top + ph / 2); pole.position.y = (top + 0.85 + ph / 2) / 2; } // give way on top, roundabout under it
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), rear); back.position.set(0, top, 0.05); back.rotation.y = Math.PI; back.scale.x = -1; root.add(back); // mirrored, so the outline lines up with the front
+    if (kind === 'rotatoria' && s[5] === 'dare') { const [f2, r2] = segTexOf('dare'), [pw2, ph2] = segDims('dare'), y2 = top + ph / 2 + ph2 / 2 + 0.06, p2 = new THREE.Mesh(new THREE.PlaneGeometry(pw2, ph2), f2); p2.position.set(0, y2, 0.06); root.add(p2); const b2 = new THREE.Mesh(new THREE.PlaneGeometry(pw2, ph2), r2); b2.position.set(0, y2, -0.06); b2.rotation.y = Math.PI; b2.scale.x = -1; root.add(b2); pole.scale.y = (y2 + ph2 / 2) / (top + ph / 2); pole.position.y = (y2 + ph2 / 2) / 2; } /* give way on top, roundabout under it */
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), rear); back.position.set(0, top, -0.06); back.rotation.y = Math.PI; back.scale.x = -1; root.add(back); // mirrored, so the outline lines up with the front
     if (!SEGN_DONE.has(idx)) { SEGN_DONE.add(idx); s.prop = addProp({ x: px, z: pz, y: gy, r: 0.1, h: 3, obj: root }); } else if (s.prop) { s.prop.obj = root; if (s.prop.broken) root.rotation.x = -1.45; }
     segLine(s, kind, dx, dz, hw, mk, lettering, WH);
   });
