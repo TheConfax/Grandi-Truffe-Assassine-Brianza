@@ -23,7 +23,7 @@ import os, sys, math, time, sqlite3, json, pickle, subprocess, tempfile
 from collections import Counter, defaultdict
 import numpy as np, shapely
 from shapely.geometry import Polygon, Point, LineString, GeometryCollection, box
-import shapely.ops
+import shapely.ops, shapely.affinity
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 from shapely import prepare
@@ -235,7 +235,7 @@ class Edifici:
         DATA = dq.DATA
         self.lidar_dir = lidar_dir or os.path.join(DATA, 'terreno', 'lidar'); self.dsm_dir = dsm_dir or os.path.join(DATA, 'terreno', 'lidar_dsm')
         tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True)
-        tg = to_game or dq.to_game_lonlat
+        tg = to_game or dq.to_game_lonlat; self.to_game = tg
         def xy(a): lon, lat = tr.transform(a[:, 0], a[:, 1]); x, z = tg(np.asarray(lon), np.asarray(lat)); return np.column_stack((x, z))
         def poly(g):
             out = []
@@ -386,10 +386,11 @@ class Edifici:
         conf_u = unary_union(confs) if confs else GeometryCollection(); prepare(conf_u)
         best = {}   # DBGT building -> (overlap share, OSM tags)
         keep, kept_osm = [], []
-        cnt = Counter(); dove = []
+        cnt = Counter(); dove = []; osm_g = []
         for b in buildings:
             g = P(b['p'], b.get('k', []))
             if g is None: keep.append(b); continue
+            if not b.get('ml') and not b.get('dbgt'): osm_g.append(g)   # (anche i multipolygon di OSM: P ne da' la geometria intera)
             near = [ok[j] for j in dt.query(g, predicate='dwithin', distance=FREE_D)]
             inside = conf_u.contains(g.centroid)
             if inside:
@@ -437,6 +438,7 @@ class Edifici:
                 if not b['k']: b.pop('k')
                 cnt['tagliati_al_confine'] += 1
             keep.append(b)
+        gone = self.demoliti(geo, ok, osm_g)
         # the OSM buildings that stay are cut off the carriageways (the street always wins, as for OSM's own streets)
         ncut = ndrop = 0
         for b, g in kept_osm:
@@ -457,6 +459,7 @@ class Edifici:
         alti, terra = [], []
         ntipo, nvol, nstato = Counter(), Counter(), Counter()
         for i, e in enumerate(self.ed):
+            if i in gone: continue   # demolito dopo il rilievo del 2015 (demoliti)
             sh, tg, ob = best.get(i, (0, {}, None))
             obt = tg.get('building')
             if obt in ('roof', 'carport') and e['kind'] == 'E': obt = None   # a roof on posts is a form: the DBGT's building (a volume on the ground) wins
@@ -491,6 +494,83 @@ class Edifici:
         self.rep['stato_2015'] = dict(ruderi=nstato[2], in_costruzione_senza_osm=nstato[1], diruti=sum(1 for e in self.ed if e['kind'] == 'E' and e['st'] == '02'), in_costruzione=sum(1 for e in self.ed if e['kind'] == 'E' and e['st'] == '01'))
         self.log('dbgt edifici: OSM', dict(cnt), 'volumi', dict(nvol), 'con attributi OSM', len(best), '%.0fs' % (time.time() - t0))
         return keep + terra
+
+    # ---------------------------------------------------------------- DBGT buildings pulled down after the 2015 survey
+    def demoliti(self, geo, ok, osm_g):
+        """The DBGT is of 2015: a building it has and OSM does not (no OSM building on it, ways and relations) may be gone. The recent aerial
+        photo (esri_foto.py, July 2025, reference only) tells: a classifier on the pixels inside the plan (narrowed by 1 m) says roof or not.
+        Trained on the DBGT buildings with an OSM building on them (sure roofs) against copies of their shapes moved onto ground with no building;
+        a building goes only when it scores under the 1.2th percentile of the sure roofs (and p<0.2) (cross-validated), otherwise it stays. Returns the set of gone buildings."""
+        if os.environ.get('GTA_SENZA_ESRI'): return set()
+        import esri_foto as ef
+        t0 = time.time(); log = self.log
+        (xa, za), (xb, zb) = [self.to_game(np.array([lo]), np.array([la])) for lo, la in ((9.16, 45.66), (9.17, 45.67))]
+        kx, kz = (float(xb[0]) - float(xa[0])) / 0.01, (float(zb[0]) - float(za[0])) / 0.01
+        to_ll = lambda x, z: (9.16 + (x - float(xa[0])) / kx, 45.66 + (z - float(za[0])) / kz)
+        foto = ef.Foto(to_ll)
+        if os.environ.get('GTA_ESRI_DUMP'):   # per tarare il classificatore a mano fuori dalla build
+            pickle.dump(dict(geo=geo, ok=ok, osm_g=osm_g, kind=[e['kind'] for e in self.ed], k=(kx, kz, float(xa[0]), float(za[0]))), open(os.environ['GTA_ESRI_DUMP'], 'wb'))
+            if os.environ.get('GTA_ESRI_DUMP_STOP'): os._exit(0)
+        ot = STRtree(osm_g) if osm_g else None
+        def has_osm(g):
+            if ot is None: return False
+            return any(osm_g[j].intersection(g).area > max(1.0, 0.05 * g.area) for j in ot.query(g, predicate='intersects'))
+        pos, cand = [], []
+        for i in ok:
+            e = self.ed[i]; g = geo[i]
+            if e['kind'] != 'E' or g.area <= 20: continue
+            (pos if has_osm(g) else cand).append(i)
+        def erode(g):
+            q = g.buffer(-1.0)
+            return None if q.is_empty else q
+        rng = np.random.default_rng(1)
+        if len(pos) > 3000: pos_s = [pos[k] for k in rng.choice(len(pos), 3000, replace=False)]
+        else: pos_s = pos
+        # negatives: the shapes of sure roofs moved 15-120 m away onto ground with no building within 4 m
+        allg = [geo[i] for i in ok] + osm_g; at = STRtree(allg); neg = []
+        for i in pos_s:
+            g = geo[i]
+            for _ in range(8):
+                a = rng.uniform(0, 2 * math.pi); d = rng.uniform(15, 120)
+                q = shapely.affinity.translate(g, d * math.cos(a), d * math.sin(a))
+                if not len(at.query(q, predicate='dwithin', distance=4.0)): neg.append(q); break
+        def feats(gs):
+            F, keep = [], []
+            for k, g in enumerate(gs):
+                q = erode(g); f = None
+                if q is not None:
+                    try: f = ef.caratteristiche(foto.pixel(q))
+                    except Exception as ex: f = None
+                if f is not None: F.append(f); keep.append(k)
+            return np.array(F), keep
+        # the tiles first (resumable, in data/esri), then the numbers
+        tl = set()
+        for g in [geo[i] for i in cand + pos_s] + neg: tl.update(foto.tiles_per(g))
+        log('dbgt edifici: demoliti, foto Esri: %d tile, %d da controllare, %d tetti sicuri, %d negativi' % (len(tl), len(cand), len(pos_s), len(neg)))
+        for x, y in sorted(tl): ef.scarica(x, y)
+        Xp, kp = feats([geo[i] for i in pos_s]); Xn, kn = feats(neg); Xc, kc = feats([geo[i] for i in cand])
+        if len(Xp) < 100 or len(Xn) < 100: log('dbgt edifici: demoliti, troppo pochi pixel per tarare (%d, %d): nessuno tolto' % (len(Xp), len(Xn))); return set()
+        X = np.vstack((Xp, Xn)); y = np.r_[np.ones(len(Xp)), np.zeros(len(Xn))]
+        fold = rng.integers(0, 5, len(y)); oof = np.zeros(len(y))
+        for f in range(5):
+            m = ef.Modello().fit(X[fold != f], y[fold != f]); oof[fold == f] = m.p(X[fold == f])
+        sp, sn = oof[:len(Xp)], oof[len(Xp):]
+        T = min(0.2, float(np.quantile(sp, 0.012)))   # (la soglia: al piu' l'1,2% dei tetti sicuri sotto, e mai sopra p=0.2)
+        mod = ef.Modello().fit(X, y)
+        sc = mod.p(Xc) if len(Xc) else np.array([])
+        gone = {cand[kc[k]] for k in range(len(kc)) if sc[k] < T}
+        # the sampled "sure roofs" under the threshold are errors if we removed them: the share is the error of the rule
+        err = float((sp < T).mean()); rec = float((sn < T).mean())
+        ordine = sorted(gone, key=lambda i: -geo[i].area)
+        link = []
+        for i in ordine[:10]:
+            c = geo[i].centroid; link.append('http://127.0.0.1:8013/?x=%.1f&z=%.1f&piedi' % (c.x, c.y))
+        self.rep['demoliti'] = dict(controllati=len(kc), non_controllabili=len(cand) - len(kc), tolti=len(gone), m2=round(sum(geo[i].area for i in gone)), soglia=round(T, 4),
+                                    errore_stimato_tetti_tolti=round(err, 4), terreno_riconosciuto=round(rec, 4), tetti_sicuri=len(Xp), negativi=len(Xn), esempi=link)
+        log('dbgt edifici: demoliti: controllati %d (su %d senza OSM, area>20 m2), tolti %d (%.0f m2); soglia p<%.4f; errore stimato (tetti sicuri che finirebbero tolti, convalida incrociata su %d) %.2f%%, terreno nudo riconosciuto %.1f%% (su %d); %.0fs' %
+            (len(kc), len(cand), len(gone), self.rep['demoliti']['m2'], T, len(Xp), 100 * err, 100 * rec, len(Xn), time.time() - t0))
+        for l in link: log('   tolto:', l)
+        return gone
 
     # ---------------------------------------------------------------- roofs
     def _dsm(self, jobs):
