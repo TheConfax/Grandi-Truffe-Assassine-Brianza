@@ -231,7 +231,7 @@ Le foto sono in Viaggiare in Brianza (guide di Meda e Seveso).
 
 ## Idee per dopo
 - [ ] **Missione secondaria: fotografare i posti fighi** (Carlo, 29/10, al posto di "Scopri la Brianza", buttato: niente cartelli con la storia). Una caccia enorme ai collezionabili: girare la mappa e fotografare tutti i posti belli (chiese, ville, monumenti, scorci, posti strani), un album che si riempie, salvato. Fonte dei posti: Wikidata (coordinate, tipo, foto su Commons) più OSM, scelti a mano dove serve; cresce con la mappa grande. Da progettare: come si fotografa (inquadratura, distanza), cosa dà averli tutti
-- [ ] **La villa del cattivo** (Carlo, 29/10: "questa è assolutamente la villa del cattivo"): la villa a x 436 z −1558 (http://127.0.0.1:8013/?x=436&z=-1558&piedi) come covo del boss per le missioni: guardie, cancello, auto di lusso nel cortile, finale della storia
+- [ ] **La villa del cattivo** (Carlo, 29/10: "questa è assolutamente la villa del cattivo", solo un'idea da tenere insieme alle safehouse): la villa a x 436 z −1558 (http://127.0.0.1:8013/?x=436&z=-1558&piedi), da pensare quando si progettano le safehouse e i luoghi delle missioni
 - [ ] Missioni legate ai luoghi veri (fiori al Santuario prima delle campane, consegna in Municipio)
 - [ ] Vita intorno ai monumenti: fedeli all'uscita della messa, mercato in piazza Vittorio Veneto, bancarelle del Palio
 - [ ] Prestazioni: verificare su telefono il numero di auto parcheggiate nei posti (oggi fino a 14 per tile)
