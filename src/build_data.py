@@ -1262,99 +1262,16 @@ if FER:  # the DBGT railway dividers (kind 6) between a platform and a track or 
     bar_out += _capi; _capi_m = round(sum(LineString(c_[0]).length for c_ in _capi), 1)
     log('CONTROLLO chiusure dei divisori ferroviari alla strada (tratti, metri):', len(_capi), _capi_m, [(round(c_[0][0][0]), round(c_[0][0][1])) for c_ in _capi[:6]])
 
-# the track bed closed to a square or a street (Carlo, 29/10, via Pace x 580 z -752: "dalla piazza si passa dritti sui binari"): the fill-in above leaves the edge
-# of the track open wherever a fence or a wall stands within 12 m, and the rule of the platforms takes the dividers between a platform and a track away, so a porfido
-# strip along the track had nothing. Rule, the same everywhere: a stretch of the edge of the track bed (BED_HW either side of the axis) that has a hard surface
-# (street, square, pavement, footway) along it, no platform, no fence, wall or building within CHIUDI_VICINO m, that is not at a level crossing, a track end or a
-# gate, nor where a way goes in (a footway or a street within 1.5 m), at least CHIUDI_MIN m long, is closed with the railway fence (solid, like the others)
-CHIUDI_VICINO, CHIUDI_MIN, CHIUDI_MAX, CHIUDI_FINE, CHIUDI_FUORI = 1.5, 4.0, 80.0, 3.0, 0.3  # CHIUDI_FUORI: the fence stands this far outside the edge of the bed: the game drops a fence within 2 m of a rail (world3.js nearLowRail)  # CHIUDI_FINE: round the end of a track (the fill-in uses 9 m: there the line may go on beyond the data)
-_chiusi_rep = {'tratti': 0, 'metri': 0.0, 'dove': []}
-if FER:
-    if os.environ.get('GTA_DUMP_CHIUDI'):
-        import pickle; pickle.dump(dict(rl=_rl_suolo, fences=fences, bar_out=bar_out, xpts=xpts, tips=tips, platforms=platforms, gates=gates, roads=[(r_['line'], r_['w'], r_['c']) for r_ in raw_roads if flat(r_)], bld=btree_geoms, asph=asph, pedz=pedz, side=side, foot=foot, cover=dbt_cover, RECT=RECT), open(os.environ['GTA_DUMP_CHIUDI'], 'wb'))
-    _Bk = unary_union([l_.buffer(dbgt_ferrovia.BED_HW + CHIUDI_FUORI, cap_style=2) for l_ in _rl_suolo]).boundary.intersection(dbt_cover.buffer(-1.5)).intersection(RECT)
-    _dura = unary_union([asph, pedz, side, foot]); prepare(_dura)
-    _adj = _Bk.intersection(_dura.buffer(0.5)).difference(platforms.buffer(0.6))
-    _ex_l = [LineString(f_) for f_ in fences if len(f_) >= 2] + [LineString(b_[0]) for b_ in bar_out if len(b_[0]) >= 2]
-    _chiude = unary_union([l_.buffer(CHIUDI_VICINO, quad_segs=2) for l_ in _ex_l if l_.distance(_Bk) < CHIUDI_VICINO + 1] + [g_.buffer(1.0) for g_ in btree_geoms if g_.distance(_Bk) < 3]
-                          + list(xpts) + [Point(c_).buffer(CHIUDI_FINE) for c_ in tips] + [g_.buffer(3.0) for g_ in gates] + [r_['line'].buffer(1.5) for r_ in raw_roads if flat(r_) and r_['c'] <= 6 and r_['line'].distance(_Bk) < 3])
-    _gap = _adj.difference(_chiude)
-    _gap = linemerge(_gap) if not _gap.is_empty and _gap.geom_type in ('MultiLineString', 'LineString') else _gap
-    _nuovi = []
-    for l_ in (list(_gap.geoms) if hasattr(_gap, 'geoms') else [_gap]):
-        if not isinstance(l_, LineString) or not CHIUDI_MIN <= l_.length <= CHIUDI_MAX or math.dist(l_.coords[0], l_.coords[-1]) < 0.5: continue
-        e_ = _Bk.intersection(l_.buffer(CHIUDI_VICINO - 0.2, cap_style=2))  # out to the wall it meets, from where the cut left it
-        e_ = linemerge(e_) if e_.geom_type == 'MultiLineString' else e_
-        if e_.geom_type != 'LineString': e_ = l_
-        _nuovi.append(list(e_.simplify(0.15).coords))
-    if _nuovi:
-        _nuovi = FER.fuori_dalle_carreggiate(_nuovi, STR.carreggiate(0, strade=True)) if STR else _nuovi
-        _nuovi = FER.via_dai_ponti(_nuovi)
-        _nuovi = FER.via_dai_binari(_nuovi, _rl_suolo, 'chiusure_alla_piazza')
-        _nuovi = FER.lontano_dai_binari(_nuovi, _rl_suolo, 'chiusure_alla_piazza')
-        _nuovi = [f_ for f_ in _nuovi if LineString(f_).length >= 2.0]
-    fences += _nuovi
-    # the ends sewn to what stands next (Carlo 29/10, via Pace, photos with the gaps drawn green): the cuts above stop a new fence short of the fence or the platform
-    # it meets, and every railway fence short of a level crossing (the opening is half the road + 3.5 m), and the gaps stay open onto the tracks. A new fence goes on to the
-    # nearest fence, wall or platform edge; a new fence or a railway fence ending by a level crossing goes on to the edge of the road or of its pavement there. Within
-    # RICUCI m, turning less than RICUCI_ANG, never nearer than CHIUDI_BIN to a track (the game drops it: world3.js nearLowRail) nor into a road or a pavement
-    RICUCI, RICUCI_ANG, CHIUDI_BIN = 10.0, 60.0, 2.05
-    _ricuciti = []
-    from shapely.ops import nearest_points
-    _X = unary_union(xpts) if xpts else GeometryCollection()
-    _rail_b = unary_union([l_.buffer(CHIUDI_BIN) for l_ in _rl_suolo])
-    _carr_b = unary_union([r_['line'].buffer(r_['w'] / 2) for r_ in raw_roads if flat(r_) and r_['line'].distance(_X) < RICUCI]) if not _X.is_empty else GeometryCollection()
-    _strada = unary_union([_carr_b, side.intersection(_X.buffer(RICUCI))]) if not _X.is_empty else GeometryCollection()
-    _t_pl = _strada.buffer(0.3).boundary.intersection(_X.buffer(RICUCI)).difference(_rail_b) if not _strada.is_empty else GeometryCollection()
-    _t_new = unary_union([l_ for l_ in _ex_l if l_.distance(_Bk) < RICUCI + 2] + [platforms.boundary.intersection(_Bk.buffer(RICUCI + 2)), _t_pl]).difference(_rail_b)
-    _n_new = len(_nuovi); _scarti = Counter()
-    if os.environ.get('GTA_DUMP_RICUCI'):
-        import pickle; pickle.dump(dict(fences=fences, bar_out=[b_[0] for b_ in bar_out], t_pl=_t_pl, t_new=_t_new, rail_b=_rail_b, strada=_strada, X=_X, Bk=_Bk, n_new=_n_new, xpts=xpts, carr=_carr_b), open(os.environ['GTA_DUMP_RICUCI'], 'wb'))
-    _x_cross = _strada.intersection(_X).buffer(0.3).boundary.intersection(_X).difference(_rail_b) if not _strada.is_empty else GeometryCollection()  # the edge of the road inside a level crossing
-    _xc = [x_.centroid for x_ in xpts]; _Bk_l = [g_ for g_ in getattr(_Bk, 'geoms', [_Bk]) if g_.geom_type == 'LineString' and g_.length > 0.5] or [LineString([(0, 0), (1, 0)])]
-    def _tangente(P_):  # the direction of the edge of the track bed nearest to P_
-        g_ = min(_Bk_l, key=lambda g_: g_.distance(Point(P_))); s_ = g_.project(Point(P_)); a_, b_ = g_.interpolate(max(0.0, s_ - 1.0)), g_.interpolate(min(g_.length, s_ + 1.0))
-        n_ = math.hypot(b_.x - a_.x, b_.y - a_.y) or 1.0; return (b_.x - a_.x) / n_, (b_.y - a_.y) / n_
-    def _ricuci(f_, T_):
-        for end_ in (0, -1):
-            P_, P1_ = f_[end_], f_[1 if end_ == 0 else -2]
-            q_ = None; par_ = False
-            if Point(P_).distance(_X) < RICUCI and not _x_cross.is_empty:  # by a level crossing: on along the track (the edge of the bed) to the road that crosses it
-                xc_ = min(_xc, key=lambda c_: c_.distance(Point(P_))); tx_, tz_ = _tangente(P_)
-                if (xc_.x - P_[0]) * tx_ + (xc_.y - P_[1]) * tz_ < 0: tx_, tz_ = -tx_, -tz_
-                h_ = LineString([P_, (P_[0] + tx_ * RICUCI, P_[1] + tz_ * RICUCI)]).intersection(_x_cross)
-                q_ = min((g_ for g_ in getattr(h_, 'geoms', [h_]) if not g_.is_empty and g_.geom_type == 'Point'), key=lambda g_: g_.distance(Point(P_)), default=None) if not h_.is_empty else None
-                par_ = q_ is not None  # along the track the fence may run on the edge of a lane that follows the tracks (via Pace: the lane of the car park)
-            if q_ is None:
-                q_ = nearest_points(Point(P_), T_)[1]; d_ = math.dist(P_, q_.coords[0])
-                a_ = math.degrees(abs(math.atan2(q_.y - P_[1], q_.x - P_[0]) - math.atan2(P_[1] - P1_[1], P_[0] - P1_[0]))) % 360
-                if min(a_, 360 - a_) > RICUCI_ANG: _scarti['svolta %.0f %.0f,%.0f' % (min(a_, 360 - a_), P_[0], P_[1])] += 1; continue
-            d_ = math.dist(P_, q_.coords[0])
-            if not 0.3 < d_ <= RICUCI: _scarti['lontano' if d_ > RICUCI else 'attaccato'] += 1; continue
-            s_ = LineString([P_, q_.coords[0]])
-            if s_.intersects(_rail_b): _scarti['binario %.0f,%.0f' % tuple(P_[:2])] += 1; continue
-            if not par_ and not _strada.is_empty and s_.intersection(_strada.buffer(0.2)).length > 0.6: _scarti['strada %.0f,%.0f' % tuple(P_[:2])] += 1; continue
-            if end_ == 0: f_.insert(0, q_.coords[0])
-            else: f_.append(q_.coords[0])
-            _ricuciti.append((round(d_, 1), '?x=%.0f&z=%.0f' % q_.coords[0]))
-        return f_
-    for i_ in range(len(fences)):
-        f_ = list(fences[i_]); nuovo_ = i_ >= len(fences) - _n_new
-        if len(f_) < 2: continue
-        if not nuovo_ and (_t_pl.is_empty or LineString(f_).distance(_X) > RICUCI): continue
-        T_ = (_t_new if nuovo_ else _t_pl).difference(LineString(f_).buffer(0.2))
-        if not T_.is_empty: fences[i_] = _ricuci(f_, T_)
-    # the walls and fences of the map standing along the edge of the track bed (a DBGT divider by the tracks, up to 5 m out at the foot of the ballast) close to the level crossing the same way
-    for j_, b_ in enumerate(bar_out):
-        if _t_pl.is_empty or len(b_[0]) < 2: continue
-        L_ = LineString(b_[0])
-        if L_.distance(_Bk) > 5.0 or L_.distance(_X) > RICUCI: continue  # the fence at the foot of the ballast, a few metres out from the edge of the bed
-        T_ = _t_pl.difference(L_.buffer(0.2))
-        if not T_.is_empty: bar_out[j_] = (_ricuci(list(b_[0]), T_),) + tuple(b_[1:])
-    _nuovi = fences[len(fences) - _n_new:] if _n_new else []
-    log('CONTROLLO capi delle recinzioni ferroviarie ricuciti a recinzioni, banchine e passaggi a livello:', len(_ricuciti), _ricuciti[:12], 'scartati', dict(_scarti.most_common(40)))
-    _chiusi_rep = {'tratti': len(_nuovi), 'metri': round(sum(LineString(f_).length for f_ in _nuovi), 1), 'dove': [(round(LineString(f_).length, 1), '?x=%.0f&z=%.0f' % LineString(f_).interpolate(0.5, normalized=True).coords[0]) for f_ in _nuovi]}
-    log('CONTROLLO chiusure del bordo dei binari verso piazze e strade (tratti, metri):', _chiusi_rep['tratti'], _chiusi_rep['metri'], _chiusi_rep['dove'])
+# via Pace by hand (Carlo, 29/10, photos with the green lines; the level crossing of via Cialdini x 586.7 z -758.6): the railway fence on the porfido side, from the
+# end of the platform parapet (580.4, -750.1) to the end of the fence that stands there (580.26, -753.05); and from the other end of that fence (582.53, -757.06) to the
+# post of the barrier of the level crossing (583.8, -759.4), where it stops before the road. Nothing along the platform
+PACE_FISSE = [
+    [(580.4, -750.1), (580.26, -753.05)],
+    [(582.53, -757.06), (583.8, -759.4)],
+]
+if FER: fences += [list(f_) for f_ in PACE_FISSE]
+# the railing (low wall with railings, kind 2) that goes on from the end of the DBGT one to the edge of the road, as it stood on dev: Carlo liked it (x 576.2 z -761.6)
+bar_out.append(([(574.61, -757.4), (577.55, -762.43)], 2, 1.6))
 
 # ---- rivers: merge the OSM pieces, then cut them where a road / railway / building passes over (a bridge or culvert mouth)
 from shapely.ops import linemerge
@@ -1999,7 +1916,6 @@ if FER:
 _ctl['paletti_e_blocchi_su_una_via'] = {'%s %s' % k_: v_ for k_, v_ in sorted(n_su_via.items())}
 log('CONTROLLO paletti e blocchi OSM su un nodo di una via: restano', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'restano'), 'spostati dalla regola vecchia', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'spostati_dalla_regola_vecchia'), 'spostati ora 0 per costruzione; sciolti spostati', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'sciolti_spostati'))
 _ctl['oggetti_senza_collisione'] = dict(_n_senza)
-_ctl['chiusure_suolo_ferroviario_verso_piazze'] = _chiusi_rep
 _ctl['aiuole_dbgt_bordi_bassi'] = _ctl_aiuole
 _ctl['divisori_ferroviari_chiusi_alla_strada'] = {'tratti': len(_capi), 'metri': _capi_m} if FER else None
 _ctl['alberi_su_isole'] = MANUF.rep.get('alberi_isole')
