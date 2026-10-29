@@ -236,6 +236,8 @@ if os.path.exists(CONF):
         ls_ = [LineString([proj(p['lat'], p['lon']) for p in m['geometry']]) for m in e_.get('members', []) if m.get('type') == 'way' and len(m.get('geometry') or []) > 1]
         if ls_ and e_.get('tags', {}).get('name'): _comuni[e_['tags']['name'].lower()] = unary_union(list(polygonize(unary_union(ls_))))
 dbt_walls, dbt_vols, dbt_roads, dbt_pc, _cov = [], [], [], [], []
+AIUOLA_MAX_M2, AIUOLA_ALONG, AIUOLA_H = 400.0, 0.8, 0.5  # flower bed: at most this area; a divider with this share of its length on its edge; the kerb height
+dbt_aiuole = []  # the edges of the flower beds (AR_VRD 04) of the DBGT, small ones: a divider along one is the kerb of the bed
 for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
     f_ = os.path.join(DBT_DIR, d_, 'dbgt.gpkg')
     if not os.path.exists(f_): continue
@@ -249,6 +251,15 @@ for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
         for part in getattr(g_, 'geoms', [g_]):
             pts_ = _xy(part.coords)
             if len(pts_) >= 2: dbt_walls.append((pts_, ty))
+    try:
+        for (blob,) in con_.execute("select s.Shape from AR_VRD a join AR_VRD_AR_VRD_SUP s on s.CLASSREF = a.CLASSID where a.AR_VRD_TY = '04'"):
+            if blob is None: continue
+            g_ = _gpkg_geom(blob)
+            for part in getattr(g_, 'geoms', [g_]):
+                if part.geom_type != 'Polygon' or len(part.exterior.coords) < 4: continue
+                _p_ = Polygon(_xy(part.exterior.coords), [_xy(h_.coords) for h_ in part.interiors if len(h_.coords) >= 4]).buffer(0)
+                if 0 < _p_.area < AIUOLA_MAX_M2: dbt_aiuole.append(_p_)
+    except sqlite3.OperationalError: pass
     for blob, av in con_.execute('select Shape, UN_VOL_AV from UN_VOL'):
         if blob is None or not av or float(av) <= 1: continue
         g_ = _gpkg_geom(blob)
@@ -930,6 +941,7 @@ prepare(bar_cut)
 # Kinds: 1 wall, 2 low wall with railings, 3 hedge, 4 retaining wall, 5 wire mesh, 6 railway fence, 7 wooden post-and-rail. What each DBGT line
 # is comes from the map first (OSM's type where it drew the same line), then from where it stands: by the tracks, along a street, in an
 # industrial zone, in the fields; between houses it is a mix (wire mesh, hedge, low wall), the one choice not taken from the data
+_ctl_aiuole = None
 _dbt_i0 = _dbt_i1 = 0  # barriers[_dbt_i0:_dbt_i1] are the dividers of the DBGT
 if dbt_walls:
     nrep_, osm_in = 0, []
@@ -944,6 +956,7 @@ if dbt_walls:
     for z_ in (_rail_z, _street_z, _ind_z, _farm_z, _park_z): prepare(z_)
     from barriere import classify  # one rule for every comune: src/barriere.py
     _bld_t = STRtree(btree_geoms) if btree_geoms else None
+    _aiu_b = [p_.boundary.buffer(AIUOLA_ALONG) for p_ in dbt_aiuole]; _aiu_t = STRtree(_aiu_b) if _aiu_b else None; n_aiu = Counter()
     kinds_, nring = Counter(), 0; _dbt_i0 = len(barriers)
     for pts, ty in dbt_walls:
         L = LineString(pts); m = L.interpolate(0.5, normalized=True); osm_ = None
@@ -958,9 +971,16 @@ if dbt_walls:
         closed = len(pts) > 3 and math.dist(pts[0], pts[-1]) < 0.3
         kh = classify(ty, osm_, zone, lot_ if lot_ is not None else h01(str(pts[0])), L.length if closed else None)
         if kh is None: nring += 1; continue
+        # a divider whose own type says nothing (17, 18, 95) lying along the edge of a flower bed of the DBGT (AR_VRD 04) is the kerb of the bed (via del Cimitero x 515 z -231, Carlo
+        # 29/10: the beds of the square were drawn as dark hedges 1,7 m high): a low wall; a divider the DBGT calls a hedge (19) or that OSM draws stays as it is
+        if _aiu_t is not None and ty in ('17', '18', '95') and osm_ is None and L.length > 0.3:
+            if any(L.intersection(_aiu_b[j_]).length >= AIUOLA_ALONG * L.length for j_ in _aiu_t.query(L.buffer(1.0))):
+                if kh[0] != 1 or kh[1] != AIUOLA_H: n_aiu[kh[0]] += 1
+                kh = (1, AIUOLA_H)
         barriers.append((pts, kh[0], round(kh[1], 1))); kinds_[kh[0]] += 1
     _dbt_i1 = len(barriers)
-    log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', sum(kinds_.values()), 'per tipo', dict(kinds_), 'bordi di aiuole e vasche', nring)
+    log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', sum(kinds_.values()), 'per tipo', dict(kinds_), 'bordi di aiuole e vasche', nring, 'bordi di aiuola resi bassi (0,5 m) invece di', dict(n_aiu), 'aiuole DBGT', len(dbt_aiuole))
+    _ctl_aiuole = {'aiuole_dbgt': len(dbt_aiuole), 'divisori_resi_cordolo_basso_per_tipo_di_prima': {str(k_): v_ for k_, v_ in n_aiu.items()}}
 # passi carrai: each DBGT driveway point within PC_D of a divider opens it PC_W wide and closes it with a gate as tall as the wall;
 # where a street (class 3 or more) already crosses there the gap stays open. Two points closer than PC_W are one gate
 PC_D, PC_W = 1.5, 3.6
@@ -1237,6 +1257,41 @@ if FER:  # the DBGT railway dividers (kind 6) between a platform and a track or 
                 if _p.geom_type == 'LineString' and _p.length >= 0.8: _capi.append((list(_p.coords), b_[1], b_[2]))
     bar_out += _capi; _capi_m = round(sum(LineString(c_[0]).length for c_ in _capi), 1)
     log('CONTROLLO chiusure dei divisori ferroviari alla strada (tratti, metri):', len(_capi), _capi_m, [(round(c_[0][0][0]), round(c_[0][0][1])) for c_ in _capi[:6]])
+
+# the track bed closed to a square or a street (Carlo, 29/10, via Pace x 580 z -752: "dalla piazza si passa dritti sui binari"): the fill-in above leaves the edge
+# of the track open wherever a fence or a wall stands within 12 m, and the rule of the platforms takes the dividers between a platform and a track away, so a porfido
+# strip along the track had nothing. Rule, the same everywhere: a stretch of the edge of the track bed (BED_HW either side of the axis) that has a hard surface
+# (street, square, pavement, footway) along it, no platform, no fence, wall or building within CHIUDI_VICINO m, that is not at a level crossing, a track end or a
+# gate, nor where a way goes in (a footway or a street within 1.5 m), at least CHIUDI_MIN m long, is closed with the railway fence (solid, like the others)
+CHIUDI_VICINO, CHIUDI_MIN, CHIUDI_MAX, CHIUDI_FINE, CHIUDI_FUORI = 1.5, 4.0, 80.0, 3.0, 0.3  # CHIUDI_FUORI: the fence stands this far outside the edge of the bed: the game drops a fence within 2 m of a rail (world3.js nearLowRail)  # CHIUDI_FINE: round the end of a track (the fill-in uses 9 m: there the line may go on beyond the data)
+_chiusi_rep = {'tratti': 0, 'metri': 0.0, 'dove': []}
+if FER:
+    if os.environ.get('GTA_DUMP_CHIUDI'):
+        import pickle; pickle.dump(dict(rl=_rl_suolo, fences=fences, bar_out=bar_out, xpts=xpts, tips=tips, platforms=platforms, gates=gates, roads=[(r_['line'], r_['w'], r_['c']) for r_ in raw_roads if flat(r_)], bld=btree_geoms, asph=asph, pedz=pedz, side=side, foot=foot, cover=dbt_cover, RECT=RECT), open(os.environ['GTA_DUMP_CHIUDI'], 'wb'))
+    _Bk = unary_union([l_.buffer(dbgt_ferrovia.BED_HW + CHIUDI_FUORI, cap_style=2) for l_ in _rl_suolo]).boundary.intersection(dbt_cover.buffer(-1.5)).intersection(RECT)
+    _dura = unary_union([asph, pedz, side, foot]); prepare(_dura)
+    _adj = _Bk.intersection(_dura.buffer(0.5)).difference(platforms.buffer(0.6))
+    _ex_l = [LineString(f_) for f_ in fences if len(f_) >= 2] + [LineString(b_[0]) for b_ in bar_out if len(b_[0]) >= 2]
+    _chiude = unary_union([l_.buffer(CHIUDI_VICINO, quad_segs=2) for l_ in _ex_l if l_.distance(_Bk) < CHIUDI_VICINO + 1] + [g_.buffer(1.0) for g_ in btree_geoms if g_.distance(_Bk) < 3]
+                          + list(xpts) + [Point(c_).buffer(CHIUDI_FINE) for c_ in tips] + [g_.buffer(3.0) for g_ in gates] + [r_['line'].buffer(1.5) for r_ in raw_roads if flat(r_) and r_['c'] <= 6 and r_['line'].distance(_Bk) < 3])
+    _gap = _adj.difference(_chiude)
+    _gap = linemerge(_gap) if not _gap.is_empty and _gap.geom_type in ('MultiLineString', 'LineString') else _gap
+    _nuovi = []
+    for l_ in (list(_gap.geoms) if hasattr(_gap, 'geoms') else [_gap]):
+        if not isinstance(l_, LineString) or not CHIUDI_MIN <= l_.length <= CHIUDI_MAX or math.dist(l_.coords[0], l_.coords[-1]) < 0.5: continue
+        e_ = _Bk.intersection(l_.buffer(CHIUDI_VICINO - 0.2, cap_style=2))  # out to the wall it meets, from where the cut left it
+        e_ = linemerge(e_) if e_.geom_type == 'MultiLineString' else e_
+        if e_.geom_type != 'LineString': e_ = l_
+        _nuovi.append(list(e_.simplify(0.15).coords))
+    if _nuovi:
+        _nuovi = FER.fuori_dalle_carreggiate(_nuovi, STR.carreggiate(0, strade=True)) if STR else _nuovi
+        _nuovi = FER.via_dai_ponti(_nuovi)
+        _nuovi = FER.via_dai_binari(_nuovi, _rl_suolo, 'chiusure_alla_piazza')
+        _nuovi = FER.lontano_dai_binari(_nuovi, _rl_suolo, 'chiusure_alla_piazza')
+        _nuovi = [f_ for f_ in _nuovi if LineString(f_).length >= 2.0]
+    fences += _nuovi
+    _chiusi_rep = {'tratti': len(_nuovi), 'metri': round(sum(LineString(f_).length for f_ in _nuovi), 1), 'dove': [(round(LineString(f_).length, 1), '?x=%.0f&z=%.0f' % LineString(f_).interpolate(0.5, normalized=True).coords[0]) for f_ in _nuovi]}
+    log('CONTROLLO chiusure del bordo dei binari verso piazze e strade (tratti, metri):', _chiusi_rep['tratti'], _chiusi_rep['metri'], _chiusi_rep['dove'])
 
 # ---- rivers: merge the OSM pieces, then cut them where a road / railway / building passes over (a bridge or culvert mouth)
 from shapely.ops import linemerge
@@ -1868,6 +1923,8 @@ if FER:
 _ctl['paletti_e_blocchi_su_una_via'] = {'%s %s' % k_: v_ for k_, v_ in sorted(n_su_via.items())}
 log('CONTROLLO paletti e blocchi OSM su un nodo di una via: restano', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'restano'), 'spostati dalla regola vecchia', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'spostati_dalla_regola_vecchia'), 'spostati ora 0 per costruzione; sciolti spostati', sum(v_ for (k_, w_), v_ in n_su_via.items() if w_ == 'sciolti_spostati'))
 _ctl['oggetti_senza_collisione'] = dict(_n_senza)
+_ctl['chiusure_suolo_ferroviario_verso_piazze'] = _chiusi_rep
+_ctl['aiuole_dbgt_bordi_bassi'] = _ctl_aiuole
 _ctl['divisori_ferroviari_chiusi_alla_strada'] = {'tratti': len(_capi), 'metri': _capi_m} if FER else None
 _ctl['alberi_su_isole'] = MANUF.rep.get('alberi_isole')
 log('CONTROLLO alberi sulle isole stradali sotto', dbgt_manufatti.ALB_ISOLA, 'm (devono essere 0 dopo):', MANUF.rep.get('alberi_isole'))
