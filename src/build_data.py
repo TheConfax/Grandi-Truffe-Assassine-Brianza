@@ -351,6 +351,9 @@ def area_type(t):
     for k in ('leisure', 'landuse', 'natural'):
         if t.get(k) in AREA_T: return AREA_T[t[k]]
     return None
+# cantieri finiti (Carlo 29/10): way OSM landuse=construction ormai superati, non si disegnano
+#   1396686491  Ewiva, via Gagarin: la stazione di ricarica c'e' gia' (Google Maps)
+CANTIERI_FINITI = {1396686491}
 areas = []
 for members, t in rels:
     if t.get('type') != 'multipolygon' or 'building' in t: continue
@@ -361,7 +364,7 @@ for members, t in rels:
     for o in join_rings(outers):
         if len(o) >= 3: areas.append((at, o, ir))
 for wid, (refs, t) in ways.items():
-    if wid in mp_ways or refs[0] != refs[-1] or 'building' in t: continue
+    if wid in mp_ways or wid in CANTIERI_FINITI or refs[0] != refs[-1] or 'building' in t: continue
     at = area_type(t)
     if at and not (t.get('highway') and t.get('area') != 'yes'):
         pts = ring(refs)
@@ -398,7 +401,7 @@ for members, t in rels:
     for o in join_rings([m[1] for m in members if m[0] == 'way' and m[2] == 'outer']):
         if len(o) >= 3: land.append((k_, o))
 for wid, (refs, t) in ways.items():
-    if wid in mp_ways or refs[0] != refs[-1] or 'building' in t: continue
+    if wid in mp_ways or wid in CANTIERI_FINITI or refs[0] != refs[-1] or 'building' in t: continue
     k_ = ls_kind(t)
     if k_:
         pts = ring(refs)
