@@ -152,18 +152,37 @@ function rectHit(A, B) { /* oriented rects {x,z,ux,uz,hl,hd}: separating axis */
 }
 function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; returns runs of {s,v0,v1,x,z,h,o} */
   const sides = lotSides(P), runs = [], placed = []; if (!sides.length) return runs;
-  sides.forEach((sd, g) => {
+  const prep = []; for (const sd of sides) {
     let ux = (sd.b[0] - sd.a[0]) / sd.L, uz = (sd.b[1] - sd.a[1]) / sd.L; const mx = (sd.a[0] + sd.b[0]) / 2, mz = (sd.a[1] + sd.b[1]) / 2;
-    if (inPoly(mx - uz * 1.5, mz + ux * 1.5, P)) { /* (-uz, ux) is the inside */ } else if (inPoly(mx + uz * 1.5, mz - ux * 1.5, P)) { ux = -ux; uz = -uz; } else return;
+    if (inPoly(mx - uz * 1.5, mz + ux * 1.5, P)) { /* (-uz, ux) is the inside */ } else if (inPoly(mx + uz * 1.5, mz - ux * 1.5, P)) { ux = -ux; uz = -uz; } else continue;
     const o = { x: 0, z: 0, ux, uz, nx: -uz, nz: ux };
     /* origin at the start of the side in the direction u */
     const fwd = (sd.b[0] - sd.a[0]) * ux + (sd.b[1] - sd.a[1]) * uz > 0, O = fwd ? sd.a : sd.b; o.x = O[0]; o.z = O[1];
+    /* a real straight edge (kerb of the pavement, bed, wall) within 4 m of the side of the data: the rows lean on it, in direction and position */
+    { const nx0 = -uz, nz0 = ux, pts = []; let tries = 0;
+      for (let s = 1; s <= sd.L - 1; s += 1.5) { tries++;
+        const bx = O[0] + ux * s, bz = O[1] + uz * s; let hit = null;
+        const pav = (x, z) => { const k = H.kind(x, z); return k === 'side' || k === 'plat' || k === 'road'; }; /* pavement, platform or street: what is not the lot's own ground ('green' is what H.kind says of everything else, a bed too) */
+        for (let v = 4; v >= -4 + 1e-6 && !hit; v -= 0.25) if (!pav(bx + nx0 * v, bz + nz0 * v) && pav(bx + nx0 * (v - 0.25), bz + nz0 * (v - 0.25))) hit = v - 0.125; /* from the inside outward: first change to pavement */
+        if (hit === null) { let best = 1e9; WALLS.each(bx - 4, bz - 4, bx + 4, bz + 4, w => { if (w.ax === undefined || w.y1 - w.y0 < 0.4) return; const wl = hyp(w.bx - w.ax, w.bz - w.az); if (wl < 3 || Math.abs(((w.bx - w.ax) * ux + (w.bz - w.az) * uz) / wl) < 0.97) return; const vv = ((w.ax + w.bx) / 2 - bx) * nx0 + ((w.az + w.bz) / 2 - bz) * nz0; if (Math.abs(vv) < Math.abs(best) && Math.abs(vv) <= 4) best = vv; }); if (best < 1e9) hit = best; }
+        if (hit !== null) pts.push([s, hit]); }
+      if (pts.length >= 4 && pts.length >= tries * 0.6) { /* least squares v = c + m s, twice, dropping what is more than 0.9 and then 0.6 m off the line (the edges of the cells are not a ruler) */
+        let q = pts, c = 0, m = 0, rms = 9; const fit = L => { const n = L.length; let ss = 0, sv = 0, s2 = 0, sSv = 0; for (const [s, v] of L) { ss += s; sv += v; s2 += s * s; sSv += s * v; } const den = n * s2 - ss * ss; m = den ? (n * sSv - ss * sv) / den : 0; c = (sv - m * ss) / n; };
+        fit(q); for (const tol of [0.9, 0.6]) { const k = q.filter(([s, v]) => Math.abs(v - c - m * s) <= tol); if (k.length < 4) { q = []; break; } q = k; fit(q); }
+        if (q.length) rms = Math.sqrt(q.reduce((a, [s, v]) => a + (v - c - m * s) ** 2, 0) / q.length);
+        if (q.length >= pts.length * 0.7 && q.length >= tries * 0.5 && rms < 0.4 && Math.abs(m) < 0.35) { const th = Math.atan(m), cs = Math.cos(th), sn = Math.sin(th), qx = ux * cs + nx0 * sn, qz = uz * cs + nz0 * sn; /* edge direction: u turned by th toward the normal */
+          o.x = O[0] + nx0 * c; o.z = O[1] + nz0 * c; o.ux = qx; o.uz = qz; o.nx = -qz; o.nz = qx; ux = qx; uz = qz; o.edge = true; } }
+    }
+    prep.push({ sd, o, ux, uz });
+  }
+  prep.sort((p, q) => (q.o.edge ? 1 : 0) - (p.o.edge ? 1 : 0) || q.sd.L - p.sd.L); /* the sides that lean on a real edge come first: their rows take the room, and the double rows */
+  prep.forEach(({ sd, o, ux, uz }, g) => {
     const bands = []; /* [v0, v1, nose sign] */
     bands.push([0.2, 5, 1]);
     if (g === 0) for (let v = 11; v < 70; v += 15.6) bands.push([v, v + 4.8, -1], [v + 4.8, v + 9.6, 1]);
     for (const [v0, v1, sg] of bands) {
       let run = []; const ext = [1e9, -1e9], mine = [];
-      const flush = () => { if (run.length) runs.push(run); run = []; };
+      const flush = () => { if (run.length > 1) runs.push(run); run = []; }; /* a lone stall is not a car park (piazzetta of via Isonzo) */
       for (let s = 1.25 + 0.0; s <= sd.L - 1.25 + 1e-6; s += 2.5) {
         const vm = (v0 + v1) / 2, rc = { x: o.x + ux * s + o.nx * vm, z: o.z + uz * s + o.nz * vm, ux, uz, hl: 1.2, hd: (v1 - v0) / 2 - 0.05, g };
         if (placed.some(r => r.g !== g && (!r.lane ? rectHit(rc, r) : rectHit(rc, r))) || !stallOK(o, s, v0, v1)) { flush(); continue; }
@@ -176,6 +195,26 @@ function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; ret
   });
   return runs;
 }
+/* Rows of stalls drawn by hand from the aerial photo (Regione Lombardia orthophoto) where the rule below, working on the whole OSM/DBGT area, got them wrong: via Isonzo (the piazzetta and the car park to the north), foto aerea, Carlo 29/10.
+   a, b: the back of the row (kerb, wall), first to last stall; lato: +1 the stalls are on the side (-uz, ux) of a->b, -1 on the other; n: stalls, 2.5 m wide, 4.8 deep, nose to the back, counted from a; ln: stalls that keep their line on the side of a left-out one; sin: stalls left out (the beds of the square stand there: the row is made of the stalls between them); dis: the stall of the disabled (-1 none); ang: angle of the stalls with the row, degrees (90 or missing: nose-in, 80 or so: herringbone), lean: +1 the stalls lean toward the end b, -1 toward a (of the pair as swapped when lato is -1); with ang the pitch grows to 2.5 / sin(ang) and the lines follow the stalls. An area holding a row of these gets no stalls of the rule. */
+const PARK_A_MANO = [
+  { a: [555.3, -233.1], b: [544.4, -216.3], lato: 1, n: 8, dis: 1 }, /* piazzetta of via Isonzo, row against the bed along the street (east) */
+  { a: [545.7, -247.7], b: [534.0, -231.4], lato: -1, n: 8, sin: [2, 3, 6], ln: [1], dis: 5 }, /* piazzetta of via Isonzo, row against the edge of the square with the beds (west) */
+  { a: [569.4, -265.5], b: [560.5, -253.5], lato: -1, n: 6, dis: -1 }, /* east side of the building of Muzic Planet */
+  { a: [548.4, -294.7], b: [567.8, -278.95], lato: 1, n: 10, dis: 1 }, /* north, along via Indipendenza, against the green strip */
+  /* via Gagarin and around, foto aerea (orthophoto 2018-19), Carlo 29/10: OSM has no parking:lane and no car park here */
+  { a: [483.4, -412.5], b: [512.7, -452.0], lato: 1, n: 19, dis: -1 }, /* west side, against the pavement of the Medateca, nose-in, from the crossing to the cross street */
+  { a: [494.3, -402.8], b: [526.7, -447.3], lato: 1, n: 22, dis: -1 }, /* south-east side, against the green strip between the lanes, from the roundabout to the crossing */
+  { a: [535.9, -457.9], b: [558.5, -489.0], lato: 1, n: 18, ang: 80, lean: 1, dis: -1 }, /* beyond the cross street, same strip, towards Ewiva: herringbone */
+  { a: [566.4, -461.8], b: [592.1, -442.0], lato: 1, n: 14, ang: 80, lean: -1, dis: -1 }, /* car park of viale Brianza, north-east row against the hedge */
+  { a: [590.05, -425.2], b: [562.15, -446.3], lato: 1, n: 14, sin: [0, 7, 8], dis: -1 }, /* car park of viale Brianza, south-west row, in front of the Amie building */
+];
+const PARK_A_MANO_STALLS = PARK_A_MANO.flatMap(r => {
+  const [a, b] = r.lato < 0 ? [r.b, r.a] : [r.a, r.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, out = [];
+  const an = (r.ang || 90) * Math.PI / 180, sa = Math.sin(an), ca = Math.cos(an) * (r.lean || 1), pitch = 2.5 / sa, ax = ux * ca + nx * sa, az = uz * ca + nz * sa; /* the axis of a stall, from its back */
+  for (let k = 0; k < r.n; k++) { const s = pitch * k + pitch / 2, ix = j => r.lato < 0 ? r.n - 1 - j : j, out0 = (r.sin || []).includes.bind(r.sin || []); if (out0(ix(k))) continue; out.push({ x: a[0] + ux * s + ax * 2.4, z: a[1] + uz * s + az * 2.4, ux: az, uz: -ax, h: Math.atan2(-ax, -az), dis: ix(k) === r.dis, l0: k === 0 || (r.ln || []).includes(ix(k)), l1: !out0(ix(k + 1)), y1: ix(k) === r.dis || ix(k + 1) === r.dis }); } /* each line drawn once, by the stall before it (yellow if either side is the disabled one); none on the side of a left-out stall, the bed is there; ux, uz: the width of the stall, for the lines */
+  return out;
+});
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf();
   T.stalls = []; T.streetStalls = [];
@@ -188,6 +227,12 @@ function buildParkingLines(T, G) {
     }
     const i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
   const outline = (x, z, ux, uz, l, w, col) => { quad(x, z, ux, uz, -l / 2, l / 2, -w / 2 - 0.06, -w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2, l / 2, w / 2 - 0.06, w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2 - 0.06, -l / 2 + 0.06, -w / 2, w / 2, col); quad(x, z, ux, uz, l / 2 - 0.06, l / 2 + 0.06, -w / 2, w / 2, col); };
+  for (const st of PARK_A_MANO_STALLS) { /* the rows by hand: each stall in the tile its centre falls in; first in T.stalls, so the cars of the tile (at most 14) park here before elsewhere */
+    if (tileOf(st.x, st.z) !== T.t) continue; const col = st.dis ? Y : W;
+    if (st.l0) quad(st.x, st.z, st.ux, st.uz, -1.31, -1.19, -2.4, 2.4, col); if (st.l1) quad(st.x, st.z, st.ux, st.uz, 1.19, 1.31, -2.4, 2.4, st.y1 ? Y : W);
+    if (st.dis) quad(st.x, st.z, st.ux, st.uz, -0.5, 0.5, -0.5, 0.5, BLUE);
+    T.stalls.push({ x: st.x, z: st.z, h: st.h, dis: st.dis });
+  }
   // the spaces OSM maps one by one: white lines, yellow with the blue square for the disabled
   const real = (T.d.ps || []).map(([X, Z, ang, L, Wd, kind]) => ({ x: X / 10, z: Z / 10, ang, L: clamp(L, 4, 7), W: clamp(Wd, 1.8, 3.5), kind }));
   for (const sp of real) {
@@ -217,7 +262,8 @@ function buildParkingLines(T, G) {
     }
   }
   for (const a of (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || [])) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
-    const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P);
+    const P = dec(a.p); if (P.length < 3) continue; if (PARK_A_MANO_STALLS.some(st => inPoly(st.x, st.z, P))) continue; /* a row drawn by hand: no stalls of the rule in this area */
+    const [cx, cz] = centroid(P);
     // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
     const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
@@ -227,15 +273,14 @@ function buildParkingLines(T, G) {
     const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3); };
     /* a stall only where it is free: no wall, hedge or kerb of a bed on its rectangle, no pavement under it (the porfido of an entrance), and a free aisle (3 m) in front of it, inside the lot or on a street (via del Cimitero, Carlo 29/10: stalls in a passage between two beds, ending on the porfido of the door) */
     const barNear = (x, z, r) => { let f = false; WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, o => { if (!f && o.ax !== undefined && o.y1 - o.y0 > 0.4 && segDist(x, z, o.ax, o.az, o.bx, o.bz) < r) f = true; }); return f; };
-    const stallFree = (s, v0, v1, row) => {
-      const at = v => [cx + ux * s + nx * v, cz + uz * s + nz * v], vm = (v0 + v1) / 2;
-      for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const x = cx + ux * (s + ds) + nx * v, z = cz + uz * (s + ds) + nz * v; if (barNear(x, z, 0.45)) return false; } /* not the ends: a fence closing the lot behind the stall is where cars park nose-in (Carlo 29/10) */
-      /* no check of the aisle in front: a strip of pavement or a kerb between the row and the lane emptied whole rows (via Gagarin, Carlo 29/10) */
-      return true;
+    const stallFree = (o, s, v0, v1) => { /* a stall boxed in, with a wall at one end and a bed or wall within 3 m past the other, has no way out (piazzetta of via Isonzo, Carlo 29/10) */
+      const barAt = (v, r) => [-0.9, 0, 0.9].some(ds => barNear(o.x + o.ux * (s + ds) + o.nx * v, o.z + o.uz * (s + ds) + o.nz * v, r));
+      const boxed = (vb, vf, d) => barAt(vb, 0.8) && [0.3, 1.3, 2.3].some(k => barAt(vf + d * k, 0.6));
+      return !(boxed(v0, v1, 1) || boxed(v1, v0, -1));
     };
     const stallOK = (o, s, v0, v1) => {
       const at = (ss, v) => [o.x + o.ux * ss + o.nx * v, o.z + o.uz * ss + o.nz * v], vm = (v0 + v1) / 2, [x, z] = at(s, vm);
-      if (!ok2(x, z)) return false;
+      if (!ok2(x, z) || !stallFree(o, s, v0, v1)) return false;
       for (const ds of [-1.1, 1.1]) for (const v of [v0 + 0.15, v1 - 0.15]) { const [cx2, cz2] = at(s + ds, v); if (!inPoly(cx2, cz2, P) || inBuilding(cx2, cz2, 0.1)) return false; }
       for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const [bx, bz] = at(s + ds, v); if (barNear(bx, bz, 0.45)) return false; }
       return !(treeNear(...at(s, v0 + 1.2), 1.75) || treeNear(...at(s, v1 - 1.2), 1.75)); /* a tree of the car park in the stall: left free */
