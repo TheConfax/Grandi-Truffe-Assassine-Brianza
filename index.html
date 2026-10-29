@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 931c130 · assemblato 29/10 17:46 · porta ' + location.port;
+    const txt = 'locale · ramo parcheggi-gagarin · dopo 4a1a147 · assemblato 29/10 18:01 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3941,16 +3941,23 @@ function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; ret
   return runs;
 }
 /* Rows of stalls drawn by hand from the aerial photo (Regione Lombardia orthophoto) where the rule below, working on the whole OSM/DBGT area, got them wrong: via Isonzo (the piazzetta and the car park to the north), foto aerea, Carlo 29/10.
-   a, b: the back of the row (kerb, wall), first to last stall; lato: +1 the stalls are on the side (-uz, ux) of a->b, -1 on the other; n: stalls, 2.5 m wide, 4.8 deep, nose to the back, counted from a; ln: stalls that keep their line on the side of a left-out one; sin: stalls left out (the beds of the square stand there: the row is made of the stalls between them); dis: the stall of the disabled (-1 none). An area holding a row of these gets no stalls of the rule. */
+   a, b: the back of the row (kerb, wall), first to last stall; lato: +1 the stalls are on the side (-uz, ux) of a->b, -1 on the other; n: stalls, 2.5 m wide, 4.8 deep, nose to the back, counted from a; ln: stalls that keep their line on the side of a left-out one; sin: stalls left out (the beds of the square stand there: the row is made of the stalls between them); dis: the stall of the disabled (-1 none); ang: angle of the stalls with the row, degrees (90 or missing: nose-in, 80 or so: herringbone), lean: +1 the stalls lean toward the end b, -1 toward a (of the pair as swapped when lato is -1); with ang the pitch grows to 2.5 / sin(ang) and the lines follow the stalls. An area holding a row of these gets no stalls of the rule. */
 const PARK_A_MANO = [
   { a: [555.3, -233.1], b: [544.4, -216.3], lato: 1, n: 8, dis: 1 }, /* piazzetta of via Isonzo, row against the bed along the street (east) */
   { a: [545.7, -247.7], b: [534.0, -231.4], lato: -1, n: 8, sin: [2, 3, 6], ln: [1], dis: 5 }, /* piazzetta of via Isonzo, row against the edge of the square with the beds (west) */
   { a: [569.4, -265.5], b: [560.5, -253.5], lato: -1, n: 6, dis: -1 }, /* east side of the building of Muzic Planet */
   { a: [548.4, -294.7], b: [567.8, -278.95], lato: 1, n: 10, dis: 1 }, /* north, along via Indipendenza, against the green strip */
+  /* via Gagarin and around, foto aerea (orthophoto 2018-19), Carlo 29/10: OSM has no parking:lane and no car park here */
+  { a: [483.4, -412.5], b: [512.7, -452.0], lato: 1, n: 19, dis: -1 }, /* west side, against the pavement of the Medateca, nose-in, from the crossing to the cross street */
+  { a: [494.3, -402.8], b: [526.7, -447.3], lato: 1, n: 22, dis: -1 }, /* south-east side, against the green strip between the lanes, from the roundabout to the crossing */
+  { a: [535.9, -457.9], b: [558.5, -489.0], lato: 1, n: 18, ang: 80, lean: 1, dis: -1 }, /* beyond the cross street, same strip, towards Ewiva: herringbone */
+  { a: [566.4, -461.8], b: [592.1, -442.0], lato: 1, n: 14, ang: 80, lean: -1, dis: -1 }, /* car park of viale Brianza, north-east row against the hedge */
+  { a: [590.05, -425.2], b: [562.15, -446.3], lato: 1, n: 14, sin: [0, 7, 8], dis: -1 }, /* car park of viale Brianza, south-west row, in front of the Amie building */
 ];
 const PARK_A_MANO_STALLS = PARK_A_MANO.flatMap(r => {
   const [a, b] = r.lato < 0 ? [r.b, r.a] : [r.a, r.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, out = [];
-  for (let k = 0; k < r.n; k++) { const s = 2.5 * k + 1.25, ix = j => r.lato < 0 ? r.n - 1 - j : j, out0 = (r.sin || []).includes.bind(r.sin || []); if (out0(ix(k))) continue; out.push({ x: a[0] + ux * s + nx * 2.4, z: a[1] + uz * s + nz * 2.4, ux, uz, h: Math.atan2(uz, -ux), dis: ix(k) === r.dis, l0: k === 0 || (r.ln || []).includes(ix(k)), l1: !out0(ix(k + 1)), y1: ix(k) === r.dis || ix(k + 1) === r.dis }); } /* each line drawn once, by the stall before it (yellow if either side is the disabled one); none on the side of a left-out stall, the bed is there */
+  const an = (r.ang || 90) * Math.PI / 180, sa = Math.sin(an), ca = Math.cos(an) * (r.lean || 1), pitch = 2.5 / sa, ax = ux * ca + nx * sa, az = uz * ca + nz * sa; /* the axis of a stall, from its back */
+  for (let k = 0; k < r.n; k++) { const s = pitch * k + pitch / 2, ix = j => r.lato < 0 ? r.n - 1 - j : j, out0 = (r.sin || []).includes.bind(r.sin || []); if (out0(ix(k))) continue; out.push({ x: a[0] + ux * s + ax * 2.4, z: a[1] + uz * s + az * 2.4, ux: az, uz: -ax, h: Math.atan2(-ax, -az), dis: ix(k) === r.dis, l0: k === 0 || (r.ln || []).includes(ix(k)), l1: !out0(ix(k + 1)), y1: ix(k) === r.dis || ix(k + 1) === r.dis }); } /* each line drawn once, by the stall before it (yellow if either side is the disabled one); none on the side of a left-out stall, the bed is there; ux, uz: the width of the stall, for the lines */
   return out;
 });
 function buildParkingLines(T, G) {
