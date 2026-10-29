@@ -163,7 +163,7 @@ function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; ret
     if (g === 0) for (let v = 11; v < 70; v += 15.6) bands.push([v, v + 4.8, -1], [v + 4.8, v + 9.6, 1]);
     for (const [v0, v1, sg] of bands) {
       let run = []; const ext = [1e9, -1e9], mine = [];
-      const flush = () => { if (run.length) runs.push(run); run = []; };
+      const flush = () => { if (run.length > 1) runs.push(run); run = []; }; /* a lone stall is not a car park (piazzetta of via Isonzo) */
       for (let s = 1.25 + 0.0; s <= sd.L - 1.25 + 1e-6; s += 2.5) {
         const vm = (v0 + v1) / 2, rc = { x: o.x + ux * s + o.nx * vm, z: o.z + uz * s + o.nz * vm, ux, uz, hl: 1.2, hd: (v1 - v0) / 2 - 0.05, g };
         if (placed.some(r => r.g !== g && (!r.lane ? rectHit(rc, r) : rectHit(rc, r))) || !stallOK(o, s, v0, v1)) { flush(); continue; }
@@ -176,6 +176,19 @@ function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; ret
   });
   return runs;
 }
+/* Rows of stalls drawn by hand from the aerial photo (Regione Lombardia orthophoto) where the rule below, working on the whole OSM/DBGT area, got them wrong: via Isonzo (the piazzetta and the car park to the north), foto aerea, Carlo 29/10.
+   a, b: the back of the row (kerb, wall), first to last stall; lato: +1 the stalls are on the side (-uz, ux) of a->b, -1 on the other; n: stalls, 2.5 m wide, 4.8 deep, nose to the back, counted from a; ln: stalls that keep their line on the side of a left-out one; sin: stalls left out (the beds of the square stand there: the row is made of the stalls between them); dis: the stall of the disabled (-1 none). An area holding a row of these gets no stalls of the rule. */
+const PARK_A_MANO = [
+  { a: [555.3, -233.1], b: [544.4, -216.3], lato: 1, n: 8, dis: 1 }, /* piazzetta of via Isonzo, row against the bed along the street (east) */
+  { a: [545.7, -247.7], b: [534.0, -231.4], lato: -1, n: 8, sin: [2, 3, 6], ln: [1], dis: 5 }, /* piazzetta of via Isonzo, row against the edge of the square with the beds (west) */
+  { a: [569.4, -265.5], b: [560.5, -253.5], lato: -1, n: 6, dis: -1 }, /* east side of the building of Muzic Planet */
+  { a: [548.4, -294.7], b: [567.8, -278.95], lato: 1, n: 10, dis: 1 }, /* north, along via Indipendenza, against the green strip */
+];
+const PARK_A_MANO_STALLS = PARK_A_MANO.flatMap(r => {
+  const [a, b] = r.lato < 0 ? [r.b, r.a] : [r.a, r.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, out = [];
+  for (let k = 0; k < r.n; k++) { const s = 2.5 * k + 1.25, ix = j => r.lato < 0 ? r.n - 1 - j : j, out0 = (r.sin || []).includes.bind(r.sin || []); if (out0(ix(k))) continue; out.push({ x: a[0] + ux * s + nx * 2.4, z: a[1] + uz * s + nz * 2.4, ux, uz, h: Math.atan2(uz, -ux), dis: ix(k) === r.dis, l0: k === 0 || (r.ln || []).includes(ix(k)), l1: !out0(ix(k + 1)), y1: ix(k) === r.dis || ix(k + 1) === r.dis }); } /* each line drawn once, by the stall before it (yellow if either side is the disabled one); none on the side of a left-out stall, the bed is there */
+  return out;
+});
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf();
   T.stalls = []; T.streetStalls = [];
@@ -188,6 +201,12 @@ function buildParkingLines(T, G) {
     }
     const i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
   const outline = (x, z, ux, uz, l, w, col) => { quad(x, z, ux, uz, -l / 2, l / 2, -w / 2 - 0.06, -w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2, l / 2, w / 2 - 0.06, w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2 - 0.06, -l / 2 + 0.06, -w / 2, w / 2, col); quad(x, z, ux, uz, l / 2 - 0.06, l / 2 + 0.06, -w / 2, w / 2, col); };
+  for (const st of PARK_A_MANO_STALLS) { /* the rows by hand: each stall in the tile its centre falls in; first in T.stalls, so the cars of the tile (at most 14) park here before elsewhere */
+    if (tileOf(st.x, st.z) !== T.t) continue; const col = st.dis ? Y : W;
+    if (st.l0) quad(st.x, st.z, st.ux, st.uz, -1.31, -1.19, -2.4, 2.4, col); if (st.l1) quad(st.x, st.z, st.ux, st.uz, 1.19, 1.31, -2.4, 2.4, st.y1 ? Y : W);
+    if (st.dis) quad(st.x, st.z, st.ux, st.uz, -0.5, 0.5, -0.5, 0.5, BLUE);
+    T.stalls.push({ x: st.x, z: st.z, h: st.h, dis: st.dis });
+  }
   // the spaces OSM maps one by one: white lines, yellow with the blue square for the disabled
   const real = (T.d.ps || []).map(([X, Z, ang, L, Wd, kind]) => ({ x: X / 10, z: Z / 10, ang, L: clamp(L, 4, 7), W: clamp(Wd, 1.8, 3.5), kind }));
   for (const sp of real) {
@@ -217,7 +236,8 @@ function buildParkingLines(T, G) {
     }
   }
   for (const a of (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || [])) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
-    const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P);
+    const P = dec(a.p); if (P.length < 3) continue; if (PARK_A_MANO_STALLS.some(st => inPoly(st.x, st.z, P))) continue; /* a row drawn by hand: no stalls of the rule in this area */
+    const [cx, cz] = centroid(P);
     // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
     const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
@@ -227,15 +247,14 @@ function buildParkingLines(T, G) {
     const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3); };
     /* a stall only where it is free: no wall, hedge or kerb of a bed on its rectangle, no pavement under it (the porfido of an entrance), and a free aisle (3 m) in front of it, inside the lot or on a street (via del Cimitero, Carlo 29/10: stalls in a passage between two beds, ending on the porfido of the door) */
     const barNear = (x, z, r) => { let f = false; WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, o => { if (!f && o.ax !== undefined && o.y1 - o.y0 > 0.4 && segDist(x, z, o.ax, o.az, o.bx, o.bz) < r) f = true; }); return f; };
-    const stallFree = (s, v0, v1, row) => {
-      const at = v => [cx + ux * s + nx * v, cz + uz * s + nz * v], vm = (v0 + v1) / 2;
-      for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const x = cx + ux * (s + ds) + nx * v, z = cz + uz * (s + ds) + nz * v; if (barNear(x, z, 0.45)) return false; } /* not the ends: a fence closing the lot behind the stall is where cars park nose-in (Carlo 29/10) */
-      /* no check of the aisle in front: a strip of pavement or a kerb between the row and the lane emptied whole rows (via Gagarin, Carlo 29/10) */
-      return true;
+    const stallFree = (o, s, v0, v1) => { /* a stall boxed in, with a wall at one end and a bed or wall within 3 m past the other, has no way out (piazzetta of via Isonzo, Carlo 29/10) */
+      const barAt = (v, r) => [-0.9, 0, 0.9].some(ds => barNear(o.x + o.ux * (s + ds) + o.nx * v, o.z + o.uz * (s + ds) + o.nz * v, r));
+      const boxed = (vb, vf, d) => barAt(vb, 0.8) && [0.3, 1.3, 2.3].some(k => barAt(vf + d * k, 0.6));
+      return !(boxed(v0, v1, 1) || boxed(v1, v0, -1));
     };
     const stallOK = (o, s, v0, v1) => {
       const at = (ss, v) => [o.x + o.ux * ss + o.nx * v, o.z + o.uz * ss + o.nz * v], vm = (v0 + v1) / 2, [x, z] = at(s, vm);
-      if (!ok2(x, z)) return false;
+      if (!ok2(x, z) || !stallFree(o, s, v0, v1)) return false;
       for (const ds of [-1.1, 1.1]) for (const v of [v0 + 0.15, v1 - 0.15]) { const [cx2, cz2] = at(s + ds, v); if (!inPoly(cx2, cz2, P) || inBuilding(cx2, cz2, 0.1)) return false; }
       for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const [bx, bz] = at(s + ds, v); if (barNear(bx, bz, 0.45)) return false; }
       return !(treeNear(...at(s, v0 + 1.2), 1.75) || treeNear(...at(s, v1 - 1.2), 1.75)); /* a tree of the car park in the stall: left free */
