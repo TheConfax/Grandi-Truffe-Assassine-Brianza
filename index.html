@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo b86d659 · assemblato 29/10 18:04 · porta ' + location.port;
+    const txt = 'locale · ramo lisciatore-parcheggi-3 · dopo cd8e070 · assemblato 29/10 18:17 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3916,12 +3916,31 @@ function rectHit(A, B) { /* oriented rects {x,z,ux,uz,hl,hd}: separating axis */
 }
 function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; returns runs of {s,v0,v1,x,z,h,o} */
   const sides = lotSides(P), runs = [], placed = []; if (!sides.length) return runs;
-  sides.forEach((sd, g) => {
+  const prep = []; for (const sd of sides) {
     let ux = (sd.b[0] - sd.a[0]) / sd.L, uz = (sd.b[1] - sd.a[1]) / sd.L; const mx = (sd.a[0] + sd.b[0]) / 2, mz = (sd.a[1] + sd.b[1]) / 2;
-    if (inPoly(mx - uz * 1.5, mz + ux * 1.5, P)) { /* (-uz, ux) is the inside */ } else if (inPoly(mx + uz * 1.5, mz - ux * 1.5, P)) { ux = -ux; uz = -uz; } else return;
+    if (inPoly(mx - uz * 1.5, mz + ux * 1.5, P)) { /* (-uz, ux) is the inside */ } else if (inPoly(mx + uz * 1.5, mz - ux * 1.5, P)) { ux = -ux; uz = -uz; } else continue;
     const o = { x: 0, z: 0, ux, uz, nx: -uz, nz: ux };
     /* origin at the start of the side in the direction u */
     const fwd = (sd.b[0] - sd.a[0]) * ux + (sd.b[1] - sd.a[1]) * uz > 0, O = fwd ? sd.a : sd.b; o.x = O[0]; o.z = O[1];
+    /* a real straight edge (kerb of the pavement, bed, wall) within 4 m of the side of the data: the rows lean on it, in direction and position */
+    { const nx0 = -uz, nz0 = ux, pts = []; let tries = 0;
+      for (let s = 1; s <= sd.L - 1; s += 1.5) { tries++;
+        const bx = O[0] + ux * s, bz = O[1] + uz * s; let hit = null;
+        const pav = (x, z) => { const k = H.kind(x, z); return k === 'side' || k === 'plat' || k === 'road'; }; /* pavement, platform or street: what is not the lot's own ground ('green' is what H.kind says of everything else, a bed too) */
+        for (let v = 4; v >= -4 + 1e-6 && !hit; v -= 0.25) if (!pav(bx + nx0 * v, bz + nz0 * v) && pav(bx + nx0 * (v - 0.25), bz + nz0 * (v - 0.25))) hit = v - 0.125; /* from the inside outward: first change to pavement */
+        if (hit === null) { let best = 1e9; WALLS.each(bx - 4, bz - 4, bx + 4, bz + 4, w => { if (w.ax === undefined || w.y1 - w.y0 < 0.4) return; const wl = hyp(w.bx - w.ax, w.bz - w.az); if (wl < 3 || Math.abs(((w.bx - w.ax) * ux + (w.bz - w.az) * uz) / wl) < 0.97) return; const vv = ((w.ax + w.bx) / 2 - bx) * nx0 + ((w.az + w.bz) / 2 - bz) * nz0; if (Math.abs(vv) < Math.abs(best) && Math.abs(vv) <= 4) best = vv; }); if (best < 1e9) hit = best; }
+        if (hit !== null) pts.push([s, hit]); }
+      if (pts.length >= 4 && pts.length >= tries * 0.6) { /* least squares v = c + m s, twice, dropping what is more than 0.9 and then 0.6 m off the line (the edges of the cells are not a ruler) */
+        let q = pts, c = 0, m = 0, rms = 9; const fit = L => { const n = L.length; let ss = 0, sv = 0, s2 = 0, sSv = 0; for (const [s, v] of L) { ss += s; sv += v; s2 += s * s; sSv += s * v; } const den = n * s2 - ss * ss; m = den ? (n * sSv - ss * sv) / den : 0; c = (sv - m * ss) / n; };
+        fit(q); for (const tol of [0.9, 0.6]) { const k = q.filter(([s, v]) => Math.abs(v - c - m * s) <= tol); if (k.length < 4) { q = []; break; } q = k; fit(q); }
+        if (q.length) rms = Math.sqrt(q.reduce((a, [s, v]) => a + (v - c - m * s) ** 2, 0) / q.length);
+        if (q.length >= pts.length * 0.7 && q.length >= tries * 0.5 && rms < 0.4 && Math.abs(m) < 0.35) { const th = Math.atan(m), cs = Math.cos(th), sn = Math.sin(th), qx = ux * cs + nx0 * sn, qz = uz * cs + nz0 * sn; /* edge direction: u turned by th toward the normal */
+          o.x = O[0] + nx0 * c; o.z = O[1] + nz0 * c; o.ux = qx; o.uz = qz; o.nx = -qz; o.nz = qx; ux = qx; uz = qz; o.edge = true; } }
+    }
+    prep.push({ sd, o, ux, uz });
+  }
+  prep.sort((p, q) => (q.o.edge ? 1 : 0) - (p.o.edge ? 1 : 0) || q.sd.L - p.sd.L); /* the sides that lean on a real edge come first: their rows take the room, and the double rows */
+  prep.forEach(({ sd, o, ux, uz }, g) => {
     const bands = []; /* [v0, v1, nose sign] */
     bands.push([0.2, 5, 1]);
     if (g === 0) for (let v = 11; v < 70; v += 15.6) bands.push([v, v + 4.8, -1], [v + 4.8, v + 9.6, 1]);
