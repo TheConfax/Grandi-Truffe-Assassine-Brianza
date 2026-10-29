@@ -150,8 +150,8 @@ function rectHit(A, B) { /* oriented rects {x,z,ux,uz,hl,hd}: separating axis */
   }
   return true;
 }
-function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; returns runs of {s,v0,v1,x,z,h,o} */
-  const sides = lotSides(P), runs = [], placed = []; if (!sides.length) return runs;
+function combRows(P, stallOK, shared) { /* stallOK(o, s, v0, v1): the stall is free; returns runs of {s,v0,v1,x,z,h,o} */
+  const sides = lotSides(P), runs = [], placed = shared ? shared.placed : [], g0 = shared ? shared.gid : 0; if (shared) shared.gid += sides.length; if (!sides.length) return runs; /* placed and the side numbers are shared by the lots of a tile: no lot puts stalls on the rows or aisles of another */
   const prep = []; for (const sd of sides) {
     let ux = (sd.b[0] - sd.a[0]) / sd.L, uz = (sd.b[1] - sd.a[1]) / sd.L; const mx = (sd.a[0] + sd.b[0]) / 2, mz = (sd.a[1] + sd.b[1]) / 2;
     if (inPoly(mx - uz * 1.5, mz + ux * 1.5, P)) { /* (-uz, ux) is the inside */ } else if (inPoly(mx + uz * 1.5, mz - ux * 1.5, P)) { ux = -ux; uz = -uz; } else continue;
@@ -176,10 +176,10 @@ function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; ret
     prep.push({ sd, o, ux, uz });
   }
   prep.sort((p, q) => (q.o.edge ? 1 : 0) - (p.o.edge ? 1 : 0) || q.sd.L - p.sd.L); /* the sides that lean on a real edge come first: their rows take the room, and the double rows */
-  prep.forEach(({ sd, o, ux, uz }, g) => {
+  prep.forEach(({ sd, o, ux, uz }, gi) => { const g = g0 + gi;
     const bands = []; /* [v0, v1, nose sign] */
     bands.push([0.2, 5, 1]);
-    if (g === 0) for (let v = 11; v < 70; v += 15.6) bands.push([v, v + 4.8, -1], [v + 4.8, v + 9.6, 1]);
+    if (gi === 0) for (let v = 11; v < 70; v += 15.6) bands.push([v, v + 4.8, -1], [v + 4.8, v + 9.6, 1]);
     for (const [v0, v1, sg] of bands) {
       let run = []; const ext = [1e9, -1e9], mine = [];
       const flush = () => { if (run.length > 1) runs.push(run); run = []; }; /* a lone stall is not a car park (piazzetta of via Isonzo) */
@@ -208,13 +208,39 @@ const PARK_A_MANO = [
   { a: [535.9, -457.9], b: [558.5, -489.0], lato: 1, n: 18, ang: 80, lean: 1, dis: -1 }, /* beyond the cross street, same strip, towards Ewiva: herringbone */
   { a: [566.4, -461.8], b: [592.1, -442.0], lato: 1, n: 14, ang: 80, lean: -1, dis: -1 }, /* car park of viale Brianza, north-east row against the hedge */
   { a: [590.05, -425.2], b: [562.15, -446.3], lato: 1, n: 14, sin: [0, 7, 8], dis: -1 }, /* car park of viale Brianza, south-west row, in front of the Amie building */
+  /* corso della Resistenza, foto Google di Carlo + foto Esri 2025, 29/10 (a lone lane of 6 m stays free beside the nose-in rows) */
+  { a: [402.5, -465.1], b: [431.9, -441.9], lato: 1, n: 15, dis: -1 }, /* along the diagonal of the corso, side of the palazzi (Pasticceria Centrale, Sindacato): nose-in against the pavement, from the crossing of via Gagarin to the crossing before the roundabout */
+  { a: [399.3, -469.5], b: [396.9, -494.5], lato: -1, n: 10, dis: -1 }, /* north stretch towards via Pace (Gelateria G'ala): nose-in against the pavement of the palazzi (the west side has no room: the road is 12 m between the kerbs) */
+  { a: [400.5, -430.4], b: [419.5, -418.2], lato: 1, n: 4, par: 5, dis: -1 }, /* via Indipendenza, north-east side, in line against the kerb of the green island */
+  { a: [443, -427.8], b: [459.5, -416.7], lato: 1, n: 4, par: 5, dis: -1 }, /* corso towards the roundabout, in line along the pavement of the palazzi (Cafe la Gre) */
+  { a: [454.5, -385.4], b: [469, -375.5], lato: 1, n: 3, par: 5, dis: -1 }, /* after the roundabout, in line against the kerb of the island with the fountain */
 ];
 const PARK_A_MANO_STALLS = PARK_A_MANO.flatMap(r => {
   const [a, b] = r.lato < 0 ? [r.b, r.a] : [r.a, r.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, out = [];
+  if (r.par) { /* a row in line (parallel to the kerb): par = pitch along the kerb, 2.2 m deep; the cars face the way of the traffic of the side */
+    const pw = r.par / 2, dp = 1.1;
+    for (let k = 0; k < r.n; k++) { const s = r.par * k + pw, ix = j => r.lato < 0 ? r.n - 1 - j : j; out.push({ x: a[0] + ux * s + nx * dp, z: a[1] + uz * s + nz * dp, ux, uz, h: Math.atan2(ux, uz), dis: false, l0: k === 0, l1: true, y1: false, pw, dp }); }
+    return out;
+  }
   const an = (r.ang || 90) * Math.PI / 180, sa = Math.sin(an), ca = Math.cos(an) * (r.lean || 1), pitch = 2.5 / sa, ax = ux * ca + nx * sa, az = uz * ca + nz * sa; /* the axis of a stall, from its back */
   for (let k = 0; k < r.n; k++) { const s = pitch * k + pitch / 2, ix = j => r.lato < 0 ? r.n - 1 - j : j, out0 = (r.sin || []).includes.bind(r.sin || []); if (out0(ix(k))) continue; out.push({ x: a[0] + ux * s + ax * 2.4, z: a[1] + uz * s + az * 2.4, ux: az, uz: -ax, h: Math.atan2(-ax, -az), dis: ix(k) === r.dis, l0: k === 0 || (r.ln || []).includes(ix(k)), l1: !out0(ix(k + 1)), y1: ix(k) === r.dis || ix(k + 1) === r.dis }); } /* each line drawn once, by the stall before it (yellow if either side is the disabled one); none on the side of a left-out stall, the bed is there; ux, uz: the width of the stall, for the lines */
   return out;
 });
+/* car park areas that touch (a shared side, within 0.5 m): one polygon, so the rows are drawn once over the whole (OSM maps one lot as two areas) */
+function mergeLotPolys(A, B) {
+  const T = 0.5, ccw = P => { let a = 0; for (let i = 0; i < P.length; i++) { const p = P[i], q = P[(i + 1) % P.length]; a += p[0] * q[1] - q[0] * p[1]; } return a >= 0 ? P.map(p => p.slice()) : P.map(p => p.slice()).reverse(); };
+  const a = ccw(A), b = ccw(B), all = a.concat(b);
+  for (const p of b) for (const q of a) if (hyp(p[0] - q[0], p[1] - q[1]) < T) { p[0] = q[0]; p[1] = q[1]; break; } /* the vertices of B near one of A are those of A */
+  const split = (P, Q) => { const o = []; for (let i = 0; i < P.length; i++) { const p = P[i], q = P[(i + 1) % P.length]; o.push(p); const L = hyp(q[0] - p[0], q[1] - p[1]), ins = []; for (const r of Q) { if ((r[0] === p[0] && r[1] === p[1]) || (r[0] === q[0] && r[1] === q[1])) continue; const t = ((r[0] - p[0]) * (q[0] - p[0]) + (r[1] - p[1]) * (q[1] - p[1])) / (L * L); if (t > 0 && t < 1 && segDist(r[0], r[1], p[0], p[1], q[0], q[1]) < T) ins.push([t, r]); } ins.sort((u, v) => u[0] - v[0]); for (const [, r] of ins) o.push(r); } return o; };
+  const a2 = split(a, b), b2 = split(b, a), E = [], key = p => p[0].toFixed(2) + ',' + p[1].toFixed(2);
+  for (const P of [a2, b2]) for (let i = 0; i < P.length; i++) E.push([P[i], P[(i + 1) % P.length]]);
+  const cancel = new Set(); let shared = 0;
+  E.forEach((e, i) => { if (cancel.has(i)) return; const j = E.findIndex((f, k) => k !== i && !cancel.has(k) && key(f[0]) === key(e[1]) && key(f[1]) === key(e[0])); if (j >= 0) { cancel.add(i); cancel.add(j); shared++; } });
+  if (!shared) return null;
+  const rest = E.filter((e, i) => !cancel.has(i)), next = new Map(); for (const e of rest) { if (next.has(key(e[0]))) return null; next.set(key(e[0]), e); }
+  const out = []; let e = rest[0]; for (let n = 0; n <= rest.length && e; n++) { out.push(e[0]); const nx = next.get(key(e[1])); if (nx === rest[0]) break; e = nx; }
+  return out.length === rest.length && out.length >= 3 ? out : null; /* a single loop, else they stay two */
+}
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf();
   T.stalls = []; T.streetStalls = [];
@@ -229,7 +255,7 @@ function buildParkingLines(T, G) {
   const outline = (x, z, ux, uz, l, w, col) => { quad(x, z, ux, uz, -l / 2, l / 2, -w / 2 - 0.06, -w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2, l / 2, w / 2 - 0.06, w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2 - 0.06, -l / 2 + 0.06, -w / 2, w / 2, col); quad(x, z, ux, uz, l / 2 - 0.06, l / 2 + 0.06, -w / 2, w / 2, col); };
   for (const st of PARK_A_MANO_STALLS) { /* the rows by hand: each stall in the tile its centre falls in; first in T.stalls, so the cars of the tile (at most 14) park here before elsewhere */
     if (tileOf(st.x, st.z) !== T.t) continue; const col = st.dis ? Y : W;
-    if (st.l0) quad(st.x, st.z, st.ux, st.uz, -1.31, -1.19, -2.4, 2.4, col); if (st.l1) quad(st.x, st.z, st.ux, st.uz, 1.19, 1.31, -2.4, 2.4, st.y1 ? Y : W);
+    const pw = st.pw || 1.25, dp = st.dp || 2.4; if (st.l0) quad(st.x, st.z, st.ux, st.uz, -pw - 0.06, -pw + 0.06, -dp, dp, col); if (st.l1) quad(st.x, st.z, st.ux, st.uz, pw - 0.06, pw + 0.06, -dp, dp, st.y1 ? Y : W);
     if (st.dis) quad(st.x, st.z, st.ux, st.uz, -0.5, 0.5, -0.5, 0.5, BLUE);
     T.stalls.push({ x: st.x, z: st.z, h: st.h, dis: st.dis });
   }
@@ -261,8 +287,19 @@ function buildParkingLines(T, G) {
       }
     }
   }
-  for (const a of (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || [])) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
-    const P = dec(a.p); if (P.length < 3) continue; if (PARK_A_MANO_STALLS.some(st => inPoly(st.x, st.z, P))) continue; /* a row drawn by hand: no stalls of the rule in this area */
+  /* two car park areas that overlap by more than half of the smaller one (an OSM lot kept whole over a DBGT one): stalls only in the bigger, never twice */
+  const lotsAll = (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || []).map(a => { const P = dec(a.p); let ar = 0; for (let i = 0; i < P.length; i++) { const A = P[i], C = P[(i + 1) % P.length]; ar += A[0] * C[1] - C[0] * A[1]; } return { a, P, ar: Math.abs(ar) / 2, bb: bbox(P) }; }).filter(l => l.P.length >= 3);
+  const lotsDup = new Set();
+  lotsAll.forEach((l, i) => { for (let j = 0; j < lotsAll.length; j++) { const m = lotsAll[j]; if (j === i || m.ar < l.ar || (m.ar === l.ar && j > i) || lotsDup.has(m)) continue;
+    if (l.bb[0] > m.bb[2] || l.bb[2] < m.bb[0] || l.bb[1] > m.bb[3] || l.bb[3] < m.bb[1]) continue;
+    let n = 0, h = 0; for (let x = l.bb[0] + 1; x < l.bb[2]; x += 2) for (let z = l.bb[1] + 1; z < l.bb[3]; z += 2) if (inPoly(x, z, l.P)) { n++; if (inPoly(x, z, m.P)) h++; }
+    if (n > 0 && h > n / 2) { lotsDup.add(l); break; } } });
+  const lotsM = lotsAll.filter(l => !lotsDup.has(l)); /* merge the lots that share a side */
+  for (let ch = true; ch;) { ch = false; outer: for (let i = 0; i < lotsM.length; i++) for (let j = i + 1; j < lotsM.length; j++) { const l = lotsM[i], m = lotsM[j]; if (l.bb[0] > m.bb[2] + 1 || l.bb[2] < m.bb[0] - 1 || l.bb[1] > m.bb[3] + 1 || l.bb[3] < m.bb[1] - 1) continue;
+    const P = mergeLotPolys(l.P, m.P); if (!P) continue; const big = l.ar >= m.ar ? l : m; lotsM.splice(j, 1); lotsM[i] = { a: big.a, P, ar: l.ar + m.ar, bb: bbox(P) }; ch = true; break outer; } }
+  const shared = { placed: [], gid: 0 };
+  for (const lot0 of lotsM) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
+    const a = lot0.a, P = lot0.P, handLot = PARK_A_MANO_STALLS.some(st => inPoly(st.x, st.z, P)); /* a row drawn by hand in the area: the stalls of the rule keep 6 m from it, no furniture */
     const [cx, cz] = centroid(P);
     // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
     const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
@@ -281,11 +318,12 @@ function buildParkingLines(T, G) {
     const stallOK = (o, s, v0, v1) => {
       const at = (ss, v) => [o.x + o.ux * ss + o.nx * v, o.z + o.uz * ss + o.nz * v], vm = (v0 + v1) / 2, [x, z] = at(s, vm);
       if (!ok2(x, z) || !stallFree(o, s, v0, v1)) return false;
+      if (handLot && PARK_A_MANO_STALLS.some(h => hyp(h.x - x, h.z - z) < 6)) return false;
       for (const ds of [-1.1, 1.1]) for (const v of [v0 + 0.15, v1 - 0.15]) { const [cx2, cz2] = at(s + ds, v); if (!inPoly(cx2, cz2, P) || inBuilding(cx2, cz2, 0.1)) return false; }
       for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const [bx, bz] = at(s + ds, v); if (barNear(bx, bz, 0.45)) return false; }
       return !(treeNear(...at(s, v0 + 1.2), 1.75) || treeNear(...at(s, v1 - 1.2), 1.75)); /* a tree of the car park in the stall: left free */
     };
-    const runs = combRows(P, stallOK);
+    const runs = combRows(P, stallOK, shared);
     let left = budget; // runs of free stalls side by side, up to the capacity: the lines between them, the yellow one every eighth
     for (const run0 of runs) {
       if (left <= 0) break; const run = run0.slice(0, left); left -= run.length; const yi = run.length >= 8 ? 1 : -1;
@@ -293,7 +331,7 @@ function buildParkingLines(T, G) {
     }
     T.stalls.push(...lot);
     if (inLot.length >= 10) lot.push(...inLot); // the furniture below goes on the lots mapped space by space too
-    if (lot.length >= 10) { // furniture on the bigger lots: lamps along the middle, the meter and the P sign at one end
+    if (lot.length >= 10 && !handLot) { // furniture on the bigger lots: lamps along the middle, the meter and the P sign at one end
       const mid = (S0 + S1) / 2, sec = lmSection(P, cx, cz, ux, uz, mid);
       for (let s = S0 + 6; s < S1 - 3; s += 22) { const sc = lmSection(P, cx, cz, ux, uz, s); if (!sc) continue; const v = (sc[0] + sc[1]) / 2, x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; if (onAnyRoad(x, z, 0.5) && !onFoot(x, z) || inBuilding(x, z, 0.5)) continue; const gy = H.ground(x, z); addBox(lamps, x, gy + 3.8, z, 0.15, 7.6, 0.15, null); addBox(heads, x + ux * 0.5, gy + 7.55, z + uz * 0.5, 1.2, 0.18, 0.35, null); addBox(heads, x - ux * 0.5, gy + 7.55, z - uz * 0.5, 1.2, 0.18, 0.35, null); }
       const e = lmSection(P, cx, cz, ux, uz, S0 + 0.5);

@@ -181,6 +181,7 @@ class Verde:
         def has_sport(g, d=FREE_D): return spt is not None and len(spt.query(g, predicate='dwithin', distance=d)) > 0
         green_u = unary_union([p for t, p in self.areas] + [p for t, p in self.sport]); gt = STRtree(_polys(green_u))
         out, rm, kept = [], Counter(), []
+        osm_vince = []  # OSM paving that stays whole over the DBGT green (the DBGT is from 2015: the car park may be newer)
         X0, Z0 = self.origin
         def tiles_of(g):  # the game's tiles under g
             x0, z0, x1, z1 = g.bounds
@@ -211,7 +212,10 @@ class Verde:
             elif at in PAVED:  # an OSM zone of paving (car park, yard, building site) over the real green: the green shows through
                 near = [gt.geometries[i] for i in gt.query(g)]
                 if not near: out.append((at, g)); continue
-                nu = unary_union(near); rm['ritaglio %d' % at] += 1
+                nu = unary_union(near)
+                if at == 4 and not has_sport(g) and nu.intersection(g).area > 0.5 * g.area:  # the green covers most of this OSM car park: the car park wins, whole
+                    out.append((at, g)); osm_vince.append(g); rm['parcheggio OSM intero'] += 1; continue
+                rm['ritaglio %d' % at] += 1
                 for p in cut(g, lambda c: c.difference(nu)): out.append((at, p))
             else: out.append((at, g))
         self.rep['osm_senza_dbgt']['aree'] = kept
@@ -231,6 +235,12 @@ class Verde:
             else: k = SPORT_DBGT.get(t, 'sport::'); sp_src['dbgt' if t in SPORT_DBGT else 'senza sport'] += 1
             new_land.append((k, p))
         # the DBGT areas, merged by type within each tile (one polygon where the DBGT cuts a lawn in pieces) and cut on the tiles
+        vu = unary_union(osm_vince) if osm_vince else None
+        if vu is not None:  # the green under those car parks goes
+            prepare(vu)
+            def sotto(L): return [(t, r) for t, q in L for r in (_polys(q.difference(vu), 1.0) if q.intersects(vu) else [q])]
+            self.areas, self.land = sotto(self.areas), sotto(self.land)
+            self.forest = [(t, q) for t, q in self.areas if t in (11, 12)]; self.forest_u = unary_union([q for t, q in self.forest]) if self.forest else GeometryCollection(); prepare(self.forest_u)
         by_t = defaultdict(list)
         for t, p in self.areas: by_t[t].append(p)
         for t, p in self.sport: by_t[6 if t.startswith('01') else 3].append(p)

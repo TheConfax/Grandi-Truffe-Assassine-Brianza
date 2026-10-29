@@ -208,6 +208,7 @@ def add_building(outer, holes, t, key):
     if t.get('amenity') == 'place_of_worship' and a > 120: bt = 'church'
     rec = {'p': outer, 'h': round(bheight(t, a, key), 1), 't': BTYPE.get(bt, 0), 'ht': bool(num(t.get('height')) or num(t.get('building:levels'))), 'lv': num(t.get('building:levels')), 'bt': bt}
     if t.get('man_made') == 'water_tower': rec['wt'] = True; rec['h'] = num(t.get('height')) or max(rec['h'], 25)
+    if a < 40 and (t.get('power') in ('substation', 'transformer') or bt == 'transformer_tower'): rec['mn'] = '01'  # a small OSM substation: the electric cabin model of the DBGT ones (g 5, paesaggio3.js lsCabina, default look)
     if holes: rec['k'] = [h for h in holes if len(h) >= 3]
     rec['tg'] = {k_: t[k_] for k_ in ('building', 'building:levels', 'roof:shape', 'roof:colour', 'building:colour', 'name', 'amenity', 'man_made') if k_ in t}  # what a DBGT building takes from OSM (dbgt_edifici.py)
     buildings.append(rec)
@@ -350,6 +351,9 @@ def area_type(t):
     for k in ('leisure', 'landuse', 'natural'):
         if t.get(k) in AREA_T: return AREA_T[t[k]]
     return None
+# cantieri finiti (Carlo 29/10): way OSM landuse=construction ormai superati, non si disegnano
+#   1396686491  Ewiva, via Gagarin: la stazione di ricarica c'e' gia' (Google Maps)
+CANTIERI_FINITI = {'1396686491'}  # ids as strings, as in ways
 areas = []
 for members, t in rels:
     if t.get('type') != 'multipolygon' or 'building' in t: continue
@@ -360,7 +364,7 @@ for members, t in rels:
     for o in join_rings(outers):
         if len(o) >= 3: areas.append((at, o, ir))
 for wid, (refs, t) in ways.items():
-    if wid in mp_ways or refs[0] != refs[-1] or 'building' in t: continue
+    if wid in mp_ways or wid in CANTIERI_FINITI or refs[0] != refs[-1] or 'building' in t: continue
     at = area_type(t)
     if at and not (t.get('highway') and t.get('area') != 'yes'):
         pts = ring(refs)
@@ -397,7 +401,7 @@ for members, t in rels:
     for o in join_rings([m[1] for m in members if m[0] == 'way' and m[2] == 'outer']):
         if len(o) >= 3: land.append((k_, o))
 for wid, (refs, t) in ways.items():
-    if wid in mp_ways or refs[0] != refs[-1] or 'building' in t: continue
+    if wid in mp_ways or wid in CANTIERI_FINITI or refs[0] != refs[-1] or 'building' in t: continue
     k_ = ls_kind(t)
     if k_:
         pts = ring(refs)
