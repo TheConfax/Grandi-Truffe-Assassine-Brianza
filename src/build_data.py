@@ -1125,8 +1125,8 @@ for r in raw_roads:
 node_bar = {}
 for bi, run in enumerate(bar_runs):
     for n_ in run: node_bar.setdefault(n_, bi)
-gate_out = []
-_cl = [(LineString(pts), h_) for pts, k_, h_ in bar_out if len(pts) >= 2 and k_ != 6] + [(g_.boundary, 2.0) for b_, g_ in _bl if g_ is not None]
+gate_out = []; doors_out = []
+_cl = [(LineString(pts), h_, -1) for pts, k_, h_ in bar_out if len(pts) >= 2 and k_ != 6] + [(g_.boundary, 2.0, i_) for i_, (b_, g_) in enumerate(_bl) if g_ is not None]
 _clt = STRtree([c_[0] for c_ in _cl])
 _go = {'osm_nodi': 0, 'disegnati': 0, 'scartati_classe1_o_non_piana': 0, 'lift_alzate': 0, 'senza_via_su_chiusura': 0, 'scartati_senza_via_senza_chiusura': 0, 'fuori': 0, 'entrance_kissing': 0, 'entrance_kissing_scartati': 0}
 def _closest(p_, R_):
@@ -1198,7 +1198,7 @@ for a_, b_, h_, k_ in pc_gates:
     gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', h_, 0])
 # passi carrai DBGT left without a gate (no divider within PC_D of the point): the gap between the closures on the two sides along the lot boundary
 # (end of a divider or wall of a building, in any combination) is closed with a gate; wider than 8 m: 6 m centred on the driveway; never across an OSM street
-_gcc = {'nuovi': 0, 'larghi': 0, 'pedonali': 0, 'senza_strada': 0, 'senza_chiusure': 0, 'carreggiata': 0, 'strada_osm': 0, 'troppo_stretti': 0, 'gia_cancello': 0, 'fuori': 0}
+_gcc = {'porte': {'p': 0, 'n': 0, 'b': 0}, 'nuovi': 0, 'larghi': 0, 'pedonali': 0, 'senza_strada': 0, 'senza_chiusure': 0, 'carreggiata': 0, 'strada_osm': 0, 'troppo_stretti': 0, 'gia_cancello': 0, 'fuori': 0}
 if dbt_pc:
     _rr = [r_ for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x']]; _rrt = STRtree([r_['line'] for r_ in _rr])
     _gd = []; _src = {'passo_carraio': 0, 'rampa': 0, 'vialetto': 0, 'varco': 0}; _cands = [(p_, 'passo_carraio') for p_ in dbt_pc]
@@ -1248,7 +1248,7 @@ if dbt_pc:
                 for part_ in getattr(x_, 'geoms', [x_]):
                     for c_ in getattr(part_, 'coords', []):
                         d_ = (c_[0] - p_[0]) * ux_ * sg_ + (c_[1] - p_[1]) * uz_ * sg_
-                        if d_ > 0.15 and (best_ is None or d_ < best_[0]): best_ = (d_, _cl[j_][1])
+                        if d_ > 0.15 and (best_ is None or d_ < best_[0]): best_ = (d_, _cl[j_][1], _cl[j_][2])
             ext_.append(best_)
         if ext_[0] is None and ext_[1] is None: _gcc['senza_chiusure'] += 1; continue
         gap_ = (ext_[0][0] if ext_[0] else 99) + (ext_[1][0] if ext_[1] else 99)
@@ -1258,6 +1258,15 @@ if dbt_pc:
         a_ = (p_[0] + ux_ * da_, p_[1] + uz_ * da_); b_ = (p_[0] + ux_ * db_, p_[1] + uz_ * db_); G_ = LineString([a_, b_])
         if any(r_['line'].distance(G_.centroid) < r_['w'] / 2 - 0.2 and r_['c'] <= 3 for r_ in _rr if r_['line'].distance(G_) < 12): _gcc['carreggiata'] += 1; continue
         if any(not r_['priv'] and r_['line'].intersects(G_) for r_ in _rr if r_['line'].distance(G_) < 1): _gcc['strada_osm'] += 1; continue
+        mid_ = G_.centroid; ids_ = [e_[2] for e_ in ext_ if e_ and e_[2] >= 0]
+        if len(ids_) == 2 and ids_[0] == ids_[1] and _cl[_clt.query_nearest(mid_)[0]][0].distance(mid_) <= 1.5:  # both closures are walls of the same house: a recess, an archway of the house
+            wd_ = min(6.0, abs(da_ - db_)); ty_ = 'p' if wd_ <= 1.5 else ('n' if wd_ <= 3.5 else 'b')  # a gap along a facade or between two parts of one house: a door in the wall, not a gate
+            rn_ = min((r_ for r_ in _rr if r_['line'].distance(mid_) < 40), key=lambda r_: r_['line'].distance(mid_), default=None)
+            c0_ = (mid_.x - ux_ * wd_ / 2, mid_.y - uz_ * wd_ / 2); c1_ = (mid_.x + ux_ * wd_ / 2, mid_.y + uz_ * wd_ / 2)
+            if rn_ is not None:
+                sp_ = rn_['line'].interpolate(rn_['line'].project(mid_)); nx_, nz_ = -(c1_[1] - c0_[1]), c1_[0] - c0_[0]
+                if nx_ * (sp_.x - mid_.x) + nz_ * (sp_.y - mid_.y) < 0: c0_, c1_ = c1_, c0_
+            _gd.append(p_); doors_out.append([q(c0_[0]), q(c0_[1]), q(c1_[0]), q(c1_[1]), ty_, 2.1 if ty_ == 'p' else (2.6 if ty_ == 'n' else 2.3)]); _gcc['porte'][ty_] += 1; continue
         _gd.append(p_); _gcc['nuovi'] += 1; _src[srcname_] += 1
         if abs(da_ - db_) < 2.5: _gcc['pedonali'] += 1
         gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'o' if srcname_ == 'rampa' else 'g', round(hh_, 1), 0])
@@ -1989,7 +1998,7 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'cut': [[q(v) for v in c_] for c_ in cuts],
        'nodes': [c for n_ in NODES for c in n_], 'roads': out_roads, 'names': names, 'tiles': tiles,
        'trains': [{'p': enc(t['pts']), 'st': t['st'], 'stn': t['stn'], 'h': [q(coordH[key(p_)]) if key(p_) in coordH else -32768 for p_ in t['pts']]} for t in trains],
-       'pois': pois, 'ng': negozi, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index] + signals_extra,
+       'pois': pois, 'ng': negozi, 'gates': gate_out, 'doors': doors_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index] + signals_extra,
        'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0)]}
 if ROT: out.setdefault('report', {})['rotonde'] = ROT.rep
 if ED:  # the buildings of the DBGT: entrances, checks, report

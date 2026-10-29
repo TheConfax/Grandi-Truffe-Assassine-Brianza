@@ -1658,7 +1658,7 @@ function* buildTileGen(T) {
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast'); put(doorB, MAT.roof, 10);
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
+  for (const f of [buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
@@ -1752,6 +1752,23 @@ for (const [X0, Z0, X1, Z1, k, h, auto] of D.gates || []) {
   const g = { ax, az, bx, bz, ux, uz, W, k, h, gy, broken: false, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [] };
   if (k !== 'o' && !g.perm) { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: true, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
   GATES.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
+}
+/* doors drawn flush on a facade (gaps along a house wall): p front door, n large door, b garage door; solid like the wall */
+const DOORS = [];
+for (const [X0, Z0, X1, Z1, k, h] of D.doors || []) {
+  const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
+  const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
+  DOORS.push({ ax, az, bx, bz, ux, uz, W, k, h, gy });
+  WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, y0: gy - 2, y1: gy + h });
+}
+const DOOR_COL = { p: 0x5b3a26, n: 0x4a3426, b: 0x8f9296 };
+function buildDoors(T, G) {
+  for (const d of DOORS) {
+    if (tileOf((d.ax + d.bx) / 2, (d.az + d.bz) / 2) !== T.t) continue;
+    const th = Math.atan2(-d.uz, d.ux), m = new THREE.Mesh(boxG(d.W, d.h, 0.14), lam(DOOR_COL[d.k] || 0x5b3a26));
+    m.position.set((d.ax + d.bx) / 2 - d.uz * 0.07, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.07); m.rotation.y = th; m.castShadow = true; G.add(m);
+    const fr = new THREE.Mesh(boxG(d.W + 0.16, d.h + 0.08, 0.1), lam(0xcfc8b8)); fr.position.set((d.ax + d.bx) / 2 - d.uz * 0.04, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.04); fr.rotation.y = th; G.add(fr);
+  }
 }
 function buildGates(T, G) {
   for (const g of GATES) {
