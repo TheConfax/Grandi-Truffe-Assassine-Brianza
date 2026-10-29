@@ -1290,6 +1290,40 @@ if FER:
         _nuovi = FER.lontano_dai_binari(_nuovi, _rl_suolo, 'chiusure_alla_piazza')
         _nuovi = [f_ for f_ in _nuovi if LineString(f_).length >= 2.0]
     fences += _nuovi
+    # the ends sewn to what stands next (Carlo 29/10, via Pace, photos with the gaps drawn green): the cuts above stop a new fence short of the fence or the platform
+    # it meets, and every railway fence short of a level crossing (the opening is half the road + 3.5 m), and the gaps stay open onto the tracks. A new fence goes on to the
+    # nearest fence, wall or platform edge; a new fence or a railway fence ending by a level crossing goes on to the edge of the road or of its pavement there. Within
+    # RICUCI m, turning less than RICUCI_ANG, never nearer than CHIUDI_BIN to a track (the game drops it: world3.js nearLowRail) nor into a road or a pavement
+    RICUCI, RICUCI_ANG, CHIUDI_BIN = 10.0, 60.0, 2.05
+    _ricuciti = []
+    from shapely.ops import nearest_points
+    _X = unary_union(xpts) if xpts else GeometryCollection()
+    _rail_b = unary_union([l_.buffer(CHIUDI_BIN) for l_ in _rl_suolo])
+    _carr_b = unary_union([r_['line'].buffer(r_['w'] / 2) for r_ in raw_roads if flat(r_) and r_['line'].distance(_X) < RICUCI]) if not _X.is_empty else GeometryCollection()
+    _strada = unary_union([_carr_b, side.intersection(_X.buffer(RICUCI))]) if not _X.is_empty else GeometryCollection()
+    _t_pl = _strada.buffer(0.3).boundary.intersection(_X.buffer(RICUCI)).difference(_rail_b) if not _strada.is_empty else GeometryCollection()
+    _t_new = unary_union([l_ for l_ in _ex_l if l_.distance(_Bk) < RICUCI + 2] + [platforms.boundary.intersection(_Bk.buffer(RICUCI + 2)), _t_pl]).difference(_rail_b)
+    _n_new = len(_nuovi)
+    for i_ in range(len(fences)):
+        f_ = list(fences[i_]); nuovo_ = i_ >= len(fences) - _n_new
+        if len(f_) < 2: continue
+        if not nuovo_ and (_t_pl.is_empty or LineString(f_).distance(_X) > RICUCI): continue
+        T_ = (_t_new if nuovo_ else _t_pl).difference(LineString(f_).buffer(0.2))
+        if T_.is_empty: continue
+        for end_ in (0, -1):
+            P_, P1_ = f_[end_], f_[1 if end_ == 0 else -2]
+            q_ = nearest_points(Point(P_), T_)[1]; d_ = math.dist(P_, q_.coords[0])
+            if not 0.3 < d_ <= RICUCI: continue
+            a_ = math.degrees(abs(math.atan2(q_.y - P_[1], q_.x - P_[0]) - math.atan2(P_[1] - P1_[1], P_[0] - P1_[0]))) % 360
+            if min(a_, 360 - a_) > RICUCI_ANG: continue
+            s_ = LineString([P_, q_.coords[0]])
+            if s_.intersects(_rail_b) or (not _strada.is_empty and s_.intersects(_strada.buffer(0.2))): continue
+            if end_ == 0: f_.insert(0, q_.coords[0])
+            else: f_.append(q_.coords[0])
+            _ricuciti.append((round(d_, 1), '?x=%.0f&z=%.0f' % q_.coords[0]))
+        fences[i_] = f_
+    _nuovi = fences[len(fences) - _n_new:] if _n_new else []
+    log('CONTROLLO capi delle recinzioni ferroviarie ricuciti a recinzioni, banchine e passaggi a livello:', len(_ricuciti), _ricuciti[:12])
     _chiusi_rep = {'tratti': len(_nuovi), 'metri': round(sum(LineString(f_).length for f_ in _nuovi), 1), 'dove': [(round(LineString(f_).length, 1), '?x=%.0f&z=%.0f' % LineString(f_).interpolate(0.5, normalized=True).coords[0]) for f_ in _nuovi]}
     log('CONTROLLO chiusure del bordo dei binari verso piazze e strade (tratti, metri):', _chiusi_rep['tratti'], _chiusi_rep['metri'], _chiusi_rep['dove'])
 
