@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------- road signs and road markings (segnaletica) from OpenStreetMap
+// ---------------------------------------------------------------- road signs and road markings (segnaletica) from OpenStreetMap and Mapillary (tile list sm)
 // SEGN (src/segnaletica.json, made from the OSM nodes and ways of the area): [kind, x, z, dx, dz, extra] where (dx, dz) is the way the traffic the sign
 // talks to is going (0, 0: along the nearest road). stop and dare (give way) where OSM maps them, limite where the maxspeed of the street changes,
 // vietato at the wrong end of one-way streets, and the signs mapped one by one (paese, via, transito, unico). Each stands on the right of the road
@@ -23,7 +23,14 @@ function segTexOf(kind, extra) {
     else if (kind === 'rotatoria') { circ(R + 3, '#ffffff'); circ(R, '#1f4fa0'); g.strokeStyle = '#ffffff'; g.fillStyle = '#ffffff'; g.lineWidth = 9; // three arrows chasing each other anticlockwise
       for (let k = 0; k < 3; k++) { const a0 = k * TAU / 3 + 0.35, a1 = a0 + 1.45, r = 32; g.beginPath(); g.arc(cx, cy, r, -a1, -a0); g.stroke(); const hx = cx + Math.cos(-a1) * r, hy = cy + Math.sin(-a1) * r, tx = -Math.sin(-a1), ty = Math.cos(-a1);
         g.beginPath(); g.moveTo(hx - tx * 14 + Math.cos(-a1) * 11, hy - ty * 14 + Math.sin(-a1) * 11); g.lineTo(hx - tx * 14 - Math.cos(-a1) * 11, hy - ty * 14 - Math.sin(-a1) * 11); g.lineTo(hx + tx * 6, hy + ty * 6); g.closePath(); g.fill(); } }
-    else if (kind === 'unico') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f4fa0'; g.fillRect(5, 5, w - 10, h - 10); g.fillStyle = '#ffffff'; g.fillRect(40, cy - 12, w - 110, 24); g.beginPath(); g.moveTo(w - 70, cy - 36); g.lineTo(w - 30, cy); g.lineTo(w - 70, cy + 36); g.fill(); }
+    else if (kind === 'sosta' || kind === 'fermata') { circ(R + 3, '#ffffff'); circ(R, '#c8102e'); circ(R - 10, '#1f4fa0'); g.save(); g.beginPath(); g.arc(cx, cy, R - 10, 0, TAU); g.clip(); g.translate(cx, cy); g.fillStyle = '#c8102e'; /* no parking: one stripe; no stopping: a cross */
+      for (const a of kind === 'sosta' ? [-Math.PI / 4] : [-Math.PI / 4, Math.PI / 4]) { g.save(); g.rotate(a); g.fillRect(-70, -6, 140, 12); g.restore(); } g.restore(); }
+    else if (kind === 'dritto') { circ(R + 3, '#ffffff'); circ(R, '#1f4fa0'); g.fillStyle = '#ffffff'; g.fillRect(cx - 7, cy - 4, 14, 38); g.beginPath(); g.moveTo(cx - 22, cy - 2); g.lineTo(cx + 22, cy - 2); g.lineTo(cx, cy - 34); g.closePath(); g.fill(); }
+    else if (kind === 'pesanti') { circ(R + 3, '#ffffff'); circ(R, '#c8102e'); circ(R - 12, '#ffffff'); g.fillStyle = '#111111'; g.fillRect(cx - 30, cy - 14, 36, 24); g.fillRect(cx + 9, cy - 5, 21, 15); g.beginPath(); g.arc(cx - 16, cy + 13, 6, 0, TAU); g.arc(cx + 19, cy + 13, 6, 0, TAU); g.fill(); }
+    else if (kind === 'pedoni') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f4fa0'; g.fillRect(5, 5, w - 10, h - 10); g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(64, 16); g.lineTo(112, 108); g.lineTo(16, 108); g.closePath(); g.fill();
+      g.fillStyle = g.strokeStyle = '#1f4fa0'; g.lineWidth = 7; g.lineCap = 'round'; g.beginPath(); g.arc(64, 50, 7, 0, TAU); g.fill(); g.beginPath(); g.moveTo(64, 60); g.lineTo(64, 82); g.moveTo(64, 82); g.lineTo(54, 100); g.moveTo(64, 82); g.lineTo(76, 100); g.moveTo(64, 66); g.lineTo(52, 78); g.moveTo(64, 66); g.lineTo(76, 76); g.stroke(); } // the blue square with the white triangle and the walking figure
+    else if (kind === 'parcheggio') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f4fa0'; g.fillRect(5, 5, w - 10, h - 10); txt('P', 88, '#ffffff'); }
+    else if (kind === 'unico') { g.save(); if (extra === 'sx') { g.translate(w, 0); g.scale(-1, 1); } g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f4fa0'; g.fillRect(5, 5, w - 10, h - 10); g.fillStyle = '#ffffff'; g.fillRect(40, cy - 12, w - 110, 24); g.beginPath(); g.moveTo(w - 70, cy - 36); g.lineTo(w - 30, cy); g.lineTo(w - 70, cy + 36); g.fill(); g.restore(); }
     else if (kind === 'paese') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.strokeStyle = '#111111'; g.lineWidth = 6; g.strokeRect(6, 6, w - 12, h - 12); txt(String(extra || '').toUpperCase(), 40, '#111111'); }
     else if (kind === 'via') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.strokeStyle = '#2a2a2a'; g.lineWidth = 4; g.strokeRect(4, 4, w - 8, h - 8); txt(String(extra || ''), 30, '#1d1d1d', cy, '600'); }
   }, false);
@@ -77,7 +84,9 @@ function segLine(s, kind, dx, dz, hw, mk, lettering, WH) { // the stop line (tee
 }
 function buildSegnali(T, G) {
   const mk = FBuf(), lettering = FBuf(), WH = COL('#f2f0e8');
-  SEGN.forEach((s, idx) => {
+  if (T.d.sm && !T.d.smo) T.d.smo = T.d.sm.map((r, i) => { const s = r.slice(); s.i = i; s.place = { px: r[1], pz: r[2], dx: r[3], dz: r[4], hw: 0 }; return s; }); // the signs of Mapillary come with their place (src/mapillary_obj.py): on the kerb, facing the drivers
+  const LIST = SEGN.map((s, i) => [s, i]); for (const s of T.d.smo || []) LIST.push([s, 'm' + T.t + '_' + s.i]);
+  LIST.forEach(([s, idx]) => {
     const [kind, x, z] = s; if (tileOf(x, z) !== T.t) return;
     const { px, pz, dx, dz, hw } = segPlace(s); if (s.skip || inBuilding(px, pz, 0.3)) { segLine(s, kind, dx, dz, hw, mk, lettering, WH); return; } // a one-way lane through a courtyard: no post in the wall; no room for the post (the corner of a junction of the DBGT): the line and the STOP on the road all the same
     const gy = H.ground(px, pz), wide = kind === 'paese' || kind === 'via' || kind === 'unico';

@@ -1881,6 +1881,18 @@ for ri, r in enumerate(raw_roads):  # road pieces per tile (for markings and dec
     for t in set(tid(*p) for p in pts) | set(tid((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) for a, b in zip(pts, pts[1:])):
         push(t, 'rp', ri)
 for x, z, dx, dz, w in crossings: push(tid(x, z), 'cr', [q(x), q(z), round(dx, 3), round(dz, 3), round(w, 1)])
+# ---- Mapillary (src/mapillary_obj.py, docs/dati.md): the signs, lamps, traffic lights, poles and bins the photos saw, confirmed, snapped to the kerb
+# and without doubles with what OSM already gives; the same rules for every comune. Signs go to the tile as 'sm', the lamps join 'lp', the poles and
+# bins join 'og', the traffic lights add junction nodes to 'signals'
+import mapillary_obj
+_ctl_osm_segn = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8'))
+_ctl_incroci = [(r_, nodes[r_]) for r_, l_ in car_nodes.items() if r_ in node_index and r_ in nodes and sum(2 if 0 < i_ < len(r__['refs']) - 1 else 1 for r__, i_ in l_ if r__['c'] <= 5) >= 3]
+MAPI = mapillary_obj.elabora(DATA, proj, inside, _segs, _segtree, STR, [g_ for g_ in (P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9) if g_ is not None],
+                             _ctl_osm_segn, lamps, ogg, OGG, [nodes[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and inside(nodes[r_], 0)],
+                             _ctl_incroci, [(c_[0], c_[1]) for c_ in crossings], [b_[0] for b_ in bar_out] + _cw, near_street, off_carriageway, log)
+lamps = lamps + MAPI['lp']; ogg = ogg + MAPI['og']
+signals_extra = [node_index[r_] for r_ in MAPI['sf']]
+for s_ in MAPI['sm']: push(tid(s_[1], s_[2]), 'sm', s_)
 for x, z in lamps: push(tid(x, z), 'lp', [q(x), q(z)])
 for o in ogg: push(tid(o[1] / 10, o[2] / 10), 'og', o)
 for s_ in pspaces: push(tid(s_[0] / 10, s_[1] / 10), 'ps', s_)
@@ -1897,7 +1909,7 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'cut': [[q(v) for v in c_] for c_ in cuts],
        'nodes': [c for n_ in NODES for c in n_], 'roads': out_roads, 'names': names, 'tiles': tiles,
        'trains': [{'p': enc(t['pts']), 'st': t['st'], 'stn': t['stn'], 'h': [q(coordH[key(p_)]) if key(p_) in coordH else -32768 for p_ in t['pts']]} for t in trains],
-       'pois': pois, 'ng': negozi, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index],
+       'pois': pois, 'ng': negozi, 'gates': gate_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index] + signals_extra,
        'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0)]}
 if ROT: out.setdefault('report', {})['rotonde'] = ROT.rep
 if ED:  # the buildings of the DBGT: entrances, checks, report
@@ -1928,10 +1940,13 @@ _ctl['aiuole_dbgt_bordi_bassi'] = _ctl_aiuole
 _ctl['divisori_ferroviari_chiusi_alla_strada'] = {'tratti': len(_capi), 'metri': _capi_m} if FER else None
 _ctl['alberi_su_isole'] = MANUF.rep.get('alberi_isole')
 log('CONTROLLO alberi sulle isole stradali sotto', dbgt_manufatti.ALB_ISOLA, 'm (devono essere 0 dopo):', MANUF.rep.get('alberi_isole'))
+out.setdefault('report', {})['mapillary'] = MAPI['rep']  # the checks of src/mapillary_obj.py: what enters, what is dropped and why, doubles with OSM, on the carriageway
 import prove_fisse  # the points of Carlo of 28/10 as fixed tests (src/prove_fisse.py)
 _ctl['prove_fisse'] = prove_fisse.prove(out)
 for _k_, _v_ in _ctl['prove_fisse'].items(): log('PROVA FISSA', _k_, 'OK' if _v_['ok'] else 'NON PASSA', _v_)
+_ctl['prove_fisse_mapillary_ok'] = all(v_['ok'] for k_, v_ in _ctl['prove_fisse'].items() if k_.startswith('mapillary'))
 out.setdefault('report', {})['controlli_28_10'] = _ctl
+
 out.setdefault('report', {})['cantieri'] = _crep  # the dividers the building sites' hoarding replaces (src/barriere.py cantieri)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
