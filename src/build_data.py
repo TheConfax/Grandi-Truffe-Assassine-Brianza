@@ -208,6 +208,7 @@ def add_building(outer, holes, t, key):
     if t.get('amenity') == 'place_of_worship' and a > 120: bt = 'church'
     rec = {'p': outer, 'h': round(bheight(t, a, key), 1), 't': BTYPE.get(bt, 0), 'ht': bool(num(t.get('height')) or num(t.get('building:levels'))), 'lv': num(t.get('building:levels')), 'bt': bt}
     if t.get('man_made') == 'water_tower': rec['wt'] = True; rec['h'] = num(t.get('height')) or max(rec['h'], 25)
+    if a < 40 and (t.get('power') in ('substation', 'transformer') or bt == 'transformer_tower'): rec['mn'] = '01'  # a small OSM substation: the electric cabin model of the DBGT ones (g 5, paesaggio3.js lsCabina, default look)
     if holes: rec['k'] = [h for h in holes if len(h) >= 3]
     rec['tg'] = {k_: t[k_] for k_ in ('building', 'building:levels', 'roof:shape', 'roof:colour', 'building:colour', 'name', 'amenity', 'man_made') if k_ in t}  # what a DBGT building takes from OSM (dbgt_edifici.py)
     buildings.append(rec)
@@ -350,6 +351,9 @@ def area_type(t):
     for k in ('leisure', 'landuse', 'natural'):
         if t.get(k) in AREA_T: return AREA_T[t[k]]
     return None
+# cantieri finiti (Carlo 29/10): way OSM landuse=construction ormai superati, non si disegnano
+#   1396686491  Ewiva, via Gagarin: la stazione di ricarica c'e' gia' (Google Maps)
+CANTIERI_FINITI = {'1396686491'}  # ids as strings, as in ways
 areas = []
 for members, t in rels:
     if t.get('type') != 'multipolygon' or 'building' in t: continue
@@ -360,7 +364,7 @@ for members, t in rels:
     for o in join_rings(outers):
         if len(o) >= 3: areas.append((at, o, ir))
 for wid, (refs, t) in ways.items():
-    if wid in mp_ways or refs[0] != refs[-1] or 'building' in t: continue
+    if wid in mp_ways or wid in CANTIERI_FINITI or refs[0] != refs[-1] or 'building' in t: continue
     at = area_type(t)
     if at and not (t.get('highway') and t.get('area') != 'yes'):
         pts = ring(refs)
@@ -397,7 +401,7 @@ for members, t in rels:
     for o in join_rings([m[1] for m in members if m[0] == 'way' and m[2] == 'outer']):
         if len(o) >= 3: land.append((k_, o))
 for wid, (refs, t) in ways.items():
-    if wid in mp_ways or refs[0] != refs[-1] or 'building' in t: continue
+    if wid in mp_ways or wid in CANTIERI_FINITI or refs[0] != refs[-1] or 'building' in t: continue
     k_ = ls_kind(t)
     if k_:
         pts = ring(refs)
@@ -1235,28 +1239,13 @@ if not _fz.is_empty:
     log('divisori sul bordo delle fontane tolti', _nb - len(bar_out))
 if FER: bar_out = FER.via_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_recinzioni', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
 if FER: bar_out = FER.lontano_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_divisori', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
-CAPO_STRADA, CAPO_LUNGO = 10.0, 10.0  # m: the end of a platform divider within CAPO_STRADA of a street at grade stays, CAPO_LUNGO m of it
 if FER:  # the DBGT railway dividers (kind 6) between a platform and a track or between two tracks: not on the boundary of the railway land, taken away
     _k6 = [b_ for b_ in bar_out if b_[1] == 6]
     log('controllo: metri di divisori ferroviari (tipo 6) dentro l area ferroviaria PRIMA', FER.metri_dentro(_E_fer, [b_[0] for b_ in _k6])[0])
     bar_out = [b_ for b_ in bar_out if b_[1] != 6] + FER.dentro_l_area(_k6, _E_fer, 'divisori_tipo_6', get=lambda b_: b_[0], put=lambda b_, pts_: (pts_, b_[1], b_[2]))
-    # the end of a platform at a crossing or a street (Carlo, 28/10, via Pace x 580 z -752: "manca un muretto a chiudere li"): the divider between platform and track that
-    # runs into a street was taken away with the rest and the platform stayed open to the track. The first CAPO_LUNGO m of it from an end that is within CAPO_STRADA m of
-    # an asphalt at grade stay (a cap; the rest of the platform edge stays open to the track, as Carlo wanted at the station of Meda)
-    from shapely.ops import substring as _subs
-    _zona_s = asph.buffer(CAPO_STRADA); prepare(_zona_s); _capi = []
-    for b_ in _k6:
-        _L = LineString(b_[0])
-        if _L.length < 1 or not _L.intersects(_E_fer): continue
-        for _a, _b in ((0.0, min(CAPO_LUNGO, _L.length)), (max(0.0, _L.length - CAPO_LUNGO), _L.length)):
-            _c = _subs(_L, _a, _b)
-            _end = Point(_c.coords[0] if _a == 0.0 else _c.coords[-1])
-            if not _zona_s.contains(_end): continue
-            _x = _c.intersection(_E_fer)
-            for _p in getattr(_x, 'geoms', [_x]):
-                if _p.geom_type == 'LineString' and _p.length >= 0.8: _capi.append((list(_p.coords), b_[1], b_[2]))
-    bar_out += _capi; _capi_m = round(sum(LineString(c_[0]).length for c_ in _capi), 1)
-    log('CONTROLLO chiusure dei divisori ferroviari alla strada (tratti, metri):', len(_capi), _capi_m, [(round(c_[0][0][0]), round(c_[0][0][1])) for c_ in _capi[:6]])
+    # no net along a platform (Carlo, 29/10, via Pace x 573 z -732, key B in 7 points): the caps of the platform dividers (the first 10 m from an end by a street) are gone;
+    # the platform edge stays open to the track as at the station of Meda. The closing at the level crossing of via Pace is by hand (PACE_FISSE below)
+    _capi, _capi_m = [], 0.0
 
 # via Pace by hand (Carlo, 29/10, photos with the green lines; the level crossing of via Cialdini x 586.7 z -758.6): the railway fence on the porfido side, from the
 # end of the platform parapet (580.4, -750.1) to the end of the fence that stands there (580.26, -753.05); and from the other end of that fence (582.53, -757.06) to the
