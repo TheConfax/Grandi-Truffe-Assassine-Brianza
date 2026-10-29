@@ -1239,28 +1239,13 @@ if not _fz.is_empty:
     log('divisori sul bordo delle fontane tolti', _nb - len(bar_out))
 if FER: bar_out = FER.via_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_recinzioni', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
 if FER: bar_out = FER.lontano_dai_binari(bar_out, [LineString(p) for p, rr in zip(rails, rail_raw) if len(p) >= 2 and not (rr['t'].get('bridge') in ('yes', 'viaduct') or rr['layer'] >= 1)], 'muri_e_divisori', get=lambda b: b[0], put=lambda b, pts: (pts,) + tuple(b[1:]))
-CAPO_STRADA, CAPO_LUNGO = 10.0, 10.0  # m: the end of a platform divider within CAPO_STRADA of a street at grade stays, CAPO_LUNGO m of it
 if FER:  # the DBGT railway dividers (kind 6) between a platform and a track or between two tracks: not on the boundary of the railway land, taken away
     _k6 = [b_ for b_ in bar_out if b_[1] == 6]
     log('controllo: metri di divisori ferroviari (tipo 6) dentro l area ferroviaria PRIMA', FER.metri_dentro(_E_fer, [b_[0] for b_ in _k6])[0])
     bar_out = [b_ for b_ in bar_out if b_[1] != 6] + FER.dentro_l_area(_k6, _E_fer, 'divisori_tipo_6', get=lambda b_: b_[0], put=lambda b_, pts_: (pts_, b_[1], b_[2]))
-    # the end of a platform at a crossing or a street (Carlo, 28/10, via Pace x 580 z -752: "manca un muretto a chiudere li"): the divider between platform and track that
-    # runs into a street was taken away with the rest and the platform stayed open to the track. The first CAPO_LUNGO m of it from an end that is within CAPO_STRADA m of
-    # an asphalt at grade stay (a cap; the rest of the platform edge stays open to the track, as Carlo wanted at the station of Meda)
-    from shapely.ops import substring as _subs
-    _zona_s = asph.buffer(CAPO_STRADA); prepare(_zona_s); _capi = []
-    for b_ in _k6:
-        _L = LineString(b_[0])
-        if _L.length < 1 or not _L.intersects(_E_fer): continue
-        for _a, _b in ((0.0, min(CAPO_LUNGO, _L.length)), (max(0.0, _L.length - CAPO_LUNGO), _L.length)):
-            _c = _subs(_L, _a, _b)
-            _end = Point(_c.coords[0] if _a == 0.0 else _c.coords[-1])
-            if not _zona_s.contains(_end): continue
-            _x = _c.intersection(_E_fer)
-            for _p in getattr(_x, 'geoms', [_x]):
-                if _p.geom_type == 'LineString' and _p.length >= 0.8: _capi.append((list(_p.coords), b_[1], b_[2]))
-    bar_out += _capi; _capi_m = round(sum(LineString(c_[0]).length for c_ in _capi), 1)
-    log('CONTROLLO chiusure dei divisori ferroviari alla strada (tratti, metri):', len(_capi), _capi_m, [(round(c_[0][0][0]), round(c_[0][0][1])) for c_ in _capi[:6]])
+    # no net along a platform (Carlo, 29/10, via Pace x 573 z -732, key B in 7 points): the caps of the platform dividers (the first 10 m from an end by a street) are gone;
+    # the platform edge stays open to the track as at the station of Meda. The closing at the level crossing of via Pace is by hand (PACE_FISSE below)
+    _capi, _capi_m = [], 0.0
 
 # via Pace by hand (Carlo, 29/10, photos with the green lines; the level crossing of via Cialdini x 586.7 z -758.6): the railway fence on the porfido side, from the
 # end of the platform parapet (580.4, -750.1) to the end of the fence that stands there (580.26, -753.05); and from the other end of that fence (582.53, -757.06) to the
@@ -1422,6 +1407,17 @@ for r_, t in ntags.items(): add_ng(t, nodes[r_])
 for wid, (refs, t) in ways.items():
     if refs[0] == refs[-1] and len(refs) >= 4: add_ng(t, centroid(ring(refs)))
 log('negozi', len(negozi), dict(Counter(NG[n[2]] for n in negozi)))
+# raised volumes (porticoes, passages): the underside at least FONDO_MIN over the ground
+FONDO_MIN, FONDO_SPESS = 4.0, 0.5
+if ED is not None:
+    _nal = 0
+    for b in ED.alti:
+        zg = b.get('zg')
+        if zg is None or b.get('zb') is None: continue
+        mn = zg + FONDO_MIN
+        if b['zb'] < mn:
+            b['zb'] = round(min(mn, b['zt'] - FONDO_SPESS), 2); _nal += 1
+    log('volumi rialzati', len(ED.alti), 'alzati al minimo', _nal)
 places = [{'n': t['name'], 'k': t['place'], 'x': round(nodes[r][0], 1), 'z': round(nodes[r][1], 1)} for r, t in ntags.items()
           if t.get('place') in ('town', 'village', 'suburb', 'neighbourhood', 'hamlet', 'quarter') and t.get('name') and inside(nodes[r], 600)]
 car_nodes = defaultdict(list)
