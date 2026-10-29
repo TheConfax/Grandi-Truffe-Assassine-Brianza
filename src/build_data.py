@@ -208,6 +208,7 @@ def add_building(outer, holes, t, key):
     if t.get('amenity') == 'place_of_worship' and a > 120: bt = 'church'
     rec = {'p': outer, 'h': round(bheight(t, a, key), 1), 't': BTYPE.get(bt, 0), 'ht': bool(num(t.get('height')) or num(t.get('building:levels'))), 'lv': num(t.get('building:levels')), 'bt': bt}
     if t.get('man_made') == 'water_tower': rec['wt'] = True; rec['h'] = num(t.get('height')) or max(rec['h'], 25)
+    if a < 40 and (t.get('power') in ('substation', 'transformer') or bt == 'transformer_tower'): rec['mn'] = '01'  # a small OSM substation: the electric cabin model of the DBGT ones (g 5, paesaggio3.js lsCabina, default look)
     if holes: rec['k'] = [h for h in holes if len(h) >= 3]
     rec['tg'] = {k_: t[k_] for k_ in ('building', 'building:levels', 'roof:shape', 'roof:colour', 'building:colour', 'name', 'amenity', 'man_made') if k_ in t}  # what a DBGT building takes from OSM (dbgt_edifici.py)
     buildings.append(rec)
