@@ -1749,8 +1749,8 @@ const GATE_MAT = new THREE.MeshLambertMaterial({ color: 0x33413a, map: GATE_TEX,
 for (const [X0, Z0, X1, Z1, k, h, auto] of D.gates || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
-  const g = { ax, az, bx, bz, ux, uz, W, k, h, gy, broken: false, auto: !!auto, open: false, oa: 0, hinges: [] };
-  if (k !== 'o') { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: true, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
+  const g = { ax, az, bx, bz, ux, uz, W, k, h, gy, broken: false, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [] };
+  if (k !== 'o' && !g.perm) { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: true, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
   GATES.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
 }
 function buildGates(T, G) {
@@ -1764,7 +1764,7 @@ function buildGates(T, G) {
     if (g.k === 'l') { // lift-gate arm, hinged at a
       outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
       const geo = new THREE.BoxGeometry(g.W, 0.09, 0.09); geo.translate(g.W / 2, 1.0, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * g.W / 1.6);
-      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: ARM_TEX })); m.castShadow = true; inner.add(m);
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: ARM_TEX })); m.castShadow = true; inner.add(m); if (g.perm) inner.rotation.z = 1.35; /* raised lift gate on a big road */
     } else { // gate leaf (two leaves when wide), hinged at the posts
       const leaves = g.W > 3.2 && g.k !== 'o' ? [[0, g.W / 2, 1], [g.W, g.W / 2, -1]] : [[0, g.W, 1]];
       outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
@@ -1780,7 +1780,7 @@ function buildGates(T, G) {
 function gateHits(v) {
   if (v.speed < 0.6) return;
   GATEG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, g => {
-    if (g.broken || g.open || g.k === 'o' || Math.abs(v.y - g.gy) > 2.5) return;
+    if (g.broken || g.open || g.k === 'o' || g.perm || Math.abs(v.y - g.gy) > 2.5) return;
     const ai = v.driver === 'ai', reach = ai && g.auto ? v.rad + 4 : v.rad + 0.3;
     for (const c of v.circles()) if (segDist(c[0], c[1], g.ax, g.az, g.bx, g.bz) < reach) { if (ai && g.auto) openGate(g); else if (v.speed > 3 || ai) breakGate(g, v); return; }
   });

@@ -481,7 +481,7 @@ for wid, (refs, t) in ways.items():
             raw_roads.append({'refs': run, 'w': round(w, 1), 'wx': bool(num(t.get('width'))) and num(t.get('width')) <= 30, 'c': RCLASS[hw], 'hw': hw, 'n': nid(t.get('name') or t.get('ref')),
                               'o': t.get('oneway') in ('yes', '1') or hw in ('motorway', 'motorway_link') or t.get('junction') == 'roundabout',
                               'bridge': bridge, 'layer': layer, 'emb': t.get('embankment') == 'yes', 'tunnel': t.get('tunnel') in ('yes', 'covered') or layer < 0, 'under': t.get('tunnel') in ('yes', 'covered', 'building_passage') or layer < 0,
-                              'x': hw in ('motorway', 'trunk', 'motorway_link', 'trunk_link'), 'ms': num(t.get('maxspeed')) if str(t.get('maxspeed', '')).replace('.', '').isdigit() else None, 'pk': street_parking(t),
+                              'x': hw in ('motorway', 'trunk', 'motorway_link', 'trunk_link'), 'priv': t.get('access') in ('private', 'no'), 'drv': t.get('service') == 'driveway', 'ms': num(t.get('maxspeed')) if str(t.get('maxspeed', '')).replace('.', '').isdigit() else None, 'pk': street_parking(t),
                               'ln': [num(t.get(k_)) for k_ in ('lanes', 'lanes:forward', 'lanes:backward')]})  # the lanes OSM maps: the markings (dbgt_righe.py)
     elif t.get('railway') == 'rail' and (t.get('tunnel') != 'yes' or sum(math.dist(nodes[a], nodes[b]) for a, b in zip(refs, refs[1:]) if a in nodes and b in nodes) < 200) and t.get('service') not in ('yard', 'siding', 'spur'):  # short rail tunnels (underpasses) stay as track at grade
         lay = num(t.get('layer')) or 0
@@ -983,7 +983,7 @@ if dbt_walls:
     _ctl_aiuole = {'aiuole_dbgt': len(dbt_aiuole), 'divisori_resi_cordolo_basso_per_tipo_di_prima': {str(k_): v_ for k_, v_ in n_aiu.items()}}
 # passi carrai: each DBGT driveway point within PC_D of a divider opens it PC_W wide and closes it with a gate as tall as the wall;
 # where a street (class 3 or more) already crosses there the gap stays open. Two points closer than PC_W are one gate
-PC_D, PC_W = 1.5, 3.6
+PC_D, PC_W = 6.0, 3.6
 # the barriers do not change until the cemetery walls: their union for those, on a thread from here (src/presto.py)
 _osm_bar_all_f = presto(lambda b_: unary_union([LineString(pts).buffer(1.5) for pts, k, h in b_ if len(pts) >= 2]) if b_ else GeometryCollection(), list(barriers))
 pc_cuts, pc_gates = [], []
@@ -1126,12 +1126,32 @@ node_bar = {}
 for bi, run in enumerate(bar_runs):
     for n_ in run: node_bar.setdefault(n_, bi)
 gate_out = []
+_cl = [(LineString(pts), h_) for pts, k_, h_ in bar_out if len(pts) >= 2 and k_ != 6] + [(g_.boundary, 2.0) for b_, g_ in _bl if g_ is not None]
+_clt = STRtree([c_[0] for c_ in _cl])
+_go = {'osm_nodi': 0, 'disegnati': 0, 'scartati_classe1_o_non_piana': 0, 'lift_alzate': 0, 'senza_via_su_chiusura': 0, 'scartati_senza_via_senza_chiusura': 0, 'fuori': 0, 'entrance_kissing': 0, 'entrance_kissing_scartati': 0}
+def _closest(p_, R_):
+    P0_ = Point(p_); best_ = None
+    for j_ in _clt.query(P0_.buffer(R_)):
+        d_ = _cl[j_][0].distance(P0_)
+        if d_ <= R_ and (best_ is None or d_ < best_[0]): best_ = (d_, j_)
+    return best_
+def _tan_at(L_, p_):
+    s0_ = L_.project(Point(p_)); a_ = L_.interpolate(max(0, s0_ - 0.8)); b_ = L_.interpolate(min(L_.length, s0_ + 0.8)); return tang((a_.x, a_.y), (b_.x, b_.y))
 for r_, t in ntags.items():
+    if t.get('barrier') in ('entrance', 'kissing_gate') and r_ in nodes and inside(nodes[r_], 0):  # a small gate in the gap of a fence
+        c_ = _closest(nodes[r_], 2.0)
+        if c_ is None or any(math.dist(nodes[r_], ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20)) < 1.5 for g_ in gate_out): _go['entrance_kissing_scartati'] += 1; continue
+        ux_, uz_ = _tan_at(_cl[c_[1]][0], nodes[r_]); p_ = nodes[r_]
+        gate_out.append([q(p_[0] - ux_ * 0.6), q(p_[1] - uz_ * 0.6), q(p_[0] + ux_ * 0.6), q(p_[1] + uz_ * 0.6), 'g', 1.4, 0]); _go['entrance_kissing'] += 1; continue
     if t.get('barrier') not in ('gate', 'lift_gate', 'swing_gate', 'sliding_gate'): continue
-    p = nodes[r_]
-    if not inside(p, 0): continue
+    p = nodes[r_]; _go['osm_nodi'] += 1
+    if not inside(p, 0): _go['fuori'] += 1; continue
     rd = node_road.get(r_)
-    if rd and (rd['c'] <= 1 or not flat(rd)): continue  # gates across main roads stay open
+    if rd and (rd['c'] <= 1 or not flat(rd)):  # gates across main roads: a lift gate is drawn raised, the others stay out
+        if t['barrier'] != 'lift_gate': _go['scartati_classe1_o_non_piana'] += 1; continue
+        k = rd['refs'].index(r_); a = nodes[rd['refs'][max(0, k - 1)]]; b = nodes[rd['refs'][min(len(rd['refs']) - 1, k + 1)]]
+        ux, uz = tang(a, b); hw_ = rd['w'] / 2 + 0.3
+        gate_out.append([q(p[0] + uz * hw_), q(p[1] - ux * hw_), q(p[0] - uz * hw_), q(p[1] + ux * hw_), 'l', 1.0, 2]); _go['lift_alzate'] += 1; _go['disegnati'] += 1; continue
     kind = 'l' if t['barrier'] == 'lift_gate' else ('o' if rd and rd['c'] == 6 else 'g')
     span = None
     if r_ in node_bar:
@@ -1143,10 +1163,25 @@ for r_, t in ntags.items():
     else: hgt = 1.6
     if span is None and rd:
         k = rd['refs'].index(r_); a = nodes[rd['refs'][max(0, k - 1)]]; b = nodes[rd['refs'][min(len(rd['refs']) - 1, k + 1)]]
-        ux, uz = tang(a, b); hw_ = rd['w'] / 2 + 0.3
-        span = ((p[0] + uz * hw_, p[1] - ux * hw_), (p[0] - uz * hw_, p[1] + ux * hw_))
-    if span is None: continue
+        ux, uz = tang(a, b); hw_ = rd['w'] / 2 + 0.3; ends_ = []
+        for sg_ in (1, -1):  # the posts stand on the closest closure (wall, fence, house) a few metres beyond the road edge
+            ray_ = LineString([p, (p[0] + sg_ * uz * (hw_ + 4), p[1] - sg_ * ux * (hw_ + 4))]).buffer(0.4, cap_style=2); bd_ = None
+            for j_ in _clt.query(ray_):
+                x_ = _cl[j_][0].intersection(ray_)
+                for part_ in getattr(x_, 'geoms', [x_]):
+                    for c_ in getattr(part_, 'coords', []):
+                        d_ = ((c_[0] - p[0]) * uz - (c_[1] - p[1]) * ux) * sg_
+                        if hw_ - 0.8 < d_ and (bd_ is None or d_ < bd_): bd_ = d_
+            ends_.append(bd_ if bd_ is not None else hw_)
+        span = ((p[0] + uz * ends_[0], p[1] - ux * ends_[0]), (p[0] - uz * ends_[1], p[1] + ux * ends_[1]))
+    if span is None:  # not on any street: a small gate along the closest fence or wall
+        c_ = _closest(p, 6.0)
+        if c_ is None: _go['scartati_senza_via_senza_chiusura'] += 1; continue
+        ux_, uz_ = _tan_at(_cl[c_[1]][0], p); hgt = min(2.2, max(1.2, _cl[c_[1]][1])); span = ((p[0] - ux_ * 0.7, p[1] - uz_ * 0.7), (p[0] + ux_ * 0.7, p[1] + uz_ * 0.7)); _go['senza_via_su_chiusura'] += 1
+    _go['disegnati'] += 1
     gate_out.append([q(span[0][0]), q(span[0][1]), q(span[1][0]), q(span[1][1]), kind, round(1.0 if kind == 'l' else hgt, 1), 1 if rd and rd['c'] <= 3 else 0])
+log('cancelli OSM', _go)
+if STR: STR.rep['cancelli_osm'] = dict(_go)
 for pts, kind, hh in gate_ways:
     L = LineString(pts)
     if not 0.8 < L.length < 14: continue
@@ -1161,6 +1196,74 @@ for a_, b_, h_, k_ in pc_gates:
     m_ = ((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2)
     if any(math.dist(m_, ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20)) < 3 for g_ in gate_out): continue  # OSM has its gate there already
     gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', h_, 0])
+# passi carrai DBGT left without a gate (no divider within PC_D of the point): the gap between the closures on the two sides along the lot boundary
+# (end of a divider or wall of a building, in any combination) is closed with a gate; wider than 8 m: 6 m centred on the driveway; never across an OSM street
+_gcc = {'nuovi': 0, 'larghi': 0, 'pedonali': 0, 'senza_strada': 0, 'senza_chiusure': 0, 'carreggiata': 0, 'strada_osm': 0, 'troppo_stretti': 0, 'gia_cancello': 0, 'fuori': 0}
+if dbt_pc:
+    _rr = [r_ for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x']]; _rrt = STRtree([r_['line'] for r_ in _rr])
+    _gd = []; _src = {'passo_carraio': 0, 'rampa': 0, 'vialetto': 0, 'varco': 0}; _cands = [(p_, 'passo_carraio') for p_ in dbt_pc]
+    try: _cands += [((v_['x'], v_['z']), 'rampa') for v_ in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sottoterra.json'), encoding='utf-8'))['viste'] if v_['esito'] == 'rampa']
+    except Exception: pass
+    for r_ in _rr:
+        if r_['drv'] and r_['c'] <= 5:  # a driveway OSM maps: its end at the street gets the gate
+            for e_ in (r_['line'].coords[0], r_['line'].coords[-1]):
+                near_ = [x_ for j_ in _rrt.query(Point(e_).buffer(8)) for x_ in [_rr[j_]] if not x_['drv'] and x_['c'] <= 3]
+                if near_ and min(x_['line'].distance(Point(e_)) for x_ in near_) < 8: _cands.append((tuple(e_), 'vialetto'))
+    import shapely
+    for st_ in _rr:  # openings between two closures along the lot boundary beside every street
+        if st_['c'] > 3 or st_['line'].length < 6: continue
+        for sg_ in (1, -1):
+            try: off_ = st_['line'].offset_curve(sg_ * (st_['w'] / 2 + 1.5), quad_segs=2, join_style=2)
+            except Exception: continue
+            if off_.is_empty or off_.geom_type != 'LineString' or off_.length < 6: continue
+            n_ = int(off_.length); pts_ = [off_.interpolate(i_) for i_ in range(n_ + 1)]
+            hit_ = set(_clt.query(pts_, predicate='dwithin', distance=0.8)[0].tolist()); cl_ = [i_ in hit_ for i_ in range(len(pts_))]
+            i_ = 0
+            while i_ < len(cl_):
+                if cl_[i_] or i_ == 0 or not cl_[i_ - 1]: i_ += 1; continue
+                j_ = i_
+                while j_ < len(cl_) and not cl_[j_]: j_ += 1
+                if j_ < len(cl_) and 0 < j_ - i_ <= 9: _cands.append((((pts_[i_ - 1].x + pts_[j_].x) / 2, (pts_[i_ - 1].y + pts_[j_].y) / 2), 'varco'))
+                i_ = j_ + 1
+    for p_, srcname_ in _cands:
+        P_ = Point(p_)
+        if not inside(p_, 0): _gcc['fuori'] += 1; continue
+        if any(math.dist(p_, ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20)) < 4 for g_ in gate_out) or any(math.dist(p_, d_) < 3.6 for d_ in _gd): _gcc['gia_cancello'] += 1; continue
+        cand = [_rr[j_] for j_ in _rrt.query(P_.buffer(30 if srcname_ == 'rampa' else 25))]
+        if not cand: _gcc['senza_strada'] += 1; continue
+        st_ = min([r_ for r_ in cand if r_['c'] <= 3] or cand, key=lambda r_: r_['line'].distance(P_))
+        if srcname_ == 'rampa':  # the ramp is inside the lot: the gate stands on the boundary in front of it
+            q0_ = st_['line'].interpolate(st_['line'].project(P_)); dd_ = math.dist(p_, (q0_.x, q0_.y))
+            if dd_ < 1: continue
+            k_ = min(1.0, (st_['w'] / 2 + 1.5) / dd_); p_ = (q0_.x + (p_[0] - q0_.x) * k_, q0_.y + (p_[1] - q0_.y) * k_); P_ = Point(p_)
+            if any(math.dist(p_, d_) < 3.6 for d_ in _gd): _gcc['gia_cancello'] += 1; continue
+        s0_ = st_['line'].project(P_); pa_ = st_['line'].interpolate(max(0, s0_ - 1)); pb_ = st_['line'].interpolate(min(st_['line'].length, s0_ + 1))
+        ux_, uz_ = tang((pa_.x, pa_.y), (pb_.x, pb_.y))
+        ext_ = []
+        for sg_ in (1, -1):
+            ray_ = LineString([p_, (p_[0] + sg_ * ux_ * 10, p_[1] + sg_ * uz_ * 10)]).buffer(1.0, cap_style=2)
+            best_ = None
+            for j_ in _clt.query(ray_):
+                x_ = _cl[j_][0].intersection(ray_)
+                for part_ in getattr(x_, 'geoms', [x_]):
+                    for c_ in getattr(part_, 'coords', []):
+                        d_ = (c_[0] - p_[0]) * ux_ * sg_ + (c_[1] - p_[1]) * uz_ * sg_
+                        if d_ > 0.15 and (best_ is None or d_ < best_[0]): best_ = (d_, _cl[j_][1])
+            ext_.append(best_)
+        if ext_[0] is None and ext_[1] is None: _gcc['senza_chiusure'] += 1; continue
+        gap_ = (ext_[0][0] if ext_[0] else 99) + (ext_[1][0] if ext_[1] else 99)
+        if gap_ <= 8: da_, db_ = ext_[0][0] - 0.05, -(ext_[1][0] - 0.05); hh_ = max(1.2, min(2.2, min(e_[1] for e_ in ext_ if e_ and e_[1] < 2.0) if any(e_ and e_[1] < 2.0 for e_ in ext_) else 1.6))
+        else: da_, db_ = 3.0, -3.0; hh_ = 1.6; _gcc['larghi'] += 1
+        if abs(da_ - db_) < 0.8: _gcc['troppo_stretti'] += 1; continue
+        a_ = (p_[0] + ux_ * da_, p_[1] + uz_ * da_); b_ = (p_[0] + ux_ * db_, p_[1] + uz_ * db_); G_ = LineString([a_, b_])
+        if any(r_['line'].distance(G_.centroid) < r_['w'] / 2 - 0.2 and r_['c'] <= 3 for r_ in _rr if r_['line'].distance(G_) < 12): _gcc['carreggiata'] += 1; continue
+        if any(not r_['priv'] and r_['line'].intersects(G_) for r_ in _rr if r_['line'].distance(G_) < 1): _gcc['strada_osm'] += 1; continue
+        _gd.append(p_); _gcc['nuovi'] += 1; _src[srcname_] += 1
+        if abs(da_ - db_) < 2.5: _gcc['pedonali'] += 1
+        gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'o' if srcname_ == 'rampa' else 'g', round(hh_, 1), 0])
+    _gcc['per_origine'] = _src
+    log('cancelli sui varchi: aggiunti', _gcc)
+    if STR: STR.rep['cancelli_passi_carrai'] = dict(_gcc)
 log('gate meshes', len(gate_out))
 
 # ---- villa frontages: muretto + cancellata along the street with a gate, where OSM has nothing mapped

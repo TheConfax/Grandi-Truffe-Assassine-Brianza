@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo lisciatore-parcheggi · dopo 6692d55 · assemblato 29/10 17:42 · porta ' + location.port;
+    const txt = 'locale · ramo cancelli-carrai · dopo 931c130 · assemblato 29/10 18:09 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3167,8 +3167,8 @@ const GATE_MAT = new THREE.MeshLambertMaterial({ color: 0x33413a, map: GATE_TEX,
 for (const [X0, Z0, X1, Z1, k, h, auto] of D.gates || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
-  const g = { ax, az, bx, bz, ux, uz, W, k, h, gy, broken: false, auto: !!auto, open: false, oa: 0, hinges: [] };
-  if (k !== 'o') { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: true, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
+  const g = { ax, az, bx, bz, ux, uz, W, k, h, gy, broken: false, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [] };
+  if (k !== 'o' && !g.perm) { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: true, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
   GATES.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
 }
 function buildGates(T, G) {
@@ -3182,7 +3182,7 @@ function buildGates(T, G) {
     if (g.k === 'l') { // lift-gate arm, hinged at a
       outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
       const geo = new THREE.BoxGeometry(g.W, 0.09, 0.09); geo.translate(g.W / 2, 1.0, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * g.W / 1.6);
-      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: ARM_TEX })); m.castShadow = true; inner.add(m);
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: ARM_TEX })); m.castShadow = true; inner.add(m); if (g.perm) inner.rotation.z = 1.35; /* raised lift gate on a big road */
     } else { // gate leaf (two leaves when wide), hinged at the posts
       const leaves = g.W > 3.2 && g.k !== 'o' ? [[0, g.W / 2, 1], [g.W, g.W / 2, -1]] : [[0, g.W, 1]];
       outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
@@ -3198,7 +3198,7 @@ function buildGates(T, G) {
 function gateHits(v) {
   if (v.speed < 0.6) return;
   GATEG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, g => {
-    if (g.broken || g.open || g.k === 'o' || Math.abs(v.y - g.gy) > 2.5) return;
+    if (g.broken || g.open || g.k === 'o' || g.perm || Math.abs(v.y - g.gy) > 2.5) return;
     const ai = v.driver === 'ai', reach = ai && g.auto ? v.rad + 4 : v.rad + 0.3;
     for (const c of v.circles()) if (segDist(c[0], c[1], g.ax, g.az, g.bx, g.bz) < reach) { if (ai && g.auto) openGate(g); else if (v.speed > 3 || ai) breakGate(g, v); return; }
   });
@@ -3887,7 +3887,7 @@ function buildPlatforms(T, G) {
 // parking stalls: white lines across the long side of every car park, one or two rows depending on its width, never over the aisles (OSM service
 // roads) or a building; one yellow stall with the wheelchair per row of eight or more; T.stalls keeps every stall for the parked cars (parkTile);
 // on the bigger car parks lamp posts down the middle, a parking meter and the blue P sign
-const PSIGN_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#1f4fa8'; g.fillRect(0, 0, w, h); g.strokeStyle = '#fff'; g.lineWidth = 3; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = '#fff'; g.font = 'bold 46px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', w / 2, h / 2 + 3); }, false), side: THREE.DoubleSide });
+const PSIGN_PROP = new Map(); /* the P plates already given a prop, by place: a rebuilt tile keeps the fallen ones fallen */
 /* smoothed car park rows: the axis follows the longest straight edge of the lot (kerb), not the principal axis; the rows of a run share one depth line,
    and a stall with a corner on the pavement, a bed, a wall or outside the lot is dropped, not bent */
 function alignRowAxis(P, pca) {
@@ -3941,7 +3941,7 @@ function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; ret
   return runs;
 }
 function buildParkingLines(T, G) {
-  const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), sign = Buf();
+  const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf();
   T.stalls = []; T.streetStalls = [];
   const quad = (x, z, ux, uz, a0, a1, w0, w1, col) => { const nx = -uz, nz = ux;
     if (H.fineAt(x, z)) { // a tile of S: thin paint on a flat car park, in pieces of at most 2.5 m along it, each corner 5 cm over S (b.noclip: cut on the cells it would cost four times the triangles)
@@ -4017,15 +4017,19 @@ function buildParkingLines(T, G) {
       for (let s = S0 + 6; s < S1 - 3; s += 22) { const sc = lmSection(P, cx, cz, ux, uz, s); if (!sc) continue; const v = (sc[0] + sc[1]) / 2, x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; if (onAnyRoad(x, z, 0.5) && !onFoot(x, z) || inBuilding(x, z, 0.5)) continue; const gy = H.ground(x, z); addBox(lamps, x, gy + 3.8, z, 0.15, 7.6, 0.15, null); addBox(heads, x + ux * 0.5, gy + 7.55, z + uz * 0.5, 1.2, 0.18, 0.35, null); addBox(heads, x - ux * 0.5, gy + 7.55, z - uz * 0.5, 1.2, 0.18, 0.35, null); }
       const e = lmSection(P, cx, cz, ux, uz, S0 + 0.5);
       if (e) { const x = cx + ux * (S0 + 0.3) + nx * e[0] - nx * -0.6, z = cz + uz * (S0 + 0.3) + nz * e[0] + nz * 0.6, gy = H.ground(x, z), ry = Math.atan2(-uz, ux);
-        F.geo(Bs.trim, lmBox(0.08, 2.6, 0.08, x, gy + 1.3, z), null, COL('#8a8f95'));
-        const i0 = sign.p.length / 3; for (const [dx, dy, u, v] of [[-0.35, 2.2, 0, 0], [0.35, 2.2, 1, 0], [0.35, 2.9, 1, 1], [-0.35, 2.9, 0, 1]]) vtx(sign, x + nx * dx, gy + dy, z + nz * dx, ux, 0, uz, u, v); sign.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
+        { const [pw, ph] = segDims('parcheggio'), [front, rear] = segTexOf('parcheggio'), top = 2.3, root = new THREE.Group(); /* the real plate (Fig. II 76) of segnali3.js, the post behind it, the face to those driving in (along u) */
+          root.position.set(x, gy, z); root.rotation.y = Math.atan2(-ux, -uz); G.add(root);
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, top + ph / 2, 8), SEG_POLE); pole.position.y = (top + ph / 2) / 2; pole.castShadow = true; root.add(pole);
+          const plate = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), front); plate.position.set(0, top, 0.06); root.add(plate);
+          const back = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), rear); back.position.set(0, top, -0.06); back.rotation.y = Math.PI; back.scale.x = -1; root.add(back);
+          const key = T.t + '_' + Math.round(x * 10) + '_' + Math.round(z * 10), old = PSIGN_PROP.get(key);
+          if (!old) PSIGN_PROP.set(key, addProp({ x, z, y: gy, r: 0.1, h: 3, obj: root })); else { old.obj = root; if (old.broken) root.rotation.x = -1.45; } }
         const mx = x + nx * 1.5, mz = z + nz * 1.5; F.geo(Bs.trim, lmBox(0.3, 1.5, 0.25, 0, 0, 0).rotateY(ry).translate(mx, gy + 0.75, mz), null, COL('#3c4650')); F.geo(Bs.trim, lmBox(0.32, 0.25, 0.27, 0, 0, 0).rotateY(ry).translate(mx, gy + 1.5, mz), null, COL('#e2b436')); } // parking meter
     }
   }
   if (b.i.length) mkMesh(b, PLAT_MAT.line, 5, false, G);
   if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
   if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
-  if (sign.i.length) mkMesh(sign, PSIGN_MAT, 10, false, G);
 }
 // the benches and bins of the parks: one instance each, the models of oggetti3.js, knocked down like the street lamps; built again, a fallen one
 // stays down (as the lamps)
@@ -6067,7 +6071,7 @@ const MODELS = {
 const TRAFFIC_MIX = [['panda', 22], ['hatch', 22], ['sedan', 13], ['wagon', 10], ['suv', 12], ['sport', 5], ['van', 9], ['ape', 6], ['scooter', 7], ['moto', 4], ['bici', 6]];
 const PARKED_MIX = [['panda', 25], ['hatch', 25], ['sedan', 15], ['wagon', 12], ['suv', 14], ['sport', 3], ['van', 6], ['ape', 3], ['scooter', 5], ['moto', 2], ['bici', 4]];
 function pickModel(mix, r = rnd) { let t = r() * mix.reduce((s, m) => s + m[1], 0); for (const [m, w] of mix) if ((t -= w) < 0) return m; return mix[0][0]; }
-const M_GLASS = lam(0x2e3d4e), M_TYRE = lam(0x1b1b1d), M_HEAD = lam(0xfff6d8, { emissive: 0xfff2c0, emissiveIntensity: 0.6 }), M_TAIL = lam(0xa01818, { emissive: 0xa01010, emissiveIntensity: 0.5 }), M_DARK = lam(0x2a2b2f), M_TRIM = lam(0x16181c);
+const M_GLASS = lam(0x2e3d4e), M_TYRE = lam(0x1b1b1d), M_HEAD = lam(0xfff6d8, { emissive: 0xfff2c0, emissiveIntensity: 0.6 }), M_TAIL = lam(0xa01818, { emissive: 0xa01010, emissiveIntensity: 0.5 }), M_HEAD_OFF = lam(0xdcd6c0), M_TAIL_OFF = lam(0x7a1414), M_DARK = lam(0x2a2b2f), M_TRIM = lam(0x16181c);
 const M_GLASS_SEE = new THREE.MeshLambertMaterial({ color: 0x2e3d4e, transparent: true, opacity: 0.42, depthWrite: false }); // police cab: the crew shows through
 const CC_COL = '#16213b'; // Carabinieri: dark blue body, red stripe, white roof
 const M_SIR_A = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 }), M_SIR_B = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 });
@@ -6153,14 +6157,14 @@ function makeCar(model, color) {
     add(boxG(S.W + 0.02, 0.17, 0.12), M_DARK, 0, bot + 0.08, hl + 0.02, false); add(boxG(S.W + 0.02, 0.17, 0.12), M_DARK, 0, bot + 0.08, -hl - 0.02, false);
   }
   const lx = S.ape ? 0.45 : S.W / 2 - 0.3;
-  const ud = body.userData = { hl: [], tl: [], tails: [] }; // tail lamps swap to brake lights, glare points just outside each lens
-  if (S.two) { const ty = S.pedal ? 0.9 : S.seatY + 0.02, tz = -hl + (S.pedal ? 0.25 : 0.12); add(boxG(0.16, 0.12, 0.06), M_HEAD, 0, lightY, lightZ + 0.04, false); ud.tails.push(add(boxG(0.14, 0.08, 0.05), M_TAIL, 0, ty, tz, false)); ud.hl.push([0, lightY, lightZ + 0.2]); ud.tl.push([0, ty, tz - 0.15]); }
-  else for (const x of [-lx, lx]) { add(boxG(0.38, 0.14, 0.06), M_HEAD, x, lightY, lightZ, false); ud.tails.push(add(boxG(0.38, 0.14, 0.06), M_TAIL, x, lightY + 0.02, -lightZ, false)); ud.hl.push([x, lightY, lightZ + 0.18]); ud.tl.push([x, lightY + 0.02, -lightZ - 0.15]); }
+  const ud = body.userData = { hl: [], tl: [], tails: [], heads: [] }; // tail lamps swap to brake lights, glare points just outside each lens
+  if (S.two) { const ty = S.pedal ? 0.9 : S.seatY + 0.02, tz = -hl + (S.pedal ? 0.25 : 0.12); ud.heads.push(add(boxG(0.16, 0.12, 0.06), M_HEAD, 0, lightY, lightZ + 0.04, false)); ud.tails.push(add(boxG(0.14, 0.08, 0.05), M_TAIL, 0, ty, tz, false)); ud.hl.push([0, lightY, lightZ + 0.2]); ud.tl.push([0, ty, tz - 0.15]); }
+  else for (const x of [-lx, lx]) { ud.heads.push(add(boxG(0.38, 0.14, 0.06), M_HEAD, x, lightY, lightZ, false)); ud.tails.push(add(boxG(0.38, 0.14, 0.06), M_TAIL, x, lightY + 0.02, -lightZ, false)); ud.hl.push([x, lightY, lightZ + 0.18]); ud.tl.push([x, lightY + 0.02, -lightZ - 0.15]); }
   const wheels = [];
   for (const [x, z, front] of wheelPos) { // two-wheelers: wheels hang from the leaning body
     const piv = new THREE.Group(); piv.position.set(x, S.wr, z); (S.two ? body : g).add(piv); const w = new THREE.Mesh(S.two ? thinWheelG(S.wr, S.pedal) : wheelG(S.wr), M_TYRE); piv.add(w); wheels.push({ piv, w, front });
   }
-  if (!S.ape) { const hp = new THREE.Mesh(makeCar.hp || (makeCar.hp = new THREE.PlaneGeometry(3.4, 9).rotateX(-Math.PI / 2)), HEADPOOL_MAT); hp.position.set(0, 0.14, hl + 4.4); if (S.two) hp.scale.set(0.6, 1, 0.75); hp.renderOrder = 12; g.add(hp); }
+  if (!S.ape) { const hp = new THREE.Mesh(makeCar.hp || (makeCar.hp = new THREE.PlaneGeometry(3.4, 9).rotateX(-Math.PI / 2)), HEADPOOL_MAT); hp.position.set(0, 0.14, hl + 4.4); if (S.two) hp.scale.set(0.6, 1, 0.75); hp.renderOrder = 12; g.add(hp); body.userData.hp = hp; }
   scene.add(g);
   return { g, body, wheels, rider, crew, bm: typeof bm !== 'undefined' ? bm : null, paint };
 }
@@ -7258,7 +7262,8 @@ function updGlow() {
   for (const v of VEH) {
     const ud = v.m.body.userData; if (!ud.tl) continue;
     const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen, fs = v.fwdSpeed, brk = live && v.inp.brk > 0, rev = brk && fs < -0.5, stop = brk && !rev;
-    const tm = stop ? M_BRAKE : M_TAIL; if (ud.tm !== tm) { ud.tm = tm; for (const m of ud.tails) m.material = tm; }
+    const tm = live ? (stop ? M_BRAKE : M_TAIL) : M_TAIL_OFF; if (ud.tm !== tm) { ud.tm = tm; for (const m of ud.tails) m.material = tm; } /* nobody inside: lamps, pool and glare all off */
+    const hm = live ? M_HEAD : M_HEAD_OFF; if (ud.hm !== hm) { ud.hm = hm; for (const m of ud.heads) m.material = hm; } if (ud.hp) ud.hp.visible = live;
     if (!v.m.g.visible) continue;
     const kh = live ? on : 0, kt = live ? 0.45 * on + (stop ? 0.85 : 0) : 0; if (kh < 0.02 && kt < 0.02 && !rev) continue;
     v.m.g.updateMatrixWorld(true); const mw = v.m.body.matrixWorld;
