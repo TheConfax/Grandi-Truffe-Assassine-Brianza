@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 1bf5c02 · assemblato 29/10 15:28 · porta ' + location.port;
+    const txt = 'locale · ramo lisciatore-parcheggi · dopo 0f48ad9 · assemblato 29/10 17:37 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3844,7 +3844,7 @@ function buildPlatforms(T, G) {
     const [cx, cz] = centroid(P.o), st = PLAT_STATIONS.slice().sort((p, q) => hyp(p.x - cx, p.z - cz) - hyp(q.x - cx, q.z - cz))[0];
     if (!st || hyp(st.x - cx, st.z - cz) > 220) continue;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P.o) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
-    const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), proj = P.o.map(([x, z]) => (x - cx) * ux + (z - cz) * uz), s0 = Math.min(...proj) + 2, s1 = Math.max(...proj) - 2;
+    const ang = alignRowAxis(P, 0.5 * Math.atan2(2 * sxz, sxx - szz)), ux = Math.cos(ang), uz = Math.sin(ang), proj = P.o.map(([x, z]) => (x - cx) * ux + (z - cz) * uz), s0 = Math.min(...proj) + 2, s1 = Math.max(...proj) - 2;
     const name = (st.n || '').replace(/^Stazione di /, '').toUpperCase(), ry = Math.atan2(-uz, ux);
     const at = (s, v) => [cx + ux * s - uz * v, cz + uz * s + ux * v];
     let lastPost = null, stairs = false;
@@ -3888,6 +3888,27 @@ function buildPlatforms(T, G) {
 // roads) or a building; one yellow stall with the wheelchair per row of eight or more; T.stalls keeps every stall for the parked cars (parkTile);
 // on the bigger car parks lamp posts down the middle, a parking meter and the blue P sign
 const PSIGN_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#1f4fa8'; g.fillRect(0, 0, w, h); g.strokeStyle = '#fff'; g.lineWidth = 3; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = '#fff'; g.font = 'bold 46px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', w / 2, h / 2 + 3); }, false), side: THREE.DoubleSide });
+/* smoothed car park rows: the axis follows the longest straight edge of the lot (kerb), not the principal axis; the rows of a run share one depth line,
+   and a stall with a corner on the pavement, a bed, a wall or outside the lot is dropped, not bent */
+function alignRowAxis(P, pca) {
+  let best = 0, bl = 0; const E = [];
+  for (let i = 0; i < P.length; i++) { const A = P[i], C = P[(i + 1) % P.length], L = hyp(C[0] - A[0], C[1] - A[1]); if (L < 6) continue; const a = Math.atan2(C[1] - A[1], C[0] - A[0]); E.push([a, L]); if (L > bl) { bl = L; best = a; } }
+  if (!bl) return pca;
+  let sx = 0, sz = 0; for (const [a, L] of E) { let d = a - best; d -= Math.round(d / (Math.PI / 2)) * (Math.PI / 2); if (Math.abs(d) < 0.09) { sx += Math.cos(4 * a) * L; sz += Math.sin(4 * a) * L; } } /* edges within 5 degrees of the longest one, modulo 90 degrees */
+  const m = Math.atan2(sz, sx) / 4; let d = m - pca; d -= Math.round(d / (Math.PI / 2)) * (Math.PI / 2);
+  return Math.abs(d) < 0.6 ? pca + d : pca; /* a lot whose edges are far from its long axis keeps it */
+}
+function smoothRun(run, row, free, at, P) {
+  if (run.length < 1) return [];
+  const DEP = 4.6, v0 = row ? null : Math.max(...run.map(t => t.v0)), v1 = row ? Math.min(...run.map(t => t.v1)) : null, out = []; let cur = [];
+  for (const t of run) {
+    const a = row ? v1 - DEP : v0, b = row ? v1 : v0 + DEP, vm = (a + b) / 2; let good = free(t.s, vm) && free(t.s - 0.9, vm) && free(t.s + 0.9, vm);
+    for (const ds of [-1.15, 1.15]) for (const v of [a + 0.15, b - 0.15]) { const [x, z] = at(t.s + ds, v); if (!inPoly(x, z, P) || inBuilding(x, z, 0.1)) good = false; }
+    if (!good) { if (cur.length) out.push(cur); cur = []; continue; }
+    const [x, z] = at(t.s, vm); cur.push(Object.assign(t, { v0: a, v1: b, x, z }));
+  }
+  if (cur.length) out.push(cur); return out;
+}
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), sign = Buf();
   T.stalls = []; T.streetStalls = [];
@@ -3933,7 +3954,7 @@ function buildParkingLines(T, G) {
     // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
     const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
-    const ang = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
+    const ang = alignRowAxis(P, 0.5 * Math.atan2(2 * sxz, sxx - szz)), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
     const S0 = Math.min(...proj) + 1.0, S1 = Math.max(...proj) - 1.0, lot = [];
     const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3); };
     /* a stall only where it is free: no wall, hedge or kerb of a bed on its rectangle, no pavement under it (the porfido of an entrance), and a free aisle (3 m) in front of it, inside the lot or on a street (via del Cimitero, Carlo 29/10: stalls in a passage between two beds, ending on the porfido of the door) */
@@ -3947,7 +3968,7 @@ function buildParkingLines(T, G) {
     const runs = [];
     for (const row of [0, 1]) {
       let run = [];
-      const flush = () => { if (run.length) runs.push(run); run = []; };
+      const flush = () => { for (const r of smoothRun(run, row, (s, v) => ok(s, v) && !barNear(cx + ux * s + nx * v, cz + uz * s + nz * v, 0.45), (s, v) => [cx + ux * s + nx * v, cz + uz * s + nz * v], P)) runs.push(r); run = []; };
       for (let s = S0 + 1.25; s <= S1 - 1.25; s += 2.5) {
         const sec = lmSection(P, cx, cz, ux, uz, s), sa = lmSection(P, cx, cz, ux, uz, s - 1.2), sb = lmSection(P, cx, cz, ux, uz, s + 1.2);
         if (!sec || !sa || !sb) { flush(); continue; }
