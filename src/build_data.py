@@ -1787,16 +1787,21 @@ def unisci_parcheggi_strada(asph, pedz, side, foot):
     road_t = STRtree([r['line'].buffer(r['w'] / 2, quad_segs=3) for r in raw_roads if r['c'] <= 3 and flat(r) and r['line'].length > 1])
     svc = [(r['line'], r['w']) for r in raw_roads if r['c'] == 4 and flat(r) and r['line'].length > 3]; svc_t = STRtree([l_ for l_, w_ in svc])
     wl = [LineString(p_) for p_, k_, h_ in bar_out if len(p_) >= 2 and h_ >= 1.0] + [LineString(f_) for f_ in fences if len(f_) >= 2]; wall_t = STRtree(wl)
-    as_t = STRtree(prts(asph)); bu_t = STRtree(prts(bunion)); md_t = STRtree(prts(median)) if not median.is_empty else None
+    as_t = STRtree(prts(asph)); st_t = STRtree(prts(unary_union([g for g in (side, foot, pedz) if not g.is_empty]))); bu_t = STRtree(prts(bunion)); md_t = STRtree(prts(median)) if not median.is_empty else None
     near = lambda tree, env: unary_union([tree.geometries[i] for i in tree.query(env)])
-    news, nlink, nacc, nvar = [], 0, 0, 0
+    news, nlink, nacc, nvar, nstr = [], 0, 0, 0, 0
     for p in pp:
         env = p.buffer(4.0, quad_segs=2); pb = p.buffer(1.0, quad_segs=2)
-        rd = near(road_t, pb); a_ = near(as_t, env)
-        if not rd.is_empty and pb.intersection(rd).area >= 6: continue  # touches an OSM street
-        if a_.intersection(rd.buffer(2.0, quad_segs=3) if not rd.is_empty else GeometryCollection()).distance(p) < 0.5 and not rd.is_empty: continue
-        if p.buffer(0.5, quad_segs=2).intersection(a_).area > 2.0: continue  # street asphalt (or a drive) touches it
+        rd = near(road_t, env); a_ = near(as_t, env)
         w_ = unary_union([wl[i].buffer(0.5, quad_segs=2) for i in wall_t.query(env)]); b_ = near(bu_t, env).buffer(0.3, quad_segs=2)
+        # (A) inside the car park only: thin pavement, footway and square strips that touch the asphalt are asphalt
+        if st_t is not None:
+            ov = near(st_t, env).intersection(p).difference(w_)
+            for q in prts(ov):
+                if q.geom_type == 'Polygon' and q.area > 0.3 and q.buffer(-1.6, quad_segs=2).is_empty and q.distance(a_) < 1.0: news.append(q); nstr += 1
+        # connected = the car park touches the asphalt of a street (OSM street within 2.5 m, not the car park's own surface) along 3 m or more
+        ca = a_.intersection(rd.buffer(2.5, quad_segs=3)).difference(p) if not rd.is_empty else GeometryCollection()
+        if not ca.is_empty and p.boundary.buffer(0.4, quad_segs=2).intersection(ca).area >= 1.2: continue
         m_ = near(md_t, env).buffer(0.3, quad_segs=2) if md_t is not None else GeometryCollection()
         keep = unary_union([p, a_, w_, b_, m_])
         new = []
@@ -1817,7 +1822,7 @@ def unisci_parcheggi_strada(asph, pedz, side, foot):
         if new: nlink += 1; news += new
     if not news: log('parcheggi isolati aperti: 0 di', len(pp)); return asph, pedz, side, foot
     N = unary_union(news).buffer(0.05, quad_segs=2).difference(near(bu_t, unary_union(news).buffer(1.0)).buffer(0.3, quad_segs=2))
-    log('parcheggi isolati aperti:', nlink, 'di', len(pp), 'con via di servizio', nacc, 'varco 6 m', nvar, 'm2', round(N.area), 'tempo', round(time.time() - t0, 1))
+    log('parcheggi isolati aperti:', nlink, 'di', len(pp), 'con via di servizio', nacc, 'varco 6 m', nvar, 'strisce dentro', nstr, 'm2', round(N.area), 'tempo', round(time.time() - t0, 1))
     area_geoms[:] = [(at, g.difference(N) if (at in (1, 2, 3) and g.intersects(N)) else g) for at, g in area_geoms]
     area_geoms[:] = [(at, g) for at, g in area_geoms if not g.is_empty]
     if trees:  # no tree stands on the new asphalt
