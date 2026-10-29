@@ -182,6 +182,7 @@ class Grid {
   }
 }
 const WALLS = new Grid(12);   // building edges + tree trunks
+const BLDR = new Grid(24); /* raised volumes (porticati, passages): the camera must stay under them */
 const BLD = new Grid(24);     // building polygons (point-in-building)
 const STREETS = new Grid(24); // named road segments
 const JUNC = new Grid(16);
@@ -1717,6 +1718,11 @@ function endRun(kind) {
 // ---------------------------------------------------------------- camera & visuals
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _camD = new THREE.Vector3();
 let camInit = false;
+function ceilAbove(x, z, y0) { /* lowest underside of a raised volume above y0 at (x,z), else Infinity */
+  let m = Infinity;
+  BLDR.each(x - 0.1, z - 0.1, x + 0.1, z + 0.1, b => { if (b.zb > y0 && b.zb < m && x >= b.bb[0] && x <= b.bb[2] && z >= b.bb[1] && z <= b.bb[3] && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) m = b.zb; });
+  return m;
+}
 function updCamera(dt) {
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
   const fx = Math.sin(h), fz = Math.cos(h); let want, look;
@@ -1725,8 +1731,15 @@ function updCamera(dt) {
   } else {
     // follow travel direction in reverse, otherwise heading
     let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }
-    const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
+    const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2; let ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
     let cx = px - hx * dist, cz = pz - hz * dist;
+    /* low ceiling (portico, passage) over the subject or over the way back to the camera: lower and bring the camera in, under it */
+    const fy = inCar ? P.car.y : P.y; let ceil = Infinity;
+    for (const t of [0, 0.35, 0.7, 1]) { const c = ceilAbove(px + (cx - px) * t, pz + (cz - pz) * t, fy + 1.8); if (c < ceil) ceil = c; }
+    const cs = updCamera; cs.cl = cs.cl === undefined ? 1 : cs.cl;
+    let tcl = 1; if (ceil < Infinity) { const room = Math.max(0.9, ceil - 0.3 - fy); tcl = clamp(room / ht, 0.35, 1); }
+    cs.cl += (tcl - cs.cl) * (1 - Math.exp(-6 * dt));
+    if (cs.cl < 0.999) { cx = px + (cx - px) * Math.max(cs.cl, 0.4); cz = pz + (cz - pz) * Math.max(cs.cl, 0.4); ht = Math.max(0.9, ht * cs.cl); }
     const f = rayWalls(px, pz, cx, cz); let lift = 0; if (f < 1) { const k = Math.max(0.12, f - 0.08); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3; }
     const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
   }

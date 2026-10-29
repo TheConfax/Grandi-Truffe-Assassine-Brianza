@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo b86d659 · assemblato 29/10 18:04 · porta ' + location.port;
+    const txt = 'locale · ramo telecamera-porticati · dopo cd8e070 · assemblato 29/10 18:14 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -229,6 +229,7 @@ class Grid {
   }
 }
 const WALLS = new Grid(12);   // building edges + tree trunks
+const BLDR = new Grid(24); /* raised volumes (porticati, passages): the camera must stay under them */
 const BLD = new Grid(24);     // building polygons (point-in-building)
 
 // ---------------------------------------------------------------- foto: light computed in linear space (ramo fotorealismo)
@@ -1526,7 +1527,7 @@ for (const T of TILES) {
     if (rec.st) rec.noSign = true;
     T.bld.push(rec);
     if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
-      BUILDINGS.push(rec); const y1 = B.zt + 3;
+      BUILDINGS.push(rec); BLDR.add(bb[0], bb[1], bb[2], bb[3], rec); const y1 = B.zt + 3;
       for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1 }); } }
       continue;
     }
@@ -7192,6 +7193,11 @@ function endRun(kind) {
 // ---------------------------------------------------------------- camera & visuals
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _camD = new THREE.Vector3();
 let camInit = false;
+function ceilAbove(x, z, y0) { /* lowest underside of a raised volume above y0 at (x,z), else Infinity */
+  let m = Infinity;
+  BLDR.each(x - 0.1, z - 0.1, x + 0.1, z + 0.1, b => { if (b.zb > y0 && b.zb < m && x >= b.bb[0] && x <= b.bb[2] && z >= b.bb[1] && z <= b.bb[3] && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) m = b.zb; });
+  return m;
+}
 function updCamera(dt) {
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
   const fx = Math.sin(h), fz = Math.cos(h); let want, look;
@@ -7210,8 +7216,15 @@ function updCamera(dt) {
     let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }
     { const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0; if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -Math.PI, Math.PI); else camYaw *= Math.exp(-2.5 * dt); /* heading grows towards the left */
       const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } } /* looking back and forward again is a cut, not a swing round */
-    const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
+    const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2; let ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
     let cx = px - hx * dist, cz = pz - hz * dist;
+    /* low ceiling (portico, passage) over the subject or over the way back to the camera: lower and bring the camera in, under it */
+    const fy = inCar ? P.car.y : P.y; let ceil = Infinity;
+    for (const t of [0, 0.35, 0.7, 1]) { const c = ceilAbove(px + (cx - px) * t, pz + (cz - pz) * t, fy + 1.8); if (c < ceil) ceil = c; }
+    const cs = updCamera; cs.cl = cs.cl === undefined ? 1 : cs.cl;
+    let tcl = 1; if (ceil < Infinity) { const room = Math.max(0.9, ceil - 0.3 - fy); tcl = clamp(room / ht, 0.35, 1); }
+    cs.cl += (tcl - cs.cl) * (1 - Math.exp(-6 * dt));
+    if (cs.cl < 0.999) { cx = px + (cx - px) * Math.max(cs.cl, 0.4); cz = pz + (cz - pz) * Math.max(cs.cl, 0.4); ht = Math.max(0.9, ht * cs.cl); }
     const f = rayWalls(px, pz, cx, cz); let lift = 0; if (f < 1) { const k = Math.max(0.12, f - 0.08); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3; }
     const gy = inCar ? P.car.y : P.y; { const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 3 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }
     want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
