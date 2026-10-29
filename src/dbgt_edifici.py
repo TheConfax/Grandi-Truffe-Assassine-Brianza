@@ -417,11 +417,11 @@ class Edifici:
                         if not bb['k']: bb.pop('k')
                         bb['osm_solo'] = True; c = q.centroid
                         dove.append([round(c.x, 1), round(c.y, 1), round(q.area), (b.get('tg') or {}).get('building', 'yes'), 'parte'])
-                        kept_osm.append((bb, q))
+                        kept_osm.append((bb, q, False))
                     continue
                 cnt['osm_senza_dbgt'] += 1; b['osm_solo'] = True
                 c = g.centroid; dove.append([round(c.x, 1), round(c.y, 1), round(g.area), (b.get('tg') or {}).get('building', 'yes')])
-                kept_osm.append((b, g)); continue
+                kept_osm.append((b, g, True)); continue
             dup = [i for i in near if geo[i].intersection(g).area > EDGE_DUP * g.area]
             if dup:
                 cnt['doppi_al_confine'] += 1
@@ -439,8 +439,9 @@ class Edifici:
             keep.append(b)
         # the OSM buildings that stay are cut off the carriageways (the street always wins, as for OSM's own streets)
         ncut = ndrop = 0
-        for b, g in kept_osm:
-            if self.carr_t is not None:
+        # (an OSM building the DBGT has nowhere stays whole: the DBGT is from 2015 and the road surface it draws there may be older than the building)
+        for b, g, intero in kept_osm:
+            if self.carr_t is not None and not intero:
                 hit = [self.carr[j] for j in self.carr_t.query(g, predicate='intersects')]
                 if hit:
                     cut = g.difference(unary_union(hit))
@@ -483,7 +484,7 @@ class Edifici:
                 if tg.get('roof:shape'): rec['rs'] = tg['roof:shape']
                 if tg.get('man_made') == 'water_tower': rec['wt'] = True
                 if stato: rec['st'] = stato
-                if v.get('alto'): rec['zb'] = round(v['z0'] - self.base, 2); alti.append(rec); nvol['alti_' + v['por']] += 1
+                if v.get('alto'): rec['zb'] = round(v['z0'] - self.base, 2); rec['zg'] = round(v['gmed'] - self.base, 2); alti.append(rec); nvol['alti_' + v['por']] += 1
                 else: terra.append(rec); nvol['a_terra'] += 1
         self.alti = alti; self.terra = terra
         self.rep['volumi_disegnati'] = dict(nvol); self.rep['tipi'] = dict(ntipo.most_common())
