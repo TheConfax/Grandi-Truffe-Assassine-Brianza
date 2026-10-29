@@ -483,7 +483,7 @@ class Edifici:
                 if tg.get('roof:shape'): rec['rs'] = tg['roof:shape']
                 if tg.get('man_made') == 'water_tower': rec['wt'] = True
                 if stato: rec['st'] = stato
-                if v.get('alto'): rec['zb'] = round(v['z0'] - self.base, 2); alti.append(rec); nvol['alti_' + v['por']] += 1
+                if v.get('alto'): rec['zb'] = round(v['z0'] - self.base, 2); rec['zg'] = round(v['gmed'] - self.base, 2); alti.append(rec); nvol['alti_' + v['por']] += 1
                 else: terra.append(rec); nvol['a_terra'] += 1
         self.alti = alti; self.terra = terra
         self.rep['volumi_disegnati'] = dict(nvol); self.rep['tipi'] = dict(ntipo.most_common())
