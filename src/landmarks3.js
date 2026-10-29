@@ -208,9 +208,20 @@ const PARK_A_MANO = [
   { a: [535.9, -457.9], b: [558.5, -489.0], lato: 1, n: 18, ang: 80, lean: 1, dis: -1 }, /* beyond the cross street, same strip, towards Ewiva: herringbone */
   { a: [566.4, -461.8], b: [592.1, -442.0], lato: 1, n: 14, ang: 80, lean: -1, dis: -1 }, /* car park of viale Brianza, north-east row against the hedge */
   { a: [590.05, -425.2], b: [562.15, -446.3], lato: 1, n: 14, sin: [0, 7, 8], dis: -1 }, /* car park of viale Brianza, south-west row, in front of the Amie building */
+  /* corso della Resistenza, foto Google di Carlo + foto Esri 2025, 29/10 (a lone lane of 6 m stays free beside the nose-in rows) */
+  { a: [402.5, -465.1], b: [431.9, -441.9], lato: 1, n: 15, dis: -1 }, /* along the diagonal of the corso, side of the palazzi (Pasticceria Centrale, Sindacato): nose-in against the pavement, from the crossing of via Gagarin to the crossing before the roundabout */
+  { a: [399.3, -469.5], b: [396.9, -494.5], lato: -1, n: 10, dis: -1 }, /* north stretch towards via Pace (Gelateria G'ala): nose-in against the pavement of the palazzi (the west side has no room: the road is 12 m between the kerbs) */
+  { a: [400.5, -430.4], b: [419.5, -418.2], lato: 1, n: 4, par: 5, dis: -1 }, /* via Indipendenza, north-east side, in line against the kerb of the green island */
+  { a: [443, -427.8], b: [459.5, -416.7], lato: 1, n: 4, par: 5, dis: -1 }, /* corso towards the roundabout, in line along the pavement of the palazzi (Cafe la Gre) */
+  { a: [454.5, -385.4], b: [469, -375.5], lato: 1, n: 3, par: 5, dis: -1 }, /* after the roundabout, in line against the kerb of the island with the fountain */
 ];
 const PARK_A_MANO_STALLS = PARK_A_MANO.flatMap(r => {
   const [a, b] = r.lato < 0 ? [r.b, r.a] : [r.a, r.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, out = [];
+  if (r.par) { /* a row in line (parallel to the kerb): par = pitch along the kerb, 2.2 m deep; the cars face the way of the traffic of the side */
+    const pw = r.par / 2, dp = 1.1;
+    for (let k = 0; k < r.n; k++) { const s = r.par * k + pw, ix = j => r.lato < 0 ? r.n - 1 - j : j; out.push({ x: a[0] + ux * s + nx * dp, z: a[1] + uz * s + nz * dp, ux, uz, h: Math.atan2(ux, uz), dis: false, l0: k === 0, l1: true, y1: false, pw, dp }); }
+    return out;
+  }
   const an = (r.ang || 90) * Math.PI / 180, sa = Math.sin(an), ca = Math.cos(an) * (r.lean || 1), pitch = 2.5 / sa, ax = ux * ca + nx * sa, az = uz * ca + nz * sa; /* the axis of a stall, from its back */
   for (let k = 0; k < r.n; k++) { const s = pitch * k + pitch / 2, ix = j => r.lato < 0 ? r.n - 1 - j : j, out0 = (r.sin || []).includes.bind(r.sin || []); if (out0(ix(k))) continue; out.push({ x: a[0] + ux * s + ax * 2.4, z: a[1] + uz * s + az * 2.4, ux: az, uz: -ax, h: Math.atan2(-ax, -az), dis: ix(k) === r.dis, l0: k === 0 || (r.ln || []).includes(ix(k)), l1: !out0(ix(k + 1)), y1: ix(k) === r.dis || ix(k + 1) === r.dis }); } /* each line drawn once, by the stall before it (yellow if either side is the disabled one); none on the side of a left-out stall, the bed is there; ux, uz: the width of the stall, for the lines */
   return out;
@@ -229,7 +240,7 @@ function buildParkingLines(T, G) {
   const outline = (x, z, ux, uz, l, w, col) => { quad(x, z, ux, uz, -l / 2, l / 2, -w / 2 - 0.06, -w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2, l / 2, w / 2 - 0.06, w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2 - 0.06, -l / 2 + 0.06, -w / 2, w / 2, col); quad(x, z, ux, uz, l / 2 - 0.06, l / 2 + 0.06, -w / 2, w / 2, col); };
   for (const st of PARK_A_MANO_STALLS) { /* the rows by hand: each stall in the tile its centre falls in; first in T.stalls, so the cars of the tile (at most 14) park here before elsewhere */
     if (tileOf(st.x, st.z) !== T.t) continue; const col = st.dis ? Y : W;
-    if (st.l0) quad(st.x, st.z, st.ux, st.uz, -1.31, -1.19, -2.4, 2.4, col); if (st.l1) quad(st.x, st.z, st.ux, st.uz, 1.19, 1.31, -2.4, 2.4, st.y1 ? Y : W);
+    const pw = st.pw || 1.25, dp = st.dp || 2.4; if (st.l0) quad(st.x, st.z, st.ux, st.uz, -pw - 0.06, -pw + 0.06, -dp, dp, col); if (st.l1) quad(st.x, st.z, st.ux, st.uz, pw - 0.06, pw + 0.06, -dp, dp, st.y1 ? Y : W);
     if (st.dis) quad(st.x, st.z, st.ux, st.uz, -0.5, 0.5, -0.5, 0.5, BLUE);
     T.stalls.push({ x: st.x, z: st.z, h: st.h, dis: st.dis });
   }
