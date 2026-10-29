@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 2820ec9 · assemblato 29/10 13:26 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo ec2515e · assemblato 29/10 13:37 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3938,12 +3938,10 @@ function buildParkingLines(T, G) {
     const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3); };
     /* a stall only where it is free: no wall, hedge or kerb of a bed on its rectangle, no pavement under it (the porfido of an entrance), and a free aisle (3 m) in front of it, inside the lot or on a street (via del Cimitero, Carlo 29/10: stalls in a passage between two beds, ending on the porfido of the door) */
     const barNear = (x, z, r) => { let f = false; WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, o => { if (!f && o.ax !== undefined && o.y1 - o.y0 > 0.4 && segDist(x, z, o.ax, o.az, o.bx, o.bz) < r) f = true; }); return f; };
-    const hardKind = (x, z) => { const k = H.kind(x, z); return k === 'side' || k === 'plat'; };
     const stallFree = (s, v0, v1, row) => {
       const at = v => [cx + ux * s + nx * v, cz + uz * s + nz * v], vm = (v0 + v1) / 2;
-      for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 0.2, vm, v1 - 0.2]) { const x = cx + ux * (s + ds) + nx * v, z = cz + uz * (s + ds) + nz * v; if (barNear(x, z, 0.45) || hardKind(x, z)) return false; }
-      const dir = row ? -1 : 1, vf = row ? v0 : v1; /* the aisle is on the side of the middle of the lot */
-      for (const d of [0.8, 1.8, 2.8]) for (const ds of [-1.0, 0, 1.0]) { const x = cx + ux * (s + ds) + nx * (vf + dir * d), z = cz + uz * (s + ds) + nz * (vf + dir * d); if (!(inPoly(x, z, P) || onAnyRoad(x, z, 0.3)) || inBuilding(x, z, 0.3) || barNear(x, z, 0.45) || hardKind(x, z) || treeNear(x, z, 1.2)) return false; }
+      for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 0.2, vm, v1 - 0.2]) { const x = cx + ux * (s + ds) + nx * v, z = cz + uz * (s + ds) + nz * v; if (barNear(x, z, 0.45) || H.kind(x, z) === 'green') return false; }
+      /* no check of the aisle in front: a strip of pavement or a kerb between the row and the lane emptied whole rows (via Gagarin, Carlo 29/10) */
       return true;
     };
     const runs = [];
