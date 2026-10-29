@@ -187,7 +187,7 @@ function buildParkingLines(T, G) {
     const runs = [];
     for (const row of [0, 1]) {
       let run = [];
-      const flush = () => { if (run.length) runs.push(run); run = []; };
+      const flush = () => { if (run.length > 1) runs.push(run); run = []; }; /* a lone stall wedged at a corner is not a car park (piazzetta of via Isonzo, Carlo 29/10) */
       for (let s = S0 + 1.25; s <= S1 - 1.25; s += 2.5) {
         const sec = lmSection(P, cx, cz, ux, uz, s), sa = lmSection(P, cx, cz, ux, uz, s - 1.2), sb = lmSection(P, cx, cz, ux, uz, s + 1.2);
         if (!sec || !sa || !sb) { flush(); continue; }

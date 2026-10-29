@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo piazzetta-isonzo · dopo 0f48ad9 · assemblato 29/10 17:09 · porta ' + location.port;
+    const txt = 'locale · ramo piazzetta-isonzo · dopo c635ac4 · assemblato 29/10 17:18 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3951,7 +3951,7 @@ function buildParkingLines(T, G) {
     const runs = [];
     for (const row of [0, 1]) {
       let run = [];
-      const flush = () => { if (run.length) runs.push(run); run = []; };
+      const flush = () => { if (run.length > 1) runs.push(run); run = []; }; /* a lone stall wedged at a corner is not a car park (piazzetta of via Isonzo, Carlo 29/10) */
       for (let s = S0 + 1.25; s <= S1 - 1.25; s += 2.5) {
         const sec = lmSection(P, cx, cz, ux, uz, s), sa = lmSection(P, cx, cz, ux, uz, s - 1.2), sb = lmSection(P, cx, cz, ux, uz, s + 1.2);
         if (!sec || !sa || !sb) { flush(); continue; }
