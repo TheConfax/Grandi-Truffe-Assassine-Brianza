@@ -1214,6 +1214,8 @@ if dbt_pc:
                 near_ = [x_ for j_ in _rrt.query(Point(e_).buffer(8)) for x_ in [_rr[j_]] if not x_['drv'] and x_['c'] <= 3]
                 if near_ and min(x_['line'].distance(Point(e_)) for x_ in near_) < 8: _cands.append((tuple(e_), 'vialetto'))
     import shapely
+    _bg = [g_ for b_, g_ in _bl if g_ is not None]; _bgt = STRtree(_bg)
+    _cltb = STRtree([c_[0] for c_ in _cl if c_[2] >= 0])
     for st_ in _rr:  # openings between two closures along the lot boundary beside every street
         if st_['c'] > 3 or st_['line'].length < 6: continue
         for sg_ in (1, -1):
@@ -1221,13 +1223,16 @@ if dbt_pc:
             except Exception: continue
             if off_.is_empty or off_.geom_type != 'LineString' or off_.length < 6: continue
             n_ = int(off_.length); pts_ = [off_.interpolate(i_) for i_ in range(n_ + 1)]
-            hit_ = set(_clt.query(pts_, predicate='dwithin', distance=0.8)[0].tolist()); cl_ = [i_ in hit_ for i_ in range(len(pts_))]
+            hit_ = set(_clt.query(pts_, predicate='dwithin', distance=0.8)[0].tolist()); hitb_ = set(_cltb.query(pts_, predicate='dwithin', distance=3.0)[0].tolist()); cl_ = [i_ in hit_ or i_ in hitb_ for i_ in range(len(pts_))]  # a house may stand a few metres back from the boundary
+            if os.environ.get('GTA_DBG'):
+                _dx, _dz = map(float, os.environ['GTA_DBG'].split(','))
+                if off_.distance(Point(_dx, _dz)) < 12: log('DBGOFF', st_['hw'], st_['c'], st_['w'], 'sg', sg_, ''.join(('B' if i_ in hitb_ else ('F' if i_ in hit_ else '.')) + ('*' if math.dist((pts_[i_].x, pts_[i_].y), (_dx, _dz)) < 1.5 else '') for i_ in range(len(pts_)) if math.dist((pts_[i_].x, pts_[i_].y), (_dx, _dz)) < 30), 'from', [round(v_, 1) for v_ in (pts_[0].x, pts_[0].y)])
             i_ = 0
             while i_ < len(cl_):
                 if cl_[i_] or i_ == 0 or not cl_[i_ - 1]: i_ += 1; continue
                 j_ = i_
                 while j_ < len(cl_) and not cl_[j_]: j_ += 1
-                if j_ < len(cl_) and 0 < j_ - i_ <= 9: _cands.append((((pts_[i_ - 1].x + pts_[j_].x) / 2, (pts_[i_ - 1].y + pts_[j_].y) / 2), 'varco'))
+                if j_ < len(cl_) and 0 < j_ - i_ <= 16: _cands.append((((pts_[i_ - 1].x + pts_[j_].x) / 2, (pts_[i_ - 1].y + pts_[j_].y) / 2), 'varco'))
                 i_ = j_ + 1
     for p_, srcname_ in _cands:
         P_ = Point(p_)
@@ -1245,15 +1250,16 @@ if dbt_pc:
         ux_, uz_ = tang((pa_.x, pa_.y), (pb_.x, pb_.y))
         ext_ = []
         for sg_ in (1, -1):
-            ray_ = LineString([p_, (p_[0] + sg_ * ux_ * 10, p_[1] + sg_ * uz_ * 10)]).buffer(1.0, cap_style=2)
+            rl_ = LineString([p_, (p_[0] + sg_ * ux_ * 10, p_[1] + sg_ * uz_ * 10)]); ray_ = rl_.buffer(1.0, cap_style=2); rayw_ = rl_.buffer(3.5, cap_style=2)  # a house may stand a few metres back from the boundary
             best_ = None
-            for j_ in _clt.query(ray_):
-                x_ = _cl[j_][0].intersection(ray_)
+            for j_ in _clt.query(rayw_):
+                x_ = _cl[j_][0].intersection(rayw_ if _cl[j_][2] >= 0 else ray_)
                 for part_ in getattr(x_, 'geoms', [x_]):
                     for c_ in getattr(part_, 'coords', []):
                         d_ = (c_[0] - p_[0]) * ux_ * sg_ + (c_[1] - p_[1]) * uz_ * sg_
                         if d_ > 0.15 and (best_ is None or d_ < best_[0]): best_ = (d_, _cl[j_][1], _cl[j_][2])
             ext_.append(best_)
+        if os.environ.get('GTA_DBG'): _dx, _dz = map(float, os.environ['GTA_DBG'].split(',')); (math.dist(p_, (_dx, _dz)) < 14) and log('DBG', srcname_, [round(v_, 1) for v_ in p_], 'ext', ext_)
         if ext_[0] is None and ext_[1] is None: _gcc['senza_chiusure'] += 1; continue
         gap_ = (ext_[0][0] if ext_[0] else 99) + (ext_[1][0] if ext_[1] else 99)
         if gap_ <= 8: da_, db_ = ext_[0][0] - 0.05, -(ext_[1][0] - 0.05); hh_ = max(1.2, min(2.2, min(e_[1] for e_ in ext_ if e_ and e_[1] < 2.0) if any(e_ and e_[1] < 2.0 for e_ in ext_) else 1.6))
@@ -1263,20 +1269,37 @@ if dbt_pc:
         if any(r_['line'].distance(G_.centroid) < r_['w'] / 2 - 0.2 and r_['c'] <= 3 for r_ in _rr if r_['line'].distance(G_) < 12): _gcc['carreggiata'] += 1; continue
         if any(not r_['priv'] and r_['line'].intersects(G_) for r_ in _rr if r_['line'].distance(G_) < 1): _gcc['strada_osm'] += 1; continue
         mid_ = G_.centroid; ids_ = [e_[2] for e_ in ext_ if e_ and e_[2] >= 0]
-        if len(ids_) == 2 and ids_[0] == ids_[1] and _cl[_clt.query_nearest(mid_)[0]][0].distance(mid_) <= 1.5:  # both closures are walls of the same house: a recess, an archway of the house
-            wd_ = min(6.0, abs(da_ - db_)); ty_ = 'p' if wd_ <= 1.5 else ('n' if wd_ <= 3.5 else 'b')  # a gap along a facade or between two parts of one house: a door in the wall, not a gate
+        if any(_bg[j_].distance(mid_) < 0.8 for j_ in _bgt.query(mid_.buffer(0.8))) or (len(ids_) == 2 and ids_[0] == ids_[1] and _cl[_clt.query_nearest(mid_)[0]][0].distance(mid_) <= 1.5):  # the gate falls on a house: a small door in its wall, not a gate
+            wd_ = min(1.2, abs(da_ - db_)); ty_ = 'p'
             rn_ = min((r_ for r_ in _rr if r_['line'].distance(mid_) < 40), key=lambda r_: r_['line'].distance(mid_), default=None)
             c0_ = (mid_.x - ux_ * wd_ / 2, mid_.y - uz_ * wd_ / 2); c1_ = (mid_.x + ux_ * wd_ / 2, mid_.y + uz_ * wd_ / 2)
             if rn_ is not None:
                 sp_ = rn_['line'].interpolate(rn_['line'].project(mid_)); nx_, nz_ = -(c1_[1] - c0_[1]), c1_[0] - c0_[0]
                 if nx_ * (sp_.x - mid_.x) + nz_ * (sp_.y - mid_.y) < 0: c0_, c1_ = c1_, c0_
-            _gd.append(p_); doors_out.append([q(c0_[0]), q(c0_[1]), q(c1_[0]), q(c1_[1]), ty_, 2.1 if ty_ == 'p' else (2.6 if ty_ == 'n' else 2.3)]); _gcc['porte'][ty_] += 1; continue
+            _gd.append(p_); doors_out.append([q(c0_[0]), q(c0_[1]), q(c1_[0]), q(c1_[1]), ty_, 2.1]); _gcc['porte'][ty_] += 1; continue
         _gd.append(p_); _gcc['nuovi'] += 1; _src[srcname_] += 1
         if abs(da_ - db_) < 2.5: _gcc['pedonali'] += 1
         gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'o' if srcname_ == 'rampa' else 'g', round(hh_, 1), 0])
     _gcc['per_origine'] = _src
     log('cancelli sui varchi: aggiunti', _gcc)
     if STR: STR.rep['cancelli_passi_carrai'] = dict(_gcc)
+# a gate wins over a fence or wall under it: the divider is cut there (the posts stand at the ends of the cut)
+_ncut = 0
+if gate_out:
+    _gz = [(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]), g_[4]) for g_ in gate_out if g_[4] != 'l']
+    _gzt = STRtree([z_[0].buffer(0.45, cap_style=2) for z_ in _gz]); _gzb = [z_[0].buffer(0.45, cap_style=2) for z_ in _gz]
+    _nbar = []
+    for pts_, k_, h_ in bar_out:
+        Lb_ = LineString(pts_) if len(pts_) >= 2 else None
+        if Lb_ is None: _nbar.append((pts_, k_, h_)); continue
+        zs_ = [_gzb[j_] for j_ in _gzt.query(Lb_) if Lb_.intersection(_gzb[j_]).length > 0.5 * min(3.0, _gz[j_][0].length)]
+        if not zs_: _nbar.append((pts_, k_, h_)); continue
+        rest_ = Lb_.difference(unary_union(zs_)); _ncut += 1
+        for part_ in (list(rest_.geoms) if hasattr(rest_, 'geoms') else [rest_]):
+            if isinstance(part_, LineString) and part_.length > 0.5: _nbar.append((list(part_.coords), k_, h_))
+    bar_out = _nbar
+log('cancelli che tagliano la recinzione sotto di loro: divisori toccati', _ncut)
+if STR: STR.rep['divisori_tagliati_da_cancelli'] = _ncut
 log('gate meshes', len(gate_out))
 
 # ---- villa frontages: muretto + cancellata along the street with a gate, where OSM has nothing mapped

@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 5561ad4 · assemblato 29/10 21:35 · porta ' + location.port;
+    const txt = 'locale · ramo cancelli-carrai · dopo 2d11721 · assemblato 29/10 22:28 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3077,7 +3077,7 @@ function* buildTileGen(T) {
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast'); put(doorB, MAT.roof, 10);
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
+  for (const f of [buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
@@ -3168,9 +3168,26 @@ const GATE_MAT = new THREE.MeshLambertMaterial({ color: 0x33413a, map: GATE_TEX,
 for (const [X0, Z0, X1, Z1, k, h, auto] of D.gates || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
-  const g = { ax, az, bx, bz, ux, uz, W, k, h, gy, broken: false, auto: !!auto, open: false, oa: 0, hinges: [] };
-  if (k !== 'o') { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: true, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
+  const g = { ax, az, bx, bz, ux, uz, W, k, h, gy, broken: false, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [] };
+  if (k !== 'o' && !g.perm) { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: true, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
   GATES.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
+}
+/* doors drawn flush on a facade (gaps along a house wall): p front door, n large door, b garage door; solid like the wall */
+const DOORS = [];
+for (const [X0, Z0, X1, Z1, k, h] of D.doors || []) {
+  const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
+  const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
+  DOORS.push({ ax, az, bx, bz, ux, uz, W, k, h, gy });
+  WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, y0: gy - 2, y1: gy + h });
+}
+const DOOR_COL = { p: 0x5b3a26, n: 0x4a3426, b: 0x8f9296 };
+function buildDoors(T, G) {
+  for (const d of DOORS) {
+    if (tileOf((d.ax + d.bx) / 2, (d.az + d.bz) / 2) !== T.t) continue;
+    const th = Math.atan2(-d.uz, d.ux), m = new THREE.Mesh(boxG(d.W, d.h, 0.14), lam(DOOR_COL[d.k] || 0x5b3a26));
+    m.position.set((d.ax + d.bx) / 2 - d.uz * 0.07, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.07); m.rotation.y = th; m.castShadow = true; G.add(m);
+    const fr = new THREE.Mesh(boxG(d.W + 0.16, d.h + 0.08, 0.1), lam(0xcfc8b8)); fr.position.set((d.ax + d.bx) / 2 - d.uz * 0.04, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.04); fr.rotation.y = th; G.add(fr);
+  }
 }
 function buildGates(T, G) {
   for (const g of GATES) {
@@ -3183,7 +3200,7 @@ function buildGates(T, G) {
     if (g.k === 'l') { // lift-gate arm, hinged at a
       outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
       const geo = new THREE.BoxGeometry(g.W, 0.09, 0.09); geo.translate(g.W / 2, 1.0, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * g.W / 1.6);
-      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: ARM_TEX })); m.castShadow = true; inner.add(m);
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: ARM_TEX })); m.castShadow = true; inner.add(m); if (g.perm) inner.rotation.z = 1.35; /* raised lift gate on a big road */
     } else { // gate leaf (two leaves when wide), hinged at the posts
       const leaves = g.W > 3.2 && g.k !== 'o' ? [[0, g.W / 2, 1], [g.W, g.W / 2, -1]] : [[0, g.W, 1]];
       outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
@@ -3199,7 +3216,7 @@ function buildGates(T, G) {
 function gateHits(v) {
   if (v.speed < 0.6) return;
   GATEG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, g => {
-    if (g.broken || g.open || g.k === 'o' || Math.abs(v.y - g.gy) > 2.5) return;
+    if (g.broken || g.open || g.k === 'o' || g.perm || Math.abs(v.y - g.gy) > 2.5) return;
     const ai = v.driver === 'ai', reach = ai && g.auto ? v.rad + 4 : v.rad + 0.3;
     for (const c of v.circles()) if (segDist(c[0], c[1], g.ax, g.az, g.bx, g.bz) < reach) { if (ai && g.auto) openGate(g); else if (v.speed > 3 || ai) breakGate(g, v); return; }
   });
