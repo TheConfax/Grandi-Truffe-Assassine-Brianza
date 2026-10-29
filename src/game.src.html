@@ -808,7 +808,7 @@ const MODELS = {
 const TRAFFIC_MIX = [['panda', 22], ['hatch', 22], ['sedan', 13], ['wagon', 10], ['suv', 12], ['sport', 5], ['van', 9], ['ape', 6], ['scooter', 7], ['moto', 4], ['bici', 6]];
 const PARKED_MIX = [['panda', 25], ['hatch', 25], ['sedan', 15], ['wagon', 12], ['suv', 14], ['sport', 3], ['van', 6], ['ape', 3], ['scooter', 5], ['moto', 2], ['bici', 4]];
 function pickModel(mix, r = rnd) { let t = r() * mix.reduce((s, m) => s + m[1], 0); for (const [m, w] of mix) if ((t -= w) < 0) return m; return mix[0][0]; }
-const M_GLASS = lam(0x2e3d4e), M_TYRE = lam(0x1b1b1d), M_HEAD = lam(0xfff6d8, { emissive: 0xfff2c0, emissiveIntensity: 0.6 }), M_TAIL = lam(0xa01818, { emissive: 0xa01010, emissiveIntensity: 0.5 }), M_DARK = lam(0x2a2b2f), M_TRIM = lam(0x16181c);
+const M_GLASS = lam(0x2e3d4e), M_TYRE = lam(0x1b1b1d), M_HEAD = lam(0xfff6d8, { emissive: 0xfff2c0, emissiveIntensity: 0.6 }), M_TAIL = lam(0xa01818, { emissive: 0xa01010, emissiveIntensity: 0.5 }), M_HEAD_OFF = lam(0xdcd6c0), M_TAIL_OFF = lam(0x7a1414), M_DARK = lam(0x2a2b2f), M_TRIM = lam(0x16181c);
 const M_GLASS_SEE = new THREE.MeshLambertMaterial({ color: 0x2e3d4e, transparent: true, opacity: 0.42, depthWrite: false }); // police cab: the crew shows through
 const CC_COL = '#16213b'; // Carabinieri: dark blue body, red stripe, white roof
 const M_SIR_A = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 }), M_SIR_B = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5cff, emissiveIntensity: 0.2 });
@@ -894,9 +894,9 @@ function makeCar(model, color) {
     add(boxG(S.W + 0.02, 0.17, 0.12), M_DARK, 0, bot + 0.08, hl + 0.02, false); add(boxG(S.W + 0.02, 0.17, 0.12), M_DARK, 0, bot + 0.08, -hl - 0.02, false);
   }
   const lx = S.ape ? 0.45 : S.W / 2 - 0.3;
-  const ud = body.userData = { hl: [], tl: [], tails: [] }; // tail lamps swap to brake lights, glare points just outside each lens
-  if (S.two) { const ty = S.pedal ? 0.9 : S.seatY + 0.02, tz = -hl + (S.pedal ? 0.25 : 0.12); add(boxG(0.16, 0.12, 0.06), M_HEAD, 0, lightY, lightZ + 0.04, false); ud.tails.push(add(boxG(0.14, 0.08, 0.05), M_TAIL, 0, ty, tz, false)); ud.hl.push([0, lightY, lightZ + 0.2]); ud.tl.push([0, ty, tz - 0.15]); }
-  else for (const x of [-lx, lx]) { add(boxG(0.38, 0.14, 0.06), M_HEAD, x, lightY, lightZ, false); ud.tails.push(add(boxG(0.38, 0.14, 0.06), M_TAIL, x, lightY + 0.02, -lightZ, false)); ud.hl.push([x, lightY, lightZ + 0.18]); ud.tl.push([x, lightY + 0.02, -lightZ - 0.15]); }
+  const ud = body.userData = { hl: [], tl: [], tails: [], heads: [] }; // tail lamps swap to brake lights, glare points just outside each lens
+  if (S.two) { const ty = S.pedal ? 0.9 : S.seatY + 0.02, tz = -hl + (S.pedal ? 0.25 : 0.12); ud.heads.push(add(boxG(0.16, 0.12, 0.06), M_HEAD, 0, lightY, lightZ + 0.04, false)); ud.tails.push(add(boxG(0.14, 0.08, 0.05), M_TAIL, 0, ty, tz, false)); ud.hl.push([0, lightY, lightZ + 0.2]); ud.tl.push([0, ty, tz - 0.15]); }
+  else for (const x of [-lx, lx]) { ud.heads.push(add(boxG(0.38, 0.14, 0.06), M_HEAD, x, lightY, lightZ, false)); ud.tails.push(add(boxG(0.38, 0.14, 0.06), M_TAIL, x, lightY + 0.02, -lightZ, false)); ud.hl.push([x, lightY, lightZ + 0.18]); ud.tl.push([x, lightY + 0.02, -lightZ - 0.15]); }
   const wheels = [];
   for (const [x, z, front] of wheelPos) { // two-wheelers: wheels hang from the leaning body
     const piv = new THREE.Group(); piv.position.set(x, S.wr, z); (S.two ? body : g).add(piv); const w = new THREE.Mesh(S.two ? thinWheelG(S.wr, S.pedal) : wheelG(S.wr), M_TYRE); piv.add(w); wheels.push({ piv, w, front });

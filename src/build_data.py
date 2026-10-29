@@ -1267,7 +1267,11 @@ PACE_FISSE = [
     [(574.61, -757.4), (577.55, -762.43)],
     [(584.64, -758.94), (589.07, -767.36)],
 ]
-if FER: fences += [list(f_) for f_ in PACE_FISSE]
+if FER:  # each piece stops at the edge of the road and of its pavement: never across a carriageway (the level crossing of via Cialdini x 586.7 z -758.6)
+    _rd_pace = unary_union([r_['line'].buffer(r_['w'] / 2 + 0.3) for r_ in raw_roads if flat(r_) and r_['line'].distance(Point(580, -755)) < 40] + [side.intersection(Point(580, -755).buffer(40))])
+    for f_ in PACE_FISSE:
+        for g_ in getattr(LineString(f_).difference(_rd_pace), 'geoms', [LineString(f_).difference(_rd_pace)]):
+            if g_.geom_type == 'LineString' and g_.length >= 1.0: fences.append(list(g_.coords))
 
 # ---- rivers: merge the OSM pieces, then cut them where a road / railway / building passes over (a bridge or culvert mouth)
 from shapely.ops import linemerge

@@ -471,7 +471,7 @@
    "vms": 48,
    "cic": 25
   },
-  "tempo_s": 3.9,
+  "tempo_s": 2.0,
   "anelli_osm": {
    "n": 3,
    "dove": [
@@ -526,7 +526,7 @@
   "piazze_m2": 44081,
   "vialetti_m2": 31976,
   "isole_m2": 15408,
-  "tempo_s": 32.1,
+  "tempo_s": 27.9,
   "cortili_nei_cantieri_m2": 14143
  },
  "muri_doppi_fusi": {
@@ -549,18 +549,18 @@
   "vie": 2562,
   "corsie_spostate_nodi": 1921,
   "vie_con_corsie": 565,
-  "tagli": 111,
-  "metri_tagliati": 980,
-  "nodi_aggiunti": 119,
+  "tagli": 110,
+  "metri_tagliati": 973,
+  "nodi_aggiunti": 118,
   "punti_per_motivo": {
-   "muro o edificio": 1103,
+   "muro o edificio": 1093,
    "fuori asfalto": 336,
    "stretta fra i muri": 123
   },
   "sensi_unici_tolti_metri": 424,
   "pezzi_isolati_tolti_metri": 113,
   "km_rete": 339.26,
-  "km_rete_ia": 337.75,
+  "km_rete_ia": 337.76,
   "dove": [
    "?x=435&z=362 muro/stretta doppio senso 3.2 m 65 m",
    "?x=-506&z=-934 muro/stretta doppio senso 2.8 m 49 m",
@@ -1374,6 +1374,6 @@
   "attraversamenti": {
    "n": 497
   },
-  "tempo_s": 5.1
+  "tempo_s": 4.4
  }
 }
