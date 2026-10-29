@@ -48,7 +48,7 @@ const H = (() => {
       for (let k = 0; k < n * n; k++) { const q = dv.getUint16(12 + 2 * k, true); y[k] = q === 65535 ? farH(x0 + (k % n) * st, z0 + Math.floor(k / n) * st) : (base * 100 + q) / 100 - B0; } // 65535: empty, the old ground
       const mo = 12 + 2 * n * n, m = b.length >= mo + (n - 1) * (n - 1) ? b.slice(mo, mo + (n - 1) * (n - 1)) : null;
       let ud = null; if (m) for (let k = 0; k < m.length; k++) if (m[k] & 128) { if (!ud) ud = new Uint8Array(m.length); ud[k] = 1; m[k] &= 127; } // bit 7: a cell under a deck where S is no street (terreno_gioco.py): no street paint there
-      FT[t] = { t, st, n, x0, z0, y, m, ud, pc: pitCells(tx, tz, n - 1) }; LS[t] = 2;
+      FT[t] = { t, st, n, x0, z0, y, m, ud, pc: pitCells(tx, tz, n - 1) }; FT[t].ud2 = ud; LS[t] = 2; /* ud2: where no street paint goes, ud widened by world3.js along the approach ramps (rampPaint) */
       for (const f of onLoad) f(t);
     } catch (e) { LS[t] = 3; console.warn('terreno ' + tx + '_' + tz + ': ' + e.message + ' (resta il motore vecchio)'); }
   }
@@ -275,7 +275,7 @@ const H = (() => {
       if (!F) { for (const f of faces) { const Q = tidy(inT(f) ? f.map(q => all[q]) : square(f.map(q => all[q]), X0, Z0, X1, Z1)); if (Q) emit(Q, false); } continue; }
       const st = F.st, n = F.n, c = n - 1, mk = F.mk || (F.mk = new Uint8Array(c * c)), marked = [], Y = F.y, own = rank !== undefined ? F.own : null;
       markOutline(F, X0, Z0, rings, mk, marked);
-      const ud = street ? F.ud : null;
+      const ud = street ? F.ud2 : null;
       if (!own) wholeCells(F, X0, Z0, rings, bz0, bz1, mk, w => {
         if (ud && ud[w]) return; const i = w % c, j = (w - i) / c, x = X0 + i * st, z = Z0 + j * st, k = j * n + i;
         emit([[x, z, Y[k]], [x + st, z, Y[k + 1]], [x + st, z + st, Y[k + n + 1]]], true); emit([[x, z, Y[k]], [x + st, z + st, Y[k + n + 1]], [x, z + st, Y[k + n]]], true);
@@ -404,7 +404,7 @@ const H = (() => {
     overFree(x, z, y) { for (const o of deckAt(x, z)) if (o.d.free && o.top > y) y = o.top; return y; },
     step, stepAt, clipPoly, clipTri, coverCells, cutLine, joinPieces, anyFine: () => !!TERRENO,
     anyFineIn(x0, z0, x1, z1) { const [i0, j0, i1, j1] = tileRange(x0, z0, x1, z1); for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (FT[i + NX * j]) return true; return false; }, // a tile of S under the box
-    ud(x, z) { const F = fineAt(x, z); if (!F || !F.ud) return 0; const n = F.n, i = clamp(Math.floor((x - F.x0) / F.st), 0, n - 2), j = clamp(Math.floor((z - F.z0) / F.st), 0, n - 2); return F.ud[j * (n - 1) + i]; }, // under a deck where S is no street (terreno_gioco.py)
+    ud(x, z) { const F = fineAt(x, z); if (!F || !F.ud2) return 0; const n = F.n, i = clamp(Math.floor((x - F.x0) / F.st), 0, n - 2), j = clamp(Math.floor((z - F.z0) / F.st), 0, n - 2); return F.ud2[j * (n - 1) + i]; }, // under a deck where S is no street (terreno_gioco.py)
     mat(x, z) { const F = fineAt(x, z); if (!F || !F.m) return 0; const n = F.n, i = clamp(Math.floor((x - F.x0) / F.st), 0, n - 2), j = clamp(Math.floor((z - F.z0) / F.st), 0, n - 2); return F.m[j * (n - 1) + i]; }, // material of the cell (1 asphalt ... 4 river bed)
     addStep(kind, h, o, k) { if (o.length < 3) return; const s = { kind, h, o, k: k || [], bb: bbox(o) }; STG.add(s.bb[0], s.bb[1], s.bb[2], s.bb[3], s); },
     surface(x, z, cy) {

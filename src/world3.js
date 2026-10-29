@@ -742,7 +742,7 @@ function clipDrape(b, hf, ro, mat) {
     for (const [Q, f, F, key] of pieces) {
       if (!f) { const q0 = put([a, c, d, den], Q, null); for (let k = 1; k < Q.length - 1; k++) o.i.push(q0, q0 + k, q0 + k + 1); continue; }
       if (hide && F.own && F.own[key >> 1] > ro) continue;
-      if (b.street && F.ud && F.ud[key >> 1]) continue; // the paint of a street under a deck where S is no street (fiumi-ponti)
+      if (b.street && F.ud2 && F.ud2[key >> 1]) continue; // the paint of a street under a deck where S is no street (fiumi-ponti)
       if (sig === null) { const g = []; for (const [A, s, o0, m] of attrs) for (let e = o0; e < o0 + m; e++) { const va = A[a * s + e], vc = A[c * s + e], vd = A[d * s + e], gx = ((cz - dz) * (va - vd) + (dz - az) * (vc - vd)) / den, gz = ((dx - cx) * (va - vd) + (ax - dx) * (vc - vd)) / den; g.push(Math.round(gx * 1e4), Math.round(gz * 1e4), Math.round((vd - gx * (dx - F.x0) - gz * (dz - F.z0)) * 1e3)); } sig = g.join(','); }
       const gk = F.t + ':' + key + ':' + sig, l = groups.get(gk); if (l) l.p.push(Q); else groups.set(gk, { F, key, src: [a, c, d, den], p: [Q] });
     }
@@ -944,6 +944,29 @@ for (const dk of H.DECKS) {
   }
 }
 // guardrails along the roads of tile T (once per tile, with their collisions): [x0, z0, y0, x1, z1, y1]
+// the street paint along the approach ramps (29/10, via Maroncelli: "la strada la stai nascondendo al posto di toglierla"). The DBGT gives the
+// carriageway of the ramps as a street at ground level (AC_VEI SED 01 under the PONTE), at the height of the ramp; drawn on S under the
+// deck, where it was wider than the deck its edge cells painted a strip of asphalt, lines and kerbs on the ground beside the ramp walls and
+// past the abutment. On the decks with approach ramps (rampWalls) the cells with a corner under the deck, more than 1 m under its top, take no street paint (H.ud2), but
+// those of a street at its own level and the cells beside them, and those where another street on the ground passes (within w/2 + 1 m
+// of its axis), keep their paint
+for (const dk of H.DECKS) {
+  if (!dk.pieno || !dk.rw.length) continue; const T = dk.tri, segs = dk.rw;
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (let i = 0; i < T.length; i += 3) { x0 = Math.min(x0, T[i]); x1 = Math.max(x1, T[i]); z0 = Math.min(z0, T[i + 1]); z1 = Math.max(z1, T[i + 1]); }
+  const onRamp = (x, z) => { for (const o of H.deckAt(x, z)) if (o.d === dk && o.top > H.base(x, z) + 1.0) return true; return false; }; // under the deck, more than 1 m under its top
+  const own = roadsOn(dk), passes = (x, z) => { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !own.has(s.r) && atGrade(s) && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 1) f = true; }); return f; }; // another street on the ground passes there
+  for (let tz = Math.floor((z0 - 4 + META.hh) / TS); tz <= Math.floor((z1 + 4 + META.hh) / TS); tz++) for (let tx = Math.floor((x0 - 4 + META.hw) / TS); tx <= Math.floor((x1 + 4 + META.hw) / TS); tx++) {
+    if (tx < 0 || tz < 0 || tx >= META.ntx || tz >= META.ntz) continue; const F = H.tile(tx + META.ntx * tz); if (!F || !F.m) continue;
+    const n = F.n, c = n - 1; if (F.ud2 === F.ud || !F.ud2) F.ud2 = F.ud ? F.ud.slice() : new Uint8Array(c * c);
+    const str = w => F.m[w] === 1 || F.m[w] === 2;
+    for (let j = 0; j < c; j++) for (let i = 0; i < c; i++) {
+      const x = F.x0 + i * F.st, z = F.z0 + j * F.st, w = j * c + i; if (F.ud2[w] || x < x0 - 4 || x > x1 + 4 || z < z0 - 4 || z > z1 + 4) continue;
+      if (!(onRamp(x, z) || onRamp(x + F.st, z) || onRamp(x, z + F.st) || onRamp(x + F.st, z + F.st))) continue;
+      let s_ = false; for (let b = -1; b <= 1 && !s_; b++) for (let a = -1; a <= 1; a++) { const I = i + a, J = j + b; if (I >= 0 && J >= 0 && I < c && J < c && str(J * c + I)) { s_ = true; break; } }
+      if (!s_ && !passes(x + F.st / 2, z + F.st / 2)) F.ud2[w] = 1;
+    }
+  }
+}
 const ROAD_BAR = new Map(), ON_DECK = new Set(); for (const dk of H.DECKS) for (const ri of dk.ra) ON_DECK.add(ri); // the roads that run on a deck
 function* roadBarriers(T) {
   if (ROAD_BAR.has(T.t)) return ROAD_BAR.get(T.t);
@@ -1091,7 +1114,7 @@ function cellOwners(T, F) {
   const underFree = w => { if (!uf[w]) { const i = w % c, j = (w - i) / c; let f = false; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x = F.x0 + (i + a) * F.st, z = F.z0 + (j + b) * F.st; if (H.overFree(x, z, H.base(x, z)) > H.base(x, z) + 0.01) f = true; } uf[w] = f ? 1 : 2; } return uf[w] === 1; };
   const S = (k, m, vs, col) => { const key = k + (col ? col.getHexString() : ''); return STY[key] || (STY[key] = { m, vs, col: col || null }); };
   const lay = T.layers = []; // [outer, holes, rank, look]: the look of a cell a ramp takes (pitLook)
-  const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && (underFree(w) || (F.ud && F.ud[w])))) return; own[w] = rank; sty[w] = st; }); };
+  const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && (underFree(w) || (F.ud2 && F.ud2[w])))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
     if (a.t === 18) cover(outer, holes, 1, S('i', MAT.incoltoS, 12)); // incolti (DBGT PS_INC 04): dry grass and bare earth
@@ -1109,7 +1132,7 @@ function cellOwners(T, F) {
   // under a deck that carries a street or a railway (F.ud, terreno_gioco.py) no grass grows and the DBGT and OSM green areas, drawn from the
   // air, are the deck's top seen from above: bare earth there (29/10, via Maroncelli: a lawn under the cavalcavia), the rail bed, the
   // water and the streets at their own level stay
-  if (F.ud) { const st_ = S('i', MAT.incoltoS, 12); for (let w = 0; w < c * c; w++) if (F.ud[w] && own[w] < 1.25) { own[w] = 1.25; sty[w] = st_; } }
+  const U_ = F.ud2 || F.ud; if (U_) { const st_ = S('i', MAT.incoltoS, 12); for (let w = 0; w < c * c; w++) if (U_[w] && own[w] < 1.25) { own[w] = 1.25; sty[w] = st_; } }
   return own;
 }
 // water mapped inside the bed of S (OSM riverbanks): the water level draws it. The cells it covers whole, or for a thin one its corners, at
