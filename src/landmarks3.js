@@ -272,8 +272,15 @@ function buildParkingLines(T, G) {
       }
     }
   }
-  for (const a of (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || [])) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
-    const P = dec(a.p); if (P.length < 3) continue; if (PARK_A_MANO_STALLS.some(st => inPoly(st.x, st.z, P))) continue; /* a row drawn by hand: no stalls of the rule in this area */
+  /* two car park areas that overlap by more than half of the smaller one (an OSM lot kept whole over a DBGT one): stalls only in the bigger, never twice */
+  const lotsAll = (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || []).map(a => { const P = dec(a.p); let ar = 0; for (let i = 0; i < P.length; i++) { const A = P[i], C = P[(i + 1) % P.length]; ar += A[0] * C[1] - C[0] * A[1]; } return { a, P, ar: Math.abs(ar) / 2, bb: bbox(P) }; }).filter(l => l.P.length >= 3);
+  const lotsDup = new Set();
+  lotsAll.forEach((l, i) => { for (let j = 0; j < lotsAll.length; j++) { const m = lotsAll[j]; if (j === i || m.ar < l.ar || (m.ar === l.ar && j > i) || lotsDup.has(m)) continue;
+    if (l.bb[0] > m.bb[2] || l.bb[2] < m.bb[0] || l.bb[1] > m.bb[3] || l.bb[3] < m.bb[1]) continue;
+    let n = 0, h = 0; for (let x = l.bb[0] + 1; x < l.bb[2]; x += 2) for (let z = l.bb[1] + 1; z < l.bb[3]; z += 2) if (inPoly(x, z, l.P)) { n++; if (inPoly(x, z, m.P)) h++; }
+    if (n > 0 && h > n / 2) { lotsDup.add(l); break; } } });
+  for (const lot0 of lotsAll) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
+    if (lotsDup.has(lot0)) continue; const a = lot0.a, P = lot0.P; if (PARK_A_MANO_STALLS.some(st => inPoly(st.x, st.z, P))) continue; /* a row drawn by hand: no stalls of the rule in this area */
     const [cx, cz] = centroid(P);
     // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
     const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;

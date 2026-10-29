@@ -471,7 +471,7 @@
    "vms": 48,
    "cic": 25
   },
-  "tempo_s": 2.2,
+  "tempo_s": 3.7,
   "anelli_osm": {
    "n": 3,
    "dove": [
@@ -521,12 +521,12 @@
  "superfici": {
   "osm_tenute_vie": 78,
   "asfalto_m2": 860353,
-  "cortili_m2": 1040178,
+  "cortili_m2": 1040176,
   "marciapiedi_m2": 62647,
   "piazze_m2": 44081,
   "vialetti_m2": 31976,
   "isole_m2": 15408,
-  "tempo_s": 36.4,
+  "tempo_s": 33.0,
   "cortili_nei_cantieri_m2": 14143
  },
  "muri_doppi_fusi": {
@@ -536,7 +536,7 @@
  "muri_sul_confine": {
   "dbgt": 16677,
   "metri_dbgt": 227298,
-  "metri_tenuti": 212000,
+  "metri_tenuti": 211995,
   "spostati": 446,
   "metri_spostati": 2875,
   "spostamento_m": {
@@ -635,8 +635,13 @@
    "dove": []
   },
   "edifici_su_carreggiata": {
-   "n": 0,
-   "dove": []
+   "n": 4,
+   "dove": [
+    "?x=1341&z=-355",
+    "?x=640&z=-51",
+    "?x=599&z=-537",
+    "?x=609&z=-540"
+   ]
   },
   "corsie_dentro_ac_vei": {
    "campioni": 48745,
@@ -1374,6 +1379,6 @@
   "attraversamenti": {
    "n": 497
   },
-  "tempo_s": 4.6
+  "tempo_s": 6.1
  }
 }
