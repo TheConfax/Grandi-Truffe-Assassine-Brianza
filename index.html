@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo b86d659 · assemblato 29/10 18:04 · porta ' + location.port;
+    const txt = 'locale · ramo parcheggi-resistenza · dopo cd8e070 · assemblato 29/10 18:08 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3953,6 +3953,9 @@ const PARK_A_MANO = [
   { a: [535.9, -457.9], b: [558.5, -489.0], lato: 1, n: 18, ang: 80, lean: 1, dis: -1 }, /* beyond the cross street, same strip, towards Ewiva: herringbone */
   { a: [566.4, -461.8], b: [592.1, -442.0], lato: 1, n: 14, ang: 80, lean: -1, dis: -1 }, /* car park of viale Brianza, north-east row against the hedge */
   { a: [590.05, -425.2], b: [562.15, -446.3], lato: 1, n: 14, sin: [0, 7, 8], dis: -1 }, /* car park of viale Brianza, south-west row, in front of the Amie building */
+  /* corso della Resistenza, the lane that leaves it to the north (towards the Medateca), foto aerea (orthophoto 2018-19), Carlo 29/10: herringbone on both sides, noses towards the south */
+  { a: [398.2, -490.0], b: [401.0, -470.5], lato: 1, n: 7, ang: 70, lean: 1, dis: -1 }, /* east side, against the wall of the building */
+  { a: [385.4, -489.0], b: [387.3, -468.5], lato: -1, n: 7, ang: 65, lean: -1, dis: -1 }, /* west side, against the green */
 ];
 const PARK_A_MANO_STALLS = PARK_A_MANO.flatMap(r => {
   const [a, b] = r.lato < 0 ? [r.b, r.a] : [r.a, r.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, out = [];
