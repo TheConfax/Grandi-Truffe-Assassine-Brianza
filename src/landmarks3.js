@@ -177,7 +177,11 @@ function buildParkingLines(T, G) {
     const stallFree = (s, v0, v1, row) => {
       const at = v => [cx + ux * s + nx * v, cz + uz * s + nz * v], vm = (v0 + v1) / 2;
       for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const x = cx + ux * (s + ds) + nx * v, z = cz + uz * (s + ds) + nz * v; if (barNear(x, z, 0.45)) return false; } /* not the ends: a fence closing the lot behind the stall is where cars park nose-in (Carlo 29/10) */
-      /* no check of the aisle in front: a strip of pavement or a kerb between the row and the lane emptied whole rows (via Gagarin, Carlo 29/10) */
+      /* no check of the kind of ground in front: a strip of pavement or a kerb between the row and the lane emptied whole rows (via Gagarin, Carlo 29/10) */
+      /* but a stall boxed in, with a wall at one end and a bed or wall within 3 m past the other, has no way out (piazzetta of via Isonzo, Carlo 29/10) */
+      const barAt = (v, r) => [-0.9, 0, 0.9].some(ds => barNear(cx + ux * (s + ds) + nx * v, cz + uz * (s + ds) + nz * v, r));
+      const boxed = (vb, vf, d) => barAt(vb, 0.8) && [0.3, 1.3, 2.3].some(k => barAt(vf + d * k, 0.6));
+      if (boxed(v0, v1, 1) || boxed(v1, v0, -1)) return false;
       return true;
     };
     const runs = [];
