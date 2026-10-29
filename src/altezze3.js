@@ -323,7 +323,7 @@ const H = (() => {
       const den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(den) < 1e-12) return;
       const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / den, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / den, l3 = 1 - l1 - l2;
       if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) return;
-      const top = l1 * T[i + 2] + l2 * T[i + 5] + l3 * T[i + 8]; out.push({ id: d.id, top, bot: top - d.sp, tipo: d.tipo, d });
+      const top = l1 * T[i + 2] + l2 * T[i + 5] + l3 * T[i + 8]; out.push({ id: d.id, top, bot: top - d.sp, tipo: d.tipo, d, i }); /* i: the triangle (its offset in d.tri) */
     });
     return out;
   }
@@ -376,8 +376,8 @@ const H = (() => {
       const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L = hyp(ex, ez) || 1, t = clamp(((x - s.a[0]) * ex + (z - s.a[1]) * ez) / (L * L), 0, 1), px = s.a[0] + ex * t, pz = s.a[1] + ez * t;
       if (w !== null || hyp(x - px, z - pz) > s.w) return;
       const F = fineAt(px, pz); if (!F) { w = oldG(px, pz) - RIV_D * (1 - fadeW(px, pz)) + 0.5; return; }
-      let lo = 1e9; for (let q = -1; q <= 1.001; q += 0.25) { const qx = px - ez / L * s.w * q, qz = pz + ex / L * s.w * q, Fq = fineAt(qx, qz); lo = Math.min(lo, Fq ? onF(Fq, qx, qz) : oldG(qx, qz)); }
-      w = lo + 0.3;
+      // in a tile of S an OSM stream has water only where src/superficie.py dug its bed (its series in TERRENO.acqua, above); elsewhere it runs
+      // in a culvert (under streets and houses) or is not in a valley: no water (29/10, Campaccio: a pool on the embankment, x 14 z -1887)
     });
     return w;
   }

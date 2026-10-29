@@ -1,22 +1,10 @@
 {
  "A1": {
   "velo_m2": 0.0,
-  "strisce_osm_m2": 9.4,
+  "strisce_osm_m2": 1.6,
   "aree_osm_m2": 0.0,
-  "totale_m2": 9.4,
+  "totale_m2": 1.6,
   "luoghi": [
-   {
-    "punti": 24,
-    "x": -686.2,
-    "z": 1804.2,
-    "link": "?x=-686.2&z=1804.2"
-   },
-   {
-    "punti": 6,
-    "x": -1751.2,
-    "z": -1473.8,
-    "link": "?x=-1751.2&z=-1473.8"
-   },
    {
     "punti": 3,
     "x": 988.2,
@@ -28,15 +16,9 @@
     "x": 993.8,
     "z": -2399.8,
     "link": "?x=993.8&z=-2399.8"
-   },
-   {
-    "punti": 1,
-    "x": -1330.2,
-    "z": 1479.8,
-    "link": "?x=-1330.2&z=1479.8"
    }
   ],
-  "n_luoghi": 5
+  "n_luoghi": 2
  },
  "A2": {
   "punti": 6,
@@ -73,8 +55,8 @@
   ],
   "n_luoghi": 3,
   "punti_controllati": 7083,
-  "bordo_punti": 52,
-  "bordo_luoghi": 12
+  "bordo_punti": 51,
+  "bordo_luoghi": 11
  },
  "A3": {
   "celle_sotto_impalcati_con_strada_disegnata": 385,
@@ -90,74 +72,49 @@
    10,
    17
   ],
-  "celle_segnate_sotto_impalcato": 1012,
+  "celle_segnate_sotto_impalcato": 1011,
   "luoghi": []
  },
  "A4": {
   "ringhiere_m": 0,
   "ringhiere_in_bosco_o_campagna_m": 0,
-  "bocche_di_tombino": 46,
-  "bocche_lontane_da_strade": 15,
+  "bocche_di_tombino": 33,
+  "bocche_lontane_da_strade": 7,
   "luoghi_bocche_lontane": [
    {
-    "x": 333.0,
-    "z": -2415.7,
-    "link": "?x=333.0&z=-2415.7"
+    "x": 690.6,
+    "z": -2468.9,
+    "link": "?x=690.6&z=-2468.9"
    },
    {
-    "x": 335.8,
-    "z": -2414.0,
-    "link": "?x=335.8&z=-2414.0"
+    "x": 1100.0,
+    "z": -2052.5,
+    "link": "?x=1100.0&z=-2052.5"
    },
    {
-    "x": 785.3,
-    "z": -2253.4,
-    "link": "?x=785.3&z=-2253.4"
+    "x": 251.2,
+    "z": -511.5,
+    "link": "?x=251.2&z=-511.5"
    },
    {
-    "x": 786.9,
-    "z": -2244.4,
-    "link": "?x=786.9&z=-2244.4"
+    "x": -1233.7,
+    "z": -2.3,
+    "link": "?x=-1233.7&z=-2.3"
    },
    {
-    "x": 787.2,
-    "z": -2230.6,
-    "link": "?x=787.2&z=-2230.6"
+    "x": -1221.5,
+    "z": 31.7,
+    "link": "?x=-1221.5&z=31.7"
    },
    {
-    "x": 825.4,
-    "z": -1670.7,
-    "link": "?x=825.4&z=-1670.7"
+    "x": -1118.8,
+    "z": 331.2,
+    "link": "?x=-1118.8&z=331.2"
    },
    {
-    "x": 868.7,
-    "z": -1625.2,
-    "link": "?x=868.7&z=-1625.2"
-   },
-   {
-    "x": 440.0,
-    "z": -698.9,
-    "link": "?x=440.0&z=-698.9"
-   },
-   {
-    "x": 437.9,
-    "z": -685.7,
-    "link": "?x=437.9&z=-685.7"
-   },
-   {
-    "x": -1330.8,
-    "z": -161.7,
-    "link": "?x=-1330.8&z=-161.7"
-   },
-   {
-    "x": -1233.9,
-    "z": -2.8,
-    "link": "?x=-1233.9&z=-2.8"
-   },
-   {
-    "x": -1220.2,
-    "z": 33.8,
-    "link": "?x=-1220.2&z=33.8"
+    "x": -1120.8,
+    "z": 337.8,
+    "link": "?x=-1120.8&z=337.8"
    }
   ]
  },
@@ -259,6 +216,475 @@
   ],
   "n_luoghi": 34
  },
+ "A6": {
+  "incroci": 45,
+  "sfondati": 1,
+  "punti_sfondati": 2,
+  "luoghi_sfondati": [
+   {
+    "comune": "Meda",
+    "x": 213.2,
+    "z": -384.2,
+    "m": 9.9,
+    "strada": 221.84,
+    "S_min": 220.63,
+    "sfondato": true,
+    "link": "?x=213.2&z=-384.2"
+   }
+  ],
+  "incroci_elenco": [
+   {
+    "comune": "Meda",
+    "x": 402.8,
+    "z": -1412.8,
+    "m": 12.8,
+    "strada": 252.57,
+    "S_min": 252.58,
+    "sfondato": false,
+    "link": "?x=402.8&z=-1412.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 398.8,
+    "z": -1396.2,
+    "m": 8.1,
+    "strada": 252.52,
+    "S_min": 252.51,
+    "sfondato": false,
+    "link": "?x=398.8&z=-1396.2"
+   },
+   {
+    "comune": "Meda",
+    "x": 393.8,
+    "z": -1358.2,
+    "m": 6.4,
+    "strada": 251.85,
+    "S_min": 251.87,
+    "sfondato": false,
+    "link": "?x=393.8&z=-1358.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -249.8,
+    "z": 217.8,
+    "m": 10.6,
+    "strada": 218.85,
+    "S_min": 217.88,
+    "sfondato": false,
+    "link": "?x=-249.8&z=217.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -250.2,
+    "z": 203.2,
+    "m": 13.0,
+    "strada": 218.17,
+    "S_min": 218.08,
+    "sfondato": false,
+    "link": "?x=-250.2&z=203.2"
+   },
+   {
+    "comune": "Meda",
+    "x": 299.2,
+    "z": -556.8,
+    "m": 98.2,
+    "strada": 223.13,
+    "S_min": 222.96,
+    "sfondato": false,
+    "link": "?x=299.2&z=-556.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 220.8,
+    "z": -395.2,
+    "m": 10.9,
+    "strada": 221.97,
+    "S_min": 221.8,
+    "sfondato": false,
+    "link": "?x=220.8&z=-395.2"
+   },
+   {
+    "comune": "Meda",
+    "x": 213.2,
+    "z": -384.2,
+    "m": 9.9,
+    "strada": 221.84,
+    "S_min": 220.63,
+    "sfondato": true,
+    "link": "?x=213.2&z=-384.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -358.2,
+    "z": -988.2,
+    "m": 11.2,
+    "strada": 230.41,
+    "S_min": 230.35,
+    "sfondato": false,
+    "link": "?x=-358.2&z=-988.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -345.8,
+    "z": -957.2,
+    "m": 7.7,
+    "strada": 229.55,
+    "S_min": 229.58,
+    "sfondato": false,
+    "link": "?x=-345.8&z=-957.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -335.8,
+    "z": -931.8,
+    "m": 22.2,
+    "strada": 228.94,
+    "S_min": 228.81,
+    "sfondato": false,
+    "link": "?x=-335.8&z=-931.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -306.2,
+    "z": -835.8,
+    "m": 7.9,
+    "strada": 228.18,
+    "S_min": 228.21,
+    "sfondato": false,
+    "link": "?x=-306.2&z=-835.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -275.8,
+    "z": -730.2,
+    "m": 7.9,
+    "strada": 223.98,
+    "S_min": 224.0,
+    "sfondato": false,
+    "link": "?x=-275.8&z=-730.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -263.2,
+    "z": -693.2,
+    "m": 11.1,
+    "strada": 222.96,
+    "S_min": 222.94,
+    "sfondato": false,
+    "link": "?x=-263.2&z=-693.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -242.2,
+    "z": -622.8,
+    "m": 18.8,
+    "strada": 221.57,
+    "S_min": 221.57,
+    "sfondato": false,
+    "link": "?x=-242.2&z=-622.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -232.2,
+    "z": -600.2,
+    "m": 6.6,
+    "strada": 221.49,
+    "S_min": 221.33,
+    "sfondato": false,
+    "link": "?x=-232.2&z=-600.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -210.8,
+    "z": -527.2,
+    "m": 2.8,
+    "strada": 220.45,
+    "S_min": 220.28,
+    "sfondato": false,
+    "link": "?x=-210.8&z=-527.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -184.2,
+    "z": -449.8,
+    "m": 24.2,
+    "strada": 219.64,
+    "S_min": 219.54,
+    "sfondato": false,
+    "link": "?x=-184.2&z=-449.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -155.8,
+    "z": -363.8,
+    "m": 9.0,
+    "strada": 219.24,
+    "S_min": 219.24,
+    "sfondato": false,
+    "link": "?x=-155.8&z=-363.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -152.8,
+    "z": -343.8,
+    "m": 4.1,
+    "strada": 219.22,
+    "S_min": 219.04,
+    "sfondato": false,
+    "link": "?x=-152.8&z=-343.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -139.8,
+    "z": -312.2,
+    "m": 19.4,
+    "strada": 219.68,
+    "S_min": 219.56,
+    "sfondato": false,
+    "link": "?x=-139.8&z=-312.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -115.8,
+    "z": -234.8,
+    "m": 8.3,
+    "strada": 219.65,
+    "S_min": 219.61,
+    "sfondato": false,
+    "link": "?x=-115.8&z=-234.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -103.2,
+    "z": -185.2,
+    "m": 3.7,
+    "strada": 219.55,
+    "S_min": 219.39,
+    "sfondato": false,
+    "link": "?x=-103.2&z=-185.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -102.2,
+    "z": -178.8,
+    "m": 6.5,
+    "strada": 219.53,
+    "S_min": 219.4,
+    "sfondato": false,
+    "link": "?x=-102.2&z=-178.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -147.2,
+    "z": -912.2,
+    "m": 13.3,
+    "strada": 228.61,
+    "S_min": 228.51,
+    "sfondato": false,
+    "link": "?x=-147.2&z=-912.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -142.2,
+    "z": -899.2,
+    "m": 6.0,
+    "strada": 228.58,
+    "S_min": 228.52,
+    "sfondato": false,
+    "link": "?x=-142.2&z=-899.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -136.2,
+    "z": -875.2,
+    "m": 5.5,
+    "strada": 227.43,
+    "S_min": 228.02,
+    "sfondato": false,
+    "link": "?x=-136.2&z=-875.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -132.8,
+    "z": -864.2,
+    "m": 8.0,
+    "strada": 227.48,
+    "S_min": 227.29,
+    "sfondato": false,
+    "link": "?x=-132.8&z=-864.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -89.8,
+    "z": -765.2,
+    "m": 7.8,
+    "strada": 227.81,
+    "S_min": 227.6,
+    "sfondato": false,
+    "link": "?x=-89.8&z=-765.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -45.2,
+    "z": -655.2,
+    "m": 6.4,
+    "strada": 223.27,
+    "S_min": 223.24,
+    "sfondato": false,
+    "link": "?x=-45.2&z=-655.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -36.8,
+    "z": -640.8,
+    "m": 11.1,
+    "strada": 223.22,
+    "S_min": 222.92,
+    "sfondato": false,
+    "link": "?x=-36.8&z=-640.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -35.2,
+    "z": -634.8,
+    "m": 2.2,
+    "strada": 222.95,
+    "S_min": 222.89,
+    "sfondato": false,
+    "link": "?x=-35.2&z=-634.8"
+   },
+   {
+    "comune": "Meda",
+    "x": -9.2,
+    "z": -571.8,
+    "m": 7.6,
+    "strada": 221.73,
+    "S_min": 221.58,
+    "sfondato": false,
+    "link": "?x=-9.2&z=-571.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 15.8,
+    "z": -510.8,
+    "m": 5.2,
+    "strada": 220.47,
+    "S_min": 220.43,
+    "sfondato": false,
+    "link": "?x=15.8&z=-510.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 53.2,
+    "z": -410.8,
+    "m": 6.0,
+    "strada": 221.12,
+    "S_min": 220.95,
+    "sfondato": false,
+    "link": "?x=53.2&z=-410.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 65.8,
+    "z": -381.8,
+    "m": 24.8,
+    "strada": 221.19,
+    "S_min": 220.99,
+    "sfondato": false,
+    "link": "?x=65.8&z=-381.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 76.2,
+    "z": -352.8,
+    "m": 12.9,
+    "strada": 221.17,
+    "S_min": 221.1,
+    "sfondato": false,
+    "link": "?x=76.2&z=-352.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 86.8,
+    "z": -329.2,
+    "m": 1.9,
+    "strada": 220.91,
+    "S_min": 220.89,
+    "sfondato": false,
+    "link": "?x=86.8&z=-329.2"
+   },
+   {
+    "comune": "Meda",
+    "x": 88.8,
+    "z": -322.8,
+    "m": 11.9,
+    "strada": 220.92,
+    "S_min": 220.87,
+    "sfondato": false,
+    "link": "?x=88.8&z=-322.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 92.2,
+    "z": -312.2,
+    "m": 4.2,
+    "strada": 221.12,
+    "S_min": 220.88,
+    "sfondato": false,
+    "link": "?x=92.2&z=-312.2"
+   },
+   {
+    "comune": "Meda",
+    "x": 99.8,
+    "z": -307.8,
+    "m": 6.1,
+    "strada": 221.18,
+    "S_min": 221.13,
+    "sfondato": false,
+    "link": "?x=99.8&z=-307.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 479.8,
+    "z": -819.2,
+    "m": 7.9,
+    "strada": 224.33,
+    "S_min": 223.88,
+    "sfondato": false,
+    "link": "?x=479.8&z=-819.2"
+   },
+   {
+    "comune": "Meda",
+    "x": -575.2,
+    "z": -1441.8,
+    "m": 11.3,
+    "strada": 237.61,
+    "S_min": 237.59,
+    "sfondato": false,
+    "link": "?x=-575.2&z=-1441.8"
+   },
+   {
+    "comune": "Meda",
+    "x": 438.8,
+    "z": -1068.2,
+    "m": 13.1,
+    "strada": 225.88,
+    "S_min": 225.83,
+    "sfondato": false,
+    "link": "?x=438.8&z=-1068.2"
+   },
+   {
+    "comune": "Meda",
+    "x": 494.2,
+    "z": -997.8,
+    "m": 11.8,
+    "strada": 225.51,
+    "S_min": 225.4,
+    "sfondato": false,
+    "link": "?x=494.2&z=-997.8"
+   }
+  ]
+ },
  "prove_fisse": [
   {
    "nome": "viale Francia, strada e ferrovia sul fiume",
@@ -306,19 +732,21 @@
   }
  ],
  "sintesi": {
-  "acqua_sulle_strade_m2": 9.4,
-  "acqua_sulle_strade_luoghi": 5,
+  "acqua_sulle_strade_m2": 1.6,
+  "acqua_sulle_strade_luoghi": 2,
   "strade_sfondate_punti": 6,
   "strade_sfondate_luoghi": 3,
-  "strade_sfondate_bordo_punti": 52,
+  "strade_sfondate_bordo_punti": 51,
   "dipinte_sotto_impalcati_celle": 0,
   "dipinte_sotto_impalcati_ponti": 0,
   "ringhiere_m": 0,
   "ringhiere_in_bosco_m": 0,
-  "bocche_lontane_da_strade": 15,
+  "bocche_lontane_da_strade": 7,
   "acqua_lontana_dal_fondo_m": 199,
   "acqua_lontana_dal_fondo_luoghi": 34,
+  "tombini_sotto_strade": 45,
+  "tombini_sotto_strade_sfondati": 1,
   "prove_fisse_ok": "3 su 4",
-  "tempo_s": 64.9
+  "tempo_s": 59.4
  }
 }

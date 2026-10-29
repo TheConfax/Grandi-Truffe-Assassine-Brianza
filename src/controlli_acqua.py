@@ -216,7 +216,7 @@ class Mondo:
         if s.acq_kd is not None:
             d, j = s.acq_kd.query(P, workers=-1); k = d <= WMAX; w[k] = s.acq_z[j[k]]
         if s.rv_kd is not None:
-            d, j = s.rv_kd.query(P, workers=-1); k = np.isnan(w) & (d <= s.rv_w[np.minimum(j, len(s.rv_w) - 1)]); w[k] = s.rv_z[j[k]]
+            d, j = s.rv_kd.query(P, workers=-1); k = np.isnan(w) & (d <= s.rv_w[np.minimum(j, len(s.rv_w) - 1)]) & ~np.isfinite(s.H(x, z)); w[k] = s.rv_z[j[k]]   # in a tile of S only the dug beds have water (29/10)
         return w
 
 
@@ -275,6 +275,7 @@ def a1_acqua_sulle_strade(m, Z, gioco_ringhiere=False):
             probes = np.array([mid, mid + n * r['w'] * 0.5, mid - n * r['w'] * 0.5, mid + (c - a) / 2])
             if (m.mat(probes[:, 0], probes[:, 1]) == 4).any() and np.isfinite(m.H(*mid[:, None])).all(): continue
             if not gioco_ringhiere and shapely.dwithin(m.strade, Point(mid), r['w']): continue   # world3.js: never on a street (fiumi-ponti)
+            if not np.isfinite(m.water(np.array([a[0], c[0]]), np.array([a[1], c[1]]))).all(): continue   # world3.js: only where H.water has a level at both ends
             strips.append(Polygon([a - n * r['w'], a + n * r['w'], c + n * r['w'], c - n * r['w']]))
     S_ = shapely.union_all(strips) if strips else Polygon()
     ib = shapely.intersection(S_, m.strade) if not S_.is_empty else Polygon()
@@ -350,12 +351,12 @@ def a4_parapetti(m, gioco_ringhiere=False, lid=None):
     strade4 = m.strade.buffer(4.0); shapely.prepare(strade4)
     for r in m.rv:
         p = r['p']
-        for ei, (E, F) in enumerate(((p[0], p[1]), (p[-1], p[-2]))):
-            if not r['e'][ei] or not np.isfinite(m.H(E[0:1], E[1:2])).all(): continue
-            L = np.hypot(*(F - E)) or 1; u = (F - E) / L; n = np.array([-u[1], u[0]]); W = r['w'] + 0.3
-            q = np.linspace(-1, 1, 9); ys = m.H(E[0] + n[0] * W * q, E[1] + n[1] * W * q); lo, hi = np.nanmin(ys), np.nanmax(ys)
-            topv = max(hi, float(m.H(E[0:1] - u[0] * 3, E[1:2] - u[1] * 3)[0]))
-            if topv - lo < 0.6: continue
+        for ei in (0, 1):
+            if not r['e'][ei] or not np.isfinite(m.H(p[[0 if ei == 0 else -1], 0], p[[0 if ei == 0 else -1], 1])).all(): continue
+            q = testata(m, p if ei == 0 else p[::-1], r['w'])
+            if q is None: continue
+            E, u, lo, topv, back, wy = q
+            if topv - lo < 0.6 or back - wy < 0.6: continue
             bocche += 1
             # far from a street: more than 4 m plus the run of a 2:3 embankment down from the street to the bed (a mouth at the foot of a
             # high embankment stands well out from the asphalt), or halfway up the slope: the bed more than 1 m over the bottom of the valley
@@ -368,6 +369,34 @@ def a4_parapetti(m, gioco_ringhiere=False, lid=None):
             if lontana: lontane.append(E)
     return dict(ringhiere_m=round(lung), ringhiere_in_bosco_o_campagna_m=round(bosco), bocche_di_tombino=bocche, bocche_lontane_da_strade=len(lontane),
                 luoghi_bocche_lontane=[dict(x=round(float(e[0]), 1), z=round(float(e[1]), 1), link=link(*e)) for e in lontane[:12]])
+
+
+def testata(m, pl, w=1.4):
+    """world3.js: where the headwall of the culvert at the start of the polyline pl stands. Walking up the line (within 25 m) the first point
+    in the open bed (a bed cell, material 4, or the water over S); if the start already lies in it, the last one walking on into the culvert
+    (10 m at most). None when no bed is along the line. Returns (Q, direction up the line, lo and top across the wall, ground 3 m behind, water)"""
+    pl = np.asarray(pl, float); seg = np.hypot(*np.diff(pl, axis=0).T); cum = np.concatenate(([0.0], np.cumsum(seg))); L0 = seg[0] or 1.0
+    u0 = (pl[1] - pl[0]) / L0
+    def at(s):
+        s = np.atleast_1d(np.asarray(s, float)); out = np.zeros((len(s), 2))
+        neg = s <= 0; out[neg] = pl[0] + u0 * s[neg, None]
+        if (~neg).any():
+            sp_ = np.minimum(s[~neg], cum[-1]); out[~neg] = np.column_stack((np.interp(sp_, cum, pl[:, 0]), np.interp(sp_, cum, pl[:, 1])))
+        return out
+    def wet(P):
+        h = m.H(P[:, 0], P[:, 1]); ww = m.water(P[:, 0], P[:, 1]); return (m.mat(P[:, 0], P[:, 1]) == 4) | (np.nan_to_num(ww - h, nan=-1) > 0.05)
+    if wet(at(0.0))[0]:
+        ss = -np.arange(0.5, 10.01, 0.5); wv = wet(at(ss)); k = np.argmin(wv) if not wv.all() else len(ss); s0 = 0.0 if k == 0 else ss[k - 1]
+    else:
+        ss = np.arange(0.5, min(25.0, cum[-1]) + 1e-9, 0.5)
+        if not len(ss): return None
+        wv = wet(at(ss))
+        if not wv.any(): return None
+        s0 = ss[np.argmax(wv)]
+    Q, Qa, Qb = at(s0)[0], at(s0 + 1)[0], at(s0 - 1)[0]; u = (Qa - Qb) / (np.hypot(*(Qa - Qb)) or 1); n = np.array([-u[1], u[0]]); W = w + 0.3
+    q = np.linspace(-1, 1, 9); ys = m.H(Q[0] + n[0] * W * q, Q[1] + n[1] * W * q); lo, hi = np.nanmin(ys), np.nanmax(ys)
+    back = float(m.H(np.array([Q[0] - u[0] * 3]), np.array([Q[1] - u[1] * 3]))[0]); wl = float(m.water(np.array([Q[0]]), np.array([Q[1]]))[0])
+    return Q, u, lo, max(hi, back), back, (wl if np.isfinite(wl) else lo + 0.3)
 
 
 def fondo_valle(lid, p, w, R=15.0):
