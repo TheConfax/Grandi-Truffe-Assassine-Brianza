@@ -1,0 +1,245 @@
+{
+ "stop": {
+  "file": "File:Italian traffic signs - fermarsi e dare precedenza - stop.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/1/1c/Italian_traffic_signs_-_fermarsi_e_dare_precedenza_-_stop.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 1010,
+  "h": 1010,
+  "lic": "CC BY-SA 3.0",
+  "artist": "F l a n k e r",
+  "copy": "True"
+ },
+ "dare": {
+  "file": "File:Italian traffic signs - dare precedenza.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/8/89/Italian_traffic_signs_-_dare_precedenza.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 834,
+  "h": 735,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "vietato": {
+  "file": "File:Italian traffic signs - senso vietato.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/5/5e/Italian_traffic_signs_-_senso_vietato.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 602,
+  "h": 602,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "transito": {
+  "file": "File:Italian traffic signs - divieto di transito.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/7/75/Italian_traffic_signs_-_divieto_di_transito.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "destra": {
+  "file": "File:Italian traffic signs - passaggio obbligatorio a destra.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/0/0e/Italian_traffic_signs_-_passaggio_obbligatorio_a_destra.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 200,
+  "h": 200,
+  "lic": "CC BY-SA 3.0",
+  "artist": "F l a n k e r",
+  "copy": "True"
+ },
+ "rotatoria": {
+  "file": "File:Italian traffic signs - rotatoria.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/a/a1/Italian_traffic_signs_-_rotatoria.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "CC BY-SA 3.0",
+  "artist": "F l a n k e r",
+  "copy": "True"
+ },
+ "sosta": {
+  "file": "File:Italian traffic signs - divieto di sosta.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/9/94/Italian_traffic_signs_-_divieto_di_sosta.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 564,
+  "h": 564,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "fermata": {
+  "file": "File:Italian traffic signs - divieto di fermata.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/0/06/Italian_traffic_signs_-_divieto_di_fermata.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 564,
+  "h": 564,
+  "lic": "CC BY-SA 3.0",
+  "artist": "F l a n k e r",
+  "copy": "True"
+ },
+ "dritto": {
+  "file": "File:Italian traffic signs - direzione obbligatoria dritto.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/4/45/Italian_traffic_signs_-_direzione_obbligatoria_dritto.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "CC BY-SA 3.0",
+  "artist": "F l a n k e r",
+  "copy": "True"
+ },
+ "pesanti": {
+  "file": "File:Italian traffic signs - divieto di transito ai veicoli da trasporto.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/8/81/Italian_traffic_signs_-_divieto_di_transito_ai_veicoli_da_trasporto.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 602,
+  "h": 602,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "pedoni": {
+  "file": "File:Italian traffic signs - attraversamento pedonale.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/5/52/Italian_traffic_signs_-_attraversamento_pedonale.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "parcheggio": {
+  "file": "File:Italian traffic signs - parcheggio (figura II 76).svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Italian_traffic_signs_-_parcheggio_%28figura_II_76%29.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "Original:  Ministero dei Lavori Pubblici Vectorization:  Arbalete",
+  "copy": "False"
+ },
+ "unico_dx": {
+  "file": "File:Italian traffic signs - senso unico (a destra).svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/f/f2/Italian_traffic_signs_-_senso_unico_%28a_destra%29.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 938,
+  "h": 234,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "unico_sx": {
+  "file": "File:Italian traffic signs - senso unico (a sinistra).svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/5/5d/Italian_traffic_signs_-_senso_unico_%28a_sinistra%29.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 938,
+  "h": 234,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite10": {
+  "file": "File:Italian traffic signs - limite di velocità 10.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/b/b4/Italian_traffic_signs_-_limite_di_velocit%C3%A0_10.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite20": {
+  "file": "File:Italian traffic signs - limite di velocità 20.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/0/06/Italian_traffic_signs_-_limite_di_velocit%C3%A0_20.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite30": {
+  "file": "File:Italian traffic signs - limite di velocità 30.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/c/cd/Italian_traffic_signs_-_limite_di_velocit%C3%A0_30.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite40": {
+  "file": "File:Italian traffic signs - limite di velocità 40.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/7/79/Italian_traffic_signs_-_limite_di_velocit%C3%A0_40.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite50": {
+  "file": "File:Italian traffic signs - limite di velocità 50.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/e/eb/Italian_traffic_signs_-_limite_di_velocit%C3%A0_50.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite60": {
+  "file": "File:Italian traffic signs - limite di velocità 60.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/7/78/Italian_traffic_signs_-_limite_di_velocit%C3%A0_60.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite70": {
+  "file": "File:Italian traffic signs - limite di velocità 70.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/7/79/Italian_traffic_signs_-_limite_di_velocit%C3%A0_70.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite80": {
+  "file": "File:Italian traffic signs - limite di velocità 80.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Italian_traffic_signs_-_limite_di_velocit%C3%A0_80.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite90": {
+  "file": "File:Italian traffic signs - limite di velocità 90.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/9/9e/Italian_traffic_signs_-_limite_di_velocit%C3%A0_90.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite100": {
+  "file": "File:Italian traffic signs - limite di velocità 100.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/a/af/Italian_traffic_signs_-_limite_di_velocit%C3%A0_100.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "F l a n k e r",
+  "copy": "False"
+ },
+ "limite110": {
+  "file": "File:Italian traffic signs - limite di velocità 110.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/2/20/Italian_traffic_signs_-_limite_di_velocit%C3%A0_110.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "Gigillo83",
+  "copy": "False"
+ },
+ "limite120": {
+  "file": "File:Italian traffic signs - limite di velocità 120.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/Italian_traffic_signs_-_limite_di_velocit%C3%A0_120.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "User:Gigillo83, User:HuBoro",
+  "copy": "False"
+ },
+ "limite130": {
+  "file": "File:Italian traffic signs - limite di velocità 130.svg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/1/10/Italian_traffic_signs_-_limite_di_velocit%C3%A0_130.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "w": 600,
+  "h": 600,
+  "lic": "Public domain",
+  "artist": "Gigillo83",
+  "copy": "False"
+ }
+}

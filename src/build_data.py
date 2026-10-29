@@ -1889,7 +1889,8 @@ _ctl_osm_segn = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__fi
 _ctl_incroci = [(r_, nodes[r_]) for r_, l_ in car_nodes.items() if r_ in node_index and r_ in nodes and sum(2 if 0 < i_ < len(r__['refs']) - 1 else 1 for r__, i_ in l_ if r__['c'] <= 5) >= 3]
 MAPI = mapillary_obj.elabora(DATA, proj, inside, _segs, _segtree, STR, [g_ for g_ in (P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9) if g_ is not None],
                              _ctl_osm_segn, lamps, ogg, OGG, [nodes[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and inside(nodes[r_], 0)],
-                             _ctl_incroci, [(c_[0], c_[1]) for c_ in crossings], [b_[0] for b_ in bar_out] + _cw, near_street, off_carriageway, log)
+                             _ctl_incroci, [(c_[0], c_[1]) for c_ in crossings], [b_[0] for b_ in bar_out] + _cw, near_street, off_carriageway, log,
+                             cortili=list(STR.cortili) if STR is not None else [], alberi=trees)
 lamps = lamps + MAPI['lp']; ogg = ogg + MAPI['og']
 signals_extra = [node_index[r_] for r_ in MAPI['sf']]
 for s_ in MAPI['sm']: push(tid(s_[1], s_[2]), 'sm', s_)
