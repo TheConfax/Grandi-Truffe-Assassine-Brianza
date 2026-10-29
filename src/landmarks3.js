@@ -124,6 +124,19 @@ function buildPlatforms(T, G) {
 // roads) or a building; one yellow stall with the wheelchair per row of eight or more; T.stalls keeps every stall for the parked cars (parkTile);
 // on the bigger car parks lamp posts down the middle, a parking meter and the blue P sign
 const PSIGN_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#1f4fa8'; g.fillRect(0, 0, w, h); g.strokeStyle = '#fff'; g.lineWidth = 3; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = '#fff'; g.font = 'bold 46px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', w / 2, h / 2 + 3); }, false), side: THREE.DoubleSide });
+/* Rows of stalls drawn by hand from the aerial photo (Regione Lombardia orthophoto) where the rule below, working on the whole OSM/DBGT area, got them wrong: via Isonzo (the piazzetta and the car park to the north), foto aerea, Carlo 29/10.
+   a, b: the back of the row (kerb, wall), first to last stall; lato: +1 the stalls are on the side (-uz, ux) of a->b, -1 on the other; n: stalls, 2.5 m wide, 4.8 deep, nose to the back, counted from a; ln: stalls that keep their line on the side of a left-out one; sin: stalls left out (the beds of the square stand there: the row is made of the stalls between them); dis: the stall of the disabled (-1 none). An area holding a row of these gets no stalls of the rule. */
+const PARK_A_MANO = [
+  { a: [555.3, -233.1], b: [544.4, -216.3], lato: 1, n: 8, dis: 1 }, /* piazzetta of via Isonzo, row against the bed along the street (east) */
+  { a: [545.7, -247.7], b: [534.0, -231.4], lato: -1, n: 8, sin: [2, 3, 6], ln: [1], dis: 5 }, /* piazzetta of via Isonzo, row against the edge of the square with the beds (west) */
+  { a: [569.4, -265.5], b: [560.5, -253.5], lato: -1, n: 6, dis: -1 }, /* east side of the building of Muzic Planet */
+  { a: [548.4, -294.7], b: [567.8, -278.95], lato: 1, n: 10, dis: 1 }, /* north, along via Indipendenza, against the green strip */
+];
+const PARK_A_MANO_STALLS = PARK_A_MANO.flatMap(r => {
+  const [a, b] = r.lato < 0 ? [r.b, r.a] : [r.a, r.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, nx = -uz, nz = ux, out = [];
+  for (let k = 0; k < r.n; k++) { const s = 2.5 * k + 1.25, ix = j => r.lato < 0 ? r.n - 1 - j : j, out0 = (r.sin || []).includes.bind(r.sin || []); if (out0(ix(k))) continue; out.push({ x: a[0] + ux * s + nx * 2.4, z: a[1] + uz * s + nz * 2.4, ux, uz, h: Math.atan2(uz, -ux), dis: ix(k) === r.dis, l0: k === 0 || (r.ln || []).includes(ix(k)), l1: !out0(ix(k + 1)), y1: ix(k) === r.dis || ix(k + 1) === r.dis }); } /* each line drawn once, by the stall before it (yellow if either side is the disabled one); none on the side of a left-out stall, the bed is there */
+  return out;
+});
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), sign = Buf();
   T.stalls = []; T.streetStalls = [];
@@ -136,6 +149,12 @@ function buildParkingLines(T, G) {
     }
     const i0 = b.p.length / 3; for (const [s, v] of [[a0, w0], [a1, w0], [a1, w1], [a0, w1]]) vtx(b, x + ux * s + nx * v, 0.05, z + uz * s + nz * v, 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
   const outline = (x, z, ux, uz, l, w, col) => { quad(x, z, ux, uz, -l / 2, l / 2, -w / 2 - 0.06, -w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2, l / 2, w / 2 - 0.06, w / 2 + 0.06, col); quad(x, z, ux, uz, -l / 2 - 0.06, -l / 2 + 0.06, -w / 2, w / 2, col); quad(x, z, ux, uz, l / 2 - 0.06, l / 2 + 0.06, -w / 2, w / 2, col); };
+  for (const st of PARK_A_MANO_STALLS) { /* the rows by hand: each stall in the tile its centre falls in; first in T.stalls, so the cars of the tile (at most 14) park here before elsewhere */
+    if (tileOf(st.x, st.z) !== T.t) continue; const col = st.dis ? Y : W;
+    if (st.l0) quad(st.x, st.z, st.ux, st.uz, -1.31, -1.19, -2.4, 2.4, col); if (st.l1) quad(st.x, st.z, st.ux, st.uz, 1.19, 1.31, -2.4, 2.4, st.y1 ? Y : W);
+    if (st.dis) quad(st.x, st.z, st.ux, st.uz, -0.5, 0.5, -0.5, 0.5, BLUE);
+    T.stalls.push({ x: st.x, z: st.z, h: st.h, dis: st.dis });
+  }
   // the spaces OSM maps one by one: white lines, yellow with the blue square for the disabled
   const real = (T.d.ps || []).map(([X, Z, ang, L, Wd, kind]) => ({ x: X / 10, z: Z / 10, ang, L: clamp(L, 4, 7), W: clamp(Wd, 1.8, 3.5), kind }));
   for (const sp of real) {
@@ -165,7 +184,8 @@ function buildParkingLines(T, G) {
     }
   }
   for (const a of (T.d.a || []).filter(a => a.t === 4 && !a.ns).concat(T.d.pk || [])) { // OSM car parks, and the DBGT ones (AC_VEI 0301, tiles[t].pk) in place of those they cover (ns)
-    const P = dec(a.p); if (P.length < 3) continue; const [cx, cz] = centroid(P);
+    const P = dec(a.p); if (P.length < 3) continue; if (PARK_A_MANO_STALLS.some(st => inPoly(st.x, st.z, P))) continue; /* a row drawn by hand: no stalls of the rule in this area */
+    const [cx, cz] = centroid(P);
     // a car park mapped space by space keeps only those; otherwise the stalls drawn here never go past the capacity OSM gives
     const inLot = real.filter(r => inPoly(r.x, r.z, P)), capE = (T.d.pc || []).find(p => inPoly(p[0] / 10, p[1] / 10, P)), budget = inLot.length >= 3 ? 0 : capE ? Math.max(0, capE[2] - inLot.length) : 1e9;
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
