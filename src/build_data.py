@@ -1418,20 +1418,17 @@ for r_, t in ntags.items(): add_ng(t, nodes[r_])
 for wid, (refs, t) in ways.items():
     if refs[0] == refs[-1] and len(refs) >= 4: add_ng(t, centroid(ring(refs)))
 log('negozi', len(negozi), dict(Counter(NG[n[2]] for n in negozi)))
-# raised volumes (porticoes, passages): the underside at least FONDO_MIN over the ground; a shop with a big glass front (class with bay models: officina, artigiano)
-# within 6 m of the volume lifts it to the glass plus the sign (negozi3.js: Hv 3.6 + 0.7)
-FONDO_MIN, FONDO_VETRINA, FONDO_SPESS = 4.0, 4.5, 0.5
+# raised volumes (porticoes, passages): the underside at least FONDO_MIN over the ground
+FONDO_MIN, FONDO_SPESS = 4.0, 0.5
 if ED is not None:
-    _bay = [Point(n[0] / 10.0, n[1] / 10.0) for n in negozi if NG[n[2]] in ('officina', 'artigiano')]
-    _nal = _nv = 0
+    _nal = 0
     for b in ED.alti:
         zg = b.get('zg')
         if zg is None or b.get('zb') is None: continue
-        gv = _Pp(b['p'], b.get('k', [])); vet = gv is not None and any(gv.distance(q_) <= 6.0 for q_ in _bay)
-        mn = zg + (FONDO_VETRINA if vet else FONDO_MIN)
+        mn = zg + FONDO_MIN
         if b['zb'] < mn:
-            b['zb'] = round(min(mn, b['zt'] - FONDO_SPESS), 2); _nal += 1; _nv += vet
-    log('volumi rialzati', len(ED.alti), 'alzati al minimo', _nal, 'di cui col minimo della vetrina grande', _nv, 'vetrine grandi', len(_bay))
+            b['zb'] = round(min(mn, b['zt'] - FONDO_SPESS), 2); _nal += 1
+    log('volumi rialzati', len(ED.alti), 'alzati al minimo', _nal)
 places = [{'n': t['name'], 'k': t['place'], 'x': round(nodes[r][0], 1), 'z': round(nodes[r][1], 1)} for r, t in ntags.items()
           if t.get('place') in ('town', 'village', 'suburb', 'neighbourhood', 'hamlet', 'quarter') and t.get('name') and inside(nodes[r], 600)]
 car_nodes = defaultdict(list)
