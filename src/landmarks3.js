@@ -176,7 +176,7 @@ function buildParkingLines(T, G) {
     const barNear = (x, z, r) => { let f = false; WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, o => { if (!f && o.ax !== undefined && o.y1 - o.y0 > 0.4 && segDist(x, z, o.ax, o.az, o.bx, o.bz) < r) f = true; }); return f; };
     const stallFree = (s, v0, v1, row) => {
       const at = v => [cx + ux * s + nx * v, cz + uz * s + nz * v], vm = (v0 + v1) / 2;
-      for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 0.2, vm, v1 - 0.2]) { const x = cx + ux * (s + ds) + nx * v, z = cz + uz * (s + ds) + nz * v; if (barNear(x, z, 0.45) || H.kind(x, z) === 'green') return false; }
+      for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const x = cx + ux * (s + ds) + nx * v, z = cz + uz * (s + ds) + nz * v; if (barNear(x, z, 0.45)) return false; } /* not the ends: a fence closing the lot behind the stall is where cars park nose-in (Carlo 29/10) */
       /* no check of the aisle in front: a strip of pavement or a kerb between the row and the lane emptied whole rows (via Gagarin, Carlo 29/10) */
       return true;
     };
