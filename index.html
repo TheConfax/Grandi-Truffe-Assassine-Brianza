@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo telecamera-porticati · dopo cd8e070 · assemblato 29/10 18:14 · porta ' + location.port;
+    const txt = 'locale · ramo telecamera-porticati · dopo ac161ee · assemblato 29/10 18:22 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -7193,6 +7193,15 @@ function endRun(kind) {
 // ---------------------------------------------------------------- camera & visuals
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _camD = new THREE.Vector3();
 let camInit = false;
+function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */
+  let best = 1; const dx = bx - ax, dz = bz - az;
+  WALLS.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => {
+    if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
+    const t = ((s.ax - ax) * ez - (s.az - az) * ex) / den, u = ((s.ax - ax) * dz - (s.az - az) * dx) / den;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < best) best = t;
+  });
+  return best;
+}
 function ceilAbove(x, z, y0) { /* lowest underside of a raised volume above y0 at (x,z), else Infinity */
   let m = Infinity;
   BLDR.each(x - 0.1, z - 0.1, x + 0.1, z + 0.1, b => { if (b.zb > y0 && b.zb < m && x >= b.bb[0] && x <= b.bb[2] && z >= b.bb[1] && z <= b.bb[3] && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) m = b.zb; });
@@ -7218,14 +7227,13 @@ function updCamera(dt) {
       const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } } /* looking back and forward again is a cut, not a swing round */
     const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2; let ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
     let cx = px - hx * dist, cz = pz - hz * dist;
-    /* low ceiling (portico, passage) over the subject or over the way back to the camera: lower and bring the camera in, under it */
+    /* low ceiling (portico, passage) over the subject or over the way back to the camera: the target is computed at once under it and in front of the walls, the camera only glides there (never up first) */
     const fy = inCar ? P.car.y : P.y; let ceil = Infinity;
     for (const t of [0, 0.35, 0.7, 1]) { const c = ceilAbove(px + (cx - px) * t, pz + (cz - pz) * t, fy + 1.8); if (c < ceil) ceil = c; }
-    const cs = updCamera; cs.cl = cs.cl === undefined ? 1 : cs.cl;
-    let tcl = 1; if (ceil < Infinity) { const room = Math.max(0.9, ceil - 0.3 - fy); tcl = clamp(room / ht, 0.35, 1); }
-    cs.cl += (tcl - cs.cl) * (1 - Math.exp(-6 * dt));
-    if (cs.cl < 0.999) { cx = px + (cx - px) * Math.max(cs.cl, 0.4); cz = pz + (cz - pz) * Math.max(cs.cl, 0.4); ht = Math.max(0.9, ht * cs.cl); }
-    const f = rayWalls(px, pz, cx, cz); let lift = 0; if (f < 1) { const k = Math.max(0.12, f - 0.08); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3; }
+    let cl = 1; if (ceil < Infinity) { const room = Math.max(0.9, ceil - 0.3 - fy); cl = clamp(room / ht, 0.35, 1); }
+    if (cl < 1) { cx = px + (cx - px) * Math.max(cl, 0.4); cz = pz + (cz - pz) * Math.max(cl, 0.4); ht = Math.max(0.9, ht * cl); }
+    const wy = Math.max(fy, H.ground(cx, cz)) + ht;
+    const f = rayCam(px, pz, cx, cz, wy); let lift = 0; if (f < 1) { const dd = hyp(cx - px, cz - pz) || 1, k = Math.max(0.08, f - 0.5 / dd); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3 * cl; }
     const gy = inCar ? P.car.y : P.y; { const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 3 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }
     want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
   }
@@ -7237,6 +7245,10 @@ function updCamera(dt) {
   C.s = subj; C.x = px; C.y = suby; C.z = pz;
   const k = camMode === 2 ? 1 : 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);
   camPos.lerp(want, k); camLook.lerp(look, camMode === 2 ? 1 : 1 - Math.exp(-12 * dt));
+  if (camMode !== 1) { /* never inside a wall: the glide may cut a corner, so pull the camera back in front of the first wall between subject and camera */
+    const g = rayCam(px, pz, camPos.x, camPos.z, camPos.y);
+    if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd); camPos.x = px + (camPos.x - px) * kk; camPos.z = pz + (camPos.z - pz) * kk; }
+  }
   camera.position.copy(camPos);
   if (shake > 0) { camera.position.x += (rnd() - 0.5) * shake * 0.6; camera.position.y += (rnd() - 0.5) * shake * 0.4; shake = Math.max(0, shake - dt * 1.8); }
   camera.lookAt(camLook);
