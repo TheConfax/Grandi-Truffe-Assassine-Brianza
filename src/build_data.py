@@ -1258,20 +1258,16 @@ if FER:  # the DBGT railway dividers (kind 6) between a platform and a track or 
     bar_out += _capi; _capi_m = round(sum(LineString(c_[0]).length for c_ in _capi), 1)
     log('CONTROLLO chiusure dei divisori ferroviari alla strada (tratti, metri):', len(_capi), _capi_m, [(round(c_[0][0][0]), round(c_[0][0][1])) for c_ in _capi[:6]])
 
-# via Pace by hand (Carlo's photos, 29/10): the railway fences that a rule of the build drew there and he approved (the rule is gone, it also closed the level crossings:
-# via Cialdini x 586.7 z -758.6): the closing of the edge of the track bed towards the square, and the pieces that join the ends of the fences to the level crossing
+# via Pace by hand (Carlo, 29/10, photos with the green lines; the level crossing of via Cialdini x 586.7 z -758.6): the railway fence on the porfido side, from the
+# end of the platform parapet (580.4, -750.1) to the end of the fence that stands there (580.26, -753.05); and from the other end of that fence (582.53, -757.06) to the
+# post of the barrier of the level crossing (583.8, -759.4), where it stops before the road. Nothing along the platform
 PACE_FISSE = [
-    [(571.07, -738.27), (579.2, -752.16), (583.5, -759.5)],
-    [(583.91, -759.29), (580.26, -753.05)],
-    [(582.53, -757.06), (583.76, -759.37)],
-    [(574.61, -757.4), (577.55, -762.43)],
-    [(584.64, -758.94), (589.07, -767.36)],
+    [(580.4, -750.1), (580.26, -753.05)],
+    [(582.53, -757.06), (583.8, -759.4)],
 ]
-if FER:  # each piece stops at the edge of the road and of its pavement: never across a carriageway (the level crossing of via Cialdini x 586.7 z -758.6)
-    _rd_pace = unary_union([r_['line'].buffer(r_['w'] / 2 + 0.3) for r_ in raw_roads if flat(r_) and r_['line'].distance(Point(580, -755)) < 40] + [side.intersection(Point(580, -755).buffer(40))])
-    for f_ in PACE_FISSE:
-        for g_ in getattr(LineString(f_).difference(_rd_pace), 'geoms', [LineString(f_).difference(_rd_pace)]):
-            if g_.geom_type == 'LineString' and g_.length >= 1.0: fences.append(list(g_.coords))
+if FER: fences += [list(f_) for f_ in PACE_FISSE]
+# the railing (low wall with railings, kind 2) that goes on from the end of the DBGT one to the edge of the road, as it stood on dev: Carlo liked it (x 576.2 z -761.6)
+bar_out.append(([(574.61, -757.4), (577.55, -762.43)], 2, 1.6))
 
 # ---- rivers: merge the OSM pieces, then cut them where a road / railway / building passes over (a bridge or culvert mouth)
 from shapely.ops import linemerge

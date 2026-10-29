@@ -5,8 +5,8 @@ import numpy as np
 from shapely.geometry import LineString, Polygon, Point
 
 PUNTI = {
-    # via Pace, la striscia di porfido fra la banchina e il binario (Carlo, 28/10 sera): il bordo del binario verso il porfido deve avere una recinzione (T.fe, 'chiusure' di build_data.py) entro 3 m dal punto di mezzo
-    'pace_chiusura_banchina': dict(x=575.0, z=-745.0, r=3.0),
+    # via Pace, la striscia di porfido fra la banchina e il binario (Carlo, 28/10 sera): la recinzione fissa a mano (PACE_FISSE di build_data.py) fra il parapetto della banchina e la recinzione esistente, sul bordo verso il porfido (29/10)
+    'pace_chiusura_banchina': dict(x=580.3, z=-751.6, r=1.5),
     # rotonda di via Papa Giovanni XXIII: i due alberi non possono essere "minuscoli" (almeno 6 m)
     'rotonda_papa_giovanni_alberi': dict(x=-549.9, z=-681.5, r=8.0, h_min=6.0),
     # parcheggio di via del Cimitero: il DBGT lo ha (AC_VEI 0301), il gioco deve averlo ('pk' della tile) entro 3 m dal punto della segnalazione; i bordi delle aiuole attorno sono cordoli bassi (kind 1), non siepi da 1,7 m (i posti dipinti li decide landmarks3.js, che li toglie dove non c'e' posto + corsia)
