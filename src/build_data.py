@@ -1774,55 +1774,54 @@ def polys_of(g, tol=0.15, min_area=0.5):
         if isinstance(p, Polygon) and p.area >= min_area:
             out.append({'p': enc(list(p.exterior.coords)[:-1]), 'k': [enc(list(i.coords)[:-1]) for i in p.interiors if Polygon(i).area > 0.3]})
     return out
-# ---- OSM car parks that touch an OSM carriageway: the strip between them is asphalt (Carlo, 29/10: via Gagarin, "OSM e' buono").
-# The DBGT (2015) draws a pavement or a verge between a car park and the street where today there is none; OSM, newer, has the car park right
-# on the street. A car park (amenity=parking, area_geoms 4) with at least 6 m2 of OSM street (not service ways) within 1 m of it is joined to the drawn asphalt:
-# (A) the thin bits of pavement, footway and square inside it that touch the asphalt, (B) the gap up to 3.5 m wide between it and the street asphalt
-# (pavement, verge, lawn). Walls and fences (bar_out, fences, 1 m or higher) stay: the strip is cut round them, and a car park with a wall along
-# its whole side stays separate. (C) A service way (OSM access or parking aisle) from the car park to a street: its corridor, 16 m from the street,
-# is asphalt too (dropped kerb), also for a car park that does not touch the street. Car parks with neither are not touched.
+# ---- isolated OSM car parks get the minimum opening to the street (Carlo, 29/10: via Gagarin; medians, islands, flowerbeds and kerbs stay).
+# A car park (amenity=parking, area_geoms 4) is isolated when no drawn street asphalt (nor OSM street within 1 m) touches it. Then: where an OSM
+# service way (access, parking aisle) runs from it to a street, its corridor (16 m from the street) is asphalt (dropped kerb); with no such way,
+# one 6 m opening at the point of the car park nearest to the street asphalt, if that is within 3.5 m. Only pavement, footway, square and
+# lawn become asphalt: never the medians (median), walls and fences (1 m or higher), buildings. A car park already connected is not touched.
 def unisci_parcheggi_strada(asph, pedz, side, foot):
     t0 = time.time(); pp = []
     for at, g in area_geoms:
         if at == 4: pp += [q for q in getattr(g, 'geoms', [g]) if q.geom_type == 'Polygon' and q.area > 80]
     prts = lambda g: [q for q in getattr(g, 'geoms', [g]) if not q.is_empty]  # the geometries are huge unions: each car park works on the parts near it (STRtree)
-    road_t = STRtree([r['line'].buffer(r['w'] / 2, quad_segs=3) for r in raw_roads if r['c'] <= 3 and flat(r) and r['line'].length > 1]); svc = [(r['line'], r['w']) for r in raw_roads if r['c'] == 4 and flat(r) and r['line'].length > 3]; svc_t = STRtree([l_ for l_, w_ in svc])  # public streets; the service ways (aisles, drives) are the accesses
+    road_t = STRtree([r['line'].buffer(r['w'] / 2, quad_segs=3) for r in raw_roads if r['c'] <= 3 and flat(r) and r['line'].length > 1])
+    svc = [(r['line'], r['w']) for r in raw_roads if r['c'] == 4 and flat(r) and r['line'].length > 3]; svc_t = STRtree([l_ for l_, w_ in svc])
     wl = [LineString(p_) for p_, k_, h_ in bar_out if len(p_) >= 2 and h_ >= 1.0] + [LineString(f_) for f_ in fences if len(f_) >= 2]; wall_t = STRtree(wl)
-    st_t = STRtree(prts(unary_union([g for g in (side, foot, pedz) if not g.is_empty]))); as_t = STRtree(prts(asph)); bu_t = STRtree(prts(bunion))
+    as_t = STRtree(prts(asph)); bu_t = STRtree(prts(bunion)); md_t = STRtree(prts(median)) if not median.is_empty else None
     near = lambda tree, env: unary_union([tree.geometries[i] for i in tree.query(env)])
-    news, nlink = [], 0
+    news, nlink, nacc, nvar = [], 0, 0, 0
     for p in pp:
-        env = p.buffer(4.0, quad_segs=2)
-        rd = near(road_t, p.buffer(1.0, quad_segs=2))
-        touch = not rd.is_empty and p.buffer(1.0, quad_segs=2).intersection(rd).area >= 6
-        acc = []  # (C) the service ways that start in the car park and end on a street: where they cross a pavement or verge it is a dropped kerb
-        for i_ in svc_t.query(p.buffer(1.0, quad_segs=2), predicate='intersects'):
-            l_, w_s = svc[i_]; rd2 = near(road_t, l_.buffer(1.5, quad_segs=2))
-            if not rd2.is_empty and l_.distance(p) < 1.0: acc.append(l_.intersection(rd2.buffer(16.0, quad_segs=3)).buffer(max(w_s, 3.0) / 2 + 0.3, cap_style=2))
-        if not touch and not acc: continue
-        a_ = near(as_t, env); w_ = unary_union([wl[i].buffer(0.5, quad_segs=2) for i in wall_t.query(env)]); b_ = near(bu_t, env).buffer(0.3, quad_segs=2); s_ = near(st_t, env)
+        env = p.buffer(4.0, quad_segs=2); pb = p.buffer(1.0, quad_segs=2)
+        rd = near(road_t, pb); a_ = near(as_t, env)
+        if not rd.is_empty and pb.intersection(rd).area >= 6: continue  # touches an OSM street
+        if a_.intersection(rd.buffer(2.0, quad_segs=3) if not rd.is_empty else GeometryCollection()).distance(p) < 0.5 and not rd.is_empty: continue
+        if p.buffer(0.5, quad_segs=2).intersection(a_).area > 2.0: continue  # street asphalt (or a drive) touches it
+        w_ = unary_union([wl[i].buffer(0.5, quad_segs=2) for i in wall_t.query(env)]); b_ = near(bu_t, env).buffer(0.3, quad_segs=2)
+        m_ = near(md_t, env).buffer(0.3, quad_segs=2) if md_t is not None else GeometryCollection()
+        keep = unary_union([p, a_, w_, b_, m_])
         new = []
-        if acc:  # (C)
-            cor = unary_union(acc).difference(p).difference(a_).difference(w_).difference(b_)
+        for i_ in svc_t.query(pb, predicate='intersects'):
+            l_, w_s = svc[i_]; rd2 = near(road_t, l_.buffer(1.5, quad_segs=2))
+            if rd2.is_empty or l_.distance(p) >= 1.0: continue
+            cor = l_.intersection(rd2.buffer(16.0, quad_segs=3)).buffer(max(w_s, 3.0) / 2 + 0.3, cap_style=2).difference(keep)
             new += [q for q in prts(cor) if q.geom_type == 'Polygon' and q.area > 0.5]
-        if not touch:
-            if new: nlink += 1; news += new
-            continue
-        ov = s_.intersection(p).difference(w_)  # (A)
-        for q in prts(ov):
-            if q.geom_type == 'Polygon' and q.area > 0.3 and q.buffer(-1.6, quad_segs=2).is_empty and q.distance(a_) < 1.0: new.append(q)
-        ar_ = a_.intersection(rd.buffer(2.0, quad_segs=3))  # the street's own asphalt (not the thin rim a car park has all round)
-        gap = p.buffer(1.75, quad_segs=3).intersection(ar_.buffer(1.75, quad_segs=3)).difference(p).difference(a_).difference(w_).difference(b_)  # (B)
-        for q in prts(gap):
-            if q.geom_type == 'Polygon' and q.area > 0.5 and q.distance(p) < 0.3 and q.distance(ar_) < 0.3: new.append(q)
+        if new: nacc += 1
+        else:  # one opening of 6 m where the car park is nearest to the street asphalt
+            ar_ = a_.difference(p.buffer(1.5, quad_segs=2))
+            if not ar_.is_empty and p.distance(ar_) < 3.5:
+                from shapely.ops import nearest_points
+                c_ = nearest_points(p, ar_)[0]
+                gap = p.buffer(3.6, quad_segs=3).intersection(ar_.buffer(3.6, quad_segs=3)).intersection(c_.buffer(3.0, quad_segs=4)).difference(keep)
+                new += [q for q in prts(gap) if q.geom_type == 'Polygon' and q.area > 0.5]
+                if new: nvar += 1
         if new: nlink += 1; news += new
-    if not news: log('parcheggi OSM uniti alla strada: 0'); return asph, pedz, side, foot
+    if not news: log('parcheggi isolati aperti: 0 di', len(pp)); return asph, pedz, side, foot
     N = unary_union(news).buffer(0.05, quad_segs=2).difference(near(bu_t, unary_union(news).buffer(1.0)).buffer(0.3, quad_segs=2))
-    log('parcheggi OSM uniti alla strada:', nlink, 'di', len(pp), 'strisce m2', round(N.area), 'tempo', round(time.time() - t0, 1))
+    log('parcheggi isolati aperti:', nlink, 'di', len(pp), 'con via di servizio', nacc, 'varco 6 m', nvar, 'm2', round(N.area), 'tempo', round(time.time() - t0, 1))
     area_geoms[:] = [(at, g.difference(N) if (at in (1, 2, 3) and g.intersects(N)) else g) for at, g in area_geoms]
+    area_geoms[:] = [(at, g) for at, g in area_geoms if not g.is_empty]
     if trees:  # no tree stands on the new asphalt
         prepare(N); _tk = [not N.contains(Point(t_[0], t_[1])) for t_ in trees]; log('alberi tolti dall asfalto nuovo', _tk.count(False)); trees[:] = [t_ for t_, k_ in zip(trees, _tk) if k_]
-    area_geoms[:] = [(at, g) for at, g in area_geoms if not g.is_empty]
     return unary_union([asph, N]), pedz.difference(N), side.difference(N), foot.difference(N)
 asph, pedz, side, foot = unisci_parcheggi_strada(asph, pedz, side, foot)
 SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}
