@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo lisciatore-parcheggi · dopo 0f48ad9 · assemblato 29/10 17:37 · porta ' + location.port;
+    const txt = 'locale · ramo lisciatore-parcheggi · dopo 6692d55 · assemblato 29/10 17:42 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3898,16 +3898,47 @@ function alignRowAxis(P, pca) {
   const m = Math.atan2(sz, sx) / 4; let d = m - pca; d -= Math.round(d / (Math.PI / 2)) * (Math.PI / 2);
   return Math.abs(d) < 0.6 ? pca + d : pca; /* a lot whose edges are far from its long axis keeps it */
 }
-function smoothRun(run, row, free, at, P) {
-  if (run.length < 1) return [];
-  const DEP = 4.6, v0 = row ? null : Math.max(...run.map(t => t.v0)), v1 = row ? Math.min(...run.map(t => t.v1)) : null, out = []; let cur = [];
-  for (const t of run) {
-    const a = row ? v1 - DEP : v0, b = row ? v1 : v0 + DEP, vm = (a + b) / 2; let good = free(t.s, vm) && free(t.s - 0.9, vm) && free(t.s + 0.9, vm);
-    for (const ds of [-1.15, 1.15]) for (const v of [a + 0.15, b - 0.15]) { const [x, z] = at(t.s + ds, v); if (!inPoly(x, z, P) || inBuilding(x, z, 0.1)) good = false; }
-    if (!good) { if (cur.length) out.push(cur); cur = []; continue; }
-    const [x, z] = at(t.s, vm); cur.push(Object.assign(t, { v0: a, v1: b, x, z }));
+/* comb rows: one row of stalls leaning on each long straight side of the lot (nose to the inside), then a 6 m aisle and, on the longest side, double
+   rows back to back, parallel to it, aisle, and so on. Rows of other sides never overlap a stall or an aisle of another side: what would touch is dropped. */
+function lotSides(P) {
+  const n = P.length, ang = i => Math.atan2(P[(i + 1) % n][1] - P[i][1], P[(i + 1) % n][0] - P[i][0]), turn = i => { let d = ang(i) - ang((i + n - 1) % n); d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI; return Math.abs(d); };
+  let st = -1; for (let i = 0; i < n; i++) if (turn(i) > 0.07) { st = i; break; } if (st < 0) return [];
+  const out = []; let cur = null;
+  for (let k = 0; k < n; k++) { const i = (st + k) % n; let d = cur ? ang(i) - cur.ang : 0; d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI; if (!cur || Math.abs(d) > 0.12) { cur = { a: P[i], b: P[(i + 1) % n], ang: ang(i) }; out.push(cur); } else cur.b = P[(i + 1) % n]; }
+  return out.map(e => ({ a: e.a, b: e.b, L: hyp(e.b[0] - e.a[0], e.b[1] - e.a[1]) })).filter(e => e.L >= 10).sort((p, q) => q.L - p.L);
+}
+function rectHit(A, B) { /* oriented rects {x,z,ux,uz,hl,hd}: separating axis */
+  for (const R of [A, B]) for (const [ax, az] of [[R.ux, R.uz], [-R.uz, R.ux]]) {
+    const ra = A.hl * Math.abs(A.ux * ax + A.uz * az) + A.hd * Math.abs(-A.uz * ax + A.ux * az), rb = B.hl * Math.abs(B.ux * ax + B.uz * az) + B.hd * Math.abs(-B.uz * ax + B.ux * az);
+    if (Math.abs((B.x - A.x) * ax + (B.z - A.z) * az) > ra + rb - 0.02) return false;
   }
-  if (cur.length) out.push(cur); return out;
+  return true;
+}
+function combRows(P, stallOK) { /* stallOK(o, s, v0, v1): the stall is free; returns runs of {s,v0,v1,x,z,h,o} */
+  const sides = lotSides(P), runs = [], placed = []; if (!sides.length) return runs;
+  sides.forEach((sd, g) => {
+    let ux = (sd.b[0] - sd.a[0]) / sd.L, uz = (sd.b[1] - sd.a[1]) / sd.L; const mx = (sd.a[0] + sd.b[0]) / 2, mz = (sd.a[1] + sd.b[1]) / 2;
+    if (inPoly(mx - uz * 1.5, mz + ux * 1.5, P)) { /* (-uz, ux) is the inside */ } else if (inPoly(mx + uz * 1.5, mz - ux * 1.5, P)) { ux = -ux; uz = -uz; } else return;
+    const o = { x: 0, z: 0, ux, uz, nx: -uz, nz: ux };
+    /* origin at the start of the side in the direction u */
+    const fwd = (sd.b[0] - sd.a[0]) * ux + (sd.b[1] - sd.a[1]) * uz > 0, O = fwd ? sd.a : sd.b; o.x = O[0]; o.z = O[1];
+    const bands = []; /* [v0, v1, nose sign] */
+    bands.push([0.2, 5, 1]);
+    if (g === 0) for (let v = 11; v < 70; v += 15.6) bands.push([v, v + 4.8, -1], [v + 4.8, v + 9.6, 1]);
+    for (const [v0, v1, sg] of bands) {
+      let run = []; const ext = [1e9, -1e9], mine = [];
+      const flush = () => { if (run.length) runs.push(run); run = []; };
+      for (let s = 1.25 + 0.0; s <= sd.L - 1.25 + 1e-6; s += 2.5) {
+        const vm = (v0 + v1) / 2, rc = { x: o.x + ux * s + o.nx * vm, z: o.z + uz * s + o.nz * vm, ux, uz, hl: 1.2, hd: (v1 - v0) / 2 - 0.05, g };
+        if (placed.some(r => r.g !== g && (!r.lane ? rectHit(rc, r) : rectHit(rc, r))) || !stallOK(o, s, v0, v1)) { flush(); continue; }
+        const st = { s, v0, v1, x: rc.x, z: rc.z, h: Math.atan2(o.nx * sg, o.nz * sg), o }; run.push(st); mine.push(rc); ext[0] = Math.min(ext[0], s); ext[1] = Math.max(ext[1], s);
+      }
+      flush();
+      for (const r of mine) placed.push(r);
+      if (mine.length) { const a = ext[0] - 1.25, b = ext[1] + 1.25, ln = 6, v = sg > 0 ? v1 + ln / 2 : v0 - ln / 2; placed.push({ x: o.x + ux * (a + b) / 2 + o.nx * v, z: o.z + uz * (a + b) / 2 + o.nz * v, ux, uz, hl: (b - a) / 2, hd: ln / 2 - 0.05, g, lane: true }); }
+    }
+  });
+  return runs;
 }
 function buildParkingLines(T, G) {
   const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), sign = Buf();
@@ -3956,6 +3987,7 @@ function buildParkingLines(T, G) {
     let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
     const ang = alignRowAxis(P, 0.5 * Math.atan2(2 * sxz, sxx - szz)), ux = Math.cos(ang), uz = Math.sin(ang), nx = -uz, nz = ux, proj = P.map(([x, z]) => (x - cx) * ux + (z - cz) * uz);
     const S0 = Math.min(...proj) + 1.0, S1 = Math.max(...proj) - 1.0, lot = [];
+    const ok2 = (x, z) => inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3);
     const ok = (s, v) => { const x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; return inPoly(x, z, P) && !inBuilding(x, z, 0.3) && !onAnyRoad(x, z, -0.4) && !real.some(r => hyp(r.x - x, r.z - z) < 3); };
     /* a stall only where it is free: no wall, hedge or kerb of a bed on its rectangle, no pavement under it (the porfido of an entrance), and a free aisle (3 m) in front of it, inside the lot or on a street (via del Cimitero, Carlo 29/10: stalls in a passage between two beds, ending on the porfido of the door) */
     const barNear = (x, z, r) => { let f = false; WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, o => { if (!f && o.ax !== undefined && o.y1 - o.y0 > 0.4 && segDist(x, z, o.ax, o.az, o.bx, o.bz) < r) f = true; }); return f; };
@@ -3965,27 +3997,18 @@ function buildParkingLines(T, G) {
       /* no check of the aisle in front: a strip of pavement or a kerb between the row and the lane emptied whole rows (via Gagarin, Carlo 29/10) */
       return true;
     };
-    const runs = [];
-    for (const row of [0, 1]) {
-      let run = [];
-      const flush = () => { for (const r of smoothRun(run, row, (s, v) => ok(s, v) && !barNear(cx + ux * s + nx * v, cz + uz * s + nz * v, 0.45), (s, v) => [cx + ux * s + nx * v, cz + uz * s + nz * v], P)) runs.push(r); run = []; };
-      for (let s = S0 + 1.25; s <= S1 - 1.25; s += 2.5) {
-        const sec = lmSection(P, cx, cz, ux, uz, s), sa = lmSection(P, cx, cz, ux, uz, s - 1.2), sb = lmSection(P, cx, cz, ux, uz, s + 1.2);
-        if (!sec || !sa || !sb) { flush(); continue; }
-        const lo = Math.max(sec[0], sa[0], sb[0]), hi = Math.min(sec[1], sa[1], sb[1]), w = hi - lo;
-        if (w < 5 || (row === 1 && w < 10.5)) { flush(); continue; }
-        const v0 = row ? hi - 4.8 : lo + 0.2, v1 = row ? hi - 0.2 : lo + 4.8, vm = (v0 + v1) / 2;
-        if (!ok(s, vm) || !ok(s - 0.9, vm) || !ok(s + 0.9, vm) || !stallFree(s, v0, v1, row)) { flush(); continue; }
-        { const at = v => [cx + ux * s + nx * v, cz + uz * s + nz * v]; if (treeNear(...at(v0 + 1.2), 1.75) || treeNear(...at(v1 - 1.2), 1.75)) { flush(); continue; } } /* a tree of the car park in the stall: left free */
-        const x = cx + ux * s + nx * vm, z = cz + uz * s + nz * vm;
-        run.push({ s, v0, v1, x, z, h: Math.atan2(nx, nz) + (row ? 0 : Math.PI) }); // nose towards the aisle in the middle
-      }
-      flush();
-    }
+    const stallOK = (o, s, v0, v1) => {
+      const at = (ss, v) => [o.x + o.ux * ss + o.nx * v, o.z + o.uz * ss + o.nz * v], vm = (v0 + v1) / 2, [x, z] = at(s, vm);
+      if (!ok2(x, z)) return false;
+      for (const ds of [-1.1, 1.1]) for (const v of [v0 + 0.15, v1 - 0.15]) { const [cx2, cz2] = at(s + ds, v); if (!inPoly(cx2, cz2, P) || inBuilding(cx2, cz2, 0.1)) return false; }
+      for (const ds of [-0.9, 0, 0.9]) for (const v of [v0 + 1.0, vm, v1 - 1.0]) { const [bx, bz] = at(s + ds, v); if (barNear(bx, bz, 0.45)) return false; }
+      return !(treeNear(...at(s, v0 + 1.2), 1.75) || treeNear(...at(s, v1 - 1.2), 1.75)); /* a tree of the car park in the stall: left free */
+    };
+    const runs = combRows(P, stallOK);
     let left = budget; // runs of free stalls side by side, up to the capacity: the lines between them, the yellow one every eighth
     for (const run0 of runs) {
       if (left <= 0) break; const run = run0.slice(0, left); left -= run.length; const yi = run.length >= 8 ? 1 : -1;
-      run.forEach((st, k) => { const col = k === yi ? Y : W; quad(cx, cz, ux, uz, st.s - 1.31, st.s - 1.19, st.v0, st.v1, col); quad(cx, cz, ux, uz, st.s + 1.19, st.s + 1.31, st.v0, st.v1, col); if (k === yi) { quad(cx, cz, ux, uz, st.s - 0.5, st.s + 0.5, (st.v0 + st.v1) / 2 - 0.5, (st.v0 + st.v1) / 2 + 0.5, BLUE); st.dis = true; } lot.push(st); });
+      run.forEach((st, k) => { const col = k === yi ? Y : W, o = st.o; quad(o.x, o.z, o.ux, o.uz, st.s - 1.31, st.s - 1.19, st.v0, st.v1, col); quad(o.x, o.z, o.ux, o.uz, st.s + 1.19, st.s + 1.31, st.v0, st.v1, col); if (k === yi) { quad(o.x, o.z, o.ux, o.uz, st.s - 0.5, st.s + 0.5, (st.v0 + st.v1) / 2 - 0.5, (st.v0 + st.v1) / 2 + 0.5, BLUE); st.dis = true; } lot.push(st); });
     }
     T.stalls.push(...lot);
     if (inLot.length >= 10) lot.push(...inLot); // the furniture below goes on the lots mapped space by space too
