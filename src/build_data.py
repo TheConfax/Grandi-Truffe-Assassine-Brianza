@@ -1420,7 +1420,7 @@ for wid, (refs, t) in ways.items():
 log('negozi', len(negozi), dict(Counter(NG[n[2]] for n in negozi)))
 # raised volumes (porticoes, passages): the underside at least FONDO_MIN over the ground; a shop with a big glass front (class with bay models: officina, artigiano)
 # within 6 m of the volume lifts it to the glass plus the sign (negozi3.js: Hv 3.6 + 0.7)
-FONDO_MIN, FONDO_VETRINA, FONDO_SPESS = 3.5, 4.3, 0.5
+FONDO_MIN, FONDO_VETRINA, FONDO_SPESS = 4.0, 4.5, 0.5
 if ED is not None:
     _bay = [Point(n[0] / 10.0, n[1] / 10.0) for n in negozi if NG[n[2]] in ('officina', 'artigiano')]
     _nal = _nv = 0
