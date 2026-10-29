@@ -11,6 +11,8 @@ PUNTI = {
     'rotonda_papa_giovanni_alberi': dict(x=-549.9, z=-681.5, r=8.0, h_min=6.0),
     # parcheggio di via del Cimitero: il DBGT lo ha (AC_VEI 0301), il gioco deve averlo ('pk' della tile) entro 3 m dal punto della segnalazione; i bordi delle aiuole attorno sono cordoli bassi (kind 1), non siepi da 1,7 m (i posti dipinti li decide landmarks3.js, che li toglie dove non c'e' posto + corsia)
     'parcheggio_via_del_cimitero': dict(x=515.3, z=-230.9, r=3.0, r_aiuole=25.0),
+    # Mapillary (29/10, src/mapillary_obj.py): un cartello di direzione obbligatoria (dritto) visto dalle foto lungo una via a scorrimento, che OSM non ha, deve esserci (tipo e verso)
+    'mapillary_cartello_centro': dict(x=-206.5, z=219.3, r=4.0, tipo='dritto'),
 }
 
 
@@ -42,6 +44,16 @@ def prove(D, isole_alberi_sotto_6=None):
     alte = sum(1 for t, L in ba if t == 3 and L.distance(pt) <= p['r_aiuole'])  # aiuole DBGT disegnate come siepi: nessuna (ora cordolo basso, tipo 1)
     basse = sum(1 for t, L in ba if t == 1 and L.distance(pt) <= p['r_aiuole'])
     out['parcheggio_via_del_cimitero'] = {'parcheggi_dbgt_entro_%gm' % p['r']: n, 'siepi_alte_entro_%gm' % p['r_aiuole']: alte, 'cordoli_bassi': basse, 'ok': n > 0 and alte == 0 and basse > 0}
+    p = PUNTI['mapillary_cartello_centro']; sm = [(s[0], s[1], s[2]) for T in D['tiles'] if T for s in T.get('sm', [])]
+    n = sum(1 for k, x, z in sm if k == p['tipo'] and math.hypot(x - p['x'], z - p['z']) <= p['r'])
+    out['mapillary_cartello_centro'] = {'cartelli_%s_entro_%gm' % (p['tipo'], p['r']): n, 'ok': n > 0}
+    # i controlli generali: cartelli di Mapillary in giro, nessun doppione con OSM, nessuno in carreggiata (cartelli, lampioni, altri oggetti)
+    M = D.get('report', {}).get('mapillary')
+    if M:
+        c = M['cartelli']; sul = c['sulla_carreggiata'] + M['lampioni']['sulla_carreggiata'] + M['altri_oggetti']['sulla_carreggiata']
+        bar = c['su_una_barriera'] + M['lampioni']['su_una_barriera'] + M['altri_oggetti']['su_una_barriera']
+        out['mapillary_controlli'] = {'cartelli': len(sm), 'doppioni_con_osm': c['doppioni_con_osm'], 'sulla_carreggiata': sul, 'dentro_edifici': c['dentro_un_edificio'], 'su_barriere': bar,
+                                      'ok': len(sm) >= 30 and c['doppioni_con_osm'] == 0 and sul == 0 and c['dentro_un_edificio'] == 0 and bar == 0}
     return out
 
 
