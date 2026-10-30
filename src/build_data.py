@@ -1847,6 +1847,14 @@ if not _zc.is_empty:
     log('barriere tolte dalla carreggiata (oltre 0,8 m dentro): linee toccate', _nz[0], 'metri', round(_nz[1]))
     if STR: STR.rep['barriere_in_carreggiata'] = dict(linee=_nz[0], metri=round(_nz[1]))
     bar_out = _nbz
+# hedge bits removed by hand (exceptions: every hedge, kind 3, short, with its centre within r metres of the point goes away; the general rule does not change)
+SIEPI_TOLTE = [
+    ('via Luigi Rho, cubetto di siepe, Carlo 30/10', 1262.3, -613.0, 2.5),
+]
+for nome_, x_, z_, r_ in SIEPI_TOLTE:
+    _nb0 = len(bar_out); _pt = Point(x_, z_)
+    bar_out = [b_ for b_ in bar_out if not (b_[1] == 3 and len(b_[0]) >= 2 and LineString(b_[0]).length < 6 and LineString(b_[0]).centroid.distance(_pt) <= r_)]
+    log('siepi tolte a mano', nome_, _nb0 - len(bar_out))
 VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 trees = MANUF.alberi(trees, VERDE.forest_u, isole=STR.isole if STR else ())
 # ---- the lanes of the AI cars away from walls, fences, gates and buildings, in every comune (src/corsie_ia.py): all of them are final here
