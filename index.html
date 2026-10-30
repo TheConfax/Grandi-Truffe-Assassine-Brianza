@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo tettoie-benzinai · dopo ebbc3da · assemblato 30/10 01:27 · porta ' + location.port;
+    const txt = 'locale · ramo tettoie-benzinai · dopo 6223e44 · assemblato 30/10 01:33 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -218,6 +218,11 @@ class Grid {
       for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) {
         const k = this.k(i, j); let a = this.m.get(k); if (!a) this.m.set(k, a = []); a.push(it);
       }
+  }
+  del(x0, z0, x1, z1, it) {
+    const c = this.cs;
+    for (let i = Math.floor(Math.min(x0, x1) / c); i <= Math.floor(Math.max(x0, x1) / c); i++)
+      for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) { const a = this.m.get(this.k(i, j)); if (!a) continue; const n = a.indexOf(it); if (n >= 0) a.splice(n, 1); }
   }
   each(x0, z0, x1, z1, fn) {
     const c = this.cs, q = ++this.q;
@@ -1531,7 +1536,7 @@ for (const T of TILES) {
       for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1 }); } }
       continue;
     }
-    if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }); } continue; }
+    if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); { const w = { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }; WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, w); (rec.walls || (rec.walls = [])).push(w); } } continue; }
     BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
     if (B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
     if (B.g === 4) continue; // a water tower: its plan is the tank up in the air, the solid is its shaft (paesaggio3.js lsTower)
@@ -1541,7 +1546,7 @@ for (const T of TILES) {
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue;
         let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; }
-        WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1 });
+        const w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1 }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
       }
     }
   }
@@ -3378,7 +3383,11 @@ for (const T of TILES) for (const B of T.bld) {
     }
     let cn = 0; /* a roof on posts (OSM roof, carport) wider than the model's canopy that holds most of it: the same canopy, bigger */
     if (B.t === 9) for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { const px = f.x + f.ux * (-7.5 + (i + 0.5) * 15 / 8) + f.nx * (-4.5 + (j + 0.5) * 9 / 8), pz = f.z + f.uz * (-7.5 + (i + 0.5) * 15 / 8) + f.nz * (-4.5 + (j + 0.5) * 9 / 8); if (inPoly(px, pz, B.pts)) cn++; }
-    if ((m && n * 2 > m) || cn * 2 > 64) { B.skipDraw = true; FUEL_ROOFS++; break; }
+    if ((m && n * 2 > m) || cn * 2 > 64) {
+      B.skipDraw = true; FUEL_ROOFS++; /* no collision either: nothing to bump into that is not drawn */
+      for (const w of B.walls || []) w.r !== undefined ? WALLS.del(w.x - 0.2, w.z - 0.2, w.x + 0.2, w.z + 0.2, w) : WALLS.del(w.ax, w.az, w.bx, w.bz, w);
+      B.walls = null; BLD.del(B.bb[0], B.bb[1], B.bb[2], B.bb[3], B); const bi = BUILDINGS.indexOf(B); if (bi >= 0) BUILDINGS.splice(bi, 1); break;
+    }
   }
 }
 function buildFuel(T, G) {
