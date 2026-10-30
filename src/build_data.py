@@ -1774,61 +1774,15 @@ def polys_of(g, tol=0.15, min_area=0.5):
         if isinstance(p, Polygon) and p.area >= min_area:
             out.append({'p': enc(list(p.exterior.coords)[:-1]), 'k': [enc(list(i.coords)[:-1]) for i in p.interiors if Polygon(i).area > 0.3]})
     return out
-# ---- isolated OSM car parks get the minimum opening to the street (Carlo, 29/10: via Gagarin; medians, islands, flowerbeds and kerbs stay).
-# A car park (amenity=parking, area_geoms 4) is isolated when no drawn street asphalt (nor OSM street within 1 m) touches it. Then: where an OSM
-# service way (access, parking aisle) runs from it to a street, its corridor (16 m from the street) is asphalt (dropped kerb); with no such way,
-# one 6 m opening at the point of the car park nearest to the street asphalt, if that is within 3.5 m. Only pavement, footway, square and
-# lawn become asphalt: never the medians (median), walls and fences (1 m or higher), buildings. A car park already connected is not touched.
-def unisci_parcheggi_strada(asph, pedz, side, foot):
-    t0 = time.time(); pp = []
-    for at, g in area_geoms:
-        if at == 4: pp += [q for q in getattr(g, 'geoms', [g]) if q.geom_type == 'Polygon' and q.area > 80]
-    prts = lambda g: [q for q in getattr(g, 'geoms', [g]) if not q.is_empty]  # the geometries are huge unions: each car park works on the parts near it (STRtree)
-    road_t = STRtree([r['line'].buffer(r['w'] / 2, quad_segs=3) for r in raw_roads if r['c'] <= 3 and flat(r) and r['line'].length > 1])
-    svc = [(r['line'], r['w']) for r in raw_roads if r['c'] == 4 and flat(r) and r['line'].length > 3]; svc_t = STRtree([l_ for l_, w_ in svc])
-    wl = [LineString(p_) for p_, k_, h_ in bar_out if len(p_) >= 2 and h_ >= 1.0] + [LineString(f_) for f_ in fences if len(f_) >= 2]; wall_t = STRtree(wl)
-    as_t = STRtree(prts(asph)); st_t = STRtree(prts(unary_union([g for g in (side, foot, pedz) if not g.is_empty]))); bu_t = STRtree(prts(bunion)); md_t = STRtree(prts(median)) if not median.is_empty else None
-    near = lambda tree, env: unary_union([tree.geometries[i] for i in tree.query(env)])
-    news, nlink, nacc, nvar, nstr = [], 0, 0, 0, 0
-    for p in pp:
-        env = p.buffer(4.0, quad_segs=2); pb = p.buffer(1.0, quad_segs=2)
-        rd = near(road_t, env); a_ = near(as_t, env)
-        w_ = unary_union([wl[i].buffer(0.5, quad_segs=2) for i in wall_t.query(env)]); b_ = near(bu_t, env).buffer(0.3, quad_segs=2)
-        # (A) inside the car park only: thin pavement, footway and square strips that touch the asphalt are asphalt
-        if st_t is not None:
-            ov = near(st_t, env).intersection(p).difference(w_)
-            for q in prts(ov):
-                if q.geom_type == 'Polygon' and q.area > 0.3 and q.buffer(-1.6, quad_segs=2).is_empty and q.distance(a_) < 1.0: news.append(q); nstr += 1
-        # connected = the car park touches the asphalt of a street (OSM street within 2.5 m, not the car park's own surface) along 3 m or more
-        ca = a_.intersection(rd.buffer(2.5, quad_segs=3)).difference(p) if not rd.is_empty else GeometryCollection()
-        if not ca.is_empty and p.boundary.buffer(0.4, quad_segs=2).intersection(ca).area >= 1.2: continue
-        m_ = near(md_t, env).buffer(0.3, quad_segs=2) if md_t is not None else GeometryCollection()
-        keep = unary_union([p, a_, w_, b_, m_])
-        new = []
-        for i_ in svc_t.query(pb, predicate='intersects'):
-            l_, w_s = svc[i_]; rd2 = near(road_t, l_.buffer(1.5, quad_segs=2))
-            if rd2.is_empty or l_.distance(p) >= 1.0: continue
-            cor = l_.intersection(rd2.buffer(16.0, quad_segs=3)).buffer(max(w_s, 3.0) / 2 + 0.3, cap_style=2).difference(keep)
-            new += [q for q in prts(cor) if q.geom_type == 'Polygon' and q.area > 0.5]
-        if new: nacc += 1
-        else:  # one opening of 6 m where the car park is nearest to the street asphalt
-            ar_ = a_.difference(p.buffer(1.5, quad_segs=2))
-            if not ar_.is_empty and p.distance(ar_) < 3.5:
-                from shapely.ops import nearest_points
-                c_ = nearest_points(p, ar_)[0]
-                gap = p.buffer(3.6, quad_segs=3).intersection(ar_.buffer(3.6, quad_segs=3)).intersection(c_.buffer(3.0, quad_segs=4)).difference(keep)
-                new += [q for q in prts(gap) if q.geom_type == 'Polygon' and q.area > 0.5]
-                if new: nvar += 1
-        if new: nlink += 1; news += new
-    if not news: log('parcheggi isolati aperti: 0 di', len(pp)); return asph, pedz, side, foot
-    N = unary_union(news).buffer(0.05, quad_segs=2).difference(near(bu_t, unary_union(news).buffer(1.0)).buffer(0.3, quad_segs=2))
-    log('parcheggi isolati aperti:', nlink, 'di', len(pp), 'con via di servizio', nacc, 'varco 6 m', nvar, 'strisce dentro', nstr, 'm2', round(N.area), 'tempo', round(time.time() - t0, 1))
-    area_geoms[:] = [(at, g.difference(N) if (at in (1, 2, 3) and g.intersects(N)) else g) for at, g in area_geoms]
-    area_geoms[:] = [(at, g) for at, g in area_geoms if not g.is_empty]
-    if trees:  # no tree stands on the new asphalt
-        prepare(N); _tk = [not N.contains(Point(t_[0], t_[1])) for t_ in trees]; log('alberi tolti dall asfalto nuovo', _tk.count(False)); trees[:] = [t_ for t_, k_ in zip(trees, _tk) if k_]
-    return unary_union([asph, N]), pedz.difference(N), side.difference(N), foot.difference(N)
-asph, pedz, side, foot = unisci_parcheggi_strada(asph, pedz, side, foot)
+# ---- parking lots attached to the street by hand (exceptions, one polygon each: the asphalt that joins the lot to the carriageway; walls and buildings stay)
+PARCHEGGI_ATTACCATI = [
+    ('parcheggio via Gagarin attaccato alla strada, Carlo 30/10', [(587.7, -542.8), (587.9, -542.6), (588.2, -542.7), (596.9, -549.7), (604.0, -554.3), (606.8, -555.6), (606.9, -555.9), (606.6, -556.4), (607.1, -557.2), (607.1, -557.5), (605.1, -558.8), (603.8, -560.9), (603.6, -561.0), (603.3, -560.9), (599.9, -556.5), (593.0, -555.2), (589.3, -557.0), (589.0, -557.0), (587.2, -554.1), (586.3, -550.0), (586.3, -547.8)]),
+]
+if PARCHEGGI_ATTACCATI:
+    _pa = unary_union([Polygon(pts_) for nome_, pts_ in PARCHEGGI_ATTACCATI]).difference(bunion)
+    asph, pedz, side, foot = unary_union([asph, _pa]), pedz.difference(_pa), side.difference(_pa), foot.difference(_pa)
+    area_geoms[:] = [(at, g.difference(_pa) if (at in (1, 2, 3) and g.intersects(_pa)) else g) for at, g in area_geoms]
+    log('parcheggi attaccati a mano', len(PARCHEGGI_ATTACCATI), 'm2', round(_pa.area))
 SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}
 parts_of = lambda g: [p for p in (list(g.geoms) if hasattr(g, 'geoms') else [g]) if not p.is_empty]
 SURFP = {k: parts_of(g) for k, g in SURF.items() if not g.is_empty}
