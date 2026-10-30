@@ -3789,9 +3789,9 @@
   "libero_oltre_3m_ha": 1.18
  },
  "cantieri_osm": {
-  "m2": 87844,
+  "m2": 87616,
   "pezzi_dbgt_ritagliati": {
-   "aree": 63,
+   "aree": 62,
    "terreni": 5
   }
  },
@@ -3802,14 +3802,15 @@
    "ritaglio 8": 70,
    "1": 273,
    "2": 27,
-   "ritaglio 4": 193,
+   "ritaglio 4": 171,
    "3": 16,
+   "parcheggio OSM intero": 22,
    "ritaglio 9": 21,
    "12": 7,
    "piscina": 2
   },
   "dbgt_pezzi_per_tipo": {
-   "1": 3317,
+   "1": 3321,
    "3": 29,
    "6": 12,
    "11": 284,
@@ -3849,12 +3850,12 @@
   "osm_tenuti": 915,
   "osm_tolti_vicini_dbgt": 896,
   "osm_tolti_nei_boschi": 61,
-  "sparsi_osm_dentro": 17484,
+  "sparsi_osm_dentro": 17491,
   "sparsi_osm_tenuti": 0,
   "sparsi_boschi_dbgt": 13287,
-  "su_superfici_vietate": 752,
+  "su_superfici_vietate": 753,
   "esito": {
-   "spostati": 486,
+   "spostati": 487,
    "restano_in_aiuola": 30,
    "tolti": 205,
    "bosco": 31

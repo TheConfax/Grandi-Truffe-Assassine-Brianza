@@ -471,7 +471,7 @@
    "vms": 48,
    "cic": 25
   },
-  "tempo_s": 4.8,
+  "tempo_s": 4.7,
   "anelli_osm": {
    "n": 3,
    "dove": [
@@ -526,7 +526,7 @@
   "piazze_m2": 44081,
   "vialetti_m2": 31976,
   "isole_m2": 15408,
-  "tempo_s": 51.3,
+  "tempo_s": 41.3,
   "cortili_nei_cantieri_m2": 14174
  },
  "muri_doppi_fusi": {
@@ -558,45 +558,49 @@
  },
  "cancelli_passi_carrai": {
   "porte": {
-   "p": 1806
+   "p": 2042
   },
-  "nuovi": 1925,
-  "pedonali": 146,
-  "senza_strada": 1713,
-  "senza_chiusure": 2879,
-  "carreggiata_o_marciapiede": 2563,
-  "strada_osm": 250,
-  "troppo_stretti": 2243,
-  "gia_cancello": 6862,
+  "nuovi": 2109,
+  "pedonali": 174,
+  "senza_strada": 1809,
+  "senza_chiusure": 2863,
+  "carreggiata_o_marciapiede": 1322,
+  "strada_osm": 349,
+  "troppo_stretti": 2261,
+  "gia_cancello": 7490,
   "fuori": 4,
-  "doppione_recinzione": 86,
-  "capo_nel_vuoto": 645,
-  "troppo_larghi": 475,
+  "doppione_recinzione": 89,
+  "capo_nel_vuoto": 642,
+  "troppo_larghi": 471,
   "per_origine": {
-   "passo_carraio": 204,
-   "rampa": 10,
+   "passo_carraio": 240,
+   "rampa": 11,
    "vialetto": 0,
-   "varco": 1269,
-   "capo_recinzione": 442
+   "varco": 1365,
+   "capo_recinzione": 493
   }
  },
- "divisori_tagliati_da_cancelli": 373,
+ "divisori_tagliati_da_cancelli": 435,
+ "barriere_in_carreggiata": {
+  "linee": 72,
+  "metri": 591
+ },
  "corsie_ia": {
   "vie": 2562,
-  "corsie_spostate_nodi": 1925,
-  "vie_con_corsie": 565,
-  "tagli": 111,
-  "metri_tagliati": 982,
-  "nodi_aggiunti": 120,
+  "corsie_spostate_nodi": 1921,
+  "vie_con_corsie": 564,
+  "tagli": 109,
+  "metri_tagliati": 961,
+  "nodi_aggiunti": 116,
   "punti_per_motivo": {
-   "muro o edificio": 1101,
+   "muro o edificio": 1087,
    "fuori asfalto": 336,
    "stretta fra i muri": 123
   },
   "sensi_unici_tolti_metri": 491,
   "pezzi_isolati_tolti_metri": 113,
   "km_rete": 339.26,
-  "km_rete_ia": 337.68,
+  "km_rete_ia": 337.7,
   "dove": [
    "?x=435&z=362 muro/stretta doppio senso 3.2 m 65 m",
    "?x=-506&z=-934 muro/stretta doppio senso 2.8 m 49 m",
@@ -622,7 +626,6 @@
    "?x=168&z=-1222 stretta doppio senso 4.8 m 14 m",
    "?x=-768&z=429 asfalto doppio senso 6.2 m 12 m",
    "?x=1329&z=792 asfalto doppio senso 6.5 m 12 m",
-   "?x=-1148&z=-628 muro doppio senso 6.5 m 12 m",
    "?x=2429&z=520 muro doppio senso 6.5 m 12 m",
    "?x=-773&z=214 asfalto doppio senso 5.8 m 12 m",
    "?x=1533&z=270 muro doppio senso 3.2 m 10 m",
@@ -636,8 +639,9 @@
    "?x=-2318&z=-571 muro doppio senso 6.5 m 9 m",
    "?x=-57&z=-1777 muro doppio senso 5.2 m 9 m",
    "?x=2651&z=-1475 muro doppio senso 5.5 m 9 m",
-   "?x=-805&z=21 muro doppio senso 6.5 m 8 m",
-   "?x=-87&z=-266 muro doppio senso 6.2 m 8 m"
+   "?x=-87&z=-266 muro doppio senso 6.2 m 8 m",
+   "?x=1385&z=-1162 asfalto doppio senso 8.8 m 8 m",
+   "?x=123&z=-1251 muro doppio senso 4.8 m 8 m"
   ]
  },
  "controlli": {
@@ -1415,6 +1419,6 @@
   "attraversamenti": {
    "n": 497
   },
-  "tempo_s": 8.6
+  "tempo_s": 8.5
  }
 }

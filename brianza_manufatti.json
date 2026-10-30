@@ -1606,7 +1606,7 @@
    "torre torre": 1
   }
  },
- "parcheggi_dbgt_m2_sotto_parcheggi_osm_con_posti_propri": 1489,
+ "parcheggi_dbgt_m2_sotto_parcheggi_osm_con_posti_propri": 1626,
  "aree": {
   "aatt_pezzi": 648,
   "aatt_m2": 68810,
@@ -1656,9 +1656,9 @@
    }
   ],
   "parcheggi_dbgt": 66,
-  "parcheggi_dbgt_m2": 61268,
+  "parcheggi_dbgt_m2": 61131,
   "parcheggi_dbgt_senza_osm": 38,
-  "parcheggi_osm_senza_posti_propri": 47,
+  "parcheggi_osm_senza_posti_propri": 46,
   "torre_acqua_osm_tolte": 0
  },
  "elettrico": {

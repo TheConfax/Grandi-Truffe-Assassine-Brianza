@@ -1134,6 +1134,8 @@ _cl = [(LineString(pts), h_, -1) for pts, k_, h_ in bar_out if len(pts) >= 2 and
 _clt = STRtree([c_[0] for c_ in _cl])
 _paved = [g_ for g_ in (asph, pedz, side, foot, parking) if g_ is not None and not g_.is_empty]
 for g_ in _paved: prepare(g_)
+_paved_in = [g_.buffer(-0.5, join_style=2) for g_ in _paved]; _asph_in = asph.buffer(-0.5, join_style=2); _side_in = side.buffer(-0.5, join_style=2); _ucarr_in = STR.U_carr.buffer(-0.5, join_style=2) if STR else None
+for g_ in _paved_in + [_asph_in, _side_in] + ([_ucarr_in] if _ucarr_in is not None else []): prepare(g_)
 _go = {'osm_nodi': 0, 'disegnati': 0, 'scartati_classe1_o_non_piana': 0, 'lift_alzate': 0, 'senza_via_su_chiusura': 0, 'scartati_senza_via_senza_chiusura': 0, 'fuori': 0, 'entrance_kissing': 0, 'entrance_kissing_scartati': 0}
 def _closest(p_, R_):
     P0_ = Point(p_); best_ = None
@@ -1241,6 +1243,8 @@ if dbt_pc:
         for e_, f_ in ((cs_[-1], cs_[-2]), (cs_[0], cs_[1])):
             dd_ = math.dist(e_, f_)
             if dd_ < 0.3: continue
+            f_ = L_.interpolate(max(0.0, L_.length - 3.0) if e_ == cs_[-1] else min(L_.length, 3.0)).coords[0]; dd_ = math.dist(e_, f_)  # the direction over the last 3 m of the line, not the last short segment (a kink of a few cm would send the ray off the line)
+            if dd_ < 0.3: continue
             if any(k_ != j_ and _cl[k_][0].distance(Point(e_)) < 0.5 for k_ in _clt.query(Point(e_).buffer(0.5))): continue
             _cands.append((tuple(e_), 'capo_recinzione', ((e_[0] - f_[0]) / dd_, (e_[1] - f_[1]) / dd_)))
     for p_, srcname_, dir_ in _cands:
@@ -1280,10 +1284,10 @@ if dbt_pc:
         if wd_ < (2.0 if dir_ else 1.0): _gcc['troppo_stretti'] += 1; continue
         if not dir_ and sum(1 for e_ in ext_ if e_ and e_[2] >= 0) == 2 and wd_ < 2.2: _gcc['capo_nel_vuoto'] += 1; continue  # a slot between two houses is not an entrance
         mid_ = G_.centroid
-        if any(g_.contains(G_.interpolate(t_, normalized=True)) for t_ in (0.1, 0.3, 0.5, 0.7, 0.9) for g_ in _paved): _gcc['carreggiata_o_marciapiede'] += 1; continue  # a gate never stands on any paved surface (street, square, pavement, footpath, car park)
+        if any(g_.contains(G_.interpolate(t_, normalized=True)) for t_ in (0.1, 0.3, 0.5, 0.7, 0.9) for g_ in _paved_in): _gcc['carreggiata_o_marciapiede'] += 1; continue  # a gate never stands on any paved surface (street, square, pavement, footpath, car park); the 0.5 m along the edge of the surface do not count (the gate stands on the lot boundary, which the surface polygons overshoot by a few dm)
         if any(math.dist((mid_.x, mid_.y), ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20)) < 1.5 for g_ in gate_out) or any(math.dist((mid_.x, mid_.y), d_) < 1.5 for d_ in _gd): _gcc['gia_cancello'] += 1; continue
         if dir_ and not any(r_['c'] <= 3 and r_['line'].distance(mid_) <= r_['w'] / 2 + 4.5 for r_ in (_rr[j_] for j_ in _rrt.query(mid_.buffer(12)))): _gcc['senza_strada'] += 1; continue  # a fence end only counts on the boundary of a street
-        if (STR and STR.U_carr.intersects(G_) and STR.U_carr.intersection(G_).length > 0.3) or (asph.intersects(G_) and asph.intersection(G_).length > 0.3) or (side.intersects(G_) and side.intersection(G_).length > 0.3): _gcc['carreggiata_o_marciapiede'] += 1; continue
+        if (_ucarr_in is not None and _ucarr_in.intersects(G_) and _ucarr_in.intersection(G_).length > 0.3) or (_asph_in.intersects(G_) and _asph_in.intersection(G_).length > 0.3) or (_side_in.intersects(G_) and _side_in.intersection(G_).length > 0.3): _gcc['carreggiata_o_marciapiede'] += 1; continue
         if any(r_['c'] <= 5 and r_['line'].distance(G_) < r_['w'] / 2 - 0.2 for r_ in (_rr[j_] for j_ in _rrt.query(G_.buffer(12)))): _gcc['strada_osm'] += 1; continue  # any street the game draws, private or service ones too
         if any(_cl[j_][2] < 0 and _cl[j_][0].intersection(G_.buffer(1.0)).length > 1.0 and _cl[j_][0].distance(Point(a_)) > 0.5 and _cl[j_][0].distance(Point(b_)) > 0.5 for j_ in _clt.query(G_.buffer(1.0))): _gcc['doppione_recinzione'] += 1; continue
         ids_ = [e_[2] for e_ in ext_ if e_ and e_[2] >= 0]; ux_, uz_ = (b_[0] - a_[0]) / wd_, (b_[1] - a_[1]) / wd_
@@ -1829,6 +1833,20 @@ if FER:  # the trains against platforms, buildings and carriageways (FER.control
     _fer_ctl_f = presto(FER.misura_treni, *_fer_ctl_a)
 log('posti auto', len(pspaces), 'disabili', sum(1 for p in pspaces if p[5] == 1), 'parcheggi con capienza', len(plots), 'strade con sosta', sum(1 for r in raw_roads if r.get('pk')))
 trees = VERDE.alberi(trees, _n_tr, [_rbuf('flat0'), bunion, _rbuf('deck0')], railL, pspaces, roadsU, [side]); bar_out += VERDE.siepi(bar_out)  # the DBGT trees and hedges
+# Carlo 30/10 (via Luigi Rho): a fence or hedge that stands in the carriageway (a divider of the DBGT on a line the road has swallowed) does not exist:
+# the stretches of any barrier (railway fences excepted) more than 0.8 m inside the carriageway (asphalt of the roads and DBGT carriageways) are cut away; at the edge nothing changes
+_zc = unary_union([g_ for g_ in (asph, STR.U_carr if STR else None) if g_ is not None and not g_.is_empty]).buffer(-0.8, join_style=2)
+if not _zc.is_empty:
+    prepare(_zc); _nz = [0, 0.0]; _nbz = []
+    for b_ in bar_out:
+        L_ = LineString(b_[0]) if len(b_[0]) >= 2 else None
+        if L_ is None or b_[1] == 6 or not _zc.intersects(L_): _nbz.append(b_); continue
+        _nz[0] += 1; r_ = L_.difference(_zc); _nz[1] += L_.length - r_.length
+        for part_ in (list(r_.geoms) if hasattr(r_, 'geoms') else [r_]):
+            if isinstance(part_, LineString) and part_.length > 0.5: _nbz.append((list(part_.coords), b_[1], b_[2]))
+    log('barriere tolte dalla carreggiata (oltre 0,8 m dentro): linee toccate', _nz[0], 'metri', round(_nz[1]))
+    if STR: STR.rep['barriere_in_carreggiata'] = dict(linee=_nz[0], metri=round(_nz[1]))
+    bar_out = _nbz
 VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 trees = MANUF.alberi(trees, VERDE.forest_u, isole=STR.isole if STR else ())
 # ---- the lanes of the AI cars away from walls, fences, gates and buildings, in every comune (src/corsie_ia.py): all of them are final here
