@@ -1849,7 +1849,7 @@ if not _zc.is_empty:
     bar_out = _nbz
 # hedge bits removed by hand (exceptions: every hedge, kind 3, short, with its centre within r metres of the point goes away; the general rule does not change)
 SIEPI_TOLTE = [
-    ('via Luigi Rho, solo il cubetto di siepe a sinistra verso la strada, Carlo 30/10', 1261.7, -612.5, 0.8),
+    ('via Luigi Rho, il cubetto di siepe verso la strada (non quello vicino alla recinzione), Carlo 30/10', 1262.8, -613.7, 0.8),
 ]
 for nome_, x_, z_, r_ in SIEPI_TOLTE:
     _nb0 = len(bar_out); _pt = Point(x_, z_)
