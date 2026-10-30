@@ -987,7 +987,7 @@ if dbt_walls:
     _ctl_aiuole = {'aiuole_dbgt': len(dbt_aiuole), 'divisori_resi_cordolo_basso_per_tipo_di_prima': {str(k_): v_ for k_, v_ in n_aiu.items()}}
 # passi carrai: each DBGT driveway point within PC_D of a divider opens it PC_W wide and closes it with a gate as tall as the wall;
 # where a street (class 3 or more) already crosses there the gap stays open. Two points closer than PC_W are one gate
-PC_D, PC_W = 6.0, 3.6
+PC_D, PC_W = 2.5, 3.6
 # the barriers do not change until the cemetery walls: their union for those, on a thread from here (src/presto.py)
 _osm_bar_all_f = presto(lambda b_: unary_union([LineString(pts).buffer(1.5) for pts, k, h in b_ if len(pts) >= 2]) if b_ else GeometryCollection(), list(barriers))
 pc_cuts, pc_gates = [], []
@@ -1202,20 +1202,19 @@ for a_, b_, h_, k_ in pc_gates:
     gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', h_, 0])
 # passi carrai DBGT left without a gate (no divider within PC_D of the point): the gap between the closures on the two sides along the lot boundary
 # (end of a divider or wall of a building, in any combination) is closed with a gate; wider than 8 m: 6 m centred on the driveway; never across an OSM street
-_gcc = {'porte': {'p': 0, 'n': 0, 'b': 0}, 'nuovi': 0, 'larghi': 0, 'pedonali': 0, 'senza_strada': 0, 'senza_chiusure': 0, 'carreggiata': 0, 'strada_osm': 0, 'troppo_stretti': 0, 'gia_cancello': 0, 'fuori': 0}
+_gcc = {'porte': {'p': 0}, 'nuovi': 0, 'pedonali': 0, 'senza_strada': 0, 'senza_chiusure': 0, 'carreggiata_o_marciapiede': 0, 'strada_osm': 0, 'troppo_stretti': 0, 'gia_cancello': 0, 'fuori': 0, 'doppione_recinzione': 0, 'capo_nel_vuoto': 0, 'troppo_larghi': 0}
 if dbt_pc:
     _rr = [r_ for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x']]; _rrt = STRtree([r_['line'] for r_ in _rr])
-    _gd = []; _src = {'passo_carraio': 0, 'rampa': 0, 'vialetto': 0, 'varco': 0}; _cands = [(p_, 'passo_carraio') for p_ in dbt_pc]
-    try: _cands += [((v_['x'], v_['z']), 'rampa') for v_ in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sottoterra.json'), encoding='utf-8'))['viste'] if v_['esito'] == 'rampa']
+    prepare(asph); prepare(side)
+    _bg = [g_ for b_, g_ in _bl if g_ is not None]; _bgt = STRtree(_bg)
+    _gd = []; _src = {'passo_carraio': 0, 'rampa': 0, 'vialetto': 0, 'varco': 0, 'capo_recinzione': 0}; _cands = [(p_, 'passo_carraio', None) for p_ in dbt_pc]
+    try: _cands += [((v_['x'], v_['z']), 'rampa', None) for v_ in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sottoterra.json'), encoding='utf-8'))['viste'] if v_['esito'] == 'rampa']
     except Exception: pass
     for r_ in _rr:
         if r_['drv'] and r_['c'] <= 5:  # a driveway OSM maps: its end at the street gets the gate
             for e_ in (r_['line'].coords[0], r_['line'].coords[-1]):
                 near_ = [x_ for j_ in _rrt.query(Point(e_).buffer(8)) for x_ in [_rr[j_]] if not x_['drv'] and x_['c'] <= 3]
-                if near_ and min(x_['line'].distance(Point(e_)) for x_ in near_) < 8: _cands.append((tuple(e_), 'vialetto'))
-    import shapely
-    _bg = [g_ for b_, g_ in _bl if g_ is not None]; _bgt = STRtree(_bg)
-    _cltb = STRtree([c_[0] for c_ in _cl if c_[2] >= 0])
+                if near_ and min(x_['line'].distance(Point(e_)) for x_ in near_) < 8: _cands.append((tuple(e_), 'vialetto', None))
     for st_ in _rr:  # openings between two closures along the lot boundary beside every street
         if st_['c'] > 3 or st_['line'].length < 6: continue
         for sg_ in (1, -1):
@@ -1223,21 +1222,27 @@ if dbt_pc:
             except Exception: continue
             if off_.is_empty or off_.geom_type != 'LineString' or off_.length < 6: continue
             n_ = int(off_.length); pts_ = [off_.interpolate(i_) for i_ in range(n_ + 1)]
-            hit_ = set(_clt.query(pts_, predicate='dwithin', distance=0.8)[0].tolist()); hitb_ = set(_cltb.query(pts_, predicate='dwithin', distance=3.0)[0].tolist()); cl_ = [i_ in hit_ or i_ in hitb_ for i_ in range(len(pts_))]  # a house may stand a few metres back from the boundary
-            if os.environ.get('GTA_DBG'):
-                _dx, _dz = map(float, os.environ['GTA_DBG'].split(','))
-                if off_.distance(Point(_dx, _dz)) < 12: log('DBGOFF', st_['hw'], st_['c'], st_['w'], 'sg', sg_, ''.join(('B' if i_ in hitb_ else ('F' if i_ in hit_ else '.')) + ('*' if math.dist((pts_[i_].x, pts_[i_].y), (_dx, _dz)) < 1.5 else '') for i_ in range(len(pts_)) if math.dist((pts_[i_].x, pts_[i_].y), (_dx, _dz)) < 30), 'from', [round(v_, 1) for v_ in (pts_[0].x, pts_[0].y)])
+            hit_ = set(_clt.query(pts_, predicate='dwithin', distance=0.8)[0].tolist()); cl_ = [i_ in hit_ for i_ in range(len(pts_))]
             i_ = 0
             while i_ < len(cl_):
                 if cl_[i_] or i_ == 0 or not cl_[i_ - 1]: i_ += 1; continue
                 j_ = i_
                 while j_ < len(cl_) and not cl_[j_]: j_ += 1
-                if j_ < len(cl_) and 0 < j_ - i_ <= 16: _cands.append((((pts_[i_ - 1].x + pts_[j_].x) / 2, (pts_[i_ - 1].y + pts_[j_].y) / 2), 'varco'))
+                if j_ < len(cl_) and 0 < j_ - i_ <= 16: _cands.append((((pts_[i_ - 1].x + pts_[j_].x) / 2, (pts_[i_ - 1].y + pts_[j_].y) / 2), 'varco', None))
                 i_ = j_ + 1
-    for p_, srcname_ in _cands:
+    # the free end of a fence or wall: the opening goes on along its line up to the next closure
+    for j_, (L_, h_, id_) in enumerate(_cl):
+        if id_ >= 0 or L_.length < 2: continue
+        cs_ = list(L_.coords)
+        for e_, f_ in ((cs_[-1], cs_[-2]), (cs_[0], cs_[1])):
+            dd_ = math.dist(e_, f_)
+            if dd_ < 0.3: continue
+            if any(k_ != j_ and _cl[k_][0].distance(Point(e_)) < 0.5 for k_ in _clt.query(Point(e_).buffer(0.5))): continue
+            _cands.append((tuple(e_), 'capo_recinzione', ((e_[0] - f_[0]) / dd_, (e_[1] - f_[1]) / dd_)))
+    for p_, srcname_, dir_ in _cands:
         P_ = Point(p_)
         if not inside(p_, 0): _gcc['fuori'] += 1; continue
-        if any(math.dist(p_, ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20)) < 4 for g_ in gate_out) or any(math.dist(p_, d_) < 3.6 for d_ in _gd): _gcc['gia_cancello'] += 1; continue
+        if any(math.dist(p_, ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20)) < (1.0 if dir_ else 4) for g_ in gate_out) or any(math.dist(p_, d_) < (1.0 if dir_ else 3.6) for d_ in _gd): _gcc['gia_cancello'] += 1; continue
         cand = [_rr[j_] for j_ in _rrt.query(P_.buffer(30 if srcname_ == 'rampa' else 25))]
         if not cand: _gcc['senza_strada'] += 1; continue
         st_ = min([r_ for r_ in cand if r_['c'] <= 3] or cand, key=lambda r_: r_['line'].distance(P_))
@@ -1246,39 +1251,48 @@ if dbt_pc:
             if dd_ < 1: continue
             k_ = min(1.0, (st_['w'] / 2 + 1.5) / dd_); p_ = (q0_.x + (p_[0] - q0_.x) * k_, q0_.y + (p_[1] - q0_.y) * k_); P_ = Point(p_)
             if any(math.dist(p_, d_) < 3.6 for d_ in _gd): _gcc['gia_cancello'] += 1; continue
-        s0_ = st_['line'].project(P_); pa_ = st_['line'].interpolate(max(0, s0_ - 1)); pb_ = st_['line'].interpolate(min(st_['line'].length, s0_ + 1))
-        ux_, uz_ = tang((pa_.x, pa_.y), (pb_.x, pb_.y))
-        ext_ = []
-        for sg_ in (1, -1):
-            rl_ = LineString([p_, (p_[0] + sg_ * ux_ * 10, p_[1] + sg_ * uz_ * 10)]); ray_ = rl_.buffer(1.0, cap_style=2); rayw_ = rl_.buffer(3.5, cap_style=2)  # a house may stand a few metres back from the boundary
-            best_ = None
-            for j_ in _clt.query(rayw_):
-                x_ = _cl[j_][0].intersection(rayw_ if _cl[j_][2] >= 0 else ray_)
+        if dir_: ux_, uz_ = dir_
+        else:
+            s0_ = st_['line'].project(P_); pa_ = st_['line'].interpolate(max(0, s0_ - 1)); pb_ = st_['line'].interpolate(min(st_['line'].length, s0_ + 1)); ux_, uz_ = tang((pa_.x, pa_.y), (pb_.x, pb_.y))
+        ext_ = []  # on each side the nearest physical closure: its real point, not a projection
+        for sg_ in ((1,) if dir_ else (1, -1)):
+            rl_ = LineString([p_, (p_[0] + sg_ * ux_ * 16.5, p_[1] + sg_ * uz_ * 16.5)]); ray_ = rl_.buffer(1.0, cap_style=2); best_ = None
+            for j_ in _clt.query(ray_):
+                if dir_ and _cl[j_][0].distance(Point(p_)) < 0.5: continue
+                x_ = _cl[j_][0].intersection(ray_)
                 for part_ in getattr(x_, 'geoms', [x_]):
                     for c_ in getattr(part_, 'coords', []):
                         d_ = (c_[0] - p_[0]) * ux_ * sg_ + (c_[1] - p_[1]) * uz_ * sg_
-                        if d_ > 0.15 and (best_ is None or d_ < best_[0]): best_ = (d_, _cl[j_][1], _cl[j_][2])
+                        if d_ > 0.15 and (best_ is None or d_ < best_[0]): best_ = (d_, _cl[j_][1], _cl[j_][2], c_)
             ext_.append(best_)
-        if os.environ.get('GTA_DBG'): _dx, _dz = map(float, os.environ['GTA_DBG'].split(',')); (math.dist(p_, (_dx, _dz)) < 14) and log('DBG', srcname_, [round(v_, 1) for v_ in p_], 'ext', ext_)
-        if ext_[0] is None and ext_[1] is None: _gcc['senza_chiusure'] += 1; continue
-        gap_ = (ext_[0][0] if ext_[0] else 99) + (ext_[1][0] if ext_[1] else 99)
-        if gap_ <= 8: da_, db_ = ext_[0][0] - 0.05, -(ext_[1][0] - 0.05); hh_ = max(1.2, min(2.2, min(e_[1] for e_ in ext_ if e_ and e_[1] < 2.0) if any(e_ and e_[1] < 2.0 for e_ in ext_) else 1.6))
-        else: da_, db_ = 3.0, -3.0; hh_ = 1.6; _gcc['larghi'] += 1
-        if abs(da_ - db_) < 0.8: _gcc['troppo_stretti'] += 1; continue
-        a_ = (p_[0] + ux_ * da_, p_[1] + uz_ * da_); b_ = (p_[0] + ux_ * db_, p_[1] + uz_ * db_); G_ = LineString([a_, b_])
-        if any(r_['line'].distance(G_.centroid) < r_['w'] / 2 - 0.2 and r_['c'] <= 3 for r_ in _rr if r_['line'].distance(G_) < 12): _gcc['carreggiata'] += 1; continue
-        if any(not r_['priv'] and r_['line'].intersects(G_) for r_ in _rr if r_['line'].distance(G_) < 1): _gcc['strada_osm'] += 1; continue
-        mid_ = G_.centroid; ids_ = [e_[2] for e_ in ext_ if e_ and e_[2] >= 0]
+        if dir_:
+            if ext_[0] is None: _gcc['senza_chiusure'] += 1; continue
+            ends_ = [p_, ext_[0][3]]; mhs_ = [ext_[0][1]]
+        else:
+            if ext_[0] is None or ext_[1] is None: _gcc['senza_chiusure' if ext_[0] is None and ext_[1] is None else 'capo_nel_vuoto'] += 1; continue
+            ends_ = [ext_[0][3], ext_[1][3]]; mhs_ = [e_[1] for e_ in ext_]
+        a_, b_ = ends_; G_ = LineString([a_, b_]); wd_ = G_.length
+        if wd_ > 16: _gcc['troppo_larghi'] += 1; continue
+        if wd_ < (2.0 if dir_ else 1.0): _gcc['troppo_stretti'] += 1; continue
+        if not dir_ and sum(1 for e_ in ext_ if e_ and e_[2] >= 0) == 2 and wd_ < 2.2: _gcc['capo_nel_vuoto'] += 1; continue  # a slot between two houses is not an entrance
+        mid_ = G_.centroid
+        if any(math.dist((mid_.x, mid_.y), ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20)) < 1.5 for g_ in gate_out) or any(math.dist((mid_.x, mid_.y), d_) < 1.5 for d_ in _gd): _gcc['gia_cancello'] += 1; continue
+        if dir_ and not any(r_['c'] <= 3 and r_['line'].distance(mid_) <= r_['w'] / 2 + 4.5 for r_ in (_rr[j_] for j_ in _rrt.query(mid_.buffer(12)))): _gcc['senza_strada'] += 1; continue  # a fence end only counts on the boundary of a street
+        if (STR and STR.U_carr.intersects(G_) and STR.U_carr.intersection(G_).length > 0.3) or (asph.intersects(G_) and asph.intersection(G_).length > 0.3) or (side.intersects(G_) and side.intersection(G_).length > 0.3): _gcc['carreggiata_o_marciapiede'] += 1; continue
+        if any(r_['c'] <= 5 and r_['line'].distance(G_) < r_['w'] / 2 - 0.2 for r_ in (_rr[j_] for j_ in _rrt.query(G_.buffer(12)))): _gcc['strada_osm'] += 1; continue  # any street the game draws, private or service ones too
+        if any(_cl[j_][2] < 0 and _cl[j_][0].intersection(G_.buffer(1.0)).length > 1.0 and _cl[j_][0].distance(Point(a_)) > 0.5 and _cl[j_][0].distance(Point(b_)) > 0.5 for j_ in _clt.query(G_.buffer(1.0))): _gcc['doppione_recinzione'] += 1; continue
+        ids_ = [e_[2] for e_ in ext_ if e_ and e_[2] >= 0]; ux_, uz_ = (b_[0] - a_[0]) / wd_, (b_[1] - a_[1]) / wd_
         if any(_bg[j_].distance(mid_) < 0.8 for j_ in _bgt.query(mid_.buffer(0.8))) or (len(ids_) == 2 and ids_[0] == ids_[1] and _cl[_clt.query_nearest(mid_)[0]][0].distance(mid_) <= 1.5):  # the gate falls on a house: a small door in its wall, not a gate
-            wd_ = min(1.2, abs(da_ - db_)); ty_ = 'p'
+            dw_ = min(1.2, wd_); ty_ = 'p'
             rn_ = min((r_ for r_ in _rr if r_['line'].distance(mid_) < 40), key=lambda r_: r_['line'].distance(mid_), default=None)
-            c0_ = (mid_.x - ux_ * wd_ / 2, mid_.y - uz_ * wd_ / 2); c1_ = (mid_.x + ux_ * wd_ / 2, mid_.y + uz_ * wd_ / 2)
+            c0_ = (mid_.x - ux_ * dw_ / 2, mid_.y - uz_ * dw_ / 2); c1_ = (mid_.x + ux_ * dw_ / 2, mid_.y + uz_ * dw_ / 2)
             if rn_ is not None:
                 sp_ = rn_['line'].interpolate(rn_['line'].project(mid_)); nx_, nz_ = -(c1_[1] - c0_[1]), c1_[0] - c0_[0]
                 if nx_ * (sp_.x - mid_.x) + nz_ * (sp_.y - mid_.y) < 0: c0_, c1_ = c1_, c0_
-            _gd.append(p_); doors_out.append([q(c0_[0]), q(c0_[1]), q(c1_[0]), q(c1_[1]), ty_, 2.1]); _gcc['porte'][ty_] += 1; continue
-        _gd.append(p_); _gcc['nuovi'] += 1; _src[srcname_] += 1
-        if abs(da_ - db_) < 2.5: _gcc['pedonali'] += 1
+            _gd.append(tuple(mid_.coords[0])); doors_out.append([q(c0_[0]), q(c0_[1]), q(c1_[0]), q(c1_[1]), ty_, 2.1]); _gcc['porte'][ty_] += 1; continue
+        hh_ = max(1.2, min(2.2, min([h_ for h_ in mhs_ if h_ < 2.0] or [1.6])))
+        _gd.append(tuple(mid_.coords[0])); _gcc['nuovi'] += 1; _src[srcname_] += 1
+        if wd_ < 2.5: _gcc['pedonali'] += 1
         gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'o' if srcname_ == 'rampa' else 'g', round(hh_, 1), 0])
     _gcc['per_origine'] = _src
     log('cancelli sui varchi: aggiunti', _gcc)
