@@ -112,7 +112,7 @@ for (const T of TILES) {
       for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1 }); } }
       continue;
     }
-    if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }); } continue; }
+    if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); { const w = { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }; WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, w); (rec.walls || (rec.walls = [])).push(w); } } continue; }
     BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
     if (B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
     if (B.g === 4) continue; // a water tower: its plan is the tank up in the air, the solid is its shaft (paesaggio3.js lsTower)
@@ -122,7 +122,7 @@ for (const T of TILES) {
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue;
         let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; }
-        WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1 });
+        const w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1 }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
       }
     }
   }
@@ -1562,6 +1562,7 @@ function* buildTileGen(T) {
     const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf(), doorB = Buf();
     let nb = 0;
     for (const B of T.bld) {
+      if (B.skipDraw) continue; /* under a fuel station's own canopy */
       if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower, cabin (paesaggio3.js)
       if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
       const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t, raised = B.zb !== undefined;
@@ -1942,6 +1943,28 @@ for (const p of D.pois) {
   for (const o of [-3.2, 3.2]) { const px = x + ux * o, pz = z + uz * o; const pump = { x: px, z: pz, alive: true, f }; f.pumps.push(pump); WALLS.add(px - 1.3, pz - 1.3, px + 1.3, pz + 1.3, pump.wall = { r: 1.0, x: px, z: pz, y0: f.gy - 2, y1: f.gy + 2 }); }
   for (const [a, b] of [[-6.5, -3.8], [6.5, -3.8], [-6.5, 3.8], [6.5, 3.8]]) { const qx = x + ux * a + nx0 * b, qz = z + uz * a + nz0 * b; WALLS.add(qx - 0.4, qz - 0.4, qx + 0.4, qz + 0.4, { r: 0.25, x: qx, z: qz, y0: f.gy - 2, y1: f.gy + 4 }); }
   FUEL.push(f);
+}
+/* a roof (OSM or DBGT) lying for more than half inside the canopy the game draws on a fuel station is not drawn: it would be a second canopy */
+let FUEL_ROOFS = 0;
+for (const T of TILES) for (const B of T.bld) {
+  if (B.skipDraw || B.lm || B.big || B.g >= 2) continue;
+  for (const f of FUEL) {
+    if (B.bb[2] < f.x - 12 || B.bb[0] > f.x + 12 || B.bb[3] < f.z - 12 || B.bb[1] > f.z + 12) continue;
+    let n = 0, m = 0; const N = 12, dx = (B.bb[2] - B.bb[0]) / N, dz = (B.bb[3] - B.bb[1]) / N;
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const px = B.bb[0] + (i + 0.5) * dx, pz = B.bb[1] + (j + 0.5) * dz;
+      if (!inPoly(px, pz, B.pts) || B.holes.some(h => inPoly(px, pz, h))) continue;
+      m++; const a = (px - f.x) * f.ux + (pz - f.z) * f.uz, c = (px - f.x) * f.nx + (pz - f.z) * f.nz;
+      if (Math.abs(a) <= 7.5 && Math.abs(c) <= 4.5) n++;
+    }
+    let cn = 0; /* a roof on posts (OSM roof, carport) wider than the model's canopy that holds most of it: the same canopy, bigger */
+    if (B.t === 9) for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { const px = f.x + f.ux * (-7.5 + (i + 0.5) * 15 / 8) + f.nx * (-4.5 + (j + 0.5) * 9 / 8), pz = f.z + f.uz * (-7.5 + (i + 0.5) * 15 / 8) + f.nz * (-4.5 + (j + 0.5) * 9 / 8); if (inPoly(px, pz, B.pts)) cn++; }
+    if ((m && n * 2 > m) || cn * 2 > 64) {
+      B.skipDraw = true; FUEL_ROOFS++; /* no collision either: nothing to bump into that is not drawn */
+      for (const w of B.walls || []) w.r !== undefined ? WALLS.del(w.x - 0.2, w.z - 0.2, w.x + 0.2, w.z + 0.2, w) : WALLS.del(w.ax, w.az, w.bx, w.bz, w);
+      B.walls = null; BLD.del(B.bb[0], B.bb[1], B.bb[2], B.bb[3], B); const bi = BUILDINGS.indexOf(B); if (bi >= 0) BUILDINGS.splice(bi, 1); break;
+    }
+  }
 }
 function buildFuel(T, G) {
   for (const f of FUEL) {
