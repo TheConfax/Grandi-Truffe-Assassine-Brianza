@@ -1774,6 +1774,15 @@ def polys_of(g, tol=0.15, min_area=0.5):
         if isinstance(p, Polygon) and p.area >= min_area:
             out.append({'p': enc(list(p.exterior.coords)[:-1]), 'k': [enc(list(i.coords)[:-1]) for i in p.interiors if Polygon(i).area > 0.3]})
     return out
+# ---- parking lots attached to the street by hand (exceptions, one polygon each: the asphalt that joins the lot to the carriageway; walls and buildings stay)
+PARCHEGGI_ATTACCATI = [
+    ('parcheggio via Gagarin attaccato alla strada, Carlo 30/10', [(587.7, -542.8), (587.9, -542.6), (588.2, -542.7), (596.9, -549.7), (604.0, -554.3), (606.8, -555.6), (606.9, -555.9), (606.6, -556.4), (607.1, -557.2), (607.1, -557.5), (605.1, -558.8), (603.8, -560.9), (603.6, -561.0), (603.3, -560.9), (599.9, -556.5), (593.0, -555.2), (589.3, -557.0), (589.0, -557.0), (587.2, -554.1), (586.3, -550.0), (586.3, -547.8)]),
+]
+if PARCHEGGI_ATTACCATI:
+    _pa = unary_union([Polygon(pts_) for nome_, pts_ in PARCHEGGI_ATTACCATI]).difference(bunion)
+    asph, pedz, side, foot = unary_union([asph, _pa]), pedz.difference(_pa), side.difference(_pa), foot.difference(_pa)
+    area_geoms[:] = [(at, g.difference(_pa) if (at in (1, 2, 3) and g.intersects(_pa)) else g) for at, g in area_geoms]
+    log('parcheggi attaccati a mano', len(PARCHEGGI_ATTACCATI), 'm2', round(_pa.area))
 SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}
 parts_of = lambda g: [p for p in (list(g.geoms) if hasattr(g, 'geoms') else [g]) if not p.is_empty]
 SURFP = {k: parts_of(g) for k, g in SURF.items() if not g.is_empty}
