@@ -37,6 +37,29 @@
  "edifici_dbgt": 5525,
  "volumi": 7556,
  "accessi": 3731,
+ "demoliti": {
+  "controllati": 933,
+  "non_controllabili": 3,
+  "tolti": 48,
+  "m2": 26032,
+  "soglia": 0.2,
+  "errore_stimato_tetti_tolti": 0.0113,
+  "terreno_riconosciuto": 0.7598,
+  "tetti_sicuri": 2293,
+  "negativi": 1145,
+  "esempi": [
+   "http://127.0.0.1:8013/?x=-93.5&z=96.9&piedi",
+   "http://127.0.0.1:8013/?x=-12.0&z=71.9&piedi",
+   "http://127.0.0.1:8013/?x=368.5&z=-323.5&piedi",
+   "http://127.0.0.1:8013/?x=1338.0&z=90.3&piedi",
+   "http://127.0.0.1:8013/?x=496.8&z=-1161.8&piedi",
+   "http://127.0.0.1:8013/?x=-752.3&z=-1004.9&piedi",
+   "http://127.0.0.1:8013/?x=1259.8&z=248.0&piedi",
+   "http://127.0.0.1:8013/?x=-19.8&z=40.1&piedi",
+   "http://127.0.0.1:8013/?x=147.2&z=-1564.0&piedi",
+   "http://127.0.0.1:8013/?x=1029.2&z=-966.0&piedi"
+  ]
+ },
  "osm": {
   "osm_sostituiti": 3617,
   "osm_in_parte_senza_dbgt": 69,
@@ -962,17 +985,17 @@
   ]
  },
  "volumi_disegnati": {
-  "a_terra": 7055,
+  "a_terra": 6990,
   "alti_02": 28,
   "alti_04": 197,
   "sotterranei": 67,
   "alti_03": 209
  },
  "tipi": {
-  "yes": 2150,
+  "yes": 2110,
   "shed": 1119,
   "garage": 958,
-  "industrial": 493,
+  "industrial": 485,
   "house": 216,
   "apartments": 213,
   "residential": 162,
@@ -997,43 +1020,43 @@
  },
  "attributi_da_osm": 2837,
  "stato_2015": {
-  "ruderi": 33,
+  "ruderi": 23,
   "in_costruzione_senza_osm": 5,
   "diruti": 33,
   "in_costruzione": 7
  },
  "tetti": {
   "dal_dsm": {
-   "rudere_con_tetto_dal_dsm": 13,
-   "piano": 2441,
-   "a_falde": 1216,
-   "a_una_falda": 183,
-   "in_ali": 477,
+   "rudere_con_tetto_dal_dsm": 9,
+   "piano": 2421,
+   "a_falde": 1210,
+   "a_una_falda": 180,
+   "in_ali": 474,
    "a_padiglione": 462,
    "in_costruzione_piano": 5,
-   "rudere_senza_tetto": 23,
+   "rudere_senza_tetto": 17,
    "da_osm_roof_shape": 4,
    "cupole_e_guglie_dal_dsm": 3
   },
   "non_dal_dsm": {
-   "troppo_ripido": 141,
-   "irregolare": 601,
-   "piccolo": 858,
-   "basso": 260,
+   "troppo_ripido": 140,
+   "irregolare": 595,
+   "piccolo": 857,
+   "basso": 259,
    "chiome": 24,
-   "alto": 325,
-   "complesso": 179,
-   "non_copre": 265,
+   "alto": 318,
+   "complesso": 175,
+   "non_copre": 262,
    "senza_dsm": 16
   },
   "ali": {
-   "volumi_in_ali": 477,
-   "ali": 1100,
+   "volumi_in_ali": 474,
+   "ali": 1094,
    "ali_piane_senza_dsm": 181,
-   "ala_piana": 423,
-   "ala_a_falde": 460,
+   "ala_piana": 421,
+   "ala_a_falde": 457,
    "ali_senza_falde": 245,
-   "ala_a_padiglione": 84,
+   "ala_a_padiglione": 83,
    "ala_a_una_falda": 133
   },
   "colmo_sulla_gronda": {
@@ -1043,7 +1066,7 @@
   }
  },
  "vie_negli_edifici": {
-  "spostate": 16,
+  "spostate": 15,
   "tagliate": 9,
   "tolte": 1,
   "dove_spostate": [
@@ -1133,14 +1156,6 @@
     6,
     0.5,
     1.09,
-    -1
-   ],
-   [
-    732.8,
-    -40.9,
-    6,
-    5.0,
-    0.92,
     -1
    ],
    [
