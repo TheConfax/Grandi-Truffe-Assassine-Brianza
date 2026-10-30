@@ -240,6 +240,7 @@ Le foto sono in Viaggiare in Brianza (guide di Meda e Seveso).
 - [ ] **Tettoie doppie sui benzinai** (Carlo, 29/10 sera): sui 3 benzinai più vicini allo spawn di via Gagarin si vede la tettoia dei dati (OSM `building=roof`, tornata intera con `osm-batte-dbgt`) sopra la pensilina del modello del benzinaio. Regola: una tettoia OSM/DBGT dentro un benzinaio disegnato dal gioco si toglie (build)
 
 ## Lungo termine (backlog generico)
+- [ ] **Quadrati neri sulla superficie** (Carlo, 30/10: backlog): celle della mesh di superficie disegnate nere con dati giusti (es. asfalto in via Indipendenza 775.8,-109.2, incolto in via Pace 491,-586): non è il terreno né l'ombra, sembra la texture campionata scura in quegli UV. Indagine con Opus su `world3.js` (`cellOwners`, `H.onTri`)
 - [ ] **Nomi delle vie e dei posti giusti ovunque** (Carlo, 29/10): oggi le segnalazioni del tasto B sbagliano la via (il piazzale fra le aiuole x 515 z −231 e il porticato x 533 z −278 sono in via Isonzo, la segnalazione scrive "Via del Cimitero"). Da rivedere come il gioco sceglie la via e il luogo più vicino, per le segnalazioni e per tutto quello che mostra un nome
 - [ ] **Cancelli di altri tipi** (Carlo, 29/10): dopo il cancello base ridimensionabile (ramo `cancelli-carrai`), tipi diversi scelti dai dati o dal contesto: legno, ferro battuto delle ville, rete, sbarra, cancelletto pedonale; il tipo è già un campo nei dati
 
