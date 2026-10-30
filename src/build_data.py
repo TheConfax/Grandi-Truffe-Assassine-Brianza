@@ -987,7 +987,7 @@ if dbt_walls:
     _ctl_aiuole = {'aiuole_dbgt': len(dbt_aiuole), 'divisori_resi_cordolo_basso_per_tipo_di_prima': {str(k_): v_ for k_, v_ in n_aiu.items()}}
 # passi carrai: each DBGT driveway point within PC_D of a divider opens it PC_W wide and closes it with a gate as tall as the wall;
 # where a street (class 3 or more) already crosses there the gap stays open. Two points closer than PC_W are one gate
-PC_D, PC_W = 2.5, 3.6
+PC_D, PC_W = 6.0, 3.6
 # the barriers do not change until the cemetery walls: their union for those, on a thread from here (src/presto.py)
 _osm_bar_all_f = presto(lambda b_: unary_union([LineString(pts).buffer(1.5) for pts, k, h in b_ if len(pts) >= 2]) if b_ else GeometryCollection(), list(barriers))
 pc_cuts, pc_gates = [], []
@@ -1132,6 +1132,8 @@ for bi, run in enumerate(bar_runs):
 gate_out = []; doors_out = []
 _cl = [(LineString(pts), h_, -1) for pts, k_, h_ in bar_out if len(pts) >= 2 and k_ != 6] + [(g_.boundary, 2.0, i_) for i_, (b_, g_) in enumerate(_bl) if g_ is not None]
 _clt = STRtree([c_[0] for c_ in _cl])
+_paved = [g_ for g_ in (asph, pedz, side, foot, parking) if g_ is not None and not g_.is_empty]
+for g_ in _paved: prepare(g_)
 _go = {'osm_nodi': 0, 'disegnati': 0, 'scartati_classe1_o_non_piana': 0, 'lift_alzate': 0, 'senza_via_su_chiusura': 0, 'scartati_senza_via_senza_chiusura': 0, 'fuori': 0, 'entrance_kissing': 0, 'entrance_kissing_scartati': 0}
 def _closest(p_, R_):
     P0_ = Point(p_); best_ = None
@@ -1181,7 +1183,9 @@ for r_, t in ntags.items():
     if span is None:  # not on any street: a small gate along the closest fence or wall
         c_ = _closest(p, 6.0)
         if c_ is None: _go['scartati_senza_via_senza_chiusura'] += 1; continue
-        ux_, uz_ = _tan_at(_cl[c_[1]][0], p); hgt = min(2.2, max(1.2, _cl[c_[1]][1])); span = ((p[0] - ux_ * 0.7, p[1] - uz_ * 0.7), (p[0] + ux_ * 0.7, p[1] + uz_ * 0.7)); _go['senza_via_su_chiusura'] += 1
+        ux_, uz_ = _tan_at(_cl[c_[1]][0], p); hgt = min(2.2, max(1.2, _cl[c_[1]][1])); span = ((p[0] - ux_ * 0.7, p[1] - uz_ * 0.7), (p[0] + ux_ * 0.7, p[1] + uz_ * 0.7))
+        if any(g_.contains(LineString(span).interpolate(t_, normalized=True)) for t_ in (0.1, 0.3, 0.5, 0.7, 0.9) for g_ in _paved): _go['scartati_senza_via_senza_chiusura'] += 1; continue  # never on a paved surface
+        _go['senza_via_su_chiusura'] += 1
     _go['disegnati'] += 1
     gate_out.append([q(span[0][0]), q(span[0][1]), q(span[1][0]), q(span[1][1]), kind, round(1.0 if kind == 'l' else hgt, 1), 1 if rd and rd['c'] <= 3 else 0])
 log('cancelli OSM', _go)
@@ -1276,6 +1280,7 @@ if dbt_pc:
         if wd_ < (2.0 if dir_ else 1.0): _gcc['troppo_stretti'] += 1; continue
         if not dir_ and sum(1 for e_ in ext_ if e_ and e_[2] >= 0) == 2 and wd_ < 2.2: _gcc['capo_nel_vuoto'] += 1; continue  # a slot between two houses is not an entrance
         mid_ = G_.centroid
+        if any(g_.contains(G_.interpolate(t_, normalized=True)) for t_ in (0.1, 0.3, 0.5, 0.7, 0.9) for g_ in _paved): _gcc['carreggiata_o_marciapiede'] += 1; continue  # a gate never stands on any paved surface (street, square, pavement, footpath, car park)
         if any(math.dist((mid_.x, mid_.y), ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20)) < 1.5 for g_ in gate_out) or any(math.dist((mid_.x, mid_.y), d_) < 1.5 for d_ in _gd): _gcc['gia_cancello'] += 1; continue
         if dir_ and not any(r_['c'] <= 3 and r_['line'].distance(mid_) <= r_['w'] / 2 + 4.5 for r_ in (_rr[j_] for j_ in _rrt.query(mid_.buffer(12)))): _gcc['senza_strada'] += 1; continue  # a fence end only counts on the boundary of a street
         if (STR and STR.U_carr.intersects(G_) and STR.U_carr.intersection(G_).length > 0.3) or (asph.intersects(G_) and asph.intersection(G_).length > 0.3) or (side.intersects(G_) and side.intersection(G_).length > 0.3): _gcc['carreggiata_o_marciapiede'] += 1; continue
