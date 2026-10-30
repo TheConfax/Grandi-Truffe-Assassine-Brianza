@@ -172,6 +172,11 @@ class Grid {
         const k = this.k(i, j); let a = this.m.get(k); if (!a) this.m.set(k, a = []); a.push(it);
       }
   }
+  del(x0, z0, x1, z1, it) {
+    const c = this.cs;
+    for (let i = Math.floor(Math.min(x0, x1) / c); i <= Math.floor(Math.max(x0, x1) / c); i++)
+      for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) { const a = this.m.get(this.k(i, j)); if (!a) continue; const n = a.indexOf(it); if (n >= 0) a.splice(n, 1); }
+  }
   each(x0, z0, x1, z1, fn) {
     const c = this.cs, q = ++this.q;
     for (let i = Math.floor(x0 / c); i <= Math.floor(x1 / c); i++)
