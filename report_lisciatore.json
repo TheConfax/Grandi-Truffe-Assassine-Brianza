@@ -1,0 +1,3445 @@
+{
+"limiti": {
+"dente_m": 1.5,
+"raccordo_minimo_m": 4.0,
+"gradino_pieno_m": 1.5,
+"gradino_massimo_m": 2.5,
+"buca_prof_m": 1.0,
+"buca_m2": [
+12.0,
+1000.0
+],
+"buca_da_strada_m": 12.0
+},
+"buche": {
+"conta": {
+"riempita": 511,
+"protetta": 41,
+"troppo_grande": 37,
+"strada_in_fondo": 5,
+"rampa_nei_dati": 2
+},
+"nodi": 22447,
+"alzati_m": {
+"n": 22447,
+"p50": 0.782,
+"p90": 2.006,
+"p99": 3.082,
+"max": 5.798
+},
+"rimaste_oltre_soglia": [
+{
+"x": 995.2,
+"z": -2420.4,
+"m2": 884,
+"prof": 1.89,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": -360.8,
+"z": -2454.4,
+"m2": 1752,
+"prof": 1.29,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 979.2,
+"z": -2222.4,
+"m2": 2692,
+"prof": 3.42,
+"sotto_edificio": 0.12,
+"esito": "protetta"
+},
+{
+"x": -12.8,
+"z": -1890.4,
+"m2": 22740,
+"prof": 11.33,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": 1095.2,
+"z": -2162.4,
+"m2": 928,
+"prof": 3.31,
+"sotto_edificio": 0.02,
+"esito": "protetta"
+},
+{
+"x": 821.2,
+"z": -2100.4,
+"m2": 704,
+"prof": 2.33,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": 1063.2,
+"z": -2152.4,
+"m2": 664,
+"prof": 2.94,
+"sotto_edificio": 0.49,
+"esito": "protetta"
+},
+{
+"x": 1105.2,
+"z": -2058.4,
+"m2": 1204,
+"prof": 4.15,
+"sotto_edificio": 0.35,
+"esito": "protetta"
+},
+{
+"x": 981.2,
+"z": -1790.4,
+"m2": 1812,
+"prof": 3.84,
+"sotto_edificio": 0.15,
+"esito": "protetta"
+},
+{
+"x": 733.2,
+"z": -1732.4,
+"m2": 2040,
+"prof": 2.94,
+"sotto_edificio": 0.33,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": 557.2,
+"z": -1738.4,
+"m2": 576,
+"prof": 1.92,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": -350.8,
+"z": -1700.4,
+"m2": 56,
+"prof": 1.23,
+"sotto_edificio": 0.0,
+"esito": "strada_in_fondo"
+},
+{
+"x": 859.2,
+"z": -1636.4,
+"m2": 1120,
+"prof": 2.42,
+"sotto_edificio": 0.35,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": -584.8,
+"z": -1458.4,
+"m2": 1092,
+"prof": 2.24,
+"sotto_edificio": 0.03,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 483.2,
+"z": -834.4,
+"m2": 5780,
+"prof": 3.89,
+"sotto_edificio": 0.23,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": 537.2,
+"z": -1338.4,
+"m2": 88,
+"prof": 2.97,
+"sotto_edificio": 0.41,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "strada_in_fondo"
+},
+{
+"x": 849.2,
+"z": -1262.4,
+"m2": 292,
+"prof": 2.31,
+"sotto_edificio": 0.55,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "protetta"
+},
+{
+"x": -910.8,
+"z": -1140.4,
+"m2": 14932,
+"prof": 17.45,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 429.2,
+"z": -1082.4,
+"m2": 504,
+"prof": 3.03,
+"sotto_edificio": 0.15,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": 777.2,
+"z": -1046.4,
+"m2": 4312,
+"prof": 1.65,
+"sotto_edificio": 0.35,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 1585.2,
+"z": -1074.4,
+"m2": 1680,
+"prof": 1.29,
+"sotto_edificio": 0.0,
+"esito": "troppo_grande"
+},
+{
+"x": -980.8,
+"z": -876.4,
+"m2": 84100,
+"prof": 27.85,
+"sotto_edificio": 0.05,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": -1388.8,
+"z": -720.4,
+"m2": 46800,
+"prof": 7.41,
+"sotto_edificio": 0.23,
+"esito": "troppo_grande"
+},
+{
+"x": 1419.2,
+"z": -1018.4,
+"m2": 1388,
+"prof": 3.1,
+"sotto_edificio": 0.78,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": -1110.8,
+"z": -1000.4,
+"m2": 3988,
+"prof": 11.61,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": -620.8,
+"z": -800.4,
+"m2": 21368,
+"prof": 4.73,
+"sotto_edificio": 0.19,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 981.2,
+"z": -896.4,
+"m2": 2520,
+"prof": 1.22,
+"sotto_edificio": 0.47,
+"esito": "troppo_grande"
+},
+{
+"x": 1061.2,
+"z": -840.4,
+"m2": 5848,
+"prof": 4.06,
+"sotto_edificio": 0.32,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 335.2,
+"z": -594.4,
+"m2": 4016,
+"prof": 4.73,
+"sotto_edificio": 0.33,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": -1336.8,
+"z": -168.4,
+"m2": 10096,
+"prof": 4.04,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": 629.2,
+"z": -700.4,
+"m2": 1088,
+"prof": 1.51,
+"sotto_edificio": 0.5,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 1491.2,
+"z": -686.4,
+"m2": 2364,
+"prof": 2.82,
+"sotto_edificio": 0.52,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 31.2,
+"z": -646.4,
+"m2": 24,
+"prof": 3.46,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "strada_in_fondo"
+},
+{
+"x": -1060.8,
+"z": -480.4,
+"m2": 6444,
+"prof": 3.88,
+"sotto_edificio": 0.28,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": -846.8,
+"z": -512.4,
+"m2": 1068,
+"prof": 3.31,
+"sotto_edificio": 0.39,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 889.2,
+"z": -498.4,
+"m2": 1676,
+"prof": 5.22,
+"sotto_edificio": 0.28,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 1075.2,
+"z": -484.4,
+"m2": 3420,
+"prof": 4.38,
+"sotto_edificio": 0.4,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 229.2,
+"z": -442.4,
+"m2": 1916,
+"prof": 3.78,
+"sotto_edificio": 0.35,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": 325.2,
+"z": -500.4,
+"m2": 84,
+"prof": 4.29,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": -856.8,
+"z": -466.4,
+"m2": 3676,
+"prof": 1.95,
+"sotto_edificio": 0.35,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": -312.8,
+"z": -496.4,
+"m2": 24,
+"prof": 3.25,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "strada_in_fondo"
+},
+{
+"x": 355.2,
+"z": -476.4,
+"m2": 264,
+"prof": 3.26,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": -76.8,
+"z": -458.4,
+"m2": 132,
+"prof": 1.99,
+"sotto_edificio": 0.39,
+"era": "dubbio/possibile",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "rampa_nei_dati"
+},
+{
+"x": 1573.2,
+"z": -400.4,
+"m2": 1652,
+"prof": 2.09,
+"sotto_edificio": 0.43,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": -1130.8,
+"z": -398.4,
+"m2": 3596,
+"prof": 2.66,
+"sotto_edificio": 0.35,
+"esito": "troppo_grande"
+},
+{
+"x": -996.8,
+"z": -400.4,
+"m2": 1760,
+"prof": 1.07,
+"sotto_edificio": 0.34,
+"esito": "troppo_grande"
+},
+{
+"x": 187.2,
+"z": -324.4,
+"m2": 268,
+"prof": 1.56,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": 973.2,
+"z": -368.4,
+"m2": 48,
+"prof": 2.07,
+"sotto_edificio": 0.0,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": -1092.8,
+"z": -352.4,
+"m2": 2648,
+"prof": 3.61,
+"sotto_edificio": 0.12,
+"esito": "troppo_grande"
+},
+{
+"x": 943.2,
+"z": -352.4,
+"m2": 196,
+"prof": 1.43,
+"sotto_edificio": 0.51,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 3 m"
+],
+"esito": "protetta"
+},
+{
+"x": -876.8,
+"z": -212.4,
+"m2": 7708,
+"prof": 3.97,
+"sotto_edificio": 0.02,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 879.2,
+"z": -228.4,
+"m2": 1824,
+"prof": 1.56,
+"sotto_edificio": 0.32,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 35.2,
+"z": -134.4,
+"m2": 1332,
+"prof": 1.46,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": -1228.8,
+"z": -4.4,
+"m2": 12928,
+"prof": 5.14,
+"sotto_edificio": 0.11,
+"esito": "protetta"
+},
+{
+"x": -806.8,
+"z": -92.4,
+"m2": 6120,
+"prof": 1.66,
+"sotto_edificio": 0.25,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": -622.8,
+"z": -56.4,
+"m2": 8008,
+"prof": 3.68,
+"sotto_edificio": 0.16,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": -184.8,
+"z": 197.6,
+"m2": 12924,
+"prof": 6.54,
+"sotto_edificio": 0.25,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": 289.2,
+"z": -66.4,
+"m2": 1268,
+"prof": 1.66,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 123.2,
+"z": 205.6,
+"m2": 27084,
+"prof": 1.32,
+"sotto_edificio": 0.04,
+"esito": "protetta"
+},
+{
+"x": 999.2,
+"z": -10.4,
+"m2": 64,
+"prof": 2.14,
+"sotto_edificio": 0.0,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"OSM parcheggio interrato",
+"ortofoto 2018-19"
+],
+"esito": "rampa_nei_dati"
+},
+{
+"x": 1019.2,
+"z": 25.6,
+"m2": 16,
+"prof": 2.15,
+"sotto_edificio": 0.0,
+"esito": "strada_in_fondo"
+},
+{
+"x": -1148.8,
+"z": 125.6,
+"m2": 1988,
+"prof": 3.17,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": 1773.2,
+"z": 107.6,
+"m2": 2028,
+"prof": 4.12,
+"sotto_edificio": 0.54,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 763.2,
+"z": 187.6,
+"m2": 11380,
+"prof": 1.23,
+"sotto_edificio": 0.15,
+"esito": "troppo_grande"
+},
+{
+"x": -468.8,
+"z": 115.6,
+"m2": 48,
+"prof": 1.33,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": -1318.8,
+"z": 653.6,
+"m2": 13272,
+"prof": 5.4,
+"sotto_edificio": 0.38,
+"esito": "protetta"
+},
+{
+"x": -2.8,
+"z": 217.6,
+"m2": 1368,
+"prof": 1.19,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": -264.8,
+"z": 675.6,
+"m2": 5212,
+"prof": 3.82,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": 415.2,
+"z": 243.6,
+"m2": 1264,
+"prof": 1.49,
+"sotto_edificio": 0.23,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": 1215.2,
+"z": 503.6,
+"m2": 1788,
+"prof": 2.83,
+"sotto_edificio": 0.68,
+"esito": "troppo_grande"
+},
+{
+"x": 385.2,
+"z": 543.6,
+"m2": 1592,
+"prof": 1.56,
+"sotto_edificio": 0.5,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 967.2,
+"z": 683.6,
+"m2": 2832,
+"prof": 2.73,
+"sotto_edificio": 0.56,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 1201.2,
+"z": 753.6,
+"m2": 5256,
+"prof": 2.41,
+"sotto_edificio": 0.56,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "troppo_grande"
+},
+{
+"x": -1246.8,
+"z": 953.6,
+"m2": 4112,
+"prof": 4.75,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": -336.8,
+"z": 887.6,
+"m2": 2940,
+"prof": 3.9,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": 1051.2,
+"z": 739.6,
+"m2": 1280,
+"prof": 2.11,
+"sotto_edificio": 0.58,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "troppo_grande"
+},
+{
+"x": 387.2,
+"z": 813.6,
+"m2": 28,
+"prof": 1.23,
+"sotto_edificio": 1.0,
+"esito": "protetta"
+},
+{
+"x": 361.2,
+"z": 817.6,
+"m2": 168,
+"prof": 2.67,
+"sotto_edificio": 0.6,
+"esito": "protetta"
+},
+{
+"x": 151.2,
+"z": 825.6,
+"m2": 3988,
+"prof": 1.45,
+"sotto_edificio": 0.23,
+"esito": "troppo_grande"
+},
+{
+"x": 727.2,
+"z": 875.6,
+"m2": 1072,
+"prof": 3.58,
+"sotto_edificio": 0.45,
+"esito": "troppo_grande"
+}
+],
+"riempite": [
+{
+"x": 1423.2,
+"z": -38.4,
+"m2": 976,
+"prof": 3.21,
+"sotto_edificio": 0.54,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -366.8,
+"z": -648.4,
+"m2": 712,
+"prof": 3.63,
+"sotto_edificio": 0.72,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "riempita"
+},
+{
+"x": 161.2,
+"z": 379.6,
+"m2": 696,
+"prof": 3.3,
+"sotto_edificio": 0.82,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 911.2,
+"z": -188.4,
+"m2": 1000,
+"prof": 2.24,
+"sotto_edificio": 0.44,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -354.8,
+"z": -1744.4,
+"m2": 680,
+"prof": 3.14,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 583.2,
+"z": -230.4,
+"m2": 764,
+"prof": 2.72,
+"sotto_edificio": 0.55,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 937.2,
+"z": 559.6,
+"m2": 884,
+"prof": 2.34,
+"sotto_edificio": 0.0,
+"esito": "riempita"
+},
+{
+"x": 179.2,
+"z": -430.4,
+"m2": 732,
+"prof": 2.78,
+"sotto_edificio": 0.69,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 851.2,
+"z": -612.4,
+"m2": 896,
+"prof": 2.26,
+"sotto_edificio": 0.64,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "riempita"
+},
+{
+"x": 249.2,
+"z": 681.6,
+"m2": 700,
+"prof": 2.89,
+"sotto_edificio": 0.58,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -574.8,
+"z": -1340.4,
+"m2": 580,
+"prof": 3.37,
+"sotto_edificio": 0.78,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -796.8,
+"z": -1864.4,
+"m2": 812,
+"prof": 2.39,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1643.2,
+"z": -816.4,
+"m2": 636,
+"prof": 3.02,
+"sotto_edificio": 0.69,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1403.2,
+"z": 225.6,
+"m2": 688,
+"prof": 2.74,
+"sotto_edificio": 0.76,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1301.2,
+"z": 571.6,
+"m2": 452,
+"prof": 4.09,
+"sotto_edificio": 0.64,
+"esito": "riempita"
+},
+{
+"x": 481.2,
+"z": -316.4,
+"m2": 624,
+"prof": 2.86,
+"sotto_edificio": 0.58,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "riempita"
+},
+{
+"x": -576.8,
+"z": -1114.4,
+"m2": 496,
+"prof": 3.47,
+"sotto_edificio": 0.71,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1375.2,
+"z": -726.4,
+"m2": 740,
+"prof": 2.31,
+"sotto_edificio": 0.74,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 969.2,
+"z": -1100.4,
+"m2": 772,
+"prof": 2.17,
+"sotto_edificio": 0.5,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "riempita"
+},
+{
+"x": 979.2,
+"z": -696.4,
+"m2": 556,
+"prof": 3.01,
+"sotto_edificio": 0.64,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 567.2,
+"z": 485.6,
+"m2": 820,
+"prof": 1.99,
+"sotto_edificio": 0.55,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1595.2,
+"z": 169.6,
+"m2": 868,
+"prof": 1.86,
+"sotto_edificio": 0.82,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 659.2,
+"z": -1040.4,
+"m2": 528,
+"prof": 3.04,
+"sotto_edificio": 0.92,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 307.2,
+"z": 705.6,
+"m2": 536,
+"prof": 2.92,
+"sotto_edificio": 0.37,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "riempita"
+},
+{
+"x": 21.2,
+"z": -672.4,
+"m2": 264,
+"prof": 5.8,
+"sotto_edificio": 0.27,
+"era": "dubbio/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1523.2,
+"z": -714.4,
+"m2": 820,
+"prof": 1.81,
+"sotto_edificio": 0.66,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 763.2,
+"z": 731.6,
+"m2": 412,
+"prof": 3.57,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1187.2,
+"z": -1338.4,
+"m2": 868,
+"prof": 1.64,
+"sotto_edificio": 0.8,
+"esito": "riempita"
+},
+{
+"x": 1179.2,
+"z": 15.6,
+"m2": 480,
+"prof": 2.95,
+"sotto_edificio": 0.47,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -448.8,
+"z": -416.4,
+"m2": 496,
+"prof": 2.82,
+"sotto_edificio": 0.31,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -368.8,
+"z": -1004.4,
+"m2": 868,
+"prof": 1.58,
+"sotto_edificio": 0.51,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -1094.8,
+"z": -1328.4,
+"m2": 484,
+"prof": 2.81,
+"sotto_edificio": 0.54,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 477.2,
+"z": 873.6,
+"m2": 420,
+"prof": 3.14,
+"sotto_edificio": 0.5,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1343.2,
+"z": -690.4,
+"m2": 612,
+"prof": 2.13,
+"sotto_edificio": 0.64,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1129.2,
+"z": -1000.4,
+"m2": 584,
+"prof": 2.2,
+"sotto_edificio": 0.73,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 963.2,
+"z": -272.4,
+"m2": 384,
+"prof": 3.34,
+"sotto_edificio": 0.72,
+"esito": "riempita"
+},
+{
+"x": -740.8,
+"z": -180.4,
+"m2": 440,
+"prof": 2.87,
+"sotto_edificio": 0.36,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 389.2,
+"z": 913.6,
+"m2": 468,
+"prof": 2.64,
+"sotto_edificio": 0.34,
+"esito": "riempita"
+},
+{
+"x": 619.2,
+"z": -992.4,
+"m2": 440,
+"prof": 2.72,
+"sotto_edificio": 0.83,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -358.8,
+"z": 525.6,
+"m2": 640,
+"prof": 1.86,
+"sotto_edificio": 0.69,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 673.2,
+"z": -376.4,
+"m2": 412,
+"prof": 2.73,
+"sotto_edificio": 0.4,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 883.2,
+"z": -154.4,
+"m2": 780,
+"prof": 1.44,
+"sotto_edificio": 0.25,
+"esito": "riempita"
+},
+{
+"x": 177.2,
+"z": 751.6,
+"m2": 332,
+"prof": 3.28,
+"sotto_edificio": 0.49,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 939.2,
+"z": 737.6,
+"m2": 372,
+"prof": 2.89,
+"sotto_edificio": 0.61,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1177.2,
+"z": -654.4,
+"m2": 548,
+"prof": 1.96,
+"sotto_edificio": 0.73,
+"esito": "riempita"
+},
+{
+"x": 311.2,
+"z": 313.6,
+"m2": 544,
+"prof": 1.97,
+"sotto_edificio": 0.47,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "riempita"
+},
+{
+"x": -374.8,
+"z": -842.4,
+"m2": 524,
+"prof": 2.02,
+"sotto_edificio": 0.41,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1445.2,
+"z": -428.4,
+"m2": 512,
+"prof": 2.06,
+"sotto_edificio": 0.48,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 635.2,
+"z": -308.4,
+"m2": 444,
+"prof": 2.37,
+"sotto_edificio": 0.6,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -90.8,
+"z": -652.4,
+"m2": 244,
+"prof": 4.31,
+"sotto_edificio": 0.0,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1267.2,
+"z": 869.6,
+"m2": 420,
+"prof": 2.5,
+"sotto_edificio": 0.52,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -908.8,
+"z": -540.4,
+"m2": 324,
+"prof": 3.21,
+"sotto_edificio": 0.41,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "riempita"
+},
+{
+"x": 1595.2,
+"z": -446.4,
+"m2": 304,
+"prof": 3.28,
+"sotto_edificio": 0.29,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 591.2,
+"z": 363.6,
+"m2": 280,
+"prof": 3.56,
+"sotto_edificio": 0.4,
+"era": "dubbio/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -764.8,
+"z": -1384.4,
+"m2": 324,
+"prof": 2.98,
+"sotto_edificio": 0.74,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 551.2,
+"z": 667.6,
+"m2": 568,
+"prof": 1.69,
+"sotto_edificio": 0.68,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 531.2,
+"z": 385.6,
+"m2": 364,
+"prof": 2.63,
+"sotto_edificio": 0.82,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 25.2,
+"z": -488.4,
+"m2": 172,
+"prof": 5.39,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -780.8,
+"z": -588.4,
+"m2": 296,
+"prof": 3.12,
+"sotto_edificio": 0.64,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 779.2,
+"z": 13.6,
+"m2": 332,
+"prof": 2.78,
+"sotto_edificio": 0.65,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 169.2,
+"z": 789.6,
+"m2": 348,
+"prof": 2.64,
+"sotto_edificio": 0.89,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1189.2,
+"z": -1194.4,
+"m2": 332,
+"prof": 2.72,
+"sotto_edificio": 0.64,
+"era": "altro/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1515.2,
+"z": -2.4,
+"m2": 504,
+"prof": 1.76,
+"sotto_edificio": 0.6,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 929.2,
+"z": -212.4,
+"m2": 356,
+"prof": 2.47,
+"sotto_edificio": 0.55,
+"esito": "riempita"
+},
+{
+"x": -748.8,
+"z": -1430.4,
+"m2": 408,
+"prof": 2.14,
+"sotto_edificio": 0.42,
+"era": "dubbio/possibile",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1203.2,
+"z": 67.6,
+"m2": 544,
+"prof": 1.6,
+"sotto_edificio": 0.53,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -680.8,
+"z": 185.6,
+"m2": 244,
+"prof": 3.55,
+"sotto_edificio": 0.07,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 0 m"
+],
+"esito": "riempita"
+},
+{
+"x": -6.8,
+"z": 119.6,
+"m2": 368,
+"prof": 2.35,
+"sotto_edificio": 1.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 577.2,
+"z": -1658.4,
+"m2": 436,
+"prof": 1.98,
+"sotto_edificio": 0.38,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 809.2,
+"z": 285.6,
+"m2": 644,
+"prof": 1.3,
+"sotto_edificio": 0.16,
+"esito": "riempita"
+},
+{
+"x": 689.2,
+"z": -974.4,
+"m2": 548,
+"prof": 1.52,
+"sotto_edificio": 0.76,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 273.2,
+"z": 329.6,
+"m2": 420,
+"prof": 1.97,
+"sotto_edificio": 0.56,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 499.2,
+"z": 405.6,
+"m2": 292,
+"prof": 2.81,
+"sotto_edificio": 0.62,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -718.8,
+"z": -1668.4,
+"m2": 548,
+"prof": 1.42,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 899.2,
+"z": -1404.4,
+"m2": 328,
+"prof": 2.35,
+"sotto_edificio": 0.63,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 1645.2,
+"z": 27.6,
+"m2": 296,
+"prof": 2.6,
+"sotto_edificio": 0.64,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 367.2,
+"z": 625.6,
+"m2": 296,
+"prof": 2.6,
+"sotto_edificio": 0.42,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 819.2,
+"z": -1204.4,
+"m2": 372,
+"prof": 2.04,
+"sotto_edificio": 0.7,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": -692.8,
+"z": 417.6,
+"m2": 300,
+"prof": 2.4,
+"sotto_edificio": 0.87,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "riempita"
+},
+{
+"x": 379.2,
+"z": 837.6,
+"m2": 304,
+"prof": 2.35,
+"sotto_edificio": 0.5,
+"era": "dubbio",
+"fonti": [
+"LiDAR 2008",
+"DBGT volume interrato a 6 m"
+],
+"esito": "riempita"
+}
+],
+"secondo_giro_nodi": 147
+},
+"pozzetti": {
+"profondita_minima_m": 0.4,
+"massimo_m2": 12.0,
+"riempiti": 2947,
+"nodi": 19826,
+"alzati_m": {
+"n": 19826,
+"p50": 0.627,
+"p90": 1.428,
+"p99": 2.525,
+"max": 5.854
+}
+},
+"dente": {
+"nodi_mossi": 226519,
+"spostamento_m": {
+"n": 226519,
+"p50": 0.085,
+"p90": 0.275,
+"p99": 0.659,
+"max": 1.504
+},
+"su_m": 5.854036912089839,
+"giu_m": -1.5037338931466877
+},
+"controlli": {
+"dente_km": {
+"definizione": "S a 0,3 m dentro e fuori da ogni anello AC_VEI, AC_PED, AC_CIC, AR_STR, ogni 0,5 m: km fuori dalla media dei suoi 4 m oltre la soglia; nodi protetti esclusi",
+"prima": {
+"AC_VEI": {
+"km": 1354.56,
+"oltre_8cm": 48.85,
+"oltre_15cm": 15.53,
+"oltre_30cm": 2.83
+},
+"AC_PED": {
+"km": 203.61,
+"oltre_8cm": 8.26,
+"oltre_15cm": 1.98,
+"oltre_30cm": 0.27
+},
+"AC_CIC": {
+"km": 11.47,
+"oltre_8cm": 0.24,
+"oltre_15cm": 0.01,
+"oltre_30cm": 0.0
+},
+"AR_STR": {
+"km": 632.99,
+"oltre_8cm": 10.49,
+"oltre_15cm": 2.38,
+"oltre_30cm": 0.38
+}
+},
+"dopo": {
+"AC_VEI": {
+"km": 1354.56,
+"oltre_8cm": 24.11,
+"oltre_15cm": 6.42,
+"oltre_30cm": 0.97
+},
+"AC_PED": {
+"km": 203.61,
+"oltre_8cm": 1.95,
+"oltre_15cm": 0.52,
+"oltre_30cm": 0.06
+},
+"AC_CIC": {
+"km": 11.47,
+"oltre_8cm": 0.05,
+"oltre_15cm": 0.0,
+"oltre_30cm": 0.0
+},
+"AR_STR": {
+"km": 632.99,
+"oltre_8cm": 2.64,
+"oltre_15cm": 0.6,
+"oltre_30cm": 0.09
+}
+},
+"totale_prima": {
+"oltre_8cm": 67.85,
+"oltre_15cm": 19.9,
+"oltre_30cm": 3.48
+},
+"totale_dopo": {
+"oltre_8cm": 28.75,
+"oltre_15cm": 7.55,
+"oltre_30cm": 1.12
+},
+"soglia_15cm_km": 15.0
+},
+"buche_vicino_alle_strade": {
+"definizione": "depressioni chiuse di S oltre 1.0 m, almeno 12 m2, entro 12 m da una strada, nodi protetti esclusi",
+"prima": {
+"n": 544,
+"prof_m": {
+"n": 544,
+"p50": 1.76,
+"p90": 2.96,
+"max": 27.85
+},
+"area_m2": {
+"n": 544,
+"p50": 120.0,
+"p90": 697.6,
+"max": 84148.0
+},
+"riempibili": 499
+},
+"dopo": {
+"n": 38,
+"prof_m": {
+"n": 38,
+"p50": 2.315,
+"p90": 5.841,
+"max": 27.49
+},
+"area_m2": {
+"n": 38,
+"p50": 2570.0,
+"p90": 11910.8,
+"max": 83936.0
+},
+"riempibili": 0
+},
+"rimaste": [
+{
+"dati": false,
+"x": -360.8,
+"z": -2454.4,
+"m2": 1748,
+"prof": 1.29,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -584.8,
+"z": -1458.4,
+"m2": 1024,
+"prof": 2.22,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -910.8,
+"z": -1140.4,
+"m2": 14932,
+"prof": 17.45,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 777.2,
+"z": -1046.4,
+"m2": 4288,
+"prof": 1.65,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -988.8,
+"z": -894.4,
+"m2": 83936,
+"prof": 27.49,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -1388.8,
+"z": -720.4,
+"m2": 44976,
+"prof": 7.29,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 1419.2,
+"z": -1018.4,
+"m2": 1388,
+"prof": 3.1,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -1110.8,
+"z": -1000.4,
+"m2": 3996,
+"prof": 11.61,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -684.8,
+"z": -786.4,
+"m2": 21476,
+"prof": 2.0,
+"grande": true,
+"strada_in_fondo": true
+},
+{
+"dati": false,
+"x": 981.2,
+"z": -896.4,
+"m2": 2472,
+"prof": 1.22,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 1053.2,
+"z": -824.4,
+"m2": 5728,
+"prof": 4.05,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 629.2,
+"z": -700.4,
+"m2": 1084,
+"prof": 1.51,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 1491.2,
+"z": -686.4,
+"m2": 2308,
+"prof": 2.77,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -1060.8,
+"z": -480.4,
+"m2": 6232,
+"prof": 3.86,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -870.8,
+"z": -514.4,
+"m2": 1064,
+"prof": 1.89,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 897.2,
+"z": -506.4,
+"m2": 1672,
+"prof": 5.22,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 1075.2,
+"z": -484.4,
+"m2": 3392,
+"prof": 4.39,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -862.8,
+"z": -464.4,
+"m2": 3272,
+"prof": 1.19,
+"grande": true,
+"strada_in_fondo": true
+},
+{
+"dati": true,
+"x": -74.8,
+"z": -460.4,
+"m2": 128,
+"prof": 1.32,
+"grande": false,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 1573.2,
+"z": -400.4,
+"m2": 1632,
+"prof": 2.09,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -1136.8,
+"z": -382.4,
+"m2": 3676,
+"prof": 2.65,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -996.8,
+"z": -400.4,
+"m2": 1648,
+"prof": 1.07,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -1092.8,
+"z": -352.4,
+"m2": 2528,
+"prof": 3.62,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -876.8,
+"z": -212.4,
+"m2": 7720,
+"prof": 3.96,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -806.8,
+"z": -96.4,
+"m2": 6096,
+"prof": 1.66,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -620.8,
+"z": -52.4,
+"m2": 7964,
+"prof": 2.86,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 301.2,
+"z": -72.4,
+"m2": 1196,
+"prof": 1.5,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 1769.2,
+"z": 93.6,
+"m2": 1940,
+"prof": 3.02,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 763.2,
+"z": 187.6,
+"m2": 10616,
+"prof": 1.26,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 1215.2,
+"z": 503.6,
+"m2": 1784,
+"prof": 2.83,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -378.8,
+"z": 523.6,
+"m2": 368,
+"prof": 1.18,
+"grande": false,
+"strada_in_fondo": true
+},
+{
+"dati": false,
+"x": -562.8,
+"z": 551.6,
+"m2": 2612,
+"prof": 1.31,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 385.2,
+"z": 543.6,
+"m2": 1568,
+"prof": 1.56,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 967.2,
+"z": 661.6,
+"m2": 2812,
+"prof": 2.76,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 1201.2,
+"z": 753.6,
+"m2": 5120,
+"prof": 2.41,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 1051.2,
+"z": 739.6,
+"m2": 1256,
+"prof": 2.12,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 151.2,
+"z": 825.6,
+"m2": 4000,
+"prof": 1.44,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": 731.2,
+"z": 873.6,
+"m2": 1072,
+"prof": 2.8,
+"grande": true,
+"strada_in_fondo": true
+}
+]
+},
+"spostamento": {
+"dente_m": {
+"n": 223510,
+"p50": 0.09,
+"p90": 0.28,
+"p99": 0.95,
+"max": 1.5
+},
+"dente_su_m": 1.13,
+"dente_giu_m": -1.5,
+"buche_m": {
+"n": 35590,
+"p50": 0.7,
+"p90": 1.82,
+"p99": 2.97,
+"max": 5.85
+},
+"nodi_mossi": 259100,
+"nodi_griglia": 4004001,
+"limite_dente_m": 1.5
+},
+"invariati": {
+"nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 0,
+"nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 8,
+"carreggiate_cambiate": 0,
+"carreggiate_nei_pozzetti_riempiti": 72,
+"impalcati_e_sotto": 0,
+"acqua_e_alvei": 0,
+"ferrovia": 0,
+"rampe": 0
+},
+"gradini_cresciuti": {
+"definizione": "coppie di nodi vicini (anche in diagonale), fuori dagli edifici e dalle buche riempite, con il salto cresciuto oltre la soglia",
+"oltre_0.3m": 7521,
+"oltre_0.5m": 1061,
+"oltre_1.0m": 17,
+"peggiori": [
+{
+"x": 97.2,
+"z": -1018.4,
+"cresce": 1.22
+},
+{
+"x": 41.2,
+"z": -900.4,
+"cresce": 1.22
+},
+{
+"x": 37.2,
+"z": -912.4,
+"cresce": 1.21
+},
+{
+"x": 37.2,
+"z": -914.4,
+"cresce": 1.21
+},
+{
+"x": 29.2,
+"z": -808.4,
+"cresce": 1.19
+},
+{
+"x": 29.2,
+"z": -810.4,
+"cresce": 1.19
+},
+{
+"x": 29.2,
+"z": -810.4,
+"cresce": 1.19
+},
+{
+"x": -462.8,
+"z": -994.4,
+"cresce": 1.13
+},
+{
+"x": -464.8,
+"z": -994.4,
+"cresce": 1.13
+},
+{
+"x": -232.8,
+"z": -1086.4,
+"cresce": 1.07
+},
+{
+"x": -260.8,
+"z": -978.4,
+"cresce": 1.05
+},
+{
+"x": 1627.2,
+"z": -830.4,
+"cresce": 1.02
+},
+{
+"x": -426.8,
+"z": -1380.4,
+"cresce": 1.02
+},
+{
+"x": -206.8,
+"z": -1018.4,
+"cresce": 1.02
+},
+{
+"x": 101.2,
+"z": -1016.4,
+"cresce": 1.02
+},
+{
+"x": -238.8,
+"z": -1010.4,
+"cresce": 1.02
+},
+{
+"x": 101.2,
+"z": -1016.4,
+"cresce": 1.0
+},
+{
+"x": 369.2,
+"z": -1112.4,
+"cresce": 1.0
+},
+{
+"x": -252.8,
+"z": -996.4,
+"cresce": 1.0
+},
+{
+"x": 35.2,
+"z": -924.4,
+"cresce": 1.0
+},
+{
+"x": -630.8,
+"z": -896.4,
+"cresce": 0.98
+},
+{
+"x": -630.8,
+"z": -896.4,
+"cresce": 0.98
+},
+{
+"x": -240.8,
+"z": -1012.4,
+"cresce": 0.98
+},
+{
+"x": -628.8,
+"z": -896.4,
+"cresce": 0.96
+},
+{
+"x": -210.8,
+"z": -1024.4,
+"cresce": 0.96
+},
+{
+"x": -204.8,
+"z": -1014.4,
+"cresce": 0.96
+},
+{
+"x": -630.8,
+"z": -896.4,
+"cresce": 0.96
+},
+{
+"x": 55.2,
+"z": -766.4,
+"cresce": 0.95
+},
+{
+"x": 55.2,
+"z": -768.4,
+"cresce": 0.95
+},
+{
+"x": -208.8,
+"z": -1022.4,
+"cresce": 0.95
+}
+]
+},
+"luoghi_oltre_30cm": [
+{
+"x": 44.8,
+"z": 510.6,
+"scarto": 1.15
+},
+{
+"x": -539.1,
+"z": -836.0,
+"scarto": 0.67
+},
+{
+"x": 44.4,
+"z": -757.5,
+"scarto": 0.59
+},
+{
+"x": -887.5,
+"z": -248.1,
+"scarto": 0.55
+},
+{
+"x": 492.4,
+"z": -1368.4,
+"scarto": 0.52
+},
+{
+"x": -343.9,
+"z": -1207.6,
+"scarto": 0.5
+},
+{
+"x": 270.4,
+"z": -1237.3,
+"scarto": 0.49
+},
+{
+"x": -686.1,
+"z": -1001.4,
+"scarto": 0.47
+},
+{
+"x": 303.3,
+"z": -1008.1,
+"scarto": 0.46
+},
+{
+"x": -759.9,
+"z": 90.6,
+"scarto": 0.45
+},
+{
+"x": 890.0,
+"z": -493.4,
+"scarto": 0.43
+},
+{
+"x": -689.3,
+"z": -1003.0,
+"scarto": 0.42
+},
+{
+"x": -709.8,
+"z": -1034.8,
+"scarto": 0.41
+},
+{
+"x": 1029.4,
+"z": -835.1,
+"scarto": 0.4
+},
+{
+"x": -456.6,
+"z": -1034.5,
+"scarto": 0.4
+},
+{
+"x": 1236.6,
+"z": -834.1,
+"scarto": 0.39
+},
+{
+"x": -540.7,
+"z": -840.7,
+"scarto": 0.38
+},
+{
+"x": 223.5,
+"z": -923.0,
+"scarto": 0.38
+},
+{
+"x": 210.2,
+"z": -971.9,
+"scarto": 0.37
+},
+{
+"x": 770.5,
+"z": -999.1,
+"scarto": 0.37
+},
+{
+"x": -482.0,
+"z": -602.4,
+"scarto": 0.36
+},
+{
+"x": 328.5,
+"z": -2013.0,
+"scarto": 0.36
+},
+{
+"x": 231.9,
+"z": -878.2,
+"scarto": 0.36
+},
+{
+"x": 895.5,
+"z": -509.8,
+"scarto": 0.35
+},
+{
+"x": -714.5,
+"z": -1034.9,
+"scarto": 0.35
+},
+{
+"x": -478.9,
+"z": -477.5,
+"scarto": 0.34
+},
+{
+"x": 1349.2,
+"z": -878.4,
+"scarto": 0.34
+},
+{
+"x": 51.7,
+"z": -761.6,
+"scarto": 0.34
+},
+{
+"x": -227.5,
+"z": -1059.7,
+"scarto": 0.33
+},
+{
+"x": 467.0,
+"z": -1199.9,
+"scarto": 0.33
+},
+{
+"x": 175.2,
+"z": -1334.6,
+"scarto": 0.33
+},
+{
+"x": -335.4,
+"z": -1260.4,
+"scarto": 0.32
+},
+{
+"x": -302.8,
+"z": -1261.6,
+"scarto": 0.32
+},
+{
+"x": -269.8,
+"z": -1131.4,
+"scarto": 0.32
+},
+{
+"x": -239.1,
+"z": -1092.6,
+"scarto": 0.31
+},
+{
+"x": -4.8,
+"z": -676.1,
+"scarto": 0.31
+},
+{
+"x": -917.5,
+"z": -1453.6,
+"scarto": 0.31
+},
+{
+"x": 46.3,
+"z": -718.4,
+"scarto": 0.31
+},
+{
+"x": -913.6,
+"z": -1450.4,
+"scarto": 0.3
+},
+{
+"x": 1084.5,
+"z": 400.3,
+"scarto": 0.3
+}
+],
+"ok": true
+},
+"controlli_pozzetti": {
+"definizione": "depressioni chiuse di S (piena dal minimo fino al punto di sfioro) profonde almeno 0.4 m con al massimo 3 nodi (12 m2), su tutta la mappa",
+"prima": {
+"totale": 1967,
+"senza_motivo": 1898,
+"oltre_1m": 246,
+"oltre_2m": 22
+},
+"dopo": {
+"totale": 71,
+"senza_motivo": 0,
+"oltre_1m": 4,
+"oltre_2m": 0
+},
+"eccezioni_per_motivo": {
+"acqua o alveo": 47,
+"impalcato o ponte": 3,
+"rampa disegnata": 11,
+"a meno di 4 m da ponte, acqua o ferrovia": 10
+},
+"eccezioni": [
+{
+"x": 791.2,
+"z": -1694.4,
+"m2": 12,
+"prof": 1.35,
+"motivo": "acqua o alveo"
+},
+{
+"x": 787.2,
+"z": -1696.4,
+"m2": 8,
+"prof": 1.34,
+"motivo": "acqua o alveo"
+},
+{
+"x": 325.2,
+"z": -500.4,
+"m2": 16,
+"prof": 1.25,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 973.2,
+"z": -368.4,
+"m2": 20,
+"prof": 1.16,
+"motivo": "rampa disegnata"
+},
+{
+"x": 387.2,
+"z": 813.6,
+"m2": 20,
+"prof": 0.87,
+"motivo": "rampa disegnata"
+},
+{
+"x": -180.8,
+"z": -248.4,
+"m2": 32,
+"prof": 0.86,
+"motivo": "rampa disegnata"
+},
+{
+"x": 421.2,
+"z": -1150.4,
+"m2": 12,
+"prof": 0.79,
+"motivo": "acqua o alveo"
+},
+{
+"x": 641.2,
+"z": -1852.4,
+"m2": 16,
+"prof": 0.78,
+"motivo": "acqua o alveo"
+},
+{
+"x": 299.2,
+"z": -2450.4,
+"m2": 8,
+"prof": 0.76,
+"motivo": "acqua o alveo"
+},
+{
+"x": 959.2,
+"z": -346.4,
+"m2": 40,
+"prof": 0.76,
+"motivo": "rampa disegnata"
+},
+{
+"x": 523.2,
+"z": -1686.4,
+"m2": 16,
+"prof": 0.75,
+"motivo": "rampa disegnata"
+},
+{
+"x": 563.2,
+"z": -2104.4,
+"m2": 8,
+"prof": 0.72,
+"motivo": "acqua o alveo"
+},
+{
+"x": 449.2,
+"z": -2304.4,
+"m2": 8,
+"prof": 0.71,
+"motivo": "acqua o alveo"
+},
+{
+"x": 379.2,
+"z": -2400.4,
+"m2": 4,
+"prof": 0.68,
+"motivo": "acqua o alveo"
+},
+{
+"x": 429.2,
+"z": -1082.4,
+"m2": 32,
+"prof": 0.68,
+"motivo": "acqua o alveo"
+},
+{
+"x": 401.2,
+"z": -2386.4,
+"m2": 12,
+"prof": 0.67,
+"motivo": "acqua o alveo"
+},
+{
+"x": 325.2,
+"z": 783.6,
+"m2": 40,
+"prof": 0.67,
+"motivo": "rampa disegnata"
+},
+{
+"x": 423.2,
+"z": -1146.4,
+"m2": 4,
+"prof": 0.63,
+"motivo": "acqua o alveo"
+},
+{
+"x": 687.2,
+"z": -1768.4,
+"m2": 16,
+"prof": 0.6,
+"motivo": "acqua o alveo"
+},
+{
+"x": 733.2,
+"z": -1732.4,
+"m2": 12,
+"prof": 0.6,
+"motivo": "acqua o alveo"
+},
+{
+"x": 187.2,
+"z": -324.4,
+"m2": 8,
+"prof": 0.6,
+"motivo": "acqua o alveo"
+},
+{
+"x": 677.2,
+"z": -1776.4,
+"m2": 16,
+"prof": 0.58,
+"motivo": "acqua o alveo"
+},
+{
+"x": 427.2,
+"z": -1136.4,
+"m2": 4,
+"prof": 0.58,
+"motivo": "acqua o alveo"
+},
+{
+"x": 373.2,
+"z": 817.6,
+"m2": 28,
+"prof": 0.58,
+"motivo": "rampa disegnata"
+},
+{
+"x": 431.2,
+"z": -1122.4,
+"m2": 20,
+"prof": 0.57,
+"motivo": "acqua o alveo"
+},
+{
+"x": 977.2,
+"z": -1800.4,
+"m2": 20,
+"prof": 0.56,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": 335.2,
+"z": -594.4,
+"m2": 44,
+"prof": 0.56,
+"motivo": "acqua o alveo"
+},
+{
+"x": 621.2,
+"z": -2040.4,
+"m2": 16,
+"prof": 0.55,
+"motivo": "acqua o alveo"
+},
+{
+"x": 821.2,
+"z": -2100.4,
+"m2": 40,
+"prof": 0.54,
+"motivo": "acqua o alveo"
+},
+{
+"x": 619.2,
+"z": -2050.4,
+"m2": 12,
+"prof": 0.53,
+"motivo": "acqua o alveo"
+},
+{
+"x": 1073.2,
+"z": -2190.4,
+"m2": 20,
+"prof": 0.52,
+"motivo": "acqua o alveo"
+},
+{
+"x": 1083.2,
+"z": -2178.4,
+"m2": 20,
+"prof": 0.52,
+"motivo": "acqua o alveo"
+},
+{
+"x": 825.2,
+"z": -1670.4,
+"m2": 12,
+"prof": 0.51,
+"motivo": "acqua o alveo"
+},
+{
+"x": 193.2,
+"z": -1010.4,
+"m2": 8,
+"prof": 0.5,
+"motivo": "rampa disegnata"
+},
+{
+"x": 697.2,
+"z": -1760.4,
+"m2": 16,
+"prof": 0.49,
+"motivo": "acqua o alveo"
+},
+{
+"x": -74.8,
+"z": 475.6,
+"m2": 12,
+"prof": 0.49,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 429.2,
+"z": -2304.4,
+"m2": 24,
+"prof": 0.48,
+"motivo": "acqua o alveo"
+},
+{
+"x": 419.2,
+"z": -2344.4,
+"m2": 12,
+"prof": 0.47,
+"motivo": "acqua o alveo"
+},
+{
+"x": 617.2,
+"z": -2060.4,
+"m2": 16,
+"prof": 0.47,
+"motivo": "acqua o alveo"
+},
+{
+"x": 653.2,
+"z": -1804.4,
+"m2": 4,
+"prof": 0.47,
+"motivo": "acqua o alveo"
+},
+{
+"x": -570.8,
+"z": 47.6,
+"m2": 12,
+"prof": 0.47,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": 365.2,
+"z": 817.6,
+"m2": 40,
+"prof": 0.47,
+"motivo": "rampa disegnata"
+},
+{
+"x": -18.8,
+"z": -2314.4,
+"m2": 16,
+"prof": 0.46,
+"motivo": "acqua o alveo"
+},
+{
+"x": 991.2,
+"z": -2226.4,
+"m2": 4,
+"prof": 0.46,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": 1047.2,
+"z": -2208.4,
+"m2": 8,
+"prof": 0.46,
+"motivo": "acqua o alveo"
+},
+{
+"x": 631.2,
+"z": -1870.4,
+"m2": 20,
+"prof": 0.46,
+"motivo": "acqua o alveo"
+},
+{
+"x": 719.2,
+"z": -1742.4,
+"m2": 12,
+"prof": 0.46,
+"motivo": "acqua o alveo"
+},
+{
+"x": 729.2,
+"z": -1410.4,
+"m2": 4,
+"prof": 0.46,
+"motivo": "acqua o alveo"
+},
+{
+"x": 463.2,
+"z": -2306.4,
+"m2": 20,
+"prof": 0.45,
+"motivo": "acqua o alveo"
+},
+{
+"x": 1095.2,
+"z": -2162.4,
+"m2": 8,
+"prof": 0.45,
+"motivo": "acqua o alveo"
+},
+{
+"x": 623.2,
+"z": -1876.4,
+"m2": 28,
+"prof": 0.45,
+"motivo": "acqua o alveo"
+},
+{
+"x": 731.2,
+"z": -1416.4,
+"m2": 4,
+"prof": 0.45,
+"motivo": "acqua o alveo"
+},
+{
+"x": 1089.2,
+"z": -2170.4,
+"m2": 20,
+"prof": 0.44,
+"motivo": "acqua o alveo"
+},
+{
+"x": 627.2,
+"z": -1954.4,
+"m2": 12,
+"prof": 0.44,
+"motivo": "acqua o alveo"
+},
+{
+"x": 709.2,
+"z": -1750.4,
+"m2": 16,
+"prof": 0.44,
+"motivo": "acqua o alveo"
+},
+{
+"x": 727.2,
+"z": -1736.4,
+"m2": 4,
+"prof": 0.44,
+"motivo": "acqua o alveo"
+},
+{
+"x": 765.2,
+"z": -1452.4,
+"m2": 32,
+"prof": 0.44,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 185.2,
+"z": -320.4,
+"m2": 4,
+"prof": 0.44,
+"motivo": "acqua o alveo"
+},
+{
+"x": -184.8,
+"z": -256.4,
+"m2": 8,
+"prof": 0.44,
+"motivo": "rampa disegnata"
+},
+{
+"x": -1228.8,
+"z": -4.4,
+"m2": 8,
+"prof": 0.44,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": -562.8,
+"z": 49.6,
+"m2": 44,
+"prof": 0.44,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": 1293.2,
+"z": 461.6,
+"m2": 16,
+"prof": 0.44,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": 655.2,
+"z": -1920.4,
+"m2": 8,
+"prof": 0.43,
+"motivo": "acqua o alveo"
+},
+{
+"x": 429.2,
+"z": -1132.4,
+"m2": 8,
+"prof": 0.43,
+"motivo": "acqua o alveo"
+},
+{
+"x": 283.2,
+"z": -2458.4,
+"m2": 8,
+"prof": 0.42,
+"motivo": "acqua o alveo"
+},
+{
+"x": -286.8,
+"z": -466.4,
+"m2": 8,
+"prof": 0.42,
+"motivo": "rampa disegnata"
+},
+{
+"x": 965.2,
+"z": 395.6,
+"m2": 12,
+"prof": 0.42,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": 313.2,
+"z": -2440.4,
+"m2": 4,
+"prof": 0.41,
+"motivo": "acqua o alveo"
+},
+{
+"x": 1275.2,
+"z": 457.6,
+"m2": 16,
+"prof": 0.41,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": 1265.2,
+"z": 455.6,
+"m2": 16,
+"prof": 0.4,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": -266.8,
+"z": 689.6,
+"m2": 8,
+"prof": 0.4,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+}
+],
+"senza_motivo": [],
+"riempiti_i_piu_profondi": [
+{
+"x": 487.2,
+"z": -726.4,
+"m2": 28,
+"prof": 4.52
+},
+{
+"x": -810.8,
+"z": 511.6,
+"m2": 40,
+"prof": 3.72
+},
+{
+"x": 705.2,
+"z": 317.6,
+"m2": 40,
+"prof": 3.63
+},
+{
+"x": -838.8,
+"z": 899.6,
+"m2": 16,
+"prof": 3.53
+},
+{
+"x": 2283.2,
+"z": 467.6,
+"m2": 44,
+"prof": 3.5
+},
+{
+"x": 2225.2,
+"z": 397.6,
+"m2": 36,
+"prof": 3.48
+},
+{
+"x": -540.8,
+"z": -858.4,
+"m2": 44,
+"prof": 3.46
+},
+{
+"x": 2231.2,
+"z": 405.6,
+"m2": 28,
+"prof": 3.4
+},
+{
+"x": -836.8,
+"z": 481.6,
+"m2": 32,
+"prof": 3.39
+},
+{
+"x": 2295.2,
+"z": 477.6,
+"m2": 32,
+"prof": 3.3
+},
+{
+"x": 983.2,
+"z": 457.6,
+"m2": 40,
+"prof": 3.28
+},
+{
+"x": -312.8,
+"z": -496.4,
+"m2": 32,
+"prof": 3.25
+},
+{
+"x": 489.2,
+"z": -732.4,
+"m2": 24,
+"prof": 3.24
+},
+{
+"x": 31.2,
+"z": -646.4,
+"m2": 20,
+"prof": 3.2
+},
+{
+"x": 2315.2,
+"z": 481.6,
+"m2": 36,
+"prof": 3.19
+},
+{
+"x": 989.2,
+"z": 469.6,
+"m2": 40,
+"prof": 3.16
+},
+{
+"x": -870.8,
+"z": -4.4,
+"m2": 44,
+"prof": 3.11
+},
+{
+"x": -620.8,
+"z": -800.4,
+"m2": 36,
+"prof": 3.1
+},
+{
+"x": 579.2,
+"z": -1180.4,
+"m2": 44,
+"prof": 3.02
+},
+{
+"x": 2259.2,
+"z": 165.6,
+"m2": 44,
+"prof": 3.02
+},
+{
+"x": -1420.8,
+"z": 467.6,
+"m2": 40,
+"prof": 3.02
+},
+{
+"x": 2033.2,
+"z": -1982.4,
+"m2": 16,
+"prof": 2.99
+},
+{
+"x": -832.8,
+"z": 489.6,
+"m2": 24,
+"prof": 2.97
+},
+{
+"x": 2153.2,
+"z": -1544.4,
+"m2": 44,
+"prof": 2.96
+},
+{
+"x": 2287.2,
+"z": 447.6,
+"m2": 44,
+"prof": 2.96
+},
+{
+"x": -208.8,
+"z": -888.4,
+"m2": 40,
+"prof": 2.88
+},
+{
+"x": 2285.2,
+"z": 457.6,
+"m2": 28,
+"prof": 2.87
+},
+{
+"x": 979.2,
+"z": 499.6,
+"m2": 36,
+"prof": 2.84
+},
+{
+"x": -824.8,
+"z": 491.6,
+"m2": 32,
+"prof": 2.81
+},
+{
+"x": 477.2,
+"z": -726.4,
+"m2": 8,
+"prof": 2.8
+}
+],
+"punte_verso_alto": {
+"totale": 583,
+"fuori_dalle_cose_protette": 548,
+"peggiori": [
+{
+"x": -462.8,
+"z": -1000.4,
+"m2": 20,
+"alta": 1.34
+},
+{
+"x": 1537.2,
+"z": 625.6,
+"m2": 12,
+"alta": 1.11
+},
+{
+"x": -870.8,
+"z": -286.4,
+"m2": 20,
+"alta": 1.0
+},
+{
+"x": -364.8,
+"z": 189.6,
+"m2": 28,
+"alta": 0.98
+},
+{
+"x": 1891.2,
+"z": -282.4,
+"m2": 20,
+"alta": 0.96
+}
+],
+"peggiori_tutte": [
+{
+"x": -462.8,
+"z": -1000.4,
+"m2": 20,
+"alta": 1.34
+},
+{
+"x": 1537.2,
+"z": 625.6,
+"m2": 12,
+"alta": 1.11
+},
+{
+"x": -1326.8,
+"z": -160.4,
+"m2": 24,
+"alta": 1.02
+},
+{
+"x": -870.8,
+"z": -286.4,
+"m2": 20,
+"alta": 1.0
+},
+{
+"x": -364.8,
+"z": 189.6,
+"m2": 28,
+"alta": 0.98
+}
+],
+"nota": "contate, non corrette"
+},
+"oggetti_protetti_cambiati": 0,
+"ok": true
+}
+}
