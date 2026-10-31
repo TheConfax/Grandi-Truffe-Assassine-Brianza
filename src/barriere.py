@@ -363,3 +363,85 @@ def facciata_su_strada(B, altri, strade):
 def apertura_ingresso(mx, mz, nx, nz, t):
     """the opening in the barriers: from the door out to the edge of the street"""
     return LineString([(mx + nx * 0.2, mz + nz * 0.2), (mx + nx * max(0.5, t - 0.3), mz + nz * max(0.5, t - 0.3))]).buffer(FRONT_W, cap_style=2)
+
+
+# ---- the openings of the railway fences towards the tracks (lisciatore, phase 2; 31/10, viale Francia x 217 z -389): two railway fences on the same side of a track,
+# running into each other, with a hole between them because a line of the data ends there (the DBGT stops its dividers at a culvert) or a cut took a piece. The hole is
+# closed by a stretch of the same fence ("un muro non sparisce, si sposta"). A true passage stays open: a level crossing, any way across, a gate, a platform, a building, a
+# carriageway, a railway bridge (RICUCI of 29/10 closed the level crossing of via Cialdini: it looked only at the ends). Every hole goes in the report with its reason
+VARCO_MAX = 15.0        # m: a hole wider than this is not the same fence
+VARCO_MIN = 0.3
+VARCO_ALLINEATO = 0.85  # |cos| between the end of each fence and the hole
+VARCO_PARALLELO = 0.9   # |cos| between the hole and the track
+VARCO_BINARIO = (2.05, 15.0)   # m from the nearest track: nearer the game drops the fence (world3.js nearLowRail), farther it does not bar the way to the tracks
+VARCO_LIVELLO = 6.0     # m from a level crossing node of OSM
+VARCO_MOZZO = 8.0       # m: a loose piece this short in the hole (what the corridor fence left between two lines of the DBGT) moves onto the closure
+
+def _capo(pts, e):
+    """an end of the line and its way out, over the last 2 m"""
+    q = list(pts) if e else list(pts)[::-1]; P = q[-1]; d = 0.0; A = q[-1]
+    for c in q[-2::-1]:
+        d += math.hypot(A[0] - c[0], A[1] - c[1]); A = c
+        if d >= 2.0: break
+    L = math.hypot(P[0] - A[0], P[1] - A[1]) or 1.0
+    return P, ((P[0] - A[0]) / L, (P[1] - A[1]) / L)
+
+def varchi_binari(linee, binari, passaggi_, chiusi):
+    """linee: the railway fences [pts]; binari: the tracks at ground level (LineString); passaggi_: [(geometry, name)], what keeps a hole open; chiusi(hole): a stop by name
+    or None, for what needs the caller's data. Returns (holes to close [(i, j, pts)], the loose pieces moved onto them [i], the report)"""
+    from shapely.geometry import LineString as LS, Point as Pt
+    from shapely import STRtree as Tree
+    capi = []
+    for i, pts in enumerate(linee):
+        if len(pts) < 2: continue
+        for e in (0, 1): capi.append((i, e) + _capo(pts, e))
+    tp0 = Tree([Pt(c[2]) for c in capi])
+    def sciolta(i):
+        L = LS(linee[i])
+        if L.length > VARCO_MOZZO: return False
+        return not any(capi0[int(j)][0] != i and Pt(capi0[int(j)][2]).distance(L) < 0.3 for j in tp0.query(L.buffer(0.3)))
+    # an end that meets another line is no end: only the free ones make a hole
+    capi0 = capi; liberi = [c for c in capi0 if not any(capi0[int(j)][0] != c[0] and Pt(capi0[int(j)][2]).distance(Pt(c[2])) < 0.3 for j in tp0.query(Pt(c[2]).buffer(0.3)))]
+    mozzi = {c[0] for c in capi0 if sciolta(c[0])}; capi = liberi
+    tb = Tree(binari); tp = Tree([g for g, _ in passaggi_]) if passaggi_ else None
+    presi = set(); chiudi = []; aperti = {}; elenco = []; togli = set(); m_chiusi = 0.0
+    for giro in (0, 1):   # first the lines without the loose pieces, then what is left
+        cp = [c for c in capi if (giro or c[0] not in mozzi) and (c[0], c[1]) not in presi and c[0] not in togli]
+        if len(cp) < 2: continue
+        tree = Tree([Pt(c[2]) for c in cp]); casi = []
+        for a, ca in enumerate(cp):
+            for b in tree.query(Pt(ca[2]).buffer(VARCO_MAX)):
+                cb = cp[int(b)]
+                if int(b) <= a or ca[0] == cb[0]: continue
+                P, Q = ca[2], cb[2]; d = math.hypot(P[0] - Q[0], P[1] - Q[1])
+                if d < VARCO_MIN or d > VARCO_MAX: continue
+                ux, uz = (Q[0] - P[0]) / d, (Q[1] - P[1]) / d
+                if ca[3][0] * ux + ca[3][1] * uz < VARCO_ALLINEATO or -(cb[3][0] * ux + cb[3][1] * uz) < VARCO_ALLINEATO: continue
+                C = LS([P, Q]); M = C.interpolate(0.5, normalized=True); near = tb.query(M.buffer(VARCO_BINARIO[1]))
+                if not len(near): continue
+                r = min((binari[int(j)] for j in near), key=lambda g: g.distance(M))
+                if r.distance(M) > VARCO_BINARIO[1]: continue
+                s_ = r.project(M); R0, R1 = r.interpolate(max(0.0, s_ - 2.0)), r.interpolate(min(r.length, s_ + 2.0)); rl = math.hypot(R1.x - R0.x, R1.y - R0.y) or 1.0
+                # (r may be one short piece of a track: its own direction, over the piece)
+                if rl > 0.5 and abs(ux * (R1.x - R0.x) + uz * (R1.y - R0.y)) / rl < VARCO_PARALLELO: continue
+                casi.append(dict(i=ca[0], j=cb[0], ei=ca[1], ej=cb[1], d=d, C=C))
+        casi.sort(key=lambda c: c['d'])
+        for c in casi:
+            if (c['i'], c['ei']) in presi or (c['j'], c['ej']) in presi: continue
+            presi.add((c['i'], c['ei'])); presi.add((c['j'], c['ej'])); C = c['C']; M = C.interpolate(0.5, normalized=True)
+            mot = None; vic = [binari[int(j)] for j in tb.query(C.buffer(VARCO_BINARIO[0] + 0.01))]
+            if any(g.distance(C) < VARCO_BINARIO[0] for g in vic): mot = 'sul binario'
+            if mot is None and tp is not None:
+                for j in tp.query(C.buffer(0.5)):
+                    g, nome = passaggi_[int(j)]
+                    if g.intersects(C): mot = nome; break
+            if mot is None: mot = chiusi(C)
+            v = dict(x=round(M.x, 1), z=round(M.y, 1), m=round(c['d'], 1))
+            if mot is None:
+                chiudi.append((c['i'], c['j'], list(C.coords))); v['esito'] = 'chiuso'; m_chiusi += c['d']
+                for q in mozzi:
+                    Lq = LS(linee[q])
+                    if q not in (c['i'], c['j']) and Lq.distance(C) < 3.0 and 0 < C.project(Lq.centroid) < c['d']: togli.add(q)
+            else: aperti[mot] = aperti.get(mot, 0) + 1; v['esito'] = mot
+            elenco.append(v)
+    return chiudi, sorted(togli), dict(limiti=dict(max_m=VARCO_MAX, allineato=VARCO_ALLINEATO, parallelo=VARCO_PARALLELO, da_binario_m=list(VARCO_BINARIO), pezzo_sciolto_m=VARCO_MOZZO), varchi_trovati=len(elenco), chiusi=len(chiudi), metri_chiusi=round(m_chiusi, 1), pezzi_sciolti_spostati=len(togli), aperti_per_motivo=aperti, da_chiudere=0, elenco=elenco)

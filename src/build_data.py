@@ -1857,6 +1857,31 @@ for nome_, x_, z_, r_ in SIEPI_TOLTE:
     log('siepi tolte a mano', nome_, _nb0 - len(bar_out))
 VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 trees = MANUF.alberi(trees, VERDE.forest_u, isole=STR.isole if STR else ())
+# the holes of the railway fences towards the tracks (src/barriere.py varchi_binari): where a line of the data ends or a cut took a piece, on the map; a true passage stays open
+from barriere import varchi_binari
+_vl6 = [b_ for b_ in bar_out if b_[1] == 6]; _vl = [b_[0] for b_ in _vl6] + list(fences)
+_vp = [(g_, 'passaggio a livello') for g_ in xpts] + [(Point(nodes[r_]).buffer(6.0), 'passaggio a livello') for r_, t_ in ntags.items() if t_.get('railway') in ('level_crossing', 'crossing') and r_ in nodes]
+_vp += [(r_['line'], 'una via che attraversa') for r_ in raw_roads if r_['line'].length > 0.1 and flat(r_)]  # its axis: a street running along the tracks beside the hole does not open it (the carriageway has its own stop below)
+_vp += [(g_, 'edificio') for g_ in btree_geoms] + [(Point(g_[0] / 10, g_[1] / 10).buffer(1.8), 'cancello') for g_ in gate_out] + [(g_, 'cancello') for g_ in [Point(p_).buffer(1.8) for p_ in [(g2_.x, g2_.y) for g2_ in gates]]]
+_vp += [(g_.buffer(8.0), 'banchina') for g_ in (list(platforms.geoms) if hasattr(platforms, 'geoms') else [platforms]) if not g_.is_empty]  # also the way onto a platform
+if FER and not FER.Z_ponti.is_empty: _vp += [(g_, 'ponte') for g_ in (list(FER.Z_ponti.geoms) if hasattr(FER.Z_ponti, 'geoms') else [FER.Z_ponti])]
+def _vchiusi(C_):
+    if not _zc.is_empty and _zc.intersects(C_): return 'carreggiata'  # (asphalt of the roads and DBGT carriageways, also outside the comuni with a DBGT)
+    if _mvt is not None:
+        for k_ in _mvt.query(C_):
+            if _mv[int(k_)].intersection(C_).length > 0.5: return 'carreggiata'
+    if FER and FER.metri_dentro(_E_fer, [list(C_.coords)])[0] > 0: return 'dentro l area ferroviaria'
+    return None
+_vc, _vt, _vrep = varchi_binari(_vl, _lowrail, _vp, _vchiusi)
+_vtf = {i_ - len(_vl6) for i_ in _vt if i_ >= len(_vl6)}; _vtb = {id(_vl6[i_]) for i_ in _vt if i_ < len(_vl6)}
+_vnew6, _vnewf = [], []
+for i_, j_, p_ in _vc:
+    if i_ < len(_vl6) and j_ < len(_vl6): _vnew6.append((p_, 6, _vl6[i_][2]))
+    else: _vnewf.append(p_)
+fences = [f_ for k_, f_ in enumerate(fences) if k_ not in _vtf] + _vnewf; bar_out = [b_ for b_ in bar_out if id(b_) not in _vtb] + _vnew6
+_vl2 = [b_[0] for b_ in bar_out if b_[1] == 6] + list(fences); _vrep['da_chiudere'] = varchi_binari(_vl2, _lowrail, _vp, _vchiusi)[2]['chiusi']  # the same search on the result: nothing left
+log('varchi verso i binari', {k_: v_ for k_, v_ in _vrep.items() if k_ != 'elenco'})
+json.dump(dict(varchi_verso_i_binari=_vrep), open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_barriere.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 # ---- the lanes of the AI cars away from walls, fences, gates and buildings, in every comune (src/corsie_ia.py): all of them are final here
 import corsie_ia
 _cia_n = [0]

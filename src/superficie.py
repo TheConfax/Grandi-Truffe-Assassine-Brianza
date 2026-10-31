@@ -1045,6 +1045,11 @@ class Superficie:
         s.t['raccordi'] = round(time.time() - t0, 1)
         s.log('raccordi: nodi in fascia %d, mossi > 5 cm %d, al bordo della fascia ancora mossi %d' % (int(band.sum()), int(s.SCARP.sum()), s.bordo_banda))
 
+    # ----- 6c. the lisciatore (src/lisciatore.py): the pits beside the streets with no ramp, and the teeth along streets and edges
+    def liscia(s):
+        import lisciatore
+        s.lisc_rep = lisciatore.lisciatore(s, log=s.log)
+
     # ----- 6a. what the DBGT burns at the level of a deck inside a PONTE (fase 6): the rail bed SD_FER of the railway bridge over via Milano
     # (PONTE 14) is one piece with SED=01 across the bridge, and since the DTM is filled across the deck it was no higher than the LiDAR
     # (not a deck part for the cap of step 4): fixed at 220.3 m, 5.5 m over the road under it and 2 m from it. Inside a PONTE footprint with
@@ -1168,7 +1173,7 @@ _S = {}
 def costruisci(comune='Meda', margine=250.0, blend=BLEND, osm=True, cache_dir=None):
     """The whole surface of the comune + margine, all steps (about 40 s for Meda); cached per comune."""
     if comune in _S: return _S[comune]
-    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi()
+    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
     ob = None
     if osm:
         lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
@@ -1476,7 +1481,7 @@ def main(argv=None):
     AX_SIGMA = a.sigma
     s = Superficie(a.comune, margine=a.margine, blend=a.blend)
     log('tessere da fare %d (tx %d..%d, tz %d..%d), griglia %dx%d' % (len(s.tiles), s.i0, s.i1, s.j0, s.j1, s.R.nx, s.R.nz))
-    s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi()
+    s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
     t0 = time.time()
     lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
     osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_v2.pkl'))
@@ -1487,6 +1492,7 @@ def main(argv=None):
     if a.margine == 250.0 and a.blend == BLEND and a.comune not in _S: _S[a.comune] = s
     tdir = os.path.join(a.out, 'terreno'); t0 = time.time(); peso = s.scrivi(tdir); s.t['scrittura'] = round(time.time() - t0, 1)
     rep, punti = controlli(s, tdir)
+    import lisciatore; lisciatore.controlli(s, s.GQ, os.path.join(a.out, 'report_lisciatore.json'), log=log)
     if not a.no_png: t0 = time.time(); immagini(s, a.out); s.t['immagini'] = round(time.time() - t0, 1)
     np.save(os.path.join(a.out, 'S_2m.npy'), s.GQ.astype(np.float32)); np.save(os.path.join(a.out, 'L_2m.npy'), s.L.astype(np.float32))
     np.save(os.path.join(a.out, 'maschere_2m.npy'), (s.CLS.astype(np.uint16) | (s.FIX << 4) | (s.BR << 5) | (s.AIR << 6) | (s.CAP << 7) | (s.SCARP << 8)).astype(np.uint16))
