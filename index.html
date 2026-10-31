@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo salto-arrampicata · dopo 62393f8 · assemblato 31/10 06:19 · porta ' + location.port;
+    const txt = 'locale · ramo fisica-auto · dopo 9c65560 · assemblato 31/10 06:52 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -957,7 +957,7 @@ const streetH = (x, z) => H.street(x, z);
 // and drawn as they are the cars jerk back and forth against the smoothly following camera, the more the faster they go. So before every step the
 // state of what moves is kept, and each frame is drawn at the point between the last two steps that the leftover time asks for (a = 0..1), then
 // the true state is put back for the next step. The arrays are reused: garbage made 60 times a second makes the phone stop now and then to sweep it
-const INTERP_VEH = ['x', 'y', 'z', 'h', 'slope', 'roll', 'pitch'], INTERP_KEYS = ['x', 'y', 'z', 'h'], INTERP_DONE = [];
+const INTERP_VEH = ['x', 'y', 'z', 'h', 'slope', 'roll', 'pitch', 'ap', 'ar'], INTERP_KEYS = ['x', 'y', 'z', 'h'], INTERP_DONE = [];
 function snapOf(o, keys) { const p = o._p || (o._p = new Array(keys.length)); for (let i = 0; i < keys.length; i++) p[i] = o[keys[i]]; o._pk = keys; }
 function interpSnap() {
   for (const v of VEH) snapOf(v, INTERP_VEH);
@@ -6325,12 +6325,132 @@ function animPed(m, phase, amp) { const s = Math.sin(phase) * amp; m.L.rotation.
 // ---------------------------------------------------------------- vehicles
 const VEH = [];
 try { localStorage.removeItem('medaDrive'); } catch (e) { } /* the realistic driving model is gone, so is its saved switch */
-const JUMP_MIN = 0.08, JUMP_V = 17, GRAV = 9.81; /* a crest that lifts the shadow less than JUMP_MIN m keeps the car on its wheels, and so does any speed under JUMP_V m/s (61 km/h): the small waves of S and town driving stay as they were */
-function vehBed(x, z, cy) { // what a car flies over and lands on: S and the decks under cy + 0.8, without the step layer (kerbs, sidewalks, bumps) that only jolts it
-  if (H.fineAt(x, z)) { let y = H.base(x, z); for (const o of H.deckAt(x, z)) if (o.top > y && o.top <= cy + 0.8) y = o.top; return y; }
-  const full = H.surface(x, z, cy), st = onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : bumpAt(x, z); if (!st) return full;
-  const rc = H.rivCut(x, z), flat = H.base(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + st; return Math.abs(full - flat) < 1e-4 ? full - st : full; /* old engine: the step comes off unless a deck won */
+// ---------------------------------------------------------------- the physics of a car over the ground (Carlo, 31/10: "manca la verticalita", "il motore fisico")
+// The driving on the ground (grip, steering, brakes, speeds: Vehicle.step) is untouched. This is what the body does in height: speed vy under
+// gravity, a spring and a damper on every wheel, each wheel on the ground under it. A wheel pushes only while its spring is loaded, so where the
+// ground drops away faster than the car falls the wheels leave it by themselves: no speed limit, no shadow, no floating. In the air the stick
+// turns the nose and the roll, the speed over the ground stays. Every parameter is here. The player's vehicle runs this (and any vehicle thrown by
+// an explosion, or left by the player until it stops); the traffic keeps a plain height that follows the ground (Vehicle.collide).
+const FIS = {
+  g: 13.5,          // m/s2 on a car off the ground: 9.81 at this camera and these speeds looked floaty (Carlo); 1.4 times it falls like GTA
+  airMin: 0.05,     // m over the full droop of the springs, or...
+  airT: 0.1,        // ...seconds with no wheel on the ground: then it is "in the air" (no grip). A wheel light for an instant over a wave keeps its grip
+  rampMax: 0.4,     // rise over run of the ground under a wheel in a step: steeper is a step (a kerb, a deck joint), it lifts the car and does not launch it
+  humpMax: 0.33,    // rise over run of the ground under the car, over a few metres: steeper is a hump of S no street has
+  stickT: 0.5,      // s the car keeps to the ground after such a hump (a street over an embankment it should pass under: no ski jump)
+  bankMax: 0.25,    // side slope the body follows, rise over run: past it is no road but the bank of S beside one (outside Meda, the old ground), the wheels take it as this
+  launch: 0.32,     // vy at take-off, at most this share of the speed
+  rightK: 40, rightP: 0.5, // on any wheel, a body leaning past what the ground asks (bankMax + 0.15, or rightP from its slope) comes back with this: nothing here tips over
+  spinMax: 1,       // rad/s of nose and roll a car takes off with, at most: what the springs give in the last instant on the ground is not a somersault
+  latMax: 11, lonMax: 12, // m/s2 of the arcade grip (up to 30) and brakes (21) that reach the body: beyond it the springs have no more to give
+  stopE: 0.22,      // what a wheel gives back on its bump stop: the bounce of a hard or crooked landing
+  stopPos: 0.35,    // share of the overrun taken back in a step at the bump stop (as the old height followed the ground)
+  stopMax: 0.22,    // m past the bump stop the body may go, never more: it does not sink into the ground
+  airPitch: 1.8, airRoll: 2.4, airAcc: 7, // stick in the air: rad/s of nose and of roll, rad/s2 to get there
+  airK: 4, airD: 3, airNose: 0.6, airLim: 1.35, // stick free: the body drifts back level, the nose towards its way down (share airNose); at most airLim rad either way
+  hitShake: 14, hitSfx: 2.5, // landing speed m/s for the full shake, speed from which it is heard
+  // f: Hz of the body on its springs, z: damping (0.7: one soft overshoot, no bouncing), up: m of travel to the bump stop, rollG / pitchG: rad of body per g of side / brake or gas
+  tipi: {
+    panda:  { f: 1.5,  z: 0.7, up: 0.13, rollG: 0.075, pitchG: 0.05 },
+    hatch:  { f: 1.55, z: 0.7, up: 0.13, rollG: 0.065, pitchG: 0.045 },
+    sedan:  { f: 1.5,  z: 0.7, up: 0.14, rollG: 0.06,  pitchG: 0.045 },
+    wagon:  { f: 1.45, z: 0.7, up: 0.14, rollG: 0.065, pitchG: 0.05 },
+    suv:    { f: 1.3,  z: 0.7, up: 0.17, rollG: 0.095, pitchG: 0.06 },
+    sport:  { f: 1.9,  z: 0.75, up: 0.09, rollG: 0.035, pitchG: 0.028 },
+    van:    { f: 1.25, z: 0.7, up: 0.17, rollG: 0.115, pitchG: 0.07 },
+    ape:    { f: 1.5,  z: 0.7, up: 0.12, rollG: 0.1,   pitchG: 0.05 },
+    police: { f: 1.6,  z: 0.72, up: 0.13, rollG: 0.055, pitchG: 0.04 },
+    scooter: { f: 1.8, z: 0.7, up: 0.09, rollG: 0, pitchG: 0.02 }, // two wheels: the lean, the wheelie and the stoppie are theirs (Vehicle.step)
+    moto:   { f: 1.9,  z: 0.7, up: 0.11, rollG: 0, pitchG: 0.02 },
+    bici:   { f: 2.1,  z: 0.7, up: 0.06, rollG: 0, pitchG: 0.015 },
+  },
+};
+function fisInit(v) {
+  const T = FIS.tipi[v.kind] || FIS.tipi.panda, W = v.m.wheels, n = W.length, om = 2 * Math.PI * T.f, F = v.F = { T, n, om, k: om * om / n, c: 2 * T.z * om / n, droop: FIS.g / (om * om), sx: [], sz: [], g: [], gf: [], dg: [], x: [], off: [], lx: v.x, lz: v.z, lh: v.h, lf: v.fwdSpeed, off0: 0, Ir: 0, Ip: 0 };
+  for (let i = 0; i < n; i++) { const p = W[i].piv.position; F.sx.push(p.x); F.sz.push(p.z); F.Ir += p.x * p.x / n; F.Ip += p.z * p.z / n; F.dg.push(0); F.x.push(0); F.off.push(0); F.g.push(0); F.gf.push(0); }
+  F.Ir = Math.max(F.Ir, 0.2); F.Ip = Math.max(F.Ip, 0.2); F.kr = T.rollG / 9.81 * om * om; F.kp = T.pitchG / 9.81 * om * om; /* what holds rollG, pitchG rad at 1 g against springs of frequency om */
+  v.ap = v.slope; v.ar = 0; v.wp = v.wr = 0; if (!(v.vy > 2)) v.vy = 0; if (!v.exploded && !v.spec.two) v.roll = 0; if (!v.spec.two) v.pitch = 0; F.stick = 0; F.sl = 0; F.lty = v.y; F.kick = v.vy > 2; fisGround(v, 0, true);
+  v.m.body.position.y = v.spec.two ? v.m.body.position.y : 0;
 }
+function fisGround(v, mv, first, yf, yb) { // the ground under each wheel: F.gf follows a ramp at once and a step in a few frames, F.dg is how fast it rises under the wheel, never for a step
+  const F = v.F, s = Math.sin(v.h), c = Math.cos(v.h), dt = 1 / 60, lim = FIS.rampMax * mv + 0.002;
+  let kerb = 0;
+  for (let i = 0; i < F.n; i++) {
+    let g = H.surface(v.x + s * F.sz[i] + c * F.sx[i], v.z + c * F.sz[i] - s * F.sx[i], v.y);
+    if (yf !== undefined) { const ga = lerp(yb, yf, clamp(0.5 + F.sz[i] / (2 * v.co), 0, 1)), lm = FIS.bankMax * Math.abs(F.sx[i]) + 0.02; g = clamp(g, ga - lm, ga + lm); } /* the axle's own ground is the mean of the two ways the wheels may lie */
+    if (first) { F.g[i] = F.gf[i] = g; F.dg[i] = 0; continue; }
+    const d = g - F.g[i], st = mv < 0.02 || Math.abs(d) > lim; F.g[i] = g; if (st && d > kerb) kerb = d;
+    if (!st) F.gf[i] += d; F.gf[i] = lerp(F.gf[i], g, 0.35); F.dg[i] = lerp(F.dg[i], st ? 0 : d / dt, 0.5);
+  }
+  return kerb;
+}
+function fisVert(v, cf, cb, yf, yb, ty) { // once a step from Vehicle.collide, after the move and the walls
+  const dt = 1 / 60, F = v.F, T = F.T, n = F.n, fs = v.fwdSpeed, G = FIS.g, gs = Math.atan2(yb - yf, v.co * 2), mv = hyp(v.x - F.lx, v.z - F.lz);
+  v.slope = lerp(v.slope, gs, 0.35); /* what the hills do to the speed in Vehicle.step, as it was */
+  if (mv > 8) { v.y = ty; v.vy = 0; v.wp = v.wr = 0; v.ap = gs; v.ar = 0; v.air = false; F.lx = v.x; F.lz = v.z; F.lh = v.h; F.lf = fs; F.sl = 0; fisGround(v, 0, true, yf, yb); F.lty = ty; return; } /* a teleport */
+  const yawR = wrapA(v.h - F.lh) / dt, aLon = clamp((fs - F.lf) / dt, -FIS.lonMax, FIS.lonMax), aLat = FIS.latMax * Math.tanh(yawR * fs / FIS.latMax);
+  F.lx = v.x; F.lz = v.z; F.lh = v.h; F.lf = fs;
+  const rise = ty - F.lty; F.lty = ty; if (mv > 0.01 && Math.abs(rise) < 1.5) F.sl += (rise / mv - F.sl) * Math.min(1, mv / 3); if (Math.abs(F.sl) > FIS.humpMax && (F.sl > 0 || F.stick > 0 || onAnyRoad(v.x, v.z, 1))) F.stick = FIS.stickT; else if (F.stick > 0) F.stick -= dt; /* up the hump and down it; a street does not drop like this, the bank of S beside it does: off the road it falls */
+  const kerb = fisGround(v, mv, false, yf, yb); if (kerb > 0.09 && kerb < 0.25 && v === P.car && v.speed > 6) shake = Math.max(shake, 0.12);
+  let sF = 0, tr = 0, tp = 0, on = 0, hit = 0; const sr = Math.sin(v.ar), sp = Math.sin(v.ap), cr = Math.cos(v.ar), cp = Math.cos(v.ap);
+  for (let i = 0; i < n; i++) {
+    const sx = F.sx[i], sz = F.sz[i], x = F.gf[i] - (v.y + sx * sr - sz * sp); F.x[i] = x; if (x < -F.droop) continue;
+    on++; const rel = F.dg[i] - (v.vy + sx * cr * v.wr - sz * cp * v.wp); if (rel > hit) hit = rel;
+    const f = Math.max(0, G / n + F.k * x + F.c * rel); sF += f; tr += f * sx; tp += f * sz;
+  }
+  const dead = v.health <= 0 || v.fallen;
+  if (v.air && on === 0 && !dead) { // the stick, in the air: forward the nose down, back the nose up, sideways the roll towards that side
+    const i = v.inp, ln = clamp(i.lean || 0, -1, 1), st = clamp(i.steer || 0, -1, 1), A = FIS.airAcc * dt, nose = Math.atan2(-v.vy, Math.max(6, Math.abs(fs))) * Math.sign(fs || 1) * FIS.airNose;
+    if (Math.abs(ln) > 0.08) v.wp += clamp(-ln * FIS.airPitch - v.wp, -A, A); else v.wp += (FIS.airK * (nose - v.ap) - FIS.airD * v.wp) * dt;
+    if (Math.abs(st) > 0.08) v.wr += clamp(-st * FIS.airRoll - v.wr, -A, A); else v.wr += (FIS.airK * -v.ar - FIS.airD * v.wr) * dt;
+  } else if (on) { v.wr += (tr * cr / F.Ir + F.kr * aLat) * dt; v.wp += (-tp * cp / F.Ip - F.kp * aLon) * dt; } /* the springs against what the turn and the brakes ask of the body */
+  else { v.wr += (FIS.airK * -v.ar - FIS.airD * v.wr) * dt; v.wp += (FIS.airK * (gs - v.ap) * 0.5 - FIS.airD * v.wp) * dt; }
+  if (on) { const la = FIS.bankMax + 0.15, or = Math.abs(v.ar) - la, op = Math.abs(v.ap - gs) - FIS.rightP; if (or > 0) { v.wr -= Math.sign(v.ar) * or * FIS.rightK * dt; v.wr *= 1 - 4 * dt; } if (op > 0) { v.wp -= Math.sign(v.ap - gs) * op * FIS.rightK * dt; v.wp *= 1 - 4 * dt; } }
+  v.vy += (sF - G) * dt; v.y += v.vy * dt; v.ar = clamp(v.ar + v.wr * dt, -FIS.airLim, FIS.airLim); v.ap = clamp(v.ap + v.wp * dt, -FIS.airLim, FIS.airLim);
+  if (Math.abs(v.ar) === FIS.airLim) v.wr = 0; if (Math.abs(v.ap) === FIS.airLim) v.wp = 0;
+  if (v.spec.two && !v.air) { v.ar = lerp(v.ar, 0, 0.15); v.wr = 0; } /* two wheels stand on their lean, not on their springs */
+  // the bump stops: a wheel at the end of its travel takes the body with it, by the point it touches: a crooked landing turns it and gives a little back
+  for (let it = 0; it < 3; it++) { // all together, so a flat landing stays flat
+    let dv = 0, dr = 0, dp = 0, dy = 0, da = 0, db = 0, m = 0;
+    for (let i = 0; i < n; i++) if (F.gf[i] - (v.y + F.sx[i] * Math.sin(v.ar) - F.sz[i] * Math.sin(v.ap)) > T.up) m++;
+    if (!m) break;
+    for (let i = 0; i < n; i++) {
+      const sx = F.sx[i], sz = F.sz[i], x = F.gf[i] - (v.y + sx * Math.sin(v.ar) - sz * Math.sin(v.ap)), over = x - T.up; if (over <= 0) continue;
+      const w = (1 + sx * sx / F.Ir + sz * sz / F.Ip) * (m > 1 ? 0.6 * m : 1), rel = F.dg[i] - (v.vy + sx * v.wr - sz * v.wp);
+      if (rel > 0) { const j = rel * (1 + (rel > 1.5 && it === 0 ? FIS.stopE : 0)) / w; dv += j; dr += j * sx / F.Ir; dp -= j * sz / F.Ip; }
+      if (it === 0) { const q = (Math.max(over - FIS.stopMax, 0) + Math.min(over, FIS.stopMax) * FIS.stopPos) / w; dy += q; da += q * sx / F.Ir; db -= q * sz / F.Ip; }
+    }
+    v.vy += dv; v.wr += dr; v.wp += dp; v.y += dy; v.ar += da; v.ap += db;
+  }
+  if (F.stick > 0 && !v.air) { const y0 = v.y; if (v.y > ty) v.y = lerp(v.y, ty, 0.35); v.vy = Math.min(v.y === y0 ? v.vy : (v.y - y0) / dt, FIS.humpMax * v.speed); v.ap = lerp(v.ap, gs, 0.35); v.ar = lerp(v.ar, 0, 0.2); v.wp = v.wr = 0; on = Math.max(on, 1); } /* a hump of S: as the old height, on the ground */
+  // the wheels as drawn: on the ground, at most the full droop below the body
+  for (let i = 0; i < n; i++) { const x = F.gf[i] - (v.y + F.sx[i] * Math.sin(v.ar) - F.sz[i] * Math.sin(v.ap)); F.x[i] = x; F.off[i] = lerp(F.off[i], clamp(x, -Math.min(F.droop, 0.2), T.up), 0.5); }
+  // on the wheels or in the air
+  if (on === 0) {
+    F.off0 += dt; let top = -1e9; for (let i = 0; i < n; i++) if (F.x[i] > top) top = F.x[i];
+    if (!v.air && (F.off0 > FIS.airT || top < -F.droop - FIS.airMin)) { v.air = true; v.airT = F.off0; v.airTop = 0; v.air0 = [v.x, v.z]; v.jumps = (v.jumps || 0) + 1; if (!v.exploded && !F.kick) v.vy = Math.min(v.vy, FIS.launch * v.speed); v.wp = clamp(v.wp, -FIS.spinMax, FIS.spinMax); v.wr = clamp(v.wr, -FIS.spinMax, FIS.spinMax); }
+    if (v.air) { v.airT += dt; v.airTop = Math.max(v.airTop, v.y - ty); }
+  } else {
+    F.off0 = 0;
+    if (v.air) { // down: the springs have taken it
+      v.air = false; F.kick = false; v.lastJump = { t: v.airT, h: v.airTop, d: hyp(v.x - v.air0[0], v.z - v.air0[1]), hit, v: v.speed, ap: v.ap, ar: v.ar };
+      if (v === P.car) { shake = Math.max(shake, Math.min(0.9, hit / FIS.hitShake)); if (hit > FIS.hitSfx && hit <= 7) sfxCrash(hit); }
+      if (hit > 10) v.impact(hit * 0.7); /* as it was: a fall from high up counts as a crash. No new damage from landing crooked: the damage system is to be redone */
+    }
+  }
+  v.fpBusy = Math.abs(v.vy) > 0.05 || Math.abs(v.wp) > 0.02 || Math.abs(v.wr) > 0.02 || !!v.air;
+}
+// the whole way of the frame, not only where it ends: at high speed a thin pole or a sign falls between two frames (Carlo, 30/10)
+function vehSweep(v, x0, z0) {
+  const dx = v.x - x0, dz = v.z - z0, d = hyp(dx, dz), st = Math.max(0.35, v.rad * 0.7); if (d <= st || d > 8) return;
+  const xe = v.x, ze = v.z, m = Math.min(32, Math.ceil(d / st));
+  for (let k = 1; k < m; k++) {
+    v.x = x0 + dx * k / m; v.z = z0 + dz * k / m; gateHits(v); fuelHits(v); propHits(v); barHits(v);
+    for (const c of v.circles()) if (collideStatic({ x: c[0], z: c[1] }, v.rad, v.y + 0.4)) return; /* stops here: Vehicle.collide takes it from this point */
+  }
+  v.x = xe; v.z = ze;
+}
+
 class Vehicle {
   constructor(kind, color, x, z, h) {
     Object.assign(this, { kind, x, z, h, vx: 0, vz: 0, steer: 0, health: 100, driver: null, sleep: true, spin: 0, roll: 0, pitch: 0, boost: false, y: 0, slope: 0 });
@@ -6370,51 +6490,15 @@ class Vehicle {
     this.x += this.vx * dt; this.z += this.vz * dt;
     this.spin += v * dt / S.wr;
     if (S.two) { const ln_ = LEAN[this.kind] || LEAN.moto, tg_ = clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85) * ln_.k, ms_ = 0.85 * ln_.k / ln_.t * dt; this.roll = lerp(this.roll, this.roll + clamp(tg_ - this.roll, -ms_, ms_), 0.5); } /* lean into the bend, rate-limited */
-    else this.roll = lerp(this.roll, clamp(-yaw * v * 0.004, -0.08, 0.08), 0.1);
-    this.pitch = lerp(this.pitch, clamp((thr - i.brk) * -0.025, -0.04, 0.04), 0.1);
+    else if (!this.F) this.roll = lerp(this.roll, clamp(yaw * v * 0.004, -0.08, 0.08), 0.1); /* a car leans out of the bend; the player's vehicle does it on its springs */
+    if (!this.F) this.pitch = lerp(this.pitch, clamp((thr - i.brk) * -0.025, -0.04, 0.04), 0.1);
   }
-  stepAir(dt) { // off its wheels: no grip, no engine, no brakes, the speed it took off with less a little air drag; the steering turns the car a little, not its path (as in GTA)
+  stepAir(dt) { // off its wheels: no grip, no engine, no brakes, the speed it took off with less a little air drag; the stick turns the body (fisVert), not its way
     const i = this.inp, k = 1 - 0.0004 * this.speed * dt;
     this.steer = lerp(this.steer, i.steer, 1 - Math.exp(-10 * dt)); this.vx *= k; this.vz *= k;
-    this.h = wrapA(this.h + this.steer * 0.6 * dt); this.x += this.vx * dt; this.z += this.vz * dt;
+    this.x += this.vx * dt; this.z += this.vz * dt;
     this.spin += (this.fwdSpeed + (i.thr > 0 && this.health > 0 ? 8 : 0)) * dt / this.spec.wr; this.drift = 0;
-    this.roll = lerp(this.roll, 0, 0.04); this.pitch = lerp(this.pitch, 0, 0.1);
-  }
-  vert(cf, cb, yf, yb, ty) { // the height of the car over the ground under its axles (cf, cb; yf, yb the ground there, ty their mean): on the wheels or in the air
-    const dt = 1 / 60, co = this.co, gs = Math.atan2(yb - yf, co * 2), fs = this.fwdSpeed, gv = -fs * Math.tan(gs);
-    if (this.sus || this.susV) { this.susV += (-240 * this.sus - 20 * this.susV) * dt; this.sus = clamp(this.sus + this.susV * dt, -0.2, 0.12); if (Math.abs(this.sus) < 1e-3 && Math.abs(this.susV) < 0.02) this.sus = this.susV = 0; } /* the springs after a landing, drawn on the body */
-    if (this.air) {
-      this.vy -= GRAV * dt; this.y += this.vy * dt; this.airT += dt; this.airTop = Math.max(this.airTop, this.y - ty);
-      const sn = Math.sin(this.slope), axle = this.y - co * sn <= yf || this.y + co * sn <= yb;
-      if (this.y > ty && !axle) { this.slope = clamp(lerp(this.slope, -Math.atan2(this.vy, Math.max(6, Math.abs(fs))) * Math.sign(fs || 1) * 0.6, 0.035), -0.6, 0.6); return; } /* still flying: the nose follows the path down, slowly */
-      const hit = gv - this.vy; /* how fast it meets the ground */
-      this.air = false; this.y = Math.max(this.y, Math.min(ty + 0.5, Math.max(ty, yf + co * sn, yb - co * sn))); this.vy = this.bedV = gv; /* the wheel that touches first stays on the ground, the other comes down with the springs */ this._gb = undefined;
-      if (!this.spec.two) this.susV = -Math.min(hit, 14) * 0.3;
-      this.lastJump = { t: this.airT, h: this.airTop, d: hyp(this.x - this.air0[0], this.z - this.air0[1]), hit, v: this.speed };
-      if (this === P.car) { shake = Math.max(shake, Math.min(0.9, hit / 14)); if (hit > 2.5 && hit <= 7) sfxCrash(hit); }
-      if (hit > 7) this.impact(hit * 0.7);
-    }
-    const kick = (this.vy || 0) > (this.bedV || 0) + 2; /* thrown up from outside (an explosion) */
-    this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, gs, 0.35);
-    // the shadow rides the bed under the two axles, eased as the body is (a wheelbase and the springs smooth the small waves of S away)
-    const gb = (vehBed(cf[0], cf[1], this.y) + vehBed(cb[0], cb[1], this.y)) / 2, mv = this._gb === undefined ? 1e9 : hyp(this.x - this._bx, this.z - this._bz);
-    if (mv > 8) { this.by = this.sy = gb; this.svy = this.bedV = this.air === false && !kick ? this.vy : gv; }
-    else {
-      const d = gb - this._gb, stp = Math.abs(d) > mv * 0.5 + 0.05; if (stp) { this.by += d; this.sy += d; } /* a step in the bed (a deck joint, the edge of a tile) carries the shadow along, it is no slope */
-      const nb = lerp(this.by, gb, 0.35); this.bedV = (nb - this.by) / dt; this.by = nb;
-      // ground steeper than 20 % under the wheels is no street but a hump or a bank of S (a street over an embankment it should pass under, the
-      // sag of the Milano-Meda where a deck is missing): there and for half a second after the car keeps to the ground as before, no ski jump
-      if (Math.abs(this.bedV) > 0.2 * this.speed + 0.3 || (!stp && mv > 0.05 && Math.abs(d) > 0.2 * mv)) this.steepT = 0.5; else if (this.steepT > 0) this.steepT -= dt;
-      this.svy -= GRAV * dt; this.sy += this.svy * dt; if (this.sy <= this.by || this.steepT > 0) { this.sy = this.by; this.svy = this.bedV; }
-    }
-    // off the wheels: the shadow has left the bed by JUMP_MIN, the car is going faster than JUMP_V and is not still catching up with a climb;
-    // it leaves with the shadow's vertical speed, at most a launch of about 11 degrees (a 20 % ramp)
-    if (kick || (this.sy - this.by > JUMP_MIN && this.speed > JUMP_V && this.y > ty - 0.03)) {
-      this.air = true; this.airT = 0; this.airTop = 0; this.air0 = [this.x, this.z]; this.jumps = (this.jumps || 0) + 1; this._gb = undefined;
-      if (!kick) { this.vy = Math.min(this.svy, 0.2 * this.speed); this.y = Math.max(this.y, ty + 0.01); this.slope = gs; } /* both wheels just over the ground they leave */
-      return;
-    }
-    this.vy = this.bedV; this._bx = this.x; this._bz = this.z; this._gb = gb;
+    this.roll = lerp(this.roll, 0, 0.04);
   }
   wheelie(dt, v, thr, i) { // pitch on the rear wheel (gas + weight back) or on the front one (brake + weight forward), a damped spring towards the wanted angle
     const S = this.spec, lb = clamp(i.lean || 0, -1, 1), was = this.wh; let tgt = 0;
@@ -6440,8 +6524,8 @@ class Vehicle {
     if (Math.abs(this.z) > LIM_Z) { this.z = Math.sign(this.z) * LIM_Z; this.vz *= -0.3; }
     // ride over kerbs: front and rear axle heights
     const [cf, cb] = this.circles(), yf = H.surface(cf[0], cf[1], this.y), yb = H.surface(cb[0], cb[1], this.y), ty = (yf + yb) / 2;
-    if (ty - this.y > 0.09 && ty - this.y < 0.2 && this === P.car && this.speed > 6) shake = Math.max(shake, 0.12);
-    this.vert(cf, cb, yf, yb, ty);
+    if (!this.F && (this === P.car || this.vy > 2)) fisInit(this); /* the player's vehicle, or one thrown up by an explosion */
+    if (this.F) fisVert(this, cf, cb, yf, yb, ty); else { this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, Math.atan2(yb - yf, this.co * 2), 0.35); } /* the traffic follows the ground */
     if (hitN) {
       const vn = this.vx * hitN[0] + this.vz * hitN[1];
       if (vn < 0) { this.vx -= hitN[0] * vn * 1.25; this.vz -= hitN[1] * vn * 1.25; this.vx *= 0.92; this.vz *= 0.92; this.impact(-vn, hitN[0], hitN[1]); }
@@ -6454,13 +6538,14 @@ class Vehicle {
     if (this.spec.two && this.driver && v > 7.5) throwRider(this, v);
   }
   sync() {
-    const m = this.m; m.g.position.set(this.x, this.y, this.z); m.g.rotation.y = this.h; m.g.rotation.x = this.slope;
-    m.body.rotation.z = this.roll; m.body.rotation.x = this.pitch; if (!this.spec.two) m.body.position.y = this.sus || 0;
+    const m = this.m; m.g.position.set(this.x, this.y, this.z); m.g.rotation.y = this.h; m.g.rotation.x = this.F ? this.ap : this.slope; m.g.rotation.z = this.F ? this.ar : 0;
+    m.body.rotation.z = this.roll; m.body.rotation.x = this.pitch;
     if (this.spec.two) { // wheelie / stoppie: rotate around the axle that stays on the ground
       const S = this.spec, a = -this.wh, py = S.wr, pz = (this.wh > 0 ? -1 : 1) * (S.L / 2 - S.wr - 0.04), c = Math.cos(a), s = Math.sin(a);
       m.body.rotation.x = a; m.body.position.set(0, py - (py * c - pz * s), pz - (py * s + pz * c));
     }
     for (const w of m.wheels) { w.w.rotation.x = this.spin; if (w.front) w.piv.rotation.y = this.steer * 0.5; }
+    if (this.F && !this.spec.two) for (let i = 0; i < m.wheels.length; i++) m.wheels[i].piv.position.y = this.spec.wr + this.F.off[i]; /* each wheel on its ground */
   }
   remove() { scene.remove(this.m.g); if (this.m.bm) this.m.bm.geometry.dispose(); VEH.splice(VEH.indexOf(this), 1); }
 }
@@ -7515,8 +7600,8 @@ function step(dt) {
   for (const v of VEH) if (v.driver === 'ai' && v.ai) { if (v.kind === 'police') aiCop(v, dt); else aiTraffic(v, dt); }
   // ----- integrate vehicles
   for (const v of VEH) {
-    if (v.driver === null && v.speed < 0.05 && !v.inp.thr && !v.air && !(v.vy > 1)) { v.vx = v.vz = 0; v.sleep = true; continue; }
-    v.step(dt); gateHits(v); fuelHits(v); propHits(v); barHits(v); v.collide();
+    if (v.driver === null && v.speed < 0.05 && !v.inp.thr && !v.air && !(v.vy > 1) && !v.fpBusy) { v.vx = v.vz = 0; v.sleep = true; continue; }
+    const x0_ = v.x, z0_ = v.z; v.step(dt); vehSweep(v, x0_, z0_); gateHits(v); fuelHits(v); propHits(v); barHits(v); v.collide();
   }
   // ----- vehicle vs vehicle
   for (let i = 0; i < VEH.length; i++) for (let j = i + 1; j < VEH.length; j++) {
@@ -8753,5 +8838,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { FIS, step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>

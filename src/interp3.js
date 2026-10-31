@@ -3,7 +3,7 @@
 // and drawn as they are the cars jerk back and forth against the smoothly following camera, the more the faster they go. So before every step the
 // state of what moves is kept, and each frame is drawn at the point between the last two steps that the leftover time asks for (a = 0..1), then
 // the true state is put back for the next step. The arrays are reused: garbage made 60 times a second makes the phone stop now and then to sweep it
-const INTERP_VEH = ['x', 'y', 'z', 'h', 'slope', 'roll', 'pitch'], INTERP_KEYS = ['x', 'y', 'z', 'h'], INTERP_DONE = [];
+const INTERP_VEH = ['x', 'y', 'z', 'h', 'slope', 'roll', 'pitch', 'ap', 'ar'], INTERP_KEYS = ['x', 'y', 'z', 'h'], INTERP_DONE = [];
 function snapOf(o, keys) { const p = o._p || (o._p = new Array(keys.length)); for (let i = 0; i < keys.length; i++) p[i] = o[keys[i]]; o._pk = keys; }
 function interpSnap() {
   for (const v of VEH) snapOf(v, INTERP_VEH);

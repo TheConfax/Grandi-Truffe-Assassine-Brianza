@@ -725,67 +725,31 @@ rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePe
     "  }\n}")
 rep("function startGame() {\n  if (running) return; running = true;",
     "function startGame() {\n  if (running) return; running = true; if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */")
-# ---- jumps (Carlo, 25/10: "the car is glued to the ground"): every car on its wheels follows the ground as before, and a ballistic shadow of it
-# rides the bed (S and the decks, without kerbs, sidewalks and bumps). Where the bed drops away faster than gravity can follow (v^2/R > g on
-# a crest, the top of a ramp taken fast) the shadow lifts; once it would rise more than JUMP_MIN above the bed the car takes off with its
-# speed, flies under gravity and lands on what is under it (a deck if it is above it). docs/motore.md, "Salti"
+# ---- the physics of the car in height (Carlo, 31/10: "manca la verticalita", "il motore fisico"): fisica3.js, every parameter is in FIS there. It replaces the jumps of 25/10
+# (a ballistic shadow on the bed): the player's vehicle stands on springs on its wheels and leaves the ground by itself; the driving on the ground, Vehicle.step, stays. The traffic keeps a plain height. docs/motore.md, "Salti"
 rep("const VEH = [];", """const VEH = [];
 try { localStorage.removeItem('medaDrive'); } catch (e) { } /* the realistic driving model is gone, so is its saved switch */
-const JUMP_MIN = 0.08, JUMP_V = 17, GRAV = 9.81; /* a crest that lifts the shadow less than JUMP_MIN m keeps the car on its wheels, and so does any speed under JUMP_V m/s (61 km/h): the small waves of S and town driving stay as they were */
-function vehBed(x, z, cy) { // what a car flies over and lands on: S and the decks under cy + 0.8, without the step layer (kerbs, sidewalks, bumps) that only jolts it
-  if (H.fineAt(x, z)) { let y = H.base(x, z); for (const o of H.deckAt(x, z)) if (o.top > y && o.top <= cy + 0.8) y = o.top; return y; }
-  const full = H.surface(x, z, cy), st = onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : bumpAt(x, z); if (!st) return full;
-  const rc = H.rivCut(x, z), flat = H.base(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + st; return Math.abs(full - flat) < 1e-4 ? full - st : full; /* old engine: the step comes off unless a deck won */
-}""")
+""" + open(os.path.join(HERE, 'fisica3.js'), encoding='utf-8').read())
 rep("    const i = this.inp, fx = Math.sin(this.h), fz = Math.cos(this.h), rx = fz, rz = -fx;\n",
     "    if (this.air) { this.stepAir(dt); return; }\n    const i = this.inp, fx = Math.sin(this.h), fz = Math.cos(this.h), rx = fz, rz = -fx;\n")
-rep("    this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, Math.atan2(yb - yf, this.co * 2), 0.35);", "    this.vert(cf, cb, yf, yb, ty);")
-rep("  wheelie(dt, v, thr, i) {", """  stepAir(dt) { // off its wheels: no grip, no engine, no brakes, the speed it took off with less a little air drag; the steering turns the car a little, not its path (as in GTA)
+rep("    if (ty - this.y > 0.09 && ty - this.y < 0.2 && this === P.car && this.speed > 6) shake = Math.max(shake, 0.12);\n", "")
+rep("    this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, Math.atan2(yb - yf, this.co * 2), 0.35);",
+    "    if (!this.F && (this === P.car || this.vy > 2)) fisInit(this); /* the player's vehicle, or one thrown up by an explosion */\n    if (this.F) fisVert(this, cf, cb, yf, yb, ty); else { this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, Math.atan2(yb - yf, this.co * 2), 0.35); } /* the traffic follows the ground */")
+rep("  wheelie(dt, v, thr, i) {", """  stepAir(dt) { // off its wheels: no grip, no engine, no brakes, the speed it took off with less a little air drag; the stick turns the body (fisVert), not its way
     const i = this.inp, k = 1 - 0.0004 * this.speed * dt;
     this.steer = lerp(this.steer, i.steer, 1 - Math.exp(-10 * dt)); this.vx *= k; this.vz *= k;
-    this.h = wrapA(this.h + this.steer * 0.6 * dt); this.x += this.vx * dt; this.z += this.vz * dt;
+    this.x += this.vx * dt; this.z += this.vz * dt;
     this.spin += (this.fwdSpeed + (i.thr > 0 && this.health > 0 ? 8 : 0)) * dt / this.spec.wr; this.drift = 0;
-    this.roll = lerp(this.roll, 0, 0.04); this.pitch = lerp(this.pitch, 0, 0.1);
-  }
-  vert(cf, cb, yf, yb, ty) { // the height of the car over the ground under its axles (cf, cb; yf, yb the ground there, ty their mean): on the wheels or in the air
-    const dt = 1 / 60, co = this.co, gs = Math.atan2(yb - yf, co * 2), fs = this.fwdSpeed, gv = -fs * Math.tan(gs);
-    if (this.sus || this.susV) { this.susV += (-240 * this.sus - 20 * this.susV) * dt; this.sus = clamp(this.sus + this.susV * dt, -0.2, 0.12); if (Math.abs(this.sus) < 1e-3 && Math.abs(this.susV) < 0.02) this.sus = this.susV = 0; } /* the springs after a landing, drawn on the body */
-    if (this.air) {
-      this.vy -= GRAV * dt; this.y += this.vy * dt; this.airT += dt; this.airTop = Math.max(this.airTop, this.y - ty);
-      const sn = Math.sin(this.slope), axle = this.y - co * sn <= yf || this.y + co * sn <= yb;
-      if (this.y > ty && !axle) { this.slope = clamp(lerp(this.slope, -Math.atan2(this.vy, Math.max(6, Math.abs(fs))) * Math.sign(fs || 1) * 0.6, 0.035), -0.6, 0.6); return; } /* still flying: the nose follows the path down, slowly */
-      const hit = gv - this.vy; /* how fast it meets the ground */
-      this.air = false; this.y = Math.max(this.y, Math.min(ty + 0.5, Math.max(ty, yf + co * sn, yb - co * sn))); this.vy = this.bedV = gv; /* the wheel that touches first stays on the ground, the other comes down with the springs */ this._gb = undefined;
-      if (!this.spec.two) this.susV = -Math.min(hit, 14) * 0.3;
-      this.lastJump = { t: this.airT, h: this.airTop, d: hyp(this.x - this.air0[0], this.z - this.air0[1]), hit, v: this.speed };
-      if (this === P.car) { shake = Math.max(shake, Math.min(0.9, hit / 14)); if (hit > 2.5 && hit <= 7) sfxCrash(hit); }
-      if (hit > 7) this.impact(hit * 0.7);
-    }
-    const kick = (this.vy || 0) > (this.bedV || 0) + 2; /* thrown up from outside (an explosion) */
-    this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, gs, 0.35);
-    // the shadow rides the bed under the two axles, eased as the body is (a wheelbase and the springs smooth the small waves of S away)
-    const gb = (vehBed(cf[0], cf[1], this.y) + vehBed(cb[0], cb[1], this.y)) / 2, mv = this._gb === undefined ? 1e9 : hyp(this.x - this._bx, this.z - this._bz);
-    if (mv > 8) { this.by = this.sy = gb; this.svy = this.bedV = this.air === false && !kick ? this.vy : gv; }
-    else {
-      const d = gb - this._gb, stp = Math.abs(d) > mv * 0.5 + 0.05; if (stp) { this.by += d; this.sy += d; } /* a step in the bed (a deck joint, the edge of a tile) carries the shadow along, it is no slope */
-      const nb = lerp(this.by, gb, 0.35); this.bedV = (nb - this.by) / dt; this.by = nb;
-      // ground steeper than 20 % under the wheels is no street but a hump or a bank of S (a street over an embankment it should pass under, the
-      // sag of the Milano-Meda where a deck is missing): there and for half a second after the car keeps to the ground as before, no ski jump
-      if (Math.abs(this.bedV) > 0.2 * this.speed + 0.3 || (!stp && mv > 0.05 && Math.abs(d) > 0.2 * mv)) this.steepT = 0.5; else if (this.steepT > 0) this.steepT -= dt;
-      this.svy -= GRAV * dt; this.sy += this.svy * dt; if (this.sy <= this.by || this.steepT > 0) { this.sy = this.by; this.svy = this.bedV; }
-    }
-    // off the wheels: the shadow has left the bed by JUMP_MIN, the car is going faster than JUMP_V and is not still catching up with a climb;
-    // it leaves with the shadow's vertical speed, at most a launch of about 11 degrees (a 20 % ramp)
-    if (kick || (this.sy - this.by > JUMP_MIN && this.speed > JUMP_V && this.y > ty - 0.03)) {
-      this.air = true; this.airT = 0; this.airTop = 0; this.air0 = [this.x, this.z]; this.jumps = (this.jumps || 0) + 1; this._gb = undefined;
-      if (!kick) { this.vy = Math.min(this.svy, 0.2 * this.speed); this.y = Math.max(this.y, ty + 0.01); this.slope = gs; } /* both wheels just over the ground they leave */
-      return;
-    }
-    this.vy = this.bedV; this._bx = this.x; this._bz = this.z; this._gb = gb;
+    this.roll = lerp(this.roll, 0, 0.04);
   }
   wheelie(dt, v, thr, i) {""")
-rep("    m.body.rotation.z = this.roll; m.body.rotation.x = this.pitch;", "    m.body.rotation.z = this.roll; m.body.rotation.x = this.pitch; if (!this.spec.two) m.body.position.y = this.sus || 0;")
-rep("if (v.driver === null && v.speed < 0.05 && !v.inp.thr)", "if (v.driver === null && v.speed < 0.05 && !v.inp.thr && !v.air && !(v.vy > 1))")
+rep("    else this.roll = lerp(this.roll, clamp(-yaw * v * 0.004, -0.08, 0.08), 0.1);\n    this.pitch = lerp(this.pitch, clamp((thr - i.brk) * -0.025, -0.04, 0.04), 0.1);",
+    "    else if (!this.F) this.roll = lerp(this.roll, clamp(yaw * v * 0.004, -0.08, 0.08), 0.1); /* a car leans out of the bend; the player's vehicle does it on its springs */\n    if (!this.F) this.pitch = lerp(this.pitch, clamp((thr - i.brk) * -0.025, -0.04, 0.04), 0.1);")
+rep("m.g.rotation.y = this.h; m.g.rotation.x = this.slope;", "m.g.rotation.y = this.h; m.g.rotation.x = this.F ? this.ap : this.slope; m.g.rotation.z = this.F ? this.ar : 0;")
+rep("    for (const w of m.wheels) { w.w.rotation.x = this.spin; if (w.front) w.piv.rotation.y = this.steer * 0.5; }",
+    "    for (const w of m.wheels) { w.w.rotation.x = this.spin; if (w.front) w.piv.rotation.y = this.steer * 0.5; }\n    if (this.F && !this.spec.two) for (let i = 0; i < m.wheels.length; i++) m.wheels[i].piv.position.y = this.spec.wr + this.F.off[i]; /* each wheel on its ground */")
+rep("    v.step(dt); gateHits(v); fuelHits(v); propHits(v); barHits(v); v.collide();", "    const x0_ = v.x, z0_ = v.z; v.step(dt); vehSweep(v, x0_, z0_); gateHits(v); fuelHits(v); propHits(v); barHits(v); v.collide();")
+rep("if (v.driver === null && v.speed < 0.05 && !v.inp.thr)", "if (v.driver === null && v.speed < 0.05 && !v.inp.thr && !v.air && !(v.vy > 1) && !v.fpBusy)")
 rep("if (Math.abs(v.x - p.x) > 4 || Math.abs(v.z - p.z) > 4) continue;", "if (Math.abs(v.x - p.x) > 4 || Math.abs(v.z - p.z) > 4 || v.y - p.y > 1.4) continue; /* a car flying over, or on the bridge above */")
 rep("if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4) continue;", "if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4) continue;")
 rep("const a = VEH[i], b = VEH[j]; if (a.sleep && b.sleep) continue;", "const a = VEH[i], b = VEH[j]; if (a.sleep && b.sleep) continue; if (Math.abs(a.y - b.y) > 1.5) continue; /* one over the other: in the air, or on a bridge over the road */")
@@ -808,5 +772,5 @@ rep("if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - 
 rep("    const f = rayCam(px, pz, cx, cz, wy);", "    if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */\n    const f = rayCam(px, pz, cx, cz, wy);")
 rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = Math.max(fy, H.ground(cx, cz)) + ht;")
 rep("  camera.position.copy(camPos);\n  if (shake > 0)", "  if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */\n  camera.position.copy(camPos);\n  if (shake > 0)")
-rep("window.__G = { FUEL,", "window.__G = { step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
+rep("window.__G = { FUEL,", "window.__G = { FIS, step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
