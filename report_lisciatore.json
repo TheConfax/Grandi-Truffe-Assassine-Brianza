@@ -13,17 +13,17 @@
 },
 "buche": {
 "conta": {
-"riempita": 508,
-"protetta": 44,
+"riempita": 511,
+"protetta": 41,
 "troppo_grande": 37,
 "strada_in_fondo": 5,
 "rampa_nei_dati": 2
 },
-"nodi": 22425,
+"nodi": 22447,
 "alzati_m": {
-"n": 22425,
+"n": 22447,
 "p50": 0.782,
-"p90": 2.007,
+"p90": 2.006,
 "p99": 3.082,
 "max": 5.798
 },
@@ -318,35 +318,11 @@
 "esito": "troppo_grande"
 },
 {
-"x": 901.2,
-"z": -816.4,
-"m2": 48,
-"prof": 2.12,
-"sotto_edificio": 0.83,
-"era": "altro",
-"fonti": [
-"LiDAR 2008"
-],
-"esito": "protetta"
-},
-{
 "x": 335.2,
 "z": -594.4,
 "m2": 4016,
 "prof": 4.73,
 "sotto_edificio": 0.33,
-"era": "altro",
-"fonti": [
-"LiDAR 2008"
-],
-"esito": "protetta"
-},
-{
-"x": 889.2,
-"z": -792.4,
-"m2": 36,
-"prof": 1.65,
-"sotto_edificio": 0.89,
 "era": "altro",
 "fonti": [
 "LiDAR 2008"
@@ -396,14 +372,6 @@
 "LiDAR 2008"
 ],
 "esito": "strada_in_fondo"
-},
-{
-"x": 1511.2,
-"z": -604.4,
-"m2": 12,
-"prof": 1.77,
-"sotto_edificio": 0.0,
-"esito": "protetta"
 },
 {
 "x": -1060.8,
@@ -873,6 +841,30 @@
 "prof": 1.23,
 "sotto_edificio": 1.0,
 "esito": "protetta"
+},
+{
+"x": 361.2,
+"z": 817.6,
+"m2": 168,
+"prof": 2.67,
+"sotto_edificio": 0.6,
+"esito": "protetta"
+},
+{
+"x": 151.2,
+"z": 825.6,
+"m2": 3988,
+"prof": 1.45,
+"sotto_edificio": 0.23,
+"esito": "troppo_grande"
+},
+{
+"x": 727.2,
+"z": 875.6,
+"m2": 1072,
+"prof": 3.58,
+"sotto_edificio": 0.45,
+"esito": "troppo_grande"
 }
 ],
 "riempite": [
@@ -1815,20 +1807,20 @@
 "pozzetti": {
 "profondita_minima_m": 0.4,
 "massimo_m2": 12.0,
-"riempiti": 2945,
-"nodi": 19815,
+"riempiti": 2947,
+"nodi": 19826,
 "alzati_m": {
-"n": 19815,
+"n": 19826,
 "p50": 0.627,
-"p90": 1.427,
-"p99": 2.523,
+"p90": 1.428,
+"p99": 2.525,
 "max": 5.854
 }
 },
 "dente": {
-"nodi_mossi": 226471,
+"nodi_mossi": 226519,
 "spostamento_m": {
-"n": 226471,
+"n": 226519,
 "p50": 0.085,
 "p90": 0.275,
 "p99": 0.659,
@@ -1842,13 +1834,13 @@
 "definizione": "S a 0,3 m dentro e fuori da ogni anello AC_VEI, AC_PED, AC_CIC, AR_STR, ogni 0,5 m: km fuori dalla media dei suoi 4 m oltre la soglia; nodi protetti esclusi",
 "prima": {
 "AC_VEI": {
-"km": 1353.99,
-"oltre_8cm": 48.77,
-"oltre_15cm": 15.52,
+"km": 1354.56,
+"oltre_8cm": 48.85,
+"oltre_15cm": 15.53,
 "oltre_30cm": 2.83
 },
 "AC_PED": {
-"km": 203.6,
+"km": 203.61,
 "oltre_8cm": 8.26,
 "oltre_15cm": 1.98,
 "oltre_30cm": 0.27
@@ -1860,7 +1852,7 @@
 "oltre_30cm": 0.0
 },
 "AR_STR": {
-"km": 632.93,
+"km": 632.99,
 "oltre_8cm": 10.49,
 "oltre_15cm": 2.38,
 "oltre_30cm": 0.38
@@ -1868,13 +1860,13 @@
 },
 "dopo": {
 "AC_VEI": {
-"km": 1353.99,
-"oltre_8cm": 24.07,
+"km": 1354.56,
+"oltre_8cm": 24.11,
 "oltre_15cm": 6.42,
 "oltre_30cm": 0.97
 },
 "AC_PED": {
-"km": 203.6,
+"km": 203.61,
 "oltre_8cm": 1.95,
 "oltre_15cm": 0.52,
 "oltre_30cm": 0.06
@@ -1886,19 +1878,19 @@
 "oltre_30cm": 0.0
 },
 "AR_STR": {
-"km": 632.93,
+"km": 632.99,
 "oltre_8cm": 2.64,
 "oltre_15cm": 0.6,
 "oltre_30cm": 0.09
 }
 },
 "totale_prima": {
-"oltre_8cm": 67.77,
-"oltre_15cm": 19.88,
+"oltre_8cm": 67.85,
+"oltre_15cm": 19.9,
 "oltre_30cm": 3.48
 },
 "totale_dopo": {
-"oltre_8cm": 28.7,
+"oltre_8cm": 28.75,
 "oltre_15cm": 7.55,
 "oltre_30cm": 1.12
 },
@@ -1907,20 +1899,20 @@
 "buche_vicino_alle_strade": {
 "definizione": "depressioni chiuse di S oltre 1.0 m, almeno 12 m2, entro 12 m da una strada, nodi protetti esclusi",
 "prima": {
-"n": 541,
+"n": 544,
 "prof_m": {
-"n": 541,
+"n": 544,
 "p50": 1.76,
 "p90": 2.96,
 "max": 27.85
 },
 "area_m2": {
-"n": 541,
+"n": 544,
 "p50": 120.0,
-"p90": 700.0,
+"p90": 697.6,
 "max": 84148.0
 },
-"riempibili": 496
+"riempibili": 499
 },
 "dopo": {
 "n": 38,
@@ -2285,7 +2277,7 @@
 },
 "spostamento": {
 "dente_m": {
-"n": 223462,
+"n": 223510,
 "p50": 0.09,
 "p90": 0.28,
 "p99": 0.95,
@@ -2294,13 +2286,13 @@
 "dente_su_m": 1.13,
 "dente_giu_m": -1.5,
 "buche_m": {
-"n": 35557,
+"n": 35590,
 "p50": 0.7,
 "p90": 1.82,
 "p99": 2.97,
 "max": 5.85
 },
-"nodi_mossi": 259019,
+"nodi_mossi": 259100,
 "nodi_griglia": 4004001,
 "limite_dente_m": 1.5
 },
@@ -2316,7 +2308,7 @@
 },
 "gradini_cresciuti": {
 "definizione": "coppie di nodi vicini (anche in diagonale), fuori dagli edifici e dalle buche riempite, con il salto cresciuto oltre la soglia",
-"oltre_0.3m": 7522,
+"oltre_0.3m": 7521,
 "oltre_0.5m": 1061,
 "oltre_1.0m": 17,
 "peggiori": [
@@ -2599,78 +2591,78 @@
 "scarto": 0.35
 },
 {
-"x": -334.8,
-"z": -1260.7,
+"x": -478.9,
+"z": -477.5,
 "scarto": 0.34
 },
 {
-"x": 449.9,
-"z": -1162.2,
+"x": 1349.2,
+"z": -878.4,
 "scarto": 0.34
 },
 {
-"x": -204.9,
-"z": -1011.1,
+"x": 51.7,
+"z": -761.6,
 "scarto": 0.34
 },
 {
-"x": 875.7,
-"z": -493.9,
+"x": -227.5,
+"z": -1059.7,
 "scarto": 0.33
 },
 {
-"x": -247.5,
-"z": -856.5,
+"x": 467.0,
+"z": -1199.9,
 "scarto": 0.33
 },
 {
-"x": -283.3,
-"z": -1114.6,
+"x": 175.2,
+"z": -1334.6,
 "scarto": 0.33
 },
 {
-"x": 239.5,
-"z": -870.0,
+"x": -335.4,
+"z": -1260.4,
 "scarto": 0.32
 },
 {
-"x": -12.6,
-"z": -670.2,
+"x": -302.8,
+"z": -1261.6,
 "scarto": 0.32
 },
 {
-"x": -649.0,
-"z": -932.6,
+"x": -269.8,
+"z": -1131.4,
 "scarto": 0.32
 },
 {
-"x": 285.7,
-"z": -959.6,
+"x": -239.1,
+"z": -1092.6,
 "scarto": 0.31
 },
 {
-"x": 1231.1,
-"z": -616.0,
+"x": -4.8,
+"z": -676.1,
 "scarto": 0.31
 },
 {
-"x": -296.4,
-"z": -1115.8,
+"x": -917.5,
+"z": -1453.6,
 "scarto": 0.31
 },
 {
-"x": -394.8,
-"z": -1302.7,
+"x": 46.3,
+"z": -718.4,
 "scarto": 0.31
 },
 {
-"x": -318.2,
-"z": -1244.1,
+"x": -913.6,
+"z": -1450.4,
 "scarto": 0.3
 },
 {
-"x": -224.4,
-"z": -1049.3,
+"x": 1084.5,
+"z": 400.3,
 "scarto": 0.3
 }
 ],
@@ -2679,21 +2671,21 @@
 "controlli_pozzetti": {
 "definizione": "depressioni chiuse di S (piena dal minimo fino al punto di sfioro) profonde almeno 0.4 m con al massimo 3 nodi (12 m2), su tutta la mappa",
 "prima": {
-"totale": 1965,
-"senza_motivo": 1894,
+"totale": 1967,
+"senza_motivo": 1898,
 "oltre_1m": 246,
 "oltre_2m": 22
 },
 "dopo": {
-"totale": 73,
+"totale": 71,
 "senza_motivo": 0,
-"oltre_1m": 6,
+"oltre_1m": 4,
 "oltre_2m": 0
 },
 "eccezioni_per_motivo": {
 "acqua o alveo": 47,
-"rampa disegnata": 13,
 "impalcato o ponte": 3,
+"rampa disegnata": 11,
 "a meno di 4 m da ponte, acqua o ferrovia": 10
 },
 "eccezioni": [
@@ -2712,25 +2704,11 @@
 "motivo": "acqua o alveo"
 },
 {
-"x": 875.2,
-"z": -816.4,
-"m2": 12,
-"prof": 1.29,
-"motivo": "rampa disegnata"
-},
-{
 "x": 325.2,
 "z": -500.4,
 "m2": 16,
 "prof": 1.25,
 "motivo": "impalcato o ponte"
-},
-{
-"x": 1511.2,
-"z": -604.4,
-"m2": 8,
-"prof": 1.24,
-"motivo": "rampa disegnata"
 },
 {
 "x": 973.2,
