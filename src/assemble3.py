@@ -266,7 +266,7 @@ rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode =
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
 rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -338,9 +338,9 @@ function pollPad() {
   /* title screen: Options or cross/A start the game like Enter */
   if (!running) { none(); if ((E[9] || E[0]) && !goBtn.disabled) startGame(); return; }
   if (E[9]) togglePause(); /* also closes the big map */
-  if (paused && !bigOpen) { none(); return; }
+  if (paused && !bigOpen) { radioWheelCancel(); none(); return; }
   if (E[tpad]) toggleBig();
-  if (bigOpen) { none(); return; }
+  if (bigOpen) { radioWheelCancel(); none(); return; }
   const ni = s => toast(s + ' non implementato');
   GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0);
   GP.thr = veh ? b(7) : 0; GP.brk = veh ? b(6) : 0;
@@ -352,8 +352,12 @@ function pollPad() {
   if (E[8]) camMode = camMode === 0 ? 2 : 0; /* third person <-> first person; the top view is gone from the pad */
   if (E[12]) reportSpot();
   if (E[13]) ni('Zoom della minimappa');
+  /* radio wheel: the right stick picks the slice, the camera does not move, the car keeps being driven; letting go of the d-pad confirms */
+  if (RW.open && !down(14)) radioWheelRelease();
+  if (RW.open) radioWheelStick(g.axes[2] || 0, g.axes[3] || 0);
+  if (RW.open || RW.lock) { if (!RW.open && !down(14) && Math.hypot(g.axes[2] || 0, g.axes[3] || 0) < 0.15) RW.lock = false; else GP.lookx = GP.looky = 0; }
   /* d-pad left: radio. d-pad right: lights (vehicles), use item (on foot) */
-  padTap(14, down(14), dt, () => { if (kind === 'car') radioNext(); else ni('Radio dal telefono'); }, () => ni(kind === 'car' ? 'Ruota delle radio' : 'Radio dal telefono'));
+  padTap(14, down(14), dt, radioNext, radioWheelOpen);
   if (veh) padTap(15, down(15), dt, () => ni(kind === 'bici' ? 'Fanale' : 'Fari'), () => ni(kind === 'bici' ? 'Fanale' : 'Abbaglianti')); else if (E[15]) ni('Usa oggetto');
   if (veh) {
     if (E[3]) { K.use = true; (GP.hold[3] || (GP.hold[3] = { t: 0, on: false, done: false })).block = true; } /* getting out ends this press: on foot it must not count as a tap that gets in again */
