@@ -14,6 +14,7 @@ const SALTO = {
   maxBar: 2.6, reach: 1.15, reachV: 0.16, cone: 0.5, // highest barrier or perch over the ground (m, "about 2.5"); how far an obstacle is taken at a standstill, plus per m/s of run-up; cosine of the half cone ahead
   camV: 15, camHold: 0.4, airPush: 0.4, // the camera during a gesture and just after it moves round him at most camV m/s; a push in the air moves him at most airPush m a step
   roofKmh: 30, // on a car's roof he stays up to this speed (km/h); over it he is thrown off to the side, no damage (Carlo, 31/10)
+  roofWait: 2, roofRun: 13, roofRage: 4, roofHorn: 0.09, // a driver with him on the roof: seconds of honking before he floors it, speed he wants then (m/s, 47 km/h; corners and obstacles still slow him), how long he stays angry after, horn volume
   vehMaxV: 1.5, boxR: 0.32, lip: 0.3, // a car moving faster than this is not climbed
   gap: 0.42, landL: [0.55, 0.8, 1.1, 1.5], clear: 0.06, r: 0.3, rLand: 0.4, head: 1.75, // where the hands go from, how far past it he comes down (first free), over the top by, body radius on the way and landing, body height
   lowH: 1.35, hoist: 2.0, // up to lowH a hop with the hands on top; over it a jump to hang from the top by the hands (feet hoist m under it), then a pull up
@@ -232,6 +233,16 @@ function footThrow(v) { // too fast to stay on: down on the nearest free ground 
     P.x = x; P.z = z; P.air = true; P.vy = 0; P.vx = P.vz = 0; P.onV = null; P.onL = null; P.land = 0; P.thrown = (P.thrown || 0) + 1; return true;
   }
   return false;
+}
+// the driver of an AI car with him on the roof: honks, after roofWait floors it to throw him off (footRide does it over roofKmh); a police car also adds a star
+let hornRoof = 0;
+function roofAnger(v, dt) {
+  const ai = v.ai, on = P.mode === 'foot' && P.onV === v;
+  if (on) {
+    ai.roofT = (ai.roofT || 0) + dt; ai.honkT = 0.5; const d = hyp(v.x - P.x, v.z - P.z); hornRoof = Math.max(hornRoof, SALTO.roofHorn * clamp(1 - d / 60, 0, 1));
+    if (ai.roofT > SALTO.roofWait) ai.rage = SALTO.roofRage;
+    if (v.kind === 'police' && !ai.roofCrime && W.stars === 0) { ai.roofCrime = true; crime(HEAT_T[1]); }
+  } else { ai.roofT = 0; ai.roofCrime = false; if (ai.rage > 0) ai.rage -= dt; }
 }
 function footRideEnd() { if (P.onV) { const [lx, lz] = vehLocal(P.onV, P.x, P.z); P.onL = [lx, lz, P.onV.h]; } else P.onL = null; }
 // the move through a wall never happens, whoever asks for it (his steps, the push of a wall from behind, a car, a knock): between where he was and where he would be
