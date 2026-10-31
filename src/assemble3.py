@@ -266,7 +266,7 @@ rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode =
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
 rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -277,7 +277,7 @@ rep("Le vie vere di Meda, dalla stazione a Piazza della Chiesa. Ruba un'auto, fa
 rep("banner('Stazione di Meda', 'MEDA · BRIANZA');", "banner('Stazione di Meda', 'BRIANZA');")
 # ---- driving model: one, the arcade one (real top speeds); the realistic model and its G key are gone (Carlo, 25/10)
 rep("const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = S.acc * (bst ? 1.7 : 1), top = this.maxV * (bst ? 1.15 : 1);",
-    "const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = Math.min(12, S.acc * 2.1) * (bst ? 2.4 : 1), top = this.maxV * (bst ? 1.3 : 1);")
+    "const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = Math.min(12, S.acc * 2.1) * (this.accMul || 1) * (bst ? 2.4 : 1), top = this.maxV * (bst ? 1.3 : 1);")
 rep("if (i.brk > 0) { if (v > 0.5) v -= 11 * dt * i.brk;", "if (i.brk > 0) { if (v > 0.5) v -= 21 * dt * i.brk;")
 rep("const drag = (0.15 + (thr ? 0 : 0.45 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);", "const drag = (0.15 + (thr ? 0 : 1.6 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);")
 rep("const yawMax = (i.hand ? 22 : 13 + S.grip * 0.4) / Math.max(4, Math.abs(v));", "const yawMax = (i.hand ? 26 : 30) / Math.max(4, Math.abs(v));")
@@ -303,24 +303,73 @@ rep("    if (v > 4) { this.health = Math.max(0, this.health - (v - 4) * 2.2); }"
 rep("      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;", "      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;")
 rep("      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;", "      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;")
 # ---- gamepad (Xbox / PlayStation layout): RT gas, LT brake, left stick steer, RB handbrake, A turbo/run, Y get in/out, B camera, X horn, View map, Start pause
-rep("// ---------------------------------------------------------------- player actions", """const GP = { steer: 0, thr: 0, brk: 0, hand: 0, turbo: 0, horn: 0, fwd: 0, prev: [] };
+rep("// ---------------------------------------------------------------- player actions", """const GP = { steer: 0, thr: 0, brk: 0, hand: 0, turbo: 0, horn: 0, fwd: 0, lookx: 0, looky: 0, back: 0, sprint: 0, prev: [], hold: [], t0: 0, mode: '', l3: 0, l3d: false };
+/* which layout applies: on foot, car (and anything else with four wheels), motorbike or scooter, bicycle */
+const padKind = () => P.mode !== 'car' || !P.car ? 'foot' : P.car.spec.pedal ? 'bici' : P.car.spec.two ? 'moto' : 'car';
+const padNames = () => GP.ps ? { x: '✕', o: '○', s: '□', t: '△', l1: 'L1', r1: 'R1', l2: 'L2', r2: 'R2', l3: 'L3', r3: 'R3', cr: 'Create', op: 'Options', tp: 'Touchpad' }
+  : { x: 'A', o: 'B', s: 'X', t: 'Y', l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT', l3: 'LS', r3: 'RS', cr: 'View', op: 'Menu', tp: 'Guide' };
+function padHelp(kind) {
+  const n = padNames(), com = `${n.r3} guarda dietro · ${n.cr} visuale · ${n.tp} mappa · ${n.op} pausa${DEBUG ? ' · croce su segnala punto' : ''}`;
+  if (kind === 'foot') return `levetta sinistra cammina (piena: corsetta) · ${n.x} premuto ripetutamente: scatto · ${n.t} sali sul mezzo · ${com}`;
+  if (kind === 'bici') return `${n.r2} pedala · ${n.x} ripetuto: scatto · ${n.l2} freno · ${n.r1} freno a mano · levetta sinistra sposta il peso · ${n.t} scendi · ${com}`;
+  return `${n.r2} gas · ${n.l2} freno e retro · ${n.r1} o ${n.x} freno a mano · ${n.o} turbo · ${n.l3} clacson · ${n.t} sali/scendi · croce sinistra radio${kind === 'moto' ? ' · levetta sinistra sposta il peso' : ''} · ${com}`;
+}
+/* tap or hold on one button: tap fires on release, hold fires once after 0.45 s */
+function padTap(i, down, dt, onTap, onHold) {
+  const h = GP.hold[i] || (GP.hold[i] = { t: 0, on: false, done: false });
+  if (down) { if (h.block) return; if (!h.on) { h.on = true; h.t = 0; h.done = false; } h.t += dt; if (!h.done && h.t >= 0.45) { h.done = true; if (onHold) onHold(); } }
+  else { h.block = false; if (h.on) { h.on = false; if (!h.done && onTap) onTap(); } }
+}
 function pollPad() {
   let pads = []; try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) { return; }
-  const g = [...pads].find(p => p && p.connected); if (!g) { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = 0; return; }
-  const dz = v => Math.abs(v) < 0.15 ? 0 : v, b = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0;
-  const edge = i => { const now = b(i) > 0.5, was = GP.prev[i]; GP.prev[i] = now; return now && !was; };
-  // cross/A handbrake, circle/B turbo, square/X horn, triangle/Y get in-out, R1/RB or R3 camera
-  GP.steer = dz(g.axes[0] || 0); GP.fwd = -dz(g.axes[1] || 0); GP.thr = b(7); GP.brk = b(6); GP.hand = b(0); GP.turbo = b(1); GP.horn = b(2);
-  if (edge(3)) K.use = true;
-  if (edge(5)) camMode = (camMode + 1) % 2;
-  if (edge(11)) reportSpot();
-  if (edge(8)) toggleBig();
-  const e9 = edge(9); if (!running) { if ((e9 || edge(0)) && !goBtn.disabled) startGame(); } else if (e9) togglePause(); /* title screen: START or cross/A start the game like Enter */
-  if (!GP.seen) {
-    GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id);
-    const L = GP.ps ? { t: 'R2', b: 'L2', h: '✕', o: '○', s: '□', y: '△', c: 'R1', m: 'Create', p: 'Options', r: 'R3' } : { t: 'RT', b: 'LT', h: 'A', o: 'B', s: 'X', y: 'Y', c: 'RB', m: 'View', p: 'Menu', r: 'R3' };
-    const txt = `${L.t} gas · ${L.b} freno · ${L.h} freno a mano · ${L.o} turbo · ${L.s} clacson · ${L.y} sali/scendi · ${L.c} visuale · ${L.r} segnala punto · ${L.m} mappa · ${L.p} pausa`;
-    toast((GP.ps ? 'DualSense' : 'Controller') + ' collegato: ' + txt); const pl = document.getElementById('padline'); if (pl) { pl.hidden = false; pl.textContent = 'Controller: ' + txt; }
+  const g = [...pads].find(p => p && p.connected); if (!g) { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = GP.lookx = GP.looky = GP.back = 0; return; }
+  const tn = performance.now(), dt = Math.min(0.1, (tn - (GP.t0 || tn)) / 1000); GP.t0 = tn;
+  const dz = v => Math.abs(v) < 0.15 ? 0 : v, b = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0, down = i => b(i) > 0.5;
+  const edge = i => { const now = down(i), was = GP.prev[i]; GP.prev[i] = now; return now && !was; };
+  const E = []; for (let i = 0; i < 18; i++) E[i] = edge(i);
+  const first = !GP.seen; if (first) { GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id); }
+  const kind = padKind(), veh = kind !== 'foot', tpad = GP.ps ? 17 : 16;
+  if (first || kind !== GP.mode) {
+    GP.mode = kind; const txt = padHelp(kind);
+    if (first) toast((GP.ps ? 'DualSense' : 'Controller') + ' collegato: ' + txt);
+    const pl = document.getElementById('padline'); if (pl) { pl.hidden = false; pl.textContent = 'Controller: ' + txt; }
+  }
+  const none = () => { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = GP.lookx = GP.looky = GP.back = 0; };
+  /* title screen: Options or cross/A start the game like Enter */
+  if (!running) { none(); if ((E[9] || E[0]) && !goBtn.disabled) startGame(); return; }
+  if (E[9]) togglePause(); /* also closes the big map */
+  if (paused && !bigOpen) { none(); return; }
+  if (E[tpad]) toggleBig();
+  if (bigOpen) { none(); return; }
+  const ni = s => toast(s + ' non implementato');
+  GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0);
+  GP.thr = veh ? b(7) : 0; GP.brk = veh ? b(6) : 0;
+  GP.hand = kind === 'bici' ? b(5) : veh ? Math.max(b(0), b(5)) : 0;
+  GP.turbo = kind === 'car' || kind === 'moto' ? b(1) : 0;
+  GP.horn = kind === 'car' || kind === 'moto' ? b(10) : 0;
+  /* sprint: each cross/A press adds a push that fades away, so the faster it is mashed the closer to the top it gets; 4.8 m/s over the jog = 9 m/s */
+  GP.sprint *= Math.exp(-1.2 * dt); if (E[0] && (!veh || kind === 'bici')) GP.sprint = Math.min(4.8, GP.sprint + 1.5);
+  if (E[8]) camMode = camMode === 0 ? 2 : 0; /* third person <-> first person; the top view is gone from the pad */
+  if (E[12]) reportSpot();
+  if (E[13]) ni('Zoom della minimappa');
+  /* d-pad left: radio. d-pad right: lights (vehicles), use item (on foot) */
+  padTap(14, down(14), dt, () => { if (kind === 'car') toggleRadio(); else ni('Radio dal telefono'); }, () => ni(kind === 'car' ? 'Ruota delle radio' : 'Radio dal telefono'));
+  if (veh) padTap(15, down(15), dt, () => ni(kind === 'bici' ? 'Fanale' : 'Fari'), () => ni(kind === 'bici' ? 'Fanale' : 'Abbaglianti')); else if (E[15]) ni('Usa oggetto');
+  if (veh) {
+    if (E[3]) { K.use = true; (GP.hold[3] || (GP.hold[3] = { t: 0, on: false, done: false })).block = true; } /* getting out ends this press: on foot it must not count as a tap that gets in again */
+    if (E[2]) ni('Cambio arma');
+    if (E[4]) ni('Sparare');
+    if (kind === 'bici') { if (E[1]) ni('Bunny hop'); if (E[10]) ni('Campanello'); }
+    else if (down(10)) { GP.l3 += dt; if (GP.l3 >= 0.8 && !GP.l3d) { GP.l3d = true; ni('Sirena'); } } else { GP.l3 = 0; GP.l3d = false; }
+  } else {
+    padTap(3, down(3), dt, () => { K.use = true; }, () => ni('Scasso'));
+    if (E[2]) ni('Salto e arrampicata');
+    if (E[1]) ni('Pugno');
+    if (E[4]) ni('Ruota delle armi');
+    if (E[5]) ni('Riparo');
+    if (E[6]) ni('Mira');
+    if (E[7]) ni('Sparare');
+    if (E[10]) ni('Accovacciarsi');
   }
 }
 addEventListener('gamepadconnected', () => { GP.seen = false; });
@@ -328,9 +377,9 @@ addEventListener('gamepadconnected', () => { GP.seen = false; });
 // ---------------------------------------------------------------- player actions""")
 rep("  const steerIn = (K.left ? 1 : 0) - (K.right ? 1 : 0);", "  const steerIn = clamp((K.left ? 1 : 0) - (K.right ? 1 : 0) - GP.steer, -1, 1);")
 rep("    const v = P.car; v.inp.thr = K.up ? 1 : 0; v.inp.brk = K.down ? 1 : 0; v.inp.steer = steerIn; v.inp.hand = K.hand ? 1 : 0; v.sleep = false;",
-    "    const v = P.car; v.inp.thr = Math.max(K.up ? 1 : 0, GP.thr); v.inp.brk = Math.max(K.down ? 1 : 0, GP.brk); v.inp.steer = steerIn; v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false;")
+    "    const v = P.car; v.inp.thr = Math.max(K.up ? 1 : 0, GP.thr); v.inp.brk = Math.max(K.down ? 1 : 0, GP.brk); v.inp.steer = steerIn; v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; if (v.spec.pedal) { const sk_ = GP.sprint / 4.8; v.maxV = v.spec.maxV * (1 + 0.3 * sk_); v.accMul = 1 + 0.6 * sk_; }")
 rep("    const want = K.turbo && K.up && v.health > 0 && P.nitro > 1;", "    const want = (K.turbo || GP.turbo > 0.5) && v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;")
-rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);", "const fwdIn = K.up ? 1 : K.down ? -0.5 : GP.fwd > 0.3 || GP.thr > 0.3 ? Math.max(GP.fwd, GP.thr) : GP.fwd < -0.3 ? -0.5 : 0, sp = fwdIn * (K.hand || K.turbo || GP.turbo > 0.5 ? 7.2 : 4.2);")
+rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);", "const gf_ = clamp(GP.fwd / 0.9, -1, 1), sp = K.up || K.down ? (K.up ? 1 : -0.5) * (K.hand || K.turbo ? 7.2 : 4.2) : gf_ > 0 ? gf_ * (4.2 + GP.sprint) : gf_ * 2.1; /* pad: the stick is analogue (half = a walk of about 2 m/s, full = the jog of 4.2), cross/A mashed adds up to 4.8 m/s of sprint on top; the keyboard run stays 7.2 */")
 rep("((K.horn && P.mode === 'car') ? 0.12", "(((K.horn || GP.horn > 0.5) && P.mode === 'car') ? 0.12")
 rep("  if (running && !paused) { acc += dt;", "  pollPad();\n  if (running && !paused) { acc += dt;")
 rep("<p>Premi <kbd>P</kbd> per riprendere</p>", "<p id=\"padline\" hidden></p><p>Premi <kbd>P</kbd> per riprendere</p>")
@@ -379,8 +428,6 @@ rep("#health i {", "#clock { font-family: var(--display); font-size: 20px; lette
 rep("  if (e.code === 'KeyU') {", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyU') {")
 rep("      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>", "      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>\n      <div><kbd>N</kbd> avanti di 2 ore</div>")
 rep("<kbd>H</kbd> clacson · <kbd>U</kbd> audio</p>", "<kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>U</kbd> audio</p>")
-rep("  if (edge(8)) toggleBig();", "  if (edge(8)) toggleBig();\n  if (edge(4)) skipTime(2);")
-rep("${L.m} mappa · ${L.p} pausa`", "${L.m} mappa · ${L.p} pausa · ${GP.ps ? 'L1' : 'LB'} +2 ore`")
 rep("banner('Stazione di Meda', 'BRIANZA')", "banner('Via Yuri Gagarin', 'MEDA')")
 # open land defaults to Brianza meadow, not grey-white
 rep("const groundTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#a4a396'; g.fillRect(0, 0, w, h); noise(g, w, h, 7000, 0.3, ['#8b8c7c', '#b7b5a8', '#8f9a74', '#7d8a5e']); });",
@@ -410,12 +457,10 @@ rep("KeyN: 'turbo', KeyH: 'horn' };", "KeyH: 'horn', KeyQ: 'back', KeyE: 'fwdw' 
 # two-wheelers: weight back (Q / left stick pulled) or forward (E / stick pushed) for wheelies and stoppies
 rep("v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false;", "v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; v.inp.lean = clamp((K.back ? 1 : 0) - (K.fwdw ? 1 : 0) - GP.fwd, -1, 1);")
 rep("  if (e.code === 'KeyN') skipTime(2);", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyR') toggleRadio();")
-rep("  if (edge(4)) skipTime(2);", "  if (edge(4)) skipTime(2);\n  if (edge(12)) toggleRadio();")
 
 rep("  updVisuals(running && !paused ? dt : 0);", "  updVisuals(running && !paused ? dt : 0); updRadio(dt);")
 rep("      <div><kbd>N</kbd> avanti di 2 ore</div>", "      <div><kbd>N</kbd> avanti di 2 ore</div>\n      <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>")
 rep("<kbd>N</kbd> +2 ore · <kbd>B</kbd> segnala punto", "<kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>B</kbd> segnala punto")
-rep("${GP.ps ? 'L1' : 'LB'} +2 ore`", "${GP.ps ? 'L1' : 'LB'} +2 ore · freccia su radio`")
 rep("CC BY 4.0.</p>", "CC BY 4.0. Edifici aggiuntivi e altezze: <a href=\"https://overturemaps.org\" target=\"_blank\" rel=\"noopener\">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href=\"https://www.discoradio.it\" target=\"_blank\" rel=\"noopener\">Discoradio</a>, stream ufficiale; <a href=\"https://www.radiomaria.it\" target=\"_blank\" rel=\"noopener\">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href=\"https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy\" target=\"_blank\" rel=\"noopener\">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href=\"https://www.mapillary.com\" target=\"_blank\" rel=\"noopener\">Mapillary</a> e i suoi contributori, CC BY-SA 4.0.</p>")
 
 # ---- debug mode (code DEBUG in the pause menu, or ?debug in the URL): bug reports, coordinates HUD, export
@@ -446,7 +491,6 @@ rep("(saved ? '' : ' (solo in locale)')", "(saved ? ' (anche su claude.ai)' : ''
 rep("updVisuals(running && !paused ? dt : 0); updRadio(dt);", "updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);")
 rep("      <div><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>", "      <div class=\"dbg\"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>")
 rep("<kbd>B</kbd> segnala punto · ", "<span class=\"dbg\"><kbd>B</kbd> segnala punto · </span>")
-rep("${L.r} segnala punto · ", "${DEBUG ? L.r + ' segnala punto · ' : ''}")
 rep("<p id=\"padline\" hidden></p>", "<p id=\"padline\" hidden></p><p class=\"dbgline\"><span class=\"dbg\"><button id=\"dbgdl\" type=\"button\">⬇ Scarica segnalazioni</button> <button id=\"dbgclr\" type=\"button\">🗑 Svuota</button> </span><input id=\"dbgcode\" type=\"text\" spellcheck=\"false\" autocomplete=\"off\" placeholder=\"codice\" maxlength=\"12\"></p>")
 rep("#pause p { font-size: 19px; margin: 6px 0; }", "#pause p { font-size: 19px; margin: 6px 0; }\nbody:not(.debug) .dbg { display: none !important; }\n#pause .dbgline { margin-top: 14px; font-size: 14px; } #pause .dbgline button { font: 600 14px system-ui; padding: 6px 12px; border-radius: 4px; border: 0; background: var(--ocra); color: #15161c; cursor: pointer; margin: 2px; } #dbgcode { width: 110px; font: 14px system-ui; padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,.25); background: #15161c; color: #fff; text-align: center; }\n#dbghud { position: fixed; left: 50%; transform: translateX(-50%); bottom: 6px; z-index: 8; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }")
 rep("<div id=\"pause\" hidden>", "<div id=\"dbghud\" hidden></div><div id=\"pause\" hidden>")
@@ -572,9 +616,7 @@ print('leftover refs', [s[i:i + 40] for i in left])
 rep("while (acc >= 1 / 60 && n < 5) { step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }", "while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }")
 # right stick: the chase camera swings round the car (or the walker) to look about; let go and it eases back behind (Carlo, 24/10)
 rep("let toastT = 0, bannerT = 0,", "let camYaw = 0, camPitch = 0, camBack = false, toastT = 0, bannerT = 0,")
-rep("GP.steer = dz(g.axes[0] || 0);", "GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11);")
 # holding the right stick down looks behind, as in GTA: the bug report moves from R3 to the d-pad down (B on the keyboard stays)
-rep("  if (edge(11)) reportSpot();", "  if (edge(13)) reportSpot();")
 # up and down: the camera drops to look up or rises to look down from above, and settles back the same way
 rep("want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz);",
     "{ const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 3 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }\n"
@@ -588,7 +630,7 @@ rep("  const k = 1 - Math.exp(-(camMode === 1 ? 5 : 7.5) * dt);",
     "  const k = camMode === 2 ? 1 : 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);")
 rep("camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));", "camPos.lerp(want, k); camLook.lerp(look, camMode === 2 ? 1 : 1 - Math.exp(-12 * dt));")
 # a third view, first person (Carlo, 24/10): the walker's eyes, or just above the bonnet; the right stick looks about, R3 behind
-rep("camMode = (camMode + 1) % 2", "camMode = (camMode + 1) % 3", 3)
+rep("camMode = (camMode + 1) % 2", "camMode = (camMode + 1) % 3", 2)
 rep("  if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,",
     "  if (!inCar) P.model.g.visible = camMode !== 2;\n"
     "  if (camMode === 2) {\n"

@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 44cbeb5 · assemblato 30/10 13:37 · porta ' + location.port;
+    const txt = 'locale · ramo controller-mapping · dopo ebff48e · assemblato 31/10 04:14 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -6195,7 +6195,7 @@ const MODELS = {
   // two-wheelers: seat height/position for the rider, crouch = forward lean of the rider
   scooter: { name: 'Scooter', L: 1.85, W: 0.7, two: true, noX: true, wr: 0.27, seatY: 0.8, seatZ: -0.25, crouch: 0.08, legA: -0.85, armA: -1.0, whMax: 0.35, maxV: 25, acc: 2.6, grip: 8.5, snd: 2.1 },
   moto:    { name: 'Moto', L: 2.1, W: 0.78, two: true, wr: 0.32, seatY: 0.86, seatZ: -0.22, crouch: 0.42, legA: -1.0, armA: -1.2, whMax: 0.8, maxV: 61, acc: 7.6, grip: 10.5, snd: 1.7 },
-  bici:    { name: 'Bicicletta', L: 1.75, W: 0.6, two: true, pedal: true, noX: true, wr: 0.34, seatY: 0.98, seatZ: -0.2, crouch: 0.3, legA: -0.3, armA: -0.95, whMax: 0.55, maxV: 8.3, acc: 1.5, grip: 8, snd: 0 },
+  bici:    { name: 'Bicicletta', L: 1.75, W: 0.6, two: true, pedal: true, noX: true, wr: 0.34, seatY: 0.98, seatZ: -0.2, crouch: 0.3, legA: -0.3, armA: -0.95, whMax: 0.55, maxV: 10.8, acc: 1.95, grip: 8, snd: 0 },
 };
 const TRAFFIC_MIX = [['panda', 22], ['hatch', 22], ['sedan', 13], ['wagon', 10], ['suv', 12], ['sport', 5], ['van', 9], ['ape', 6], ['scooter', 7], ['moto', 4], ['bici', 6]];
 const PARKED_MIX = [['panda', 25], ['hatch', 25], ['sedan', 15], ['wagon', 12], ['suv', 14], ['sport', 3], ['van', 6], ['ape', 3], ['scooter', 5], ['moto', 2], ['bici', 4]];
@@ -6349,7 +6349,7 @@ class Vehicle {
     if (this.air) { this.stepAir(dt); return; }
     const i = this.inp, fx = Math.sin(this.h), fz = Math.cos(this.h), rx = fz, rz = -fx;
     let v = this.vx * fx + this.vz * fz, lat = this.vx * rx + this.vz * rz;
-    const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = Math.min(12, S.acc * 2.1) * (bst ? 2.4 : 1), top = this.maxV * (bst ? 1.3 : 1);
+    const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = Math.min(12, S.acc * 2.1) * (this.accMul || 1) * (bst ? 2.4 : 1), top = this.maxV * (bst ? 1.3 : 1);
     if (thr > 0) { if (v < -0.5) v += 24 * dt; else v += thr * acc * Math.max(0.02, 1 - Math.pow(Math.max(0, v) / top, 2.2)) * dt; } // power curve fitted to real 0-100 times
     if (i.brk > 0) { if (v > 0.5) v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk; else if (!dead) v = Math.max(-11, v - 7 * dt * i.brk); }
     v += 9.81 * Math.sin(this.slope) * 0.6 * dt; // gravity on hills
@@ -6973,26 +6973,73 @@ if (isTouch) {
   btn('MAP', { left: `calc(88px + ${sl})`, bottom: `calc(108px + ${sb})` }, 'map', 'sm');
 }
 
-const GP = { steer: 0, thr: 0, brk: 0, hand: 0, turbo: 0, horn: 0, fwd: 0, prev: [] };
+const GP = { steer: 0, thr: 0, brk: 0, hand: 0, turbo: 0, horn: 0, fwd: 0, lookx: 0, looky: 0, back: 0, sprint: 0, prev: [], hold: [], t0: 0, mode: '', l3: 0, l3d: false };
+/* which layout applies: on foot, car (and anything else with four wheels), motorbike or scooter, bicycle */
+const padKind = () => P.mode !== 'car' || !P.car ? 'foot' : P.car.spec.pedal ? 'bici' : P.car.spec.two ? 'moto' : 'car';
+const padNames = () => GP.ps ? { x: '✕', o: '○', s: '□', t: '△', l1: 'L1', r1: 'R1', l2: 'L2', r2: 'R2', l3: 'L3', r3: 'R3', cr: 'Create', op: 'Options', tp: 'Touchpad' }
+  : { x: 'A', o: 'B', s: 'X', t: 'Y', l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT', l3: 'LS', r3: 'RS', cr: 'View', op: 'Menu', tp: 'Guide' };
+function padHelp(kind) {
+  const n = padNames(), com = `${n.r3} guarda dietro · ${n.cr} visuale · ${n.tp} mappa · ${n.op} pausa${DEBUG ? ' · croce su segnala punto' : ''}`;
+  if (kind === 'foot') return `levetta sinistra cammina (piena: corsetta) · ${n.x} premuto ripetutamente: scatto · ${n.t} sali sul mezzo · ${com}`;
+  if (kind === 'bici') return `${n.r2} pedala · ${n.x} ripetuto: scatto · ${n.l2} freno · ${n.r1} freno a mano · levetta sinistra sposta il peso · ${n.t} scendi · ${com}`;
+  return `${n.r2} gas · ${n.l2} freno e retro · ${n.r1} o ${n.x} freno a mano · ${n.o} turbo · ${n.l3} clacson · ${n.t} sali/scendi · croce sinistra radio${kind === 'moto' ? ' · levetta sinistra sposta il peso' : ''} · ${com}`;
+}
+/* tap or hold on one button: tap fires on release, hold fires once after 0.45 s */
+function padTap(i, down, dt, onTap, onHold) {
+  const h = GP.hold[i] || (GP.hold[i] = { t: 0, on: false, done: false });
+  if (down) { if (h.block) return; if (!h.on) { h.on = true; h.t = 0; h.done = false; } h.t += dt; if (!h.done && h.t >= 0.45) { h.done = true; if (onHold) onHold(); } }
+  else { h.block = false; if (h.on) { h.on = false; if (!h.done && onTap) onTap(); } }
+}
 function pollPad() {
   let pads = []; try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) { return; }
-  const g = [...pads].find(p => p && p.connected); if (!g) { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = 0; return; }
-  const dz = v => Math.abs(v) < 0.15 ? 0 : v, b = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0;
-  const edge = i => { const now = b(i) > 0.5, was = GP.prev[i]; GP.prev[i] = now; return now && !was; };
-  // cross/A handbrake, circle/B turbo, square/X horn, triangle/Y get in-out, R1/RB or R3 camera
-  GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0); GP.thr = b(7); GP.brk = b(6); GP.hand = b(0); GP.turbo = b(1); GP.horn = b(2);
-  if (edge(3)) K.use = true;
-  if (edge(5)) camMode = (camMode + 1) % 3;
-  if (edge(13)) reportSpot();
-  if (edge(8)) toggleBig();
-  if (edge(4)) skipTime(2);
-  if (edge(12)) toggleRadio();
-  const e9 = edge(9); if (!running) { if ((e9 || edge(0)) && !goBtn.disabled) startGame(); } else if (e9) togglePause(); /* title screen: START or cross/A start the game like Enter */
-  if (!GP.seen) {
-    GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id);
-    const L = GP.ps ? { t: 'R2', b: 'L2', h: '✕', o: '○', s: '□', y: '△', c: 'R1', m: 'Create', p: 'Options', r: 'R3' } : { t: 'RT', b: 'LT', h: 'A', o: 'B', s: 'X', y: 'Y', c: 'RB', m: 'View', p: 'Menu', r: 'R3' };
-    const txt = `${L.t} gas · ${L.b} freno · ${L.h} freno a mano · ${L.o} turbo · ${L.s} clacson · ${L.y} sali/scendi · ${L.c} visuale · ${DEBUG ? L.r + ' segnala punto · ' : ''}${L.m} mappa · ${L.p} pausa · ${GP.ps ? 'L1' : 'LB'} +2 ore · freccia su radio`;
-    toast((GP.ps ? 'DualSense' : 'Controller') + ' collegato: ' + txt); const pl = document.getElementById('padline'); if (pl) { pl.hidden = false; pl.textContent = 'Controller: ' + txt; }
+  const g = [...pads].find(p => p && p.connected); if (!g) { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = GP.lookx = GP.looky = GP.back = 0; return; }
+  const tn = performance.now(), dt = Math.min(0.1, (tn - (GP.t0 || tn)) / 1000); GP.t0 = tn;
+  const dz = v => Math.abs(v) < 0.15 ? 0 : v, b = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0, down = i => b(i) > 0.5;
+  const edge = i => { const now = down(i), was = GP.prev[i]; GP.prev[i] = now; return now && !was; };
+  const E = []; for (let i = 0; i < 18; i++) E[i] = edge(i);
+  const first = !GP.seen; if (first) { GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id); }
+  const kind = padKind(), veh = kind !== 'foot', tpad = GP.ps ? 17 : 16;
+  if (first || kind !== GP.mode) {
+    GP.mode = kind; const txt = padHelp(kind);
+    if (first) toast((GP.ps ? 'DualSense' : 'Controller') + ' collegato: ' + txt);
+    const pl = document.getElementById('padline'); if (pl) { pl.hidden = false; pl.textContent = 'Controller: ' + txt; }
+  }
+  const none = () => { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = GP.lookx = GP.looky = GP.back = 0; };
+  /* title screen: Options or cross/A start the game like Enter */
+  if (!running) { none(); if ((E[9] || E[0]) && !goBtn.disabled) startGame(); return; }
+  if (E[9]) togglePause(); /* also closes the big map */
+  if (paused && !bigOpen) { none(); return; }
+  if (E[tpad]) toggleBig();
+  if (bigOpen) { none(); return; }
+  const ni = s => toast(s + ' non implementato');
+  GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0);
+  GP.thr = veh ? b(7) : 0; GP.brk = veh ? b(6) : 0;
+  GP.hand = kind === 'bici' ? b(5) : veh ? Math.max(b(0), b(5)) : 0;
+  GP.turbo = kind === 'car' || kind === 'moto' ? b(1) : 0;
+  GP.horn = kind === 'car' || kind === 'moto' ? b(10) : 0;
+  /* sprint: each cross/A press adds a push that fades away, so the faster it is mashed the closer to the top it gets; 4.8 m/s over the jog = 9 m/s */
+  GP.sprint *= Math.exp(-1.2 * dt); if (E[0] && (!veh || kind === 'bici')) GP.sprint = Math.min(4.8, GP.sprint + 1.5);
+  if (E[8]) camMode = camMode === 0 ? 2 : 0; /* third person <-> first person; the top view is gone from the pad */
+  if (E[12]) reportSpot();
+  if (E[13]) ni('Zoom della minimappa');
+  /* d-pad left: radio. d-pad right: lights (vehicles), use item (on foot) */
+  padTap(14, down(14), dt, () => { if (kind === 'car') toggleRadio(); else ni('Radio dal telefono'); }, () => ni(kind === 'car' ? 'Ruota delle radio' : 'Radio dal telefono'));
+  if (veh) padTap(15, down(15), dt, () => ni(kind === 'bici' ? 'Fanale' : 'Fari'), () => ni(kind === 'bici' ? 'Fanale' : 'Abbaglianti')); else if (E[15]) ni('Usa oggetto');
+  if (veh) {
+    if (E[3]) { K.use = true; (GP.hold[3] || (GP.hold[3] = { t: 0, on: false, done: false })).block = true; } /* getting out ends this press: on foot it must not count as a tap that gets in again */
+    if (E[2]) ni('Cambio arma');
+    if (E[4]) ni('Sparare');
+    if (kind === 'bici') { if (E[1]) ni('Bunny hop'); if (E[10]) ni('Campanello'); }
+    else if (down(10)) { GP.l3 += dt; if (GP.l3 >= 0.8 && !GP.l3d) { GP.l3d = true; ni('Sirena'); } } else { GP.l3 = 0; GP.l3d = false; }
+  } else {
+    padTap(3, down(3), dt, () => { K.use = true; }, () => ni('Scasso'));
+    if (E[2]) ni('Salto e arrampicata');
+    if (E[1]) ni('Pugno');
+    if (E[4]) ni('Ruota delle armi');
+    if (E[5]) ni('Riparo');
+    if (E[6]) ni('Mira');
+    if (E[7]) ni('Sparare');
+    if (E[10]) ni('Accovacciarsi');
   }
 }
 addEventListener('gamepadconnected', () => { GP.seen = false; });
@@ -7150,7 +7197,7 @@ function step(dt) {
   if (K.use) { K.use = false; if (P.knock <= 0 && !W.busted) enterExit(); }
   if (W.busted) { for (const k of ['up', 'down', 'left', 'right', 'hand']) K[k] = false; }
   if (P.mode === 'car') {
-    const v = P.car; v.inp.thr = Math.max(K.up ? 1 : 0, GP.thr); v.inp.brk = Math.max(K.down ? 1 : 0, GP.brk); v.inp.steer = steerIn; v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; v.inp.lean = clamp((K.back ? 1 : 0) - (K.fwdw ? 1 : 0) - GP.fwd, -1, 1);
+    const v = P.car; v.inp.thr = Math.max(K.up ? 1 : 0, GP.thr); v.inp.brk = Math.max(K.down ? 1 : 0, GP.brk); v.inp.steer = steerIn; v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; v.inp.lean = clamp((K.back ? 1 : 0) - (K.fwdw ? 1 : 0) - GP.fwd, -1, 1); if (v.spec.pedal) { const sk_ = GP.sprint / 4.8; v.maxV = v.spec.maxV * (1 + 0.3 * sk_); v.accMul = 1 + 0.6 * sk_; }
     const want = (K.turbo || GP.turbo > 0.5) && v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;
     if (want && !v.boost) sfxWhoosh();
     v.boost = want;
@@ -7228,7 +7275,7 @@ function step(dt) {
     if (P.knock > 0) { P.knock -= dt; P.vy -= 22 * dt; const fl = H.surface(P.x, P.z, P.y); P.y = Math.max(fl, P.y + P.vy * dt); P.x += P.vx * dt; P.z += P.vz * dt; if (P.y <= fl) { P.vx *= 0.85; P.vz *= 0.85; } }
     else {
       P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + steerIn * 2.8 * dt);
-      const fwdIn = K.up ? 1 : K.down ? -0.5 : GP.fwd > 0.3 || GP.thr > 0.3 ? Math.max(GP.fwd, GP.thr) : GP.fwd < -0.3 ? -0.5 : 0, sp = fwdIn * (K.hand || K.turbo || GP.turbo > 0.5 ? 7.2 : 4.2);
+      const gf_ = clamp(GP.fwd / 0.9, -1, 1), sp = K.up || K.down ? (K.up ? 1 : -0.5) * (K.hand || K.turbo ? 7.2 : 4.2) : gf_ > 0 ? gf_ * (4.2 + GP.sprint) : gf_ * 2.1; /* pad: the stick is analogue (half = a walk of about 2 m/s, full = the jog of 4.2), cross/A mashed adds up to 4.8 m/s of sprint on top; the keyboard run stays 7.2 */
       P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; P.x += P.vx * dt; P.z += P.vz * dt; P.phase += Math.abs(sp) * dt * 3;
       P.speedNow = sp;
     }
@@ -8244,5 +8291,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
+window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
 </script>
