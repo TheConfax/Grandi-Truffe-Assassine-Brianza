@@ -187,9 +187,20 @@ function radioStartFor(kind, r = Math.random()) {
   let x = r * 100; for (const [k, w] of RADIO_MIX) { if ((x -= w) < 0) return k; } return 'disco';
 }
 const stationFor = v => v ? (v.radioSt || (v.radioSt = radioStartFor(v.kind))) : 'disco'; /* v.radioSt: the station on that vehicle, from the lottery until someone tunes it */
-function setStation(v, n) { v.radioSt = n; radioOn = true; radioErr = false; STATIC.quiet = false; toast('📻 ' + STATIONS[n].name); }
-function radioNext() { /* pad d-pad left tap: next station of ORDER, kept on this vehicle; also switches the radio on. Off is not in the cycle */
-  const v = P.car; if (!v) return; setStation(v, ORDER[(ORDER.indexOf(stationFor(v)) + 1) % ORDER.length]);
+/* two separate radios: the car's (a station per car, on/off in radioOn) and the phone's (one station, off until switched on). radioOn always means "the audio now current"; RC keeps the other one aside.
+   Getting off any vehicle: both off. Getting into a car: the phone goes off and the car radio comes back as it was. Onto a bike with the phone on: it stays on. */
+const RC = { ctx: 'car', car: true, phone: false, phoneSt: 'disco', prevMode: 'foot' };
+const radioCtx = () => P.mode === 'car' && P.car && !P.car.spec.two ? 'car' : 'phone';
+const curStation = () => radioCtx() === 'car' ? stationFor(P.car) : RC.phoneSt;
+function radioCtxSync() { /* called every frame by updRadio: context switches and the get-off rule */
+  const c = radioCtx();
+  if (RC.prevMode === 'car' && P.mode !== 'car') { RC.phone = false; if (RC.ctx === 'phone') radioOn = false; } /* off the vehicle: the phone is off (and the vehicle's radio stops by itself, it is no longer wanted) */
+  RC.prevMode = P.mode;
+  if (c !== RC.ctx) { RC[RC.ctx] = radioOn; if (c === 'car') RC.phone = false; radioOn = RC[c]; RC.ctx = c; radioErr = false; STATIC.quiet = false; }
+}
+function setStation(n) { if (radioCtx() === 'car') P.car.radioSt = n; else RC.phoneSt = n; radioOn = true; radioErr = false; STATIC.quiet = false; toast((radioCtx() === 'car' ? '📻 ' : '📱 ') + STATIONS[n].name); }
+function radioNext() { /* pad d-pad left tap: next station of ORDER, kept on this vehicle (or on the phone); also switches the radio on. Off is not in the cycle */
+  const st = curStation(); setStation(radioOn ? ORDER[(ORDER.indexOf(st) + 1) % ORDER.length] : st); /* radio off: the tap only switches it on, on the station it remembers */
 }
 const RADIO = new Audio(); RADIO.preload = 'none';
 const IN_CLAUDE = /claudeusercontent\.com|claude\.ai/.test(location.hostname);
@@ -240,24 +251,26 @@ RADIO.addEventListener('error', () => { if (RADIO.getAttribute('src')) radioFail
 RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown[radioSt]) { radioShown[radioSt] = true; toast(STATIONS[radioSt].hello); } });
 function stopRadio() { hlsKill(); RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
 function updRadio(dt) {
-  const want = radioOn && running && (!paused || bigOpen) && P.mode === 'car' && !P.car.spec.two && !(AU && AU.muted); /* no radio on bikes, scooters and motorbikes */
-  if (P.mode === 'car' && stationFor(P.car) !== radioSt) { radioSt = stationFor(P.car); radioUrl = 0; radioErr = false; STATIC.quiet = false; stopRadio(); } /* another car or another pick: retune at once */
+  radioCtxSync(); if (RW.open && RW.ctx !== RC.ctx) radioWheelCancel();
+  const want = radioOn && running && (!paused || bigOpen) && !(AU && AU.muted);
+  if (curStation() !== radioSt) { radioSt = curStation(); radioUrl = 0; radioErr = false; STATIC.quiet = false; stopRadio(); } /* another car or another pick: retune at once */
   if (want && RADIO.paused && !radioErr && !HLS.pend && !HLS.h) { RADIO.volume = radioVol; tuneUrl(STATIONS[radioSt].urls[radioUrl]); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } /* fresh src = back to live, not to a stale buffer */
   if (AU && AU.on) updStatic(dt, want);
   radioVol = lerp(radioVol, want ? 0.6 : 0, 1 - Math.exp(-3 * dt)); try { RADIO.volume = clamp(radioVol, 0, 1); } catch (e) { }
   if (!want && (!RADIO.paused || HLS.pend || HLS.h) && radioVol < 0.02) stopRadio();
 }
-function toggleRadio() { radioOn = !radioOn; radioErr = false; radioUrl = 0; STATIC.quiet = false; toast(radioOn ? '📻 Radio accesa' : '📻 Radio spenta'); }
+function toggleRadio() { radioOn = !radioOn; radioErr = false; radioUrl = 0; STATIC.quiet = false; toast(RC.ctx === 'car' ? (radioOn ? '📻 Radio accesa' : '📻 Radio spenta') : (radioOn ? '📱 Telefono acceso' : '📱 Telefono spento')); }
 
 /* ---- the wheel (pad, d-pad left held 0.45 s): eight slices in ORDER from twelve o'clock clockwise, the centre is "off". While open the right stick picks, the camera stays put, the game runs.
-   Opens on the current station (or the centre if the radio is off) and keeps it until the stick has really moved; back to the middle after that = off. Letting go of the d-pad confirms. */
-const RW = { open: false, sel: 0, touched: false, el: null };
+   Push the stick onto a slice and let it go: that station is chosen and the wheel closes at once, d-pad still down or not (the last stable direction counts, not the samples of the way back).
+   D-pad let go without ever moving the stick = the centre = radio off. After a choice the camera stays frozen while the stick is out or the d-pad is down, and the wheel opens again only on a new hold. */
+const RW = { ctx: 'phone', open: false, sel: -1, last: -1, cand: -2, touched: false, lock: false, el: null };
 function radioWheelDom() {
   if (RW.el) return RW.el;
   const st = document.createElement('style');
   st.textContent = '#rwheel { position: fixed; left: 50%; top: 46%; width: min(74vmin, 540px); transform: translate(-50%, -50%); z-index: 40; pointer-events: none; text-align: center; font-family: var(--display); }'
     + '#rwheel svg { width: 100%; display: block; filter: drop-shadow(0 6px 18px rgba(0,0,0,.55)); } #rwheel .sl { fill: rgba(26,28,34,.86); stroke: #0e0f13; stroke-width: 3; } #rwheel .sl.on { fill: var(--ocra); } #rwheel .sl.cur { stroke: var(--ocra); }'
-    + '#rwheel text { fill: var(--ink); font-size: 15.5px; text-anchor: middle; letter-spacing: 0; } #rwheel .sl.on + text, #rwheel .ce.on + text { fill: #1a1c22; } #rwheel .ce { fill: rgba(26,28,34,.9); stroke: #0e0f13; stroke-width: 3; } #rwheel .ce.on { fill: var(--ocra); }'
+    + '#rwheel text { fill: var(--ink); font-size: 15.5px; text-anchor: middle; letter-spacing: 0; } #rwheel .sl.on + text, #rwheel .ce.on + text { fill: #1a1c22; } #rwheel .ph { color: var(--ink); } #rwheel .ce.on ~ .ph { color: #1a1c22; } #rwheel .ce { fill: rgba(26,28,34,.9); stroke: #0e0f13; stroke-width: 3; } #rwheel .ce.on { fill: var(--ocra); }'
     + '#rwheel .nm { margin-top: 6px; font-size: clamp(22px, 5vmin, 38px); color: var(--ocra); text-shadow: 0 3px 0 #000; }';
   document.head.appendChild(st);
   const el = document.createElement('div'); el.id = 'rwheel'; el.hidden = true;
@@ -268,23 +281,25 @@ function radioWheelDom() {
     const w = STATIONS[k].name.split(' '), two = w.length > 1 ? [w[0], w.slice(1).join(' ')] : w;
     h += `<path class="sl" data-i="${i}" d="M${x0} ${y0} A${R1} ${R1} 0 0 1 ${x1} ${y1} L${x2} ${y2} A${R0} ${R0} 0 0 0 ${x3} ${y3}Z"/><text x="${tx}" y="${(+ty - (two.length - 1) * 9.5 + 5).toFixed(1)}">${two.map((t, j) => `<tspan x="${tx}" dy="${j ? 19 : 0}">${t}</tspan>`).join('')}</text>`;
   });
-  h += '<circle class="ce" r="70"/><text x="0" y="7">SPENTA</text></svg><div class="nm"></div>';
+  h += '<circle class="ce" r="70"/><text class="ct" x="0" y="7">Spenta</text><g class="ph" style="display:none"><rect x="-11" y="-42" width="22" height="38" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><circle cy="-10" r="2" fill="currentColor"/></g></svg><div class="nm"></div>';
   el.innerHTML = h; document.body.appendChild(el); RW.el = el; return el;
 }
 function radioWheelDraw() {
-  const el = radioWheelDom(), cur = radioOn ? ORDER.indexOf(stationFor(P.car)) : -1;
+  const el = radioWheelDom(), cur = radioOn ? ORDER.indexOf(curStation()) : -1, ph = RC.ctx === 'phone';
   el.querySelectorAll('.sl').forEach((p, i) => { p.classList.toggle('on', i === RW.sel); p.classList.toggle('cur', i === cur); });
   el.querySelector('.ce').classList.toggle('on', RW.sel === -1);
+  const pg = el.querySelector('.ph'), tx = el.querySelector('.ct'); pg.style.display = ph ? '' : 'none'; tx.setAttribute('y', ph ? 30 : 7);
   el.querySelector('.nm').textContent = RW.sel < 0 ? 'Radio spenta' : STATIONS[ORDER[RW.sel]].name;
 }
-function radioWheelOpen() { if (RW.open || !P.car) return; RW.open = true; RW.touched = false; RW.sel = radioOn ? ORDER.indexOf(stationFor(P.car)) : -1; radioWheelDom().hidden = false; radioWheelDraw(); }
+function radioWheelOpen() { if (RW.open) return; RW.open = true; RW.ctx = RC.ctx; RW.touched = false; RW.sel = RW.last = -1; RW.cand = -2; radioWheelDom().hidden = false; radioWheelDraw(); }
+function radioWheelPick(sel) { /* choose and close; the lock keeps the camera still until stick and d-pad are both let go */
+  if (!RW.open) return; RW.open = false; RW.lock = true; if (RW.el) RW.el.hidden = true;
+  if (sel < 0) { radioOn = false; toast(RC.ctx === 'car' ? '📻 Radio spenta' : '📱 Telefono spento'); } else setStation(ORDER[sel]);
+}
+function radioWheelRelease() { radioWheelPick(RW.touched ? RW.last : -1); } /* d-pad let go */
 function radioWheelStick(sx, sy) { /* right stick, raw axes (x right, y down) */
-  const m = Math.hypot(sx, sy); let s = RW.sel;
-  if (m > 0.55) { RW.touched = true; s = Math.round(((Math.atan2(sx, -sy) * 4 / Math.PI) % 8 + 8) % 8) % 8; } else if (RW.touched && m < 0.35) s = -1;
-  if (s !== RW.sel) { RW.sel = s; radioWheelDraw(); }
+  const m = Math.hypot(sx, sy);
+  if (m > 0.55) { const i = Math.round(((Math.atan2(sx, -sy) * 4 / Math.PI) % 8 + 8) % 8) % 8; if (i === RW.cand) { RW.last = i; RW.touched = true; if (RW.sel !== i) { RW.sel = i; radioWheelDraw(); } } RW.cand = i; } /* two frames on the same slice before it counts: a one-frame spring overshoot to the other side is ignored */
+  else { RW.cand = -2; if (RW.touched && m < 0.4) radioWheelPick(RW.last); }
 }
-function radioWheelClose(confirm) {
-  if (!RW.open) return; RW.open = false; if (RW.el) RW.el.hidden = true;
-  if (!confirm || !P.car) return;
-  if (RW.sel < 0) { radioOn = false; toast('📻 Radio spenta'); } else setStation(P.car, ORDER[RW.sel]);
-}
+function radioWheelCancel() { if (!RW.open) return; RW.open = false; if (RW.el) RW.el.hidden = true; }
