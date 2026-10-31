@@ -172,7 +172,10 @@ const STATIONS = {
   disco: { name: 'Discoradio', urls: ['https://icstream.rds.radio/disco'], hello: '📻 Discoradio · il ritmo della tua città' },
   maria: { name: 'Radio Maria', urls: [...(location.protocol === 'http:' ? ['http://dreamsiteradiocp.com:8092/;'] : []), 'https://dreamsiteradiocp2.com/proxy/rmitaly?mp=/stream', 'https://dreamsiteradiocp4.com/proxy/rmitaliamontecarlo?mp=/stream'], hello: '📻 Radio Maria · in volante si prega' }, /* played locally (http) the MP3 stream comes first: some browsers block the AAC relays (Carlo 29/10); an https page cannot load it */ // second url: same programme on another relay
 };
-const stationFor = v => v && v.kind === 'police' ? 'maria' : 'disco';
+const stationFor = v => v && v.radioSt || (v && v.kind === 'police' ? 'maria' : 'disco'); /* v.radioSt: the station picked on that vehicle, else its default */
+function radioNext() { /* pad d-pad left tap: next station of STATIONS, kept on this vehicle; also switches the radio on */
+  const v = P.car; if (!v) return; const ks = Object.keys(STATIONS), n = ks[(ks.indexOf(stationFor(v)) + 1) % ks.length]; v.radioSt = n; radioOn = true; radioErr = false; STATIC.quiet = false; toast('📻 ' + STATIONS[n].name);
+}
 const RADIO = new Audio(); RADIO.preload = 'none';
 const IN_CLAUDE = /claudeusercontent\.com|claude\.ai/.test(location.hostname);
 let radioOn = true, radioVol = 0, radioErr = false, radioSt = 'disco', radioUrl = 0; const radioShown = {};

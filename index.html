@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo controller-mapping · dopo ebff48e · assemblato 31/10 04:14 · porta ' + location.port;
+    const txt = 'locale · ramo controller-mapping · dopo 7f4f160 · assemblato 31/10 04:24 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -7023,14 +7023,18 @@ function pollPad() {
   if (E[12]) reportSpot();
   if (E[13]) ni('Zoom della minimappa');
   /* d-pad left: radio. d-pad right: lights (vehicles), use item (on foot) */
-  padTap(14, down(14), dt, () => { if (kind === 'car') toggleRadio(); else ni('Radio dal telefono'); }, () => ni(kind === 'car' ? 'Ruota delle radio' : 'Radio dal telefono'));
+  padTap(14, down(14), dt, () => { if (kind === 'car') radioNext(); else ni('Radio dal telefono'); }, () => ni(kind === 'car' ? 'Ruota delle radio' : 'Radio dal telefono'));
   if (veh) padTap(15, down(15), dt, () => ni(kind === 'bici' ? 'Fanale' : 'Fari'), () => ni(kind === 'bici' ? 'Fanale' : 'Abbaglianti')); else if (E[15]) ni('Usa oggetto');
   if (veh) {
     if (E[3]) { K.use = true; (GP.hold[3] || (GP.hold[3] = { t: 0, on: false, done: false })).block = true; } /* getting out ends this press: on foot it must not count as a tap that gets in again */
     if (E[2]) ni('Cambio arma');
     if (E[4]) ni('Sparare');
     if (kind === 'bici') { if (E[1]) ni('Bunny hop'); if (E[10]) ni('Campanello'); }
-    else if (down(10)) { GP.l3 += dt; if (GP.l3 >= 0.8 && !GP.l3d) { GP.l3d = true; ni('Sirena'); } } else { GP.l3 = 0; GP.l3d = false; }
+    else if (down(10)) {
+      /* police car: horn up to 0.8 s, past that the horn stops and the siren flips (v.siren, no sound yet); other cars and bikes: horn while held */
+      GP.l3 += dt;
+      if (kind === 'car' && P.car.kind === 'police') { if (GP.l3 >= 0.8) { GP.horn = 0; if (!GP.l3d) { GP.l3d = true; P.car.siren = !P.car.siren; toast('Sirena non implementata'); } } }
+    } else { GP.l3 = 0; GP.l3d = false; }
   } else {
     padTap(3, down(3), dt, () => { K.use = true; }, () => ni('Scasso'));
     if (E[2]) ni('Salto e arrampicata');
@@ -7580,7 +7584,10 @@ const STATIONS = {
   disco: { name: 'Discoradio', urls: ['https://icstream.rds.radio/disco'], hello: '📻 Discoradio · il ritmo della tua città' },
   maria: { name: 'Radio Maria', urls: [...(location.protocol === 'http:' ? ['http://dreamsiteradiocp.com:8092/;'] : []), 'https://dreamsiteradiocp2.com/proxy/rmitaly?mp=/stream', 'https://dreamsiteradiocp4.com/proxy/rmitaliamontecarlo?mp=/stream'], hello: '📻 Radio Maria · in volante si prega' }, /* played locally (http) the MP3 stream comes first: some browsers block the AAC relays (Carlo 29/10); an https page cannot load it */ // second url: same programme on another relay
 };
-const stationFor = v => v && v.kind === 'police' ? 'maria' : 'disco';
+const stationFor = v => v && v.radioSt || (v && v.kind === 'police' ? 'maria' : 'disco'); /* v.radioSt: the station picked on that vehicle, else its default */
+function radioNext() { /* pad d-pad left tap: next station of STATIONS, kept on this vehicle; also switches the radio on */
+  const v = P.car; if (!v) return; const ks = Object.keys(STATIONS), n = ks[(ks.indexOf(stationFor(v)) + 1) % ks.length]; v.radioSt = n; radioOn = true; radioErr = false; STATIC.quiet = false; toast('📻 ' + STATIONS[n].name);
+}
 const RADIO = new Audio(); RADIO.preload = 'none';
 const IN_CLAUDE = /claudeusercontent\.com|claude\.ai/.test(location.hostname);
 let radioOn = true, radioVol = 0, radioErr = false, radioSt = 'disco', radioUrl = 0; const radioShown = {};
