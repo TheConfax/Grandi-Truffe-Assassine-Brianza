@@ -119,7 +119,7 @@ function vehSweep(v, x0, z0) {
   const xe = v.x, ze = v.z, m = Math.min(32, Math.ceil(d / st));
   for (let k = 1; k < m; k++) {
     v.x = x0 + dx * k / m; v.z = z0 + dz * k / m; gateHits(v); fuelHits(v); propHits(v); barHits(v);
-    for (const c of v.circles()) if (collideStatic({ x: c[0], z: c[1] }, v.rad, v.y + 0.4)) return; /* stops here: Vehicle.collide takes it from this point */
+    for (const c of v.circles()) if (collideStatic({ x: c[0], z: c[1] }, v.rad, v.y + 0.4, true)) return; /* stops here: Vehicle.collide takes it from this point */
   }
   v.x = xe; v.z = ze;
 }

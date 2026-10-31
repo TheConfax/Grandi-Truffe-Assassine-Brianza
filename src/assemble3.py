@@ -58,10 +58,10 @@ const flatMat""")
 world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'rotonde3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
-function collideStatic(p, r, y) {
+function collideStatic(p, r, y, veh) {
   let nx = 0, nz = 0, hit = false;
   WALLS.each(p.x - r - 1, p.z - r - 1, p.x + r + 1, p.z + r + 1, s => {
-    if (s.off || s.y0 !== undefined && (y === undefined || y < s.y0 || y > s.y1)) return; /* s.off: a barrier piece broken through (sfondabili3.js) */
+    if (s.off || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh && s.yv !== undefined ? s.yv : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
     if (s.dyn && !s.on) return;
     if (s.r) { const dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz), R = r + s.r; if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; hit = true; } return; }
     if (s.dyn && !s.on) return;
@@ -94,7 +94,7 @@ rep("if (TR) for (const [cx, cz, tvx, tvz] of TR.circ) { const dx = P.x - cx", "
 
 # ---- heights on several levels
 rep("const [cf, cb] = this.circles(), yf = surfY(cf[0], cf[1]), yb = surfY(cb[0], cb[1]), ty = (yf + yb) / 2;", "const [cf, cb] = this.circles(), yf = H.surface(cf[0], cf[1], this.y), yb = H.surface(cb[0], cb[1], this.y), ty = (yf + yb) / 2;")
-rep("const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad);", "const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad, this.y + 0.4);")
+rep("const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad);", "const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad, this.y + 0.4, true);")
 rep("const fl = surfY(p.x, p.z); p.t += dt;", "const fl = H.surface(p.x, p.z, p.y); p.t += dt;")
 rep("p.phase += spd * dt * 3.2; p.y = surfY(p.x, p.z);", "p.phase += spd * dt * 3.2; p.y = H.surface(p.x, p.z, p.y);")
 rep("const fl = surfY(P.x, P.z); P.y = Math.max(fl,", "const fl = H.surface(P.x, P.z, P.y); P.y = Math.max(fl,")
@@ -119,7 +119,7 @@ s = s[:a] + """// a car standing still (parked, or just spawned in the traffic) 
 function carFree(spec, x, z, h, y) {
   const rad = spec.W / 2 + 0.02, co = Math.max(0.2, spec.L / 2 - rad), fx = Math.sin(h) * co, fz = Math.cos(h) * co, yy = y + 0.4, cs = [[x + fx, z + fz], [x - fx, z - fz]]; let ok = true;
   WALLS.each(x - co - rad - 1.5, z - co - rad - 1.5, x + co + rad + 1.5, z + co + rad + 1.5, s => {
-    if (!ok || s.dyn || s.off || (s.y0 !== undefined && (yy < s.y0 || yy > s.y1))) return;
+    if (!ok || s.dyn || s.off || (s.y0 !== undefined && (yy < s.y0 || yy > (s.yv !== undefined ? s.yv : s.y1)))) return;
     for (const c of cs) if (s.r ? hyp(c[0] - s.x, c[1] - s.z) < s.r + rad + 0.1 : segDist(c[0], c[1], s.ax, s.az, s.bx, s.bz) < rad + 0.2) { ok = false; return; }
   });
   return ok;

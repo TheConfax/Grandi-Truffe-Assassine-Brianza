@@ -262,7 +262,7 @@ function hedgeRedraw(pc) { // the segment drawn again without its cuts; its coll
   const b = Buf(), lk = barLook(rec), A = rec.pts[pc.k0 - 1], C = rec.pts[pc.k0], at = t => { const q = [A[0] + (C[0] - A[0]) * t, A[1] + (C[1] - A[1]) * t]; q.fy = A.fy + (C.fy - A.fy) * t; q.lo = Math.min(A.lo, C.lo); q.g0 = q.fy; return q; };
   keep.forEach(([t0, t1], i) => {
     const a = at(t0), c = at(t1), B = { hd: b, posts: [] }; barDraw(B, rec, lk, a, c, (pc.acc0 || 0) + t0 * L, (t0 > 0 || ((pc.cap | pc.ext) & 1) ? 1 : 0) | (t1 < 1 || ((pc.cap | pc.ext) & 2) ? 2 : 0));
-    let q = pc.subs[i]; if (!q) { q = { two: true, nx: s.nx, nz: s.nz, y0: s.y0, y1: s.y1, off: true }; pc.subs.push(q); WALLS.add(s.ax, s.az, s.bx, s.bz, q); }
+    let q = pc.subs[i]; if (!q) { q = { two: true, nx: s.nx, nz: s.nz, y0: s.y0, y1: s.y1, yv: s.yv, off: true }; pc.subs.push(q); WALLS.add(s.ax, s.az, s.bx, s.bz, q); }
     q.ax = a[0]; q.az = a[1]; q.bx = c[0]; q.bz = c[1]; q.off = false;
   });
   for (let i = keep.length; i < pc.subs.length; i++) pc.subs[i].off = true;

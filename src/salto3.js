@@ -13,6 +13,7 @@ const SALTO = {
   landT: 0.24, landDip: 0.14, landSlow: 0.45, heavyV: 6, // the bend at landing: time, how far the body goes down, the speed lost after a fall faster than heavyV m/s
   maxBar: 2.6, reach: 1.15, reachV: 0.16, cone: 0.5, // highest barrier or perch over the ground (m, "about 2.5"); how far an obstacle is taken at a standstill, plus per m/s of run-up; cosine of the half cone ahead
   camV: 15, camHold: 0.4, airPush: 0.4, // the camera during a gesture and just after it moves round him at most camV m/s; a push in the air moves him at most airPush m a step
+  roofKmh: 30, // on a car's roof he stays up to this speed (km/h); over it he is thrown off to the side, no damage (Carlo, 31/10)
   vehMaxV: 1.5, boxR: 0.32, lip: 0.3, // a car moving faster than this is not climbed
   gap: 0.42, landL: [0.55, 0.8, 1.1, 1.5], clear: 0.06, r: 0.3, rLand: 0.4, head: 1.75, // where the hands go from, how far past it he comes down (first free), over the top by, body radius on the way and landing, body height
   lowH: 1.35, hoist: 2.0, // up to lowH a hop with the hands on top; over it a jump to hang from the top by the hands (feet hoist m under it), then a pull up
@@ -221,7 +222,16 @@ function footVert(dt) {
 function footRide() {
   const v = P.onV; if (!v) return;
   if (VEH.indexOf(v) < 0 || P.mode !== 'foot') { P.onV = null; if (P.mode === 'foot') { P.air = true; P.vy = 0; } return; }
+  if (Math.abs(v.speed) * 3.6 > SALTO.roofKmh && footThrow(v)) return;
   if (P.onL) { const [x, z] = vehWorld(v, P.onL[0], P.onL[1]); P.x = x; P.z = z; P.h = wrapA(P.h + wrapA(v.h - P.onL[2])); }
+}
+function footThrow(v) { // too fast to stay on: down on the nearest free ground at the side of the car, falling from where he stood (no fall damage is done in the game)
+  const [lx, lz] = vehLocal(v, P.x, P.z), S = v.spec, sd = Math.sign(lx || 1), al = clamp(lz, -S.L / 2, S.L / 2);
+  for (let d = S.W / 2 + SALTO.rLand + 0.15; d < S.W / 2 + 3.5; d += 0.35) for (const q of [sd, -sd]) {
+    const [x, z] = vehWorld(v, q * d, al), g = H.surface(x, z, P.y); if (g > P.y + 0.2 || inWater(x, z, g) || inBuilding(x, z, SALTO.rLand) || capsuleFree(x, z, g, SALTO.rLand, 0.05)) continue;
+    P.x = x; P.z = z; P.air = true; P.vy = 0; P.vx = P.vz = 0; P.onV = null; P.onL = null; P.land = 0; P.thrown = (P.thrown || 0) + 1; return true;
+  }
+  return false;
 }
 function footRideEnd() { if (P.onV) { const [lx, lz] = vehLocal(P.onV, P.x, P.z); P.onL = [lx, lz, P.onV.h]; } else P.onL = null; }
 // the move through a wall never happens, whoever asks for it (his steps, the push of a wall from behind, a car, a knock): between where he was and where he would be
