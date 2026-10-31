@@ -16,7 +16,7 @@ Fatto solo con ricerca web e qualche richiesta di conteggio ai servizi (niente d
 - DBGT di 30 comuni attorno a Meda: 8 scaricati prima più 22 nuovi, zip non estratti. La build legge solo `dbgt.gpkg`.
 - `overture/edifici_mappa_grande.geojson` e `osm/mappa_grande.osm`: pronti, non letti dalla build di Meda.
 - LiDAR: 54 tessere su 170 per la mappa grande. Le altre 116 non si scaricano perché il portale del Ministero ha la manutenzione fino al 6/11.
-- Il DBGT contiene tabelle che la build non legge (le tre usate sono `EL_DIV`, `UN_VOL`, `EL_STR_*`; ne ha 106).
+- Il DBGT ha 106 tabelle e la build non le legge tutte. Non sono solo tre: il codice ne cita molte di più (fra cui `AC_VEI`, `AC_PED`, `AR_STR`, `EL_STR`, `EL_FER`, `EL_IDR`, `PONTE`, `GALLER`, `MAN_TR`, `PS_INC`, `FIL_AL`, `EL_DIV`, `UN_VOL`). L'elenco di quelle non usate è da fare. Da controllare anche se `FIL_AL` e le siepi `EL_DIV` tipo 19 coprono già lo strato "Filari e siepi" di DUSAF, che qui sopra è detto mancante nel DBGT.
 
 ## Tabella
 
