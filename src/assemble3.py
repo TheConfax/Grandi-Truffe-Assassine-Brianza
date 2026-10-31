@@ -353,14 +353,18 @@ function pollPad() {
   if (E[12]) reportSpot();
   if (E[13]) ni('Zoom della minimappa');
   /* d-pad left: radio. d-pad right: lights (vehicles), use item (on foot) */
-  padTap(14, down(14), dt, () => { if (kind === 'car') toggleRadio(); else ni('Radio dal telefono'); }, () => ni(kind === 'car' ? 'Ruota delle radio' : 'Radio dal telefono'));
+  padTap(14, down(14), dt, () => { if (kind === 'car') radioNext(); else ni('Radio dal telefono'); }, () => ni(kind === 'car' ? 'Ruota delle radio' : 'Radio dal telefono'));
   if (veh) padTap(15, down(15), dt, () => ni(kind === 'bici' ? 'Fanale' : 'Fari'), () => ni(kind === 'bici' ? 'Fanale' : 'Abbaglianti')); else if (E[15]) ni('Usa oggetto');
   if (veh) {
     if (E[3]) { K.use = true; (GP.hold[3] || (GP.hold[3] = { t: 0, on: false, done: false })).block = true; } /* getting out ends this press: on foot it must not count as a tap that gets in again */
     if (E[2]) ni('Cambio arma');
     if (E[4]) ni('Sparare');
     if (kind === 'bici') { if (E[1]) ni('Bunny hop'); if (E[10]) ni('Campanello'); }
-    else if (down(10)) { GP.l3 += dt; if (GP.l3 >= 0.8 && !GP.l3d) { GP.l3d = true; ni('Sirena'); } } else { GP.l3 = 0; GP.l3d = false; }
+    else if (down(10)) {
+      /* police car: horn up to 0.8 s, past that the horn stops and the siren flips (v.siren, no sound yet); other cars and bikes: horn while held */
+      GP.l3 += dt;
+      if (kind === 'car' && P.car.kind === 'police') { if (GP.l3 >= 0.8) { GP.horn = 0; if (!GP.l3d) { GP.l3d = true; P.car.siren = !P.car.siren; toast('Sirena non implementata'); } } }
+    } else { GP.l3 = 0; GP.l3d = false; }
   } else {
     padTap(3, down(3), dt, () => { K.use = true; }, () => ni('Scasso'));
     if (E[2]) ni('Salto e arrampicata');
