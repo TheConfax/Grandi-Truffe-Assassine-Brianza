@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo controller-mapping · dopo ebff48e · assemblato 31/10 04:14 · porta ' + location.port;
+    const txt = 'locale · ramo telecamera-gta · dopo 7f4f160 · assemblato 31/10 04:33 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -6820,7 +6820,7 @@ function missionStep(dt) {
 
 // ---------------------------------------------------------------- HUD
 const $ = id => document.getElementById(id);
-let camYaw = 0, camPitch = 0, camBack = false, toastT = 0, bannerT = 0, hintT = 0, lastStreet = '', shake = 0, camMode = 0, paused = false, running = false, bigOpen = false, now = 0;
+let fpDone = false, camA = 0, camFree = false, camIdle = 9, camVA = 0, camPitch = 0, camBack = false, toastT = 0, bannerT = 0, hintT = 0, lastStreet = '', shake = 0, camMode = 0, paused = false, running = false, bigOpen = false, now = 0;
 function toast(t) { $('toast').textContent = t; $('toast').classList.add('on'); toastT = 3.2; }
 function banner(t, sub) { $('banner').innerHTML = (sub ? `<small>${sub}</small>` : '') + escapeHtml(t); $('banner').classList.add('on'); bannerT = 3; }
 function hint(t) { $('hint').innerHTML = t; $('hint').hidden = false; hintT = 0.25; }
@@ -7274,8 +7274,14 @@ function step(dt) {
   if (P.mode === 'foot') {
     if (P.knock > 0) { P.knock -= dt; P.vy -= 22 * dt; const fl = H.surface(P.x, P.z, P.y); P.y = Math.max(fl, P.y + P.vy * dt); P.x += P.vx * dt; P.z += P.vz * dt; if (P.y <= fl) { P.vx *= 0.85; P.vz *= 0.85; } }
     else {
-      P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + steerIn * 2.8 * dt);
-      const gf_ = clamp(GP.fwd / 0.9, -1, 1), sp = K.up || K.down ? (K.up ? 1 : -0.5) * (K.hand || K.turbo ? 7.2 : 4.2) : gf_ > 0 ? gf_ * (4.2 + GP.sprint) : gf_ * 2.1; /* pad: the stick is analogue (half = a walk of about 2 m/s, full = the jog of 4.2), cross/A mashed adds up to 4.8 m/s of sprint on top; the keyboard run stays 7.2 */
+      P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + ((K.left ? 1 : 0) - (K.right ? 1 : 0)) * 2.8 * dt);
+      let sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);
+      /* pad on foot (Carlo, 31/10): the left stick is a direction in the world as the camera sees it; the walker turns towards it with a soft curve and walks the way he faces, never backwards. Half stick = a walk of about 2 m/s, full = the jog of 4.2, cross/A mashed adds up to 4.8 m/s. The keyboard keeps its own way (turn on the spot, up/down) */
+      if (!(K.up || K.down) && Math.hypot(GP.steer, GP.fwd) > 0.15) {
+        const m_ = Math.min(1, Math.hypot(GP.steer, GP.fwd)), va_ = camVA, dx_ = GP.fwd * Math.sin(va_) - GP.steer * Math.cos(va_), dz_ = GP.fwd * Math.cos(va_) + GP.steer * Math.sin(va_);
+        const dh_ = wrapA(Math.atan2(dx_, dz_) - P.h), tn_ = clamp(dh_ * (1 - Math.exp(-PAD_TURN * dt)), -PAD_MAXTURN * dt, PAD_MAXTURN * dt);
+        P.h = wrapA(P.h + tn_); sp = clamp(m_ / 0.9, 0, 1) * (4.2 + GP.sprint) * (0.15 + 0.85 * Math.max(0, Math.cos(dh_)));
+      }
       P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; P.x += P.vx * dt; P.z += P.vz * dt; P.phase += Math.abs(sp) * dt * 3;
       P.speedNow = sp;
     }
@@ -7356,25 +7362,45 @@ function ceilAbove(x, z, y0) { /* lowest underside of a raised volume above y0 a
   BLDR.each(x - 0.1, z - 0.1, x + 0.1, z + 0.1, b => { if (b.zb > y0 && b.zb < m && x >= b.bb[0] && x <= b.bb[2] && z >= b.bb[1] && z <= b.bb[3] && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) m = b.zb; });
   return m;
 }
+/* free-camera tuning (change here): view turn speed rad/s at full stick, tilt speed, pause before easing back (s), easing back rate (1/s), walker turn rate towards the stick (1/s) and its cap (rad/s) */
+const CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 11, PAD_MAXTURN = 11;
+function camSteer(dt, inCar, hb, moving) { /* hb = the heading the camera sits behind by default; camA = where the view points in the world */
+  const lx = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, ly = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0, fp = camMode === 2;
+  const lim = fp ? 0.7 : 1.3, lo = fp ? -0.7 : -0.45;
+  if (!inCar && (K.up || K.down || K.left || K.right)) camFree = false; /* the keyboard keeps the old camera: always straight behind */
+  else if (lx || ly || (!inCar && Math.hypot(GP.steer, GP.fwd) > 0.15)) { if (!camFree) { camFree = true; camA = hb; camIdle = 0; } }
+  if (!camFree) { camA = hb; camPitch *= Math.exp(-2.5 * dt); return; }
+  if (lx || ly) camIdle = 0; else camIdle += dt;
+  const sh = v => v * (0.5 + 0.5 * Math.abs(v));
+  if (lx) camA = wrapA(camA + sh(lx) * CAM_VEL * dt);
+  if (ly) camPitch = clamp(camPitch + sh(ly) * CAM_VELP * dt, lo, lim);
+  camPitch = clamp(camPitch, lo, lim);
+  const ramp = clamp((camIdle - CAM_DELAY) / 1.0, 0, 1);
+  if (ramp > 0 && moving && (inCar || !fp)) { /* on foot in first person the view is the way he walks: no easing back */
+    const d = wrapA(hb - camA), w = inCar ? 1 : Math.max(0, Math.cos(d)); /* on foot sideways or towards the camera it stays put, or he would spin the camera round himself */
+    camA = wrapA(camA + d * (1 - Math.exp(-CAM_RE * ramp * w * dt))); camPitch *= Math.exp(-CAM_RE * ramp * dt);
+    if (inCar && Math.abs(wrapA(hb - camA)) < 0.02 && Math.abs(camPitch) < 0.02) { camFree = false; camA = hb; camPitch = 0; }
+  }
+}
 function updCamera(dt) {
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
   const fx = Math.sin(h), fz = Math.cos(h); let want, look;
-  if (!inCar) P.model.g.visible = camMode !== 2;
+  if (!inCar) P.model.g.visible = !((camMode === 2 && fpDone) || (hyp(camPos.x - px, camPos.z - pz) < 0.9 && camPos.y - P.y < 2.2)); /* the body is hidden only once the camera is close to the eyes */
   if (camMode === 2) {
-    let hx = fx, hz = fz; const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0;
-    if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -2.3, 2.3); else camYaw *= Math.exp(-4 * dt);
-    if (p_) camPitch = clamp(camPitch + p_ * 2 * dt, -0.7, 0.7); else camPitch *= Math.exp(-4 * dt);
-    const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; if (GP.back > 0.5) { hx = -hx; hz = -hz; }
+    camSteer(dt, inCar, h, inCar ? P.car.speed > 3 : Math.abs(P.speedNow || 0) > 0.5);
+    let hx = Math.sin(camA), hz = Math.cos(camA); if (GP.back > 0.5) { hx = -hx; hz = -hz; } camVA = Math.atan2(hx, hz);
     const ey = inCar ? P.car.y + 1.25 : P.y + 1.62, fo = inCar ? 1.1 : 0.15;
     want = new THREE.Vector3(px + fx * fo, ey, pz + fz * fo); look = new THREE.Vector3(want.x + hx * 10, ey - camPitch * 7, want.z + hz * 10);
   } else if (camMode === 1) {
+    camVA = Math.PI;
     const ht = inCar ? 58 + sp * 0.9 : 36, gy = H.ground(px, pz); want = new THREE.Vector3(px, gy + ht, pz + ht * 0.28); look = new THREE.Vector3(px, gy, pz);
   } else {
     // follow travel direction in reverse, otherwise heading
     let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }
-    { const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0; if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -Math.PI, Math.PI); else camYaw *= Math.exp(-2.5 * dt); /* heading grows towards the left */
-      const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } } /* looking back and forward again is a cut, not a swing round */
-    const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2; let ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
+    camSteer(dt, inCar, Math.atan2(hx, hz), inCar ? P.car.speed > 3 : Math.abs(P.speedNow || 0) > 0.5); hx = Math.sin(camA); hz = Math.cos(camA);
+    { const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } camVA = Math.atan2(hx, hz); } /* looking back and forward again is a cut, not a swing round */
+    const two = inCar && isTwo(P.car); let dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;
+    if (!inCar && camPitch) { const ph_ = Math.atan2(1, 5.2) + camPitch; dist = 5.3 * Math.cos(ph_); ht = 1.5 + 5.3 * Math.sin(ph_); } /* sphere of radius 5.3 round his chest: camPitch 0 is the old view */
     let cx = px - hx * dist, cz = pz - hz * dist;
     /* low ceiling (portico, passage) over the subject or over the way back to the camera: the target is computed at once under it and in front of the walls, the camera only glides there (never up first) */
     const fy = inCar ? P.car.y : P.y; let ceil = Infinity;
@@ -7383,8 +7409,7 @@ function updCamera(dt) {
     if (cl < 1) { cx = px + (cx - px) * Math.max(cl, 0.4); cz = pz + (cz - pz) * Math.max(cl, 0.4); ht = Math.max(0.9, ht * cl); }
     const wy = Math.max(fy, H.ground(cx, cz)) + ht;
     const f = rayCam(px, pz, cx, cz, wy); let lift = 0; if (f < 1) { const dd = hyp(cx - px, cz - pz) || 1, k = Math.max(0.08, f - 0.5 / dd); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3 * cl; }
-    const gy = inCar ? P.car.y : P.y; { const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 3 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }
-    want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
+    const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + (inCar ? camPitch * 6 : 0)), cz); look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));
   }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
   // the camera rides along with what it follows and the smoothing below only softens turns and walls: chasing the car itself, a frame that
@@ -7392,11 +7417,13 @@ function updCamera(dt) {
   const subj = inCar ? P.car : P, suby = inCar ? P.car.y : P.y, C = updCamera;
   if (C.s === subj && hyp(px - C.x, pz - C.z) < 20) { const d = _camD.set(px - C.x, suby - C.y, pz - C.z); camPos.add(d); camLook.add(d); }
   C.s = subj; C.x = px; C.y = suby; C.z = pz;
-  const k = camMode === 2 ? 1 : 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);
-  camPos.lerp(want, k); camLook.lerp(look, camMode === 2 ? 1 : 1 - Math.exp(-12 * dt));
+  const k = camMode === 2 && fpDone ? 1 : 1 - Math.exp(-(camMode === 2 ? FP_ZOOM : camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);
+  camPos.lerp(want, k); camLook.lerp(look, camMode === 2 && fpDone ? 1 : 1 - Math.exp(-12 * dt));
+  /* going into first person is a soft zoom in, as coming out is a zoom out; once the camera is at the eyes it is locked on with no delay */
+  if (camMode !== 2) fpDone = false; else if (!fpDone && camPos.distanceTo(want) < 0.12 && camLook.distanceTo(look) < 0.3) fpDone = true;
   if (camMode !== 1) { /* never inside a wall: the glide may cut a corner, so pull the camera back in front of the first wall between subject and camera */
     const g = rayCam(px, pz, camPos.x, camPos.z, camPos.y);
-    if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd); camPos.x = px + (camPos.x - px) * kk; camPos.z = pz + (camPos.z - pz) * kk; }
+    if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd), tx_ = px + (camPos.x - px) * kk, tz_ = pz + (camPos.z - pz) * kk, sl_ = hyp(tx_ - camPos.x, tz_ - camPos.z) > 0.4 ? 1 - Math.exp(-CAM_WALL * dt) : 1; /* a small correction is exact; a big one (the walker jumped past a wall edge) is a quick glide, not a jump */ camPos.x += (tx_ - camPos.x) * sl_; camPos.z += (tz_ - camPos.z) * sl_; }
   }
   camera.position.copy(camPos);
   if (shake > 0) { camera.position.x += (rnd() - 0.5) * shake * 0.6; camera.position.y += (rnd() - 0.5) * shake * 0.4; shake = Math.max(0, shake - dt * 1.8); }
@@ -8291,5 +8318,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
+window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
 </script>

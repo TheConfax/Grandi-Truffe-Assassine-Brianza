@@ -98,7 +98,7 @@ rep("const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad);", "co
 rep("const fl = surfY(p.x, p.z); p.t += dt;", "const fl = H.surface(p.x, p.z, p.y); p.t += dt;")
 rep("p.phase += spd * dt * 3.2; p.y = surfY(p.x, p.z);", "p.phase += spd * dt * 3.2; p.y = H.surface(p.x, p.z, p.y);")
 rep("const fl = surfY(P.x, P.z); P.y = Math.max(fl,", "const fl = H.surface(P.x, P.z, P.y); P.y = Math.max(fl,")
-rep("P.y = surfY(P.x, P.z); P.h = wrapA(P.h + steerIn * 2.8 * dt);", "P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + steerIn * 2.8 * dt);")
+rep("P.y = surfY(P.x, P.z); P.h = wrapA(P.h + steerIn * 2.8 * dt);", "P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + ((K.left ? 1 : 0) - (K.right ? 1 : 0)) * 2.8 * dt);")
 rep("const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4);", "const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4, P.y + 0.4);")
 rep("const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35);", "const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35, p.y + 0.4);")
 
@@ -266,7 +266,7 @@ rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode =
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
 rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -379,7 +379,13 @@ rep("  const steerIn = (K.left ? 1 : 0) - (K.right ? 1 : 0);", "  const steerIn 
 rep("    const v = P.car; v.inp.thr = K.up ? 1 : 0; v.inp.brk = K.down ? 1 : 0; v.inp.steer = steerIn; v.inp.hand = K.hand ? 1 : 0; v.sleep = false;",
     "    const v = P.car; v.inp.thr = Math.max(K.up ? 1 : 0, GP.thr); v.inp.brk = Math.max(K.down ? 1 : 0, GP.brk); v.inp.steer = steerIn; v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; if (v.spec.pedal) { const sk_ = GP.sprint / 4.8; v.maxV = v.spec.maxV * (1 + 0.3 * sk_); v.accMul = 1 + 0.6 * sk_; }")
 rep("    const want = K.turbo && K.up && v.health > 0 && P.nitro > 1;", "    const want = (K.turbo || GP.turbo > 0.5) && v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;")
-rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);", "const gf_ = clamp(GP.fwd / 0.9, -1, 1), sp = K.up || K.down ? (K.up ? 1 : -0.5) * (K.hand || K.turbo ? 7.2 : 4.2) : gf_ > 0 ? gf_ * (4.2 + GP.sprint) : gf_ * 2.1; /* pad: the stick is analogue (half = a walk of about 2 m/s, full = the jog of 4.2), cross/A mashed adds up to 4.8 m/s of sprint on top; the keyboard run stays 7.2 */")
+rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);", "let sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);\n"
+    "      /* pad on foot (Carlo, 31/10): the left stick is a direction in the world as the camera sees it; the walker turns towards it with a soft curve and walks the way he faces, never backwards. Half stick = a walk of about 2 m/s, full = the jog of 4.2, cross/A mashed adds up to 4.8 m/s. The keyboard keeps its own way (turn on the spot, up/down) */\n"
+    "      if (!(K.up || K.down) && Math.hypot(GP.steer, GP.fwd) > 0.15) {\n"
+    "        const m_ = Math.min(1, Math.hypot(GP.steer, GP.fwd)), va_ = camVA, dx_ = GP.fwd * Math.sin(va_) - GP.steer * Math.cos(va_), dz_ = GP.fwd * Math.cos(va_) + GP.steer * Math.sin(va_);\n"
+    "        const dh_ = wrapA(Math.atan2(dx_, dz_) - P.h), tn_ = clamp(dh_ * (1 - Math.exp(-PAD_TURN * dt)), -PAD_MAXTURN * dt, PAD_MAXTURN * dt);\n"
+    "        P.h = wrapA(P.h + tn_); sp = clamp(m_ / 0.9, 0, 1) * (4.2 + GP.sprint) * (0.15 + 0.85 * Math.max(0, Math.cos(dh_)));\n"
+    "      }")
 rep("((K.horn && P.mode === 'car') ? 0.12", "(((K.horn || GP.horn > 0.5) && P.mode === 'car') ? 0.12")
 rep("  if (running && !paused) { acc += dt;", "  pollPad();\n  if (running && !paused) { acc += dt;")
 rep("<p>Premi <kbd>P</kbd> per riprendere</p>", "<p id=\"padline\" hidden></p><p>Premi <kbd>P</kbd> per riprendere</p>")
@@ -614,33 +620,55 @@ print('leftover refs', [s[i:i + 40] for i in left])
 
 # ---- draw each frame between the last two physics steps (interp3.js)
 rep("while (acc >= 1 / 60 && n < 5) { step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }", "while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }")
-# right stick: the chase camera swings round the car (or the walker) to look about; let go and it eases back behind (Carlo, 24/10)
-rep("let toastT = 0, bannerT = 0,", "let camYaw = 0, camPitch = 0, camBack = false, toastT = 0, bannerT = 0,")
-# holding the right stick down looks behind, as in GTA: the bug report moves from R3 to the d-pad down (B on the keyboard stays)
-# up and down: the camera drops to look up or rises to look down from above, and settles back the same way
+# camera (Carlo, 31/10): the right stick turns the view round the walker or the car, up and down too, and it stays where it is left; walking or driving on it eases back behind, slowly and after a pause
+rep("let toastT = 0, bannerT = 0,", "let fpDone = false, camA = 0, camFree = false, camIdle = 9, camVA = 0, camPitch = 0, camBack = false, toastT = 0, bannerT = 0,")
+rep("function updCamera(dt) {", """/* free-camera tuning (change here): view turn speed rad/s at full stick, tilt speed, pause before easing back (s), easing back rate (1/s), walker turn rate towards the stick (1/s) and its cap (rad/s) */
+const CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 11, PAD_MAXTURN = 11;
+function camSteer(dt, inCar, hb, moving) { /* hb = the heading the camera sits behind by default; camA = where the view points in the world */
+  const lx = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, ly = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0, fp = camMode === 2;
+  const lim = fp ? 0.7 : 1.3, lo = fp ? -0.7 : -0.45;
+  if (!inCar && (K.up || K.down || K.left || K.right)) camFree = false; /* the keyboard keeps the old camera: always straight behind */
+  else if (lx || ly || (!inCar && Math.hypot(GP.steer, GP.fwd) > 0.15)) { if (!camFree) { camFree = true; camA = hb; camIdle = 0; } }
+  if (!camFree) { camA = hb; camPitch *= Math.exp(-2.5 * dt); return; }
+  if (lx || ly) camIdle = 0; else camIdle += dt;
+  const sh = v => v * (0.5 + 0.5 * Math.abs(v));
+  if (lx) camA = wrapA(camA + sh(lx) * CAM_VEL * dt);
+  if (ly) camPitch = clamp(camPitch + sh(ly) * CAM_VELP * dt, lo, lim);
+  camPitch = clamp(camPitch, lo, lim);
+  const ramp = clamp((camIdle - CAM_DELAY) / 1.0, 0, 1);
+  if (ramp > 0 && moving && (inCar || !fp)) { /* on foot in first person the view is the way he walks: no easing back */
+    const d = wrapA(hb - camA), w = inCar ? 1 : Math.max(0, Math.cos(d)); /* on foot sideways or towards the camera it stays put, or he would spin the camera round himself */
+    camA = wrapA(camA + d * (1 - Math.exp(-CAM_RE * ramp * w * dt))); camPitch *= Math.exp(-CAM_RE * ramp * dt);
+    if (inCar && Math.abs(wrapA(hb - camA)) < 0.02 && Math.abs(camPitch) < 0.02) { camFree = false; camA = hb; camPitch = 0; }
+  }
+}
+function updCamera(dt) {""")
+# up and down: on foot the camera orbits on a sphere round his chest; in the car the chase height changes (R3 behind stays)
 rep("want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz);",
-    "{ const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 3 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }\n"
-    "    want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz);")
+    "want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + (inCar ? camPitch * 6 : 0)), cz);")
+rep("const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2; let ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;",
+    "const two = inCar && isTwo(P.car); let dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;\n"
+    "    if (!inCar && camPitch) { const ph_ = Math.atan2(1, 5.2) + camPitch; dist = 5.3 * Math.cos(ph_); ht = 1.5 + 5.3 * Math.sin(ph_); } /* sphere of radius 5.3 round his chest: camPitch 0 is the old view */")
 rep("    let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }",
     "    let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }\n"
-    "    { const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0; if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -Math.PI, Math.PI); else camYaw *= Math.exp(-2.5 * dt); /* heading grows towards the left */\n"
-    "      const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } } /* looking back and forward again is a cut, not a swing round */")
-# while the stick turns it the camera goes where it is pushed at once: the follow smoothing is for the car's turns, on the stick it felt like butter
+    "    camSteer(dt, inCar, Math.atan2(hx, hz), inCar ? P.car.speed > 3 : Math.abs(P.speedNow || 0) > 0.5); hx = Math.sin(camA); hz = Math.cos(camA);\n"
+    "    { const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } camVA = Math.atan2(hx, hz); } /* looking back and forward again is a cut, not a swing round */")
+# while the stick turns it the camera goes where it is pushed at once
 rep("  const k = 1 - Math.exp(-(camMode === 1 ? 5 : 7.5) * dt);",
-    "  const k = camMode === 2 ? 1 : 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);")
-rep("camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));", "camPos.lerp(want, k); camLook.lerp(look, camMode === 2 ? 1 : 1 - Math.exp(-12 * dt));")
+    "  const k = camMode === 2 && fpDone ? 1 : 1 - Math.exp(-(camMode === 2 ? FP_ZOOM : camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);")
+rep("camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));", "camPos.lerp(want, k); camLook.lerp(look, camMode === 2 && fpDone ? 1 : 1 - Math.exp(-12 * dt));\n  /* going into first person is a soft zoom in, as coming out is a zoom out; once the camera is at the eyes it is locked on with no delay */\n  if (camMode !== 2) fpDone = false; else if (!fpDone && camPos.distanceTo(want) < 0.12 && camLook.distanceTo(look) < 0.3) fpDone = true;")
+rep("if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd); camPos.x = px + (camPos.x - px) * kk; camPos.z = pz + (camPos.z - pz) * kk; }",
+    "if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd), tx_ = px + (camPos.x - px) * kk, tz_ = pz + (camPos.z - pz) * kk, sl_ = hyp(tx_ - camPos.x, tz_ - camPos.z) > 0.4 ? 1 - Math.exp(-CAM_WALL * dt) : 1; /* a small correction is exact; a big one (the walker jumped past a wall edge) is a quick glide, not a jump */ camPos.x += (tx_ - camPos.x) * sl_; camPos.z += (tz_ - camPos.z) * sl_; }")
 # a third view, first person (Carlo, 24/10): the walker's eyes, or just above the bonnet; the right stick looks about, R3 behind
 rep("camMode = (camMode + 1) % 2", "camMode = (camMode + 1) % 3", 2)
 rep("  if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,",
-    "  if (!inCar) P.model.g.visible = camMode !== 2;\n"
+    "  if (!inCar) P.model.g.visible = !((camMode === 2 && fpDone) || (hyp(camPos.x - px, camPos.z - pz) < 0.9 && camPos.y - P.y < 2.2)); /* the body is hidden only once the camera is close to the eyes */\n"
     "  if (camMode === 2) {\n"
-    "    let hx = fx, hz = fz; const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0;\n"
-    "    if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -2.3, 2.3); else camYaw *= Math.exp(-4 * dt);\n"
-    "    if (p_) camPitch = clamp(camPitch + p_ * 2 * dt, -0.7, 0.7); else camPitch *= Math.exp(-4 * dt);\n"
-    "    const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; if (GP.back > 0.5) { hx = -hx; hz = -hz; }\n"
+    "    camSteer(dt, inCar, h, inCar ? P.car.speed > 3 : Math.abs(P.speedNow || 0) > 0.5);\n"
+    "    let hx = Math.sin(camA), hz = Math.cos(camA); if (GP.back > 0.5) { hx = -hx; hz = -hz; } camVA = Math.atan2(hx, hz);\n"
     "    const ey = inCar ? P.car.y + 1.25 : P.y + 1.62, fo = inCar ? 1.1 : 0.15;\n"
     "    want = new THREE.Vector3(px + fx * fo, ey, pz + fz * fo); look = new THREE.Vector3(want.x + hx * 10, ey - camPitch * 7, want.z + hz * 10);\n"
-    "  } else if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,")
+    "  } else if (camMode === 1) {\n    camVA = Math.PI;\n    const ht = inCar ? 58 + sp * 0.9 : 36,")
 # debug mode: cars never break (health back to full after every physics step, so nothing reaches zero and burns)
 rep("interpSnap(); step(1 / 60);", "interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100;")
 rep("  updVisuals(running && !paused ? dt : 0); updRadio(dt);", "  const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  updVisuals(running && !paused ? dt : 0); updRadio(dt);")
