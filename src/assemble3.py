@@ -383,6 +383,11 @@ rep("  const steerIn = (K.left ? 1 : 0) - (K.right ? 1 : 0);", "  const steerIn 
 rep("    const v = P.car; v.inp.thr = K.up ? 1 : 0; v.inp.brk = K.down ? 1 : 0; v.inp.steer = steerIn; v.inp.hand = K.hand ? 1 : 0; v.sleep = false;",
     "    const v = P.car; v.inp.thr = Math.max(K.up ? 1 : 0, GP.thr); v.inp.brk = Math.max(K.down ? 1 : 0, GP.brk); v.inp.steer = steerIn; v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; if (v.spec.pedal) { const sk_ = GP.sprint / 4.8; v.maxV = v.spec.maxV + (BICI_SPRINT_MAX - v.spec.maxV) * sk_; v.accMul = 1 + 0.6 * sk_; }")
 rep("    const want = K.turbo && K.up && v.health > 0 && P.nitro > 1;", "    const want = (K.turbo || GP.turbo > 0.5) && v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;")
+rep("(S.two ? 4.5 : 10) * dt)", "(S.two ? (TWO_STEER[this.kind] || 4.5) : 10) * dt)")
+rep("this.whv += (28 * (tgt - this.wh) - 7 * this.whv) * dt;", "this.whv += (28 * (tgt - this.wh) - 7 * this.whv + (this.wh > S.whMax * WHEEL.bal ? WHEEL.kov * (this.wh - S.whMax * WHEEL.bal) : 0) - (this.wh < -S.whMax * STOP.bal ? STOP.kov * Math.min(5, v / STOP.v0) * (-this.wh - S.whMax * STOP.bal) : 0)) * dt;")
+rep("    if (this.wh > S.whMax * 0.9 && lb > 0.9 && thr > 0) this.whHold += dt; else this.whHold = Math.max(0, this.whHold - dt * 2);\n", "    this.whHold = 0;\n")
+rep("    else if (i.brk > 0 && lb < -0.1 && v > 4) tgt = -0.55 * S.whMax * -lb * i.brk;", "    else if (i.brk > 0 && lb < -0.1 && v > 4) tgt = -STOP.max * S.whMax * -lb * i.brk * Math.min(5, v / STOP.v0);")
+rep("(this.whHold > 2.2 || this.wh < -0.72)", "(this.wh > S.whMax * WHEEL.fall || this.wh < -S.whMax * STOP.fall)")
 rep("    if (S.two) this.roll = lerp(this.roll, clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85), 0.14); // lean into the bend",
     "    if (S.two) { const ln_ = LEAN[this.kind] || LEAN.moto, tg_ = clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85) * ln_.k, ms_ = 0.85 * ln_.k / ln_.t * dt; this.roll = lerp(this.roll, this.roll + clamp(tg_ - this.roll, -ms_, ms_), 0.5); } /* lean into the bend, rate-limited */")
 rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);", "let sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);\n"
@@ -633,6 +638,12 @@ rep("function updCamera(dt) {", """/* free-camera tuning (change here): view tur
 const CAMF = { delay: 0.3, kBase: 3.5, kSpeed: 2.2, minW: 0.6, tau: 0.06, hyst: 2.7, hystOff: 2.0, recT: 0.35, recK: 18, posK: 14 };
 /* two-wheeler look (Carlo, 31/10): the visible lean is a fraction of the physical one and builds up over about LEAN.<kind>.t seconds (moto 0.15, scooter 0.2, bici 0.35) from upright to full; the physics (steering, wheelie, stoppie) is untouched. BICI_SPRINT_MAX: top speed of the bike with the cross mashed (m/s, 55 km/h), base stays 10.8 */
 const LEAN = { moto: { k: 0.667, t: 0.15 }, scooter: { k: 0.667, t: 0.2 }, bici: { k: 0.8, t: 0.35 } }, BICI_SPRINT_MAX = 15.3;
+/* handlebar filter of the two-wheelers (1/s, game.src.html steer lerp): the car's rack is 10, the old two-wheeler value 4.5 felt like a lorry (Carlo, 31/10); moto and scooter answer faster, the bike keeps 4.5 */
+/* wheelie (Carlo, 31/10): up to bal x whMax it is stable (the angle follows the stick and the gas); above it the bike tips over backwards unless the stick is eased, so the balance point is held with small corrections (kov = how fast it runs away, 1/s^2 per rad); past fall x whMax (moto 0.8 -> 1.04 rad) the rider falls back. Stoppie unchanged */
+const WHEEL = { bal: 0.55, fall: 1.4, kov: 32 };
+/* stoppie: the angle it is pulled to grows with speed and brake x stick (max x whMax x speed/v0 x brake x stick, so 0.55 whMax at 15 m/s as before and 2 whMax at 55 m/s); above bal x whMax the push over the bars grows with speed (kov x speed/v0: stable below about 28/kov x v0, i.e. 26 m/s); past fall x whMax the rider goes over the bars. The brake alone, without the stick forward, does no stoppie */
+const STOP = { max: 0.55, v0: 15, bal: 0.4, kov: 16, fall: 0.9 };
+const TWO_STEER = { moto: 24, scooter: 18 };
 const CAMV = { delay: 0.25, k: 0.12, minW: 0.1, tau: 0.15 };
 const CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 14, PAD_MAXTURN = 14;
 function camSteer(dt, inCar, hb, moving) { /* hb = the heading the camera sits behind by default; camA = where the view points in the world */

@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo telecamera-gta · dopo 9285c92 · assemblato 31/10 05:02 · porta ' + location.port;
+    const txt = 'locale · ramo telecamera-gta · dopo d8387d5 · assemblato 31/10 05:19 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -6356,7 +6356,7 @@ class Vehicle {
     const drag = (0.15 + (thr ? 0 : 1.6 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);
     v -= Math.sign(v) * Math.min(Math.abs(v), drag);
     if (S.two) v = this.wheelie(dt, v, thr, i);
-    this.steer = lerp(this.steer, i.steer, 1 - Math.exp(-(S.two ? 4.5 : 10) * dt)); // a handlebar answers slower than a steering rack
+    this.steer = lerp(this.steer, i.steer, 1 - Math.exp(-(S.two ? (TWO_STEER[this.kind] || 4.5) : 10) * dt)); // a handlebar answers slower than a steering rack
     // two-wheelers: the short wheelbase would turn twice as hard as a car, so their steering is scaled to car-like turns
     const sMax = 0.62 / (1 + Math.abs(v) * 0.045) * (S.two ? 0.4 : 1);
     let yaw = this.steer * sMax * v / (S.L * 0.62); if (i.hand) yaw *= 1.55;
@@ -6418,14 +6418,14 @@ class Vehicle {
   wheelie(dt, v, thr, i) { // pitch on the rear wheel (gas + weight back) or on the front one (brake + weight forward), a damped spring towards the wanted angle
     const S = this.spec, lb = clamp(i.lean || 0, -1, 1), was = this.wh; let tgt = 0;
     if (thr > 0 && lb > 0.1 && v > 1) tgt = S.whMax * lb * Math.min(1, thr) * Math.min(1, v / 4);
-    else if (i.brk > 0 && lb < -0.1 && v > 4) tgt = -0.55 * S.whMax * -lb * i.brk;
-    this.whv += (28 * (tgt - this.wh) - 7 * this.whv) * dt; this.wh += this.whv * dt;
+    else if (i.brk > 0 && lb < -0.1 && v > 4) tgt = -STOP.max * S.whMax * -lb * i.brk * Math.min(5, v / STOP.v0);
+    this.whv += (28 * (tgt - this.wh) - 7 * this.whv + (this.wh > S.whMax * WHEEL.bal ? WHEEL.kov * (this.wh - S.whMax * WHEEL.bal) : 0) - (this.wh < -S.whMax * STOP.bal ? STOP.kov * Math.min(5, v / STOP.v0) * (-this.wh - S.whMax * STOP.bal) : 0)) * dt; this.wh += this.whv * dt;
     if ((was >= 0 && this.wh < 0 && tgt >= 0) || (was <= 0 && this.wh > 0 && tgt <= 0)) { this.wh = 0; this.whv = 0; } // the ground: back on both wheels, no bounce through it
     if (was > 0.3 && this.wh === 0 && this === P.car) shake = Math.max(shake, 0.25); // the front wheel slams down
     if (this.wh < -0.03) v -= 5 * dt; // all the braking on the front wheel
     // past the balance point: holding it fully back too long loops it over; too much stoppie goes over the bars
-    if (this.wh > S.whMax * 0.9 && lb > 0.9 && thr > 0) this.whHold += dt; else this.whHold = Math.max(0, this.whHold - dt * 2);
-    if ((this.whHold > 2.2 || this.wh < -0.72) && this.driver) { this.wh = this.whv = this.whHold = 0; throwRider(this, Math.max(9, Math.abs(v))); }
+    this.whHold = 0;
+    if ((this.wh > S.whMax * WHEEL.fall || this.wh < -S.whMax * STOP.fall) && this.driver) { this.wh = this.whv = this.whHold = 0; throwRider(this, Math.max(9, Math.abs(v))); }
     return v;
   }
   collide() {
@@ -7373,6 +7373,12 @@ function ceilAbove(x, z, y0) { /* lowest underside of a raised volume above y0 a
 const CAMF = { delay: 0.3, kBase: 3.5, kSpeed: 2.2, minW: 0.6, tau: 0.06, hyst: 2.7, hystOff: 2.0, recT: 0.35, recK: 18, posK: 14 };
 /* two-wheeler look (Carlo, 31/10): the visible lean is a fraction of the physical one and builds up over about LEAN.<kind>.t seconds (moto 0.15, scooter 0.2, bici 0.35) from upright to full; the physics (steering, wheelie, stoppie) is untouched. BICI_SPRINT_MAX: top speed of the bike with the cross mashed (m/s, 55 km/h), base stays 10.8 */
 const LEAN = { moto: { k: 0.667, t: 0.15 }, scooter: { k: 0.667, t: 0.2 }, bici: { k: 0.8, t: 0.35 } }, BICI_SPRINT_MAX = 15.3;
+/* handlebar filter of the two-wheelers (1/s, game.src.html steer lerp): the car's rack is 10, the old two-wheeler value 4.5 felt like a lorry (Carlo, 31/10); moto and scooter answer faster, the bike keeps 4.5 */
+/* wheelie (Carlo, 31/10): up to bal x whMax it is stable (the angle follows the stick and the gas); above it the bike tips over backwards unless the stick is eased, so the balance point is held with small corrections (kov = how fast it runs away, 1/s^2 per rad); past fall x whMax (moto 0.8 -> 1.04 rad) the rider falls back. Stoppie unchanged */
+const WHEEL = { bal: 0.55, fall: 1.4, kov: 32 };
+/* stoppie: the angle it is pulled to grows with speed and brake x stick (max x whMax x speed/v0 x brake x stick, so 0.55 whMax at 15 m/s as before and 2 whMax at 55 m/s); above bal x whMax the push over the bars grows with speed (kov x speed/v0: stable below about 28/kov x v0, i.e. 26 m/s); past fall x whMax the rider goes over the bars. The brake alone, without the stick forward, does no stoppie */
+const STOP = { max: 0.55, v0: 15, bal: 0.4, kov: 16, fall: 0.9 };
+const TWO_STEER = { moto: 24, scooter: 18 };
 const CAMV = { delay: 0.25, k: 0.12, minW: 0.1, tau: 0.15 };
 const CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 14, PAD_MAXTURN = 14;
 function camSteer(dt, inCar, hb, moving) { /* hb = the heading the camera sits behind by default; camA = where the view points in the world */
