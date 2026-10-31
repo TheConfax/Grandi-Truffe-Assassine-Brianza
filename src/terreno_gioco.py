@@ -73,6 +73,8 @@ def main(argv=None):
     print('terreno: %d tile (%s), %.1f MB in gzip; impalcati %d, fosse %d, assi d acqua %d; indice %.0f KB; celle sotto un impalcato senza strada %d' % (
         len(tiles), {s: sum(1 for v in tiles.values() if v == s) for s in sorted(set(tiles.values()))}, peso / 1e6, len(decks), len(ind['pits']), len(acqua),
         os.path.getsize(os.path.join(a.out, 'indice.json')) / 1024, sotto))
+    fl = os.path.join(a.da, 'report_lisciatore.json')   # the checks of the lisciatore (src/lisciatore.py), next to the other reports
+    if os.path.exists(fl): import shutil; shutil.copyfile(fl, os.path.join(os.path.dirname(os.path.abspath(a.out)), 'report_lisciatore.json'))
     if not a.no_controlli:   # the checks of the water and the bridges on what the game reads (src/controlli_acqua.py)
         ca.controlla(a.out, os.path.join(ROOT, 'brianza.json'), os.path.join(os.path.dirname(os.path.abspath(a.out)), 'report_acqua.json'))
 
