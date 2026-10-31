@@ -1760,7 +1760,7 @@ for (const [X0, Z0, X1, Z1, k, h] of D.doors || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
   DOORS.push({ ax, az, bx, bz, ux, uz, W, k, h, gy });
-  WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, y0: gy - 2, y1: gy + h });
+  WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, door: true, y0: gy - 2, y1: gy + h });
 }
 const DOOR_COL = { p: 0x5b3a26, n: 0x4a3426, b: 0x8f9296 };
 function buildDoors(T, G) {
@@ -2236,7 +2236,7 @@ function buildSignals(T, G) {
     const sp = new THREE.Mesh(boxG(0.06, 2.7, 0.06), lam(0x5a6068)); sp.position.set(0.7, 1.35, 1.9); root.add(sp);
     // the shelter goes over when rammed, like the street lamps; built again, a fallen one stays down
     const key = X + ',' + Z, old = BUS_PROPS.get(key);
-    if (!old) BUS_PROPS.set(key, addProp({ x: x - Math.cos(root.rotation.y) * 0.3, z: z + Math.sin(root.rotation.y) * 0.3, y: gy, r: 1.1, h: 2.6, obj: root }));
+    if (!old) BUS_PROPS.set(key, addProp({ x: x - Math.cos(root.rotation.y) * 0.3, z: z + Math.sin(root.rotation.y) * 0.3, y: gy, r: 1.1, h: 2.5, obj: root, sali: { rs: 0.7, dy: 2.49 } }));
     else { old.obj = root; if (old.broken) root.visible = false; }
   }
 }

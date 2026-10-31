@@ -4,6 +4,7 @@
 const PROPS = [], PROPG = new Grid(16), PROP_FALL = [];
 function addProp(p) { // { x, z, r, obj | inst: { meshes, i, ry, base }, onBreak }
   p.wall = { r: p.r, x: p.x, z: p.z, dyn: true, on: true, y0: p.y - 3, y1: p.y + (p.h || 6) };
+  if (p.sali) p.wall.sali = { rs: p.sali.rs, top: p.y + p.sali.dy }; if (p.scav) p.wall.scav = true; // climbing on foot (salto3.js): stand on it, go over it
   WALLS.add(p.x - p.r - 0.2, p.z - p.r - 0.2, p.x + p.r + 0.2, p.z + p.r + 0.2, p.wall);
   PROPS.push(p); PROPG.add(p.x - 2, p.z - 2, p.x + 2, p.z + 2, p); return p;
 }

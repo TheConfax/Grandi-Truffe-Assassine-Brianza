@@ -371,7 +371,7 @@ function pollPad() {
     } else { GP.l3 = 0; GP.l3d = false; }
   } else {
     padTap(3, down(3), dt, () => { K.use = true; }, () => ni('Scasso'));
-    if (E[2]) ni('Salto e arrampicata');
+    if (E[2]) P.jumpReq = SALTO.buffer; /* square: jump, or over and up what is ahead (salto3.js) */
     if (E[1]) ni('Pugno');
     if (E[4]) ni('Ruota delle armi');
     if (E[5]) ni('Riparo');
@@ -789,4 +789,24 @@ rep("if (v.driver === null && v.speed < 0.05 && !v.inp.thr)", "if (v.driver === 
 rep("if (Math.abs(v.x - p.x) > 4 || Math.abs(v.z - p.z) > 4) continue;", "if (Math.abs(v.x - p.x) > 4 || Math.abs(v.z - p.z) > 4 || v.y - p.y > 1.4) continue; /* a car flying over, or on the bridge above */")
 rep("if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4) continue;", "if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4) continue;")
 rep("const a = VEH[i], b = VEH[j]; if (a.sleep && b.sleep) continue;", "const a = VEH[i], b = VEH[j]; if (a.sleep && b.sleep) continue; if (Math.abs(a.y - b.y) > 1.5) continue; /* one over the other: in the air, or on a bridge over the road */")
+# ---- jumping and climbing on foot (Carlo, 31/10): salto3.js. The foot branch of the step, gravity, the guard against moves through a wall, the pose, the camera over low barriers
+rep("function step(dt) {", open(os.path.join(HERE, 'salto3.js'), encoding='utf-8').read() + "\nfunction step(dt) {", 1)
+rep("  if (P.mode === 'foot') {\n    if (P.knock > 0) { P.knock -= dt;", "  if (P.mode === 'foot') {\n    if (P.knock > 0) { P.climb = null; P.air = false; P.onV = null; }\n    footRide(); const x0_ = P.x, y0_ = P.y, z0_ = P.z; let mx_, mz_;\n    if (P.knock > 0) { P.knock -= dt;")
+rep("    else {\n      P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + ((K.left ? 1 : 0) - (K.right ? 1 : 0)) * 2.8 * dt);",
+    "    else if (P.climb) climbStep(dt);\n    else if ((footVert(dt), P.climb)) { /* the press started a climb */ }\n    else {\n      P.h = wrapA(P.h + ((K.left ? 1 : 0) - (K.right ? 1 : 0)) * 2.8 * dt);")
+rep("      P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; P.x += P.vx * dt; P.z += P.vz * dt; P.phase += Math.abs(sp) * dt * 3;",
+    "      if (P.land > 0 && P.heavy) sp *= 1 - SALTO.landSlow * P.land / SALTO.landT;\n"
+    "      if (P.air) { if (Math.abs(sp) > 0.1) { const a_ = SALTO.airAcc * dt; P.vx += clamp(Math.sin(P.h) * sp - P.vx, -a_, a_); P.vz += clamp(Math.cos(P.h) * sp - P.vz, -a_, a_); } P.x += P.vx * dt; P.z += P.vz * dt; }\n"
+    "      else { P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; P.x += P.vx * dt; P.z += P.vz * dt; P.phase += Math.abs(sp) * dt * 3; }")
+rep("    const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4, P.y + 0.4); P.x = clamp(pp.x, -LIM_X, LIM_X); P.z = clamp(pp.z, -LIM_Z, LIM_Z);",
+    "    mx_ = P.x; mz_ = P.z; if (!P.climb) footCollide();")
+rep("if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4) continue;", "if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4 || saltoAbove(v)) continue;")
+rep("else { P.x = cx + dx / d * 2.2; P.z = cz + dz / d * 2.2; } } }\n  } else {\n    P.x = P.car.x;", "else { P.x = cx + dx / d * 2.2; P.z = cz + dz / d * 2.2; } } }\n    if (!P.climb) footGuard(x0_, y0_, z0_, mx_, mz_); else { const g_ = H.surface(P.x, P.z); if (P.y < g_) P.y = g_; } if (!P.air && !P.climb) P.yg = P.y; footRideEnd();\n  } else {\n    P.air = false; P.climb = null; P.onV = null; P.land = 0; P.jumpReq = 0;\n    P.x = P.car.x;")
+rep("else { pm.inner.rotation.x = 0; pm.inner.position.y = 0; animPed(pm, P.phase, K.hand ? 0.9 : 0.55); }", "else saltoPose(pm, dt, K.hand ? 0.9 : 0.55);")
+rep("    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false;\n", "    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y);\n")
+rep("if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex;", "if (s.r || s.dyn || s.y0 > cy || s.off || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex;")
+rep("    const f = rayCam(px, pz, cx, cz, wy);", "    if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */\n    const f = rayCam(px, pz, cx, cz, wy);")
+rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = Math.max(fy, H.ground(cx, cz)) + ht;")
+rep("  camera.position.copy(camPos);\n  if (shake > 0)", "  if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */\n  camera.position.copy(camPos);\n  if (shake > 0)")
+rep("window.__G = { FUEL,", "window.__G = { step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)

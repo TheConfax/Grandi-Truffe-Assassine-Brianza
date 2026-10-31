@@ -8,11 +8,11 @@ const OGG_KINDS = ['traliccio', 'palo', 'dosso', 'rallentatore', 'piattaforma', 
 const OGG_MAT = new THREE.MeshLambertMaterial({ vertexColors: true }), WIRE_MAT = new THREE.LineBasicMaterial({ color: 0x2b2d30 });
 // collision: r radius, h height, knock (falls over) or solid; tall ones are scaled from their modelled height to the mapped one
 const OGG_SPEC = {
-  traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8 },
-  idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
-  panchina: { r: 0.8, h: 0.9, knock: true }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: {},
-  telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true }, rastrelliera: { r: 0.6, h: 0.8, knock: true }, cassetta: { r: 0.22, h: 1.2, knock: true },
-  armadietti: { r: 1.0, h: 2.1 }, pannello: { r: 0.4, h: 2.3 }, picnic: { r: 0.9, h: 0.8, knock: true }, fitness: { r: 0.8, h: 2.3 }, torre_acqua: { r: 3.2, h: 28, scale: 28 }, lavaggio: {},
+  traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8, sali: 0.5 },
+  idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true, sali: 0.5 }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
+  panchina: { r: 0.8, h: 0.9, knock: true, sali: 0.4 }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: {},
+  telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true, sali: 0.35 }, rastrelliera: { r: 0.6, h: 0.8, knock: true }, cassetta: { r: 0.22, h: 1.2, knock: true },
+  armadietti: { r: 1.0, h: 2.1, sali: 0.4 }, pannello: { r: 0.4, h: 2.3 }, picnic: { r: 0.9, h: 0.8, knock: true, sali: 0.6 }, fitness: { r: 0.8, h: 2.3 }, torre_acqua: { r: 3.2, h: 28, scale: 28 }, lavaggio: {},
 };
 const OGG_GEO = (() => {
   const F = lmFrame(new THREE.Matrix4()), up = new THREE.Vector3(0, 1, 0);
@@ -153,9 +153,9 @@ function buildOggetti(T, G) {
       o3.position.set(x, gy, z); o3.rotation.set(0, a, 0); o3.scale.set(1, sy, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix);
       if (!S.r) return;
       if (S.knock) {
-        if (!T.ogDone) addProp({ x, z, y: gy, r: S.r, h: S.h, inst: { meshes: [im], i, ry: a, base: gy }, ogTile: T, og: oi });
+        if (!T.ogDone) addProp({ x, z, y: gy, r: S.r, h: S.h, inst: { meshes: [im], i, ry: a, base: gy }, ogTile: T, og: oi, sali: S.sali ? { rs: S.sali, dy: S.h * sy } : null });
         else for (const p of PROPS) if (p.ogTile === T && p.og === oi) { p.inst.meshes = [im]; if (p.broken) { o3.scale.set(0, 0, 0); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); } } // built again: what was knocked down stays down
-      } else if (!T.ogDone) WALLS.add(x - S.r, z - S.r, x + S.r, z + S.r, { r: S.r, x, z, y0: gy - 3, y1: gy + S.h * sy });
+      } else if (!T.ogDone) WALLS.add(x - S.r, z - S.r, x + S.r, z + S.r, { r: S.r, x, z, y0: gy - 3, y1: gy + S.h * sy, ...(S.sali ? { sali: { rs: S.sali, top: gy + S.h * sy } } : {}) });
     });
     G.add(im);
   }
@@ -194,7 +194,7 @@ function buildManufatti(T, G) {
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i], c = pts[(i + 1) % pts.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
       F.face(b, [[a[0], y0[i], a[1]], [c[0], y0[(i + 1) % pts.length], c[1]], [c[0], y1, c[1]], [a[0], y1, a[1]]], 2, col);
-      if (walls) WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(...y0) - 3, y1 });
+      if (walls) WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, mf: true, y0: Math.min(...y0) - 3, y1 });
     }
   };
   const geo = (g, col) => F.geo(b, g, null, COL(col)), bx = (w, h, d, x, y, z, col, ry = 0) => geo(lmBox(w, h, d, x, y, z, ry), col);
@@ -216,7 +216,7 @@ function buildManufatti(T, G) {
         const R = Math.min(W / 2, (top - Math.min(...gys)) / 2), yc = top - R, ry = Math.atan2(A.ux, A.uz);
         const g = new THREE.CylinderGeometry(R, R, L - 0.2, 20).rotateX(Math.PI / 2).rotateY(ry).translate(A.cx, yc, A.cz); geo(g, m.m || '#d8d7d2');
         const yb = Math.min(...gys); for (const f of [-0.3, 0.3]) { const [sx, sz] = A.at((A.s0 + A.s1) / 2 + f * L, (A.v0 + A.v1) / 2); bx(W * 0.8, yc - yb, 0.3, sx, (yc + yb) / 2, sz, '#8f949a', ry); }
-        if (solid) for (let i = 0; i < pts.length; i++) { const a = pts[i], c = pts[(i + 1) % pts.length], l = hyp(c[0] - a[0], c[1] - a[1]); if (l > 0.05) WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / l, nz: -(c[0] - a[0]) / l, two: true, y0: Math.min(...gys) - 3, y1: top }); }
+        if (solid) for (let i = 0; i < pts.length; i++) { const a = pts[i], c = pts[(i + 1) % pts.length], l = hyp(c[0] - a[0], c[1] - a[1]); if (l > 0.05) WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / l, nz: -(c[0] - a[0]) / l, two: true, mf: true, y0: Math.min(...gys) - 3, y1: top }); }
         continue;
       }
       ring(pts, gys.map(g => g - 0.3), top, COL(m.m || '#d8d7d2'), solid);
