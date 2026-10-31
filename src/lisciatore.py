@@ -43,6 +43,10 @@ POZ_TUTTI = 12      # ... and this many in all, with the shallow halo around the
 POZ_CARR_PONTE = 12.0   # m from a deck: a pit on a carriageway this close stays
 POZ_MARG = 4.0      # m around decks, water and the rail bed where they stay as they are (the banks and the abutments read the nodes next to them)
 SF = 2.0
+# --- the street on the edge of the railway fence (bordo_barriere)
+BORDO_LARGO = 3.0   # m from the fence to where the carriageway must be (within a cell of it)
+BORDO_MIN = 0.2     # m: the step under it is no step
+BORDO_BIN = 3.6     # m from a track: a node there stays (the rails lie on the cells: a cell diagonal + half the gauge; at 2 m the near rail of viale Francia kinked)
 
 
 def _mask_geoms(R, geoms, buf=0.0):
@@ -204,6 +208,61 @@ def distanza_vera(s, FISSI, band):
     D = np.full(FISSI.shape, np.inf, np.float32); D[rr, cc] = np.minimum(dp, np.maximum(de - SF / 2, 0.0)); return D
 
 
+def bordo_barriere(s, S, parti, CARR):
+    """phase 2 (31/10, viale Francia: "ancora un disastro"): a street beside the tracks, at another level than the rail bed, with the railway fence on its edge. The step was closed inside
+    the cells the fence crosses, with the street on some corners and the rail bed on the others (a staircase, along a diagonal edge), so the ground met the wall in teeth and the asphalt
+    climbed or dropped for the last metres. Now the corners of those cells and the nodes between the fence and the street take the height of the street, up or down, whatever they
+    were (the protected rail bed too): the street is flat to the fence, the step falls past it, behind its wall. Not on a track, a bed, a culvert, a deck, a drawn ramp, a building, not over LIM_DENTE"""
+    import superficie as sf
+    R = s.R; sh = S.shape; B = getattr(s, 'B', None); M = np.zeros(sh, bool); rep = dict(metri_di_recinzione=0, nodi=0, mossi_m={})
+    if B is None: return S, M, rep
+    dec = lambda a: np.cumsum(np.asarray(a, float).reshape(-1, 2), axis=0) / 10
+    lin, rail = [], []
+    for T in B['tiles']:
+        for f in T.get('fe', []): lin.append(dec(f['p']))
+        for b in T.get('ba', []):
+            if b.get('t') == 6: lin.append(dec(b['p']))
+        for r in T.get('rl', []):
+            if not r.get('h'): rail.append(shapely.linestrings(dec(r['p'])))
+    if not lin: return S, M, rep
+    BIN = _mask_geoms(R, rail, BORDO_BIN) if rail else np.zeros(sh, bool)
+    NO = BIN | s.CASE_LISC_ | ndimage.binary_dilation(parti['ponti'] | parti['bed'] | parti['ram'], iterations=1)
+    NUCLEO = ndimage.binary_erosion(CARR, np.ones((3, 3), bool), border_value=1)   # the carriageway less its edge nodes: the edge came down with the step too
+    dr, (ri, ci) = ndimage.distance_transform_edt(~NUCLEO, sampling=SF, return_indices=True)
+    dfer = ndimage.distance_transform_edt(~parti['fer'], sampling=SF); Ts, Tn = np.zeros(sh), np.zeros(sh, np.int32)
+    ij = lambda x, z: (int(round((z - R.z0) / SF)), int(round((x - R.x0) / SF)))
+    dent = lambda r, c: 0 <= r < sh[0] and 0 <= c < sh[1]
+    for L in lin:
+        n = len(L)
+        if n < 2: continue
+        d = np.hypot(*(L[1:] - L[:-1]).T); tot = float(d.sum())
+        if tot < 2: continue
+        g = shapely.linestrings(L); u = np.arange(0.25, tot, 0.5); P = shapely.get_coordinates(shapely.line_interpolate_point(g, u)); Q = shapely.get_coordinates(shapely.line_interpolate_point(g, np.minimum(u + 0.5, tot)))
+        t = Q - P; t /= np.maximum(np.hypot(*t.T), 1e-9)[:, None]; N = np.column_stack((t[:, 1], -t[:, 0])); m_ = 0.0
+        for (x, z), (nx, nz) in zip(P, N):
+            for sg in (1, -1):
+                r, c = ij(x + sg * nx * BORDO_LARGO, z + sg * nz * BORDO_LARGO)
+                if not dent(r, c) or dr[r, c] > 2 * SF: continue          # the street on this side
+                r2, c2 = ij(x - sg * nx * 2.5, z - sg * nz * 2.5)
+                if not dent(r2, c2) or dfer[r2, c2] > 6.0 or dr[r2, c2] <= 2 * SF: continue   # the rail bed on the other one (a strip of grass may lie before it)
+                h = float(S[ri[r, c], ci[r, c]]); step = h - float(S[r2, c2])
+                if abs(step) < BORDO_MIN or abs(step) > LIM_DENTE: continue
+                m_ += 0.5
+                c0, r0 = int(np.floor((x - R.x0) / SF)), int(np.floor((z - R.z0) / SF))
+                for a in (0, 1):
+                    for b in (0, 1):
+                        if dent(r0 + a, c0 + b): Ts[r0 + a, c0 + b] += h; Tn[r0 + a, c0 + b] += 1
+                for dd in (1.0, 2.0, 3.0):
+                    r3, c3 = ij(x + sg * nx * dd, z + sg * nz * dd)
+                    if dent(r3, c3): Ts[r3, c3] += h; Tn[r3, c3] += 1
+                break
+        rep['metri_di_recinzione'] += m_
+    T = Ts / np.maximum(Tn, 1); k = (Tn > 0) & (np.abs(T - S) > MOSSO_MIN) & ~NO & ~NUCLEO
+    Sn = S.copy(); Sn[k] = T[k]; M[k] = True
+    rep['metri_di_recinzione'] = round(rep['metri_di_recinzione']); rep['nodi'] = int(k.sum()); rep['mossi_m'] = dict(zip(('p50', 'p90', 'su', 'giu'), [round(float(v), 2) for v in (np.percentile(np.abs(Sn - S)[k], 50), np.percentile(np.abs(Sn - S)[k], 90), (Sn - S)[k].max(), (Sn - S)[k].min())])) if k.any() else {}
+    return Sn, M, rep
+
+
 def lisciatore(s, log=print):
     import superficie as sf
     t0 = time.time(); R = s.R; S0 = s.S.copy(); L0 = s.L; FIX = s.RANK > 0
@@ -274,6 +333,7 @@ def lisciatore(s, log=print):
     rep['buche']['secondo_giro_nodi'] = int(F2.sum())
     # the mortar: the small pits, all over the map
     S, POZ, fatti, eccez = malta(s, S, parti, CARR); s.LISC_POZZ = POZ; FILLB = FILLB | POZ; s.lisc_poz = (fatti, eccez)
+    s.CASE_LISC_ = CASE; S, BAR, rep['bordo_barriere'] = bordo_barriere(s, S, parti, CARR); s.LISC_BARR = BAR; FILLB = FILLB | BAR; log('lisciatore: bordo delle recinzioni sulle strade: %s' % rep['bordo_barriere'])
     s.S0_lisc = S0; s.S = S; s.L_lisc = Lb; s.LISC_BUCHE = FILLB; s.LISC_PROT = PROT; s.LISC_PARTI = parti; s.CASE_LISC = CASE
     rep['pozzetti'] = dict(profondita_minima_m=POZ_PROF, massimo_m2=POZ_NODI * SF * SF, riempiti=len(s.lisc_poz[0]), nodi=int(s.LISC_POZZ.sum()), alzati_m=sf.pct((S - Sb)[s.LISC_POZZ], (50, 90, 99)))
     mv = np.abs(S - S0) > 0.005
@@ -359,7 +419,7 @@ def controlli(s, G, out_file=None, log=print):
         dente_km=dict(definizione='S a 0,3 m dentro e fuori da ogni anello AC_VEI, AC_PED, AC_CIC, AR_STR, ogni 0,5 m: km fuori dalla media dei suoi 4 m oltre la soglia; nodi protetti esclusi', prima=p0, dopo=p1, totale_prima=t0_, totale_dopo=t1, soglia_15cm_km=DENTE_15_MAX_KM),
         buche_vicino_alle_strade=dict(definizione='depressioni chiuse di S oltre %.1f m, almeno %.0f m2, entro %.0f m da una strada, nodi protetti esclusi' % (B_PROF, B_AREA_MIN, B_STRADA), prima=sint(b0), dopo=sint(b1), rimaste=b1[:60]),
         spostamento=dict(dente_m=sf.pct(np.abs(dG)[mv & ~B], (50, 90, 99, 99.9)), dente_su_m=round(float(dG[~B].max()), 3), dente_giu_m=round(float(dG[~B].min()), 3), buche_m=sf.pct(np.abs(dG)[mv & B], (50, 90, 99)), nodi_mossi=int(mv.sum()), nodi_griglia=int(G.size), limite_dente_m=LIM_DENTE),
-        invariati=dict(nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti=int((np.abs(dG)[PROT & ~s.LISC_POZZ] >= 0.015).sum()), nodi_nella_fascia_protetta_cambiati_nei_pozzetti=int((np.abs(dG)[PROT & s.LISC_POZZ] >= 0.015).sum()), carreggiate_cambiate=int((np.abs(dG)[CARR & ~s.LISC_POZZ] >= 0.015).sum()), carreggiate_nei_pozzetti_riempiti=int((np.abs(dG)[CARR & s.LISC_POZZ] >= 0.015).sum()), impalcati_e_sotto=int((np.abs(dG)[parti['ponti']] >= 0.015).sum()), acqua_e_alvei=int((np.abs(dG)[parti['bed']] >= 0.015).sum()), ferrovia=int((np.abs(dG)[parti['fer']] >= 0.015).sum()), rampe=int((np.abs(dG)[parti['ram']] >= 0.015).sum())),
+        invariati=dict(nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti=int((np.abs(dG)[PROT & ~s.LISC_POZZ & ~s.LISC_BARR] >= 0.015).sum()), nodi_nella_fascia_protetta_cambiati_nei_pozzetti=int((np.abs(dG)[PROT & s.LISC_POZZ] >= 0.015).sum()), carreggiate_cambiate=int((np.abs(dG)[CARR & ~s.LISC_POZZ & ~s.LISC_BARR] >= 0.015).sum()), bordo_carreggiate_alle_recinzioni=int((np.abs(dG)[CARR & s.LISC_BARR] >= 0.015).sum()), carreggiate_nei_pozzetti_riempiti=int((np.abs(dG)[CARR & s.LISC_POZZ] >= 0.015).sum()), impalcati_e_sotto=int((np.abs(dG)[parti['ponti']] >= 0.015).sum()), acqua_e_alvei=int((np.abs(dG)[parti['bed']] >= 0.015).sum()), ferrovia=int((np.abs(dG)[parti['fer'] & ~s.LISC_BARR] >= 0.015).sum()), ferrovia_sotto_le_recinzioni_sulle_strade=int((np.abs(dG)[parti['fer'] & s.LISC_BARR] >= 0.015).sum()), rampe=int((np.abs(dG)[parti['ram']] >= 0.015).sum())),
         gradini_cresciuti=dict(definizione='coppie di nodi vicini (anche in diagonale), fuori dagli edifici e dalle buche riempite, con il salto cresciuto oltre la soglia', **{'oltre_%.1fm' % k: v for k, v in gr_.items()}, peggiori=sorted(g_lista, key=lambda q: -q['cresce'])[:30]),
         luoghi_oltre_30cm=[dict(x=round(float(q[0]), 1), z=round(float(q[1]), 1), scarto=round(float(q[2]), 2)) for q in luoghi[np.argsort(-luoghi[:, 2])][::max(1, len(luoghi) // 40)]][:40])
     # the small pits, before and after, on what the tiles give; the exceptions with the reason. And the small spikes, only counted
@@ -381,7 +441,7 @@ def controlli(s, G, out_file=None, log=print):
     punte = sorted([dict(x=round(float(R.x0 + cc[np.argmax(G[rr, cc])] * SF), 1), z=round(float(R.z0 + rr[np.argmax(G[rr, cc])] * SF), 1), m2=int(len(rr) * SF * SF), alta=round(float(p_), 2)) for rr, cc, p_, _ in pozzi(-G) if IN[rr, cc].all()], key=lambda e: -e['alta'])
     punte_fuori = [e for e in punte if not any(M[int(round((e['z'] - R.z0) / SF)), int(round((e['x'] - R.x0) / SF))] for _, M in mot) and not marg[int(round((e['z'] - R.z0) / SF)), int(round((e['x'] - R.x0) / SF))]]
     POZm = s.LISC_POZZ
-    cambiati_oggetti = sum(int((np.abs(dG)[M & ~POZm] >= 0.015).sum()) for _, M in mot)
+    cambiati_oggetti = sum(int((np.abs(dG)[M & ~POZm & ~s.LISC_BARR] >= 0.015).sum()) for _, M in mot)
     rep['controlli_pozzetti'] = dict(definizione='depressioni chiuse di S (piena dal minimo fino al punto di sfioro) profonde almeno %.1f m con al massimo %d nodi (%.0f m2), su tutta la mappa' % (POZ_PROF, POZ_NODI, POZ_NODI * SF * SF),
                                      prima=dict(totale=n0, senza_motivo=sum(e['motivo'] is None for e in l0), oltre_1m=sum(e['prof'] >= 1 for e in l0), oltre_2m=sum(e['prof'] >= 2 for e in l0)), dopo=dict(totale=n1, senza_motivo=len(fuori), oltre_1m=sum(e['prof'] >= 1 for e in l1), oltre_2m=sum(e['prof'] >= 2 for e in l1)),
                                      eccezioni_per_motivo=per_mot, eccezioni=ecc1[:300], senza_motivo=fuori[:60], riempiti_i_piu_profondi=sorted(s.lisc_poz[0], key=lambda e: -e['prof'])[:30],

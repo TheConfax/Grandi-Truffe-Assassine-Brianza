@@ -1804,6 +1804,16 @@
 ],
 "secondo_giro_nodi": 147
 },
+"bordo_barriere": {
+"metri_di_recinzione": 1945,
+"nodi": 389,
+"mossi_m": {
+"p50": 0.16,
+"p90": 0.47,
+"su": 1.49,
+"giu": -0.65
+}
+},
 "pozzetti": {
 "profondita_minima_m": 0.4,
 "massimo_m2": 12.0,
@@ -1818,9 +1828,9 @@
 }
 },
 "dente": {
-"nodi_mossi": 226519,
+"nodi_mossi": 226517,
 "spostamento_m": {
-"n": 226519,
+"n": 226517,
 "p50": 0.085,
 "p90": 0.275,
 "p99": 0.659,
@@ -2277,7 +2287,7 @@
 },
 "spostamento": {
 "dente_m": {
-"n": 223510,
+"n": 223508,
 "p50": 0.09,
 "p90": 0.28,
 "p99": 0.95,
@@ -2286,13 +2296,13 @@
 "dente_su_m": 1.13,
 "dente_giu_m": -1.5,
 "buche_m": {
-"n": 35590,
-"p50": 0.7,
-"p90": 1.82,
-"p99": 2.97,
+"n": 35978,
+"p50": 0.69,
+"p90": 1.81,
+"p99": 2.96,
 "max": 5.85
 },
-"nodi_mossi": 259100,
+"nodi_mossi": 259486,
 "nodi_griglia": 4004001,
 "limite_dente_m": 1.5
 },
@@ -2300,15 +2310,17 @@
 "nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 0,
 "nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 8,
 "carreggiate_cambiate": 0,
+"bordo_carreggiate_alle_recinzioni": 119,
 "carreggiate_nei_pozzetti_riempiti": 72,
 "impalcati_e_sotto": 0,
 "acqua_e_alvei": 0,
 "ferrovia": 0,
+"ferrovia_sotto_le_recinzioni_sulle_strade": 15,
 "rampe": 0
 },
 "gradini_cresciuti": {
 "definizione": "coppie di nodi vicini (anche in diagonale), fuori dagli edifici e dalle buche riempite, con il salto cresciuto oltre la soglia",
-"oltre_0.3m": 7521,
+"oltre_0.3m": 7520,
 "oltre_0.5m": 1061,
 "oltre_1.0m": 17,
 "peggiori": [

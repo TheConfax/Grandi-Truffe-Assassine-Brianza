@@ -13,28 +13,109 @@ const BAR_KEYS = ['wl', 'ft', 'hd', 'wlP0', 'wlP1', 'bars', 'mesh', 'rly', 'wood
 const BAR_CAST = { wl: 'cast', hd: 'cast', wlP0: 'cast', wlP1: 'cast', wood: 'cast' };
 const barMats = () => ({ wl: MAT.wall, ft: MAT.railing, hd: MAT.hedge, wlP0: MAT.wallPlaster, wlP1: MAT.wallOchre, bars: MAT.bars, mesh: MAT.mesh, rly: MAT.railPanel, wood: MAT.wood });
 const BARG = new Grid(8), BAR_FLY = [], BAR_DOWN = [];
-// the foot of a barrier (28/10, viale Francia): on a bank the 2 m cells of S put the line half way down the slope, and a fence that followed the
-// ground there went up and down like a saw (along the canals, between a street and the ballast). Where within 1.5 m the ground is more than
-// 0.4 m higher and flat beyond (the top of the bank: a street, the ballast, a yard), the barrier stands on that top; p.lo is the lowest ground
-// within 0.7 m, down to which its wall (or a plinth, for the nets) goes, so it never floats. Kept on the point (the same for every piece)
-function barFoot(p) {
+// the foot of a barrier (lisciatore, phase 2, 31/10; it was decided vertex by vertex, 28/10, and the 2 m cells made it come and go: fences up and down
+// like a saw along the tracks, a net rising alone for 3 m by a football pitch, Carlo). Now it is decided per stretch, on whole chains of lines (the
+// pieces the tiles and the junctions cut one line into, joined again), and it reads the same for the drawing, the pieces a car breaks and the collisions:
+// - a barrier goes up on the top of a bank only along a true bank: for at least BAR_L.TRATTO m (BAR_L.COPERTURA of them read, holes up to BAR_L.BUCO m)
+//   the ground crosses the line by at least BAR_L.ARGINE m and is flat on the high side. A step of the ground under that, or a short one, does not count;
+// - along the line its foot is a smooth line inside a tube round the ground (or round the top): at most BAR_L.SU over and BAR_L.GIU under it. Over the ground
+//   the wall goes on down (p.lo, the ground under the segment) and a net and its posts too. Along a true bank (p.pl) a net stands on a retaining wall, for the whole stretch.
+const BAR_L = { ARGINE: 0.7, TRATTO: 40, COPERTURA: 0.7, BUCO: 8, PIANO: 0.25, SU: 0.45, GIU: 0.15, RAMPA: 0.25, PASSO: 1, R: 3 };
+const BAR_TRATTI = window.__BAR_T = [];
+function barFoot(p) { // a point outside the lines (the hedges cut by a car bring their own)
   if (p.fy !== undefined) return p.fy;
-  const x = p[0], z = p[1], g0 = H.ground(x, z); let top = g0, lo = g0;
-  for (let i = 0; i < 8; i++) {
-    const c = Math.cos(i * Math.PI / 4), s = Math.sin(i * Math.PI / 4), g1 = H.ground(x + c * 1.5, z + s * 1.5); lo = Math.min(lo, H.ground(x + c * 0.7, z + s * 0.7));
-    if (g1 - g0 > 0.4 && g1 > top && Math.abs(H.ground(x + c * 2.5, z + s * 2.5) - g1) < 0.25) top = g1;
-  }
-  p.g0 = g0; p.fy = top; p.lo = lo; return top;
+  const g = H.ground(p[0], p[1]); p.g0 = g; p.fy = g; p.lo = g; return g;
 }
-// the feet of a whole line: a point raised on a top more than 0.3 m over its neighbours is a corner of a cell, not a bank (it goes back to the
-// ground, or to the higher neighbour); then one point lower than both its neighbours by more than 0.3 m is a notch of the cells (it takes the lower neighbour)
-function barFeet(pts) {
-  const n = pts.length; for (const p of pts) barFoot(p);
-  const nb = k => Math.max(k > 0 ? pts[k - 1].fy : -1e9, k < n - 1 ? pts[k + 1].fy : -1e9);
-  const up = []; for (let k = 0; k < n; k++) { const m = nb(k); up.push(n > 1 && pts[k].fy > pts[k].g0 && pts[k].fy > m + 0.3 ? Math.max(pts[k].g0, m) : null); }
-  up.forEach((v, k) => { if (v !== null) pts[k].fy = v; });
-  for (let k = 1; k < n - 1; k++) { const m = Math.min(pts[k - 1].fy, pts[k + 1].fy); if (pts[k].fy < m - 0.3) pts[k].fy = m; }
-  return pts;
+// the lines of the map into chains: ends within 20 cm meet; at a meeting two lines go on into each other if they run straight (the most straight pair at a junction)
+function barChains(lines) {
+  const key = p => Math.round(p[0] * 5) + '_' + Math.round(p[1] * 5), nodes = new Map(), link = lines.map(() => [null, null]);
+  const dir = (l, e) => { const n = l.length, at = i => l[e ? n - 1 - i : i]; let i = 1; while (i < n - 1 && hyp(at(i)[0] - at(0)[0], at(i)[1] - at(0)[1]) < 1.5) i++; const L = hyp(at(i)[0] - at(0)[0], at(i)[1] - at(0)[1]) || 1; return [(at(i)[0] - at(0)[0]) / L, (at(i)[1] - at(0)[1]) / L]; };
+  lines.forEach((l, i) => { for (const e of [0, 1]) { const k = key(e ? l[l.length - 1] : l[0]); let n = nodes.get(k); if (!n) nodes.set(k, n = []); n.push([i, e]); } });
+  for (const n of nodes.values()) {
+    if (n.length < 2) continue; const D = n.map(([i, e]) => dir(lines[i], e)), used = n.map(() => false), need = n.length > 2 ? 0.8 : 0.5;
+    for (;;) {
+      let best = need, a = -1, b = -1;
+      for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) if (!used[i] && !used[j] && n[i][0] !== n[j][0]) { const c = -(D[i][0] * D[j][0] + D[i][1] * D[j][1]); if (c > best) { best = c; a = i; b = j; } }
+      if (a < 0) break; used[a] = used[b] = true; link[n[a][0]][n[a][1]] = n[b]; link[n[b][0]][n[b][1]] = n[a];
+    }
+  }
+  const seen = lines.map(() => false), out = [];
+  const walk = (i0, e0) => { const c = []; let i = i0, e = e0; while (!seen[i]) { seen[i] = true; c.push(e ? lines[i].slice().reverse() : lines[i]); const nx = link[i][1 - e]; if (!nx) break; i = nx[0]; e = nx[1]; } return c; };
+  lines.forEach((l, i) => { if (!seen[i] && (!link[i][0] || !link[i][1])) out.push(walk(i, link[i][0] ? 1 : 0)); });
+  lines.forEach((l, i) => { if (!seen[i]) out.push(walk(i, 0)); }); // rings of lines
+  return { chains: out, key };
+}
+// a box mean along the chain, the window narrower at the ends so that they stay where they are
+function barBox(y, r) { const n = y.length, P = new Float64Array(n + 1), o = new Float64Array(n); for (let i = 0; i < n; i++) P[i + 1] = P[i] + y[i]; for (let i = 0; i < n; i++) { const w = Math.min(r, i, n - 1 - i); o[i] = (P[i + w + 1] - P[i - w]) / (2 * w + 1); } return o; }
+// the stretches of one side of the chain along a true bank: [a, b, T] with T the height of the top at every grid point of the stretch
+function barBank(ok, top, m, ds, st) {
+  const out = [], gap = Math.round(BAR_L.BUCO / ds), min = Math.round(BAR_L.TRATTO / ds); let i = 0;
+  while (i <= m) {
+    if (!ok[i]) { i += st; continue; }
+    const a = i; let b = i, cnt = 1, j = i + st; while (j <= m && j - b <= gap + st) { if (ok[j]) { b = j; cnt++; } j += st; }
+    if (b - a >= min && cnt * st / (b - a + st) >= BAR_L.COPERTURA) {
+      const T = new Float64Array(b - a + 1); let last = a;
+      for (let k = a + st; k <= b; k += st) if (ok[k]) { for (let q = last; q <= k; q++) T[q - a] = top[last] + (top[k] - top[last]) * (q - last) / (k - last); last = k; }
+      out.push([a, b, barBox(T, Math.round(BAR_L.R / ds))]);
+    }
+    i = b + st;
+  }
+  return out;
+}
+function barChainFoot(parts, pins, key) {
+  const V = []; let s = 0, px = null, pz = null;
+  for (const l of parts) for (const p of l) { if (px !== null) s += hyp(p[0] - px, p[1] - pz); px = p[0]; pz = p[1]; V.push({ p, s }); }
+  const Ln = s, k0 = key(V[0].p), k1 = key(V[V.length - 1].p);
+  if (Ln < 0.05) { for (const v of V) barFoot(v.p); return; }
+  const m = Math.max(1, Math.ceil(Ln / BAR_L.PASSO)), ds = Ln / m, g = new Float64Array(m + 1), X = new Float64Array(m + 1), Z = new Float64Array(m + 1);
+  for (let i = 0, j = 0; i <= m; i++) { const u = i * ds; while (j < V.length - 2 && V[j + 1].s < u) j++; const a = V[j], c = V[j + 1], d = c.s - a.s, t = d > 1e-6 ? Math.min(1, (u - a.s) / d) : 0; X[i] = a.p[0] + (c.p[0] - a.p[0]) * t; Z[i] = a.p[1] + (c.p[1] - a.p[1]) * t; g[i] = H.ground(X[i], Z[i]); }
+  const Lb = new Float64Array(m + 1), Ub = new Float64Array(m + 1); for (let i = 0; i <= m; i++) { Lb[i] = g[i] - BAR_L.GIU; Ub[i] = g[i] + BAR_L.SU; }
+  const zk = new Uint8Array(m + 1); // on a true bank, or going up to it
+  // the true banks, on the two sides, read every 2 m
+  if (Ln >= BAR_L.TRATTO) {
+    const st = Math.round(2 / ds) || 1, oks = [new Uint8Array(m + 1), new Uint8Array(m + 1)], tops = [new Float64Array(m + 1), new Float64Array(m + 1)];
+    for (let i = 0; i <= m; i += st) {
+      const i0 = Math.max(0, i - st), i1 = Math.min(m, i + st), dx = X[i1] - X[i0], dz = Z[i1] - Z[i0], L = hyp(dx, dz) || 1, nx = dz / L, nz = -dx / L, G = d => H.ground(X[i] + nx * d, Z[i] + nz * d);
+      const p1 = G(1), p15 = G(1.5), p25 = G(2.5), p35 = G(3.5), n1 = G(-1), n15 = G(-1.5), n25 = G(-2.5), n35 = G(-3.5);
+      for (const [q, h15, h25, h35, l1, l25] of [[0, p15, p25, p35, n1, n25], [1, n15, n25, n35, p1, p25]]) {
+        const T = (h25 + h35) / 2, B = T - Math.min(g[i], l1, l25);
+        tops[q][i] = T; if (Math.abs(h35 - h25) < BAR_L.PIANO && B >= BAR_L.ARGINE && h15 - l1 >= 0.5 * B) oks[q][i] = 1;
+      }
+    }
+    const rs = [...barBank(oks[0], tops[0], m, ds, st), ...barBank(oks[1], tops[1], m, ds, st)].sort((a, b) => (b[1] - b[0]) - (a[1] - a[0])), taken = new Uint8Array(m + 1);
+    for (const [a, b, T] of rs) {
+      let free = true; for (let i = a; i <= b; i++) if (taken[i]) { free = false; break; } if (!free) continue; taken.fill(1, a, b + 1); zk.fill(1, a, b + 1);
+      let sum = 0; for (let i = a; i <= b; i++) { const t = Math.max(T[i - a], g[i]); Lb[i] = t - BAR_L.GIU; Ub[i] = t + BAR_L.GIU; sum += t - g[i]; }
+      // from the ends of the stretch back down to the ground, on a slope; the wall stays under it
+      for (const [e, sg] of [[a, -1], [b, 1]]) { const t = Math.max(T[e - a], g[e]); for (let i = e + sg, d = ds; i >= 0 && i <= m && !taken[i]; i += sg, d += ds) { const v = t - BAR_L.RAMPA * d; if (v <= g[i]) break; zk[i] = 1; Lb[i] = Math.max(Lb[i], v - BAR_L.GIU); Ub[i] = Math.max(Ub[i], v + BAR_L.GIU); } }
+      BAR_TRATTI.push({ x: Math.round(X[(a + b) >> 1] * 10) / 10, z: Math.round(Z[(a + b) >> 1] * 10) / 10, L: Math.round((b - a) * ds), su: Math.round(sum / (b - a + 1) * 100) / 100 });
+    }
+  }
+  // what the ends meet: the foot of the chain done before (the longer ones first) at the same point
+  const closed = k0 === k1, pinA = pins.has(k0) ? pins.get(k0) : (closed ? g[0] : null), pinB = closed ? pinA : (pins.has(k1) ? pins.get(k1) : null);
+  for (const [e, sg, pin] of [[0, 1, pinA], [m, -1, pinB]]) if (pin !== null) for (let i = e, d = 0; i >= 0 && i <= m; i += sg, d += ds) { const lo = pin - 0.4 * d, up = pin + 0.4 * d; if (lo <= Lb[i] && up >= Ub[i] && d > 0) break; Lb[i] = Math.min(Lb[i], lo); Ub[i] = Math.max(Ub[i], up); }
+  // the smooth line in the tube
+  let y = new Float64Array(m + 1); for (let i = 0; i <= m; i++) y[i] = Math.max(Lb[i], Math.min(Ub[i], g[i])); if (pinA !== null) y[0] = pinA; if (pinB !== null) y[m] = pinB;
+  const R = Math.max(1, Math.round(BAR_L.R / ds));
+  for (let it = 0; it < 6; it++) { const b = barBox(y, R); for (let i = 1; i < m; i++) y[i] = Math.max(Lb[i], Math.min(Ub[i], b[i])); }
+  y = barBox(y, Math.max(1, Math.round(1 / ds))); for (let i = 1; i < m; i++) if (y[i] < Lb[i] - 0.05) y[i] = Lb[i] - 0.05; if (pinA !== null) y[0] = pinA; if (pinB !== null) y[m] = pinB;
+  pins.set(k0, y[0]); pins.set(k1, y[m]);
+  // the retaining wall goes on until the foot has come back to the ground: it never ends in a step
+  for (let i = 1; i <= m; i++) if (zk[i - 1] && !zk[i] && y[i] - g[i] > 0.08) zk[i] = 1;
+  for (let i = m - 1; i >= 0; i--) if (zk[i + 1] && !zk[i] && y[i] - g[i] > 0.08) zk[i] = 1;
+  // to the vertices: the height of the line, the lowest ground of the segments round them (the wall goes down to it), the plinth
+  for (let j = 0; j < V.length; j++) {
+    const v = V[j], p = v.p, u = v.s / ds, i0 = Math.min(m - 1, Math.floor(u)), t = u - i0, s0 = j ? V[j - 1].s : v.s, s1 = j < V.length - 1 ? V[j + 1].s : v.s;
+    p.fy = y[i0] + (y[i0 + 1] - y[i0]) * t; p.g0 = H.ground(p[0], p[1]); let lo = Math.min(p.g0, p.fy);
+    for (let i = Math.max(0, Math.floor(s0 / ds)); i <= Math.min(m, Math.ceil(s1 / ds)); i++) if (g[i] < lo) lo = g[i];
+    p.lo = lo; p.pl = !!zk[Math.round(u)];
+  }
+}
+// all the barriers of the map, once, before the tiles keep them
+function barFeetAll(lines) {
+  const { chains, key } = barChains(lines), pins = new Map(), L = c => { let n = 0; for (const l of c) n += l.length; return n; };
+  chains.sort((a, b) => L(b) - L(a));
+  for (const c of chains) barChainFoot(c, pins, key);
 }
 const barLo = p => (barFoot(p), Math.min(p.lo, p.fy));
 const barBufs = () => { const B = { posts: [] }; for (const k of BAR_KEYS) B[k] = Buf(); return B; };
@@ -67,19 +148,19 @@ function barLook(br) {
 // one segment a→c of a barrier into the buffers B (acc: the length drawn before it, for the texture). cap: 1 its end at a closed, 2 at c (the
 // two ends of a barrier and the sides of a hole: a thick slab open at its end showed its empty inside, Carlo 26/10)
 function barDraw(B, br, lk, a, c, acc, cap = 0) {
-  const L = hyp(c[0] - a[0], c[1] - a[1]), ga = barFoot(a), gc = barFoot(c), la = barLo(a), lc = barLo(c), plinth = ga - la > 0.25 || gc - lc > 0.25, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux;
+  const L = hyp(c[0] - a[0], c[1] - a[1]), ga = barFoot(a), gc = barFoot(c), la = barLo(a), lc = barLo(c), plinth = a.pl || c.pl, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, nx = uz, nz = -ux;
   const slab = (b, th, y0a, y0c, y1a, y1c, cp = cap) => { // thin vertical slab, both faces + cap
     for (const sd of [1, -1]) { const b0 = b.p.length / 3, ox = nx * th * sd, oz = nz * th * sd; vtx(b, a[0] + ox, y0a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 0); vtx(b, c[0] + ox, y0c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 0); vtx(b, c[0] + ox, y1c, c[1] + oz, nx * sd, 0, nz * sd, (acc + L) / 2, 1); vtx(b, a[0] + ox, y1a, a[1] + oz, nx * sd, 0, nz * sd, acc / 2, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3, b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); }
     const b0 = b.p.length / 3; vtx(b, a[0] + nx * th, y1a, a[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] + nx * th, y1c, c[1] + nz * th, 0, 1, 0, 0, 1); vtx(b, c[0] - nx * th, y1c, c[1] - nz * th, 0, 1, 0, 0, 1); vtx(b, a[0] - nx * th, y1a, a[1] - nz * th, 0, 1, 0, 0, 1); triUp(b, b0, b0 + 1, b0 + 2); triUp(b, b0, b0 + 2, b0 + 3);
     for (const [e, p, y0, y1, sg] of [[1, a, y0a, y1a, -1], [2, c, y0c, y1c, 1]]) if (cp & e) { const q = b.p.length / 3, ex = ux * sg, ez = uz * sg; vtx(b, p[0] + nx * th, y0, p[1] + nz * th, ex, 0, ez, 0, 0); vtx(b, p[0] - nx * th, y0, p[1] - nz * th, ex, 0, ez, th, 0); vtx(b, p[0] - nx * th, y1, p[1] - nz * th, ex, 0, ez, th, 1); vtx(b, p[0] + nx * th, y1, p[1] + nz * th, ex, 0, ez, 0, 1); b.i.push(q, q + 1, q + 2, q, q + 2, q + 3, q, q + 2, q + 1, q, q + 3, q + 2); } // both windings: whichever way round the ring goes
   };
-  const panel = (b, y0, y1, rep) => { const b0 = b.p.length / 3; vtx(b, a[0], ga + y0, a[1], nx, 0, nz, acc / rep, 0); vtx(b, c[0], gc + y0, c[1], nx, 0, nz, (acc + L) / rep, 0); vtx(b, c[0], gc + y1, c[1], nx, 0, nz, (acc + L) / rep, 1); vtx(b, a[0], ga + y1, a[1], nx, 0, nz, acc / rep, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
+  const panel = (b, y0, y1, rep, ba = ga + y0, bc = gc + y0) => { const b0 = b.p.length / 3; vtx(b, a[0], ba, a[1], nx, 0, nz, acc / rep, 0); vtx(b, c[0], bc, c[1], nx, 0, nz, (acc + L) / rep, 0); vtx(b, c[0], gc + y1, c[1], nx, 0, nz, (acc + L) / rep, 1); vtx(b, a[0], ga + y1, a[1], nx, 0, nz, acc / rep, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
   const postsEvery = (step, y0) => { for (let s0 = 0; s0 < L; s0 += step) B.posts.push([a[0] + ux * s0, a[1] + uz * s0, ga + (gc - ga) * s0 / L + y0, br.h - y0]); };
   if (br.t === 1 || br.t === 4) slab(B.wl, 0.14, la - 0.3, lc - 0.3, ga + br.h, gc + br.h);
   else if (br.t === 3) slab(B.hd, 0.45, la - 0.2, lc - 0.2, ga + br.h, gc + br.h);
-  else if (br.t === 5) { if (plinth) slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); panel(B.mesh, 0, br.h, 2.6); postsEvery(2.5, 0); } // wire mesh on posts, from the ground
+  else if (br.t === 5) { if (plinth) { slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); panel(B.mesh, 0, br.h, 2.6); postsEvery(2.5, 0); } else { panel(B.mesh, 0, br.h, 2.6, Math.min(ga, la - 0.1), Math.min(gc, lc - 0.1)); postsEvery(2.5, -0.5); } } // wire mesh on posts, from the ground
   else if (br.t === 6) { slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga + 0.3, gc + 0.3, 3); panel(B.rly, 0.3, br.h, 2.6); postsEvery(2.5, 0.3); } // by the railway: a concrete kerb, tall panels
-  else if (br.t === 7) { if (plinth) slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); for (const y of [0.45, 0.95]) slab(B.wood, 0.04, ga + y, gc + y, ga + y + 0.12, gc + y + 0.12); for (let s0 = 0; s0 < L; s0 += 2.5) { const x = a[0] + ux * s0, z = a[1] + uz * s0, gy = ga + (gc - ga) * s0 / L; addBox(B.wood, x, gy + 0.6, z, 0.12, 1.2, 0.12, null); } } // post and rail
+  else if (br.t === 7) { if (plinth) slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); for (const y of [0.45, 0.95]) slab(B.wood, 0.04, ga + y, gc + y, ga + y + 0.12, gc + y + 0.12); for (let s0 = 0; s0 < L; s0 += 2.5) { const x = a[0] + ux * s0, z = a[1] + uz * s0, gy = ga + (gc - ga) * s0 / L; addBox(B.wood, x, gy + 0.35, z, 0.12, 1.7, 0.12, null); } } // post and rail
   else { // muretto + cancellata, the Brianza classic
     const wb = B[lk.wallK], rb = B[lk.railK];
     slab(wb, 0.12, la - 0.3, lc - 0.3, ga + lk.base, gc + lk.base);
@@ -178,7 +259,7 @@ function hedgeRedraw(pc) { // the segment drawn again without its cuts; its coll
   const s = pc.seg, rec = pc.rec, L = hyp(s.bx - s.ax, s.bz - s.az), keep = []; let u = 0;
   for (const [a, b] of pc.cut) { if (a - u > 0.1 / L) keep.push([u, a]); u = b; } if (1 - u > 0.1 / L) keep.push([u, 1]);
   if (pc.rep) { if (pc.rep.parent) pc.rep.parent.remove(pc.rep); pc.rep.geometry.dispose(); pc.rep = null; }
-  const b = Buf(), lk = barLook(rec), A = rec.pts[pc.k0 - 1], C = rec.pts[pc.k0], at = t => [A[0] + (C[0] - A[0]) * t, A[1] + (C[1] - A[1]) * t];
+  const b = Buf(), lk = barLook(rec), A = rec.pts[pc.k0 - 1], C = rec.pts[pc.k0], at = t => { const q = [A[0] + (C[0] - A[0]) * t, A[1] + (C[1] - A[1]) * t]; q.fy = A.fy + (C.fy - A.fy) * t; q.lo = Math.min(A.lo, C.lo); q.g0 = q.fy; return q; };
   keep.forEach(([t0, t1], i) => {
     const a = at(t0), c = at(t1), B = { hd: b, posts: [] }; barDraw(B, rec, lk, a, c, (pc.acc0 || 0) + t0 * L, (t0 > 0 || ((pc.cap | pc.ext) & 1) ? 1 : 0) | (t1 < 1 || ((pc.cap | pc.ext) & 2) ? 2 : 0));
     let q = pc.subs[i]; if (!q) { q = { two: true, nx: s.nx, nz: s.nz, y0: s.y0, y1: s.y1, off: true }; pc.subs.push(q); WALLS.add(s.ax, s.az, s.bx, s.bz, q); }

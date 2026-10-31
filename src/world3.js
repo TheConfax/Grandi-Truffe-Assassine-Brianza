@@ -94,6 +94,8 @@ const inWater = (x, z, gy) => { if (!H.fineAt(x, z)) return false; const w = H.w
 // the streets leave a tree's place free, as in a car park lined with trees (the DBGT trees of the yards, src/dbgt_verde.py)
 const treeNear = (x, z, r) => { let f = false; WALLS.each(x - r, z - r, x + r, z + r, o => { if (o.tree && hyp(o.x - x, o.z - z) < r) f = true; }); return f; };
 const EDIF = new Map(); // DBGT building -> its volumes on the ground (a shop looks for its front on all of them)
+// the barriers of the whole map, before the tiles keep them: their feet are decided on whole chains of lines (barFeetAll, sfondabili3.js)
+{ const all = []; for (const T of TILES) { T.feQ = []; T.baQ = []; for (const f of T.d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) { T.feQ.push(q); all.push(q); } for (const br of T.d.ba || []) for (const q of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) { T.baQ.push([br, q]); all.push(q); } } barFeetAll(all); }
 for (const T of TILES) {
   const d = T.d;
   for (const B of d.b || []) {
@@ -126,10 +128,10 @@ for (const T of TILES) {
       }
     }
   }
-  for (const f of d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) T.fe.push(barFeet(q)); // fences follow the ground every 3 m (walls and collisions are built later)
+  for (const q of T.feQ) T.fe.push(q); T.feQ = null; // fences follow the ground every 3 m (walls and collisions are built later)
   for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
-  for (const br of d.ba || []) for (const pts of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) {
-    const sp = BAR_PANEL[br.t], rec = { pts: barFeet(pts), t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
+  for (const [br, pts] of T.baQ) {
+    const sp = BAR_PANEL[br.t], rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
     if (sp || br.t === 3) barPieces(T, rec, segs);
   }
