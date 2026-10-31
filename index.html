@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo telecamera-gta · dopo a3939ed · assemblato 31/10 04:59 · porta ' + location.port;
+    const txt = 'locale · ramo telecamera-gta · dopo 9285c92 · assemblato 31/10 05:02 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -6368,7 +6368,7 @@ class Vehicle {
     this.vx = fx * v + rx * lat; this.vz = fz * v + rz * lat; // world velocity kept in old frame → slides when grip is low
     this.x += this.vx * dt; this.z += this.vz * dt;
     this.spin += v * dt / S.wr;
-    if (S.two) { const lk_ = LEAN[this.kind] || LEAN.moto, tg_ = clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85) * lk_, ms_ = 0.85 * lk_ / LEAN.t * dt; this.roll = lerp(this.roll, this.roll + clamp(tg_ - this.roll, -ms_, ms_), 0.5); } /* lean into the bend, rate-limited */
+    if (S.two) { const ln_ = LEAN[this.kind] || LEAN.moto, tg_ = clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85) * ln_.k, ms_ = 0.85 * ln_.k / ln_.t * dt; this.roll = lerp(this.roll, this.roll + clamp(tg_ - this.roll, -ms_, ms_), 0.5); } /* lean into the bend, rate-limited */
     else this.roll = lerp(this.roll, clamp(-yaw * v * 0.004, -0.08, 0.08), 0.1);
     this.pitch = lerp(this.pitch, clamp((thr - i.brk) * -0.025, -0.04, 0.04), 0.1);
   }
@@ -7371,8 +7371,8 @@ function ceilAbove(x, z, y0) { /* lowest underside of a raised volume above y0 a
 /* free-camera tuning (change here): view turn speed rad/s at full stick, tilt speed, pause before easing back (s), easing back rate (1/s), walker turn rate towards the stick (1/s) and its cap (rad/s) */
 /* on foot with the pad (Carlo, 31/10: "troppo dura"): the view follows his heading from 0.3 s after the last touch of the right stick, proportionally to the error and to how fast he runs, with its own angular speed eased in and out; R3 recentres behind him in about 0.25 s. CAMF.* on foot, CAMV.* in vehicles (pace set by the speed: k = CAMV.k * speed) */
 const CAMF = { delay: 0.3, kBase: 3.5, kSpeed: 2.2, minW: 0.6, tau: 0.06, hyst: 2.7, hystOff: 2.0, recT: 0.35, recK: 18, posK: 14 };
-/* two-wheeler look (Carlo, 31/10): the visible lean is a fraction of the physical one and builds up over about LEAN.t seconds from upright to full; the physics (steering, wheelie, stoppie) is untouched. BICI_SPRINT_MAX: top speed of the bike with the cross mashed (m/s, 55 km/h), base stays 10.8 */
-const LEAN = { moto: 0.667, scooter: 0.667, bici: 0.8, t: 0.35 }, BICI_SPRINT_MAX = 15.3;
+/* two-wheeler look (Carlo, 31/10): the visible lean is a fraction of the physical one and builds up over about LEAN.<kind>.t seconds (moto 0.15, scooter 0.2, bici 0.35) from upright to full; the physics (steering, wheelie, stoppie) is untouched. BICI_SPRINT_MAX: top speed of the bike with the cross mashed (m/s, 55 km/h), base stays 10.8 */
+const LEAN = { moto: { k: 0.667, t: 0.15 }, scooter: { k: 0.667, t: 0.2 }, bici: { k: 0.8, t: 0.35 } }, BICI_SPRINT_MAX = 15.3;
 const CAMV = { delay: 0.25, k: 0.12, minW: 0.1, tau: 0.15 };
 const CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 14, PAD_MAXTURN = 14;
 function camSteer(dt, inCar, hb, moving) { /* hb = the heading the camera sits behind by default; camA = where the view points in the world */

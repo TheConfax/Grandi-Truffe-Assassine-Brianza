@@ -384,7 +384,7 @@ rep("    const v = P.car; v.inp.thr = K.up ? 1 : 0; v.inp.brk = K.down ? 1 : 0; 
     "    const v = P.car; v.inp.thr = Math.max(K.up ? 1 : 0, GP.thr); v.inp.brk = Math.max(K.down ? 1 : 0, GP.brk); v.inp.steer = steerIn; v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; if (v.spec.pedal) { const sk_ = GP.sprint / 4.8; v.maxV = v.spec.maxV + (BICI_SPRINT_MAX - v.spec.maxV) * sk_; v.accMul = 1 + 0.6 * sk_; }")
 rep("    const want = K.turbo && K.up && v.health > 0 && P.nitro > 1;", "    const want = (K.turbo || GP.turbo > 0.5) && v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;")
 rep("    if (S.two) this.roll = lerp(this.roll, clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85), 0.14); // lean into the bend",
-    "    if (S.two) { const lk_ = LEAN[this.kind] || LEAN.moto, tg_ = clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85) * lk_, ms_ = 0.85 * lk_ / LEAN.t * dt; this.roll = lerp(this.roll, this.roll + clamp(tg_ - this.roll, -ms_, ms_), 0.5); } /* lean into the bend, rate-limited */")
+    "    if (S.two) { const ln_ = LEAN[this.kind] || LEAN.moto, tg_ = clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85) * ln_.k, ms_ = 0.85 * ln_.k / ln_.t * dt; this.roll = lerp(this.roll, this.roll + clamp(tg_ - this.roll, -ms_, ms_), 0.5); } /* lean into the bend, rate-limited */")
 rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);", "let sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);\n"
     "      /* pad on foot (Carlo, 31/10): the left stick is a direction in the world as the camera sees it; the walker turns towards it with a soft curve and walks the way he faces, never backwards. Half stick = a walk of about 2 m/s, full = the jog of 4.2, cross/A mashed adds up to 4.8 m/s. The keyboard keeps its own way (turn on the spot, up/down) */\n"
     "      if (!(K.up || K.down) && Math.hypot(GP.steer, GP.fwd) > 0.15) {\n"
@@ -631,8 +631,8 @@ rep("let toastT = 0, bannerT = 0,", "let camW = 0, camSgn = 0, camR3 = false, ca
 rep("function updCamera(dt) {", """/* free-camera tuning (change here): view turn speed rad/s at full stick, tilt speed, pause before easing back (s), easing back rate (1/s), walker turn rate towards the stick (1/s) and its cap (rad/s) */
 /* on foot with the pad (Carlo, 31/10: "troppo dura"): the view follows his heading from 0.3 s after the last touch of the right stick, proportionally to the error and to how fast he runs, with its own angular speed eased in and out; R3 recentres behind him in about 0.25 s. CAMF.* on foot, CAMV.* in vehicles (pace set by the speed: k = CAMV.k * speed) */
 const CAMF = { delay: 0.3, kBase: 3.5, kSpeed: 2.2, minW: 0.6, tau: 0.06, hyst: 2.7, hystOff: 2.0, recT: 0.35, recK: 18, posK: 14 };
-/* two-wheeler look (Carlo, 31/10): the visible lean is a fraction of the physical one and builds up over about LEAN.t seconds from upright to full; the physics (steering, wheelie, stoppie) is untouched. BICI_SPRINT_MAX: top speed of the bike with the cross mashed (m/s, 55 km/h), base stays 10.8 */
-const LEAN = { moto: 0.667, scooter: 0.667, bici: 0.8, t: 0.35 }, BICI_SPRINT_MAX = 15.3;
+/* two-wheeler look (Carlo, 31/10): the visible lean is a fraction of the physical one and builds up over about LEAN.<kind>.t seconds (moto 0.15, scooter 0.2, bici 0.35) from upright to full; the physics (steering, wheelie, stoppie) is untouched. BICI_SPRINT_MAX: top speed of the bike with the cross mashed (m/s, 55 km/h), base stays 10.8 */
+const LEAN = { moto: { k: 0.667, t: 0.15 }, scooter: { k: 0.667, t: 0.2 }, bici: { k: 0.8, t: 0.35 } }, BICI_SPRINT_MAX = 15.3;
 const CAMV = { delay: 0.25, k: 0.12, minW: 0.1, tau: 0.15 };
 const CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 14, PAD_MAXTURN = 14;
 function camSteer(dt, inCar, hb, moving) { /* hb = the heading the camera sits behind by default; camA = where the view points in the world */
