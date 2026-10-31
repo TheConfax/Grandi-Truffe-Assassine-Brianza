@@ -125,6 +125,24 @@ const H = (() => {
   // the step layer (docs/motore.md 1.4): polygons standing h over S (1 sidewalk, 2 platform, 3 median), indexed on a 10 m grid. Until the
   // build writes tiles[t].st (phases 7-8) world3.js fills it from the sidewalks, platforms and medians the tiles draw (H.addStep). It counts
   // only in the tiles of S: elsewhere the old engine adds onSide/onPlatform
+  // the height of the tracks (src/binari.py, terreno/indice.json binari): a profile of their own, smooth, which the game draws rails, sleepers and ballast on. On the strip of the
+  // ballast (RAIL_W from an axis) it is the ground too, for what walks and drives and for what stands there (H.ground, H.surface): S under it may lie lower where a cell also has
+  // a corner on a street at another level. RAIL_BLEND: the same blend of the near axes as binari.py and superficie.py Assi.valuta
+  const BING = new Grid(8), RAILT = new Uint8Array(NX * NZ), RAIL_W = 2.1, RAIL_BLEND = 4;
+  for (const b of TERRENO && TERRENO.binari || []) for (let k = 1; k < b.y.length; k++) {
+    const ax = b.p[2 * k - 2], az = b.p[2 * k - 1], bx = b.p[2 * k], bz = b.p[2 * k + 1], dx = bx - ax, dz = bz - az, s = { ax, az, dx, dz, l2: dx * dx + dz * dz || 1e-9, ya: b.y[k - 1] - B0, yb: b.y[k] - B0 };
+    BING.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s);
+    for (const q of [[ax - 3, az - 3], [ax + 3, az - 3], [ax - 3, az + 3], [ax + 3, az + 3]]) { const i = Math.floor((q[0] + HW) / TSZ), j = Math.floor((q[1] + HHt) / TSZ); if (i >= 0 && j >= 0 && i < NX && j < NZ) RAILT[i + NX * j] = 1; }
+  }
+  const railRd = [], railRy = [];
+  function railY(x, z, R = 7) { // the profile at (x, z), null further than R from every track at grade
+    const r = R + RAIL_BLEND; let n = 0, dm = 1e9;
+    BING.each(x - r, z - r, x + r, z + r, s => { const t = Math.max(0, Math.min(1, ((x - s.ax) * s.dx + (z - s.az) * s.dz) / s.l2)), d = Math.hypot(x - s.ax - s.dx * t, z - s.az - s.dz * t); railRd[n] = d; railRy[n++] = s.ya + (s.yb - s.ya) * t; if (d < dm) dm = d; });
+    if (dm > R) return null; let a = 0, w = 0;
+    for (let i = 0; i < n; i++) { const d = railRd[i], f = 1 - Math.min(1, (d - dm) / RAIL_BLEND), q = f * f / (d * d + 0.25); a += q * railRy[i]; w += q; }
+    return a / w;
+  }
+  const railTop = (x, z) => railY(x, z, RAIL_W); // the strip of the ballast
   const STG = new Grid(10);
   function stepAt(x, z) { let r = null; STG.each(x, z, x, z, s => { if ((!r || s.h > r.h) && x >= s.bb[0] && x <= s.bb[2] && z >= s.bb[1] && z <= s.bb[3] && inPoly(x, z, s.o) && !s.k.some(q => inPoly(x, z, q))) r = s; }); return r; }
   const step = (x, z) => { const s = stepAt(x, z); return s ? s.h : 0; };
@@ -383,7 +401,7 @@ const H = (() => {
   }
   const KIND = [null, 'road', 'side', 'green', 'river', 'slope', 'rail'];
   const H = {
-    B0, DECKS, PITS, onLoad, farH, deckAt, water,
+    B0, DECKS, PITS, onLoad, farH, deckAt, water, railY, railTop,
     baseS(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); }, // S alone, without the ramps (their walls stand on it)
     pitAt(x, z) { const F = fineAt(x, z); return F ? pitIn(F, x, z) : null; }, // the floor of a ramp here, or null
     inPit(x, z, m = 0) { for (const p of PITS) { if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) continue; if (inPoly(x, z, p.imp)) return p; if (m > 0) for (let k = 0; k < p.imp.length; k++) { const a = p.imp[k], b = p.imp[(k + 1) % p.imp.length]; if (segDist(x, z, a[0], a[1], b[0], b[1]) < m) return p; } } return null; }, // within m of a ramp: no tree, car or bench there
@@ -393,7 +411,7 @@ const H = (() => {
     // the ground as drawn (docs/motore.md 3): S + step, the cover of a sidewalk, a platform or a median where the point is on one; in a tile
     // without .bin the old ground and its sidewalks and platforms (onSide, onPlatform of world3.js). What draws the step itself (the sides
     // of a platform, the kerbs) or drapes a surface takes H.base
-    ground(x, z) { const F = fineAt(x, z); if (!F) return oldG(x, z) + oldStep(x, z); const p = pitIn(F, x, z); return p !== null ? p : onF(F, x, z) + step(x, z); },
+    ground(x, z) { const F = fineAt(x, z); if (!F) return oldG(x, z) + oldStep(x, z); const p = pitIn(F, x, z); if (p !== null) return p; const sh = step(x, z); if (!sh && RAILT[F.t]) { const y = railTop(x, z); if (y !== null) return y; } return onF(F, x, z) + sh; },
     vis(x, z) { const F = fineAt(x, z); return F ? onG(F, x, z) : oldG(x, z) - rivCut(x, z); }, // the old drawn ground cut the river into the grid
     rivCut, fadeW, // the old engine near S: how deep its river cut is, how much of S it takes
     inRiver: (x, z) => riverCut(x, z) > 0, // within an OSM river (its axis and width), wherever: the tiles of S use it to find the water mapped in the bed
@@ -411,6 +429,7 @@ const H = (() => {
       const F = fineAt(x, z); if (!F) return H.oldSurface(x, z, cy);
       const pf = pitIn(F, x, z); if (pf !== null) return pf; // down a ramp: its floor
       const sh = step(x, z); let y = onF(F, x, z) + (sh || bumpAt(x, z)); // the step layer: the sidewalks, platforms and medians as drawn
+      if (!sh && RAILT[F.t]) { const ry = railTop(x, z); if (ry !== null) y = ry; } // the ballast of a track: on its profile
       if (cy === undefined) return y;
       for (const o of deckAt(x, z)) if (o.top > y && o.top <= cy + 0.8) y = o.top;
       return y;

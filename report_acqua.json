@@ -72,7 +72,7 @@
    10,
    17
   ],
-  "celle_segnate_sotto_impalcato": 1011,
+  "celle_segnate_sotto_impalcato": 1010,
   "luoghi": []
  },
  "A4": {
@@ -226,7 +226,7 @@
     "x": 213.2,
     "z": -384.2,
     "m": 9.9,
-    "strada": 221.84,
+    "strada": 221.81,
     "S_min": 220.63,
     "sfondato": true,
     "link": "?x=213.2&z=-384.2"
@@ -298,7 +298,7 @@
     "x": 220.8,
     "z": -395.2,
     "m": 10.9,
-    "strada": 221.96,
+    "strada": 221.94,
     "S_min": 221.8,
     "sfondato": false,
     "link": "?x=220.8&z=-395.2"
@@ -308,7 +308,7 @@
     "x": 213.2,
     "z": -384.2,
     "m": 9.9,
-    "strada": 221.84,
+    "strada": 221.81,
     "S_min": 220.63,
     "sfondato": true,
     "link": "?x=213.2&z=-384.2"
@@ -458,8 +458,8 @@
     "x": -103.2,
     "z": -185.2,
     "m": 3.7,
-    "strada": 219.55,
-    "S_min": 219.39,
+    "strada": 219.56,
+    "S_min": 219.47,
     "sfondato": false,
     "link": "?x=-103.2&z=-185.2"
    },
@@ -468,8 +468,8 @@
     "x": -102.2,
     "z": -178.8,
     "m": 6.5,
-    "strada": 219.52,
-    "S_min": 219.4,
+    "strada": 219.53,
+    "S_min": 219.48,
     "sfondato": false,
     "link": "?x=-102.2&z=-178.8"
    },
@@ -618,7 +618,7 @@
     "x": 88.8,
     "z": -322.8,
     "m": 11.9,
-    "strada": 220.92,
+    "strada": 220.91,
     "S_min": 220.87,
     "sfondato": false,
     "link": "?x=88.8&z=-322.8"
@@ -628,8 +628,8 @@
     "x": 92.2,
     "z": -312.2,
     "m": 4.2,
-    "strada": 221.12,
-    "S_min": 220.88,
+    "strada": 221.02,
+    "S_min": 220.86,
     "sfondato": false,
     "link": "?x=92.2&z=-312.2"
    },
@@ -638,8 +638,8 @@
     "x": 99.8,
     "z": -307.8,
     "m": 6.1,
-    "strada": 221.17,
-    "S_min": 221.13,
+    "strada": 221.12,
+    "S_min": 221.02,
     "sfondato": false,
     "link": "?x=99.8&z=-307.8"
    },
@@ -701,8 +701,8 @@
     {
      "x": 222,
      "z": -392,
-     "S": 222.22,
-     "strada_intorno": 221.97
+     "S": 222.24,
+     "strada_intorno": 221.96
     }
    ],
    "ok": true
@@ -747,6 +747,6 @@
   "tombini_sotto_strade": 45,
   "tombini_sotto_strade_sfondati": 1,
   "prove_fisse_ok": "3 su 4",
-  "tempo_s": 93.6
+  "tempo_s": 94.8
  }
 }

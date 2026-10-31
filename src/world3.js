@@ -1488,7 +1488,17 @@ function* buildTileGen(T) {
   yield 'railway';
   // railway & fences
   {
-    const bal = FBuf(), steel = Object.assign(FBuf(), { noclip: true }); // the rails, 12 cm strips 11 cm over a smooth bed: each vertex on S, not cut on the cells
+    // the tracks at grade stand on their own profile (src/binari.py, H.railY), every vertex on it, not cut on the cells of S, which is flat under them where it can be: ballast, sleepers and
+    // rails, and a shoulder of ballast from the edge down into S (no gap where S lies lower, by a street at another level). Off the profile (outside S) as before
+    const railHf = (x, z) => { const y = H.railY(x, z); return y !== null ? y : streetH(x, z); };
+    const bal = Object.assign(FBuf(), { noclip: true, hf: railHf }), steel = Object.assign(FBuf(), { noclip: true, hf: railHf }), gra = Object.assign(FBuf(), { noclip: true, hf: railHf }), shou = Buf(), BAL_W = 2.1, BAL_Y = 0.04, SH_D = 0.8;
+    const shoulder = run => { // the two sides of a run, 1 : 1 down
+      for (const sd of [1, -1]) for (let k = 1; k < run.length; k++) {
+        const A = run[k - 1], C = run[k], L = hyp(C[0] - A[0], C[1] - A[1]); if (L < 0.01) continue; const rx = -(C[1] - A[1]) / L * sd, rz = (C[0] - A[0]) / L * sd, i0 = shou.p.length / 3, ya = railHf(A[0] + rx * BAL_W, A[1] + rz * BAL_W) + BAL_Y, yc = railHf(C[0] + rx * BAL_W, C[1] + rz * BAL_W) + BAL_Y;
+        for (const [P_, y, w] of [[A, ya, BAL_W], [A, ya - SH_D, BAL_W + SH_D], [C, yc - SH_D, BAL_W + SH_D], [C, yc, BAL_W]]) vtx(shou, P_[0] + rx * w, y, P_[1] + rz * w, 0, 1, 0, (P_[0] + rx * w) / 3, (P_[1] + rz * w) / 3);
+        triUp(shou, i0, i0 + 1, i0 + 2); triUp(shou, i0, i0 + 2, i0 + 3);
+      }
+    };
     const ebal = Buf(), esteel = Buf(), eside = Buf();
     for (const r of d.rl || []) {
       const p0 = dec(r.p); if (p0.length < 2) continue;
@@ -1501,7 +1511,9 @@ function* buildTileGen(T) {
           if (k < p.length && cls[k] === cls[k0]) continue;
           const run = p.slice(k0, Math.min(p.length, k + 1)), c = cls[k0], y = c === 2 ? 0.035 : 0.11; // (the run takes the next point: no gap)
           if (run.length >= 2) {
-            if (c === 0) ribbon(bal, run, -1.9, 1.9, 0.07, 2.4, 'along'); else if (c === 1) ribbon(bal, run, -1.3, 1.3, 0.07, 2.4, 'along');
+            const onP = T.fine && c !== 2 && H.railY(run[run.length >> 1][0], run[run.length >> 1][1], 2) !== null;
+            if (onP) { ribbon(gra, run, -BAL_W, BAL_W, BAL_Y, 3, 'world'); shoulder(run); ribbon(bal, run, -1.3, 1.3, 0.07, 2.4, 'along'); }
+            else if (c === 0) ribbon(bal, run, -1.9, 1.9, 0.07, 2.4, 'along'); else if (c === 1) ribbon(bal, run, -1.3, 1.3, 0.07, 2.4, 'along');
             ribbon(steel, run, -0.8, -0.68, y, 9, 'world'); ribbon(steel, run, 0.68, 0.8, y, 9, 'world');
           }
           k0 = k;
@@ -1519,7 +1531,8 @@ function* buildTileGen(T) {
           if (T.fine && y0 <= H.base(x0, z0) + 1e-3 && y1 <= H.base(x1, z1) + 1e-3) { // an old elevated track that runs on S (no railway deck under it): draped like the
             // tracks at grade, the ballast cut on the cells; a flat 3 m piece 7 cm over its ends let the ground, which writes its depth, through it on every hump
             const qS = (b, a0, a1, d) => { const i0 = b.p.length / 3; vtx(b, x0 + rx * a0, d, z0 + rz * a0, 0, 1, 0, 0, t0 * L / 2.4); vtx(b, x0 + rx * a1, d, z0 + rz * a1, 0, 1, 0, 1, t0 * L / 2.4); vtx(b, x1 + rx * a1, d, z1 + rz * a1, 0, 1, 0, 1, t1 * L / 2.4); vtx(b, x1 + rx * a0, d, z1 + rz * a0, 0, 1, 0, 0, t1 * L / 2.4); triUp(b, i0, i0 + 1, i0 + 2); triUp(b, i0, i0 + 2, i0 + 3); };
-            qS(bal, -2.2, 2.2, 0.07); qS(steel, -0.8, -0.68, 0.11); qS(steel, 0.68, 0.8, 0.11); continue;
+            if (H.railY(x0, z0, 2) !== null && H.railY(x1, z1, 2) !== null) { qS(gra, -BAL_W, BAL_W, BAL_Y); shoulder([[x0, z0], [x1, z1]]); qS(bal, -1.3, 1.3, 0.07); } else qS(bal, -2.2, 2.2, 0.07);
+            qS(steel, -0.8, -0.68, 0.11); qS(steel, 0.68, 0.8, 0.11); continue;
           }
           const quadA =(b, a0, a1, d0, d1) => { const i0 = b.p.length / 3; vtx(b, x0 + rx * a0, y0 + d0, z0 + rz * a0, 0, 1, 0, 0, t0 * L / 2.4); vtx(b, x0 + rx * a1, y0 + d0, z0 + rz * a1, 0, 1, 0, 1, t0 * L / 2.4); vtx(b, x1 + rx * a1, y1 + d1, z1 + rz * a1, 0, 1, 0, 1, t1 * L / 2.4); vtx(b, x1 + rx * a0, y1 + d1, z1 + rz * a0, 0, 1, 0, 0, t1 * L / 2.4); triUp(b, i0, i0 + 1, i0 + 2); triUp(b, i0, i0 + 2, i0 + 3); };
           quadA(ebal, -2.2, 2.2, 0.07, 0.07); quadA(esteel, -0.8, -0.68, 0.12, 0.12); quadA(esteel, 0.68, 0.8, 0.12, 0.12);
@@ -1532,7 +1545,7 @@ function* buildTileGen(T) {
       }
     }
     if (ebal.i.length) { const m1 = new THREE.MeshLambertMaterial({ map: ballastTex }); put(ebal, m1, 9); put(esteel, MAT.rail, 10); put(eside, MAT.deckSide, 10, 'cast'); }
-    put(bal, MAT.ballast, 7); put(steel, MAT.steel, 8);
+    put(gra, MAT.gravel, 6); put(shou, MAT.gravel, 6); put(bal, MAT.ballast, 7); put(steel, MAT.steel, 8);
     const wall = Buf(), net = Buf(), WH = 0.9, NH = 2.0, TK = 0.13, posts = []; /* on the foot of the barriers (barFoot, sfondabili3.js), no longer draped on the cells: on a bank they went up and down like a saw */
     for (const pts of T.fe) {
       let acc = 0, nextPost = 0;
