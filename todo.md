@@ -1,6 +1,7 @@
 # Da fare
 
 ## Scaletta (ottobre 2026)
+**Ordine di Carlo (31/10), vale sopra la lista qui sotto:** prima il gameplay di base (comandi, movimento, telecamera, fisica), poi i sistemi del gioco, solo dopo la storia.
 Regola per tutto: niente stili, scritte o dettagli inventati. Quello che non viene da OSM, da foto recenti o da chi gioca resta neutro.
 1. **Storia**: una traccia di una pagina (Carlo). Dice quali luoghi vanno curati per primi
 2. **Zona di gioco**: verificare che dati OSM e quote coprano Seregno, allargare la mappa a est, disegnare un confine lungo strade e ferrovie (non il rettangolo), uscite chiuse con transenne, fuori solo il paesaggio
