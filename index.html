@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo radio-ruota · dopo 9840d60 · assemblato 31/10 04:39 · porta ' + location.port;
+    const txt = 'locale · ramo radio-ruota · dopo 8e83a8c · assemblato 31/10 04:48 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -7008,9 +7008,9 @@ function pollPad() {
   /* title screen: Options or cross/A start the game like Enter */
   if (!running) { none(); if ((E[9] || E[0]) && !goBtn.disabled) startGame(); return; }
   if (E[9]) togglePause(); /* also closes the big map */
-  if (paused && !bigOpen) { none(); return; }
+  if (paused && !bigOpen) { radioWheelClose(false); none(); return; }
   if (E[tpad]) toggleBig();
-  if (bigOpen) { none(); return; }
+  if (bigOpen) { radioWheelClose(false); none(); return; }
   const ni = s => toast(s + ' non implementato');
   GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0);
   GP.thr = veh ? b(7) : 0; GP.brk = veh ? b(6) : 0;
@@ -7022,8 +7022,11 @@ function pollPad() {
   if (E[8]) camMode = camMode === 0 ? 2 : 0; /* third person <-> first person; the top view is gone from the pad */
   if (E[12]) reportSpot();
   if (E[13]) ni('Zoom della minimappa');
+  /* radio wheel: the right stick picks the slice, the camera does not move, the car keeps being driven; letting go of the d-pad confirms */
+  if (RW.open && (kind !== 'car' || !down(14))) radioWheelClose(kind === 'car' && !down(14));
+  if (RW.open) { radioWheelStick(g.axes[2] || 0, g.axes[3] || 0); GP.lookx = GP.looky = 0; }
   /* d-pad left: radio. d-pad right: lights (vehicles), use item (on foot) */
-  padTap(14, down(14), dt, () => { if (kind === 'car') radioNext(); else ni('Radio dal telefono'); }, () => ni(kind === 'car' ? 'Ruota delle radio' : 'Radio dal telefono'));
+  padTap(14, down(14), dt, () => { if (kind === 'car') radioNext(); else ni('Radio dal telefono'); }, () => { if (kind === 'car') radioWheelOpen(); else ni('Radio dal telefono'); });
   if (veh) padTap(15, down(15), dt, () => ni(kind === 'bici' ? 'Fanale' : 'Fari'), () => ni(kind === 'bici' ? 'Fanale' : 'Abbaglianti')); else if (E[15]) ni('Usa oggetto');
   if (veh) {
     if (E[3]) { K.use = true; (GP.hold[3] || (GP.hold[3] = { t: 0, on: false, done: false })).block = true; } /* getting out ends this press: on foot it must not count as a tap that gets in again */
@@ -7605,19 +7608,51 @@ function explodeCar(v) {
 updDayNight(0);
 window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); };
 
-// ---------------------------------------------------------------- car radio: Discoradio live (official stream) only while driving; a police car is tuned to Radio Maria
+// ---------------------------------------------------------------- car radio: eight live stations, only while driving a car; each car keeps the station picked on it
 // claude.ai artifacts allow no external audio (media-src/connect-src 'self'): there the radio stays off with a note
+/* ORDER is the wheel order from twelve o'clock clockwise, and the order of the d-pad tap */
+const ORDER = ['disco', 'm2o', 'virgin', 'radicale', 'maria', 'liberta', 'italia', 'r105'];
 const STATIONS = {
   disco: { name: 'Discoradio', urls: ['https://icstream.rds.radio/disco'], hello: '📻 Discoradio · il ritmo della tua città' },
-  maria: { name: 'Radio Maria', urls: [...(location.protocol === 'http:' ? ['http://dreamsiteradiocp.com:8092/;'] : []), 'https://dreamsiteradiocp2.com/proxy/rmitaly?mp=/stream', 'https://dreamsiteradiocp4.com/proxy/rmitaliamontecarlo?mp=/stream'], hello: '📻 Radio Maria · in volante si prega' }, /* played locally (http) the MP3 stream comes first: some browsers block the AAC relays (Carlo 29/10); an https page cannot load it */ // second url: same programme on another relay
+  m2o: { name: 'M2O', urls: ['https://4c4b867c89244861ac216426883d1ad0.msvdn.net/radiom2o/radiom2o/master_ma.m3u8'], hello: '📻 M2O' }, /* HLS only: hls.js where the browser has no HLS of its own */
+  virgin: { name: 'Virgin Radio', urls: ['https://icecast.unitedradio.it/Virgin.mp3'], hello: '📻 Virgin Radio' },
+  radicale: { name: 'Radio Radicale', urls: ['https://live.radioradicale.it/live.mp3', ...(location.protocol === 'http:' ? ['http://live.radioradicale.it/live.mp3'] : [])], hello: '📻 Radio Radicale' },
+  maria: { name: 'Radio Maria', urls: [...(location.protocol === 'http:' ? ['http://dreamsiteradiocp.com:8092/;'] : []), 'https://dreamsiteradiocp2.com/proxy/rmitaly?mp=/stream', 'https://dreamsiteradiocp4.com/proxy/rmitaliamontecarlo?mp=/stream'], hello: '📻 Radio Maria' }, /* played locally (http) the MP3 stream comes first: some browsers block the AAC relays (Carlo 29/10); an https page cannot load it */
+  liberta: { name: 'Radio Libertà', urls: ['https://stream1.xdevel.com/audio0s975360-306/stream/icecast.audio'], hello: '📻 Radio Libertà' },
+  italia: { name: 'Radio Italia', urls: ['https://stream4.xdevel.com/audio0s976608-1379/stream/icecast.audio', 'https://radioitaliasmi.akamaized.net/hls/live/2093120/RISMI/master.m3u8'], hello: '📻 Radio Italia' }, /* AAC first, the official HLS as a back-up */
+  r105: { name: 'Radio 105', urls: ['https://icecast.unitedradio.it/Radio105.mp3'], hello: '📻 Radio 105' },
 };
-const stationFor = v => v && v.radioSt || (v && v.kind === 'police' ? 'maria' : 'disco'); /* v.radioSt: the station picked on that vehicle, else its default */
-function radioNext() { /* pad d-pad left tap: next station of STATIONS, kept on this vehicle; also switches the radio on */
-  const v = P.car; if (!v) return; const ks = Object.keys(STATIONS), n = ks[(ks.indexOf(stationFor(v)) + 1) % ks.length]; v.radioSt = n; radioOn = true; radioErr = false; STATIC.quiet = false; toast('📻 ' + STATIONS[n].name);
+/* the station a car starts on, by kind, chosen once per car: police (and the like) Radio Italia, sports cars Discoradio, the rest by lottery */
+const RADIO_MIX = [['disco', 37], ['m2o', 25], ['r105', 15], ['virgin', 15], ['italia', 5], ['radicale', 1], ['liberta', 1], ['maria', 1]];
+function radioStartFor(kind, r = Math.random()) {
+  if (kind === 'police') return 'italia'; if (kind === 'sport') return 'disco';
+  let x = r * 100; for (const [k, w] of RADIO_MIX) { if ((x -= w) < 0) return k; } return 'disco';
+}
+const stationFor = v => v ? (v.radioSt || (v.radioSt = radioStartFor(v.kind))) : 'disco'; /* v.radioSt: the station on that vehicle, from the lottery until someone tunes it */
+function setStation(v, n) { v.radioSt = n; radioOn = true; radioErr = false; STATIC.quiet = false; toast('📻 ' + STATIONS[n].name); }
+function radioNext() { /* pad d-pad left tap: next station of ORDER, kept on this vehicle; also switches the radio on. Off is not in the cycle */
+  const v = P.car; if (!v) return; setStation(v, ORDER[(ORDER.indexOf(stationFor(v)) + 1) % ORDER.length]);
 }
 const RADIO = new Audio(); RADIO.preload = 'none';
 const IN_CLAUDE = /claudeusercontent\.com|claude\.ai/.test(location.hostname);
 let radioOn = true, radioVol = 0, radioErr = false, radioSt = 'disco', radioUrl = 0; const radioShown = {};
+/* hls.js (lib/hls.light.min.js, v1.7.4, Apache-2.0): loaded only when an .m3u8 stream meets a browser without native HLS; one instance, destroyed on every retune */
+const HLS = { h: null, tok: 0, pend: false, lib: null, force: /[?&]hlsjs\b/.test(location.search) };
+function hlsLib() { return HLS.lib || (HLS.lib = new Promise((ok, ko) => { if (window.Hls) return ok(); const s = document.createElement('script'); s.src = 'lib/hls.light.min.js'; s.onload = ok; s.onerror = () => { HLS.lib = null; ko(); }; document.head.appendChild(s); })); }
+function hlsKill() { HLS.tok++; HLS.pend = false; if (HLS.h) { try { HLS.h.destroy(); } catch (e) { } HLS.h = null; } }
+function tuneUrl(url) {
+  hlsKill(); const tok = HLS.tok;
+  if (!/\.m3u8(\?|$)/.test(url) || (!HLS.force && RADIO.canPlayType('application/vnd.apple.mpegurl'))) { RADIO.src = url; RADIO.play().catch(() => { }); return; }
+  RADIO.removeAttribute('src'); HLS.pend = true;
+  hlsLib().then(() => {
+    if (tok !== HLS.tok) return; HLS.pend = false;
+    if (!window.Hls || !Hls.isSupported()) return radioFail();
+    const h = new Hls({ lowLatencyMode: false }); HLS.h = h;
+    h.on(Hls.Events.ERROR, (e, d) => { if (d.fatal && tok === HLS.tok) radioFail(); });
+    h.on(Hls.Events.MANIFEST_PARSED, () => { RADIO.play().catch(() => { }); });
+    h.loadSource(url); h.attachMedia(RADIO);
+  }, () => { if (tok === HLS.tok) { HLS.pend = false; radioFail(); } });
+}
 // static while the tuner looks for the station: band-passed hiss with crackles and a drifting whistle, until the stream plays (at least 0.9 s)
 const STATIC = { g: null, t: 0, tuning: false };
 function staticInit() {
@@ -7638,22 +7673,63 @@ function updStatic(dt, want) {
   if (on) { STATIC.w.frequency.setTargetAtTime(1500 + Math.sin(now * 2.3) * 700 + rnd() * 250, t, 0.08); STATIC.f.frequency.setTargetAtTime(1300 + rnd() * 900, t, 0.05); }
 }
 RADIO.addEventListener('playing', () => { STATIC.tuning = false; STATIC.quiet = false; });
-RADIO.addEventListener('error', () => {
-  if (!radioOn || !RADIO.getAttribute('src') || radioErr) return;
-  const St = STATIONS[radioSt]; if (!IN_CLAUDE && radioUrl < St.urls.length - 1) { RADIO.src = St.urls[++radioUrl]; RADIO.play().catch(() => { }); return; } // try the next relay, still hissing
-  STATIC.tuning = false; radioErr = true; toast(IN_CLAUDE ? '📻 Su claude.ai la radio è bloccata: gioca dalla versione su GitHub Pages' : `📻 ${St.name} non raggiungibile`); toastT = 6;
-});
+function radioFail() { /* this relay does not answer: the next one, still hissing, else give up */
+  if (!radioOn || radioErr) return;
+  const St = STATIONS[radioSt]; if (!IN_CLAUDE && radioUrl < St.urls.length - 1) { tuneUrl(St.urls[++radioUrl]); return; }
+  hlsKill(); STATIC.tuning = false; radioErr = true; toast(IN_CLAUDE ? '📻 Su claude.ai la radio è bloccata: gioca dalla versione su GitHub Pages' : `📻 ${St.name} non raggiungibile`); toastT = 6;
+}
+RADIO.addEventListener('error', () => { if (RADIO.getAttribute('src')) radioFail(); });
 RADIO.addEventListener('playing', () => { radioErr = false; if (!radioShown[radioSt]) { radioShown[radioSt] = true; toast(STATIONS[radioSt].hello); } });
-function stopRadio() { RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
+function stopRadio() { hlsKill(); RADIO.pause(); RADIO.removeAttribute('src'); RADIO.load(); }
 function updRadio(dt) {
-  const want = radioOn && running && (!paused || bigOpen) && P.mode === 'car' && !P.car.spec.two && !(AU && AU.muted); // no radio on bikes, scooters and motorbikes
-  if (P.mode === 'car' && stationFor(P.car) !== radioSt) { radioSt = stationFor(P.car); radioUrl = 0; radioErr = false; STATIC.quiet = false; if (!RADIO.paused) stopRadio(); } // another car, another station: retune
-  if (want && RADIO.paused && !radioErr) { RADIO.src = STATIONS[radioSt].urls[radioUrl]; RADIO.volume = radioVol; RADIO.play().catch(() => { }); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } // fresh src = back to live, not to a stale buffer
+  const want = radioOn && running && (!paused || bigOpen) && P.mode === 'car' && !P.car.spec.two && !(AU && AU.muted); /* no radio on bikes, scooters and motorbikes */
+  if (P.mode === 'car' && stationFor(P.car) !== radioSt) { radioSt = stationFor(P.car); radioUrl = 0; radioErr = false; STATIC.quiet = false; stopRadio(); } /* another car or another pick: retune at once */
+  if (want && RADIO.paused && !radioErr && !HLS.pend && !HLS.h) { RADIO.volume = radioVol; tuneUrl(STATIONS[radioSt].urls[radioUrl]); if (!STATIC.tuning && !STATIC.quiet) { STATIC.tuning = true; STATIC.t = 0.9; } } /* fresh src = back to live, not to a stale buffer */
   if (AU && AU.on) updStatic(dt, want);
   radioVol = lerp(radioVol, want ? 0.6 : 0, 1 - Math.exp(-3 * dt)); try { RADIO.volume = clamp(radioVol, 0, 1); } catch (e) { }
-  if (!want && !RADIO.paused && radioVol < 0.02) stopRadio();
+  if (!want && (!RADIO.paused || HLS.pend || HLS.h) && radioVol < 0.02) stopRadio();
 }
 function toggleRadio() { radioOn = !radioOn; radioErr = false; radioUrl = 0; STATIC.quiet = false; toast(radioOn ? '📻 Radio accesa' : '📻 Radio spenta'); }
+
+/* ---- the wheel (pad, d-pad left held 0.45 s): eight slices in ORDER from twelve o'clock clockwise, the centre is "off". While open the right stick picks, the camera stays put, the game runs.
+   Opens on the current station (or the centre if the radio is off) and keeps it until the stick has really moved; back to the middle after that = off. Letting go of the d-pad confirms. */
+const RW = { open: false, sel: 0, touched: false, el: null };
+function radioWheelDom() {
+  if (RW.el) return RW.el;
+  const st = document.createElement('style');
+  st.textContent = '#rwheel { position: fixed; left: 50%; top: 46%; width: min(74vmin, 540px); transform: translate(-50%, -50%); z-index: 40; pointer-events: none; text-align: center; font-family: var(--display); }'
+    + '#rwheel svg { width: 100%; display: block; filter: drop-shadow(0 6px 18px rgba(0,0,0,.55)); } #rwheel .sl { fill: rgba(26,28,34,.86); stroke: #0e0f13; stroke-width: 3; } #rwheel .sl.on { fill: var(--ocra); } #rwheel .sl.cur { stroke: var(--ocra); }'
+    + '#rwheel text { fill: var(--ink); font-size: 15.5px; text-anchor: middle; letter-spacing: 0; } #rwheel .sl.on + text, #rwheel .ce.on + text { fill: #1a1c22; } #rwheel .ce { fill: rgba(26,28,34,.9); stroke: #0e0f13; stroke-width: 3; } #rwheel .ce.on { fill: var(--ocra); }'
+    + '#rwheel .nm { margin-top: 6px; font-size: clamp(22px, 5vmin, 38px); color: var(--ocra); text-shadow: 0 3px 0 #000; }';
+  document.head.appendChild(st);
+  const el = document.createElement('div'); el.id = 'rwheel'; el.hidden = true;
+  const R0 = 76, R1 = 192, P2 = (r, a) => [(r * Math.sin(a)).toFixed(1), (-r * Math.cos(a)).toFixed(1)];
+  let h = '<svg viewBox="-200 -200 400 400">';
+  ORDER.forEach((k, i) => {
+    const a0 = (i - 0.5) * Math.PI / 4 + 0.012, a1 = (i + 0.5) * Math.PI / 4 - 0.012, [x0, y0] = P2(R1, a0), [x1, y1] = P2(R1, a1), [x2, y2] = P2(R0, a1), [x3, y3] = P2(R0, a0), [tx, ty] = P2(140, i * Math.PI / 4);
+    const w = STATIONS[k].name.split(' '), two = w.length > 1 ? [w[0], w.slice(1).join(' ')] : w;
+    h += `<path class="sl" data-i="${i}" d="M${x0} ${y0} A${R1} ${R1} 0 0 1 ${x1} ${y1} L${x2} ${y2} A${R0} ${R0} 0 0 0 ${x3} ${y3}Z"/><text x="${tx}" y="${(+ty - (two.length - 1) * 9.5 + 5).toFixed(1)}">${two.map((t, j) => `<tspan x="${tx}" dy="${j ? 19 : 0}">${t}</tspan>`).join('')}</text>`;
+  });
+  h += '<circle class="ce" r="70"/><text x="0" y="7">SPENTA</text></svg><div class="nm"></div>';
+  el.innerHTML = h; document.body.appendChild(el); RW.el = el; return el;
+}
+function radioWheelDraw() {
+  const el = radioWheelDom(), cur = radioOn ? ORDER.indexOf(stationFor(P.car)) : -1;
+  el.querySelectorAll('.sl').forEach((p, i) => { p.classList.toggle('on', i === RW.sel); p.classList.toggle('cur', i === cur); });
+  el.querySelector('.ce').classList.toggle('on', RW.sel === -1);
+  el.querySelector('.nm').textContent = RW.sel < 0 ? 'Radio spenta' : STATIONS[ORDER[RW.sel]].name;
+}
+function radioWheelOpen() { if (RW.open || !P.car) return; RW.open = true; RW.touched = false; RW.sel = radioOn ? ORDER.indexOf(stationFor(P.car)) : -1; radioWheelDom().hidden = false; radioWheelDraw(); }
+function radioWheelStick(sx, sy) { /* right stick, raw axes (x right, y down) */
+  const m = Math.hypot(sx, sy); let s = RW.sel;
+  if (m > 0.55) { RW.touched = true; s = Math.round(((Math.atan2(sx, -sy) * 4 / Math.PI) % 8 + 8) % 8) % 8; } else if (RW.touched && m < 0.35) s = -1;
+  if (s !== RW.sel) { RW.sel = s; radioWheelDraw(); }
+}
+function radioWheelClose(confirm) {
+  if (!RW.open) return; RW.open = false; if (RW.el) RW.el.hidden = true;
+  if (!confirm || !P.car) return;
+  if (RW.sel < 0) { radioOn = false; toast('📻 Radio spenta'); } else setStation(P.car, ORDER[RW.sel]);
+}
 
 // ---------------------------------------------------------------- bug reports: R3 on the pad, B on the keyboard
 let spotDb = null, spotN = 0; (async () => { try { spotDb = await window.claude?.use?.('db'); } catch (e) { spotDb = null; } })();
@@ -8325,5 +8401,5 @@ $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };
+window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>
