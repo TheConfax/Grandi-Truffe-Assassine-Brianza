@@ -46,7 +46,7 @@ Nel gioco (`altezze3.js`, `world3.js`): dentro il contorno della rampa `H.base`,
 | 16 | -277 | -469 | 13,5 m | 6,5 m | 2,2 m | LiDAR, OSM parcheggio interrato, ortofoto 2018-19 | alla serranda | alla serranda |
 | 17 | -185 | -242 | 13,6 m | 6,5 m | 2,6 m | LiDAR, DBGT volume interrato a 0 m, ortofoto 2018-19 | alla serranda | alla serranda |
 | 18 | -363 | -251 | 16,7 m | 5,5 m | 2,7 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
-| 19 | 754 | -228 | 18,2 m | 4,2-5,7 m | 2,7 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
+| 19 | 754 | -228 | 18,2 m | 4,2-5,7 m | 2,7 m | LiDAR, ortofoto 2018-19 (**tolta il 31/10: Carlo, guardandola nel gioco, è un errore; la fossa è riempita**) | alla serranda | alla serranda |
 | 20 | 1418 | 719 | 18,1 m | 5,8 m | 3,0 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
 | 21 | 1454 | 745 | 13,5 m | 6,5 m | 2,6 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |
 | 22 | 1343 | 782 | 12,8 m | 4,0 m | 2,1 m | LiDAR, ortofoto 2018-19 | alla serranda | alla serranda |

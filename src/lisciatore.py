@@ -40,6 +40,7 @@ B_CARR = 0.10       # a carriageway on this share of the deep half of the pit: a
 POZ_PROF = 0.4      # m: from its lowest node to its spill point
 POZ_NODI = 3        # at most this many nodes deeper than POZ_PROF under the spill point (12 m2)
 POZ_TUTTI = 12      # ... and this many in all, with the shallow halo around the hole
+POZ_CARR_PONTE = 12.0   # m from a deck: a pit on a carriageway this close stays
 POZ_MARG = 4.0      # m around decks, water and the rail bed where they stay as they are (the banks and the abutments read the nodes next to them)
 SF = 2.0
 
@@ -105,7 +106,9 @@ def pozzi(S, prof=POZ_PROF, nodi=POZ_NODI):
 def motivi_pozzi(s, PARTI, CARR):
     import superficie as sf
     tomb = s.TOMB | s.TOMBC | s.RIEMP
-    return [('impalcato o ponte', PARTI['ponti']), ('tombino', tomb), ('acqua o alveo', PARTI['bed'] & ~tomb), ('ferrovia', PARTI['fer']), ('rampa disegnata', PARTI['ram']), ('carreggiata (quota DBGT o LiDAR)', CARR)]
+    # a closed pit on a carriageway is an error of the data (Carlo, 31/10: x -313 z -496, x 1019 z 26, x 31 z -646) and is filled like the others, except by a deck
+    vicino = ndimage.distance_transform_edt(~PARTI['ponti'], sampling=SF) <= POZ_CARR_PONTE
+    return [('impalcato o ponte', PARTI['ponti']), ('tombino', tomb), ('acqua o alveo', PARTI['bed'] & ~tomb), ('ferrovia', PARTI['fer']), ('rampa disegnata', PARTI['ram']), ('carreggiata vicino a un impalcato', CARR & vicino)]
 
 
 def malta(s, S, PARTI, CARR):
@@ -356,7 +359,7 @@ def controlli(s, G, out_file=None, log=print):
         dente_km=dict(definizione='S a 0,3 m dentro e fuori da ogni anello AC_VEI, AC_PED, AC_CIC, AR_STR, ogni 0,5 m: km fuori dalla media dei suoi 4 m oltre la soglia; nodi protetti esclusi', prima=p0, dopo=p1, totale_prima=t0_, totale_dopo=t1, soglia_15cm_km=DENTE_15_MAX_KM),
         buche_vicino_alle_strade=dict(definizione='depressioni chiuse di S oltre %.1f m, almeno %.0f m2, entro %.0f m da una strada, nodi protetti esclusi' % (B_PROF, B_AREA_MIN, B_STRADA), prima=sint(b0), dopo=sint(b1), rimaste=b1[:60]),
         spostamento=dict(dente_m=sf.pct(np.abs(dG)[mv & ~B], (50, 90, 99, 99.9)), dente_su_m=round(float(dG[~B].max()), 3), dente_giu_m=round(float(dG[~B].min()), 3), buche_m=sf.pct(np.abs(dG)[mv & B], (50, 90, 99)), nodi_mossi=int(mv.sum()), nodi_griglia=int(G.size), limite_dente_m=LIM_DENTE),
-        invariati=dict(nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti=int((np.abs(dG)[PROT & ~s.LISC_POZZ] >= 0.015).sum()), nodi_nella_fascia_protetta_cambiati_nei_pozzetti=int((np.abs(dG)[PROT & s.LISC_POZZ] >= 0.015).sum()), carreggiate_cambiate=int((np.abs(dG)[CARR] >= 0.015).sum()), impalcati_e_sotto=int((np.abs(dG)[parti['ponti']] >= 0.015).sum()), acqua_e_alvei=int((np.abs(dG)[parti['bed']] >= 0.015).sum()), ferrovia=int((np.abs(dG)[parti['fer']] >= 0.015).sum()), rampe=int((np.abs(dG)[parti['ram']] >= 0.015).sum())),
+        invariati=dict(nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti=int((np.abs(dG)[PROT & ~s.LISC_POZZ] >= 0.015).sum()), nodi_nella_fascia_protetta_cambiati_nei_pozzetti=int((np.abs(dG)[PROT & s.LISC_POZZ] >= 0.015).sum()), carreggiate_cambiate=int((np.abs(dG)[CARR & ~s.LISC_POZZ] >= 0.015).sum()), carreggiate_nei_pozzetti_riempiti=int((np.abs(dG)[CARR & s.LISC_POZZ] >= 0.015).sum()), impalcati_e_sotto=int((np.abs(dG)[parti['ponti']] >= 0.015).sum()), acqua_e_alvei=int((np.abs(dG)[parti['bed']] >= 0.015).sum()), ferrovia=int((np.abs(dG)[parti['fer']] >= 0.015).sum()), rampe=int((np.abs(dG)[parti['ram']] >= 0.015).sum())),
         gradini_cresciuti=dict(definizione='coppie di nodi vicini (anche in diagonale), fuori dagli edifici e dalle buche riempite, con il salto cresciuto oltre la soglia', **{'oltre_%.1fm' % k: v for k, v in gr_.items()}, peggiori=sorted(g_lista, key=lambda q: -q['cresce'])[:30]),
         luoghi_oltre_30cm=[dict(x=round(float(q[0]), 1), z=round(float(q[1]), 1), scarto=round(float(q[2]), 2)) for q in luoghi[np.argsort(-luoghi[:, 2])][::max(1, len(luoghi) // 40)]][:40])
     # the small pits, before and after, on what the tiles give; the exceptions with the reason. And the small spikes, only counted
