@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 154db2c · assemblato 01/11 22:44 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 987ef91 · assemblato 01/11 22:53 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -7609,7 +7609,7 @@ function bigRoadBox(r) { if (!r.bb) { let a = 1e9, b = 1e9, c = -1e9, d = -1e9; 
 function bigScale(sc, dpr) { // a round length in metres that is 90 css px wide or more
   for (const m of [20, 50, 100, 200, 500, 1000, 2000, 5000]) if (m * sc / dpr >= 90) return m; return 5000;
 }
-// move the cursor and the map: stick (sx, sy) in -1..1, zoom in/out in 0..1; the map scrolls when the cursor gets near an edge, the zoom keeps what is under the cursor where it is
+// move the cursor and the map: stick (sx, sy) in -1..1, zoom in/out in 0..1; the map scrolls when the stick pushes the cursor against an edge, the zoom keeps what is under the cursor where it is
 function bigPad(sx, sy, zin, zout, dt) {
   const c = $('bigmap'), V = BIGV, dpr = Math.min(2, devicePixelRatio || 1); if (!V.z || c.width !== Math.round(innerWidth * dpr)) drawBig();
   const W_ = c.width, H_ = c.height; let ch = false;
@@ -7619,8 +7619,8 @@ function bigPad(sx, sy, zin, zout, dt) {
   const E = Math.min(W_, H_) * 0.14, wx = () => (V.mx - W_ / 2) / V.z, wy = () => (V.my - H_ / 2) / V.z;
   const zf = Math.exp((zin - zout) * 1.5 * dt);
   if (zf !== 1) { const ax = V.cx + wx(), az = V.cz + wy(); V.z = clamp(V.z * zf, V.fit, V.max); V.cx = ax - wx(); V.cz = az - wy(); ch = true; }
-  const pan = (v, size) => v < E ? -(E - v) / E : v > size - E ? (v - (size - E)) / E : 0;
-  const ex = pan(V.mx, W_), ey = pan(V.my, H_); if ((ex || ey) && V.z > V.fit * 1.001) { V.cx += ex * 900 * dpr * dt / V.z; V.cz += ey * 900 * dpr * dt / V.z; ch = true; }
+  const pan = (v, size, s) => s < 0 && v < E ? (E - v) / E * s : s > 0 && v > size - E ? (v - (size - E)) / E * s : 0; /* only while the stick pushes towards that edge: a cursor resting there, or moved by the mouse, stays still */
+  const ex = pan(V.mx, W_, sx), ey = pan(V.my, H_, sy); if ((ex || ey) && V.z > V.fit * 1.001) { V.cx += ex * 900 * dpr * dt / V.z; V.cz += ey * 900 * dpr * dt / V.z; ch = true; }
   V.cx = clamp(V.cx, -META.hw, META.hw); V.cz = clamp(V.cz, -META.hh, META.hh); if (V.z <= V.fit * 1.001) V.cx = V.cz = 0;
   if (ch) drawBig();
 }
