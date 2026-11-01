@@ -136,7 +136,7 @@ function tileTick(px, pz, budgetMs, force, soloDati) {
   while (performance.now() - t0 < bud) {
     let T = tileTick.cur;
     if (!T || !T.gen) { T = cand.shift(); if (!T) break; T.gen = buildTileGen(T); tileTick.cur = T; }
-    if (DEBUG) { const a = performance.now(), r = T.gen.next(), b = performance.now() - a, k = T.fetta || 'inizio', e = PZ.fette[k] || (PZ.fette[k] = [0, 0, 0]); e[0]++; e[1] += b; if (b > e[2]) e[2] = b; T.fetta = r.value; if (r.done) { T.gen = null; tileTick.cur = null; T.fetta = null; } continue; } /* the slices, in the debug numbers */
+    if (DEBUG) { const a = performance.now(), r = T.gen.next(), b = performance.now() - a, k = T.fetta || 'inizio', e = PZ.fette[k] || (PZ.fette[k] = [0, 0, 0]); e[0]++; e[1] += b; if (b > e[2]) { e[2] = b; e[3] = T.t; } T.fetta = r.value; if (r.done) { T.gen = null; tileTick.cur = null; T.fetta = null; } continue; } /* the slices, in the debug numbers */
     if (T.gen.next().done) { T.gen = null; tileTick.cur = null; }
   }
   PZ.usa.mesh += performance.now() - t2;
@@ -184,7 +184,7 @@ const _vistaF = new THREE.Frustum(), _vistaM = new THREE.Matrix4();
 scene.onBeforeRender = (r, sc, cam) => { // after the matrices of the frame, before the renderer walks the scene
   _vistaF.setFromProjectionMatrix(_vistaM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
   const om = sun.castShadow && sun.visible; let SF = null; if (om) { sun.shadow.updateMatrices(sun); SF = sun.shadow.getFrustum(); }
-  for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
+  for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
 };
 
 // ---- the shaders of the whole map, compiled at the start and kept: a shader seen for the first time at speed stopped the game 80 to 200 ms, and one whose last user went with its tile was compiled again the next time.
