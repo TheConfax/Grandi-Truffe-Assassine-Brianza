@@ -1747,6 +1747,7 @@ function freeTile(T) {
     if (own(mt.map) || own(mt.emissiveMap)) { const k = SIGN_MATS.indexOf(mt); if (k >= 0) SIGN_MATS.splice(k, 1); for (const t of [mt.map, mt.emissiveMap]) if (own(t)) t.dispose(); mt.dispose(); } });
   { const tutti = []; G.traverse(o => tutti.push(o)); for (const o of tutti) { o.parent = null; o.children = []; if (o.geometry) o.geometry = GEO_VUOTA; } } /* a prop, a gate or a pump that keeps one object of the tile must not keep the whole tile through parent and children */
   T.group = null; T.built = false; T.ready = false; T.gen = null;
+  for (const g of T.gates || []) { g.bk = null; g.outer = g.inner = null; g.hinges = []; } /* nothing of the gates stays either */
   for (const p of H.PITS) if (tileOf(p.c[0], p.c[1]) === T.t) { p.built = false; p.meshes = []; } else if (p.meshes) p.meshes = p.meshes.filter(M => M.parent && M.parent !== G); // its ramp is drawn again with it
   for (const p of PROPS) if (tileOf(p.x, p.z) === T.t) { p.obj = p.lx ? p.obj : null; if (p.inst) p.inst.meshes = []; } // the props stay, as what was knocked down, but not the meshes they drew
   for (const p of PROPS) if (p.tile === T) { p.onBreak = null; p.inst.meshes = []; } // a lamp may stand just past the edge of its tile
@@ -1774,35 +1775,83 @@ function layPorte(T) { T.doors = []; for (const [X0, Z0, X1, Z1, k, h] of T.d.dr
   WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, door: true, y0: gy - 2, y1: gy + h });
 } }
 const DOOR_COL = { p: 0x5b3a26, n: 0x4a3426, b: 0x8f9296 };
+// What stands still in a tile by the thousand (posts, doors, closed gates) goes in one mesh per material: a tile has hundreds of them and each one cost an object or three in every pass of the renderer.
+// addGeo copies a geometry through a matrix, in the buffers of mkMesh; the normals go through the same matrix (rotations only, no scale)
+const _fzm = new THREE.Matrix4(), _fzm2 = new THREE.Matrix4(), _fze = new THREE.Euler(), _fzv = new THREE.Vector3(), _fzone = new THREE.Vector3(1, 1, 1), _fzq = new THREE.Quaternion();
+function addGeo(b, g, m) {
+  const k0 = b.p.length / 3, P = g.attributes.position, No = g.attributes.normal, U = g.attributes.uv, e = m.elements, ix = g.index;
+  for (let i = 0; i < P.count; i++) {
+    const x = P.getX(i), y = P.getY(i), z = P.getZ(i), nx = No.getX(i), ny = No.getY(i), nz = No.getZ(i);
+    b.p.push(e[0] * x + e[4] * y + e[8] * z + e[12], e[1] * x + e[5] * y + e[9] * z + e[13], e[2] * x + e[6] * y + e[10] * z + e[14]);
+    b.n.push(e[0] * nx + e[4] * ny + e[8] * nz, e[1] * nx + e[5] * ny + e[9] * nz, e[2] * nx + e[6] * ny + e[10] * nz);
+    b.uv.push(U.getX(i), U.getY(i));
+  }
+  for (let i = 0; i < ix.count; i++) b.i.push(k0 + ix.getX(i));
+  return [k0, b.p.length / 3];
+}
+const matTRy = (x, y, z, th) => _fzm.compose(_fzv.set(x, y, z), _fzq.setFromEuler(_fze.set(0, th, 0)), _fzone);
+function fuso(G) { // one buffer per material and per casting a shadow or not. Nothing here takes shadows, as the separate meshes did not
+  const L = new Map();
+  return {
+    buf(mat, cast) { const k = mat.id + (cast ? 'c' : ''); let e = L.get(k); if (!e) L.set(k, e = { b: Buf(), mat, cast, m: null, chi: [] }); return e; },
+    fine() { for (const e of L.values()) { e.m = mkMesh(e.b, e.mat, undefined, false, G); e.m.receiveShadow = false; e.m.castShadow = e.cast; for (const g of e.chi) g.bk.m = e.m; } }
+  };
+}
 function buildDoors(T, G) {
+  const F = fuso(G);
   for (const d of T.doors || []) {
-    const th = Math.atan2(-d.uz, d.ux), m = new THREE.Mesh(boxG(d.W, d.h, 0.14), lam(DOOR_COL[d.k] || 0x5b3a26));
-    m.position.set((d.ax + d.bx) / 2 - d.uz * 0.07, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.07); m.rotation.y = th; m.castShadow = true; G.add(m);
-    const fr = new THREE.Mesh(boxG(d.W + 0.16, d.h + 0.08, 0.1), lam(0xcfc8b8)); fr.position.set((d.ax + d.bx) / 2 - d.uz * 0.04, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.04); fr.rotation.y = th; G.add(fr);
+    const th = Math.atan2(-d.uz, d.ux);
+    addGeo(F.buf(lam(DOOR_COL[d.k] || 0x5b3a26), true).b, boxG(d.W, d.h, 0.14), matTRy((d.ax + d.bx) / 2 - d.uz * 0.07, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.07, th));
+    addGeo(F.buf(lam(0xcfc8b8), false).b, boxG(d.W + 0.16, d.h + 0.08, 0.1), matTRy((d.ax + d.bx) / 2 - d.uz * 0.04, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.04, th));
+  }
+  F.fine();
+}
+const ARM_MAT = new THREE.MeshLambertMaterial({ map: ARM_TEX });
+function armG(g) { const geo = new THREE.BoxGeometry(g.W, 0.09, 0.09); geo.translate(g.W / 2, 1.0, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * g.W / 1.6); return geo; }
+function leafG(g, w, dir) { const geo = new THREE.PlaneGeometry(w - 0.3, g.h); geo.translate(dir * (w / 2), g.h / 2 + 0.05, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (w - 0.3) / 0.75); return geo; }
+const gateLeaves = g => g.W > 3.2 && g.k !== 'o' ? [[0, g.W / 2, 1], [g.W, g.W / 2, -1]] : [[0, g.W, 1]];
+// A gate at rest is drawn in the mesh of its tile. When it opens or is rammed it gets its own objects, as long as it moves, with the hinges where they were; its place in the mesh collapses to a point.
+function gateVivo(g) {
+  if (g.outer || !g.bk) return; const b = g.bk, a = b.m.geometry.attributes.position; if (!a) return;
+  b.save = a.array.slice(b.v0 * 3, b.v1 * 3);
+  for (let i = b.v0; i < b.v1; i++) a.setXYZ(i, b.save[0], b.save[1], b.save[2]); a.needsUpdate = true;
+  gateOggetti(g, b.G);
+}
+function gateDorme(g) { // closed again: back in the mesh
+  const b = g.bk; if (!b || !g.outer || !b.save) return; const a = b.m.geometry.attributes.position; if (!a) return;
+  a.array.set(b.save, b.v0 * 3); a.needsUpdate = true; b.save = null;
+  g.outer.traverse(o => { if (o.geometry) o.geometry.dispose(); }); if (g.outer.parent) g.outer.parent.remove(g.outer); g.outer = g.inner = null; g.hinges = [];
+}
+function gateOggetti(g, G) {
+  const th = Math.atan2(-g.uz, g.ux), outer = new THREE.Group(), inner = new THREE.Group(); outer.add(inner); G.add(outer); g.outer = outer; g.inner = inner; g.hinges = [];
+  outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
+  if (g.k === 'l') { // lift-gate arm, hinged at a
+    const m = new THREE.Mesh(armG(g), ARM_MAT); m.castShadow = true; inner.add(m); if (g.perm) inner.rotation.z = 1.35; /* raised lift gate on a big road */
+  } else for (const [x0, w, dir] of gateLeaves(g)) { // gate leaf (two leaves when wide), hinged at the posts
+    const hinge = new THREE.Group(); hinge.position.x = x0; inner.add(hinge); g.hinges.push([hinge, dir]);
+    const m = new THREE.Mesh(leafG(g, w, dir), GATE_MAT); m.castShadow = true; hinge.add(m);
+    if (g.k === 'o') hinge.rotation.y = -1.35 * dir; // footpath gates stand open
   }
 }
 function buildGates(T, G) {
+  const F = fuso(G);
   for (const g of T.gates || []) {
-    const th = Math.atan2(-g.uz, g.ux);
-    if (g.k !== 'l') for (const [x, z] of [[g.ax, g.az], [g.bx, g.bz]]) { const p = new THREE.Mesh(boxG(0.32, g.h + 0.25, 0.32), lam(0x8d877c)); p.position.set(x, H.ground(x, z) + (g.h + 0.25) / 2, z); p.castShadow = true; G.add(p); }
-    else { const p = new THREE.Mesh(boxG(0.25, 1.15, 0.25), lam(0xd9d6cf)); p.position.set(g.ax, H.ground(g.ax, g.az) + 0.57, g.az); G.add(p); }
+    g.outer = g.inner = null; g.hinges = []; g.bk = null;
+    if (g.k !== 'l') for (const [x, z] of [[g.ax, g.az], [g.bx, g.bz]]) addGeo(F.buf(lam(0x8d877c), true).b, boxG(0.32, g.h + 0.25, 0.32), matTRy(x, H.ground(x, z) + (g.h + 0.25) / 2, z, 0));
+    else addGeo(F.buf(lam(0xd9d6cf), false).b, boxG(0.25, 1.15, 0.25), matTRy(g.ax, H.ground(g.ax, g.az) + 0.57, g.az, 0));
     if (g.broken && g.k !== 'o') continue; // already rammed
-    const outer = new THREE.Group(), inner = new THREE.Group(); outer.add(inner); G.add(outer); g.outer = outer; g.inner = inner;
-    if (g.k === 'l') { // lift-gate arm, hinged at a
-      outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
-      const geo = new THREE.BoxGeometry(g.W, 0.09, 0.09); geo.translate(g.W / 2, 1.0, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * g.W / 1.6);
-      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: ARM_TEX })); m.castShadow = true; inner.add(m); if (g.perm) inner.rotation.z = 1.35; /* raised lift gate on a big road */
-    } else { // gate leaf (two leaves when wide), hinged at the posts
-      const leaves = g.W > 3.2 && g.k !== 'o' ? [[0, g.W / 2, 1], [g.W, g.W / 2, -1]] : [[0, g.W, 1]];
-      outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
-      for (const [x0, w, dir] of leaves) {
-        const hinge = new THREE.Group(); hinge.position.x = x0; inner.add(hinge); g.hinges.push([hinge, dir]);
-        const geo = new THREE.PlaneGeometry(w - 0.3, g.h); geo.translate(dir * (w / 2), g.h / 2 + 0.05, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (w - 0.3) / 0.75);
-        const m = new THREE.Mesh(geo, GATE_MAT); m.castShadow = true; hinge.add(m);
-        if (g.k === 'o') hinge.rotation.y = -1.35 * dir; // footpath gates stand open
-      }
+    if (GATE_OPEN.has(g)) { gateOggetti(g, G); continue; } // built again while it was moving
+    const th = Math.atan2(-g.uz, g.ux), e = F.buf(g.k === 'l' ? ARM_MAT : GATE_MAT, true); let v0 = -1, v1 = 0;
+    if (g.k === 'l') {
+      matTRy(g.ax, g.gy, g.az, th); if (g.perm) _fzm.multiply(_fzm2.makeRotationZ(1.35));
+      [v0, v1] = addGeo(e.b, armG(g), _fzm);
+    } else for (const [x0, w, dir] of gateLeaves(g)) {
+      matTRy(g.ax, g.gy, g.az, th).multiply(_fzm2.makeTranslation(x0, 0, 0)); if (g.k === 'o') _fzm.multiply(_fzm2.makeRotationY(-1.35 * dir));
+      const r = addGeo(e.b, leafG(g, w, dir), _fzm); if (v0 < 0) v0 = r[0]; v1 = r[1];
     }
+    g.bk = { m: null, G, v0, v1, save: null }; e.chi.push(g);
   }
+  F.fine();
 }
 function gateHits(v) {
   if (v.speed < 0.6) return;
@@ -1812,12 +1861,12 @@ function gateHits(v) {
     for (const c of v.circles()) if (segDist(c[0], c[1], g.ax, g.az, g.bx, g.bz) < reach) { if (ai && g.auto) openGate(g); else if (v.speed > 3 || ai) breakGate(g, v); return; }
   });
 }
-function openGate(g) { g.open = true; g.openT = 5; if (g.seg) g.seg.on = false; GATE_OPEN.add(g); }
+function openGate(g) { gateVivo(g); g.open = true; g.openT = 5; if (g.seg) g.seg.on = false; GATE_OPEN.add(g); }
 function breakGate(g, v) {
   g.broken = true; GATE_ROTTI.add(g.key); if (g.seg) g.seg.on = false;
   const sp = v.speed; v.vx *= 0.82; v.vz *= 0.82; v.health = Math.max(0, v.health - 1.5);
   if (v === P.car) { sfxCrash(Math.min(14, sp)); shake = Math.max(shake, 0.35); }
-  if (!g.outer) return;
+  gateVivo(g); if (!g.outer) return;
   const vn = v.vx * -g.uz + v.vz * g.ux; // push side, in the gate's local z
   g.fall = Math.sign(vn) || 1; g.vx = v.vx * 0.55; g.vz = v.vz * 0.55; g.t = 0; GATE_FLY.push(g);
 }
@@ -1835,10 +1884,10 @@ function updGates(dt) {
     }
     g.oa = lerp(g.oa, g.open ? 1 : 0, 1 - Math.exp(-3 * dt));
     if (g.k === 'l') { if (g.inner) g.inner.rotation.z = 1.35 * g.oa; } else for (const [hn, dir] of g.hinges) hn.rotation.y = -1.45 * dir * g.oa;
-    if (!g.open && g.oa < 0.01) { g.oa = 0; GATE_OPEN.delete(g); }
+    if (!g.open && g.oa < 0.01) { g.oa = 0; GATE_OPEN.delete(g); gateDorme(g); }
   }
   for (let i = GATE_FLY.length - 1; i >= 0; i--) {
-    const g = GATE_FLY[i]; g.t += dt; const o = g.outer, k = Math.exp(-2.5 * dt);
+    const g = GATE_FLY[i]; g.t += dt; const o = g.outer, k = Math.exp(-2.5 * dt); if (!o) { GATE_FLY.splice(i, 1); continue; }
     o.position.x += g.vx * dt; o.position.z += g.vz * dt; g.vx *= k; g.vz *= k;
     if (g.k === 'l') { g.inner.rotation.z = Math.min(1.2, g.inner.rotation.z + dt * 6); g.inner.rotation.x += g.fall * dt * 4; o.position.y = g.gy + Math.max(-0.95, -g.t * g.t * 6); }
     else { g.inner.rotation.x = lerp(g.inner.rotation.x, g.fall * Math.PI * 0.49, 1 - Math.exp(-7 * dt)); o.position.y = H.ground(o.position.x, o.position.z) + 0.02; }
