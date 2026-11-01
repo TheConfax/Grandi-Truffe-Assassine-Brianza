@@ -471,7 +471,7 @@
    "vms": 48,
    "cic": 25
   },
-  "tempo_s": 1.8,
+  "tempo_s": 1.9,
   "anelli_osm": {
    "n": 3,
    "dove": [
@@ -526,7 +526,7 @@
   "piazze_m2": 44081,
   "vialetti_m2": 31976,
   "isole_m2": 15408,
-  "tempo_s": 26.1,
+  "tempo_s": 27.8,
   "cortili_nei_cantieri_m2": 14174
  },
  "muri_doppi_fusi": {
@@ -560,27 +560,27 @@
   "porte": {
    "p": 2042
   },
-  "nuovi": 2109,
+  "nuovi": 2108,
   "pedonali": 174,
   "senza_strada": 1809,
   "senza_chiusure": 2863,
   "carreggiata_o_marciapiede": 1322,
   "strada_osm": 349,
   "troppo_stretti": 2261,
-  "gia_cancello": 7490,
+  "gia_cancello": 7489,
   "fuori": 4,
   "doppione_recinzione": 89,
-  "capo_nel_vuoto": 642,
+  "capo_nel_vuoto": 641,
   "troppo_larghi": 471,
   "per_origine": {
    "passo_carraio": 240,
-   "rampa": 11,
+   "rampa": 9,
    "vialetto": 0,
-   "varco": 1365,
+   "varco": 1366,
    "capo_recinzione": 493
   }
  },
- "divisori_tagliati_da_cancelli": 435,
+ "divisori_tagliati_da_cancelli": 434,
  "barriere_in_carreggiata": {
   "linee": 72,
   "metri": 591
@@ -593,7 +593,7 @@
   "metri_tagliati": 961,
   "nodi_aggiunti": 116,
   "punti_per_motivo": {
-   "muro o edificio": 1087,
+   "muro o edificio": 1091,
    "fuori asfalto": 336,
    "stretta fra i muri": 123
   },
@@ -1419,6 +1419,6 @@
   "attraversamenti": {
    "n": 497
   },
-  "tempo_s": 3.7
+  "tempo_s": 7.7
  }
 }

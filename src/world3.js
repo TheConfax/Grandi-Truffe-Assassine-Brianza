@@ -94,6 +94,8 @@ const inWater = (x, z, gy) => { if (!H.fineAt(x, z)) return false; const w = H.w
 // the streets leave a tree's place free, as in a car park lined with trees (the DBGT trees of the yards, src/dbgt_verde.py)
 const treeNear = (x, z, r) => { let f = false; WALLS.each(x - r, z - r, x + r, z + r, o => { if (o.tree && hyp(o.x - x, o.z - z) < r) f = true; }); return f; };
 const EDIF = new Map(); // DBGT building -> its volumes on the ground (a shop looks for its front on all of them)
+// the barriers of the whole map, before the tiles keep them: their feet are decided on whole chains of lines (barFeetAll, sfondabili3.js)
+{ const all = []; for (const T of TILES) { T.feQ = []; T.baQ = []; for (const f of T.d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) { T.feQ.push(q); all.push(q); } for (const br of T.d.ba || []) for (const q of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) { T.baQ.push([br, q]); all.push(q); } } barFeetAll(all); }
 for (const T of TILES) {
   const d = T.d;
   for (const B of d.b || []) {
@@ -126,11 +128,11 @@ for (const T of TILES) {
       }
     }
   }
-  for (const f of d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) T.fe.push(barFeet(q)); // fences follow the ground every 3 m (walls and collisions are built later)
+  for (const q of T.feQ) T.fe.push(q); T.feQ = null; // fences follow the ground every 3 m (walls and collisions are built later)
   for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
-  for (const br of d.ba || []) for (const pts of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) {
-    const sp = BAR_PANEL[br.t], rec = { pts: barFeet(pts), t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
-    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
+  for (const [br, pts] of T.baQ) {
+    const sp = BAR_PANEL[br.t], rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
+    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + br.h, yv: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
     if (sp || br.t === 3) barPieces(T, rec, segs);
   }
   for (const q of d.sd || []) {
@@ -1486,7 +1488,17 @@ function* buildTileGen(T) {
   yield 'railway';
   // railway & fences
   {
-    const bal = FBuf(), steel = Object.assign(FBuf(), { noclip: true }); // the rails, 12 cm strips 11 cm over a smooth bed: each vertex on S, not cut on the cells
+    // the tracks at grade stand on their own profile (src/binari.py, H.railY), every vertex on it, not cut on the cells of S, which is flat under them where it can be: ballast, sleepers and
+    // rails, and a shoulder of ballast from the edge down into S (no gap where S lies lower, by a street at another level). Off the profile (outside S) as before
+    const railHf = (x, z) => { const y = H.railY(x, z); return y !== null ? y : streetH(x, z); };
+    const bal = Object.assign(FBuf(), { noclip: true, hf: railHf }), steel = Object.assign(FBuf(), { noclip: true, hf: railHf }), gra = Object.assign(FBuf(), { noclip: true, hf: railHf }), shou = Buf(), BAL_W = 2.1, BAL_Y = 0.04, SH_D = 0.8;
+    const shoulder = run => { // the two sides of a run, 1 : 1 down
+      for (const sd of [1, -1]) for (let k = 1; k < run.length; k++) {
+        const A = run[k - 1], C = run[k], L = hyp(C[0] - A[0], C[1] - A[1]); if (L < 0.01) continue; const rx = -(C[1] - A[1]) / L * sd, rz = (C[0] - A[0]) / L * sd, i0 = shou.p.length / 3, ya = railHf(A[0] + rx * BAL_W, A[1] + rz * BAL_W) + BAL_Y, yc = railHf(C[0] + rx * BAL_W, C[1] + rz * BAL_W) + BAL_Y;
+        for (const [P_, y, w] of [[A, ya, BAL_W], [A, ya - SH_D, BAL_W + SH_D], [C, yc - SH_D, BAL_W + SH_D], [C, yc, BAL_W]]) vtx(shou, P_[0] + rx * w, y, P_[1] + rz * w, 0, 1, 0, (P_[0] + rx * w) / 3, (P_[1] + rz * w) / 3);
+        triUp(shou, i0, i0 + 1, i0 + 2); triUp(shou, i0, i0 + 2, i0 + 3);
+      }
+    };
     const ebal = Buf(), esteel = Buf(), eside = Buf();
     for (const r of d.rl || []) {
       const p0 = dec(r.p); if (p0.length < 2) continue;
@@ -1499,7 +1511,9 @@ function* buildTileGen(T) {
           if (k < p.length && cls[k] === cls[k0]) continue;
           const run = p.slice(k0, Math.min(p.length, k + 1)), c = cls[k0], y = c === 2 ? 0.035 : 0.11; // (the run takes the next point: no gap)
           if (run.length >= 2) {
-            if (c === 0) ribbon(bal, run, -1.9, 1.9, 0.07, 2.4, 'along'); else if (c === 1) ribbon(bal, run, -1.3, 1.3, 0.07, 2.4, 'along');
+            const onP = T.fine && c !== 2 && H.railY(run[run.length >> 1][0], run[run.length >> 1][1], 2) !== null;
+            if (onP) { ribbon(gra, run, -BAL_W, BAL_W, BAL_Y, 3, 'world'); shoulder(run); ribbon(bal, run, -1.3, 1.3, 0.07, 2.4, 'along'); }
+            else if (c === 0) ribbon(bal, run, -1.9, 1.9, 0.07, 2.4, 'along'); else if (c === 1) ribbon(bal, run, -1.3, 1.3, 0.07, 2.4, 'along');
             ribbon(steel, run, -0.8, -0.68, y, 9, 'world'); ribbon(steel, run, 0.68, 0.8, y, 9, 'world');
           }
           k0 = k;
@@ -1517,7 +1531,8 @@ function* buildTileGen(T) {
           if (T.fine && y0 <= H.base(x0, z0) + 1e-3 && y1 <= H.base(x1, z1) + 1e-3) { // an old elevated track that runs on S (no railway deck under it): draped like the
             // tracks at grade, the ballast cut on the cells; a flat 3 m piece 7 cm over its ends let the ground, which writes its depth, through it on every hump
             const qS = (b, a0, a1, d) => { const i0 = b.p.length / 3; vtx(b, x0 + rx * a0, d, z0 + rz * a0, 0, 1, 0, 0, t0 * L / 2.4); vtx(b, x0 + rx * a1, d, z0 + rz * a1, 0, 1, 0, 1, t0 * L / 2.4); vtx(b, x1 + rx * a1, d, z1 + rz * a1, 0, 1, 0, 1, t1 * L / 2.4); vtx(b, x1 + rx * a0, d, z1 + rz * a0, 0, 1, 0, 0, t1 * L / 2.4); triUp(b, i0, i0 + 1, i0 + 2); triUp(b, i0, i0 + 2, i0 + 3); };
-            qS(bal, -2.2, 2.2, 0.07); qS(steel, -0.8, -0.68, 0.11); qS(steel, 0.68, 0.8, 0.11); continue;
+            if (H.railY(x0, z0, 2) !== null && H.railY(x1, z1, 2) !== null) { qS(gra, -BAL_W, BAL_W, BAL_Y); shoulder([[x0, z0], [x1, z1]]); qS(bal, -1.3, 1.3, 0.07); } else qS(bal, -2.2, 2.2, 0.07);
+            qS(steel, -0.8, -0.68, 0.11); qS(steel, 0.68, 0.8, 0.11); continue;
           }
           const quadA =(b, a0, a1, d0, d1) => { const i0 = b.p.length / 3; vtx(b, x0 + rx * a0, y0 + d0, z0 + rz * a0, 0, 1, 0, 0, t0 * L / 2.4); vtx(b, x0 + rx * a1, y0 + d0, z0 + rz * a1, 0, 1, 0, 1, t0 * L / 2.4); vtx(b, x1 + rx * a1, y1 + d1, z1 + rz * a1, 0, 1, 0, 1, t1 * L / 2.4); vtx(b, x1 + rx * a0, y1 + d1, z1 + rz * a0, 0, 1, 0, 0, t1 * L / 2.4); triUp(b, i0, i0 + 1, i0 + 2); triUp(b, i0, i0 + 2, i0 + 3); };
           quadA(ebal, -2.2, 2.2, 0.07, 0.07); quadA(esteel, -0.8, -0.68, 0.12, 0.12); quadA(esteel, 0.68, 0.8, 0.12, 0.12);
@@ -1530,7 +1545,7 @@ function* buildTileGen(T) {
       }
     }
     if (ebal.i.length) { const m1 = new THREE.MeshLambertMaterial({ map: ballastTex }); put(ebal, m1, 9); put(esteel, MAT.rail, 10); put(eside, MAT.deckSide, 10, 'cast'); }
-    put(bal, MAT.ballast, 7); put(steel, MAT.steel, 8);
+    put(gra, MAT.gravel, 6); put(shou, MAT.gravel, 6); put(bal, MAT.ballast, 7); put(steel, MAT.steel, 8);
     const wall = Buf(), net = Buf(), WH = 0.9, NH = 2.0, TK = 0.13, posts = []; /* on the foot of the barriers (barFoot, sfondabili3.js), no longer draped on the cells: on a bank they went up and down like a saw */
     for (const pts of T.fe) {
       let acc = 0, nextPost = 0;
@@ -1760,7 +1775,7 @@ for (const [X0, Z0, X1, Z1, k, h] of D.doors || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
   DOORS.push({ ax, az, bx, bz, ux, uz, W, k, h, gy });
-  WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, y0: gy - 2, y1: gy + h });
+  WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, door: true, y0: gy - 2, y1: gy + h });
 }
 const DOOR_COL = { p: 0x5b3a26, n: 0x4a3426, b: 0x8f9296 };
 function buildDoors(T, G) {
@@ -2236,7 +2251,7 @@ function buildSignals(T, G) {
     const sp = new THREE.Mesh(boxG(0.06, 2.7, 0.06), lam(0x5a6068)); sp.position.set(0.7, 1.35, 1.9); root.add(sp);
     // the shelter goes over when rammed, like the street lamps; built again, a fallen one stays down
     const key = X + ',' + Z, old = BUS_PROPS.get(key);
-    if (!old) BUS_PROPS.set(key, addProp({ x: x - Math.cos(root.rotation.y) * 0.3, z: z + Math.sin(root.rotation.y) * 0.3, y: gy, r: 1.1, h: 2.6, obj: root }));
+    if (!old) BUS_PROPS.set(key, addProp({ x: x - Math.cos(root.rotation.y) * 0.3, z: z + Math.sin(root.rotation.y) * 0.3, y: gy, r: 1.1, h: 2.5, obj: root, sali: { rs: 0.7, dy: 2.49 } }));
     else { old.obj = root; if (old.broken) root.visible = false; }
   }
 }

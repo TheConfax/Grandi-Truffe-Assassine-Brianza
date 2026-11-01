@@ -58,10 +58,10 @@ const flatMat""")
 world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'rotonde3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
-function collideStatic(p, r, y) {
+function collideStatic(p, r, y, veh) {
   let nx = 0, nz = 0, hit = false;
   WALLS.each(p.x - r - 1, p.z - r - 1, p.x + r + 1, p.z + r + 1, s => {
-    if (s.off || s.y0 !== undefined && (y === undefined || y < s.y0 || y > s.y1)) return; /* s.off: a barrier piece broken through (sfondabili3.js) */
+    if (s.off || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh && s.yv !== undefined ? s.yv : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
     if (s.dyn && !s.on) return;
     if (s.r) { const dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz), R = r + s.r; if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; hit = true; } return; }
     if (s.dyn && !s.on) return;
@@ -94,11 +94,11 @@ rep("if (TR) for (const [cx, cz, tvx, tvz] of TR.circ) { const dx = P.x - cx", "
 
 # ---- heights on several levels
 rep("const [cf, cb] = this.circles(), yf = surfY(cf[0], cf[1]), yb = surfY(cb[0], cb[1]), ty = (yf + yb) / 2;", "const [cf, cb] = this.circles(), yf = H.surface(cf[0], cf[1], this.y), yb = H.surface(cb[0], cb[1], this.y), ty = (yf + yb) / 2;")
-rep("const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad);", "const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad, this.y + 0.4);")
+rep("const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad);", "const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad, this.y + 0.4, true);")
 rep("const fl = surfY(p.x, p.z); p.t += dt;", "const fl = H.surface(p.x, p.z, p.y); p.t += dt;")
 rep("p.phase += spd * dt * 3.2; p.y = surfY(p.x, p.z);", "p.phase += spd * dt * 3.2; p.y = H.surface(p.x, p.z, p.y);")
 rep("const fl = surfY(P.x, P.z); P.y = Math.max(fl,", "const fl = H.surface(P.x, P.z, P.y); P.y = Math.max(fl,")
-rep("P.y = surfY(P.x, P.z); P.h = wrapA(P.h + steerIn * 2.8 * dt);", "P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + steerIn * 2.8 * dt);")
+rep("P.y = surfY(P.x, P.z); P.h = wrapA(P.h + steerIn * 2.8 * dt);", "P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + ((K.left ? 1 : 0) - (K.right ? 1 : 0)) * 2.8 * dt);")
 rep("const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4);", "const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4, P.y + 0.4);")
 rep("const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35);", "const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35, p.y + 0.4);")
 
@@ -119,7 +119,7 @@ s = s[:a] + """// a car standing still (parked, or just spawned in the traffic) 
 function carFree(spec, x, z, h, y) {
   const rad = spec.W / 2 + 0.02, co = Math.max(0.2, spec.L / 2 - rad), fx = Math.sin(h) * co, fz = Math.cos(h) * co, yy = y + 0.4, cs = [[x + fx, z + fz], [x - fx, z - fz]]; let ok = true;
   WALLS.each(x - co - rad - 1.5, z - co - rad - 1.5, x + co + rad + 1.5, z + co + rad + 1.5, s => {
-    if (!ok || s.dyn || s.off || (s.y0 !== undefined && (yy < s.y0 || yy > s.y1))) return;
+    if (!ok || s.dyn || s.off || (s.y0 !== undefined && (yy < s.y0 || yy > (s.yv !== undefined ? s.yv : s.y1)))) return;
     for (const c of cs) if (s.r ? hyp(c[0] - s.x, c[1] - s.z) < s.r + rad + 0.1 : segDist(c[0], c[1], s.ax, s.az, s.bx, s.bz) < rad + 0.2) { ok = false; return; }
   });
   return ok;
@@ -255,7 +255,7 @@ rep("$('street').textContent = (st || 'Meda') + (TER ? ` · ${Math.round(TER.bas
 rep("const spot = D.pois.find(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')) || { x: 0, z: 0 };",
     "const cands = D.pois.filter(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')), spot = cands.sort((a, b) => hyp(a.x - P.x, a.z - P.z) - hyp(b.x - P.x, b.z - P.z))[0] || STATION;")
 rep("banner(kind === 'busted' ? 'Polizia Locale' : 'Stazione di Meda', 'DI NUOVO IN STRADA');", "banner(spot.n || 'Meda', 'DI NUOVO IN STRADA');")
-rep("const STATION = D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0 };", "const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };\nconst START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && Math.abs(x) < META.hw && Math.abs(z) < META.hh) return { x, z, n: 'Punto', piedi: q.has('piedi') }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */")
+rep("const STATION = D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0 };", "const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };\nconst START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && Math.abs(x) < META.hw && Math.abs(z) < META.hh) return { x, z, n: 'Punto', piedi: q.has('piedi'), mezzo: q.get('mezzo') }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */")
 rep("""function setupWorld(saved) {
   spawnParked();""", """function setupWorld(saved) {
   tileTick(STATION.x, STATION.z, 0, 420);
@@ -266,7 +266,7 @@ rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode =
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
 rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME };")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -277,7 +277,7 @@ rep("Le vie vere di Meda, dalla stazione a Piazza della Chiesa. Ruba un'auto, fa
 rep("banner('Stazione di Meda', 'MEDA · BRIANZA');", "banner('Stazione di Meda', 'BRIANZA');")
 # ---- driving model: one, the arcade one (real top speeds); the realistic model and its G key are gone (Carlo, 25/10)
 rep("const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = S.acc * (bst ? 1.7 : 1), top = this.maxV * (bst ? 1.15 : 1);",
-    "const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = Math.min(12, S.acc * 2.1) * (bst ? 2.4 : 1), top = this.maxV * (bst ? 1.3 : 1);")
+    "const S = this.spec, dead = this.health <= 0, thr = dead ? 0 : i.thr, bst = this.boost && thr > 0, acc = Math.min(12, S.acc * 2.1) * (this.accMul || 1) * (bst ? 2.4 : 1), top = this.maxV * (bst ? 1.3 : 1);")
 rep("if (i.brk > 0) { if (v > 0.5) v -= 11 * dt * i.brk;", "if (i.brk > 0) { if (v > 0.5) v -= 21 * dt * i.brk;")
 rep("const drag = (0.15 + (thr ? 0 : 0.45 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);", "const drag = (0.15 + (thr ? 0 : 1.6 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);")
 rep("const yawMax = (i.hand ? 22 : 13 + S.grip * 0.4) / Math.max(4, Math.abs(v));", "const yawMax = (i.hand ? 26 : 30) / Math.max(4, Math.abs(v));")
@@ -303,24 +303,81 @@ rep("    if (v > 4) { this.health = Math.max(0, this.health - (v - 4) * 2.2); }"
 rep("      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;", "      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;")
 rep("      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;", "      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;")
 # ---- gamepad (Xbox / PlayStation layout): RT gas, LT brake, left stick steer, RB handbrake, A turbo/run, Y get in/out, B camera, X horn, View map, Start pause
-rep("// ---------------------------------------------------------------- player actions", """const GP = { steer: 0, thr: 0, brk: 0, hand: 0, turbo: 0, horn: 0, fwd: 0, prev: [] };
+rep("// ---------------------------------------------------------------- player actions", """const GP = { steer: 0, thr: 0, brk: 0, hand: 0, turbo: 0, horn: 0, fwd: 0, lookx: 0, looky: 0, back: 0, sprint: 0, prev: [], hold: [], t0: 0, mode: '', l3: 0, l3d: false };
+/* which layout applies: on foot, car (and anything else with four wheels), motorbike or scooter, bicycle */
+const padKind = () => P.mode !== 'car' || !P.car ? 'foot' : P.car.spec.pedal ? 'bici' : P.car.spec.two ? 'moto' : 'car';
+const padNames = () => GP.ps ? { x: '✕', o: '○', s: '□', t: '△', l1: 'L1', r1: 'R1', l2: 'L2', r2: 'R2', l3: 'L3', r3: 'R3', cr: 'Create', op: 'Options', tp: 'Touchpad' }
+  : { x: 'A', o: 'B', s: 'X', t: 'Y', l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT', l3: 'LS', r3: 'RS', cr: 'View', op: 'Menu', tp: 'Guide' };
+function padHelp(kind) {
+  const n = padNames(), com = `${n.r3} ${kind === 'foot' ? 'ricentra la camera' : 'guarda dietro'} · ${n.cr} visuale · ${n.tp} mappa · ${n.op} pausa${DEBUG ? ' · croce su segnala punto' : ''}`;
+  if (kind === 'foot') return `levetta sinistra cammina (piena: corsetta) · ${n.x} premuto ripetutamente: scatto · ${n.t} sali sul mezzo · ${com}`;
+  if (kind === 'bici') return `${n.r2} pedala · ${n.x} ripetuto: scatto · ${n.l2} freno · ${n.r1} freno a mano · levetta sinistra sposta il peso · ${n.t} scendi · ${com}`;
+  return `${n.r2} gas · ${n.l2} freno e retro · ${n.r1} o ${n.x} freno a mano · ${n.o} turbo · ${n.l3} clacson · ${n.t} sali/scendi · croce sinistra radio${kind === 'moto' ? ' · levetta sinistra sposta il peso' : ''} · ${com}`;
+}
+/* tap or hold on one button: tap fires on release, hold fires once after 0.45 s */
+function padTap(i, down, dt, onTap, onHold) {
+  const h = GP.hold[i] || (GP.hold[i] = { t: 0, on: false, done: false });
+  if (down) { if (h.block) return; if (!h.on) { h.on = true; h.t = 0; h.done = false; } h.t += dt; if (!h.done && h.t >= 0.45) { h.done = true; if (onHold) onHold(); } }
+  else { h.block = false; if (h.on) { h.on = false; if (!h.done && onTap) onTap(); } }
+}
 function pollPad() {
   let pads = []; try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) { return; }
-  const g = [...pads].find(p => p && p.connected); if (!g) { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = 0; return; }
-  const dz = v => Math.abs(v) < 0.15 ? 0 : v, b = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0;
-  const edge = i => { const now = b(i) > 0.5, was = GP.prev[i]; GP.prev[i] = now; return now && !was; };
-  // cross/A handbrake, circle/B turbo, square/X horn, triangle/Y get in-out, R1/RB or R3 camera
-  GP.steer = dz(g.axes[0] || 0); GP.fwd = -dz(g.axes[1] || 0); GP.thr = b(7); GP.brk = b(6); GP.hand = b(0); GP.turbo = b(1); GP.horn = b(2);
-  if (edge(3)) K.use = true;
-  if (edge(5)) camMode = (camMode + 1) % 2;
-  if (edge(11)) reportSpot();
-  if (edge(8)) toggleBig();
-  const e9 = edge(9); if (!running) { if ((e9 || edge(0)) && !goBtn.disabled) startGame(); } else if (e9) togglePause(); /* title screen: START or cross/A start the game like Enter */
-  if (!GP.seen) {
-    GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id);
-    const L = GP.ps ? { t: 'R2', b: 'L2', h: '✕', o: '○', s: '□', y: '△', c: 'R1', m: 'Create', p: 'Options', r: 'R3' } : { t: 'RT', b: 'LT', h: 'A', o: 'B', s: 'X', y: 'Y', c: 'RB', m: 'View', p: 'Menu', r: 'R3' };
-    const txt = `${L.t} gas · ${L.b} freno · ${L.h} freno a mano · ${L.o} turbo · ${L.s} clacson · ${L.y} sali/scendi · ${L.c} visuale · ${L.r} segnala punto · ${L.m} mappa · ${L.p} pausa`;
-    toast((GP.ps ? 'DualSense' : 'Controller') + ' collegato: ' + txt); const pl = document.getElementById('padline'); if (pl) { pl.hidden = false; pl.textContent = 'Controller: ' + txt; }
+  const g = [...pads].find(p => p && p.connected); if (!g) { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = GP.lookx = GP.looky = GP.back = 0; return; }
+  const tn = performance.now(), dt = Math.min(0.1, (tn - (GP.t0 || tn)) / 1000); GP.t0 = tn;
+  const dz = v => Math.abs(v) < 0.15 ? 0 : v, b = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0, down = i => b(i) > 0.5;
+  const edge = i => { const now = down(i), was = GP.prev[i]; GP.prev[i] = now; return now && !was; };
+  const E = []; for (let i = 0; i < 18; i++) E[i] = edge(i);
+  const first = !GP.seen; if (first) { GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id); }
+  const kind = padKind(), veh = kind !== 'foot', tpad = GP.ps ? 17 : 16;
+  if (first || kind !== GP.mode) {
+    GP.mode = kind; const txt = padHelp(kind);
+    if (first) toast((GP.ps ? 'DualSense' : 'Controller') + ' collegato: ' + txt);
+    const pl = document.getElementById('padline'); if (pl) { pl.hidden = false; pl.textContent = 'Controller: ' + txt; }
+  }
+  const none = () => { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = GP.lookx = GP.looky = GP.back = 0; };
+  /* title screen: Options or cross/A start the game like Enter */
+  if (!running) { none(); if ((E[9] || E[0]) && !goBtn.disabled) startGame(); return; }
+  if (E[9]) togglePause(); /* also closes the big map */
+  if (paused && !bigOpen) { radioWheelCancel(); none(); return; }
+  if (E[tpad]) toggleBig();
+  if (bigOpen) { radioWheelCancel(); none(); return; }
+  const ni = s => toast(s + ' non implementato');
+  GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0);
+  GP.thr = veh ? b(7) : 0; GP.brk = veh ? b(6) : 0;
+  GP.hand = kind === 'bici' ? b(5) : veh ? Math.max(b(0), b(5)) : 0;
+  GP.turbo = kind === 'car' || kind === 'moto' ? b(1) : 0;
+  GP.horn = kind === 'car' || kind === 'moto' ? b(10) : 0;
+  /* sprint: each cross/A press adds a push that fades away, so the faster it is mashed the closer to the top it gets; 4.8 m/s over the jog = 9 m/s */
+  GP.sprint *= Math.exp(-1.2 * dt); if (E[0] && (!veh || kind === 'bici')) GP.sprint = Math.min(4.8, GP.sprint + 1.5);
+  if (E[8]) camMode = camMode === 0 ? 2 : 0; /* third person <-> first person; the top view is gone from the pad */
+  if (E[12]) reportSpot();
+  if (E[13]) ni('Zoom della minimappa');
+  /* radio wheel: the right stick picks the slice, the camera does not move, the car keeps being driven; letting go of the d-pad confirms */
+  if (RW.open && !down(14)) radioWheelRelease();
+  if (RW.open) radioWheelStick(g.axes[2] || 0, g.axes[3] || 0);
+  if (RW.open || RW.lock) { if (!RW.open && !down(14) && Math.hypot(g.axes[2] || 0, g.axes[3] || 0) < 0.15) RW.lock = false; else GP.lookx = GP.looky = 0; }
+  /* d-pad left: radio. d-pad right: lights (vehicles), use item (on foot) */
+  padTap(14, down(14), dt, radioNext, radioWheelOpen);
+  if (veh) padTap(15, down(15), dt, () => ni(kind === 'bici' ? 'Fanale' : 'Fari'), () => ni(kind === 'bici' ? 'Fanale' : 'Abbaglianti')); else if (E[15]) ni('Usa oggetto');
+  if (veh) {
+    if (E[3]) { K.use = true; (GP.hold[3] || (GP.hold[3] = { t: 0, on: false, done: false })).block = true; } /* getting out ends this press: on foot it must not count as a tap that gets in again */
+    if (E[2]) ni('Cambio arma');
+    if (E[4]) ni('Sparare');
+    if (kind === 'bici') { if (E[1]) ni('Bunny hop'); if (E[10]) ni('Campanello'); }
+    else if (down(10)) {
+      /* police car: horn up to 0.8 s, past that the horn stops and the siren flips (v.siren, no sound yet); other cars and bikes: horn while held */
+      GP.l3 += dt;
+      if (kind === 'car' && P.car.kind === 'police') { if (GP.l3 >= 0.8) { GP.horn = 0; if (!GP.l3d) { GP.l3d = true; P.car.siren = !P.car.siren; toast('Sirena non implementata'); } } }
+    } else { GP.l3 = 0; GP.l3d = false; }
+  } else {
+    padTap(3, down(3), dt, () => { K.use = true; }, () => ni('Scasso'));
+    if (E[2]) P.jumpReq = SALTO.buffer; /* square: jump, or over and up what is ahead (salto3.js) */
+    if (E[1]) ni('Pugno');
+    if (E[4]) ni('Ruota delle armi');
+    if (E[5]) ni('Riparo');
+    if (E[6]) ni('Mira');
+    if (E[7]) ni('Sparare');
+    if (E[10]) ni('Accovacciarsi');
   }
 }
 addEventListener('gamepadconnected', () => { GP.seen = false; });
@@ -328,9 +385,22 @@ addEventListener('gamepadconnected', () => { GP.seen = false; });
 // ---------------------------------------------------------------- player actions""")
 rep("  const steerIn = (K.left ? 1 : 0) - (K.right ? 1 : 0);", "  const steerIn = clamp((K.left ? 1 : 0) - (K.right ? 1 : 0) - GP.steer, -1, 1);")
 rep("    const v = P.car; v.inp.thr = K.up ? 1 : 0; v.inp.brk = K.down ? 1 : 0; v.inp.steer = steerIn; v.inp.hand = K.hand ? 1 : 0; v.sleep = false;",
-    "    const v = P.car; v.inp.thr = Math.max(K.up ? 1 : 0, GP.thr); v.inp.brk = Math.max(K.down ? 1 : 0, GP.brk); v.inp.steer = steerIn; v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false;")
+    "    const v = P.car; v.inp.thr = Math.max(K.up ? 1 : 0, GP.thr); v.inp.brk = Math.max(K.down ? 1 : 0, GP.brk); v.inp.steer = steerIn; v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; if (v.spec.pedal) { const sk_ = GP.sprint / 4.8; v.maxV = v.spec.maxV + (BICI_SPRINT_MAX - v.spec.maxV) * sk_; v.accMul = 1 + 0.6 * sk_; }")
 rep("    const want = K.turbo && K.up && v.health > 0 && P.nitro > 1;", "    const want = (K.turbo || GP.turbo > 0.5) && v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;")
-rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);", "const fwdIn = K.up ? 1 : K.down ? -0.5 : GP.fwd > 0.3 || GP.thr > 0.3 ? Math.max(GP.fwd, GP.thr) : GP.fwd < -0.3 ? -0.5 : 0, sp = fwdIn * (K.hand || K.turbo || GP.turbo > 0.5 ? 7.2 : 4.2);")
+rep("(S.two ? 4.5 : 10) * dt)", "(S.two ? (TWO_STEER[this.kind] || 4.5) : 10) * dt)")
+rep("this.whv += (28 * (tgt - this.wh) - 7 * this.whv) * dt;", "this.whv += (28 * (tgt - this.wh) - 7 * this.whv + (this.wh > S.whMax * WHEEL.bal ? WHEEL.kov * (this.wh - S.whMax * WHEEL.bal) : 0) - (this.wh < -S.whMax * STOP.bal ? STOP.kov * Math.min(5, v / STOP.v0) * (-this.wh - S.whMax * STOP.bal) : 0)) * dt;")
+rep("    if (this.wh > S.whMax * 0.9 && lb > 0.9 && thr > 0) this.whHold += dt; else this.whHold = Math.max(0, this.whHold - dt * 2);\n", "    this.whHold = 0;\n")
+rep("    else if (i.brk > 0 && lb < -0.1 && v > 4) tgt = -0.55 * S.whMax * -lb * i.brk;", "    else if (i.brk > 0 && lb < -0.1 && v > 4) tgt = -STOP.max * S.whMax * -lb * i.brk * Math.min(5, v / STOP.v0);")
+rep("(this.whHold > 2.2 || this.wh < -0.72)", "(this.wh > S.whMax * WHEEL.fall || this.wh < -S.whMax * STOP.fall)")
+rep("    if (S.two) this.roll = lerp(this.roll, clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85), 0.14); // lean into the bend",
+    "    if (S.two) { const ln_ = LEAN[this.kind] || LEAN.moto, tg_ = clamp(-Math.atan(yaw * v / 9.81), -0.85, 0.85) * ln_.k, ms_ = 0.85 * ln_.k / ln_.t * dt; this.roll = lerp(this.roll, this.roll + clamp(tg_ - this.roll, -ms_, ms_), 0.5); } /* lean into the bend, rate-limited */")
+rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);", "let sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2);\n"
+    "      /* pad on foot (Carlo, 31/10): the left stick is a direction in the world as the camera sees it; the walker turns towards it with a soft curve and walks the way he faces, never backwards. Half stick = a walk of about 2 m/s, full = the jog of 4.2, cross/A mashed adds up to 4.8 m/s. The keyboard keeps its own way (turn on the spot, up/down) */\n"
+    "      if (!(K.up || K.down) && Math.hypot(GP.steer, GP.fwd) > 0.15) {\n"
+    "        const m_ = Math.min(1, Math.hypot(GP.steer, GP.fwd)), va_ = camVA, dx_ = GP.fwd * Math.sin(va_) - GP.steer * Math.cos(va_), dz_ = GP.fwd * Math.cos(va_) + GP.steer * Math.sin(va_);\n        /* the direction is fixed in the world while the stick holds still: the camera swinging round behind him must not drag it along (no endless circling); a new stick position or the right stick sets it again */\n        if (!padLat || Math.hypot(GP.steer - pSx, GP.fwd - pSy) > 0.04 || Math.abs(GP.lookx || 0) > 0.12) { padTgt = Math.atan2(dx_, dz_); pSx = GP.steer; pSy = GP.fwd; padLat = true; }\n"
+    "        const dh_ = wrapA(padTgt - P.h), tn_ = clamp(dh_ * (1 - Math.exp(-PAD_TURN * dt)), -PAD_MAXTURN * dt, PAD_MAXTURN * dt);\n"
+    "        P.h = wrapA(P.h + tn_); sp = clamp(m_ / 0.9, 0, 1) * (4.2 + GP.sprint) * (0.45 + 0.55 * Math.max(0, Math.cos(dh_)));\n"
+    "      }")
 rep("((K.horn && P.mode === 'car') ? 0.12", "(((K.horn || GP.horn > 0.5) && P.mode === 'car') ? 0.12")
 rep("  if (running && !paused) { acc += dt;", "  pollPad();\n  if (running && !paused) { acc += dt;")
 rep("<p>Premi <kbd>P</kbd> per riprendere</p>", "<p id=\"padline\" hidden></p><p>Premi <kbd>P</kbd> per riprendere</p>")
@@ -379,8 +449,6 @@ rep("#health i {", "#clock { font-family: var(--display); font-size: 20px; lette
 rep("  if (e.code === 'KeyU') {", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyU') {")
 rep("      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>", "      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>\n      <div><kbd>N</kbd> avanti di 2 ore</div>")
 rep("<kbd>H</kbd> clacson · <kbd>U</kbd> audio</p>", "<kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>U</kbd> audio</p>")
-rep("  if (edge(8)) toggleBig();", "  if (edge(8)) toggleBig();\n  if (edge(4)) skipTime(2);")
-rep("${L.m} mappa · ${L.p} pausa`", "${L.m} mappa · ${L.p} pausa · ${GP.ps ? 'L1' : 'LB'} +2 ore`")
 rep("banner('Stazione di Meda', 'BRIANZA')", "banner('Via Yuri Gagarin', 'MEDA')")
 # open land defaults to Brianza meadow, not grey-white
 rep("const groundTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#a4a396'; g.fillRect(0, 0, w, h); noise(g, w, h, 7000, 0.3, ['#8b8c7c', '#b7b5a8', '#8f9a74', '#7d8a5e']); });",
@@ -410,12 +478,10 @@ rep("KeyN: 'turbo', KeyH: 'horn' };", "KeyH: 'horn', KeyQ: 'back', KeyE: 'fwdw' 
 # two-wheelers: weight back (Q / left stick pulled) or forward (E / stick pushed) for wheelies and stoppies
 rep("v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false;", "v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; v.inp.lean = clamp((K.back ? 1 : 0) - (K.fwdw ? 1 : 0) - GP.fwd, -1, 1);")
 rep("  if (e.code === 'KeyN') skipTime(2);", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyR') toggleRadio();")
-rep("  if (edge(4)) skipTime(2);", "  if (edge(4)) skipTime(2);\n  if (edge(12)) toggleRadio();")
 
 rep("  updVisuals(running && !paused ? dt : 0);", "  updVisuals(running && !paused ? dt : 0); updRadio(dt);")
 rep("      <div><kbd>N</kbd> avanti di 2 ore</div>", "      <div><kbd>N</kbd> avanti di 2 ore</div>\n      <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>")
 rep("<kbd>N</kbd> +2 ore · <kbd>B</kbd> segnala punto", "<kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>B</kbd> segnala punto")
-rep("${GP.ps ? 'L1' : 'LB'} +2 ore`", "${GP.ps ? 'L1' : 'LB'} +2 ore · freccia su radio`")
 rep("CC BY 4.0.</p>", "CC BY 4.0. Edifici aggiuntivi e altezze: <a href=\"https://overturemaps.org\" target=\"_blank\" rel=\"noopener\">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href=\"https://www.discoradio.it\" target=\"_blank\" rel=\"noopener\">Discoradio</a>, stream ufficiale; <a href=\"https://www.radiomaria.it\" target=\"_blank\" rel=\"noopener\">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href=\"https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy\" target=\"_blank\" rel=\"noopener\">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href=\"https://www.mapillary.com\" target=\"_blank\" rel=\"noopener\">Mapillary</a> e i suoi contributori, CC BY-SA 4.0.</p>")
 
 # ---- debug mode (code DEBUG in the pause menu, or ?debug in the URL): bug reports, coordinates HUD, export
@@ -446,7 +512,6 @@ rep("(saved ? '' : ' (solo in locale)')", "(saved ? ' (anche su claude.ai)' : ''
 rep("updVisuals(running && !paused ? dt : 0); updRadio(dt);", "updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);")
 rep("      <div><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>", "      <div class=\"dbg\"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>")
 rep("<kbd>B</kbd> segnala punto · ", "<span class=\"dbg\"><kbd>B</kbd> segnala punto · </span>")
-rep("${L.r} segnala punto · ", "${DEBUG ? L.r + ' segnala punto · ' : ''}")
 rep("<p id=\"padline\" hidden></p>", "<p id=\"padline\" hidden></p><p class=\"dbgline\"><span class=\"dbg\"><button id=\"dbgdl\" type=\"button\">⬇ Scarica segnalazioni</button> <button id=\"dbgclr\" type=\"button\">🗑 Svuota</button> </span><input id=\"dbgcode\" type=\"text\" spellcheck=\"false\" autocomplete=\"off\" placeholder=\"codice\" maxlength=\"12\"></p>")
 rep("#pause p { font-size: 19px; margin: 6px 0; }", "#pause p { font-size: 19px; margin: 6px 0; }\nbody:not(.debug) .dbg { display: none !important; }\n#pause .dbgline { margin-top: 14px; font-size: 14px; } #pause .dbgline button { font: 600 14px system-ui; padding: 6px 12px; border-radius: 4px; border: 0; background: var(--ocra); color: #15161c; cursor: pointer; margin: 2px; } #dbgcode { width: 110px; font: 14px system-ui; padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,.25); background: #15161c; color: #fff; text-align: center; }\n#dbghud { position: fixed; left: 50%; transform: translateX(-50%); bottom: 6px; z-index: 8; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }")
 rep("<div id=\"pause\" hidden>", "<div id=\"dbghud\" hidden></div><div id=\"pause\" hidden>")
@@ -570,35 +635,76 @@ print('leftover refs', [s[i:i + 40] for i in left])
 
 # ---- draw each frame between the last two physics steps (interp3.js)
 rep("while (acc >= 1 / 60 && n < 5) { step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }", "while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }")
-# right stick: the chase camera swings round the car (or the walker) to look about; let go and it eases back behind (Carlo, 24/10)
-rep("let toastT = 0, bannerT = 0,", "let camYaw = 0, camPitch = 0, camBack = false, toastT = 0, bannerT = 0,")
-rep("GP.steer = dz(g.axes[0] || 0);", "GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11);")
-# holding the right stick down looks behind, as in GTA: the bug report moves from R3 to the d-pad down (B on the keyboard stays)
-rep("  if (edge(11)) reportSpot();", "  if (edge(13)) reportSpot();")
-# up and down: the camera drops to look up or rises to look down from above, and settles back the same way
+# camera (Carlo, 31/10): the right stick turns the view round the walker or the car, up and down too, and it stays where it is left; walking or driving on it eases back behind, slowly and after a pause
+rep("let toastT = 0, bannerT = 0,", "let camW = 0, camSgn = 0, camR3 = false, camRecT = 0, padTgt = 0, padLat = false, pSx = 0, pSy = 0, fpDone = false, camA = 0, camFree = false, camIdle = 9, camVA = 0, camPitch = 0, camBack = false, toastT = 0, bannerT = 0,")
+rep("function updCamera(dt) {", """/* free-camera tuning (change here): view turn speed rad/s at full stick, tilt speed, pause before easing back (s), easing back rate (1/s), walker turn rate towards the stick (1/s) and its cap (rad/s) */
+/* on foot with the pad (Carlo, 31/10: "troppo dura"): the view follows his heading from 0.3 s after the last touch of the right stick, proportionally to the error and to how fast he runs, with its own angular speed eased in and out; R3 recentres behind him in about 0.25 s. CAMF.* on foot, CAMV.* in vehicles (pace set by the speed: k = CAMV.k * speed) */
+const CAMF = { delay: 0.3, kBase: 3.5, kSpeed: 2.2, minW: 0.6, tau: 0.06, hyst: 2.7, hystOff: 2.0, recT: 0.35, recK: 18, posK: 14 };
+/* two-wheeler look (Carlo, 31/10): the visible lean is a fraction of the physical one and builds up over about LEAN.<kind>.t seconds (moto 0.15, scooter 0.2, bici 0.35) from upright to full; the physics (steering, wheelie, stoppie) is untouched. BICI_SPRINT_MAX: top speed of the bike with the cross mashed (m/s, 55 km/h), base stays 10.8 */
+const LEAN = { moto: { k: 0.667, t: 0.15 }, scooter: { k: 0.667, t: 0.2 }, bici: { k: 0.8, t: 0.35 } }, BICI_SPRINT_MAX = 15.3;
+/* handlebar filter of the two-wheelers (1/s, game.src.html steer lerp): the car's rack is 10, the old two-wheeler value 4.5 felt like a lorry (Carlo, 31/10); moto and scooter answer faster, the bike keeps 4.5 */
+/* wheelie (Carlo, 31/10): up to bal x whMax it is stable (the angle follows the stick and the gas); above it the bike tips over backwards unless the stick is eased, so the balance point is held with small corrections (kov = how fast it runs away, 1/s^2 per rad); past fall x whMax (moto 0.8 -> 1.04 rad) the rider falls back. Stoppie unchanged */
+const WHEEL = { bal: 0.55, fall: 1.4, kov: 32 };
+/* stoppie: the angle it is pulled to grows with speed and brake x stick (max x whMax x speed/v0 x brake x stick, so 0.55 whMax at 15 m/s as before and 2 whMax at 55 m/s); above bal x whMax the push over the bars grows with speed (kov x speed/v0: stable below about 28/kov x v0, i.e. 26 m/s); past fall x whMax the rider goes over the bars. The brake alone, without the stick forward, does no stoppie */
+const STOP = { max: 0.55, v0: 15, bal: 0.4, kov: 16, fall: 0.9 };
+const TWO_STEER = { moto: 24, scooter: 18 };
+const CAMV = { delay: 0.25, k: 0.12, minW: 0.1, tau: 0.15 };
+const CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 14, PAD_MAXTURN = 14;
+function camSteer(dt, inCar, hb, moving) { /* hb = the heading the camera sits behind by default; camA = where the view points in the world */
+  const lx = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, ly = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0, fp = camMode === 2;
+  const lim = fp ? 0.7 : 1.3, lo = fp ? -0.7 : -0.45;
+  if (!inCar && (K.up || K.down || K.left || K.right)) camFree = false; /* the keyboard keeps the old camera: always straight behind */
+  else if (lx || ly || (!inCar && Math.hypot(GP.steer, GP.fwd) > 0.15)) { if (!camFree) { camFree = true; camA = hb; camIdle = 0; } }
+  if (!camFree) { camA = hb; camPitch *= Math.exp(-2.5 * dt); return; }
+  if (lx || ly) camIdle = 0; else camIdle += dt;
+  const sh = v => v * (0.5 + 0.5 * Math.abs(v));
+  if (lx) camA = wrapA(camA + sh(lx) * CAM_VEL * dt);
+  if (ly) camPitch = clamp(camPitch + sh(ly) * CAM_VELP * dt, lo, lim);
+  camPitch = clamp(camPitch, lo, lim);
+  if (!inCar) { /* on foot: recentre on R3, otherwise follow his heading, fast and proportional, never when he stands still */
+    const r3 = GP.back > 0.5; if (r3 && !camR3) camRecT = CAMF.recT; camR3 = r3;
+    if (camRecT > 0) { camRecT -= dt; const kk = 1 - Math.exp(-CAMF.recK * dt); camA = wrapA(camA + wrapA(hb - camA) * kk); camPitch *= 1 - kk; camW = 0; camIdle = 0.1; return; }
+    if (moving && !fp && camIdle > CAMF.delay) { const sn = clamp(Math.abs(P.speedNow || 0) / 4.2, 0, 2.2), k = CAMF.kBase + CAMF.kSpeed * sn; camEase(dt, hb, k, CAMF.minW * (0.5 + sn), CAMF.tau); } else { camW *= Math.exp(-dt / CAMF.tau); camSgn = 0; }
+    return;
+  }
+  /* vehicles: back behind at a pace set by the speed (still: stays; walking pace: slow; normal: decided; fast: a few moments), after a short wait; not while reversing */
+  { const s_ = Math.abs(P.car.speed), rev = P.car.fwdSpeed < -2;
+    if (camIdle > CAMV.delay && s_ > 0.5 && !rev) { const k = CAMV.k * s_; camEase(dt, hb, k, CAMV.minW * s_, CAMV.tau); camPitch *= Math.exp(-k * dt); if (Math.abs(wrapA(hb - camA)) < 0.02 && Math.abs(camPitch) < 0.02) { camFree = false; camA = hb; camPitch = 0; camW = 0; } }
+    else { camW *= Math.exp(-dt / CAMV.tau); camSgn = 0; } }
+}
+function camEase(dt, hb, k, minW, tau) { /* angular speed proportional to the error with a floor, eased in and out; near 180 degrees the side is chosen once and kept */
+  let d = wrapA(hb - camA);
+  if (Math.abs(d) > CAMF.hyst) { if (!camSgn) camSgn = camW > 0.2 ? 1 : camW < -0.2 ? -1 : (d >= 0 ? 1 : -1); if (Math.sign(d) !== camSgn) d += camSgn * TAU; } else if (Math.abs(d) < CAMF.hystOff) camSgn = 0; else if (camSgn && Math.sign(d) !== camSgn) d += camSgn * TAU;
+  let want = d * k; if (Math.abs(d) > 0.08) want = Math.sign(d) * Math.max(Math.abs(want), minW);
+  camW += (want - camW) * (1 - Math.exp(-dt / tau)); let st = camW * dt; if (Math.abs(st) > Math.abs(d)) st = d; camA = wrapA(camA + st);
+}
+function updCamera(dt) {""")
+# up and down: on foot the camera orbits on a sphere round his chest; in the car the chase height changes (R3 behind stays)
 rep("want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz);",
-    "{ const p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0; if (p_) camPitch = clamp(camPitch + p_ * 3 * dt, -0.45, 1.3); else camPitch *= Math.exp(-2.5 * dt); }\n"
-    "    want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + camPitch * (inCar ? 6 : 3.5)), cz);")
+    "want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + (inCar ? camPitch * 6 : 0)), cz);")
+rep("const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2; let ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;",
+    "const two = inCar && isTwo(P.car); let dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;\n"
+    "    if (!inCar && camPitch) { const ph_ = Math.atan2(1, 5.2) + camPitch; dist = 5.3 * Math.cos(ph_); ht = 1.5 + 5.3 * Math.sin(ph_); } /* sphere of radius 5.3 round his chest: camPitch 0 is the old view */")
 rep("    let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }",
     "    let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }\n"
-    "    { const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0; if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -Math.PI, Math.PI); else camYaw *= Math.exp(-2.5 * dt); /* heading grows towards the left */\n"
-    "      const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; const bk_ = GP.back > 0.5; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } } /* looking back and forward again is a cut, not a swing round */")
-# while the stick turns it the camera goes where it is pushed at once: the follow smoothing is for the car's turns, on the stick it felt like butter
+    "    camSteer(dt, inCar, Math.atan2(hx, hz), inCar ? P.car.speed > 3 : Math.abs(P.speedNow || 0) > 0.5); hx = Math.sin(camA); hz = Math.cos(camA);\n"
+    "    { const bk_ = GP.back > 0.5 && inCar; if (bk_) { hx = -hx; hz = -hz; } if (bk_ !== camBack) { camBack = bk_; camInit = false; } camVA = Math.atan2(hx, hz); } /* looking back and forward again is a cut, not a swing round */")
+# while the stick turns it the camera goes where it is pushed at once
 rep("  const k = 1 - Math.exp(-(camMode === 1 ? 5 : 7.5) * dt);",
-    "  const k = camMode === 2 ? 1 : 1 - Math.exp(-(camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : 7.5) * dt);")
-rep("camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));", "camPos.lerp(want, k); camLook.lerp(look, camMode === 2 ? 1 : 1 - Math.exp(-12 * dt));")
+    "  const k = camMode === 2 && fpDone ? 1 : 1 - Math.exp(-(camMode === 2 ? FP_ZOOM : camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : !inCar && camFree ? CAMF.posK : 7.5) * dt);")
+rep("camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));", "camPos.lerp(want, k); camLook.lerp(look, camMode === 2 && fpDone ? 1 : 1 - Math.exp(-12 * dt));\n  /* going into first person is a soft zoom in, as coming out is a zoom out; once the camera is at the eyes it is locked on with no delay */\n  if (camMode !== 2) fpDone = false; else if (!fpDone && camPos.distanceTo(want) < 0.12 && camLook.distanceTo(look) < 0.3) fpDone = true;")
+rep("if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd); camPos.x = px + (camPos.x - px) * kk; camPos.z = pz + (camPos.z - pz) * kk; }",
+    "if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd), tx_ = px + (camPos.x - px) * kk, tz_ = pz + (camPos.z - pz) * kk, sl_ = hyp(tx_ - camPos.x, tz_ - camPos.z) > 0.4 ? 1 - Math.exp(-CAM_WALL * dt) : 1; /* a small correction is exact; a big one (the walker jumped past a wall edge) is a quick glide, not a jump */ camPos.x += (tx_ - camPos.x) * sl_; camPos.z += (tz_ - camPos.z) * sl_; }")
 # a third view, first person (Carlo, 24/10): the walker's eyes, or just above the bonnet; the right stick looks about, R3 behind
-rep("camMode = (camMode + 1) % 2", "camMode = (camMode + 1) % 3", 3)
+rep("camMode = (camMode + 1) % 2", "camMode = (camMode + 1) % 3", 2)
 rep("  if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,",
-    "  if (!inCar) P.model.g.visible = camMode !== 2;\n"
+    "  if (!inCar) P.model.g.visible = !((camMode === 2 && fpDone) || (hyp(camPos.x - px, camPos.z - pz) < 0.9 && camPos.y - P.y < 2.2)); /* the body is hidden only once the camera is close to the eyes */\n"
     "  if (camMode === 2) {\n"
-    "    let hx = fx, hz = fz; const s_ = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, p_ = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0;\n"
-    "    if (s_) camYaw = clamp(camYaw + s_ * 4.5 * dt, -2.3, 2.3); else camYaw *= Math.exp(-4 * dt);\n"
-    "    if (p_) camPitch = clamp(camPitch + p_ * 2 * dt, -0.7, 0.7); else camPitch *= Math.exp(-4 * dt);\n"
-    "    const c_ = Math.cos(camYaw), n_ = Math.sin(camYaw), rx_ = hx * c_ + hz * n_, rz_ = hz * c_ - hx * n_; hx = rx_; hz = rz_; if (GP.back > 0.5) { hx = -hx; hz = -hz; }\n"
+    "    camSteer(dt, inCar, h, inCar ? P.car.speed > 3 : Math.abs(P.speedNow || 0) > 0.5);\n"
+    "    let hx = Math.sin(camA), hz = Math.cos(camA); if (GP.back > 0.5 && inCar) { hx = -hx; hz = -hz; } camVA = Math.atan2(hx, hz);\n"
     "    const ey = inCar ? P.car.y + 1.25 : P.y + 1.62, fo = inCar ? 1.1 : 0.15;\n"
     "    want = new THREE.Vector3(px + fx * fo, ey, pz + fz * fo); look = new THREE.Vector3(want.x + hx * 10, ey - camPitch * 7, want.z + hz * 10);\n"
-    "  } else if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,")
+    "  } else if (camMode === 1) {\n    camVA = Math.PI;\n    const ht = inCar ? 58 + sp * 0.9 : 36,")
 # debug mode: cars never break (health back to full after every physics step, so nothing reaches zero and burns)
 rep("interpSnap(); step(1 / 60);", "interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100;")
 rep("  updVisuals(running && !paused ? dt : 0); updRadio(dt);", "  const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  updVisuals(running && !paused ? dt : 0); updRadio(dt);")
@@ -613,71 +719,58 @@ rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePe
     "    tileTick(START.x, START.z, 0, 420); for (const T of TILES) T.dist = hyp(T.cx - START.x, T.cz - START.z);\n"
     "    if (START.piedi) { P.x = START.x; P.z = START.z; } /* &piedi: on foot at the exact point, the car stays on the nearest lane */\n"
     "    P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync();\n"
+    "    if (START.mezzo && !START.piedi && MODELS[START.mezzo] && START.mezzo !== mine.kind) { /* &mezzo=<key of MODELS>: the start vehicle is that one (moto, bici, scooter, police...); an unknown key does nothing */\n"
+    "      const cl_ = MODEL_COLS[START.mezzo], m2 = new Vehicle(START.mezzo, cl_ ? cl_[0] : '#c8332b', mine.x, mine.z, mine.h); m2.y = mine.y; m2.moved = true; mine.remove(); m2.sync();\n"
+    "    }\n"
     "  }\n}")
 rep("function startGame() {\n  if (running) return; running = true;",
     "function startGame() {\n  if (running) return; running = true; if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */")
-# ---- jumps (Carlo, 25/10: "the car is glued to the ground"): every car on its wheels follows the ground as before, and a ballistic shadow of it
-# rides the bed (S and the decks, without kerbs, sidewalks and bumps). Where the bed drops away faster than gravity can follow (v^2/R > g on
-# a crest, the top of a ramp taken fast) the shadow lifts; once it would rise more than JUMP_MIN above the bed the car takes off with its
-# speed, flies under gravity and lands on what is under it (a deck if it is above it). docs/motore.md, "Salti"
+# ---- the physics of the car in height (Carlo, 31/10: "manca la verticalita", "il motore fisico"): fisica3.js, every parameter is in FIS there. It replaces the jumps of 25/10
+# (a ballistic shadow on the bed): the player's vehicle stands on springs on its wheels and leaves the ground by itself; the driving on the ground, Vehicle.step, stays. The traffic keeps a plain height. docs/motore.md, "Salti"
 rep("const VEH = [];", """const VEH = [];
 try { localStorage.removeItem('medaDrive'); } catch (e) { } /* the realistic driving model is gone, so is its saved switch */
-const JUMP_MIN = 0.08, JUMP_V = 17, GRAV = 9.81; /* a crest that lifts the shadow less than JUMP_MIN m keeps the car on its wheels, and so does any speed under JUMP_V m/s (61 km/h): the small waves of S and town driving stay as they were */
-function vehBed(x, z, cy) { // what a car flies over and lands on: S and the decks under cy + 0.8, without the step layer (kerbs, sidewalks, bumps) that only jolts it
-  if (H.fineAt(x, z)) { let y = H.base(x, z); for (const o of H.deckAt(x, z)) if (o.top > y && o.top <= cy + 0.8) y = o.top; return y; }
-  const full = H.surface(x, z, cy), st = onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : bumpAt(x, z); if (!st) return full;
-  const rc = H.rivCut(x, z), flat = H.base(x, z) - (rc > 0 && !onAnyRoad(x, z, 0.3) ? rc : 0) + st; return Math.abs(full - flat) < 1e-4 ? full - st : full; /* old engine: the step comes off unless a deck won */
-}""")
+""" + open(os.path.join(HERE, 'fisica3.js'), encoding='utf-8').read())
 rep("    const i = this.inp, fx = Math.sin(this.h), fz = Math.cos(this.h), rx = fz, rz = -fx;\n",
     "    if (this.air) { this.stepAir(dt); return; }\n    const i = this.inp, fx = Math.sin(this.h), fz = Math.cos(this.h), rx = fz, rz = -fx;\n")
-rep("    this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, Math.atan2(yb - yf, this.co * 2), 0.35);", "    this.vert(cf, cb, yf, yb, ty);")
-rep("  wheelie(dt, v, thr, i) {", """  stepAir(dt) { // off its wheels: no grip, no engine, no brakes, the speed it took off with less a little air drag; the steering turns the car a little, not its path (as in GTA)
+rep("    if (ty - this.y > 0.09 && ty - this.y < 0.2 && this === P.car && this.speed > 6) shake = Math.max(shake, 0.12);\n", "")
+rep("    this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, Math.atan2(yb - yf, this.co * 2), 0.35);",
+    "    if (!this.F && (this === P.car || this.vy > 2)) fisInit(this); /* the player's vehicle, or one thrown up by an explosion */\n    if (this.F) fisVert(this, cf, cb, yf, yb, ty); else { this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, Math.atan2(yb - yf, this.co * 2), 0.35); } /* the traffic follows the ground */")
+rep("  wheelie(dt, v, thr, i) {", """  stepAir(dt) { // off its wheels: no grip, no engine, no brakes, the speed it took off with less a little air drag; the stick turns the body (fisVert), not its way
     const i = this.inp, k = 1 - 0.0004 * this.speed * dt;
     this.steer = lerp(this.steer, i.steer, 1 - Math.exp(-10 * dt)); this.vx *= k; this.vz *= k;
-    this.h = wrapA(this.h + this.steer * 0.6 * dt); this.x += this.vx * dt; this.z += this.vz * dt;
+    this.x += this.vx * dt; this.z += this.vz * dt;
     this.spin += (this.fwdSpeed + (i.thr > 0 && this.health > 0 ? 8 : 0)) * dt / this.spec.wr; this.drift = 0;
-    this.roll = lerp(this.roll, 0, 0.04); this.pitch = lerp(this.pitch, 0, 0.1);
-  }
-  vert(cf, cb, yf, yb, ty) { // the height of the car over the ground under its axles (cf, cb; yf, yb the ground there, ty their mean): on the wheels or in the air
-    const dt = 1 / 60, co = this.co, gs = Math.atan2(yb - yf, co * 2), fs = this.fwdSpeed, gv = -fs * Math.tan(gs);
-    if (this.sus || this.susV) { this.susV += (-240 * this.sus - 20 * this.susV) * dt; this.sus = clamp(this.sus + this.susV * dt, -0.2, 0.12); if (Math.abs(this.sus) < 1e-3 && Math.abs(this.susV) < 0.02) this.sus = this.susV = 0; } /* the springs after a landing, drawn on the body */
-    if (this.air) {
-      this.vy -= GRAV * dt; this.y += this.vy * dt; this.airT += dt; this.airTop = Math.max(this.airTop, this.y - ty);
-      const sn = Math.sin(this.slope), axle = this.y - co * sn <= yf || this.y + co * sn <= yb;
-      if (this.y > ty && !axle) { this.slope = clamp(lerp(this.slope, -Math.atan2(this.vy, Math.max(6, Math.abs(fs))) * Math.sign(fs || 1) * 0.6, 0.035), -0.6, 0.6); return; } /* still flying: the nose follows the path down, slowly */
-      const hit = gv - this.vy; /* how fast it meets the ground */
-      this.air = false; this.y = Math.max(this.y, Math.min(ty + 0.5, Math.max(ty, yf + co * sn, yb - co * sn))); this.vy = this.bedV = gv; /* the wheel that touches first stays on the ground, the other comes down with the springs */ this._gb = undefined;
-      if (!this.spec.two) this.susV = -Math.min(hit, 14) * 0.3;
-      this.lastJump = { t: this.airT, h: this.airTop, d: hyp(this.x - this.air0[0], this.z - this.air0[1]), hit, v: this.speed };
-      if (this === P.car) { shake = Math.max(shake, Math.min(0.9, hit / 14)); if (hit > 2.5 && hit <= 7) sfxCrash(hit); }
-      if (hit > 7) this.impact(hit * 0.7);
-    }
-    const kick = (this.vy || 0) > (this.bedV || 0) + 2; /* thrown up from outside (an explosion) */
-    this.y = lerp(this.y, ty, 0.35); this.slope = lerp(this.slope, gs, 0.35);
-    // the shadow rides the bed under the two axles, eased as the body is (a wheelbase and the springs smooth the small waves of S away)
-    const gb = (vehBed(cf[0], cf[1], this.y) + vehBed(cb[0], cb[1], this.y)) / 2, mv = this._gb === undefined ? 1e9 : hyp(this.x - this._bx, this.z - this._bz);
-    if (mv > 8) { this.by = this.sy = gb; this.svy = this.bedV = this.air === false && !kick ? this.vy : gv; }
-    else {
-      const d = gb - this._gb, stp = Math.abs(d) > mv * 0.5 + 0.05; if (stp) { this.by += d; this.sy += d; } /* a step in the bed (a deck joint, the edge of a tile) carries the shadow along, it is no slope */
-      const nb = lerp(this.by, gb, 0.35); this.bedV = (nb - this.by) / dt; this.by = nb;
-      // ground steeper than 20 % under the wheels is no street but a hump or a bank of S (a street over an embankment it should pass under, the
-      // sag of the Milano-Meda where a deck is missing): there and for half a second after the car keeps to the ground as before, no ski jump
-      if (Math.abs(this.bedV) > 0.2 * this.speed + 0.3 || (!stp && mv > 0.05 && Math.abs(d) > 0.2 * mv)) this.steepT = 0.5; else if (this.steepT > 0) this.steepT -= dt;
-      this.svy -= GRAV * dt; this.sy += this.svy * dt; if (this.sy <= this.by || this.steepT > 0) { this.sy = this.by; this.svy = this.bedV; }
-    }
-    // off the wheels: the shadow has left the bed by JUMP_MIN, the car is going faster than JUMP_V and is not still catching up with a climb;
-    // it leaves with the shadow's vertical speed, at most a launch of about 11 degrees (a 20 % ramp)
-    if (kick || (this.sy - this.by > JUMP_MIN && this.speed > JUMP_V && this.y > ty - 0.03)) {
-      this.air = true; this.airT = 0; this.airTop = 0; this.air0 = [this.x, this.z]; this.jumps = (this.jumps || 0) + 1; this._gb = undefined;
-      if (!kick) { this.vy = Math.min(this.svy, 0.2 * this.speed); this.y = Math.max(this.y, ty + 0.01); this.slope = gs; } /* both wheels just over the ground they leave */
-      return;
-    }
-    this.vy = this.bedV; this._bx = this.x; this._bz = this.z; this._gb = gb;
+    this.roll = lerp(this.roll, 0, 0.04);
   }
   wheelie(dt, v, thr, i) {""")
-rep("    m.body.rotation.z = this.roll; m.body.rotation.x = this.pitch;", "    m.body.rotation.z = this.roll; m.body.rotation.x = this.pitch; if (!this.spec.two) m.body.position.y = this.sus || 0;")
-rep("if (v.driver === null && v.speed < 0.05 && !v.inp.thr)", "if (v.driver === null && v.speed < 0.05 && !v.inp.thr && !v.air && !(v.vy > 1))")
+rep("    else this.roll = lerp(this.roll, clamp(-yaw * v * 0.004, -0.08, 0.08), 0.1);\n    this.pitch = lerp(this.pitch, clamp((thr - i.brk) * -0.025, -0.04, 0.04), 0.1);",
+    "    else if (!this.F) this.roll = lerp(this.roll, clamp(yaw * v * 0.004, -0.08, 0.08), 0.1); /* a car leans out of the bend; the player's vehicle does it on its springs */\n    if (!this.F) this.pitch = lerp(this.pitch, clamp((thr - i.brk) * -0.025, -0.04, 0.04), 0.1);")
+rep("m.g.rotation.y = this.h; m.g.rotation.x = this.slope;", "m.g.rotation.y = this.h; m.g.rotation.x = this.F ? this.ap : this.slope; m.g.rotation.z = this.F ? this.ar : 0;")
+rep("    for (const w of m.wheels) { w.w.rotation.x = this.spin; if (w.front) w.piv.rotation.y = this.steer * 0.5; }",
+    "    for (const w of m.wheels) { w.w.rotation.x = this.spin; if (w.front) w.piv.rotation.y = this.steer * 0.5; }\n    if (this.F && !this.spec.two) for (let i = 0; i < m.wheels.length; i++) m.wheels[i].piv.position.y = this.spec.wr + this.F.off[i]; /* each wheel on its ground */")
+rep("    v.step(dt); gateHits(v); fuelHits(v); propHits(v); barHits(v); v.collide();", "    const x0_ = v.x, z0_ = v.z; v.step(dt); vehSweep(v, x0_, z0_); gateHits(v); fuelHits(v); propHits(v); barHits(v); v.collide();")
+rep("if (v.driver === null && v.speed < 0.05 && !v.inp.thr)", "if (v.driver === null && v.speed < 0.05 && !v.inp.thr && !v.air && !(v.vy > 1) && !v.fpBusy)")
 rep("if (Math.abs(v.x - p.x) > 4 || Math.abs(v.z - p.z) > 4) continue;", "if (Math.abs(v.x - p.x) > 4 || Math.abs(v.z - p.z) > 4 || v.y - p.y > 1.4) continue; /* a car flying over, or on the bridge above */")
 rep("if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4) continue;", "if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4) continue;")
 rep("const a = VEH[i], b = VEH[j]; if (a.sleep && b.sleep) continue;", "const a = VEH[i], b = VEH[j]; if (a.sleep && b.sleep) continue; if (Math.abs(a.y - b.y) > 1.5) continue; /* one over the other: in the air, or on a bridge over the road */")
+# ---- jumping and climbing on foot (Carlo, 31/10): salto3.js. The foot branch of the step, gravity, the guard against moves through a wall, the pose, the camera over low barriers
+rep("function step(dt) {", open(os.path.join(HERE, 'salto3.js'), encoding='utf-8').read() + "\nfunction step(dt) {", 1)
+rep("  if (P.mode === 'foot') {\n    if (P.knock > 0) { P.knock -= dt;", "  if (P.mode === 'foot') {\n    if (P.knock > 0) { P.climb = null; P.air = false; P.onV = null; }\n    footRide(); const x0_ = P.x, y0_ = P.y, z0_ = P.z; let mx_, mz_;\n    if (P.knock > 0) { P.knock -= dt;")
+rep("    else {\n      P.y = H.surface(P.x, P.z, P.y); P.h = wrapA(P.h + ((K.left ? 1 : 0) - (K.right ? 1 : 0)) * 2.8 * dt);",
+    "    else if (P.climb) climbStep(dt);\n    else if ((footVert(dt), P.climb)) { /* the press started a climb */ }\n    else {\n      P.h = wrapA(P.h + ((K.left ? 1 : 0) - (K.right ? 1 : 0)) * 2.8 * dt);")
+rep("      P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; P.x += P.vx * dt; P.z += P.vz * dt; P.phase += Math.abs(sp) * dt * 3;",
+    "      if (P.land > 0 && P.heavy) sp *= 1 - SALTO.landSlow * P.land / SALTO.landT;\n"
+    "      if (P.air) { if (Math.abs(sp) > 0.1) { const a_ = SALTO.airAcc * dt; P.vx += clamp(Math.sin(P.h) * sp - P.vx, -a_, a_); P.vz += clamp(Math.cos(P.h) * sp - P.vz, -a_, a_); } P.x += P.vx * dt; P.z += P.vz * dt; }\n"
+    "      else { P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; P.x += P.vx * dt; P.z += P.vz * dt; P.phase += Math.abs(sp) * dt * 3; }")
+rep("    const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4, P.y + 0.4); P.x = clamp(pp.x, -LIM_X, LIM_X); P.z = clamp(pp.z, -LIM_Z, LIM_Z);",
+    "    mx_ = P.x; mz_ = P.z; if (!P.climb) footCollide();")
+rep("if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4) continue;", "if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4 || saltoAbove(v)) continue;")
+rep("else { P.x = cx + dx / d * 2.2; P.z = cz + dz / d * 2.2; } } }\n  } else {\n    P.x = P.car.x;", "else { P.x = cx + dx / d * 2.2; P.z = cz + dz / d * 2.2; } } }\n    if (!P.climb) footGuard(x0_, y0_, z0_, mx_, mz_); else { const g_ = H.surface(P.x, P.z); if (P.y < g_) P.y = g_; } if (!P.air && !P.climb) P.yg = P.y; footRideEnd();\n  } else {\n    P.air = false; P.climb = null; P.onV = null; P.land = 0; P.jumpReq = 0;\n    P.x = P.car.x;")
+rep("else { pm.inner.rotation.x = 0; pm.inner.position.y = 0; animPed(pm, P.phase, K.hand ? 0.9 : 0.55); }", "else saltoPose(pm, dt, K.hand ? 0.9 : 0.55);")
+rep("    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false;\n", "    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y);\n")
+rep("if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex;", "if (s.r || s.dyn || s.y0 > cy || s.off || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex;")
+rep("    const f = rayCam(px, pz, cx, cz, wy);", "    if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */\n    const f = rayCam(px, pz, cx, cz, wy);")
+rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = Math.max(fy, H.ground(cx, cz)) + ht;")
+rep("  camera.position.copy(camPos);\n  if (shake > 0)", "  if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */\n  camera.position.copy(camPos);\n  if (shake > 0)")
+rep("window.__G = { FUEL,", "window.__G = { FIS, step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)

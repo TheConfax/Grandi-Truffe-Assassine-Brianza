@@ -809,7 +809,7 @@ const MODELS = {
   // two-wheelers: seat height/position for the rider, crouch = forward lean of the rider
   scooter: { name: 'Scooter', L: 1.85, W: 0.7, two: true, noX: true, wr: 0.27, seatY: 0.8, seatZ: -0.25, crouch: 0.08, legA: -0.85, armA: -1.0, whMax: 0.35, maxV: 25, acc: 2.6, grip: 8.5, snd: 2.1 },
   moto:    { name: 'Moto', L: 2.1, W: 0.78, two: true, wr: 0.32, seatY: 0.86, seatZ: -0.22, crouch: 0.42, legA: -1.0, armA: -1.2, whMax: 0.8, maxV: 61, acc: 7.6, grip: 10.5, snd: 1.7 },
-  bici:    { name: 'Bicicletta', L: 1.75, W: 0.6, two: true, pedal: true, noX: true, wr: 0.34, seatY: 0.98, seatZ: -0.2, crouch: 0.3, legA: -0.3, armA: -0.95, whMax: 0.55, maxV: 8.3, acc: 1.5, grip: 8, snd: 0 },
+  bici:    { name: 'Bicicletta', L: 1.75, W: 0.6, two: true, pedal: true, noX: true, wr: 0.34, seatY: 0.98, seatZ: -0.2, crouch: 0.3, legA: -0.3, armA: -0.95, whMax: 0.55, maxV: 10.8, acc: 1.95, grip: 8, snd: 0 },
 };
 const TRAFFIC_MIX = [['panda', 22], ['hatch', 22], ['sedan', 13], ['wagon', 10], ['suv', 12], ['sport', 5], ['van', 9], ['ape', 6], ['scooter', 7], ['moto', 4], ['bici', 6]];
 const PARKED_MIX = [['panda', 25], ['hatch', 25], ['sedan', 15], ['wagon', 12], ['suv', 14], ['sport', 3], ['van', 6], ['ape', 3], ['scooter', 5], ['moto', 2], ['bici', 4]];
@@ -1500,6 +1500,7 @@ function aiTraffic(v, dt) {
   let [tx, tz, node] = ai.q[0];
   if (hyp(tx - v.x, tz - v.z) < 4.5) { ai.from = ai.q.shift(); if (node >= 0) { ai.prev = ai.cur; ai.cur = node; } extendRoute(v); if (!ai.q.length) return;[tx, tz] = ai.q[0]; }
   let cruise = ai.cruise;
+  if (ai.rage > 0) cruise = Math.max(cruise, SALTO.roofRun);
   if (ai.q.length > 1) { // slow for corners
     const [ax, az] = ai.q[0], [bx, bz] = ai.q[1], d = hyp(ax - v.x, az - v.z), turn = Math.abs(wrapA(Math.atan2(bx - ax, bz - az) - Math.atan2(ax - v.x, az - v.z)));
     if (d < 20 && turn > 0.5) cruise = Math.min(cruise, 5.5 + (1 - turn / Math.PI) * 4);
@@ -1542,7 +1543,7 @@ function unstick(v, dt) { // any AI car pressing the gas without moving (wedged 
 }
 function aiCop(v, dt) {
   const ai = v.ai, tx = P.mode === 'car' ? P.car.x : P.x, tz = P.mode === 'car' ? P.car.z : P.z, d = hyp(tx - v.x, tz - v.z);
-  if (W.stars === 0) { // patrol: behave like traffic
+  if (W.stars === 0 || ai.rage > 0) { // patrol: behave like traffic
     if (!ai.q || ai.cop) { const n = nearestNode(TRAF_NODES, v.x, v.z); ai.cop = false; ai.prev = -1; ai.cur = n; ai.q = [[N[n][0], N[n][1], n]]; ai.cruise = 9; }
     return aiTraffic(v, dt);
   }
@@ -1586,7 +1587,7 @@ function step(dt) {
     if (v.boost) { P.nitro = Math.max(0, P.nitro - 30 * dt); P.nitroCd = 1.2; } else { P.nitroCd -= dt; if (P.nitroCd <= 0) P.nitro = Math.min(100, P.nitro + 10 * dt); }
   } else { P.nitroCd -= dt; if (P.nitroCd <= 0) P.nitro = Math.min(100, P.nitro + 10 * dt); }
   // ----- AI
-  for (const v of VEH) if (v.driver === 'ai' && v.ai) { if (v.kind === 'police') aiCop(v, dt); else aiTraffic(v, dt); }
+  for (const v of VEH) if (v.driver === 'ai' && v.ai) { roofAnger(v, dt); if (v.kind === 'police') aiCop(v, dt); else aiTraffic(v, dt); }
   // ----- integrate vehicles
   for (const v of VEH) {
     if (v.driver === null && v.speed < 0.05 && !v.inp.thr) { v.vx = v.vz = 0; v.sleep = true; continue; }
@@ -1824,7 +1825,7 @@ function updAudio() {
   let nd = 1e9; if (W.stars) for (const c of cops()) nd = Math.min(nd, hyp(c.x - P.x, c.z - P.z));
   AU.sir.so.frequency.setValueAtTime((now % 1.3) < 0.65 ? 435 : 580, t); // bitonale
   AU.sir.sg.gain.setTargetAtTime(m * (nd < 220 ? 0.16 * (1 - nd / 220) : 0), t, 0.1);
-  AU.horn.gain.setTargetAtTime(m * ((K.horn && P.mode === 'car') ? 0.12 : hornOther > 0 ? 0.05 : 0), t, 0.02);
+  AU.horn.gain.setTargetAtTime(m * Math.max((K.horn && P.mode === 'car') ? 0.12 : hornOther > 0 ? 0.05 : 0, hornRoof), t, 0.02); hornRoof = 0;
 }
 
 // ---------------------------------------------------------------- HUD per frame

@@ -68,6 +68,8 @@ def main(argv=None):
     if os.path.exists(ff): pits = pits + json.load(open(ff, encoding='utf-8'))['fosse']
     ind = dict(ver=1, fase=4, comune=a.comune, nota='docs/motore.md fase 4: quote in m sul mare; il gioco toglie terrain.base di brianza.json',
                tiles=tiles, decks=decks, pits=pits, acqua=acqua)
+    fb = os.path.join(a.da, 'binari_meda.json')   # the height of the tracks (src/binari.py)
+    if os.path.exists(fb): ind['binari'] = json.load(open(fb, encoding='utf-8'))['binari']
     open(os.path.join(a.out, 'indice.json'), 'w', encoding='utf-8').write(json.dumps(ind, ensure_ascii=False, separators=(',', ':')))
     import terreno_pacco; terreno_pacco.impacchetta(a.out)  # i .bin.gz in un file solo (avvio veloce)
     print('terreno: %d tile (%s), %.1f MB in gzip; impalcati %d, fosse %d, assi d acqua %d; indice %.0f KB; celle sotto un impalcato senza strada %d' % (

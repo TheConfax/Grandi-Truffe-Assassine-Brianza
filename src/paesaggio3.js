@@ -359,7 +359,7 @@ function* buildPaesaggio(T, G) {
       const L = hyp(x1 - x0, z1 - z0), x = (x0 + x1) / 2, z = (z0 + z1) / 2, gy = H.ground(x, z), ry = Math.atan2(x1 - x0, z1 - z0) - Math.PI / 2;
       o3.position.set(x, gy, z); o3.rotation.set(0, ry, 0); o3.scale.set(L, 1, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); im.setColorAt(i, COL(col));
       const id = T.t + ':' + i, p = LS_PANEL_PROPS.get(id);
-      if (!p) LS_PANEL_PROPS.set(id, addProp({ x, z, y: gy, r: Math.min(1.1, L / 2), h: 2.1, inst: { meshes: [im], i, ry, base: gy, sx: L } }));
+      if (!p) LS_PANEL_PROPS.set(id, addProp({ x, z, y: gy, r: Math.min(1.1, L / 2), h: 2.1, inst: { meshes: [im], i, ry, base: gy, sx: L }, scav: true }));
       else { p.inst.meshes = [im]; if (p.broken) { o3.scale.set(0, 0, 0); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); } }
     });
     G.add(im);
@@ -371,7 +371,7 @@ function* buildPaesaggio(T, G) {
   inst(LS_POT_G, lam(0x4f7a35), pots, (x, z) => 0.7 + LS_HASH(x, z, 'p') * 0.6);
   if (!T.lsDone) {
     for (const [x, z, r, hh] of solids) { const gy = H.ground(x, z); WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: gy - 3, y1: gy + hh }); }
-    for (const [x, z] of bales) { const gy = H.ground(x, z); WALLS.add(x - 0.8, z - 0.8, x + 0.8, z + 0.8, { r: 0.75, x, z, y0: gy - 3, y1: gy + 1.5 }); }
+    for (const [x, z] of bales) { const gy = H.ground(x, z); WALLS.add(x - 0.8, z - 0.8, x + 0.8, z + 0.8, { r: 0.75, x, z, y0: gy - 3, y1: gy + 1.5, sali: { rs: 0.55, top: gy + 1.5 } }); }
   }
   T.lsDone = true;
 }

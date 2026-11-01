@@ -22,7 +22,7 @@ function parkCaserme(T) {
     let n = 0;
     for (const sp of st.spots) {
       if (n >= 3) break;
-      const fx = Math.sin(sp.h) * 1.3, fz = Math.cos(sp.h) * 1.3, y = H.surface(sp.x, sp.z), free = (x, z) => collideStatic({ x, z }, 1.05, y + 0.4) === null && !inBuilding(x, z, 0.4);
+      const fx = Math.sin(sp.h) * 1.3, fz = Math.cos(sp.h) * 1.3, y = H.surface(sp.x, sp.z), free = (x, z) => collideStatic({ x, z }, 1.05, y + 0.4, true) === null && !inBuilding(x, z, 0.4);
       if (!free(sp.x + fx, sp.z + fz) || !free(sp.x - fx, sp.z - fz) || (!sp.kerb && onAnyRoad(sp.x, sp.z, 0.6))) continue;
       if (!sp.kerb && !(hardAt(sp.x, sp.z) && hardAt(sp.x + fx, sp.z + fz) && hardAt(sp.x - fx, sp.z - fz))) continue; /* a yard spot is hard standing, never a lawn */
       if (VEH.some(v => hyp(v.x - sp.x, v.z - sp.z) < 4.2)) { n++; continue; } // a volante already sits here

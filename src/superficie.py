@@ -1491,6 +1491,7 @@ def main(argv=None):
     # this surface instead of computing it all again (it was half the time of the terrain)
     if a.margine == 250.0 and a.blend == BLEND and a.comune not in _S: _S[a.comune] = s
     tdir = os.path.join(a.out, 'terreno'); t0 = time.time(); peso = s.scrivi(tdir); s.t['scrittura'] = round(time.time() - t0, 1)
+    import binari; json.dump(dict(binari=binari.per_gioco(s.binari)), open(os.path.join(a.out, 'binari_meda.json'), 'w', encoding='utf-8'), separators=(',', ':'))   # the height of the tracks, for the game (terreno_gioco.py)
     rep, punti = controlli(s, tdir)
     import lisciatore; lisciatore.controlli(s, s.GQ, os.path.join(a.out, 'report_lisciatore.json'), log=log)
     if not a.no_png: t0 = time.time(); immagini(s, a.out); s.t['immagini'] = round(time.time() - t0, 1)
