@@ -16,7 +16,7 @@ function interpMix(o, a) {
   const c = o._c || (o._c = new Array(keys.length));
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i], cur = o[k]; c[i] = cur; if (p[i] === undefined || cur === undefined) continue;
-    o[k] = k === 'h' ? p[i] + wrapA(cur - p[i]) * a : p[i] + (cur - p[i]) * a;
+    o[k] = k === 'h' || k === 'ap' || k === 'ar' ? p[i] + wrapA(cur - p[i]) * a : p[i] + (cur - p[i]) * a; /* angles go the short way: a whole turn in the air wraps at 180 degrees */
   }
   INTERP_DONE.push(o);
 }
