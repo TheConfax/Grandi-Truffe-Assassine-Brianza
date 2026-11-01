@@ -18,6 +18,7 @@ sys.path.insert(0, HERE)
 import dbgt_quote as dq
 import riquadro as RQ
 from presto import in_parallelo   # the TINs on all the cores (src/presto.py)
+import opere
 from dbgt_quote import DATA, KX, KZ, LAT0, LON0, FT_RAW, FT_NONE
 
 # map frame, as src/build.py and the game: tile i,j has its corner at (-META.hw + i*TILE, -META.hh + j*TILE)
@@ -1060,7 +1061,7 @@ class Superficie:
         S = s.L.copy(); band = ~FIX & ~BARR & np.isfinite(hi)
         lo_, hi_ = np.minimum(lo, hi), np.maximum(lo, hi)
         S[band] = s.L[band] + np.clip(0.0, lo_[band], hi_[band]); S[FIX] = s.ZF[FIX]
-        s.FIX = FIX; s.sotto_ponti(S, BARR)
+        s.FIX = FIX; s.sotto_ponti(S, BARR); opere.scarpate(s, S)   # (src/opere.py: il suolo attorno alla strada sotto un cavalcavia)
         zs = getattr(s, 'ZSOTTO', None)
         if zs is not None: k = np.isfinite(zs) & BARR; S[k] = zs[k]
         s.S = S
@@ -1199,7 +1200,7 @@ def costruisci(comune=None, margine=250.0, blend=BLEND, osm=True, cache_dir=None
     """The whole surface of the comuni + margine, all steps (about 40 s for Meda); cached per comuni."""
     comune = '+'.join(dq.lista_comuni(comune))
     if comune in _S: return _S[comune]
-    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
+    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); opere.cavalcavia(s, s.log); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
     ob = None
     if osm:
         lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
@@ -1508,12 +1509,16 @@ def main(argv=None):
     AX_SIGMA = a.sigma
     s = Superficie(a.comune, margine=a.margine, blend=a.blend)
     log('tessere da fare %d (tx %d..%d, tz %d..%d), griglia %dx%d' % (len(s.tiles), s.i0, s.i1, s.j0, s.j1, s.R.nx, s.R.nz))
-    s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
+    s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); opere.cavalcavia(s, log); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
     t0 = time.time()
     lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
     osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_v2.pkl'))
     s.t['osm'] = round(time.time() - t0, 1); log('osm: %d oggetti per decidere il passo' % len(osm))
     s.tessere(osm); s.sotto.fosse(); s.sotto.scrivi(a.out)
+    import impalcati as _im   # the underpasses (src/opere.py), on the S just made
+    _G = s.HQ / 100.0; _q = lambda x, z: float(tri_interp(_G, s.R, np.atleast_1d(float(x)), np.atleast_1d(float(z)))[0])
+    _sp, _sc = opere.trova(s.D, _q, _im.osm_vie(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_vie.pkl')), log)
+    json.dump(dict(fosse=opere.fosse_gioco(_sp), scartati=_sc, cavalcavia=opere.rapporto(s), scarpate=s.opere_scarpate), open(os.path.join(a.out, 'opere.json'), 'w', encoding='utf-8'), ensure_ascii=False, default=float)
     # the same steps as costruisci() with its defaults: impalcati.py, run after this in the same process (terreno_gioco.py --rigenera), takes
     # this surface instead of computing it all again (it was half the time of the terrain)
     if a.margine == 250.0 and a.blend == BLEND and s.comune not in _S: _S[s.comune] = s

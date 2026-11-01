@@ -355,9 +355,27 @@ const H = (() => {
   // pits (docs/sottoterra.md, tappa 1): ramps of the underground garages, from src/sottoterra.py. Each takes the 2 m cells of S its outline
   // touches (F.pc, a flag per cell); inside its outline its floor triangles are the ground (H.base, H.ground, H.surface), outside it S. The
   // terrain mesh leaves those cells out, world3.js draws the floor, the ground of the cells around it (anello), the walls and the door
-  const PITS = [], PIT_ORD = new Map(), PG = new Grid(8), PCELL = new Map();
+  const PITS = [], PIT_ORD = new Map(), PG = new Grid(8), PCELL = new Map(), GALL = [], UG = new Grid(8);
+  function gallAt(x, z) { // the covered part of an underpass at (x, z): { floor, soff }, or null
+    if (!GALL.length) return null; let u = null;
+    UG.each(x, z, x, z, ({ p, i }) => {
+      if (u) return; const T = p.tri, ax = T[i], az = T[i + 1], bx = T[i + 3], bz = T[i + 4], cx = T[i + 6], cz = T[i + 7], den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(den) < 1e-12) return;
+      const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / den, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / den, l3 = 1 - l1 - l2; if (l1 < -1e-7 || l2 < -1e-7 || l3 < -1e-7) return;
+      const j = i / 9 * 3; u = { floor: l1 * T[i + 2] + l2 * T[i + 5] + l3 * T[i + 8], soff: l1 * p.sof[j] + l2 * p.sof[j + 1] + l3 * p.sof[j + 2], p };
+    });
+    return u;
+  }
   function pitDentro(q) { // as deckDentro
     let o = PIT_ORD.get(q.ord); if (o) { o.refs++; return o; }
+    if (q.tipo === 'galleria') { // the covered part of an underpass (src/opere.py): S stays drawn over it, under it a level that only H.surface(x, z, cy) reads, with cy under the ceiling
+      const n = q.sx.length, tri = new Float64Array((n - 1) * 18), sof = new Float64Array((n - 1) * 6); let i = 0, j = 0;
+      for (let k = 0; k < n - 1; k++) for (const t of [[q.sx[k], q.sx[k + 1], q.dx[k + 1], k, k + 1, k + 1], [q.sx[k], q.dx[k + 1], q.dx[k], k, k + 1, k]]) { for (let w = 0; w < 3; w++) { tri[i++] = t[w][0]; tri[i++] = t[w][1]; tri[i++] = t[w][2] - B0; } sof[j++] = q.soffitto[t[3]] - B0; sof[j++] = q.soffitto[t[4]] - B0; sof[j++] = q.soffitto[t[5]] - B0; }
+      const imp = q.sx.map(v => [v[0], v[1]]).concat(q.dx.slice().reverse().map(v => [v[0], v[1]]));
+      o = { id: q.ord, ord: q.ord, refs: 1, reg: [], src: q, galleria: true, tri, sof, imp, sx: q.sx.map(([x, z, y]) => [x, z, y - B0]), dx: q.dx.map(([x, z, y]) => [x, z, y - B0]), soffitto: q.soffitto.map(v => v - B0), c: q.c };
+      GALL.push(o); PIT_ORD.set(q.ord, o); const rec0 = GRID_REC; GRID_REC = o.reg;
+      for (let t = 0; t < tri.length; t += 9) UG.add(Math.min(tri[t], tri[t + 3], tri[t + 6]), Math.min(tri[t + 1], tri[t + 4], tri[t + 7]), Math.max(tri[t], tri[t + 3], tri[t + 6]), Math.max(tri[t + 1], tri[t + 4], tri[t + 7]), { p: o, i: t });
+      GRID_REC = rec0; return o;
+    }
     if (q.tipo !== 'rampa') { PIT_ORD.set(q.ord, o = { refs: 1, vuota: true }); return o; }
     const n = q.sx.length, tri = new Float64Array((n - 1) * 18), imp = q.sx.map(v => [v[0], v[1]]).concat(q.dx.slice().reverse().map(v => [v[0], v[1]])); // the strip between the two sides, as src/sottoterra.py
     for (let k = 0, i = 0; k < n - 1; k++) for (const t of [[q.sx[k], q.sx[k + 1], q.dx[k + 1]], [q.sx[k], q.dx[k + 1], q.dx[k]]]) for (const v of t) { tri[i++] = v[0]; tri[i++] = v[1]; tri[i++] = v[2] - B0; }
@@ -370,7 +388,7 @@ const H = (() => {
     return o;
   }
   function pitFuori(o) {
-    if (--o.refs > 0) return; PIT_ORD.delete(o.ord); if (o.vuota) return; PITS.splice(PITS.indexOf(o), 1); disfaGriglie(o.reg);
+    if (--o.refs > 0) return; PIT_ORD.delete(o.ord); if (o.vuota) return; if (o.galleria) { GALL.splice(GALL.indexOf(o), 1); disfaGriglie(o.reg); return; } PITS.splice(PITS.indexOf(o), 1); disfaGriglie(o.reg);
     for (const k in o.src.celle) { const l = PCELL.get(k); if (!l) continue; const a = new Set(o.src.celle[k]), m = l.filter(w => !a.has(w)); if (m.length) PCELL.set(k, m); else PCELL.delete(k); }
   }
   function deckFuori(o) { if (--o.refs > 0) return; DECK_ORD.delete(o.ord); DECKS.splice(DECKS.indexOf(o), 1); disfaGriglie(o.reg); }
@@ -406,9 +424,10 @@ const H = (() => {
     });
     return w;
   }
+  let NSOT = null; const nodeSotto = i => { if (!NSOT) { NSOT = new Set(); for (const r of D.roads) if (r.u) for (const n of r.g) NSOT.add(n); } return NSOT.has(i); }; // the nodes of the ways in gallery in OSM
   const KIND = [null, 'road', 'side', 'green', 'river', 'slope', 'rail'];
   const H = {
-    B0, DECKS, PITS, farH, deckAt, water, railY, railTop,
+    B0, DECKS, PITS, GALL, gallAt, farH, deckAt, water, railY, railTop,
     gradini: true, // false while a piece lays out what the build decided on the ground without the step layer (pezzi3.js)
     // a piece comes in (what H needs of it: S, decks, pits, water) and goes out; what goes in the grids is noted by the caller (GRID_REC)
     dentro(t, d, s) {
@@ -420,6 +439,9 @@ const H = (() => {
       FT[t] = null; NFADE.clear();
     },
     deck: ord => DECK_ORD.get(ord), nodeDeckCalc,
+    floorAt(x, z, y) { const u = gallAt(x, z); return u && y < u.soff ? u.floor : H.surface(x, z); }, // the ground (no decks) of someone at height y: the floor of a gallery if he is in it
+    camG(x, z, y) { const u = gallAt(x, z); return u && y < u.soff ? u.floor : H.ground(x, z); }, // the ground under the camera of someone at height y
+    camCap(x, z, gy, y) { const u = gallAt(x, z); return u && gy < u.soff ? Math.min(y, u.soff - 0.35) : y; }, // ... and the ceiling
     baseS(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); }, // S alone, without the ramps (their walls stand on it)
     pitAt(x, z) { const F = fineAt(x, z); return F ? pitIn(F, x, z) : null; }, // the floor of a ramp here, or null
     inPit(x, z, m = 0) { for (const p of PITS) { if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) continue; if (inPoly(x, z, p.imp)) return p; if (m > 0) for (let k = 0; k < p.imp.length; k++) { const a = p.imp[k], b = p.imp[(k + 1) % p.imp.length]; if (segDist(x, z, a[0], a[1], b[0], b[1]) < m) return p; } } return null; }, // within m of a ramp: no tree, car or bench there
@@ -445,7 +467,8 @@ const H = (() => {
     addStep(kind, h, o, k) { if (o.length < 3) return; const s = { kind, h, o, k: k || [], bb: bbox(o) }; STG.add(s.bb[0], s.bb[1], s.bb[2], s.bb[3], s); },
     surface(x, z, cy) {
       const F = fineAt(x, z); if (!F) return H.oldSurface(x, z, cy);
-      const pf = pitIn(F, x, z); if (pf !== null) return pf; // down a ramp: its floor
+      const pf = pitIn(F, x, z); if (pf !== null) { if (cy === undefined) return pf; let yp = pf; for (const o of deckAt(x, z)) if (o.top > yp && o.top <= cy + 0.8) yp = o.top; return yp; } // down a ramp: its floor, or a deck over it
+      if (cy !== undefined && GALL.length) { const u = gallAt(x, z); if (u && cy < u.soff) return u.floor; } // in the covered part of an underpass
       const sh = step(x, z); let y = onF(F, x, z) + (sh || bumpAt(x, z)); // the step layer: the sidewalks, platforms and medians as drawn
       if (!sh && RAILT[F.t]) { const ry = railTop(x, z); if (ry !== null) y = ry; } // the ballast of a track: on its profile
       if (cy === undefined) return y;
@@ -460,7 +483,8 @@ const H = (() => {
       const [x, z] = N[i], F = fineAt(x, z), y0 = NHt[i];
       if (!F) return y0 === null ? oldG(x, z) : oldDeck(i, y0);
       const d = nodeDeck(i); if (d !== null) return d;
-      return y0 === null ? onF(F, x, z) : onDeck(F, x, z, y0);
+      if (GALL.length && nodeSotto(i)) { const u = gallAt(x, z); if (u) return u.floor; }
+      return y0 === null ? onG(F, x, z) : onDeck(F, x, z, y0);
     },
     nodeDeck: i => nodeDeck(i),
     kind(x, z) {

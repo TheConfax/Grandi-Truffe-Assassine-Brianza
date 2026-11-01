@@ -7,7 +7,7 @@ from collections import defaultdict, Counter
 import xml.etree.ElementTree as ET
 import numpy as np, tifffile
 from pyproj import Transformer
-from shapely.geometry import LineString, Polygon, Point, box, GeometryCollection, MultiLineString
+from shapely.geometry import LineString, Polygon, Point, box, GeometryCollection, MultiLineString, MultiPolygon
 from shapely.ops import unary_union, linemerge
 from shapely.strtree import STRtree
 from shapely import prepare, segmentize as _segmentize
@@ -2003,6 +2003,26 @@ if PARCHEGGI_ATTACCATI:
     asph, pedz, side, foot = unary_union([asph, _pa]), pedz.difference(_pa), side.difference(_pa), foot.difference(_pa)
     area_geoms[:] = [(at, g.difference(_pa) if (at in (1, 2, 3) and g.intersects(_pa)) else g) for at, g in area_geoms]
     log('parcheggi attaccati a mano', len(PARCHEGGI_ATTACCATI), 'm2', round(_pa.area))
+import opere as _op, impalcati as _imp, dbgt_quote as _dq   # the underpasses (src/opere.py): no paint in the open trench, nor over the tunnel what the DBGT has in gallery; the floor is drawn by the game
+_lid = _dq.Lidar(); _Dop = _dq.load_dbgt_comuni(_dq.lista_comuni(None), _lid); _Dop.pop('_info', None)
+_b = riquadro.BBOX; _lo, _la = _dq.game_to_lonlat(np.array([-5000.0, 5000.0]), np.array([5000.0, -5000.0]))
+_vie = _imp.osm_vie(sys.argv[1], (_lo[0], _la[0], _lo[1], _la[1]))
+_sott, _ = _op.trova(_Dop, lambda x, z: float(_lid.at(np.array([float(x)]), np.array([float(z)]))[0]), _vie, log)
+_ap, _co = _op.impronte(_sott)
+_top = unary_union([p for nm in ('AC_VEI', 'AR_STR') for p, q in zip(_op.poligoni(_Dop, nm), _Dop[nm]['attr']['sed']) if q == '03' and any(p.intersects(c_) for c_ in _co)])
+_raso = unary_union([p for p, q in zip(_op.poligoni(_Dop, 'AC_VEI'), _Dop['AC_VEI']['attr']['sed']) if q != '03' and p.intersects(_top)]) if not _top.is_empty else _top
+_via = unary_union(_ap + ([_top.difference(_raso)] if not _top.is_empty else [])).buffer(0.25)   # (a poco dal muro: un vertice sul muro prenderebbe la quota del fondo)
+def _togli(g_):   # only the pieces it touches: the others stay as they are, in the same order
+    ps_ = list(g_.geoms) if hasattr(g_, 'geoms') else [g_]
+    if not any(p_.intersects(_via) for p_ in ps_): return g_
+    out_ = []
+    for p_ in ps_:
+        q_ = p_.difference(_via) if p_.intersects(_via) else p_
+        out_ += [t_ for t_ in (list(q_.geoms) if hasattr(q_, 'geoms') else [q_]) if t_.geom_type == 'Polygon' and not t_.is_empty]
+    return MultiPolygon(out_)
+asph, pedz, side, foot = _togli(asph), _togli(pedz), _togli(side), _togli(foot)
+area_geoms[:] = [(at, g.difference(_via) if g.intersects(_via) else g) for at, g in area_geoms]
+log('sottopassi', len(_sott), 'vernice tolta m2', round(_via.area))
 SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}
 parts_of = lambda g: [p for p in (list(g.geoms) if hasattr(g, 'geoms') else [g]) if not p.is_empty]
 SURFP = {k: parts_of(g) for k, g in SURF.items() if not g.is_empty}

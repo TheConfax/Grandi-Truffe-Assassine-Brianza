@@ -1829,7 +1829,7 @@
 "n": 14433,
 "catene": 43,
 "campioni_che_non_sono_il_binario": 57,
-"legami_fra_binari": 5738,
+"legami_fra_binari": 5737,
 "passaggi_a_livello_campioni": 122,
 "ponti_ferroviari": 3,
 "scarto_da_S_m": {
@@ -1912,9 +1912,9 @@
 "profondita_minima_m": 0.4,
 "massimo_m2": 12.0,
 "riempiti": 5191,
-"nodi": 36224,
+"nodi": 36223,
 "alzati_m": {
-"n": 36224,
+"n": 36223,
 "p50": 0.591,
 "p90": 1.367,
 "p99": 2.473,
@@ -1922,9 +1922,9 @@
 }
 },
 "dente": {
-"nodi_mossi": 433200,
+"nodi_mossi": 433206,
 "spostamento_m": {
-"n": 433200,
+"n": 433206,
 "p50": 0.085,
 "p90": 0.277,
 "p99": 0.655,
@@ -1940,7 +1940,7 @@
 "AC_VEI": {
 "km": 2387.49,
 "oltre_8cm": 88.05,
-"oltre_15cm": 28.43,
+"oltre_15cm": 28.44,
 "oltre_30cm": 5.1
 },
 "AC_PED": {
@@ -1957,7 +1957,7 @@
 },
 "AR_STR": {
 "km": 1252.91,
-"oltre_8cm": 22.09,
+"oltre_8cm": 22.1,
 "oltre_15cm": 5.62,
 "oltre_30cm": 0.87
 }
@@ -2336,7 +2336,7 @@
 "dati": false,
 "x": 967.2,
 "z": 661.6,
-"m2": 2812,
+"m2": 2804,
 "prof": 2.76,
 "grande": true,
 "strada_in_fondo": false
@@ -2579,7 +2579,7 @@
 },
 "spostamento": {
 "dente_m": {
-"n": 427340,
+"n": 427343,
 "p50": 0.09,
 "p90": 0.28,
 "p99": 1.01,
@@ -2588,19 +2588,19 @@
 "dente_su_m": 1.5,
 "dente_giu_m": -1.5,
 "buche_m": {
-"n": 114569,
+"n": 114568,
 "p50": 0.48,
 "p90": 1.56,
 "p99": 2.77,
 "max": 6.0
 },
-"nodi_mossi": 541909,
+"nodi_mossi": 541911,
 "nodi_griglia": 7880626,
 "limite_dente_m": 1.5
 },
 "invariati": {
 "nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 0,
-"nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 25,
+"nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 24,
 "carreggiate_cambiate": 0,
 "carreggiate_ai_passaggi_a_livello": 578,
 "bordo_carreggiate_alle_recinzioni": 180,
@@ -3769,7 +3769,7 @@
 }
 ],
 "punte_verso_alto": {
-"totale": 1047,
+"totale": 1048,
 "fuori_dalle_cose_protette": 999,
 "peggiori": [
 {

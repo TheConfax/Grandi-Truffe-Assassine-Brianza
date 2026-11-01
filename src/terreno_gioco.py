@@ -67,6 +67,8 @@ def main(argv=None):
     pits = dk.get('pits', [])
     ff = os.path.join(a.da, 'fosse.json')   # the ramps of src/sottoterra.py (docs/sottoterra.md, tappa 1)
     if os.path.exists(ff): pits = pits + json.load(open(ff, encoding='utf-8'))['fosse']
+    fo = os.path.join(a.da, 'opere.json')   # the underpasses of src/opere.py
+    if os.path.exists(fo): pits = pits + json.load(open(fo, encoding='utf-8'))['fosse']
     import dbgt_quote as dq
     ind = dict(ver=1, fase=4, comune='+'.join(dq.lista_comuni(a.comune)), nota='docs/motore.md fase 4: quote in m sul mare; il gioco toglie terrain.base di brianza.json',
                tiles=tiles, decks=decks, pits=pits, acqua=acqua)

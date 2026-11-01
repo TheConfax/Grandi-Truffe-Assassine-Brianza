@@ -808,7 +808,7 @@ function genLamps(T, d, osm) {
       let k = 1; while (k < r.cum.length - 1 && r.cum[k] < s) k++;
       const a = N[r.g[k - 1]], b = N[r.g[k]], L = r.cum[k] - r.cum[k - 1] || 1, f = (s - r.cum[k - 1]) / L, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
       const sd = wide ? (n % 2 ? 1 : -1) : side; let off = r.w / 2 + 0.9; for (let e = 0; e < 8 && nearAsph(a[0] + (b[0] - a[0]) * f - uz * off * sd, a[1] + (b[1] - a[1]) * f + ux * off * sd, 0.25); e++) off += 0.25; /* the pole past the edge of the drawn carriageway (the 0.5 m grid of onAsph left some 0.2 m in it) */ const x = a[0] + (b[0] - a[0]) * f - uz * off * sd, z = a[1] + (b[1] - a[1]) * f + ux * off * sd;
-      if (tileOf(x, z) !== T.t || nearAsph(x, z, 0.25) || onAnyRoad(x, z, 0.3) || inBuilding(x, z, 0.4) || nearRail(x, z, 4) || osm.some(o => hyp(o[0] - x, o[1] - z) < 14)) continue;
+      if (tileOf(x, z) !== T.t || H.gallAt(x, z) || H.inPit(x, z, 0.6) || nearAsph(x, z, 0.25) || onAnyRoad(x, z, 0.3) || inBuilding(x, z, 0.4) || nearRail(x, z, 4) || osm.some(o => hyp(o[0] - x, o[1] - z) < 14)) continue;
       let town = 0; BLD.each(x - 30, z - 30, x + 30, z + 30, () => { town++; }); if (town < 2) continue; // only where there are houses
       out.push([x, z, Math.atan2(ux * sd, uz * sd)]); // arm towards the middle of the road
     }
@@ -854,7 +854,7 @@ function rampWalls(dk) {
   for (let t = 0; t < nt; t++) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) { const i = t * 9, k = key(T[i + a], T[i + a + 1], T[i + b], T[i + b + 1]); let l = E.get(k); if (!l) E.set(k, l = { ts: [], e: [T[i + a], T[i + a + 1], T[i + a + 2], T[i + b], T[i + b + 1], T[i + b + 2]] }); l.ts.push(t); }
   for (const [k, { ts, e }] of E) {
     const wall = ts.length === 1 ? pieno[ts[0]] && !spk.has(k) : ts.length === 2 && pieno[ts[0]] !== pieno[ts[1]]; if (!wall) continue;
-    const [ax, az, ay, bx, bz, by] = e, ga = H.base(ax, az), gb = H.base(bx, bz); if (ay - sp - ga < 0.05 && by - sp - gb < 0.05) continue;
+    const [ax, az, ay, bx, bz, by] = e, ga = H.base(ax, az), gb = H.base(bx, bz); if (ay - sp - ga < 0.05 && by - sp - gb < 0.05) continue; if (H.inPit((ax + bx) / 2, (az + bz) / 2, 0.3)) continue; // (over the road of an underpass: no wall down to it)
     const L = hyp(bx - ax, bz - az) || 1; dk.rw.push([ax, az, ga - 0.3, ay - sp, bx, bz, gb - 0.3, by - sp]);
     WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: Math.min(ga, gb) - 1, y1: Math.max(ay, by), deckw: true });
   }
@@ -944,7 +944,7 @@ function deckInit2(dk) {
   for (let k = 1; k <= nP; k++) for (const v of vs) {
     const s = s0 + len * k / (nP + 1), x = c[0] + ux * s - uz * v, z = c[1] + uz * s + ux * v;
     if (!inPoly(x, z, P)) continue; let edge = 1e9; for (let i = 0; i < P.length; i++) edge = Math.min(edge, segDist(x, z, P[i][0], P[i][1], P[(i + 1) % P.length][0], P[(i + 1) % P.length][1])); if (edge < 1.2) continue;
-    const o = deckTopAt(dk, x, z); if (!o) continue; const g = H.base(x, z), bot = o.top - dk.sp; if (bot - g < 2.5 || busyGround(dk, x, z) || (dk.pieno && dk.pieno[o.i / 9])) continue; // (not inside a solid ramp)
+    const o = deckTopAt(dk, x, z); if (!o) continue; const g = H.base(x, z), bot = o.top - dk.sp; if (bot - g < 2.5 || H.inPit(x, z, 0.6) || H.gallAt(x, z) || busyGround(dk, x, z) || (dk.pieno && dk.pieno[o.i / 9])) continue; // (not inside a solid ramp)
     dk.bar.pillars.push([x, z, g, bot]); WALLS.add(x - 0.5, z - 0.5, x + 0.5, z + 0.5, { r: 0.45, x, z, y0: g - 3, y1: bot - 0.3, deckw: true });
   }
 }
@@ -999,7 +999,7 @@ function* roadBarriers(T) {
             const gx = cx + ex * offS, gz = cz + ez * offS, yE = H.surface(gx, gz, yc + 0.3);
             const onCore = H.deckAt(gx, gz).some(o => o.d.nucleo && inPoly(gx, gz, o.d.nucleo) && Math.abs(o.top - yc) < 0.6); // the parapets of the deck
             let other = false; ROADSEG.each(gx - 4, gz - 4, gx + 4, gz + 4, o => { if (!other && o.r !== r && o.r.c <= 5 && segDist(gx, gz, o.a[0], o.a[1], o.b[0], o.b[1]) < o.r.w / 2 + 0.3 && Math.abs(lerp(H.node(o.ia), H.node(o.ib), 0.5) - yE) < 1.5) other = true; });
-            if (!onCore && !other) {
+            if (!onCore && !other && !H.inPit(gx, gz, 0.5) && !H.inPit(cx, cz, 0.5) && !H.gallAt(cx, cz)) { /* (in the trench of an underpass its walls hold the car) */
               if (Math.abs(yE - yc) < 0.5) {
                 let lo = 1e9, hi = -1e9; for (const d of [1, 2, 3, 4]) { const y = H.surface(gx + ex * d, gz + ez * d, yE + 0.3); lo = Math.min(lo, y); hi = Math.max(hi, y); }
                 if (r.x || yE - lo > RAIL_DROP || hi - yE > RAIL_DROP) rail = yE;
@@ -1056,6 +1056,31 @@ function pitLook(T, x, z) { // the look of the highest layer of the tile over th
   for (const [o, k, rank, st] of T.layers || []) if ((!best || rank >= best[0]) && inPoly(x, z, o) && !k.some(h => inPoly(x, z, h))) best = [rank, st];
   return best ? best[1] : null;
 }
+// the top of a wall of a trench under a deck stops at the deck
+function pitWallTop(A, y) { let t = y; for (const o of H.deckAt(A[0], A[1])) if (o.tipo !== 'copertura' && o.bot > y) { t = o.bot; break; } return t; }
+function gallLintel(Wb, quad, p, a, b, id) {
+  const ya = H.baseS(a[0], a[1]), yb = H.baseS(b[0], b[1]), lo = Math.max(Math.min(ya, yb) - 0.9, a[2] + 2.5);
+  quad(Wb, [a[0], a[1]], [b[0], b[1]], lo, ya + PIT_PAR, lo, yb + PIT_PAR, 0, hyp(b[0] - a[0], b[1] - a[1]) / 2);
+  const L = hyp(b[0] - a[0], b[1] - a[1]) || 1; WALLS.add(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1]), { ax: a[0], az: a[1], bx: b[0], bz: b[1], nx: (b[1] - a[1]) / L, nz: -(b[0] - a[0]) / L, two: true, y0: lo, y1: Math.max(ya, yb) + PIT_PAR, pit: id });
+}
+// the covered part of an underpass (altezze3.js gallAt): floor, side walls with their collisions, ceiling. Its top is S, drawn as everywhere
+function buildGallerie(T, G) {
+  for (const p of H.GALL) {
+    if (tileOf(p.c[0], p.c[1]) !== T.t || p.built) continue;
+    p.built = true; p.meshes = []; const F = Buf(), C = Buf(), W_ = Buf(), tr = p.tri, sf = p.sof;
+    for (let i = 0, j = 0; i < tr.length; i += 9, j += 3) {
+      const a = F.p.length / 3; for (let q = 0; q < 3; q++) vtx(F, tr[i + q * 3], tr[i + q * 3 + 2], tr[i + q * 3 + 1], 0, 1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4); triUp(F, a, a + 1, a + 2);
+      const u = C.p.length / 3; for (let q = 0; q < 3; q++) vtx(C, tr[i + q * 3], sf[j + q], tr[i + q * 3 + 1], 0, -1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4); triUp(C, u, u + 1, u + 2); const t3 = C.i.splice(-3); C.i.push(t3[0], t3[2], t3[1]);
+    }
+    const side = (L, s) => { let u = 0;
+      for (let k = 1; k < L.length; k++) { const [ax, az, ay] = L[k - 1], [bx, bz, by] = L[k], n = hyp(bx - ax, bz - az) || 1, nx = (bz - az) / n, nz = -(bx - ax) / n, sa = p.soffitto[k - 1], sb = p.soffitto[k];
+        for (const sg of [1, -1]) { const i0 = W_.p.length / 3; vtx(W_, ax, ay, az, nx * sg, 0, nz * sg, u, ay / 2); vtx(W_, bx, by, bz, nx * sg, 0, nz * sg, u + n / 2, by / 2); vtx(W_, bx, sb, bz, nx * sg, 0, nz * sg, u + n / 2, sb / 2); vtx(W_, ax, sa, az, nx * sg, 0, nz * sg, u, sa / 2); if (sg > 0) W_.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); else W_.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); }
+        u += n / 2; WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx, nz, two: true, y0: Math.min(ay, by) - 3, y1: Math.max(sa, sb), pit: p.id });
+      } };
+    side(p.sx); side(p.dx);
+    for (const [b, mt, r] of [[F, MAT.asph, -2], [C, MAT.pitWall, 0], [W_, MAT.pitWall, 0]]) if (b.i.length) { const M = mkMesh(b, mt, r, false); scene.remove(M); G.add(M); p.meshes.push(M); }
+  }
+}
 function buildPits(T, G) {
   const key = (T.t % NTX) + '_' + Math.floor(T.t / NTX);
   for (const p of H.PITS) {
@@ -1081,7 +1106,7 @@ function buildPits(T, G) {
       const i0 = F.p.length / 3; for (let q = 0; q < 3; q++) vtx(F, tr[i + q * 3], tr[i + q * 3 + 2], tr[i + q * 3 + 1], 0, 1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4);
       triUp(F, i0, i0 + 1, i0 + 2);
     }
-    const MF = mkMesh(F, MAT.pitFloor, -2, false); scene.remove(MF); G.add(MF); MF.userData.suolo = true; p.meshes.push(MF);
+    const MF = mkMesh(F, p.src && p.src.sotto ? MAT.asph : MAT.pitFloor, -2, false); scene.remove(MF); G.add(MF); MF.userData.suolo = true; p.meshes.push(MF);
     // walls and parapets along the two sides, the door at the end
     const Wb = Buf(), D = Buf(), quad = (b, a, c, ya0, ya1, yc0, yc1, u0, u1) => { const dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1, nx = dz / L, nz = -dx / L, i0 = b.p.length / 3; vtx(b, a[0], ya0, a[1], nx, 0, nz, u0, ya0 / 2); vtx(b, c[0], yc0, c[1], nx, 0, nz, u1, yc0 / 2); vtx(b, c[0], yc1, c[1], nx, 0, nz, u1, yc1 / 2); vtx(b, a[0], ya1, a[1], nx, 0, nz, u0, ya1 / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); };
     for (const side of [p.sx, p.dx]) {
@@ -1092,12 +1117,17 @@ function buildPits(T, G) {
         for (let q = 1; q < pts.length; q++) {
           const A = pts[q - 1], C = pts[q], fa = ay + (by - ay) * hyp(A[0] - ax, A[1] - az) / L, fc = ay + (by - ay) * hyp(C[0] - ax, C[1] - az) / L, da = A[2] - fa, dc = C[2] - fc;
           if (Math.max(da, dc) < 0.25) continue; deep = true;
-          const ta = A[2] + Math.min(PIT_PAR, Math.max(0, da)), tc = C[2] + Math.min(PIT_PAR, Math.max(0, dc)); lo = Math.min(lo, fa, fc); hi = Math.max(hi, ta, tc);
+          const ta = pitWallTop(A, A[2] + Math.min(PIT_PAR, Math.max(0, da))), tc = pitWallTop(C, C[2] + Math.min(PIT_PAR, Math.max(0, dc))); lo = Math.min(lo, fa, fc); hi = Math.max(hi, ta, tc);
           const ua = u + hyp(A[0] - ax, A[1] - az) / 2, uc = u + hyp(C[0] - ax, C[1] - az) / 2; quad(Wb, A, C, Math.min(fa, A[2]), ta, Math.min(fc, C[2]), tc, ua, uc);
         }
         u += L / 2;
         if (deep) { const L2 = hyp(bx - ax, bz - az); WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L2, nz: -(bx - ax) / L2, two: true, y0: lo - 3, y1: hi, pit: p.id }); }
       }
+    }
+    if (p.src && p.src.sotto) { // an underpass: no door. Where the trench goes under the cover, a lintel from the ceiling up to the parapet
+      for (const [on, k] of [[p.src.testa, 0], [p.src.coda, p.sx.length - 1]]) if (on) gallLintel(Wb, quad, p, p.sx[k], p.dx[k], p.id);
+      for (const [b, mt] of [[Wb, MAT.pitWall]]) if (b.i.length) { const M = mkMesh(b, mt, 0, 'cast'); scene.remove(M); G.add(M); p.meshes.push(M); }
+      continue;
     }
     const [lx, lz, ly] = p.sx[p.sx.length - 1], [rx, rz, ry] = p.dx[p.dx.length - 1], dl = H.baseS(lx, lz), dr = H.baseS(rx, rz), ph = p.porta_h;
     quad(D, [lx, lz], [rx, rz], ly, Math.min(ly + ph, Math.max(dl, ly + 0.5)), ry, Math.min(ry + ph, Math.max(dr, ry + 0.5)), 0, hyp(rx - lx, rz - lz) / 2.5);
@@ -1110,7 +1140,7 @@ function buildPits(T, G) {
 // out, the ramp's walls and parapet stand there. The polyline in the runs of segments whose middle is out of every ramp
 function pitSplit(pts) {
   if (!H.PITS.length) return [pts]; const out = []; let cur = [pts[0]];
-  for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k]; let inn = false; for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) if (H.inPit(a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, 0.15)) inn = true; if (inn) { if (cur.length > 1) out.push(cur); cur = [c]; } else cur.push(c); }
+  for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k]; let inn = false; for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) { const x_ = a[0] + (c[0] - a[0]) * t, z_ = a[1] + (c[1] - a[1]) * t, p_ = H.inPit(x_, z_, 0.7); if (H.inPit(x_, z_, 0.15) || (p_ && p_.src && p_.src.sotto)) inn = true; } /* (a wall along a trench of an underpass: the parapet of the trench takes its place) */ if (inn) { if (cur.length > 1) out.push(cur); cur = [c]; } else cur.push(c); }
   if (cur.length > 1) out.push(cur); return out;
 }
 const STY = {};
@@ -1187,6 +1217,7 @@ function* buildTileGen(T) {
     // phase 5: the mesh writes its own depth (the surfaces on it are cut on its cells and win by polygonOffset), so no depth mask under it
     const m = new THREE.Mesh(g, MAT.terrainS); m.renderOrder = -2; m.receiveShadow = true; G.add(m); T.terrMesh = m; T.st = st;
     if (H.PITS.length) buildPits(T, G);
+    if (H.GALL.length) buildGallerie(T, G);
   } else {
     // beside a tile of S its edge nodes are S (H.vis takes the neighbour's on the shared edge): every 2 m, as S, or the edge would crack
     const st = (d.rv || []).length || H.nearFine(T.t) ? 2 : TER.step, nn = Math.round(TS / st), b = Buf(), w = nn + 1; T.st = st;
@@ -1341,7 +1372,8 @@ function* buildTileGen(T) {
     const top = (x, z) => { let y = null; for (const o of H.deckAt(x, z)) if (o.tipo !== 'copertura' && (y === null || o.top > y)) y = o.top; return y; }; // the highest deck over (x, z)
     for (const [ty, lev, s0, E] of d.sg || []) {
       const P = []; let px = 0, pz = 0; for (let i = 0; i < E.length; i += 2) { px += E[i]; pz += E[i + 1]; P.push([px / 100, pz / 100]); }
-      if (P.length < 2) continue;
+      if (P.length < 2 || (lev === 2 && H.GALL.length && P.some(q => H.gallAt(q[0], q[1])))) continue; /* the lines of a carriageway in gallery are not on the ground over it */
+      if (H.PITS.length) { const ins = P.map(q => !!H.inPit(q[0], q[1], 0.1)); if (ins.some(v => v) && ins.some(v => !v)) { let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i; while (j < P.length && ins[j] === ins[i]) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* a line does not climb the wall of a trench: only the longest run on one side of it */
       const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + hyp(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
       const at = s => { let i = 1; while (i < P.length - 1 && cum[i] < s) i++; const f = clamp((s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), 0, 1); return [lerp(P[i - 1][0], P[i][0], f), lerp(P[i - 1][1], P[i][1], f)]; };
       const piece = (a, b) => { const o = [at(a)]; for (let i = 1; i < P.length - 1; i++) if (cum[i] > a && cum[i] < b) o.push(P[i]); o.push(at(b)); return o; }; // the line from a to b m along it
@@ -1435,7 +1467,7 @@ function* buildTileGen(T) {
         const free = r.wd ? r.w : r.mh * 2, twoWay = !r.o && r.c <= 2 && !r.pv && free >= 5.5, lanes = r.o && r.c <= 1 && free >= 6.6; // r.wd: the width of the carriageway AC_VEI (mh there is the p5 room of the lanes: by it 16 km of centre line went, verifica 24/10)
         if ((!twoWay && !lanes) || r.sg) continue; // r.sg: its markings come from the carriageway (tiles[t].sg, above)
         const ja = NODE_DEG[r.g[k - 1]] >= 3 ? hw + 4 : 0, jb = NODE_DEG[r.g[k]] >= 3 ? hw + 4 : 0;
-        for (let s = ja + 0.5; s + 3 < L - jb; s += 7.5) quad(mark, A[0] + ux * (s + 1.5), A[1] + uz * (s + 1.5), ux, uz, -uz, ux, 3, 0.16, 0.08 * fy, white);
+        for (let s = ja + 0.5; s + 3 < L - jb; s += 7.5) if (!H.gallAt(A[0] + ux * (s + 1.5), A[1] + uz * (s + 1.5))) quad(mark, A[0] + ux * (s + 1.5), A[1] + uz * (s + 1.5), ux, uz, -uz, ux, 3, 0.16, 0.08 * fy, white);
       }
     }
     // the old guardrails and pillars (old engine); in a tile of S the parapets, pillars and guardrails of sBarriers
@@ -1752,6 +1784,7 @@ function freeTile(T) {
   { const tutti = []; G.traverse(o => tutti.push(o)); for (const o of tutti) { o.parent = null; o.children = []; if (o.geometry) o.geometry = GEO_VUOTA; } } /* a prop, a gate or a pump that keeps one object of the tile must not keep the whole tile through parent and children */
   T.group = null; T.built = false; T.ready = false; T.gen = null;
   for (const g of T.gates || []) { g.bk = null; g.outer = g.inner = null; g.hinges = []; } /* nothing of the gates stays either */
+  for (const p of H.GALL) if (tileOf(p.c[0], p.c[1]) === T.t) { p.built = false; p.meshes = []; }
   for (const p of H.PITS) if (tileOf(p.c[0], p.c[1]) === T.t) { p.built = false; p.meshes = []; } else if (p.meshes) p.meshes = p.meshes.filter(M => M.parent && M.parent !== G); // its ramp is drawn again with it
   for (const p of PROPS) if (tileOf(p.x, p.z) === T.t) { p.obj = p.lx ? p.obj : null; if (p.inst) p.inst.meshes = []; } // the props stay, as what was knocked down, but not the meshes they drew
   for (const p of PROPS) if (p.tile === T) { p.onBreak = null; p.inst.meshes = []; } // a lamp may stand just past the edge of its tile
