@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 5aa713a · assemblato 02/11 00:45 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 3aea10d · assemblato 02/11 00:45 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -195,7 +195,7 @@ const TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const wrapA = a => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
-const hyp = Math.hypot;
+function hyp(a, b, c) { return c === undefined ? Math.sqrt(a * a + b * b) : Math.hypot(a, b, c); }
 let seed = 20821;
 const srnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const rnd = Math.random;
@@ -287,7 +287,47 @@ sun.shadow.bias = -0.0007; sun.shadow.normalBias = 0.03;
 scene.add(sun, sun.target);
 
 // ---------------------------------------------------------------- geometry buffers
-const Buf = () => ({ p: [], n: [], uv: [], c: [], i: [] });
+// ---------------------------------------------------------------- the blocks of numbers a tile is built in (Buf): the same blocks again, tile after tile
+// A plain array has to grow, and each size it passes through is rubbish: gigabytes a minute at speed, and from a certain size in the old generation of the memory, where the long cleanups come from (50 ms). A plain array cannot be emptied and kept either: JS gives its memory back.
+// So during the building of a tile (BLOCCHI.on) Buf hands out typed arrays from a pool, one pool per size, that go back when the tile is finished. They read and write like the arrays they replace: [i], length, push. Doubles for the coordinates, so the numbers are the same to the last bit. One too small hands over to a bigger one, in its Buf: reach it through the Buf (b.p.push); a local copy of b.p is for reading. Outside the building (start of the game, a hedge cut by a car) Buf stays plain.
+// Not on resizable buffers: tried, a push on them costs seven times as much once there are many.
+const BLOCCHI = { on: false, F: new Map(), U: new Map(), usati: [], giro: 1, MIN: 1 << 12 };
+const bloccoRendi = (P, a) => { let l = P.get(a.cap); if (!l) P.set(a.cap, l = []); if (l.length < (a.cap >= 1 << 19 ? 2 : a.cap >= 1 << 16 ? 6 : a.cap >= 1 << 13 ? 30 : 400)) l.push(a); }; /* the bigger, the fewer kept: the rest to the collector, once in a while */
+const bloccoDa = (P, K, cap) => { const l = P.get(cap); let a = l && l.pop(); if (!a) { try { a = new K(cap); } catch (e) { BLOCCHI.F.clear(); BLOCCHI.U.clear(); a = new K(cap); } } a.n = 0; a.resa = false; a.dopo = null; BLOCCHI.usati.push(a); return a; };
+const bloccoIdem = (a, P, K, k) => { let c = a.cap * 2; while (c < k) c *= 2; const q = bloccoDa(P, K, c); q.set(a.subarray(0, a.n)); q.n = a.n; q.own = a.own; q.key = a.key; a.own[a.key] = q; a.resa = true; a.dopo = q; a.n = a.cap; bloccoRendi(P, a); return q; }; /* a.dopo: a push through a local copy kept across the handover still lands in the right place */
+// Two classes written out, not one made twice: each keeps its own push, or the speed of a push seen on both kinds of number goes
+class BloccoF extends Float64Array {
+  constructor(cap) { super(cap); this.n = 0; this.cap = cap; this.own = null; this.key = ''; this.resa = false; this.giro = 0; this.dopo = null; }
+  static get [Symbol.species]() { return Float64Array; }
+  get length() { return this.n; }
+  fBlocco() { return this.subarray(0, this.n); }
+  push(a, b, c) { const k = arguments.length, n = this.n; if (n + k > this.cap) { if (this.dopo) return this.dopo.push(...arguments); const q = bloccoIdem(this, BLOCCHI.F, BloccoF, n + k); for (let i = 0; i < k; i++) q[n + i] = arguments[i]; return q.n = n + k; } if (k === 3) { this[n] = a; this[n + 1] = b; this[n + 2] = c; } else if (k === 2) { this[n] = a; this[n + 1] = b; } else if (k === 1) this[n] = a; else for (let i = 0; i < k; i++) this[n + i] = arguments[i]; return this.n = n + k; }
+  splice(s) { const a = s < 0 ? this.n + s : s, r = Array.from(this.subarray(a, this.n)); this.n = a; return r; } /* only "take the last ones", as the world uses it */
+  slice(a, b) { return Array.from(this.subarray(0, this.n).slice(a, b)); }
+  [Symbol.iterator]() { return this.subarray(0, this.n)[Symbol.iterator](); }
+}
+class BloccoU extends Uint32Array {
+  constructor(cap) { super(cap); this.n = 0; this.cap = cap; this.own = null; this.key = ''; this.resa = false; this.giro = 0; this.dopo = null; }
+  static get [Symbol.species]() { return Uint32Array; }
+  get length() { return this.n; }
+  fBlocco() { return this.subarray(0, this.n); }
+  push(a, b, c, d, e, f) { const k = arguments.length, n = this.n; if (n + k > this.cap) { if (this.dopo) return this.dopo.push(...arguments); const q = bloccoIdem(this, BLOCCHI.U, BloccoU, n + k); for (let i = 0; i < k; i++) q[n + i] = arguments[i]; return q.n = n + k; } if (k === 3) { this[n] = a; this[n + 1] = b; this[n + 2] = c; } else if (k === 6) { this[n] = a; this[n + 1] = b; this[n + 2] = c; this[n + 3] = d; this[n + 4] = e; this[n + 5] = f; } else for (let i = 0; i < k; i++) this[n + i] = arguments[i]; return this.n = n + k; }
+  splice(s) { const a = s < 0 ? this.n + s : s, r = Array.from(this.subarray(a, this.n)); this.n = a; return r; }
+  slice(a, b) { return Array.from(this.subarray(0, this.n).slice(a, b)); }
+  [Symbol.iterator]() { return this.subarray(0, this.n)[Symbol.iterator](); }
+}
+const Buf = () => { if (!BLOCCHI.on) return { p: [], n: [], uv: [], c: [], i: [] }; const m = BLOCCHI.MIN, b = { p: bloccoDa(BLOCCHI.F, BloccoF, m), n: bloccoDa(BLOCCHI.F, BloccoF, m), uv: bloccoDa(BLOCCHI.F, BloccoF, m), c: bloccoDa(BLOCCHI.F, BloccoF, m), i: bloccoDa(BLOCCHI.U, BloccoU, m) }; for (const k of ['p', 'n', 'uv', 'c', 'i']) { b[k].own = b; b[k].key = k; } return b; };
+function blocchiResi() { // the tile is finished: nothing reads its buffers any more, the geometries have their own copy.
+  const g = ++BLOCCHI.giro;
+  for (const a of BLOCCHI.usati) { if (a.giro === g) continue; a.giro = g; a.own = null; a.dopo = null; if (a.resa) continue; a.resa = true; a.n = 0; bloccoRendi(a instanceof BloccoU ? BLOCCHI.U : BLOCCHI.F, a); }
+  BLOCCHI.usati.length = 0;
+}
+{ // what makes a geometry out of a buffer takes the blocks too, at their real length
+  const F0 = THREE.Float32BufferAttribute; THREE.Float32BufferAttribute = class extends F0 { constructor(a, k, nz) { super(a.fBlocco ? a.fBlocco() : a, k, nz); } };
+  const si = THREE.BufferGeometry.prototype.setIndex; THREE.BufferGeometry.prototype.setIndex = function (x) { if (x && x.fBlocco) { const v = x.fBlocco(); let m = 0; for (let i = 0; i < v.length; i++) if (v[i] > m) m = v[i]; x = new (m > 65535 ? THREE.Uint32BufferAttribute : THREE.Uint16BufferAttribute)(v, 1); } return si.call(this, x); };
+}
+function passoTile(g) { BLOCCHI.on = true; try { const r = g.next(); if (r.done) blocchiResi(); return r; } finally { BLOCCHI.on = false; } } /* one slice of the building of a tile */
+
 function vtx(b, x, y, z, nx, ny, nz, u, v, col) { b.p.push(x, y, z); b.n.push(nx, ny, nz); b.uv.push(u, v); if (col) b.c.push(col.r, col.g, col.b); return b.p.length / 3 - 1; }
 function triUp(b, i, j, k) {
   const P = b.p; const ax = P[i * 3], az = P[i * 3 + 2];
@@ -2254,7 +2294,7 @@ function clipDrape(b, hf, ro, mat) {
   const P = b.p, ab = b.ab || [], nv = P.length / 3, I = b.i, hasC = b.c.length === P.length;
   let bx0 = 1e9, bz0 = 1e9, bx1 = -1e9, bz1 = -1e9; for (let v = 0; v < nv; v++) { const x = P[v * 3], z = P[v * 3 + 2]; if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (z < bz0) bz0 = z; if (z > bz1) bz1 = z; }
   if (!H.anyFine() || b.noclip || !nv || !H.anyFineIn(bx0, bz0, bx1, bz1)) { /* no tile of S under the buffer (outside Meda): the old drape, without cutting every triangle for nothing */ for (let v = 0; v < nv; v++) if (!ab[v]) P[v * 3 + 1] += hf(P[v * 3], P[v * 3 + 2]); return; } // noclip: thin strips over a smooth S (rails), each vertex on it
-  const o = { p: [], n: [], uv: [], c: [], i: [] }, remap = new Int32Array(nv).fill(-1);
+  const o = Buf(), remap = new Int32Array(nv).fill(-1);
   const keep = v => { let r = remap[v]; if (r < 0) { r = remap[v] = o.p.length / 3; o.p.push(P[v * 3], ab[v] ? P[v * 3 + 1] : P[v * 3 + 1] + hf(P[v * 3], P[v * 3 + 2]), P[v * 3 + 2]); o.n.push(b.n[v * 3], b.n[v * 3 + 1], b.n[v * 3 + 2]); o.uv.push(b.uv[v * 2], b.uv[v * 2 + 1]); if (hasC) o.c.push(b.c[v * 3], b.c[v * 3 + 1], b.c[v * 3 + 2]); } return r; };
   // the attributes of a source triangle as affine functions of (x, z): relative height, normal, uv, colour; pieces of triangles with the same
   // functions on the same cell triangle are joined again (the two halves of a quad, the quads of a strip, strips of one colour)
@@ -2266,7 +2306,7 @@ function clipDrape(b, hf, ro, mat) {
       const x = p[0], z = p[1], l1 = ((cz - dz) * (x - dx) + (dx - cx) * (z - dz)) / den, l2 = ((dz - az) * (x - dx) + (ax - dx) * (z - dz)) / den, l3 = 1 - l1 - l2;
       const yr = l1 * P[a * 3 + 1] + l2 * P[c * 3 + 1] + l3 * P[d * 3 + 1];
       o.p.push(x, yr + (F ? (b.free ? H.overFree(x, z, p[2]) : p[2]) : hf(x, z)), z);
-      for (const [A, s, o0, m] of attrs.slice(1)) { const D = A === b.n ? o.n : A === b.uv ? o.uv : o.c; for (let e = o0; e < o0 + m; e++) D.push(l1 * A[a * s + e] + l2 * A[c * s + e] + l3 * A[d * s + e]); }
+      for (let q_ = 1; q_ < attrs.length; q_++) { const [A, s, o0, m] = attrs[q_], D = A === b.n ? o.n : A === b.uv ? o.uv : o.c; for (let e = o0; e < o0 + m; e++) D.push(l1 * A[a * s + e] + l2 * A[c * s + e] + l3 * A[d * s + e]); }
     }
     return q0;
   };
@@ -2686,7 +2726,7 @@ function waterInBed(a, outer, holes, T) {
   if (tot >= 4) return bed >= tot * 0.3;
   const pts = [...outer, centroid(outer)]; return pts.filter(([x, z]) => bedC(clamp(Math.floor((z - F.z0) / F.st), 0, c - 1) * c + clamp(Math.floor((x - F.x0) / F.st), 0, c - 1))).length >= pts.length * 0.3;
 }
-function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!g.next().done); }
+function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!passoTile(g).done); }
 function* buildTileGen(T) {
   if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.seme * 7919; for (const p of CAS_T.get(T.t) || []) if (!p.casFatta) { p.casFatta = true; casermeDi([p]); }
   T.tex0 = new THREE.Texture().id; // textures newer than this were made for this tile: freed with it
@@ -6482,8 +6522,8 @@ function tileTick(px, pz, budgetMs, force, soloDati) {
   while (performance.now() - t0 < bud) {
     let T = tileTick.cur;
     if (!T || !T.gen) { T = cand.shift(); if (!T) break; T.gen = buildTileGen(T); tileTick.cur = T; }
-    if (DEBUG) { const a = performance.now(), r = T.gen.next(), b = performance.now() - a, k = T.fetta || 'inizio', e = PZ.fette[k] || (PZ.fette[k] = [0, 0, 0]); e[0]++; e[1] += b; if (b > e[2]) { e[2] = b; e[3] = T.t; } T.fetta = r.value; if (r.done) { T.gen = null; tileTick.cur = null; T.fetta = null; } continue; } /* the slices, in the debug numbers */
-    if (T.gen.next().done) { T.gen = null; tileTick.cur = null; }
+    if (DEBUG) { const a = performance.now(), r = passoTile(T.gen), b = performance.now() - a, k = T.fetta || 'inizio', e = PZ.fette[k] || (PZ.fette[k] = [0, 0, 0]); e[0]++; e[1] += b; if (b > e[2]) { e[2] = b; e[3] = T.t; } T.fetta = r.value; if (r.done) { T.gen = null; tileTick.cur = null; T.fetta = null; } continue; } /* the slices, in the debug numbers */
+    if (passoTile(T.gen).done) { T.gen = null; tileTick.cur = null; }
   }
   PZ.usa.mesh += performance.now() - t2;
 }
@@ -8350,7 +8390,7 @@ function step(dt) {
   // ----- train
   updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWeather(dt); updWrecks(dt); updFuel(dt); updCaserme(dt); updProps(dt); updOggetti(dt); updNegozi(dt);
   for (const [cx, cz, tvx, tvz] of TRAIN_CIRC) {
-    for (const v of VEH) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad; if (d < RT && d > 1e-5) { const nx = dx / d, nz = dz / d; v.x += nx * (RT - d); v.z += nz * (RT - d); v.vx = tvx + nx * 6; v.vz = tvz + nz * 6; v.sleep = false; v.impact(12 + hyp(tvx, tvz)); } }
+    for (const v of VEH) if (Math.abs(v.x - cx) <= 1.75 + v.rad + v.co && Math.abs(v.z - cz) <= 1.75 + v.rad + v.co) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad; if (d < RT && d > 1e-5) { const nx = dx / d, nz = dz / d; v.x += nx * (RT - d); v.z += nz * (RT - d); v.vx = tvx + nx * 6; v.vz = tvz + nz * 6; v.sleep = false; v.impact(12 + hyp(tvx, tvz)); } }
   }
   // ----- pedestrians
   const pc = P.car;

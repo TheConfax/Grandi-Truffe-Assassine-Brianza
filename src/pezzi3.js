@@ -136,8 +136,8 @@ function tileTick(px, pz, budgetMs, force, soloDati) {
   while (performance.now() - t0 < bud) {
     let T = tileTick.cur;
     if (!T || !T.gen) { T = cand.shift(); if (!T) break; T.gen = buildTileGen(T); tileTick.cur = T; }
-    if (DEBUG) { const a = performance.now(), r = T.gen.next(), b = performance.now() - a, k = T.fetta || 'inizio', e = PZ.fette[k] || (PZ.fette[k] = [0, 0, 0]); e[0]++; e[1] += b; if (b > e[2]) { e[2] = b; e[3] = T.t; } T.fetta = r.value; if (r.done) { T.gen = null; tileTick.cur = null; T.fetta = null; } continue; } /* the slices, in the debug numbers */
-    if (T.gen.next().done) { T.gen = null; tileTick.cur = null; }
+    if (DEBUG) { const a = performance.now(), r = passoTile(T.gen), b = performance.now() - a, k = T.fetta || 'inizio', e = PZ.fette[k] || (PZ.fette[k] = [0, 0, 0]); e[0]++; e[1] += b; if (b > e[2]) { e[2] = b; e[3] = T.t; } T.fetta = r.value; if (r.done) { T.gen = null; tileTick.cur = null; T.fetta = null; } continue; } /* the slices, in the debug numbers */
+    if (passoTile(T.gen).done) { T.gen = null; tileTick.cur = null; }
   }
   PZ.usa.mesh += performance.now() - t2;
 }

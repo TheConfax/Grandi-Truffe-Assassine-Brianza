@@ -786,6 +786,11 @@ rep("    toast(`${best.stolen ? (isTwo(best)", "    if (!best.ko) toast(`${best.
 rep("v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;", "v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal && !v.ko;")
 rep("const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen,", "const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen && !v.ko,")
 rep("  const v = P.mode === 'car' ? P.car : null;\n  if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2,", "  const v = P.mode === 'car' && !P.car.ko ? P.car : null; /* finished on its roof: no engine to hear */\n  if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2,")
+# ---- less garbage per frame: Math.hypot boxes its arguments on every call, and it is called everywhere (same numbers to the last bits or so). The train against the traffic: a look at the distance first, no two circles of every car for every coach, every step
+rep("const hyp = Math.hypot;", "function hyp(a, b, c) { return c === undefined ? Math.sqrt(a * a + b * b) : Math.hypot(a, b, c); }")
+rep("    for (const v of VEH) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad;", "    for (const v of VEH) if (Math.abs(v.x - cx) <= 1.75 + v.rad + v.co && Math.abs(v.z - cz) <= 1.75 + v.rad + v.co) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad;")
+# ---- the blocks a tile is built in (blocchi3.js)
+rep("const Buf = () => ({ p: [], n: [], uv: [], c: [], i: [] });", open(os.path.join(HERE, 'blocchi3.js'), encoding='utf-8').read())
 # ---- cars and people drawn together (fusi3.js)
 rep("const _geo = {};\nconst boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; return _geo[k] || (_geo[k] = new THREE.BoxGeometry(w, h, l)); };", open(os.path.join(HERE, 'fusi3.js'), encoding='utf-8').read() + "\nconst _geo = {};\nconst boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; if (_geo[k]) return _geo[k]; const g = new THREE.BoxGeometry(w, h, l); g.fU = [w, h, l]; return _geo[k] = g; };")
 rep("var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);", "var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0); bm.geometry.fU = [S.W, S.bh, S.L, 3, 2, 6];")
