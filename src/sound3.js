@@ -115,7 +115,7 @@ function updSfx(dt) {
     if (car.inp.brk > 0 && car.fwdSpeed > 9) sk = Math.max(sk, clamp((car.fwdSpeed - 9) / 20, 0, 0.6));
     if (sk > 0 && !onAnyRoad(car.x, car.z, 2)) sk *= 0.15;
   }
-  SFX.skid.gain.setTargetAtTime(m * sk * 0.13, t, 0.05);
+  SFX.skid.gain.setTargetAtTime(Number.isFinite(sk) ? m * sk * 0.13 : 0, t, 0.05); // a car's first frames, before its drift is known
   if (sk > 0) { const j = () => 1 + (Math.random() - 0.5) * 0.12; SFX.skidA.f.frequency.setTargetAtTime((680 + sk * 90) * j(), t, 0.06); SFX.skidB.f.frequency.setTargetAtTime((1230 + sk * 140) * j(), t, 0.06); SFX.skidLfo.frequency.setTargetAtTime(38 + Math.random() * 16, t, 0.05); } // the resonances wander, the chatter is uneven
   if (!live) return;
   // footsteps: one per stride half, when the swinging leg comes down
