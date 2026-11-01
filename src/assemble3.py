@@ -192,7 +192,7 @@ a = s.index("// minimap source canvas (1 px = 1 m)"); b = s.index("const mm = $(
 s = s[:a] + """// big map pre-rendered at 0.32 px/m
 // the bake draws it from the whole world (mappa/grande.png); the game takes the picture the first time the map opens
 const BIG_S = 0.32, BOX = Math.ceil(META.hw * BIG_S), BOZ = Math.ceil(META.hh * BIG_S); let BIGC = null;
-function bigLoad() { if (BIGC) return; BIGC = new Image(); BIGC.onload = () => { if (bigOpen) drawBig(); }; BIGC.src = 'mappa/grande.png?v=' + D.ver; }
+function bigLoad() { if (BIGC) return; BIGC = new Image(); BIGC.onload = () => { if (bigOpen) drawBig(); }; BIGC.src = 'mappa/grande.webp?v=' + D.ver; }
 function bigCanvas() {
   const C = document.createElement('canvas'); C.width = BOX * 2; C.height = BOZ * 2;
   const g = C.getContext('2d'); g.fillStyle = '#20232b'; g.fillRect(0, 0, C.width, C.height); g.translate(BOX, BOZ); g.scale(BIG_S, BIG_S);
@@ -715,7 +715,8 @@ rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePe
     "  if (START !== STATION) { /* the start chosen in the address: the car on the nearest lane, the tiles around it first */\n"
     "    const n2 = nearestNode(TRAF_NODES, START.x, START.z), e2 = TRAF[n2][0], [q0, q1] = edgePts(n2, e2.to, e2.off + 0.9), h2 = Math.atan2(q1[0] - q0[0], q1[1] - q0[1]);\n"
     "    for (const v of VEH.slice()) if (v !== mine && hyp(v.x - q0[0], v.z - q0[1]) < 7) v.remove();\n"
-    "    mine.x = q0[0]; mine.z = q0[1]; mine.h = h2; P.x = mine.x + Math.cos(h2) * 2.4; P.z = mine.z - Math.sin(h2) * 2.4; P.h = h2;\n"
+    "    const lontano = hyp(q0[0] - START.x, q0[1] - START.z) > 150; /* out on the bare ground, no lane near: the car at the exact point */\n"
+    "    mine.x = lontano ? START.x : q0[0]; mine.z = lontano ? START.z : q0[1]; mine.h = h2; P.x = mine.x + Math.cos(h2) * 2.4; P.z = mine.z - Math.sin(h2) * 2.4; P.h = h2;\n"
     "    tileTick(START.x, START.z, 0, 420); for (const T of TILES) T.dist = hyp(T.cx - START.x, T.cz - START.z);\n"
     "    if (START.piedi) { P.x = START.x; P.z = START.z; } /* &piedi: on foot at the exact point, the car stays on the nearest lane */\n"
     "    P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync();\n"
@@ -772,7 +773,7 @@ rep("if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - 
 rep("    const f = rayCam(px, pz, cx, cz, wy);", "    if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */\n    const f = rayCam(px, pz, cx, cz, wy);")
 rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = Math.max(fy, H.ground(cx, cz)) + ht;")
 rep("  camera.position.copy(camPos);\n  if (shake > 0)", "  if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */\n  camera.position.copy(camPos);\n  if (shake > 0)")
-rep("window.__G = { VIVI,", "window.__G = { FIS, step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
+rep("window.__G = { VIVI,", "window.__G = { FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
 # ---- a car off its wheels (Carlo, 1/11): fisica3.js. It steps with no grip, it turns round its waist, on its roof it is finished, he always gets out in a free place
 rep("    if (this.air) { this.stepAir(dt); return; }\n", "    if (this.air || (this.F && this.F.rig)) { this.stepAir(dt); return; }\n")
 rep("    const i = this.inp, k = 1 - 0.0004 * this.speed * dt;\n", "    const i = this.ko ? KO_INP : this.inp, k = 1 - 0.0004 * this.speed * dt;\n")

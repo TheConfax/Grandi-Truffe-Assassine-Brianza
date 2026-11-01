@@ -1,5 +1,5 @@
 // La cottura (docs/motore.md "Caricamento a pezzi"): apre il gioco con ?cuoci, che legge tutti i pezzi e calcola con il suo stesso codice ciò che dipende dall'intera mappa, e ne salva il risultato.
-//   node src/cuoci.mjs <url del sito> <cotta.json> <grande.png>       la lancia src/pezzi.py
+//   node src/cuoci.mjs <url del sito> <cotta.json> <grande.webp>       la lancia src/pezzi.py
 //   PLAYWRIGHT=<percorso di playwright/index.mjs> se non è installato qui; CHROME=<percorso di chrome.exe>
 import fs from 'fs';
 import path from 'path';

@@ -6,6 +6,7 @@ Leggi questo, `CLAUDE.md` e solo le parti di `docs/motore.md` che servono al tuo
 - Gioco: `src/*.js` assemblati in `index.html` da `python src/assemble3.py`. Pezzi principali: `world3.js` (tile, superfici, muri), `altezze3.js` (quote `H.*`), `assemble3.py` (fisica e guida, blocchi inseriti), `sfondabili3.js` (barriere che si rompono), `negozi3.js`, `paesaggio3.js` (campi, cantieri), `rotonde3.js`, `segnali3.js`, `police3.js`.
 - Build dei dati: `src/build.py <out.json>` lancia `build_data.py`, che chiama `dbgt_strade.py`, `dbgt_righe.py`, `dbgt_verde.py`, `dbgt_manufatti.py`, `dbgt_edifici.py`, `barriere.py`, `corsie_ia.py`, `rotonde.py`. Circa 5 minuti per Meda, deterministica.
 - Terreno: `superficie.py`, `impalcati.py`, `terreno_gioco.py` scrivono `terreno/indice.json` + `terreno/pacco.bin` (`terreno_pacco.py`).
+- Pezzi: il gioco legge solo `mappa/`. Dopo build o terreno `python src/pezzi.py` riscrive i pezzi e la cottura (`docs/motore.md` sezione 9); `src/pezzi3.js` li carica. `?tutto` nel link stende tutta la mappa, per i controlli.
 - Dati: `data/` (non versionata; dalle copie di lavoro `GTA_DATA=C:/Users/theco/GitHub/GTA-Brianza/data`). DBGT di Meda `data/dbt/Meda/dbgt.gpkg` (lettore `src/dbgt_quote.py`), OSM `data/osm/maplarge.osm`, LiDAR `data/terreno/lidar`, token Mapillary `data/mapillary_token.txt`.
 - Python: `C:/Users/theco/GitHub/GTA-Brianza/.venv/Scripts/python.exe` (pacchetti mancanti: installali nella venv).
 

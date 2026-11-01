@@ -11,7 +11,7 @@ const LIM = { dente_oltre_15cm_km: 0.5, fondo_sospeso_oltre_10cm_km: 0, salgono_
 const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu'] });
 const page = await browser.newPage({ viewport: { width: 640, height: 360 } }); const errs = [];
 page.on('pageerror', e => errs.push(e.message));
-await page.goto(url + (process.env.PAGINA || ''));
+await page.goto(url + (process.env.PAGINA || '?tutto')); // ?tutto: the whole map laid out, as these checks read it
 await page.waitForFunction(() => { const b = document.getElementById('go'); return b && !b.disabled; }, null, { timeout: 180000 });
 await page.evaluate(() => document.getElementById('go').click()); await page.waitForFunction(() => window.__G && __G.P, null, { timeout: 180000 });
 const r = await page.evaluate(() => {

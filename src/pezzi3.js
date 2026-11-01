@@ -114,9 +114,9 @@ function tileTick(px, pz, budgetMs, force, soloDati) {
     else if (T.lw && !T.built && dd > R_TOGLI && !vicini(T).some(u => u.built)) tileUnlay(T);
     else if (T.l0 && !T.lw && dd > R_BUTTA && !vicini(T).some(u => u.lw)) { if (T.d === NOD) { T.l0 = false; VIVI.delete(T); } else pzVia(T); }
   }
-  // the nearest not yet there is close: this frame may spend more on it (at speed; standing still nothing changes)
+  // the nearest tile not yet built is inside the ring it should have been built at: this frame may spend more, up to 4 times at 300 m (at speed in a town the front runs ahead of the budget; standing still nothing changes)
   cand.sort((a, b) => a.dist - b.dist); stend.sort((a, b) => a.dist - b.dist);
-  const tardi = (cand.length && cand[0].dist < 500) || (stend.length && stend[0].dist < 700), bud = force || soloDati ? budgetMs : tardi ? budgetMs * 2 : budgetMs;
+  const fuori = cand.length ? Math.max(0, R_MESH - 110 - cand[0].dist) : 0, bud = force || soloDati ? budgetMs : budgetMs * (1 + Math.min(3, fuori / 117));
   // the pieces that have arrived: one at least per frame
   let k = 0;
   while (PZ.arrivi.length && (k++ === 0 || performance.now() - t0 < bud * 0.5)) { const [T, b] = PZ.arrivi.shift(), t1 = performance.now(); if (!T.l0) { try { pzArriva(T, b); } catch (e) { GRID_REC = null; console.error('pezzo ' + T.t, e); T.riprova = performance.now() + 3000; } } PZ.usa.arrivo += performance.now() - t1; }
@@ -154,7 +154,7 @@ const partenza = () => START !== STATION ? [START.x, START.z] : [STATION.x + 190
 // ---- the whole map at once. ?cuoci (src/cuoci.mjs): what depends on all the map, decided once by the same code, goes into mappa/ and the game stops there. ?tutto: the same and then the game goes on with
 // nothing taken away, for the checks of the whole map (src/controlli_barriere.mjs)
 async function cuoci() {
-  const R6 = (k, v) => typeof v === 'number' ? Math.round(v * 1e6) / 1e6 : v, pz = {}, ogni = t => pz[t] || (pz[t] = {}), tutti = Object.keys(D.pezzi).map(Number).sort((a, b) => a - b);
+  const pz = {}, ogni = t => pz[t] || (pz[t] = {}), tutti = Object.keys(D.pezzi).map(Number).sort((a, b) => a - b);
   H.gradini = false; let dn = 0;
   await Promise.all(Array.from({ length: 16 }, async (_, w) => { for (let i = w; i < tutti.length; i += 16) { const T = TILES[tutti[i]], r = await fetch(`mappa/p/${T.t % NTX}_${Math.floor(T.t / NTX)}.bin?v=${D.ver}`, FRESCO); PZ.arrivi.push([T, await gunzip(await r.arrayBuffer())]); goBtn.textContent = 'COTTURA ' + (++dn) + '/' + tutti.length; } }));
   PZ.arrivi.sort((a, b) => a[0].t - b[0].t); for (const [T, b] of PZ.arrivi) pzArriva(T, b); PZ.arrivi.length = 0;
@@ -164,7 +164,7 @@ async function cuoci() {
   const mm = v => Math.round(v * 1000);
   for (const T of TILES) { const bf = []; for (const q of [...T.feQ, ...T.baQ.map(e => e[1])]) { const a = []; for (const p of q) { barFoot(p); a.push(mm(p.g0), mm(p.fy) - mm(p.g0), mm(p.g0) - mm(p.lo), p.pl ? 1 : 0); } bf.push(a); } if (bf.length) ogni(T.t).bf = bf; }
   // walls, trees, barriers: on the same ground
-  const eTile = new Map(); for (const T of TILES) { const f = T.feQ, b = T.baQ; layMuri(T); T.feQ = f; T.baQ = b; }
+  for (const T of TILES) { const f = T.feQ, b = T.baQ; layMuri(T); T.feQ = f; T.baQ = b; }
   // the step layer, and whether a segment of road stands in a building: before the fuel stations take their roofs away
   H.gradini = true;
   for (const T of TILES) if (H.tile(T.t)) { const mds = stepsAdd(T); if (mds.length) ogni(T.t).mds = mds; }
@@ -181,8 +181,8 @@ async function cuoci() {
     for (const T of TILES) T.bld.forEach((B, i) => { if (!B.big) return; const { e, front, ...big } = B.big; let fr; if (front) { const { b, big: _b, ...f } = front; fr = { ...f, b: ref(b) }; } (ogni(T.t).sup || (ogni(T.t).sup = [])).push([i, { ...big, front: fr }, B.h]); });
     for (const s of signList()) { if (s.b.lm) continue; const t = tileOf(s.p.x, s.p.z); (ogni(t).sgf || (ogni(t).sgf = [])).push({ ...s, p: D.pois.indexOf(s.p), b: ref(s.b) }); }
     casermeDi(D.pois); glob.cas = CASERME.map(st => [D.pois.indexOf(st.p), tileOf(st.x, st.z)]);
-    window.__COTTA = JSON.stringify({ pezzi: pz, globale: glob }, R6);
-    window.__COTTA_GRANDE = bigCanvas().toDataURL('image/png');
+    window.__COTTA = JSON.stringify({ pezzi: pz, globale: glob }); // the numbers as they are: a shop draws its look from h0
+    window.__COTTA_GRANDE = bigCanvas().toDataURL('image/webp', 0.92);
     goBtn.textContent = 'COTTURA FINITA';
     await new Promise(() => { }); // the game stops here: src/cuoci.mjs takes the results
   }

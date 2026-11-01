@@ -177,7 +177,7 @@ class Grid {
   del(x0, z0, x1, z1, it) {
     const c = this.cs;
     for (let i = Math.floor(Math.min(x0, x1) / c); i <= Math.floor(Math.max(x0, x1) / c); i++)
-      for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) { const a = this.m.get(this.k(i, j)); if (!a) continue; const n = a.indexOf(it); if (n >= 0) a.splice(n, 1); }
+      for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) { const a = this.m.get(this.k(i, j)); if (!a) continue; const n = a.indexOf(it); if (n >= 0) { a.splice(n, 1); if (!a.length) this.m.delete(this.k(i, j)); } }
   }
   each(x0, z0, x1, z1, fn) {
     const c = this.cs, q = ++this.q;

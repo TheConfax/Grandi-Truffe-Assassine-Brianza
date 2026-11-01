@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo pezzi · dopo e27cd14 · assemblato 01/11 17:55 · porta ' + location.port;
+    const txt = 'locale · ramo pezzi · dopo 3604ee0 · assemblato 01/11 18:46 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -221,7 +221,7 @@ class Grid {
   del(x0, z0, x1, z1, it) {
     const c = this.cs;
     for (let i = Math.floor(Math.min(x0, x1) / c); i <= Math.floor(Math.max(x0, x1) / c); i++)
-      for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) { const a = this.m.get(this.k(i, j)); if (!a) continue; const n = a.indexOf(it); if (n >= 0) a.splice(n, 1); }
+      for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) { const a = this.m.get(this.k(i, j)); if (!a) continue; const n = a.indexOf(it); if (n >= 0) { a.splice(n, 1); if (!a.length) this.m.delete(this.k(i, j)); } }
   }
   each(x0, z0, x1, z1, fn) {
     const c = this.cs, q = ++this.q;
@@ -3282,6 +3282,9 @@ function freeTile(T) {
   T.group = null; T.built = false; T.ready = false; T.gen = null;
   for (const p of H.PITS) if (tileOf(p.c[0], p.c[1]) === T.t) { p.built = false; p.meshes = []; } else if (p.meshes) p.meshes = p.meshes.filter(M => M.parent && M.parent !== G); // its ramp is drawn again with it
   for (const p of PROPS) if (tileOf(p.x, p.z) === T.t) { p.obj = p.lx ? p.obj : null; if (p.inst) p.inst.meshes = []; if (p.tile) p.onBreak = null; } // the props stay, as what was knocked down, but not the meshes they drew
+  for (const k of ['terrMesh', 'ownMeshes', 'cellMesh', 'cellIdx', 'sill', 'roWalls', 'roIm', 'ngShut', 'layers', 'stalls', 'streetStalls', 'nSmall']) T[k] = undefined; /* nothing of the meshes stays on the tile; its stalls are worked out again */
+  for (const st of CASERME) if (st.root && tileOf(st.x, st.z) === T.t) st.root = null; for (const f of FUEL) if (tileOf(f.x, f.z) === T.t) for (const q of f.pumps) { q.g = null; q.body = null; }
+  for (const f of FOUNT) if (f.spray && tileOf(f.x, f.z) === T.t) f.spray = null;
 }
 // ---------------------------------------------------------------- gates (cancelli): closed ones can be rammed open
 const GATE_ROTTI = new Set(), GATEG = new Grid(16), GATE_FLY = [], GATE_OPEN = new Set();
@@ -6383,9 +6386,9 @@ function tileTick(px, pz, budgetMs, force, soloDati) {
     else if (T.lw && !T.built && dd > R_TOGLI && !vicini(T).some(u => u.built)) tileUnlay(T);
     else if (T.l0 && !T.lw && dd > R_BUTTA && !vicini(T).some(u => u.lw)) { if (T.d === NOD) { T.l0 = false; VIVI.delete(T); } else pzVia(T); }
   }
-  // the nearest not yet there is close: this frame may spend more on it (at speed; standing still nothing changes)
+  // the nearest tile not yet built is inside the ring it should have been built at: this frame may spend more, up to 4 times at 300 m (at speed in a town the front runs ahead of the budget; standing still nothing changes)
   cand.sort((a, b) => a.dist - b.dist); stend.sort((a, b) => a.dist - b.dist);
-  const tardi = (cand.length && cand[0].dist < 500) || (stend.length && stend[0].dist < 700), bud = force || soloDati ? budgetMs : tardi ? budgetMs * 2 : budgetMs;
+  const fuori = cand.length ? Math.max(0, R_MESH - 110 - cand[0].dist) : 0, bud = force || soloDati ? budgetMs : budgetMs * (1 + Math.min(3, fuori / 117));
   // the pieces that have arrived: one at least per frame
   let k = 0;
   while (PZ.arrivi.length && (k++ === 0 || performance.now() - t0 < bud * 0.5)) { const [T, b] = PZ.arrivi.shift(), t1 = performance.now(); if (!T.l0) { try { pzArriva(T, b); } catch (e) { GRID_REC = null; console.error('pezzo ' + T.t, e); T.riprova = performance.now() + 3000; } } PZ.usa.arrivo += performance.now() - t1; }
@@ -6423,7 +6426,7 @@ const partenza = () => START !== STATION ? [START.x, START.z] : [STATION.x + 190
 // ---- the whole map at once. ?cuoci (src/cuoci.mjs): what depends on all the map, decided once by the same code, goes into mappa/ and the game stops there. ?tutto: the same and then the game goes on with
 // nothing taken away, for the checks of the whole map (src/controlli_barriere.mjs)
 async function cuoci() {
-  const R6 = (k, v) => typeof v === 'number' ? Math.round(v * 1e6) / 1e6 : v, pz = {}, ogni = t => pz[t] || (pz[t] = {}), tutti = Object.keys(D.pezzi).map(Number).sort((a, b) => a - b);
+  const pz = {}, ogni = t => pz[t] || (pz[t] = {}), tutti = Object.keys(D.pezzi).map(Number).sort((a, b) => a - b);
   H.gradini = false; let dn = 0;
   await Promise.all(Array.from({ length: 16 }, async (_, w) => { for (let i = w; i < tutti.length; i += 16) { const T = TILES[tutti[i]], r = await fetch(`mappa/p/${T.t % NTX}_${Math.floor(T.t / NTX)}.bin?v=${D.ver}`, FRESCO); PZ.arrivi.push([T, await gunzip(await r.arrayBuffer())]); goBtn.textContent = 'COTTURA ' + (++dn) + '/' + tutti.length; } }));
   PZ.arrivi.sort((a, b) => a[0].t - b[0].t); for (const [T, b] of PZ.arrivi) pzArriva(T, b); PZ.arrivi.length = 0;
@@ -6433,7 +6436,7 @@ async function cuoci() {
   const mm = v => Math.round(v * 1000);
   for (const T of TILES) { const bf = []; for (const q of [...T.feQ, ...T.baQ.map(e => e[1])]) { const a = []; for (const p of q) { barFoot(p); a.push(mm(p.g0), mm(p.fy) - mm(p.g0), mm(p.g0) - mm(p.lo), p.pl ? 1 : 0); } bf.push(a); } if (bf.length) ogni(T.t).bf = bf; }
   // walls, trees, barriers: on the same ground
-  const eTile = new Map(); for (const T of TILES) { const f = T.feQ, b = T.baQ; layMuri(T); T.feQ = f; T.baQ = b; }
+  for (const T of TILES) { const f = T.feQ, b = T.baQ; layMuri(T); T.feQ = f; T.baQ = b; }
   // the step layer, and whether a segment of road stands in a building: before the fuel stations take their roofs away
   H.gradini = true;
   for (const T of TILES) if (H.tile(T.t)) { const mds = stepsAdd(T); if (mds.length) ogni(T.t).mds = mds; }
@@ -6450,8 +6453,8 @@ async function cuoci() {
     for (const T of TILES) T.bld.forEach((B, i) => { if (!B.big) return; const { e, front, ...big } = B.big; let fr; if (front) { const { b, big: _b, ...f } = front; fr = { ...f, b: ref(b) }; } (ogni(T.t).sup || (ogni(T.t).sup = [])).push([i, { ...big, front: fr }, B.h]); });
     for (const s of signList()) { if (s.b.lm) continue; const t = tileOf(s.p.x, s.p.z); (ogni(t).sgf || (ogni(t).sgf = [])).push({ ...s, p: D.pois.indexOf(s.p), b: ref(s.b) }); }
     casermeDi(D.pois); glob.cas = CASERME.map(st => [D.pois.indexOf(st.p), tileOf(st.x, st.z)]);
-    window.__COTTA = JSON.stringify({ pezzi: pz, globale: glob }, R6);
-    window.__COTTA_GRANDE = bigCanvas().toDataURL('image/png');
+    window.__COTTA = JSON.stringify({ pezzi: pz, globale: glob }); // the numbers as they are: a shop draws its look from h0
+    window.__COTTA_GRANDE = bigCanvas().toDataURL('image/webp', 0.92);
     goBtn.textContent = 'COTTURA FINITA';
     await new Promise(() => { }); // the game stops here: src/cuoci.mjs takes the results
   }
@@ -7339,7 +7342,7 @@ const fmtEur = v => '€ ' + Math.round(v).toLocaleString('it-IT');
 // big map pre-rendered at 0.32 px/m
 // the bake draws it from the whole world (mappa/grande.png); the game takes the picture the first time the map opens
 const BIG_S = 0.32, BOX = Math.ceil(META.hw * BIG_S), BOZ = Math.ceil(META.hh * BIG_S); let BIGC = null;
-function bigLoad() { if (BIGC) return; BIGC = new Image(); BIGC.onload = () => { if (bigOpen) drawBig(); }; BIGC.src = 'mappa/grande.png?v=' + D.ver; }
+function bigLoad() { if (BIGC) return; BIGC = new Image(); BIGC.onload = () => { if (bigOpen) drawBig(); }; BIGC.src = 'mappa/grande.webp?v=' + D.ver; }
 function bigCanvas() {
   const C = document.createElement('canvas'); C.width = BOX * 2; C.height = BOZ * 2;
   const g = C.getContext('2d'); g.fillStyle = '#20232b'; g.fillRect(0, 0, C.width, C.height); g.translate(BOX, BOZ); g.scale(BIG_S, BIG_S);
@@ -9227,7 +9230,8 @@ function setupWorld(saved) {
   if (START !== STATION) { /* the start chosen in the address: the car on the nearest lane, the tiles around it first */
     const n2 = nearestNode(TRAF_NODES, START.x, START.z), e2 = TRAF[n2][0], [q0, q1] = edgePts(n2, e2.to, e2.off + 0.9), h2 = Math.atan2(q1[0] - q0[0], q1[1] - q0[1]);
     for (const v of VEH.slice()) if (v !== mine && hyp(v.x - q0[0], v.z - q0[1]) < 7) v.remove();
-    mine.x = q0[0]; mine.z = q0[1]; mine.h = h2; P.x = mine.x + Math.cos(h2) * 2.4; P.z = mine.z - Math.sin(h2) * 2.4; P.h = h2;
+    const lontano = hyp(q0[0] - START.x, q0[1] - START.z) > 150; /* out on the bare ground, no lane near: the car at the exact point */
+    mine.x = lontano ? START.x : q0[0]; mine.z = lontano ? START.z : q0[1]; mine.h = h2; P.x = mine.x + Math.cos(h2) * 2.4; P.z = mine.z - Math.sin(h2) * 2.4; P.h = h2;
     tileTick(START.x, START.z, 0, 420); for (const T of TILES) T.dist = hyp(T.cx - START.x, T.cz - START.z);
     if (START.piedi) { P.x = START.x; P.z = START.z; } /* &piedi: on foot at the exact point, the car stays on the nearest lane */
     P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync();
@@ -9287,5 +9291,5 @@ window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { FIS, step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>

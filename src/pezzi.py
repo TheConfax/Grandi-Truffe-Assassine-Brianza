@@ -3,7 +3,7 @@ mappa/, che è tutto quello che il gioco legge:
   mappa/globale.bin      gzip di un JSON: meta, grafo stradale, nomi, punti di interesse, ferrovie, fiumi, l'elenco dei pezzi e quello che la cottura ha deciso sull'intera mappa
   mappa/suolo.bin        gzip: il terreno a 10 m su tutta la zona giocabile, il suolo che c'è sempre (la fisica non cade mai nel vuoto)
   mappa/p/<tx>_<tz>.bin  un pezzo per ogni tile con dei dati, gzip di: lunghezza del JSON (uint32), JSON del tile, S del tile (GTAS). Un tile senza file è suolo nudo
-  mappa/grande.png       la mappa grande, disegnata dalla cottura
+  mappa/grande.webp       la mappa grande, disegnata dalla cottura
 Due passate: la prima scrive i pezzi crudi, poi src/cuoci.mjs apre il gioco con ?cuoci (legge tutti i pezzi e calcola una volta sola ciò che dipende dall'intera mappa), la seconda ci scrive dentro il risultato.
   python src/pezzi.py                 tutte e due le passate con la cottura in mezzo (PLAYWRIGHT e CHROME come per i controlli)
   python src/pezzi.py --solo-crudi    solo la prima
@@ -147,7 +147,7 @@ def main(argv=None):
         def log_message(s, *p): pass
     srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Muto); threading.Thread(target=srv.serve_forever, daemon=True).start()
     c = os.path.join(a.root, 'mappa', 'cotta.json')
-    rc = subprocess.call(['node', os.path.join(ROOT, 'src', 'cuoci.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], c, os.path.join(a.root, 'mappa', 'grande.png')])
+    rc = subprocess.call(['node', os.path.join(ROOT, 'src', 'cuoci.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], c, os.path.join(a.root, 'mappa', 'grande.webp')])
     srv.shutdown()
     if rc: sys.exit('cottura fallita')
     print('cotti', scrivi(a.root, B, IND, PK, g, json.load(open(c, encoding='utf-8')), dem))
