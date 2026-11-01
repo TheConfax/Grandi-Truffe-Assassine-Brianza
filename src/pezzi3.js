@@ -157,9 +157,12 @@ const partenza = () => START !== STATION ? [START.x, START.z] : [STATION.x + 190
 // ---- what neither the camera nor the sun can see costs nothing: a tile out of both is switched off before the renderer walks it, the instanced meshes get a sphere of their own.
 // An InstancedMesh is born with frustumCulled = false, because the sphere of its geometry says nothing of where its copies are: each one of them, trees and lamps by the hundred, was drawn in both passes wherever it stood.
 { const io = THREE.Frustum.prototype.intersectsObject; THREE.Frustum.prototype.intersectsObject = function (o) { return o.cullS ? this.intersectsSphere(o.cullS) : io.call(this, o); }; }
-const CULL_MARGINE = 12; // what falls or flies stays in its tile: a lamp, a gate
+const CULL_MARGINE = 25; // what falls or flies stays by its tile: a lamp, a gate, a panel of a barrier
 function tileLimiti(T, G) {
   G.updateMatrixWorld(true);
+  // the group of the tile and the meshes drawn where they stand (no position of their own, nothing under them) never move: no matrix to work out each frame. What flies off later is a new object under a new group
+  scene.matrixAutoUpdate = false; G.matrixAutoUpdate = false;
+  for (const o of G.children) if (o.isMesh && !o.children.length && !o.position.x && !o.position.y && !o.position.z && !o.rotation.x && !o.rotation.y && !o.rotation.z && o.scale.x === 1 && o.scale.y === 1 && o.scale.z === 1) o.matrixAutoUpdate = false;
   const B = T.box || (T.box = new THREE.Box3()), v = new THREE.Vector3(), S = new THREE.Sphere(); B.makeEmpty();
   G.traverse(o => {
     const g = o.geometry; if (!g || !g.attributes || !g.attributes.position || !g.attributes.position.count) return;
