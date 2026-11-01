@@ -200,11 +200,10 @@ function bigCanvas() {
   g.fillStyle = '#3a3e49'; for (const b of BUILDINGS) { g.beginPath(); b.pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fill(); }
   g.lineCap = 'round'; g.lineJoin = 'round';
   for (const pass of [0, 1, 2]) for (const r of D.roads) {
-    if (pass === 0 && r.c === 6) { g.strokeStyle = '#4b4f58'; g.lineWidth = 2; } else if (pass === 1 && r.c >= 2 && r.c <= 5) { g.strokeStyle = r.c === 5 ? '#9b8676' : '#a7a49c'; g.lineWidth = r.w + 2; } else if (pass === 2 && r.c <= 1) { g.strokeStyle = r.d ? '#f0c27a' : '#d8cfbd'; g.lineWidth = r.w + 4; } else continue;
+    if (pass === 0 && r.c === 6) { g.strokeStyle = '#4b4f58'; g.lineWidth = 2; } else if (pass === 1 && r.c >= 2 && r.c <= 5) { g.strokeStyle = r.c === 5 ? '#9b8676' : '#a7a49c'; g.lineWidth = r.w + 2; } else if (pass === 2 && r.c <= 1) { g.strokeStyle = r.x ? '#f39a1e' : '#d8cfbd'; g.lineWidth = r.w + 4; } else continue;
     g.beginPath(); r.g.forEach((i, k) => k ? g.lineTo(N[i][0], N[i][1]) : g.moveTo(N[i][0], N[i][1])); g.stroke();
   }
   g.setLineDash([12, 10]); g.strokeStyle = '#c96b4a'; g.lineWidth = 4; for (const r of RAILPTS) { g.beginPath(); r.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); } g.setLineDash([]);
-  g.lineWidth = 9; for (const L of CONF_LINEE) { g.strokeStyle = L.css; for (const c of L.anelli) { g.beginPath(); c.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.stroke(); } } /* the two barriers (confine3.js) */
   return C;
 }
 """ + s[b:]
@@ -220,7 +219,7 @@ s = s[:a] + """function drawMinimap() {
   const segs = []; ROADSEG.each(px - RM, pz - RM, px + RM, pz + RM, sg => segs.push(sg));
   for (const pass of [0, 1]) for (const sg of segs) {
     const r = sg.r; if (pass === 0 ? r.c !== 6 : r.c === 6) continue;
-    mg.strokeStyle = r.c === 6 ? '#4b4f58' : r.d ? '#f0c27a' : r.c <= 1 ? '#d8cfbd' : r.c === 5 ? '#9b8676' : '#a7a49c'; mg.lineWidth = r.c === 6 ? 1.6 : r.w + (r.c <= 1 ? 2 : 0.5);
+    mg.strokeStyle = r.c === 6 ? '#4b4f58' : r.x ? '#f39a1e' : r.c <= 1 ? '#d8cfbd' : r.c === 5 ? '#9b8676' : '#a7a49c'; mg.lineWidth = r.c === 6 ? 1.6 : r.w + (r.c <= 1 ? 2 : 0.5);
     mg.beginPath(); mg.moveTo(sg.a[0], sg.a[1]); mg.lineTo(sg.b[0], sg.b[1]); mg.stroke();
   }
   mg.lineWidth = 4 / zoom; for (const L of CONF_LINEE) { mg.strokeStyle = L.css; for (const c of L.anelli) { mg.beginPath(); c.forEach((q, i) => i ? mg.lineTo(q[0], q[1]) : mg.moveTo(q[0], q[1])); mg.closePath(); mg.stroke(); } } /* the two barriers (confine3.js) */
@@ -243,11 +242,6 @@ s = s[:a] + """function drawMinimap() {
   mg.translate(0, -(R - 20)); mg.rotate(-(h - Math.PI)); mg.fillText('N', 0, 0); mg.restore();
 }
 """ + s[b:]
-rep("for (const p of D.pois) if (['stazione', 'chiesa', 'polizia', 'parco', 'monumento'].includes(p.k) && p.n.length < 30 && !p.n.startsWith('Grotta')) {",
-    "for (const p of [...PLACES.filter(p => (p.k === 'town' || p.k === 'village') && Math.abs(p.x) < META.dati.hw - 150 && Math.abs(p.z) < META.dati.hh - 60).map(p => ({ ...p, big: 1 })), ...D.pois.filter(p => ['stazione', 'chiesa', 'parco'].includes(p.k))]) if (p.n.length < 30 && !p.n.startsWith('Grotta')) {")
-rep("lab(p, '#c9bfa8', 5 * dpr); g.fillStyle = '#e8e0cc'; g.fillText(p.n, p.x + 8 * dpr / sc, p.z + 5 * dpr / sc);",
-    "if (p.big) { g.save(); g.font = `400 ${20 * dpr / sc}px Bungee, Impact, sans-serif`; g.fillStyle = '#f0b23c'; g.fillText(p.n.toUpperCase(), p.x, p.z); g.restore(); } else { lab(p, '#c9bfa8', 5 * dpr); g.fillStyle = '#e8e0cc'; g.fillText(p.n, p.x + 8 * dpr / sc, p.z + 5 * dpr / sc); }")
-rep("<div class=\"cap\">MEDA<span>", "<div class=\"cap\">BRIANZA<span>")
 
 # ---- HUD place name, respawn spots, start
 rep("$('street').textContent = (st || 'Meda') + (TER ? ` · ${Math.round(TER.base + groundH(P.x, P.z))} m` : '');",
@@ -303,11 +297,16 @@ rep("    if (v > 4) { this.health = Math.max(0, this.health - (v - 4) * 2.2); }"
 rep("      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;", "      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;")
 rep("      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;", "      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;")
 # ---- gamepad (Xbox / PlayStation layout): RT gas, LT brake, left stick steer, RB handbrake, A turbo/run, Y get in/out, B camera, X horn, View map, Start pause
-rep("// ---------------------------------------------------------------- player actions", """const GP = { steer: 0, thr: 0, brk: 0, hand: 0, turbo: 0, horn: 0, fwd: 0, lookx: 0, looky: 0, back: 0, sprint: 0, prev: [], hold: [], t0: 0, mode: '', l3: 0, l3d: false };
+rep("// ---------------------------------------------------------------- player actions", """const GP = { steer: 0, thr: 0, brk: 0, hand: 0, turbo: 0, horn: 0, fwd: 0, lookx: 0, looky: 0, back: 0, sprint: 0, prev: [], blk: [], hold: [], t0: 0, mode: '', l3: 0, l3d: false };
 /* which layout applies: on foot, car (and anything else with four wheels), motorbike or scooter, bicycle */
 const padKind = () => P.mode !== 'car' || !P.car ? 'foot' : P.car.spec.pedal ? 'bici' : P.car.spec.two ? 'moto' : 'car';
 const padNames = () => GP.ps ? { x: '✕', o: '○', s: '□', t: '△', l1: 'L1', r1: 'R1', l2: 'L2', r2: 'R2', l3: 'L3', r3: 'R3', cr: 'Create', op: 'Options', tp: 'Touchpad' }
   : { x: 'A', o: 'B', s: 'X', t: 'Y', l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT', l3: 'LS', r3: 'RS', cr: 'View', op: 'Menu', tp: 'Guide' };
+function bigHint() {
+  const n = padNames(), el = document.getElementById('bighint'); if (!el) return;
+  el.textContent = (GP.seen ? `${n.x} segnaposto (di nuovo: lo toglie) · ${n.r2} ${n.l2} zoom · levetta sinistra sposta · ${n.o} o ${n.tp} chiude
+` : '') + 'Mouse: rotella o due dita zoom · trascina sposta · clic segnaposto · M o Esc chiude';
+}
 function padHelp(kind) {
   const n = padNames(), com = `${n.r3} ${kind === 'foot' ? 'ricentra la camera' : 'guarda dietro'} · ${n.cr} visuale · ${n.tp} mappa · ${n.op} pausa${DEBUG ? ' · croce su segnala punto' : ''}`;
   if (kind === 'foot') return `levetta sinistra cammina (piena: corsetta) · ${n.x} premuto ripetutamente: scatto · ${n.t} sali sul mezzo · ${com}`;
@@ -324,7 +323,9 @@ function pollPad() {
   let pads = []; try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) { return; }
   const g = [...pads].find(p => p && p.connected); if (!g) { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = GP.lookx = GP.looky = GP.back = 0; return; }
   const tn = performance.now(), dt = Math.min(0.1, (tn - (GP.t0 || tn)) / 1000); GP.t0 = tn;
-  const dz = v => Math.abs(v) < 0.15 ? 0 : v, b = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0, down = i => b(i) > 0.5;
+  const dz = v => Math.abs(v) < 0.15 ? 0 : v, b0 = i => g.buttons[i] ? g.buttons[i].value || (g.buttons[i].pressed ? 1 : 0) : 0, b = i => { if (!GP.blk[i]) return b0(i); if (b0(i) > 0.5) return 0; GP.blk[i] = false; return b0(i); }, down = i => b(i) > 0.5;
+  /* opening or closing the map: what is held down at that moment counts for nothing until it is let go (R2 held while closing must not be gas) */
+  const blkAll = () => { for (let i = 0; i < 18; i++) if (b0(i) > 0.5) GP.blk[i] = true; };
   const edge = i => { const now = down(i), was = GP.prev[i]; GP.prev[i] = now; return now && !was; };
   const E = []; for (let i = 0; i < 18; i++) E[i] = edge(i);
   const first = !GP.seen; if (first) { GP.seen = true; GP.ps = /dualsense|dualshock|wireless controller|054c|playstation/i.test(g.id); }
@@ -337,10 +338,11 @@ function pollPad() {
   const none = () => { GP.steer = GP.thr = GP.brk = GP.hand = GP.turbo = GP.horn = GP.fwd = GP.lookx = GP.looky = GP.back = 0; };
   /* title screen: Options or cross/A start the game like Enter */
   if (!running) { none(); if ((E[9] || E[0]) && !goBtn.disabled) startGame(); return; }
-  if (E[9]) togglePause(); /* also closes the big map */
+  if (E[9] && !bigOpen) togglePause(); /* Options does nothing on the big map */
   if (paused && !bigOpen) { radioWheelCancel(); none(); return; }
-  if (E[tpad]) toggleBig();
-  if (bigOpen) { radioWheelCancel(); none(); return; }
+  /* big map: touchpad opens it, touchpad or circle closes it; the game is paused and nothing reaches the driving. Left stick = cursor (the map scrolls at the edge), R2 zoom in, L2 zoom out, cross = waypoint (a second one on the same spot takes it away); right stick and Options: nothing */
+  if (E[tpad] || (bigOpen && E[1])) { toggleBig(); blkAll(); radioWheelCancel(); none(); return; }
+  if (bigOpen) { radioWheelCancel(); none(); bigPad(dz(g.axes[0] || 0), dz(g.axes[1] || 0), b(7), b(6), dt); if (E[0]) bigMark(); return; }
   const ni = s => toast(s + ' non implementato');
   GP.steer = dz(g.axes[0] || 0); GP.lookx = dz(g.axes[2] || 0); GP.looky = dz(g.axes[3] || 0); GP.back = b(11); GP.fwd = -dz(g.axes[1] || 0);
   GP.thr = veh ? b(7) : 0; GP.brk = veh ? b(6) : 0;

@@ -67,7 +67,9 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 #big { position: fixed; inset: 0; z-index: 8; background: rgba(12,13,18,.82); }
 #bigmap { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
 #big .cap { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(14px + env(safe-area-inset-top, 0px)); font-family: var(--display); font-size: 20px; }
-#big .cap span { display: block; font-family: var(--body); font-size: 16px; font-weight: 600; color: var(--ink-dim); letter-spacing: .04em; }
+#bigx { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(52px + env(safe-area-inset-bottom, 0px)); width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--ink-dim); background: rgba(12,13,18,.7); color: var(--ink); font: 26px/1 var(--body); cursor: pointer; }
+#bigx { top: calc(80px + env(safe-area-inset-top, 0px)); bottom: auto; }
+#big .cap span { white-space: pre-line; line-height: 1.35; text-shadow: 0 1px 3px #000; display: block; font-family: var(--body); font-size: 16px; font-weight: 600; color: var(--ink-dim); letter-spacing: .04em; }
 #fx { position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; pointer-events: none; background: rgba(0,0,0,0); transition: background .8s; }
 #fx.on { background: rgba(10,10,14,.55); }
 #fx h2 { font-family: var(--display); font-size: clamp(40px, 9vw, 96px); margin: 0; color: var(--cotto); opacity: 0; transform: scale(1.15); transition: opacity .6s, transform .8s; text-shadow: 0 4px 0 var(--shade); text-align: center; }
@@ -118,7 +120,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 <div id="osm">Mappa © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · Quote: <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">TINITALY/INGV</a></div>
 <div id="touch" hidden></div>
 <div id="fx"><h2 id="fxt"></h2></div>
-<div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">MEDA<span>Rotella o due dita: zoom · trascina: sposta · clic: segnaposto · M: torna in strada</span></div></div>
+<div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span id="bighint">Rotella o due dita: zoom · trascina: sposta · clic: segnaposto · M: torna in strada</span></div><button id="bigx" aria-label="Chiudi la mappa">×</button></div>
 <div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>U</kbd> audio</p><p>Premi <kbd>P</kbd> per riprendere</p></div></div>
 
 <div id="start">
@@ -1342,51 +1344,137 @@ function drawMinimap() {
   mg.save(); mg.translate(R, R); mg.rotate(h - Math.PI); mg.fillStyle = '#f0b23c'; mg.font = '800 26px "Barlow Condensed", sans-serif'; mg.textAlign = 'center'; mg.textBaseline = 'middle';
   mg.translate(0, -(R - 20)); mg.rotate(-(h - Math.PI)); mg.fillText('N', 0, 0); mg.restore();
 }
+// (drawBig comes first: assemble3.py replaces everything between the minimap and drawBig)
 function drawBig() {
   const c = $('bigmap'), dpr = Math.min(2, devicePixelRatio || 1); if (c.width !== Math.round(innerWidth * dpr) || c.height !== Math.round(innerHeight * dpr)) { c.width = innerWidth * dpr; c.height = innerHeight * dpr; }
-  const g = c.getContext('2d'); BIGV.fit = Math.min(c.width / (META.hw * 2), c.height / (META.hh * 2)) * 0.96; if (!BIGV.z) BIGV.z = BIGV.fit; const sc = BIGV.z;
-  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#16181e'; g.fillRect(0, 0, c.width, c.height); g.save(); g.translate(c.width / 2, c.height / 2); g.scale(sc, sc); g.translate(-BIGV.cx, -BIGV.cz);
-  if (BIGC && BIGC.complete) g.drawImage(BIGC, -META.hw, -META.hh, META.hw * 2, META.hh * 2);
-  if (sc > 0.7) { // close up: buildings and streets drawn sharp from the map data, only what is on screen
-    const hx = c.width / 2 / sc, hz = c.height / 2 / sc, x0 = BIGV.cx - hx, x1 = BIGV.cx + hx, z0 = BIGV.cz - hz, z1 = BIGV.cz + hz;
-    g.fillStyle = '#3a3e49'; BLD.each(x0, z0, x1, z1, b => { g.beginPath(); b.pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fill(); });
-    g.lineCap = 'round'; const segs = []; ROADSEG.each(x0, z0, x1, z1, sg => segs.push(sg));
-    for (const pass of [0, 1]) for (const sg of segs) { const r = sg.r; if (pass === 0 ? r.c !== 6 : r.c === 6) continue; g.strokeStyle = r.c === 6 ? '#4b4f58' : r.d ? '#f0c27a' : r.c <= 1 ? '#d8cfbd' : r.c === 5 ? '#9b8676' : '#a7a49c'; g.lineWidth = r.c === 6 ? 1.6 : r.w + (r.c <= 1 ? 2 : 0.5); g.beginPath(); g.moveTo(sg.a[0], sg.a[1]); g.lineTo(sg.b[0], sg.b[1]); g.stroke(); }
+  const g = c.getContext('2d'), W_ = c.width, H_ = c.height, V = BIGV;
+  V.fit = Math.min(W_ / (META.hw * 2), H_ / (META.hh * 2)) * 0.96; V.max = 1.3 * dpr; if (!V.z) V.z = V.fit; V.z = clamp(V.z, V.fit, V.max); if (V.fresh) { V.fresh = false; V.mx = W_ / 2; V.my = H_ / 2; }
+  const sc = V.z, s = sc / dpr, hx = W_ / 2 / sc, hz = H_ / 2 / sc, x0 = V.cx - hx, x1 = V.cx + hx, z0 = V.cz - hz, z1 = V.cz + hz, px_ = k => k * dpr / sc;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#0b0d11'; g.fillRect(0, 0, W_, H_);
+  g.save(); g.translate(W_ / 2, H_ / 2); g.scale(sc, sc); g.translate(-V.cx, -V.cz);
+  // the world: flat where there is nothing; the whole-world picture over it
+  g.fillStyle = '#1c1f27'; g.fillRect(-META.hw, -META.hh, META.hw * 2, META.hh * 2);
+  if (BIGC && BIGC.complete && BIGC.naturalWidth) { g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(BIGC, -META.hw, -META.hh, META.hw * 2, META.hh * 2); }
+  // where the data stop: a hatch, so the empty part reads as not drawn yet; outside the red barrier, darker
+  const dt = META.dati, red = CONF_LINEE[0].anelli;
+  g.save(); g.beginPath(); g.rect(-META.hw, -META.hh, META.hw * 2, META.hh * 2); g.rect(-dt.hw, -dt.hh, dt.hw * 2, dt.hh * 2);
+  const pat = g.createPattern(BIG_HATCH, 'repeat'); if (pat && pat.setTransform) pat.setTransform(new DOMMatrix().scale(dpr / sc * 1.4)); g.fillStyle = pat || 'rgba(0,0,0,0)'; g.fill('evenodd'); g.restore();
+  if (red.length) { g.save(); g.beginPath(); g.rect(-META.hw, -META.hh, META.hw * 2, META.hh * 2); for (const o of red) o.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fillStyle = 'rgba(6,7,10,.5)'; g.fill('evenodd'); g.restore(); }
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  // the roads sharp from the graph, only what is on screen: all of them close up, far away the main ones. Yellow is the expressway and its ramps (r.x), whatever they stand on
+  let street = null, sd = 1e9; const wcx = V.cx + (V.mx - W_ / 2) / sc, wcz = V.cz + (V.my - H_ / 2) / sc;
+  {
+    const far = s <= 0.2, vis = []; for (const r of D.roads) { if (far && r.c > 1) continue; const b = bigRoadBox(r); if (b[2] < x0 || b[0] > x1 || b[3] < z0 || b[1] > z1) continue; vis.push(r); }
+    const path = r => { g.beginPath(); r.g.forEach((i, k) => k ? g.lineTo(N[i][0], N[i][1]) : g.moveTo(N[i][0], N[i][1])); };
+    g.strokeStyle = '#555b68'; for (const r of vis) if (r.c === 6) { g.lineWidth = Math.max(r.w * 0.5, px_(1.1)); path(r); g.stroke(); }
+    for (const [pass, big] of [[0, false], [0, true], [1, false], [1, true]]) for (const r of vis) {
+      if (r.c === 6 || (r.c <= 1) !== big) continue;
+      const w = Math.max(r.w + (big ? 1 : 0.5), px_(far ? (r.x ? 3 : 1.6) : r.x ? 4.4 : big ? 3.2 : 2.2));
+      if (pass === 0) { g.strokeStyle = '#101218'; g.lineWidth = w + px_(far ? 1.2 : 2.2); } else { g.strokeStyle = r.c === 5 ? '#a08c79' : big ? (r.x ? '#f39a1e' : '#ece3cc') : '#bdb9ae'; g.lineWidth = w; }
+      path(r); g.stroke();
+    }
+    if (V.pad && s > 0.5) { // the name of the street under the cursor
+      for (const r of vis) { if (r.c === 6 || r.n < 0) continue; for (let k = 1; k < r.g.length; k++) { const a = N[r.g[k - 1]], b = N[r.g[k]], ex = b[0] - a[0], ez = b[1] - a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((wcx - a[0]) * ex + (wcz - a[1]) * ez) / L2, 0, 1), d = hyp(a[0] + ex * t - wcx, a[1] + ez * t - wcz); if (d < sd && d * sc < 16 * dpr) { sd = d; street = D.names[r.n]; } } }
+    }
+    if (!far) { g.setLineDash([px_(9), px_(7)]); g.strokeStyle = '#c96b4a'; g.lineWidth = px_(2); for (const rp of RAILPTS) { g.beginPath(); rp.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); } g.setLineDash([]); }
   }
-  const lab = (p, col, r) => { g.fillStyle = col; g.strokeStyle = '#0f1116'; g.lineWidth = 3 * dpr / sc; g.beginPath(); g.arc(p.x, p.z, r / sc, 0, TAU); g.fill(); g.stroke(); };
-  const placed = []; g.font = `600 ${15 * dpr / sc}px "Barlow Condensed", sans-serif`;
-  for (const p of D.pois) if (['stazione', 'chiesa', 'polizia', 'parco', 'monumento'].includes(p.k) && p.n.length < 30 && !p.n.startsWith('Grotta')) {
-    const w = g.measureText(p.n).width, hh = 16 * dpr / sc, r = [p.x - 6 / sc, p.z - hh, p.x + 10 / sc + w, p.z + hh * 0.5];
-    if (placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) continue; placed.push(r);
-    lab(p, '#c9bfa8', 5 * dpr); g.fillStyle = '#e8e0cc'; g.fillText(p.n, p.x + 8 * dpr / sc, p.z + 5 * dpr / sc);
+  // the two barriers (confine3.js), always: red the end of the playable zone, yellow the end of the high quality zone
+  for (const L of CONF_LINEE) for (const o of L.anelli) { g.beginPath(); o.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.strokeStyle = L.css.replace(/[\d.]+\)$/, '.22)'); g.lineWidth = px_(9); g.stroke(); g.strokeStyle = L.css; g.lineWidth = px_(2.6); g.stroke(); }
+  // places and landmarks
+  const txt = (t, x, z, size, fill, fam, wt) => { g.font = `${wt || 400} ${size}px ${fam}`; g.lineWidth = px_(4); g.strokeStyle = 'rgba(10,11,15,.85)'; g.strokeText(t, x, z); g.fillStyle = fill; g.fillText(t, x, z); };
+  const placed = [], fits = r => !placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]);
+  g.textBaseline = 'alphabetic'; g.textAlign = 'center';
+  const ta = s < 0.7 ? 1 : clamp((1.1 - s) / 0.4, 0, 1);
+  if (ta > 0) {
+    g.globalAlpha = ta;
+    for (const p of PLACES) if ((p.k === 'town' || p.k === 'village') && Math.abs(p.x) < META.dati.hw - 150 && Math.abs(p.z) < META.dati.hh - 60) {
+      g.font = `400 ${px_(17)}px ${BIG_DISP}`; const t = p.n.toUpperCase(), w = g.measureText(t).width, hh = px_(17), r = [p.x - w / 2, p.z - hh, p.x + w / 2, p.z]; if (!fits(r)) continue; placed.push(r); txt(t, p.x, p.z, px_(17), '#f0b23c', BIG_DISP);
+    }
+    g.globalAlpha = 1;
   }
-  if (MS.state === 'pickup') lab(MS.from, '#f0b23c', 10 * dpr); if (MS.state === 'deliver') lab(MS.to, '#7fd18b', 10 * dpr);
-  if (WAYPT) { const q = 11 * dpr / sc; g.lineCap = 'round'; for (const [col, w] of [['#0f1116', 7], ['#e05adc', 4]]) { g.strokeStyle = col; g.lineWidth = w * dpr / sc; g.beginPath(); g.moveTo(WAYPT.x - q, WAYPT.z - q); g.lineTo(WAYPT.x + q, WAYPT.z + q); g.moveTo(WAYPT.x + q, WAYPT.z - q); g.lineTo(WAYPT.x - q, WAYPT.z + q); g.stroke(); } }
+  g.textAlign = 'left';
+  if (s > 0.1) {
+    const col = { stazione: '#8ec5ff', chiesa: '#e8e0cc', parco: '#8fd18b' };
+    for (const p of D.pois) if (col[p.k] && p.n.length < 30 && !p.n.startsWith('Grotta') && p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1) {
+      g.font = `600 ${px_(14)}px ${BIG_FONT}`; const w = g.measureText(p.n).width, hh = px_(15), r = [p.x - px_(7), p.z - hh, p.x + px_(12) + w, p.z + hh * 0.5]; if (!fits(r)) continue; placed.push(r);
+      g.fillStyle = col[p.k]; g.strokeStyle = '#0f1116'; g.lineWidth = px_(2.6); g.beginPath(); g.arc(p.x, p.z, px_(4.6), 0, TAU); g.fill(); g.stroke(); txt(p.n, p.x + px_(10), p.z + px_(4.5), px_(14), '#ece5d3', BIG_FONT, 600);
+    }
+  }
+  const lab = (p, col, r) => { g.fillStyle = col; g.strokeStyle = '#0f1116'; g.lineWidth = px_(3); g.beginPath(); g.arc(p.x, p.z, px_(r), 0, TAU); g.fill(); g.stroke(); };
+  if (MS.state === 'pickup') lab(MS.from, '#f0b23c', 9); if (MS.state === 'deliver') lab(MS.to, '#7fd18b', 9);
+  // the waypoint: the same cross as on the minimap, in a ring
+  if (WAYPT) { const q = px_(8); g.lineCap = 'round'; g.beginPath(); g.arc(WAYPT.x, WAYPT.z, px_(16), 0, TAU); g.fillStyle = 'rgba(224,90,220,.18)'; g.fill(); for (const [col, w] of [['#0f1116', 7], ['#e05adc', 4]]) { g.strokeStyle = col; g.lineWidth = px_(w); g.beginPath(); g.arc(WAYPT.x, WAYPT.z, px_(16), 0, TAU); g.moveTo(WAYPT.x - q, WAYPT.z - q); g.lineTo(WAYPT.x + q, WAYPT.z + q); g.moveTo(WAYPT.x + q, WAYPT.z - q); g.lineTo(WAYPT.x - q, WAYPT.z + q); g.stroke(); } }
   // you: an arrow pointing where you are heading, as on the minimap
-  const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z, hd = P.mode === 'car' ? P.car.h : P.h, k = 1.5 * dpr / sc;
+  const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z, hd = P.mode === 'car' ? P.car.h : P.h, k = 1.3 * dpr / sc;
   g.save(); g.translate(px, pz); g.rotate(Math.PI - hd); g.fillStyle = '#fbf5e6'; g.strokeStyle = '#0f1116'; g.lineWidth = 3 * k; g.lineJoin = 'round';
   g.beginPath(); g.moveTo(0, -14 * k); g.lineTo(10 * k, 11 * k); g.lineTo(0, 5 * k); g.lineTo(-10 * k, 11 * k); g.closePath(); g.stroke(); g.fill(); g.restore();
   g.restore();
+  // screen furniture: vignette, scale, compass, legend, cursor
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const vg = g.createRadialGradient(W_ / 2, H_ / 2, Math.min(W_, H_) * 0.45, W_ / 2, H_ / 2, Math.hypot(W_, H_) * 0.62); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.5)'); g.fillStyle = vg; g.fillRect(0, 0, W_, H_);
+  const M = 18 * dpr, sm = bigScale(sc, dpr), sw = sm * sc; g.font = `700 ${14 * dpr}px ${BIG_FONT}`; g.textAlign = 'center'; g.textBaseline = 'bottom';
+  g.lineCap = 'butt'; g.strokeStyle = '#0f1116'; g.lineWidth = 6 * dpr; g.beginPath(); g.moveTo(W_ - M - sw, H_ - M); g.lineTo(W_ - M, H_ - M); g.stroke(); g.strokeStyle = '#ece5d3'; g.lineWidth = 2.4 * dpr; g.stroke();
+  g.fillStyle = '#ece5d3'; g.fillText(sm >= 1000 ? sm / 1000 + ' km' : sm + ' m', W_ - M - sw / 2, H_ - M - 6 * dpr);
+  g.fillStyle = '#f0b23c'; g.font = `400 ${22 * dpr}px ${BIG_DISP}`; g.textBaseline = 'top'; g.fillText('N', W_ - M - 8 * dpr, M); g.strokeStyle = '#f0b23c'; g.lineWidth = 2 * dpr; g.beginPath(); g.moveTo(W_ - M - 8 * dpr, M + 30 * dpr); g.lineTo(W_ - M - 8 * dpr, M + 52 * dpr); g.stroke();
+  g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = `600 ${15 * dpr}px ${BIG_FONT}`; let ly = H_ - M - 36 * dpr; { const n_ = CONF_LINEE.filter(L => L.anelli.length).length; if (n_) { g.fillStyle = 'rgba(12,13,18,.72)'; g.fillRect(M - 8 * dpr, ly - 16 * dpr, 290 * dpr, n_ * 22 * dpr + 8 * dpr); } }
+  for (const [L, t] of [[CONF_LINEE[0], 'Fine della zona giocabile'], [CONF_LINEE[1], 'Fine della zona ad alta qualità']]) { if (!L.anelli.length) continue; g.strokeStyle = L.css; g.lineWidth = 3 * dpr; g.beginPath(); g.moveTo(M, ly); g.lineTo(M + 28 * dpr, ly); g.stroke(); g.fillStyle = '#d9d2c0'; g.fillText(t, M + 38 * dpr, ly); ly += 22 * dpr; }
+  if (!(BIGC && BIGC.complete && BIGC.naturalWidth)) { g.textAlign = 'center'; g.fillStyle = '#d9d2c0'; g.font = `700 ${18 * dpr}px ${BIG_FONT}`; g.fillText('Carico la mappa…', W_ / 2, H_ / 2 + 60 * dpr); }
+  // the cursor (pad), with where it is
+  if (V.pad) {
+    const mx = V.mx, my = V.my, r = 13 * dpr; g.lineCap = 'round';
+    for (const [col, w] of [['#0f1116', 5.5], ['#fbf5e6', 2.4]]) { g.strokeStyle = col; g.lineWidth = w * dpr; g.beginPath(); g.arc(mx, my, r, 0, TAU); g.moveTo(mx - r - 6 * dpr, my); g.lineTo(mx - 4 * dpr, my); g.moveTo(mx + 4 * dpr, my); g.lineTo(mx + r + 6 * dpr, my); g.moveTo(mx, my - r - 6 * dpr); g.lineTo(mx, my - 4 * dpr); g.moveTo(mx, my + 4 * dpr); g.lineTo(mx, my + r + 6 * dpr); g.stroke(); }
+    const inside = Math.abs(wcx) < META.dati.hw && Math.abs(wcz) < META.dati.hh, lines = inside ? [street, placeAt(wcx, wcz)].filter(Boolean) : ['Nessun dato qui'];
+    g.font = `700 ${15 * dpr}px ${BIG_FONT}`; g.textAlign = 'left'; g.textBaseline = 'middle'; const tw = Math.max(...lines.map(t => g.measureText(t).width)) + 16 * dpr, th = lines.length * 20 * dpr + 8 * dpr;
+    let bx = mx + 24 * dpr, by = my + 20 * dpr; if (bx + tw > W_ - 8 * dpr) bx = mx - 24 * dpr - tw; if (by + th > H_ - 8 * dpr) by = my - 20 * dpr - th;
+    g.fillStyle = 'rgba(12,13,18,.82)'; g.fillRect(bx, by, tw, th); g.fillStyle = '#ece5d3'; lines.forEach((t, i) => g.fillText(t, bx + 8 * dpr, by + 14 * dpr + i * 20 * dpr));
+  }
 }
-// the big map: wheel or two fingers to zoom, drag to move, a click (or a tap) drops a waypoint, a click on it takes it away
-// (declared after drawBig: assemble3.py replaces everything between the minimap and drawBig)
-var BIGV = { cx: 0, cz: 0, z: 0, fit: 1 }, WAYPT = null;
+// the big map, drawn from the data that is always there (the whole-world picture mappa/grande.webp, the road graph D.roads / N, the barriers, the places): never from tiles that may not be loaded yet,
+// so while the world loads in pieces the map is the same and the empty parts look empty. Pad: the cursor, scroll at the edge, R2/L2 zoom, cross = waypoint (pollPad, assemble3.py).
+var BIGV = { cx: 0, cz: 0, z: 0, fit: 1, max: 1, mx: 0, my: 0, pad: false, fresh: true }, WAYPT = null;
+const BIG_HATCH = (() => { const c = document.createElement('canvas'); c.width = c.height = 14; const g = c.getContext('2d'); g.strokeStyle = 'rgba(150,160,180,.13)'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-2, 16); g.lineTo(16, -2); g.moveTo(-2, 2); g.lineTo(2, -2); g.moveTo(12, 16); g.lineTo(16, 12); g.stroke(); return c; })();
+const BIG_FONT = '"Barlow Condensed", sans-serif', BIG_DISP = 'Bungee, Impact, sans-serif';
+function bigRoadBox(r) { if (!r.bb) { let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const i of r.g) { const p = N[i]; if (p[0] < a) a = p[0]; if (p[0] > c) c = p[0]; if (p[1] < b) b = p[1]; if (p[1] > d) d = p[1]; } r.bb = [a, b, c, d]; } return r.bb; }
+function bigScale(sc, dpr) { // a round length in metres that is 90 css px wide or more
+  for (const m of [20, 50, 100, 200, 500, 1000, 2000, 5000]) if (m * sc / dpr >= 90) return m; return 5000;
+}
+// move the cursor and the map: stick (sx, sy) in -1..1, zoom in/out in 0..1; the map scrolls when the stick pushes the cursor against an edge, the zoom keeps what is under the cursor where it is
+function bigPad(sx, sy, zin, zout, dt) {
+  const c = $('bigmap'), V = BIGV, dpr = Math.min(2, devicePixelRatio || 1); if (!V.z || c.width !== Math.round(innerWidth * dpr)) drawBig();
+  const W_ = c.width, H_ = c.height; let ch = false;
+  if (!V.pad) { V.pad = true; ch = true; }
+  const m = Math.hypot(sx, sy), sp = m > 0 ? Math.pow(Math.min(1, m), 1.6) / m * 640 * dpr * dt : 0;
+  if (m > 0) { V.mx = clamp(V.mx + sx * sp, 20 * dpr, W_ - 20 * dpr); V.my = clamp(V.my + sy * sp, 20 * dpr, H_ - 20 * dpr); ch = true; }
+  const E = Math.min(W_, H_) * 0.14, wx = () => (V.mx - W_ / 2) / V.z, wy = () => (V.my - H_ / 2) / V.z;
+  const zf = Math.exp((zin - zout) * 1.5 * dt);
+  if (zf !== 1) { const ax = V.cx + wx(), az = V.cz + wy(); V.z = clamp(V.z * zf, V.fit, V.max); V.cx = ax - wx(); V.cz = az - wy(); ch = true; }
+  const pan = (v, size, s) => s < 0 && v < E ? (E - v) / E * s : s > 0 && v > size - E ? (v - (size - E)) / E * s : 0; /* only while the stick pushes towards that edge: a cursor resting there, or moved by the mouse, stays still */
+  const ex = pan(V.mx, W_, sx), ey = pan(V.my, H_, sy); if ((ex || ey) && V.z > V.fit * 1.001) { V.cx += ex * 900 * dpr * dt / V.z; V.cz += ey * 900 * dpr * dt / V.z; ch = true; }
+  V.cx = clamp(V.cx, -META.hw, META.hw); V.cz = clamp(V.cz, -META.hh, META.hh); if (V.z <= V.fit * 1.001) V.cx = V.cz = 0;
+  if (ch) drawBig();
+}
+// cross / A, or a click: a waypoint where the cursor is; on the one already there, it takes it away
+function bigMark(wx, wz, dpr) {
+  const c = $('bigmap'); if (wx === undefined) { wx = BIGV.cx + (BIGV.mx - c.width / 2) / BIGV.z; wz = BIGV.cz + (BIGV.my - c.height / 2) / BIGV.z; dpr = Math.min(2, devicePixelRatio || 1); }
+  const had = WAYPT && hyp(WAYPT.x - wx, WAYPT.z - wz) * BIGV.z < 26 * dpr; WAYPT = had ? null : { x: wx, z: wz }; toast(had ? 'Segnaposto tolto' : 'Segnaposto messo'); drawBig();
+}
 {
   const c = $('bigmap'), pts = new Map(); let pinch = null, moved = 0;
   const px2 = () => c.width / c.getBoundingClientRect().width;
   const toWorld = (ex, ey) => { const r = c.getBoundingClientRect(), k = px2(); return [BIGV.cx + ((ex - r.left) * k - c.width / 2) / BIGV.z, BIGV.cz + ((ey - r.top) * k - c.height / 2) / BIGV.z]; };
   const keepIn = () => { BIGV.cx = clamp(BIGV.cx, -META.hw, META.hw); BIGV.cz = clamp(BIGV.cz, -META.hh, META.hh); if (BIGV.z <= BIGV.fit * 1.001) BIGV.cx = BIGV.cz = 0; };
-  const zoomAt = (ex, ey, f) => { const [wx, wz] = toWorld(ex, ey); BIGV.z = clamp(BIGV.z * f, BIGV.fit, 14); const [wx2, wz2] = toWorld(ex, ey); BIGV.cx += wx - wx2; BIGV.cz += wz - wz2; keepIn(); drawBig(); };
+  const zoomAt = (ex, ey, f) => { const [wx, wz] = toWorld(ex, ey); BIGV.z = clamp(BIGV.z * f, BIGV.fit, BIGV.max); const [wx2, wz2] = toWorld(ex, ey); BIGV.cx += wx - wx2; BIGV.cz += wz - wz2; keepIn(); drawBig(); };
   c.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
   c.addEventListener('pointerdown', e => { c.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) moved = 0; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: hyp(a[0] - b[0], a[1] - b[1]) || 1, z: BIGV.z }; moved = 99; } });
   c.addEventListener('pointermove', e => {
+    if (e.pointerType === 'mouse') { if (BIGV.pad) { BIGV.pad = false; drawBig(); } const r = c.getBoundingClientRect(), k = px2(); BIGV.mx = (e.clientX - r.left) * k; BIGV.my = (e.clientY - r.top) * k; }
     const p = pts.get(e.pointerId); if (!p) return; const dx = e.clientX - p[0], dy = e.clientY - p[1]; pts.set(e.pointerId, [e.clientX, e.clientY]);
     if (pts.size === 2 && pinch) { const [a, b] = [...pts.values()]; zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, pinch.z * hyp(a[0] - b[0], a[1] - b[1]) / pinch.d / BIGV.z); return; }
     moved += Math.abs(dx) + Math.abs(dy); if (moved < 6) return; const k = px2(); BIGV.cx -= dx * k / BIGV.z; BIGV.cz -= dy * k / BIGV.z; keepIn(); drawBig();
   });
   c.addEventListener('pointerup', e => {
     const had = pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!had || pts.size || moved >= 6) return;
-    const [wx, wz] = toWorld(e.clientX, e.clientY); WAYPT = WAYPT && hyp(WAYPT.x - wx, WAYPT.z - wz) * BIGV.z < 26 * px2() ? null : { x: wx, z: wz }; drawBig();
+    const [wx, wz] = toWorld(e.clientX, e.clientY); bigMark(wx, wz, px2());
   });
   c.addEventListener('pointercancel', e => { pts.delete(e.pointerId); pinch = null; });
 }
@@ -1407,8 +1495,8 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) K[k] = false; });
 addEventListener('blur', () => { for (const k in K) K[k] = false; });
 function togglePause() { if (bigOpen) return toggleBig(); paused = !paused; $('pause').hidden = !paused; if (AU.ctx) paused ? AU.ctx.suspend() : AU.ctx.resume(); }
-function toggleBig() { bigLoad(); bigOpen = !bigOpen; $('big').hidden = !bigOpen; paused = bigOpen; if (bigOpen) drawBig(); }
-$('big').addEventListener('click', toggleBig);
+function toggleBig() { bigLoad(); bigOpen = !bigOpen; $('big').hidden = !bigOpen; paused = bigOpen; if (bigOpen) { BIGV.fresh = true; BIGV.pad = false; if (typeof bigHint === 'function') bigHint(); drawBig(); } }
+$('bigx').addEventListener('click', toggleBig);
 // touch controls
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 if (isTouch) {
