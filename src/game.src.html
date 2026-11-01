@@ -1361,22 +1361,22 @@ function drawBig() {
   const pat = g.createPattern(BIG_HATCH, 'repeat'); if (pat && pat.setTransform) pat.setTransform(new DOMMatrix().scale(dpr / sc * 1.4)); g.fillStyle = pat || 'rgba(0,0,0,0)'; g.fill('evenodd'); g.restore();
   if (red.length) { g.save(); g.beginPath(); g.rect(-META.hw, -META.hh, META.hw * 2, META.hh * 2); for (const o of red) o.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fillStyle = 'rgba(6,7,10,.5)'; g.fill('evenodd'); g.restore(); }
   g.lineCap = 'round'; g.lineJoin = 'round';
-  // close up: the roads sharp from the graph, only what is on screen
+  // the roads sharp from the graph, only what is on screen: all of them close up, far away the main ones. Yellow is the expressway and its ramps (r.x), whatever they stand on
   let street = null, sd = 1e9; const wcx = V.cx + (V.mx - W_ / 2) / sc, wcz = V.cz + (V.my - H_ / 2) / sc;
-  if (s > 0.2) {
-    const vis = []; for (const r of D.roads) { const b = bigRoadBox(r); if (b[2] < x0 || b[0] > x1 || b[3] < z0 || b[1] > z1) continue; vis.push(r); }
+  {
+    const far = s <= 0.2, vis = []; for (const r of D.roads) { if (far && r.c > 1) continue; const b = bigRoadBox(r); if (b[2] < x0 || b[0] > x1 || b[3] < z0 || b[1] > z1) continue; vis.push(r); }
     const path = r => { g.beginPath(); r.g.forEach((i, k) => k ? g.lineTo(N[i][0], N[i][1]) : g.moveTo(N[i][0], N[i][1])); };
     g.strokeStyle = '#555b68'; for (const r of vis) if (r.c === 6) { g.lineWidth = Math.max(r.w * 0.5, px_(1.1)); path(r); g.stroke(); }
     for (const [pass, big] of [[0, false], [0, true], [1, false], [1, true]]) for (const r of vis) {
       if (r.c === 6 || (r.c <= 1) !== big) continue;
-      const w = Math.max(r.w + (big ? 1 : 0.5), px_(big ? 3.2 : 2.2));
-      if (pass === 0) { g.strokeStyle = '#101218'; g.lineWidth = w + px_(2.2); } else { g.strokeStyle = r.c === 5 ? '#a08c79' : big ? (r.d ? '#f0c27a' : '#ece3cc') : '#bdb9ae'; g.lineWidth = w; }
+      const w = Math.max(r.w + (big ? 1 : 0.5), px_(far ? (r.x ? 3 : 1.6) : r.x ? 4.4 : big ? 3.2 : 2.2));
+      if (pass === 0) { g.strokeStyle = '#101218'; g.lineWidth = w + px_(far ? 1.2 : 2.2); } else { g.strokeStyle = r.c === 5 ? '#a08c79' : big ? (r.x ? '#f39a1e' : '#ece3cc') : '#bdb9ae'; g.lineWidth = w; }
       path(r); g.stroke();
     }
     if (V.pad && s > 0.5) { // the name of the street under the cursor
-      for (const r of vis) { if (r.c === 6 || !r.n) continue; for (let k = 1; k < r.g.length; k++) { const a = N[r.g[k - 1]], b = N[r.g[k]], ex = b[0] - a[0], ez = b[1] - a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((wcx - a[0]) * ex + (wcz - a[1]) * ez) / L2, 0, 1), d = hyp(a[0] + ex * t - wcx, a[1] + ez * t - wcz); if (d < sd && d * sc < 16 * dpr) { sd = d; street = D.names[r.n]; } } }
+      for (const r of vis) { if (r.c === 6 || r.n < 0) continue; for (let k = 1; k < r.g.length; k++) { const a = N[r.g[k - 1]], b = N[r.g[k]], ex = b[0] - a[0], ez = b[1] - a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((wcx - a[0]) * ex + (wcz - a[1]) * ez) / L2, 0, 1), d = hyp(a[0] + ex * t - wcx, a[1] + ez * t - wcz); if (d < sd && d * sc < 16 * dpr) { sd = d; street = D.names[r.n]; } } }
     }
-    g.setLineDash([px_(9), px_(7)]); g.strokeStyle = '#c96b4a'; g.lineWidth = px_(2); for (const rp of RAILPTS) { g.beginPath(); rp.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); } g.setLineDash([]);
+    if (!far) { g.setLineDash([px_(9), px_(7)]); g.strokeStyle = '#c96b4a'; g.lineWidth = px_(2); for (const rp of RAILPTS) { g.beginPath(); rp.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); } g.setLineDash([]); }
   }
   // the two barriers (confine3.js), always: red the end of the playable zone, yellow the end of the high quality zone
   for (const L of CONF_LINEE) for (const o of L.anelli) { g.beginPath(); o.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.strokeStyle = L.css.replace(/[\d.]+\)$/, '.22)'); g.lineWidth = px_(9); g.stroke(); g.strokeStyle = L.css; g.lineWidth = px_(2.6); g.stroke(); }

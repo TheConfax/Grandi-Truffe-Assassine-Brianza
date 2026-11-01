@@ -200,7 +200,7 @@ function bigCanvas() {
   g.fillStyle = '#3a3e49'; for (const b of BUILDINGS) { g.beginPath(); b.pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fill(); }
   g.lineCap = 'round'; g.lineJoin = 'round';
   for (const pass of [0, 1, 2]) for (const r of D.roads) {
-    if (pass === 0 && r.c === 6) { g.strokeStyle = '#4b4f58'; g.lineWidth = 2; } else if (pass === 1 && r.c >= 2 && r.c <= 5) { g.strokeStyle = r.c === 5 ? '#9b8676' : '#a7a49c'; g.lineWidth = r.w + 2; } else if (pass === 2 && r.c <= 1) { g.strokeStyle = r.d ? '#f0c27a' : '#d8cfbd'; g.lineWidth = r.w + 4; } else continue;
+    if (pass === 0 && r.c === 6) { g.strokeStyle = '#4b4f58'; g.lineWidth = 2; } else if (pass === 1 && r.c >= 2 && r.c <= 5) { g.strokeStyle = r.c === 5 ? '#9b8676' : '#a7a49c'; g.lineWidth = r.w + 2; } else if (pass === 2 && r.c <= 1) { g.strokeStyle = r.x ? '#f39a1e' : '#d8cfbd'; g.lineWidth = r.w + 4; } else continue;
     g.beginPath(); r.g.forEach((i, k) => k ? g.lineTo(N[i][0], N[i][1]) : g.moveTo(N[i][0], N[i][1])); g.stroke();
   }
   g.setLineDash([12, 10]); g.strokeStyle = '#c96b4a'; g.lineWidth = 4; for (const r of RAILPTS) { g.beginPath(); r.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); } g.setLineDash([]);
@@ -219,7 +219,7 @@ s = s[:a] + """function drawMinimap() {
   const segs = []; ROADSEG.each(px - RM, pz - RM, px + RM, pz + RM, sg => segs.push(sg));
   for (const pass of [0, 1]) for (const sg of segs) {
     const r = sg.r; if (pass === 0 ? r.c !== 6 : r.c === 6) continue;
-    mg.strokeStyle = r.c === 6 ? '#4b4f58' : r.d ? '#f0c27a' : r.c <= 1 ? '#d8cfbd' : r.c === 5 ? '#9b8676' : '#a7a49c'; mg.lineWidth = r.c === 6 ? 1.6 : r.w + (r.c <= 1 ? 2 : 0.5);
+    mg.strokeStyle = r.c === 6 ? '#4b4f58' : r.x ? '#f39a1e' : r.c <= 1 ? '#d8cfbd' : r.c === 5 ? '#9b8676' : '#a7a49c'; mg.lineWidth = r.c === 6 ? 1.6 : r.w + (r.c <= 1 ? 2 : 0.5);
     mg.beginPath(); mg.moveTo(sg.a[0], sg.a[1]); mg.lineTo(sg.b[0], sg.b[1]); mg.stroke();
   }
   mg.lineWidth = 4 / zoom; for (const L of CONF_LINEE) { mg.strokeStyle = L.css; for (const c of L.anelli) { mg.beginPath(); c.forEach((q, i) => i ? mg.lineTo(q[0], q[1]) : mg.moveTo(q[0], q[1])); mg.closePath(); mg.stroke(); } } /* the two barriers (confine3.js) */
