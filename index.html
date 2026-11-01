@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 32db25e · assemblato 02/11 00:30 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 23e0092 · assemblato 02/11 00:45 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -8856,7 +8856,7 @@ function updDebugHud(dt) {
 /* misure del fotogramma (debug, &debug=1): valori mediati su circa 1 secondo, nella riga #dbgmis sopra quella di debug.
    A debug spento non gira niente: frame() non chiama queste funzioni e le query GPU vengono tolte.
    Tasto K (solo debug): copia la riga negli appunti. Tasto B: la riga finisce nella segnalazione (campo "misure"). */
-const MIS = { a: { sim: 0, tile: 0, vis: 0, draw: 0 }, n: 0, sum: 0, max: 0, prev: 0, t0: 0, t1: 0, gpuSum: 0, gpuN: 0, txt: 'misure: in raccolta…', out: null, el: null, gpu: undefined, qs: [], cur: null };
+const MIS = { log: null, f: { sim: 0, tile: 0, vis: 0, draw: 0 }, a: { sim: 0, tile: 0, vis: 0, draw: 0 }, n: 0, sum: 0, max: 0, prev: 0, t0: 0, t1: 0, gpuSum: 0, gpuN: 0, txt: 'misure: in raccolta…', out: null, el: null, gpu: undefined, qs: [], cur: null };
 function dbgBegin(t) {
   const now_ = performance.now(); MIS.t0 = now_;
   if (!MIS.el) { const e = document.createElement('div'); e.id = 'dbgmis'; e.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:30px;z-index:8;font:12px ui-monospace,monospace;color:#9fe;background:rgba(0,0,0,.6);padding:3px 8px;border-radius:4px;pointer-events:none;white-space:pre;max-width:calc(100vw - 32px);overflow:hidden'; document.body.appendChild(e); MIS.el = e; }
@@ -8865,7 +8865,7 @@ function dbgBegin(t) {
   MIS.prev = t; if (!MIS.t1) MIS.t1 = now_;
   return MIS;
 }
-function dbgMk(m, k) { const n = performance.now(); m.a[k] += n - m.t0; m.t0 = n; }
+function dbgMk(m, k) { const n = performance.now(); m.a[k] += n - m.t0; m.f[k] += n - m.t0; m.t0 = n; }
 function dbgGpuBegin() {
   const M = MIS;
   if (M.gpu === undefined) { const gl = renderer.getContext(); M.gl = gl; M.ext = gl.createQuery && gl.getExtension('EXT_disjoint_timer_query_webgl2'); M.gpu = !!M.ext; }
@@ -8874,6 +8874,7 @@ function dbgGpuBegin() {
 }
 function dbgGpuEnd(b) { if (!b) return; MIS.gl.endQuery(MIS.ext.TIME_ELAPSED_EXT); MIS.qs.push(MIS.cur); MIS.cur = null; }
 function dbgEnd(m) {
+  { const f = m.f; if (m.log) m.log.push([performance.now(), f.sim, f.tile, f.vis, f.draw, renderer.info.render.calls]); f.sim = f.tile = f.vis = f.draw = 0; } /* MIS.log = []: one row a frame, for the scripts */
   if (m.gpu) { const gl = m.gl; while (m.qs.length && gl.getQueryParameter(m.qs[0], gl.QUERY_RESULT_AVAILABLE)) { const q = m.qs.shift(); if (!gl.getParameter(m.ext.GPU_DISJOINT_EXT)) { m.gpuSum += gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; m.gpuN++; } gl.deleteQuery(q); } }
   const now_ = performance.now(); if (now_ - m.t1 < 1000 || !m.n) return;
   const n = m.n, f = x => (x / n).toFixed(1), cpu = m.a.sim + m.a.tile + m.a.vis + m.a.draw, avg = m.sum / n, inf = renderer.info;
