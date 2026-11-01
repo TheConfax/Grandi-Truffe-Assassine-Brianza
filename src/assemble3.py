@@ -786,6 +786,13 @@ rep("    toast(`${best.stolen ? (isTwo(best)", "    if (!best.ko) toast(`${best.
 rep("v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;", "v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal && !v.ko;")
 rep("const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen,", "const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen && !v.ko,")
 rep("  const v = P.mode === 'car' ? P.car : null;\n  if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2,", "  const v = P.mode === 'car' && !P.car.ko ? P.car : null; /* finished on its roof: no engine to hear */\n  if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2,")
+# ---- cars and people drawn together (fusi3.js)
+rep("const _geo = {};\nconst boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; return _geo[k] || (_geo[k] = new THREE.BoxGeometry(w, h, l)); };", open(os.path.join(HERE, 'fusi3.js'), encoding='utf-8').read() + "\nconst _geo = {};\nconst boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; if (_geo[k]) return _geo[k]; const g = new THREE.BoxGeometry(w, h, l); g.fU = [w, h, l]; return _geo[k] = g; };")
+rep("var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);", "var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0); bm.geometry.fU = [S.W, S.bh, S.L, 3, 2, 6];")
+rep("  scene.add(g);\n  return { g, body, wheels, rider, crew,", "  scene.add(g); g.fRadice = true; g.updateMatrixWorld = fusiMatrici;\n  return { g, body, wheels, rider, crew,")
+rep("  scene.add(g); return { g, inner, L, R, AL, AR };", "  scene.add(g); g.fRadice = true; g.updateMatrixWorld = fusiMatrici; return { g, inner, L, R, AL, AR };")
+rep("  const geo = m.bm.geometry, pos = geo.attributes.position, org = m.org", "  const geo = m.bm.geometry; geo.fFuori = true; /* dented: its own shape, drawn on its own (fusi3.js) */ const pos = geo.attributes.position, org = m.org")
+rep("    VEH.push(this); this.sync();", "    this.m.g.fVeh = this; VEH.push(this); this.sync();")
 # ---- frame timing (debug only): misure3.js, row #dbgmis. Nothing runs with debug off.
 rep("async function reportSpot() {", open(os.path.join(HERE, 'misure3.js'), encoding='utf-8').read() + "\nasync function reportSpot() {")
 rep("  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();", "  const m_ = DEBUG ? dbgBegin(t) : null;\n  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();")

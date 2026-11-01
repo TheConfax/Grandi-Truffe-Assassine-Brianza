@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 80b6fdb · assemblato 02/11 00:45 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 5aa713a · assemblato 02/11 00:45 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -6531,14 +6531,14 @@ scene.onBeforeRender = (r, sc, cam) => { // after the matrices of the frame, bef
   _vistaF.setFromProjectionMatrix(_vistaM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
   const om = sun.castShadow && sun.visible; let SF = null; if (om) { sun.shadow.updateMatrices(sun); SF = sun.shadow.getFrustum(); }
   for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
-
+  fusiDisegna(_vistaF, om ? SF : null);
 };
 
 // ---- the shaders of the whole map, compiled at the start and kept: a shader seen for the first time at speed stopped the game 80 to 200 ms, and one whose last user went with its tile was compiled again the next time.
 // One small material per kind found on the map (type; m map, a alphaMap, e emissiveMap, v vertex colours, t transparent, n no fog, i instanced, c instance colours; side; alphaTest). Never drawn. A kind missing here only costs its stop, as before.
 const VETRINA = [['B', 'mt', 0, 0], ['B', 'vt', 0, 0], ['B', 'vtn', 2, 0], ['B', 't', 0, 0], ['B', '', 0, 0], ['B', 'tn', 2, 0], ['S', 'mtn', 0, 0], ['S', 'atn', 0, 0], ['S', 'at', 0, 0], ['P', 'mvtn', 0, 0], ['P', 'mtn', 0, 0], ['P', 'vtn', 0, 0], ['P', 't', 0, 0], ['K', '', 0, 0], ['K', 't', 0, 0],
   ['L', 'me', 0, 0.5], ['L', 'me', 0, 0], ['L', 'me', 2, 0], ['L', 'mv', 0, 0], ['L', 'mvic', 2, 0.5], ['L', 'mv', 2, 0], ['L', 'mt', 0, 0], ['L', 'm', 0, 0.5], ['L', 'mic', 0, 0], ['L', 'mi', 0, 0], ['L', 'm', 0, 0], ['L', 'm', 2, 0.12], ['L', 'm', 2, 0.35], ['L', 'm', 2, 0.4], ['L', 'm', 2, 0.5], ['L', 'm', 2, 0],
-  ['L', 'vic', 0, 0], ['L', 'vi', 0, 0], ['L', 'v', 0, 0], ['L', 'vt', 2, 0], ['L', 'v', 2, 0], ['L', 't', 0, 0], ['L', 'i', 0, 0], ['L', '', 0, 0], ['L', '', 1, 0], ['L', 't', 2, 0], ['L', '', 2, 0]];
+  ['L', 'vic', 0, 0], ['L', 'vi', 0, 0], ['L', 'v', 0, 0], ['L', 'vt', 2, 0], ['L', 'v', 2, 0], ['L', 't', 0, 0], ['L', 'i', 0, 0], ['L', 'ic', 0, 0], ['L', '', 0, 0], ['L', '', 1, 0], ['L', 't', 2, 0], ['L', '', 2, 0]];
 const VETRINA_TIENI = [];
 function vetrinaShader() {
   const tex = new THREE.Texture(), geo = new THREE.BufferGeometry(), cl = { L: THREE.MeshLambertMaterial, B: THREE.MeshBasicMaterial, S: THREE.SpriteMaterial, P: THREE.PointsMaterial, K: THREE.LineBasicMaterial }, oggetti = [];
@@ -6656,8 +6656,59 @@ const M_SIR_A = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5
 const CAR_COLS = ['#c8332b', '#f2f2ee', '#2f3540', '#9aa3ad', '#2c4f8f', '#e0b23b', '#3f6b4a', '#7b2d3a', '#d8d0c0', '#16181c', '#5b8fb8', '#b85d2a'];
 const MODEL_COLS = { scooter: ['#9cc8b4', '#e8e2d2', '#c8332b', '#2c4f8f', '#f2c230', '#16181c'], moto: ['#c8102e', '#1f5fbf', '#16181c', '#f2f2ee', '#e2562a', '#3f6b4a'], bici: ['#2c4f8f', '#c8332b', '#16181c', '#e8e2d2', '#3f6b4a', '#e0b23b'], sport: ['#c8102e', '#f2c230', '#16181c', '#e8e6e0', '#1f5fbf', '#e2562a'], van: ['#f2f2ee', '#d8d0c0', '#9aa3ad', '#c9cdd2'], ape: ['#7fb3c8', '#e8e4d8', '#9dbb6a', '#d9cf9a', '#c94f3d'], suv: ['#2f3540', '#9aa3ad', '#f2f2ee', '#16181c', '#5a6b4e', '#7b2d3a'] };
 const colorFor = (m, r = rnd) => { const a = MODEL_COLS[m] || CAR_COLS; return a[Math.floor(r() * a.length)]; };
+// ---------------------------------------------------------------- cars and people drawn together (docs/motore.md "Caricamento a pezzi", FPS): each stays the tree of objects the game has always moved, turned, lit, dented and hidden, but the renderer no longer draws its parts one by one.
+// Every frame, after the matrices and before the renderer walks the scene, the parts of what the camera or the sun can see go into one instanced mesh per kind of geometry and material. A part fused leaves the renderer's sight by its layer: its matrix is still worked out, and nothing else changes.
+// Boxes share one unit box scaled to size. The plain lit materials share one material, their colour read each frame per part (a car that scorches, a new paint); a lit one (lamps, brake lights, sirens) has its own batch with its own material, so what the game does to it shows. Not fused, and drawn as ever: what is see-through or has a map (the cab of the police, the pool of the headlights) and a dented body, whose geometry is its own (geo.fFuori).
+const FUSI = { n: 0, sf: new THREE.Sphere(new THREE.Vector3(), 9), gu: {}, lista: [], opaca: new THREE.MeshLambertMaterial({ color: 0xffffff }), slot: new Map(), mask: 1 << 20, ogg: new THREE.Matrix4() };
+FUSI.slot.set(FUSI.opaca, 0); const FUSI_MAT = [FUSI.opaca];
+// The matrices: what is hidden needs none (it has them the frame it shows again), and a parked car that has not moved has the ones it had, some twenty parts each, every frame
+const _fusiUMW = THREE.Object3D.prototype.updateMatrixWorld;
+function fusiMatrici(force) {
+  if (!this.visible) return; const v = this.fVeh;
+  if (v && !force) { const q = this.fQ || (this.fQ = [NaN, 0, 0, 0, 0, 0, 0, 0]); if (v.sleep && !v.driver && !v.F && q[0] === v.x && q[1] === v.y && q[2] === v.z && q[3] === v.h && q[4] === v.roll && q[5] === v.pitch && q[6] === v.spin && q[7] === v.steer) return; q[0] = v.x; q[1] = v.y; q[2] = v.z; q[3] = v.h; q[4] = v.roll; q[5] = v.pitch; q[6] = v.spin; q[7] = v.steer; }
+  _fusiUMW.call(this, force);
+}
+function fusiSlot(M) { // 0: the shared plain material; n: a batch with M itself; -1: drawn as ever
+  let s = FUSI.slot.get(M); if (s !== undefined) return s;
+  if (!M.isMeshLambertMaterial || M.transparent || M.map || M.alphaMap || M.emissiveMap || M.vertexColors || M.side !== THREE.FrontSide || M.alphaTest || M.polygonOffset || M.opacity !== 1 || !M.fog || !M.depthWrite || !M.depthTest || !M.colorWrite) s = -1;
+  else if (M.emissive.r || M.emissive.g || M.emissive.b) { s = FUSI_MAT.length; FUSI_MAT.push(M); } else s = 0;
+  FUSI.slot.set(M, s); return s;
+}
+function fusiLotto(g, s, c) { // the batch of a geometry, a material, cast or not
+  const k = s * 2 + (c ? 1 : 0); return (g.fL || (g.fL = []))[k] || (g.fL[k] = fusiNuovo(g, s, c, s ? 64 : 512));
+}
+function fusiNuovo(g, s, c, cap) {
+  const m = new THREE.InstancedMesh(g, FUSI_MAT[s], cap); m.castShadow = c; m.receiveShadow = false; m.frustumCulled = false; m.matrixAutoUpdate = false; m.visible = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const l = { m, n: 0, cap, mt: m.instanceMatrix.array, col: null, g, s, c };
+  if (!s) { m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage); l.col = m.instanceColor.array; }
+  scene.add(m); FUSI.lista.push(l); FUSI.n++; return l;
+}
+function fusiCresci(l) { // a batch too small: the next size up; what is in it stays
+  const q = fusiNuovoSenza(l); q.mt.set(l.mt); if (l.col) q.col.set(l.col); q.n = l.n; scene.remove(l.m); l.m.dispose(); l.m = q.m; l.mt = q.mt; l.col = q.col; l.cap = q.cap;
+}
+function fusiNuovoSenza(l) { const q = fusiNuovo(l.g, l.s, l.c, l.cap * 2); FUSI.lista.pop(); return q; }
+function fusiGeo(g) { // what a part's geometry draws: the unit box (fU = size) or itself
+  const u = g.fU; if (!u) return g; const k = u[3] ? 'b' + u[3] : 's'; return FUSI.gu[k] || (FUSI.gu[k] = u[3] ? new THREE.BoxGeometry(1, 1, 1, u[3], u[4], u[5]) : new THREE.BoxGeometry(1, 1, 1));
+}
+function fusiParte(o) {
+  const M = o.material, gg = o.geometry, s = gg.fFuori ? -1 : fusiSlot(M); if (s < 0) { o.layers.mask = 1; return; }
+  o.layers.mask = FUSI.mask;
+  const u = gg.fU, l = fusiLotto(fusiGeo(gg), s, o.castShadow); if (l.n === l.cap) fusiCresci(l);
+  const e = o.matrixWorld.elements, a = l.mt, k = l.n * 16;
+  if (u) { const sx = u[0], sy = u[1], sz = u[2]; a[k] = e[0] * sx; a[k + 1] = e[1] * sx; a[k + 2] = e[2] * sx; a[k + 3] = 0; a[k + 4] = e[4] * sy; a[k + 5] = e[5] * sy; a[k + 6] = e[6] * sy; a[k + 7] = 0; a[k + 8] = e[8] * sz; a[k + 9] = e[9] * sz; a[k + 10] = e[10] * sz; a[k + 11] = 0; a[k + 12] = e[12]; a[k + 13] = e[13]; a[k + 14] = e[14]; a[k + 15] = 1; }
+  else for (let q = 0; q < 16; q++) a[k + q] = e[q];
+  if (l.col) { const c = M.color, j = l.n * 3; l.col[j] = c.r; l.col[j + 1] = c.g; l.col[j + 2] = c.b; }
+  l.n++;
+}
+function fusiGiro(o) { const K = o.children; for (let i = 0; i < K.length; i++) { const c = K[i]; if (!c.visible) continue; if (c.isMesh) fusiParte(c); if (c.children.length) fusiGiro(c); } }
+function fusiDisegna(F, SF) { // F, SF: what the camera and the sun see (pezzi3.js)
+  const L = FUSI.lista, K = scene.children, sf = FUSI.sf; for (let i = 0; i < L.length; i++) L[i].n = 0;
+  for (let i = 0; i < K.length; i++) { const c = K[i]; if (!c.fRadice || !c.visible) continue; sf.center.setFromMatrixPosition(c.matrixWorld); if (!F.intersectsSphere(sf) && !(SF && SF.intersectsSphere(sf))) continue; fusiGiro(c); }
+  for (let i = 0; i < L.length; i++) { const l = L[i], m = l.m; m.count = l.n; m.visible = l.n > 0; if (!l.n) continue; const a = m.instanceMatrix; a.updateRange.count = l.n * 16; a.needsUpdate = true; if (l.col) { const b = m.instanceColor; b.updateRange.count = l.n * 3; b.needsUpdate = true; } }
+}
+
 const _geo = {};
-const boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; return _geo[k] || (_geo[k] = new THREE.BoxGeometry(w, h, l)); };
+const boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; if (_geo[k]) return _geo[k]; const g = new THREE.BoxGeometry(w, h, l); g.fU = [w, h, l]; return _geo[k] = g; };
 const wheelG = r => { const k = 'w' + r; return _geo[k] || (_geo[k] = new THREE.CylinderGeometry(r, r, 0.26, 12).rotateZ(Math.PI / 2)); };
 function makeCar(model, color) {
   const S = MODELS[model], g = new THREE.Group(), body = new THREE.Group(), hl = S.L / 2, paint = lam(color); g.add(body); g.rotation.order = 'YXZ';
@@ -6716,7 +6767,7 @@ function makeCar(model, color) {
     wheelPos = [[-S.W / 2 + 0.05, hl - 0.8, 1], [S.W / 2 - 0.05, hl - 0.8, 1], [-S.W / 2 + 0.05, -hl + 0.85, 0], [S.W / 2 - 0.05, -hl + 0.85, 0]]; lightY = 0.9;
   } else {
     const bot = S.wr * 0.9, by = bot + S.bh / 2, [cw, ch, cl, cz] = S.cab, cy = bot + S.bh + ch / 2;
-    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);
+    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0); bm.geometry.fU = [S.W, S.bh, S.L, 3, 2, 6];
     add(boxG(cw, ch, cl), model === 'police' ? M_GLASS_SEE : M_GLASS, 0, cy, cz, false);
     add(boxG(cw + 0.04, 0.07, cl - 0.12), paint, 0, cy + ch / 2 + 0.03, cz);
     for (const x of [-1, 1]) add(boxG(0.06, ch, 0.12), paint, x * (cw / 2 + 0.005), cy, cz + cl / 2 - 0.08, false);
@@ -6743,7 +6794,7 @@ function makeCar(model, color) {
     const piv = new THREE.Group(); piv.position.set(x, S.wr, z); (S.two ? body : g).add(piv); const w = new THREE.Mesh(S.two ? thinWheelG(S.wr, S.pedal) : wheelG(S.wr), M_TYRE); piv.add(w); wheels.push({ piv, w, front });
   }
   if (!S.ape) { const hp = new THREE.Mesh(makeCar.hp || (makeCar.hp = new THREE.PlaneGeometry(3.4, 9).rotateX(-Math.PI / 2)), HEADPOOL_MAT); hp.position.set(0, 0.14, hl + 4.4); if (S.two) hp.scale.set(0.6, 1, 0.75); hp.renderOrder = 12; g.add(hp); body.userData.hp = hp; }
-  scene.add(g);
+  scene.add(g); g.fRadice = true; g.updateMatrixWorld = fusiMatrici;
   return { g, body, wheels, rider, crew, bm: typeof bm !== 'undefined' ? bm : null, paint };
 }
 const thinWheelG = (r, spoke) => { const k = 't' + r + spoke; if (_geo[k]) return _geo[k]; const t = new THREE.TorusGeometry(r - (spoke ? 0.025 : 0.05), spoke ? 0.025 : 0.06, 6, 16).rotateY(Math.PI / 2); return _geo[k] = t; };
@@ -6765,7 +6816,7 @@ function makePed(shirt, pants, skin, hair) {
   const L = add(PGEO.leg, pants, -0.11, 0.84, 0), R = add(PGEO.leg, pants, 0.11, 0.84, 0);
   add(PGEO.torso, shirt, 0, 1.16, 0); add(PGEO.head, skin, 0, 1.62, 0); add(PGEO.hair, hair, 0, 1.78, -0.01);
   const AL = add(PGEO.arm, shirt, -0.3, 1.44, 0), AR = add(PGEO.arm, shirt, 0.3, 1.44, 0);
-  scene.add(g); return { g, inner, L, R, AL, AR };
+  scene.add(g); g.fRadice = true; g.updateMatrixWorld = fusiMatrici; return { g, inner, L, R, AL, AR };
 }
 const makeCop = () => makePed('#1d2f5a', '#1a2238', pick(SKIN), '#f2f2ee'); // Polizia Locale: dark blue uniform, white cap
 function animPed(m, phase, amp) { const s = Math.sin(phase) * amp; m.L.rotation.x = s; m.R.rotation.x = -s; m.AL.rotation.x = -s * 0.8; m.AR.rotation.x = s * 0.8; }
@@ -7011,7 +7062,7 @@ class Vehicle {
     this.spec = MODELS[kind]; this.color = color; this.m = makeCar(kind, color); if (this.spec.two) { this.roll = 0.1; this.wh = this.whv = this.whHold = 0; } // parked on its stand; wh = wheelie (+) / stoppie (-) pitch
     this.rad = this.spec.W / 2 + 0.02; this.co = Math.max(0.2, this.spec.L / 2 - this.rad);
     this.inp = { thr: 0, brk: 0, steer: 0, hand: 0 }; this.ai = null; this.maxV = this.spec.maxV;
-    VEH.push(this); this.sync();
+    this.m.g.fVeh = this; VEH.push(this); this.sync();
   }
   get speed() { return hyp(this.vx, this.vz); }
   get fwdSpeed() { return this.vx * Math.sin(this.h) + this.vz * Math.cos(this.h); }
@@ -8661,7 +8712,7 @@ function dentCar(v, sev, nx, nz) {
   }
   // contact point in the car's frame: opposite to the push normal
   const c = Math.cos(v.h), s = Math.sin(v.h), lx = -nx * c + nz * s, lz = -nx * s - nz * c; // world -> local (x right, z forward)
-  const geo = m.bm.geometry, pos = geo.attributes.position, org = m.org || (m.org = pos.array.slice()), S = v.spec;
+  const geo = m.bm.geometry; geo.fFuori = true; /* dented: its own shape, drawn on its own (fusi3.js) */ const pos = geo.attributes.position, org = m.org || (m.org = pos.array.slice()), S = v.spec;
   const cx = lx * S.W / 2 * 1.2, cz = lz * S.L / 2 * 1.2, R = 1.25;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), d = hyp(x - cx, z - cz), w = Math.max(0, 1 - d / R); if (!w) continue;

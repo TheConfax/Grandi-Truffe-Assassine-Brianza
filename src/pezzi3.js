@@ -184,14 +184,15 @@ const _vistaF = new THREE.Frustum(), _vistaM = new THREE.Matrix4();
 scene.onBeforeRender = (r, sc, cam) => { // after the matrices of the frame, before the renderer walks the scene
   _vistaF.setFromProjectionMatrix(_vistaM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
   const om = sun.castShadow && sun.visible; let SF = null; if (om) { sun.shadow.updateMatrices(sun); SF = sun.shadow.getFrustum(); }
-  for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
+  for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
+  fusiDisegna(_vistaF, om ? SF : null);
 };
 
 // ---- the shaders of the whole map, compiled at the start and kept: a shader seen for the first time at speed stopped the game 80 to 200 ms, and one whose last user went with its tile was compiled again the next time.
 // One small material per kind found on the map (type; m map, a alphaMap, e emissiveMap, v vertex colours, t transparent, n no fog, i instanced, c instance colours; side; alphaTest). Never drawn. A kind missing here only costs its stop, as before.
 const VETRINA = [['B', 'mt', 0, 0], ['B', 'vt', 0, 0], ['B', 'vtn', 2, 0], ['B', 't', 0, 0], ['B', '', 0, 0], ['B', 'tn', 2, 0], ['S', 'mtn', 0, 0], ['S', 'atn', 0, 0], ['S', 'at', 0, 0], ['P', 'mvtn', 0, 0], ['P', 'mtn', 0, 0], ['P', 'vtn', 0, 0], ['P', 't', 0, 0], ['K', '', 0, 0], ['K', 't', 0, 0],
   ['L', 'me', 0, 0.5], ['L', 'me', 0, 0], ['L', 'me', 2, 0], ['L', 'mv', 0, 0], ['L', 'mvic', 2, 0.5], ['L', 'mv', 2, 0], ['L', 'mt', 0, 0], ['L', 'm', 0, 0.5], ['L', 'mic', 0, 0], ['L', 'mi', 0, 0], ['L', 'm', 0, 0], ['L', 'm', 2, 0.12], ['L', 'm', 2, 0.35], ['L', 'm', 2, 0.4], ['L', 'm', 2, 0.5], ['L', 'm', 2, 0],
-  ['L', 'vic', 0, 0], ['L', 'vi', 0, 0], ['L', 'v', 0, 0], ['L', 'vt', 2, 0], ['L', 'v', 2, 0], ['L', 't', 0, 0], ['L', 'i', 0, 0], ['L', '', 0, 0], ['L', '', 1, 0], ['L', 't', 2, 0], ['L', '', 2, 0]];
+  ['L', 'vic', 0, 0], ['L', 'vi', 0, 0], ['L', 'v', 0, 0], ['L', 'vt', 2, 0], ['L', 'v', 2, 0], ['L', 't', 0, 0], ['L', 'i', 0, 0], ['L', 'ic', 0, 0], ['L', '', 0, 0], ['L', '', 1, 0], ['L', 't', 2, 0], ['L', '', 2, 0]];
 const VETRINA_TIENI = [];
 function vetrinaShader() {
   const tex = new THREE.Texture(), geo = new THREE.BufferGeometry(), cl = { L: THREE.MeshLambertMaterial, B: THREE.MeshBasicMaterial, S: THREE.SpriteMaterial, P: THREE.PointsMaterial, K: THREE.LineBasicMaterial }, oggetti = [];
