@@ -5,7 +5,7 @@
 //   built: its meshes (buildTileGen). What is not there yet the physics takes from the ground of mappa/suolo.bin (H.* old engine): it never falls into nothing.
 // The steps come down in the opposite order, farther out. The tile objects stay (TILES), and with them what was broken: BAR_ROTTE, GATE_ROTTI, the props.
 const R_MESH = 760, R_FREE = 1150, R_STESO = 1150, R_TOGLI = 1550, R_PEZZO = 1530, R_BUTTA = 1950;
-const PZ = { vola: 0, MAX: 12, arrivi: [], vx: 0, vz: 0, lx: null, lz: 0, lt: 0, presi: 0, byte: 0, falliti: 0, usa: { arrivo: 0, stesura: 0, mesh: 0 } };
+const PZ = { vola: 0, MAX: 12, arrivi: [], vx: 0, vz: 0, lx: null, lz: 0, lt: 0, presi: 0, byte: 0, falliti: 0, usa: { arrivo: 0, stesura: 0, mesh: 0 }, fette: {} };
 const RLT = new Map(), RVT = new Map(); for (const [t, r] of D.rl) { let l = RLT.get(t); if (!l) RLT.set(t, l = []); l.push(r); } for (const [t, r] of D.rv) { let l = RVT.get(t); if (!l) RVT.set(t, l = []); l.push(r); }
 const FOUNT_T = new Map(), FUEL_T = new Map(); for (const f of FOUNT) { const t = tileOf(f.x, f.z); let l = FOUNT_T.get(t); if (!l) FOUNT_T.set(t, l = []); l.push(f); } for (const f of FUEL) { const t = tileOf(f.x, f.z); let l = FUEL_T.get(t); if (!l) FUEL_T.set(t, l = []); l.push(f); }
 const CAS_T = new Map(); if (COT && COT.cas) for (const [i, t] of COT.cas) { let l = CAS_T.get(t); if (!l) CAS_T.set(t, l = []); l.push(D.pois[i]); }
@@ -134,6 +134,7 @@ function tileTick(px, pz, budgetMs, force, soloDati) {
   while (performance.now() - t0 < bud) {
     let T = tileTick.cur;
     if (!T || !T.gen) { T = cand.shift(); if (!T) break; T.gen = buildTileGen(T); tileTick.cur = T; }
+    if (DEBUG) { const a = performance.now(), r = T.gen.next(), b = performance.now() - a, k = T.fetta || 'inizio', e = PZ.fette[k] || (PZ.fette[k] = [0, 0, 0]); e[0]++; e[1] += b; if (b > e[2]) e[2] = b; T.fetta = r.value; if (r.done) { T.gen = null; tileTick.cur = null; T.fetta = null; } continue; } /* the slices, in the debug numbers */
     if (T.gen.next().done) { T.gen = null; tileTick.cur = null; }
   }
   PZ.usa.mesh += performance.now() - t2;
