@@ -5,6 +5,7 @@
 // turns the nose and the roll, the speed over the ground stays. Every parameter is here. The player's vehicle runs this (and any vehicle thrown by
 // an explosion, or left by the player until it stops); the traffic keeps a plain height that follows the ground (Vehicle.collide).
 // Off its wheels a car is a rigid hull (fisRig): it turns over if it has way on, and if it stops on its roof it is finished (v.ko, Carlo 1/11): no engine, no controls, he gets out.
+// While it has way on it can be saved (Carlo, 1/11): the player's stick works on the ground too, and a car touching down crooked with the stick pushed takes a hop to finish the turn.
 const FIS = {
   g: 13.5,          // m/s2 on a car off the ground: 9.81 at this camera and these speeds looked floaty (Carlo); 1.4 times it falls like GTA
   airMin: 0.05,     // m over the full droop of the springs, or...
@@ -27,6 +28,7 @@ const FIS = {
   pivHi: 0.95, pivLo: 0.6, // it turns round its waist, not round the point under the wheels: nothing at pivHi (an ordinary jump looks as it did), all of it at pivLo
   rigMu: 0.7, rigE: 0.2, rigDamp: 1.5, // grip of the hull on the ground, what a blow gives back, rad/s lost per s touching
   flipV: 9, flipUp: 0.3, flipMax: 6, flipPop: 0.22, popMax: 5, flipKeep: 0.85, // landing crooked (up under flipUp) with over flipV m/s: a hop of flipPop of the speed, at most popMax, and a turn back towards the wheels, at most flipMax rad/s; flipKeep of the speed goes on
+  rigPitch: 3.2, rigRoll: 3.6, rigAcc: 16, saveK: 2, saveMax: 5.5, // the player's stick on a hull off its wheels, touching the ground or in a hop: rad/s of nose and of roll, rad/s2 to get there; touching crooked with the stick pushed: a hop of saveK of the speed, at most saveMax, for the time to finish the turn. Free of the stick nothing of this happens
   nudge: 6, nudgeV: 6, // rad/s2 on a body slower than nudgeV on its side or its nose, growing with the time it takes: it does not stay in the balance
   koUp: -0.8, koV: 0.5, koT: 0.4, stuckT: 5, // on the roof (up under koUp), slower than koV for koT s: finished (v.ko), for good. Nothing lies crooked longer than stuckT s
   hitShake: 14, hitSfx: 2.5, // landing speed m/s for the full shake, speed from which it is heard
@@ -130,7 +132,7 @@ function fisPivot(F, up) { const t = clamp((FIS.pivHi - up) / (FIS.pivHi - FIS.p
 // No grip, no engine, no brakes (Vehicle.stepAir): the ground only pushes up and rubs, at the points that touch it. Three numbers of the body and one vertical: speeds y, ar, ap.
 // Where a point goes when each of them moves is J below (the turn is yaw, then nose ap, then roll ar, as drawn), so a blow off centre turns the body by itself and gravity tips it off an edge
 function fisRigIn(v) {
-  const F = v.F; F.rig = true; F.free = false; F.restT = F.koT = 0; F.rest = false;
+  const F = v.F; F.rig = true; F.free = false; F.restT = F.koT = 0; F.rest = false; F.way = true;
   if (F.ha) return;
   const S = v.spec, hw = S.W / 2, hl = S.L / 2, [cw, cz, cl] = S.ape ? [hw * 0.8, 0, hl * 0.8] : vehUpper(v), top = vehMaxTop(v); F.ha = []; F.hb = []; F.hd = [];
   const add = (a, b, d) => { F.ha.push(a); F.hb.push(b); F.hd.push(d); };
@@ -148,10 +150,12 @@ function fisRigOut(v, yf, yb) { // back on the springs
 function fisRig(v, yf, yb, ty, fs) {
   const dt = 1 / 60, F = v.F, G = FIS.g;
   if (F.rest) { if (v.speed < 0.2 && v.vy < 1) { v.vx = v.vz = 0; v.fpBusy = false; return; } F.rest = false; } /* finished on its roof: nothing to do until something shoves it */
-  if (v.air && !v.ko && v.health > 0) { // the stick as ever; free of it, a hop keeps its turn and anything else drifts back level as ever
-    const i = v.inp, ln = clamp(i.lean || 0, -1, 1), st = clamp(i.steer || 0, -1, 1), A = FIS.airAcc * dt;
-    if (Math.abs(ln) > 0.08) v.wp += clamp(-ln * FIS.airPitch - v.wp, -A, A); else if (!F.free) v.wp += (FIS.airK * fisLevel(wrapA(Math.atan2(-v.vy, Math.max(6, Math.abs(fs))) * Math.sign(fs || 1) * FIS.airNose - v.ap)) - FIS.airD * v.wp) * dt;
-    if (Math.abs(st) > 0.08) v.wr += clamp(-st * FIS.airRoll - v.wr, -A, A); else if (!F.free) v.wr += (FIS.airK * fisLevel(-v.ar) - FIS.airD * v.wr) * dt;
+  const live = !v.ko && v.health > 0, me = live && v === P.car, i = v.inp, ln = clamp(i.lean || 0, -1, 1), st = clamp(i.steer || 0, -1, 1), lnOn = me && Math.abs(ln) > 0.08, stOn = me && Math.abs(st) > 0.08, way = F.way = v.speed > FIS.koV && (v.air || F.way); /* the player's stick; the traffic has none on the ground. Way on is what it had when it came down: once it has stopped, the rub of a turn of the stick does not count as way on */
+  if (me && !v.air && way) { const A = FIS.rigAcc * dt; if (lnOn) v.wp += clamp(-ln * FIS.rigPitch - v.wp, -A, A); if (stOn) v.wr += clamp(-st * FIS.rigRoll - v.wr, -A, A); } /* on the ground, while it moves: the same stick */
+  else if (v.air && live) { // the stick as ever (in a hop, as quick as on the ground); free of it, a hop keeps its turn and anything else drifts back level as ever; with the stick pushed one way the other way drifts back level, or the turn would never close
+    const q = me && F.free, drift = !F.free || lnOn || stOn, A = (q ? FIS.rigAcc : FIS.airAcc) * dt;
+    if (Math.abs(ln) > 0.08) v.wp += clamp(-ln * (q ? FIS.rigPitch : FIS.airPitch) - v.wp, -A, A); else if (drift) v.wp += (FIS.airK * fisLevel(wrapA(Math.atan2(-v.vy, Math.max(6, Math.abs(fs))) * Math.sign(fs || 1) * FIS.airNose - v.ap)) - FIS.airD * v.wp) * dt;
+    if (Math.abs(st) > 0.08) v.wr += clamp(-st * (q ? FIS.rigRoll : FIS.airRoll) - v.wr, -A, A); else if (drift) v.wr += (FIS.airK * fisLevel(-v.ar) - FIS.airD * v.wr) * dt;
   }
   v.vy -= G * dt; v.y += v.vy * dt; v.ar = wrapA(v.ar + v.wr * dt); v.ap = wrapA(v.ap + v.wp * dt);
   const sa = Math.sin(v.ar), ca = Math.cos(v.ar), sp = Math.sin(v.ap), cp = Math.cos(v.ap), sh = Math.sin(v.h), ch = Math.cos(v.h), up = ca * cp, k = fisPivot(F, up), Ir = F.Ir, Ip = F.Ip, N = F.ha.length;
@@ -179,19 +183,20 @@ function fisRig(v, yf, yb, ty, fs) {
       if (v === P.car) { shake = Math.max(shake, Math.min(0.9, hit / FIS.hitShake)); if (hit > FIS.hitSfx && hit <= 7) sfxCrash(hit); }
       if (hit > 10) v.impact(hit * 0.7); /* as it was */
       const sd = v.speed;
-      if (!v.ko && up < FIS.flipUp && sd > FIS.flipV) { // with way on, it does not stay there: a hop, and round towards the wheels
+      if (!v.ko && up < FIS.flipUp && sd > FIS.flipV && !lnOn && !stOn) { // with way on, it does not stay there: a hop, and round towards the wheels
         const byR = Math.abs(v.ar) >= Math.abs(v.ap), a = byR ? v.ar : v.ap, w = byR ? v.wr : v.wp, tw = byR ? -Math.sign(la) : Math.sign(fw), s = Math.abs(a) < 2.2 ? -Math.sign(a) : Math.abs(w) > 0.5 ? Math.sign(w) : tw || 1;
         const vy = Math.min(FIS.popMax, FIS.flipPop * sd), T = 2 * vy / G, dist = (((-a * s) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI), om = s * Math.min(FIS.flipMax, dist / T * (0.85 + rnd() * 0.3));
         v.vy = Math.max(v.vy, vy); if (byR) v.wr = om; else v.wp = om; v.vx *= FIS.flipKeep; v.vz *= FIS.flipKeep; F.free = true; F.freeT = 0.25; v.y += 0.02;
       }
     }
     else if (F.free && (F.freeT -= dt) < 0) F.free = false; /* a hop that never left the ground */
+    if ((lnOn || stOn) && way && !F.free && up < FIS.flipUp) { v.vy = Math.max(v.vy, Math.min(FIS.saveMax, FIS.saveK * v.speed)); F.free = true; F.freeT = 0.25; v.y += 0.02; } /* crooked, with way on and the stick pushed: a hop, the stick does the turn; the slower, the smaller */
     const slow = Math.abs(v.wr) < 0.6 && Math.abs(v.wp) < 0.6 && Math.abs(v.vy) < 0.6 && v.speed < FIS.koV;
     if (!F.free && slow && (up < FIS.koUp || v.ko)) { F.koT += dt; if (F.koT > FIS.koT) { fisKo(v); return; } } else F.koT = 0;
-    if (!F.free && !v.ko && v.speed < FIS.nudgeV) { // on its side or its nose it does not stay: down the nearer way, on the wheels or on the roof, harder the longer it takes
+    if (!F.free && !v.ko && v.speed < FIS.nudgeV) { // on its side or its nose it does not stay: down the nearer way, on the wheels or on the roof, or the way the stick says (once stopped, only towards the wheels: else not at all), harder the longer it takes
       F.restT += dt; const nd = FIS.nudge * (1 + 2 * F.restT) * dt;
-      if (Math.abs(ca) < 0.85) { const dir = (Math.abs(v.ar) < Math.PI / 2 ? -1 : 1) * (Math.sign(v.ar) || 1); if (v.wr * dir < 2) v.wr += dir * nd; }
-      if (Math.abs(cp) < 0.85) { const dir = (Math.abs(v.ap) < Math.PI / 2 ? -1 : 1) * (Math.sign(v.ap) || 1); if (v.wp * dir < 2) v.wp += dir * nd; }
+      if (Math.abs(ca) < 0.85) { const dir = stOn ? -Math.sign(st) : (Math.abs(v.ar) < Math.PI / 2 ? -1 : 1) * (Math.sign(v.ar) || 1); if ((!stOn || way || dir === -Math.sign(v.ar)) && v.wr * dir < 2) v.wr += dir * nd; }
+      if (Math.abs(cp) < 0.85) { const dir = lnOn ? -Math.sign(ln) : (Math.abs(v.ap) < Math.PI / 2 ? -1 : 1) * (Math.sign(v.ap) || 1); if ((!lnOn || way || dir === -Math.sign(v.ap)) && v.wp * dir < 2) v.wp += dir * nd; }
       if (F.restT > FIS.stuckT && slow) { if (up < 0) { fisKo(v); return; } fisRigOut(v, yf, yb); v.fpBusy = true; return; }
     } else F.restT = 0;
     if (!v.ko && up > FIS.tipLand && Math.abs(v.wr) < 3 && Math.abs(v.wp) < 3) { fisRigOut(v, yf, yb); v.fpBusy = true; return; } /* on the wheels */
