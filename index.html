@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo d7fc1cc · assemblato 01/11 20:53 · porta ' + location.port;
+    const txt = 'locale · ramo misure-fps · dopo 62602d1 · assemblato 01/11 21:00 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -7470,6 +7470,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyN') skipTime(2);
   if (e.code === 'KeyR') toggleRadio();
   if (e.code === 'KeyB') reportSpot();
+  if (e.code === 'KeyK' && DEBUG) dbgCopy();
   if (e.code === 'KeyJ' && DEBUG) { const r = H.check(); toast('H.check: ' + r.tile + ' tile, scarto ' + r.scarto_max_m.toFixed(3) + ' m (raggi ' + r.scarto_raggi_m.toFixed(3) + ')'); }
   if (e.code === 'KeyU') { AU.muted = !AU.muted; toast(AU.muted ? 'Audio spento' : 'Audio acceso'); }
 });
@@ -8643,18 +8644,55 @@ function exportSpots() {
 function clearSpots() { try { localStorage.removeItem('gtaSpots'); } catch (e) { } spotN = 0; updDbgMenu(); toast('🗑 Segnalazioni svuotate'); }
 let dbgT = 0, dbgFps = 60;
 function updDebugHud(dt) {
-  const el = document.getElementById('dbghud'); if (!el) return; if (!DEBUG) { el.hidden = true; return; } el.hidden = false;
+  const el = document.getElementById('dbghud'); if (!el) return; if (!DEBUG) { el.hidden = true; if (MIS.el && !MIS.el.hidden) dbgOff(); return; } el.hidden = false;
   if (dt > 0) dbgFps = dbgFps * 0.95 + 0.05 / dt; if ((dbgT -= dt) > 0) return; dbgT = 0.25;
   const v = P.mode === 'car' ? P.car : null, x = v ? v.x : P.x, z = v ? v.z : P.z, y = v ? v.y : P.y;
   const lat = META.lat0 - z / 110540, lon = META.lon0 + x / (111320 * Math.cos(META.lat0 * Math.PI / 180));
   el.textContent = 'DEBUG · ' + lat.toFixed(5) + ', ' + lon.toFixed(5) + ' · x ' + x.toFixed(0) + ' z ' + z.toFixed(0) + ' y ' + y.toFixed(1) + ' · ' + (streetAt(x, z) || '-') + ' · ' + dbgFps.toFixed(0) + ' fps · segnalazioni ' + spotsLocal().length;
 }
+/* misure del fotogramma (debug, &debug=1): valori mediati su circa 1 secondo, nella riga #dbgmis sopra quella di debug.
+   A debug spento non gira niente: frame() non chiama queste funzioni e le query GPU vengono tolte.
+   Tasto K (solo debug): copia la riga negli appunti. Tasto B: la riga finisce nella segnalazione (campo "misure"). */
+const MIS = { a: { sim: 0, tile: 0, vis: 0, draw: 0 }, n: 0, sum: 0, max: 0, prev: 0, t0: 0, t1: 0, gpuSum: 0, gpuN: 0, txt: 'misure: in raccolta…', out: null, el: null, gpu: undefined, qs: [], cur: null };
+function dbgBegin(t) {
+  const now_ = performance.now(); MIS.t0 = now_;
+  if (!MIS.el) { const e = document.createElement('div'); e.id = 'dbgmis'; e.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:30px;z-index:8;font:12px ui-monospace,monospace;color:#9fe;background:rgba(0,0,0,.6);padding:3px 8px;border-radius:4px;pointer-events:none;white-space:pre;max-width:calc(100vw - 32px);overflow:hidden'; document.body.appendChild(e); MIS.el = e; }
+  MIS.el.hidden = false;
+  if (MIS.prev) { const d = t - MIS.prev; if (d > 0 && d < 2000) { MIS.n++; MIS.sum += d; if (d > MIS.max) MIS.max = d; } }
+  MIS.prev = t; if (!MIS.t1) MIS.t1 = now_;
+  return MIS;
+}
+function dbgMk(m, k) { const n = performance.now(); m.a[k] += n - m.t0; m.t0 = n; }
+function dbgGpuBegin() {
+  const M = MIS;
+  if (M.gpu === undefined) { const gl = renderer.getContext(); M.gl = gl; M.ext = gl.createQuery && gl.getExtension('EXT_disjoint_timer_query_webgl2'); M.gpu = !!M.ext; }
+  if (!M.gpu || M.qs.length >= 6) return 0;
+  const q = M.gl.createQuery(); M.gl.beginQuery(M.ext.TIME_ELAPSED_EXT, q); M.cur = q; return 1;
+}
+function dbgGpuEnd(b) { if (!b) return; MIS.gl.endQuery(MIS.ext.TIME_ELAPSED_EXT); MIS.qs.push(MIS.cur); MIS.cur = null; }
+function dbgEnd(m) {
+  if (m.gpu) { const gl = m.gl; while (m.qs.length && gl.getQueryParameter(m.qs[0], gl.QUERY_RESULT_AVAILABLE)) { const q = m.qs.shift(); if (!gl.getParameter(m.ext.GPU_DISJOINT_EXT)) { m.gpuSum += gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; m.gpuN++; } gl.deleteQuery(q); } }
+  const now_ = performance.now(); if (now_ - m.t1 < 1000 || !m.n) return;
+  const n = m.n, f = x => (x / n).toFixed(1), cpu = m.a.sim + m.a.tile + m.a.vis + m.a.draw, avg = m.sum / n, inf = renderer.info;
+  let tr = 0, tv = 0; for (const T of TILES) if (T.ready) { tr++; if (T.group && T.group.visible) tv++; }
+  let aw = 0; for (const v of VEH) if (!v.sleep) aw++; let pd = 0; for (const p of PEDS) if (p.state !== 'dead') pd++;
+  const gpu = m.gpu ? (m.gpuN ? (m.gpuSum / m.gpuN).toFixed(1) + ' ms' : 'GPU in attesa') : 'GPU n/d';
+  const o = m.out = { fps: +(1000 / avg).toFixed(1), ms: +avg.toFixed(2), msMax: +m.max.toFixed(1), cpu: +(cpu / n).toFixed(2), sim: +(m.a.sim / n).toFixed(2), tile: +(m.a.tile / n).toFixed(2), vis: +(m.a.vis / n).toFixed(2), draw: +(m.a.draw / n).toFixed(2), attesa: +Math.max(0, avg - cpu / n).toFixed(2), gpuMs: m.gpu && m.gpuN ? +(m.gpuSum / m.gpuN).toFixed(2) : null, chiamate: inf.render.calls, triangoli: inf.render.triangles, programmi: inf.programs ? inf.programs.length : 0, geometrie: inf.memory.geometries, texture: inf.memory.textures, tileMesh: tr, tileVisibili: tv, auto: VEH.length, autoSveglie: aw, pedoni: pd, modo: P.mode };
+  m.txt = o.fps + ' fps · fotogramma ' + o.ms + ' ms (peggiore ' + o.msMax + ')\nCPU ' + o.cpu + ' ms = sim ' + f(m.a.sim) + ' + tile ' + f(m.a.tile) + ' + resto ' + f(m.a.vis) + ' + disegno ' + f(m.a.draw) + ' · attesa ' + o.attesa + ' · ' + (m.gpu ? (m.gpuN ? 'GPU ' + gpu : gpu) : gpu) + '\n' + o.chiamate + ' chiamate · ' + (o.triangoli / 1000).toFixed(0) + 'k triangoli · ' + o.programmi + ' programmi · tile ' + tr + ' (' + tv + ' visibili) · auto ' + aw + '/' + VEH.length + ' · pedoni ' + pd + ' · ' + o.modo;
+  m.el.textContent = m.txt;
+  m.a.sim = m.a.tile = m.a.vis = m.a.draw = 0; m.n = 0; m.sum = 0; m.max = 0; m.gpuSum = 0; m.gpuN = 0; m.t1 = now_;
+}
+function dbgOff() { /* debug spento: via le query GPU e la riga */
+  const M = MIS; if (M.el) M.el.hidden = true; if (M.qs.length) { for (const q of M.qs) M.gl.deleteQuery(q); M.qs.length = 0; } M.prev = 0; M.t1 = 0; M.n = 0; M.sum = 0; M.max = 0; M.a.sim = M.a.tile = M.a.vis = M.a.draw = 0; M.gpuSum = 0; M.gpuN = 0;
+}
+function dbgCopy() { try { navigator.clipboard.writeText(MIS.txt).then(() => toast('📋 Misure copiate negli appunti')).catch(() => toast('Misure: copia non riuscita (B le salva nella segnalazione)')); } catch (e) { } }
+
 async function reportSpot() {
   if (!DEBUG) return;
   const v = P.mode === 'car' ? P.car : null, x = v ? v.x : P.x, z = v ? v.z : P.z, y = v ? v.y : P.y;
   const lat = META.lat0 - z / 110540, lon = META.lon0 + x / (111320 * Math.cos(META.lat0 * Math.PI / 180));
   const rec = { x: +x.toFixed(1), z: +z.toFixed(1), y: +y.toFixed(1), suolo: +H.ground(x, z).toFixed(1), lat: +lat.toFixed(6), lon: +lon.toFixed(6), via: streetAt(x, z) || '', zona: placeAt(x, z) || '', direzione: Math.round(((v ? v.h : P.h) * 180 / Math.PI + 360) % 360), modo: P.mode, velocita: v ? Math.round(v.speed * 3.6) : 0, cam: camMode, ora: $('clock') ? $('clock').textContent : '', quando: new Date().toISOString(), versione: 'v16' };
-  spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }
+  rec.misure = MIS.txt; spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }
   let saved = false; if (spotDb) { try { await spotDb.collection('segnalazioni').add(rec); saved = true; } catch (e) { saved = false; } }
   if (!saved && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { try { const r = await fetch('/segnala', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) }); saved = r.ok; } catch (e) { } } /* local game: straight to the dev server, Claude reads it live */
   try { const a = spotsLocal(); a.push(rec); localStorage.setItem('gtaSpots', JSON.stringify(a)); } catch (e) { } updDbgMenu();
@@ -9281,17 +9319,24 @@ const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, SOLE: () => setWeat
 let last = performance.now(), acc = 0;
 function frame(t) {
   requestAnimationFrame(frame);
+  const m_ = DEBUG ? dbgBegin(t) : null;
   let dt = Math.min(0.1, (t - last) / 1000); last = t;
   pollPad();
   if (running && !paused) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100; acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
   else if (!running) { now += dt; P.h += dt * 0.08; } // slow orbit behind the title
-  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
+  if (m_) dbgMk(m_, 'sim');
+  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (m_) dbgMk(m_, 'tile'); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
+  if (m_) dbgMk(m_, 'sim');
   const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;
   updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);
   updCamera(running ? dt : dt * 0.4); updGlow(); updSkyFx(running && !paused ? dt : 0);
   if (running) { updHud(dt); updAudio(); updSfx(dt); }
+  if (m_) dbgMk(m_, 'vis');
+  const g_ = m_ ? dbgGpuBegin() : 0;
   renderer.render(scene, camera);
+  if (m_) { dbgGpuEnd(g_); dbgMk(m_, 'draw'); }
   if (ipol) interpEnd(ipol);
+  if (m_) dbgEnd(m_);
 }
 function startGame() {
   if (running) return; running = true; if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
@@ -9303,5 +9348,5 @@ window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { MIS, FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>
