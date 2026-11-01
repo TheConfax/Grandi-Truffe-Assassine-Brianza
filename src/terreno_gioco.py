@@ -79,8 +79,9 @@ def main(argv=None):
         os.path.getsize(os.path.join(a.out, 'indice.json')) / 1024, sotto))
     fl = os.path.join(a.da, 'report_lisciatore.json')   # the checks of the lisciatore (src/lisciatore.py), next to the other reports
     if os.path.exists(fl): import shutil; shutil.copyfile(fl, os.path.join(os.path.dirname(os.path.abspath(a.out)), 'report_lisciatore.json'))
+    giu = ca.acqua_giu_dalle_strade(a.out, os.path.join(ROOT, 'brianza.json'))   # on the S the game reads: the water comes down where it would stand on a street
     if not a.no_controlli:   # the checks of the water and the bridges on what the game reads (src/controlli_acqua.py)
-        ca.controlla(a.out, os.path.join(ROOT, 'brianza.json'), os.path.join(os.path.dirname(os.path.abspath(a.out)), 'report_acqua.json'))
+        ca.controlla(a.out, os.path.join(ROOT, 'brianza.json'), os.path.join(os.path.dirname(os.path.abspath(a.out)), 'report_acqua.json'), acqua_giu=giu)
 
 
 if __name__ == '__main__':

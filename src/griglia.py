@@ -12,11 +12,16 @@ SEME_HW, SEME_HH, SEME_NX, SEME_NZ = 3628.8, 2542.4, 30, 21
 PARTENZA = dict(stazione='Stazione di Meda', via='Via Yuri Gagarin', comune='MEDA', lat=45.661706, lon=9.161211)
 
 
-def zona_gioco(data):
-    """il riquadro del confine disegnato da Carlo in coordinate di gioco: x0, z0, x1, z1"""
+def confine_gioco(data):
+    """il confine disegnato da Carlo in coordinate di gioco: [(x, z)], chiuso (l'ultimo punto è il primo)"""
     s = open(os.path.join(data, 'confine_gioco', 'confine_gioco.kml'), encoding='utf-8').read()
     c = [(float(a), float(b)) for blocco in re.findall(r'<coordinates>(.*?)</coordinates>', s, re.S) for a, b in re.findall(r'(-?\d+\.\d+),(-?\d+\.\d+)', blocco)]
-    xs = [(lo - RQ.LON0) * KX for lo, _ in c]; zs = [-(la - RQ.LAT0) * KZ for _, la in c]
+    return [((lo - RQ.LON0) * KX, -(la - RQ.LAT0) * KZ) for lo, la in c]
+
+
+def zona_gioco(data):
+    """il riquadro del confine disegnato da Carlo in coordinate di gioco: x0, z0, x1, z1"""
+    c = confine_gioco(data); xs = [p[0] for p in c]; zs = [p[1] for p in c]
     return min(xs), min(zs), max(xs), max(zs)
 
 

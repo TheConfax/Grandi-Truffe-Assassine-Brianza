@@ -10,7 +10,7 @@ from pyproj import Transformer
 from shapely.geometry import LineString, Polygon, Point, box, GeometryCollection, MultiLineString
 from shapely.ops import unary_union, linemerge
 from shapely.strtree import STRtree
-from shapely import prepare
+from shapely import prepare, segmentize as _segmentize
 
 src, dem, dst = sys.argv[1:4]
 S, Nn, W, E = map(float, sys.argv[4:8])
@@ -281,10 +281,24 @@ for d_ in (sorted(os.listdir(DBT_DIR)) if os.path.isdir(DBT_DIR) else []):
 dbt_cover = unary_union(_cov).buffer(-3) if _cov else GeometryCollection()  # a few metres inside the boundary: the neighbour's data meets it
 prepare(dbt_cover)
 log('dbgt: muri e recinzioni', len(dbt_walls), 'volumi', len(dbt_vols), 'passi carrai', len(dbt_pc), 'comuni', len(_cov))
-OVT = os.path.join(DATA, 'overture', 'edifici_overture.geojson')
+import riquadro
+OVT = os.path.join(DATA, 'overture', 'edifici_overture.geojson'); OVT_MARGINE = 0.00097   # gradi, 75 m
 ms_h, ms_only = {}, []
+def _overture():
+    """edifici_overture.geojson copre il riquadro di prima (lon 9,117..9,191); fuori da lì, finché il riquadro cresce, gli edifici vengono da edifici_mappa_grande.geojson, quello di tutta la mappa grande"""
+    fe = json.load(open(OVT, encoding='utf-8'))['features']; gr = os.path.join(DATA, 'overture', 'edifici_mappa_grande.geojson')
+    if os.path.exists(gr):
+        W0, E0 = 9.117, 9.191; _rq = riquadro.BBOX; W1, E1 = _rq[2] - OVT_MARGINE, _rq[3] + OVT_MARGINE   # il primo punto dentro il riquadro di oggi con il margine, fuori da quello di prima
+        def primo(f):
+            c = f['geometry']['coordinates']
+            while isinstance(c[0], list): c = c[0]
+            return c
+        for f in json.load(open(gr, encoding='utf-8'))['features']:
+            lo, la = primo(f)[:2]
+            if _rq[0] <= la <= _rq[1] and W1 <= lo <= E1 and not W0 <= lo <= E0: fe.append(f)
+    return fe
 if os.path.exists(OVT):
-    for f_ in json.load(open(OVT, encoding='utf-8'))['features']:
+    for f_ in _overture():
         pr_ = f_['properties']; srcs = pr_.get('sources') or []; ds = {x.get('dataset') for x in srcs}
         if pr_.get('is_underground'): continue
         hh_ = pr_.get('height')
@@ -1467,7 +1481,8 @@ for RL, w_ in riv_lines:
         caps = []
         for E in (Point(part.coords[0]), Point(part.coords[-1])):  # no headwall where a stream flows into another river
             caps.append(not any(o is not RL and o.distance(E) < 4 for o in all_riv) and inside((E.x, E.y), -2))
-        riv_out.append((list(part.simplify(0.2).coords), w_, caps))
+        # il gioco decide tratto per tratto se la striscia del fiume sta su una strada, guardando il mezzo del tratto: niente tratti lunghi, o la striscia ci passa sopra con un capo
+        riv_out.append((list(_segmentize(part.simplify(0.2), 6.0).coords), w_, caps))
 log('river pieces', len(riv_out), 'from', len(riv_lines))
 
 # ------------------------------------------------------------------ trains: smooth chains, longest first
@@ -2035,6 +2050,9 @@ for rr in rail_raw:  # rail pieces per tile with heights where elevated
 # v: one look per property (the hash of the building the divider belongs to), so a garden's low wall does not change colour and railing
 # at every piece the DBGT cuts it into
 _bvt = STRtree(btree_geoms) if btree_geoms else None
+# a low curb (kind 1) on a railway platform stands under it (the platform is a step of 0.55 m over the ground): nobody can see it, it does not go in the data. The walls and the fences stay
+_pf03 = platforms.buffer(0.3); prepare(_pf03); _nc = len(bar_out); bar_out = [b_ for b_ in bar_out if not (b_[1] == 1 and _pf03.contains(LineString(b_[0])))]
+log('cordoli sotto le banchine, tolti', _nc - len(bar_out))
 for pts, kind, hgt in bar_out:
     c = LineString(pts).centroid; v_ = None
     if _bvt is not None:

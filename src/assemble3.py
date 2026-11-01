@@ -204,7 +204,7 @@ function bigCanvas() {
     g.beginPath(); r.g.forEach((i, k) => k ? g.lineTo(N[i][0], N[i][1]) : g.moveTo(N[i][0], N[i][1])); g.stroke();
   }
   g.setLineDash([12, 10]); g.strokeStyle = '#c96b4a'; g.lineWidth = 4; for (const r of RAILPTS) { g.beginPath(); r.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); } g.setLineDash([]);
-  g.strokeStyle = 'rgba(255,60,40,.9)'; g.lineWidth = 9; for (const c of CONFINE) { g.beginPath(); c.p.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.stroke(); } /* the edge of the area drawn from the DBGT (confine3.js) */
+  g.lineWidth = 9; for (const L of CONF_LINEE) { g.strokeStyle = L.css; for (const c of L.anelli) { g.beginPath(); c.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.stroke(); } } /* the two barriers (confine3.js) */
   return C;
 }
 """ + s[b:]
@@ -223,7 +223,7 @@ s = s[:a] + """function drawMinimap() {
     mg.strokeStyle = r.c === 6 ? '#4b4f58' : r.d ? '#f0c27a' : r.c <= 1 ? '#d8cfbd' : r.c === 5 ? '#9b8676' : '#a7a49c'; mg.lineWidth = r.c === 6 ? 1.6 : r.w + (r.c <= 1 ? 2 : 0.5);
     mg.beginPath(); mg.moveTo(sg.a[0], sg.a[1]); mg.lineTo(sg.b[0], sg.b[1]); mg.stroke();
   }
-  mg.strokeStyle = 'rgba(255,60,40,.9)'; mg.lineWidth = 4 / zoom; for (const c of CONFINE) { mg.beginPath(); c.p.forEach((q, i) => i ? mg.lineTo(q[0], q[1]) : mg.moveTo(q[0], q[1])); mg.closePath(); mg.stroke(); } /* the edge of the area drawn from the DBGT (confine3.js) */
+  mg.lineWidth = 4 / zoom; for (const L of CONF_LINEE) { mg.strokeStyle = L.css; for (const c of L.anelli) { mg.beginPath(); c.forEach((q, i) => i ? mg.lineTo(q[0], q[1]) : mg.moveTo(q[0], q[1])); mg.closePath(); mg.stroke(); } } /* the two barriers (confine3.js) */
   mg.setTransform(1, 0, 0, 1, 0, 0);
   const tr = (x, z) => { const dx = (x - px) * zoom, dz = (z - pz) * zoom, a = h - Math.PI, c = Math.cos(a), s = Math.sin(a); return [dx * c - dz * s, dx * s + dz * c]; };
   mg.translate(R, R);

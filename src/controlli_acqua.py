@@ -240,12 +240,9 @@ def zona_acqua(m, extra=3.0):
     Z = shapely.union_all(g) if g else Polygon(); shapely.prepare(Z); return Z
 
 
-def a1_acqua_sulle_strade(m, Z, gioco_ringhiere=False):
-    """the water the game draws over a carriageway, a rail bed or a track. (a) the sheet at zw over the bed (material 4 cells and the cells
-    the flood reaches, at most 6 from the bed, as world3.js), where zw > S; (b) the strip of an OSM river where no bed is near, at H.water;
-    (c) the OSM water areas not in the bed"""
-    st = m.st; c_ = m.M.shape; out = dict()
-    # (a) the sheet, on 4 x 4 points per cell
+def velo_sulle_strade(m):
+    """the points of a street (4 x 4 per cell) under the sheet of water the game draws: zw over the bed (material 4 cells and the cells the flood reaches, at most 6 from the bed, as world3.js), where zw > S"""
+    st = m.st
     bed = (m.M == 4) & m.IN[:-1, :-1] & m.IN[1:, 1:]
     Wn = np.full(m.S.shape, np.nan); near = ndimage.binary_dilation(bed, iterations=7); rr, cc = np.nonzero(np.pad(near, ((0, 1), (0, 1))) | np.pad(near, ((1, 0), (1, 0))))
     Wn[rr, cc] = m.water(m.x0 + cc * st, m.z0 + rr * st)
@@ -263,6 +260,47 @@ def a1_acqua_sulle_strade(m, Z, gioco_ringhiere=False):
             x, z = X[on], Zc[on]; wl = m.water(x, z); wet = np.nan_to_num(wl - m.H(x, z), nan=-1) > 0
             tp = m.top(x, z); wet &= ~(np.isfinite(tp) & (tp > m.H(x, z) + SOTTO_DK))    # under a deck the street on it is the deck's
             pts_a = np.column_stack((x[wet], z[wet]))
+    return pts_a
+
+
+def acqua_giu_dalle_strade(terreno, dati, log=print, giri=5, margine=0.02):
+    """the water never stands over a street: a stream that runs on the foot of a slope beside a lower road (OSM lines above all) has its level 1 m over the asphalt and the sheet flooded it.
+    The level the game reads at a point is zw at the nearest point of the axes (H.water): each of those under which a street gets wet comes down to the street, and the axis downstream of it with it
+    (the water does not climb). S does not change: the bed stays there, dry. Rewrites the water of indice.json; returns what it did"""
+    fi = os.path.join(terreno, 'indice.json'); ind = json.load(open(fi, encoding='utf-8')); A = ind.get('acqua') or []
+    if not A: return dict(punti_abbassati=0)
+    m = Mondo(terreno, dati, lambda *a: None); n = [len(s['zw']) for s in A]; off = np.concatenate(([0], np.cumsum(n))); F = np.concatenate([np.asarray(s['zw'], float) for s in A]); F0 = F.copy()
+    # every point Mondo reads (one a metre, as the game) belongs to a stretch of an axis: own its first vertex in F, t how far along
+    own, tt = [], []
+    for s, a in zip(A, off[:-1]):
+        p = np.asarray(s['p'], float).reshape(-1, 2)
+        for k in range(1, len(p)):
+            q = max(1, int(np.ceil(np.hypot(*(p[k] - p[k - 1]))))); own.append(np.full(q, a + k - 1)); tt.append(np.arange(q) / q)
+    own, tt = np.concatenate(own), np.concatenate(tt); assert len(own) == len(m.acq_z)
+    sc = []
+    for g in range(giri):
+        P = velo_sulle_strade(m)
+        if not len(P): break
+        _, j = m.acq_kd.query(P, workers=-1); cap = np.full(len(F), np.inf); h = m.H(P[:, 0], P[:, 1]) - margine; np.minimum.at(cap, own[j], h); np.minimum.at(cap, own[j] + 1, h)
+        for a, b in zip(off[:-1], off[1:]):
+            c = cap[a:b]
+            if not np.isfinite(c).any(): continue
+            giu = F[a] >= F[b - 1]; F[a:b] = np.minimum(F[a:b], np.minimum.accumulate(c) if giu else np.minimum.accumulate(c[::-1])[::-1])
+        m.acq_z = F[own] + (F[own + 1] - F[own]) * tt; sc.append(len(P))
+    d = F0 - F; k = d > 1e-9
+    for s, a, b in zip(A, off[:-1], off[1:]): s['zw'] = [round(float(v), 2) for v in F[a:b]]
+    open(fi, 'w', encoding='utf-8').write(json.dumps(ind, ensure_ascii=False, separators=(',', ':')))
+    vp = np.concatenate([np.asarray(s['p'], float).reshape(-1, 2) for s in A])
+    r = dict(punti_abbassati=int(k.sum()), punti_acqua=len(d), abbassati_di=pct(d[k]), serie_toccate=sum(1 for a, b in zip(off[:-1], off[1:]) if k[a:b].any()), punti_bagnati_per_giro=sc, dove=[link(*q) for q in vp[k][::max(1, int(k.sum()) // 30)]])
+    log('acqua giu dalle strade: %s' % {a: b for a, b in r.items() if a != 'dove'})
+    return r
+
+
+def a1_acqua_sulle_strade(m, Z, gioco_ringhiere=False):
+    """the water the game draws over a carriageway, a rail bed or a track. (a) the sheet at zw over the bed (velo_sulle_strade); (b) the strip of an OSM river where no bed is near, at H.water;
+    (c) the OSM water areas not in the bed"""
+    st = m.st; c_ = m.M.shape; out = dict()
+    pts_a = velo_sulle_strade(m)
     out['velo_m2'] = round(len(pts_a) * st * st / 16, 1)
     # (b) the OSM strips with no bed near (world3.js bedNear), (c) the OSM water areas outside the bed
     strips = []
@@ -510,7 +548,7 @@ def prove_fisse(m, lid, P1, P2, P3, P5, rep):
     return out
 
 
-def controlla(terreno, dati, out=None, log=print, ringhiere=None):
+def controlla(terreno, dati, out=None, log=print, ringhiere=None, acqua_giu=None):
     t0 = time.time(); m = Mondo(terreno, dati, log)
     import dbgt_quote as dq
     lid = dq.Lidar()
@@ -520,6 +558,7 @@ def controlla(terreno, dati, out=None, log=print, ringhiere=None):
         try: ringhiere = 'RIVER_RAIL = false' not in open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read()
         except OSError: ringhiere = False
     rep['A1'], P1 = a1_acqua_sulle_strade(m, Z, ringhiere)
+    if acqua_giu: rep['A1']['acqua_giu_dalle_strade'] = acqua_giu
     rep['A2'], P2 = a2_sfondate(m, Z)
     rep['A3'], P3 = a3_dipinte_sotto(m)
     rep['A4'] = a4_parapetti(m, ringhiere, lid)

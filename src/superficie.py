@@ -36,6 +36,7 @@ AX_NEAR = 8.0    # ... otherwise one within this; farther than this from every a
 BLEND = 4.0      # axes within d_min + BLEND are blended (1/d^2 with a taper): no step where two axes share a polygon
 AX_SIGMA = 15.0  # the axis Z is smoothed along the network over this (the DBGT gives it in steps of 0.21 m)
 LEVEL = 3.0      # an axis this far from the polygon's own vertices is at another level (underpass, ramp beside)
+C4_LUOGHI_KM2 = 30 / 8.27   # C4: la soglia cresce con la superficie della zona accesa; 30 luoghi su 8,27 km2 è il valore di quando c'era Meda sola
 DZ_WARN, DZ_CAP = 1.5, 3.0   # C4: DBGT farther than this from the LiDAR is listed; farther than DZ_CAP the LiDAR wins (the "tetto")
 NEAR_BR = 30.0   # ... unless within this of a bridge: then it is the part of the deck the DBGT left as ground (phase 3 makes it a deck)
 NEAR_UNDER = 10.0   # ... and a road under the LiDAR this close to a bridge or the gallery is never capped (the DTM is filled across the deck)
@@ -1294,8 +1295,9 @@ def controlli(s, out_dir):
                      nodi=int(car.sum()), luoghi=len(casi), per_esito={e: sum(1 for c in casi if c['esito'] == e) for e in ('dbgt', 'lidar', 'impalcato', 'tombino')},
                      luoghi_aree_interne_0307=sum(1 for c in casi if c['interne']), luoghi_strade_non_impalcato=len(strade_vere),
                      luoghi_strade_almeno_5_nodi=sum(1 for c in strade_vere if c['nodi'] >= 5),
-                     soglia='< 30 luoghi sulle strade (ZON diversa da 0307, impalcati esclusi) con almeno 5 nodi', elenco=casi[:300])
-    rep['C4']['ok'] = rep['C4']['luoghi_strade_almeno_5_nodi'] < 30
+                     superficie_km2=round(s.conf.area / 1e6, 2), soglia_luoghi=max(1, round(C4_LUOGHI_KM2 * s.conf.area / 1e6)),
+                     soglia='meno di %.2f luoghi per km2 sulle strade (ZON diversa da 0307, impalcati esclusi) con almeno 5 nodi' % C4_LUOGHI_KM2, elenco=casi[:300])
+    rep['C4']['ok'] = rep['C4']['luoghi_strade_almeno_5_nodi'] < rep['C4']['soglia_luoghi']
     punti += [dict(c='C4', x=c['x'], z=c['z'], v=c['dz_max'], esito=c['esito'], link=c['link']) for c in strade_vere[:15]]
     # C5: road nodes of the road graph (brianza.json) on the DBGT carriageways, not on decks
     nodes = None; bj = os.path.join(HERE, '..', 'brianza.json')

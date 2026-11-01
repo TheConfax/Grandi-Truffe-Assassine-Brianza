@@ -186,5 +186,5 @@ async function cuoci() {
     goBtn.textContent = 'COTTURA FINITA';
     await new Promise(() => { }); // the game stops here: src/cuoci.mjs takes the results
   }
-  casermeDi(D.pois); confineMuro();
+  casermeDi(D.pois); confineMuri();
 }

@@ -16,7 +16,7 @@ await page.waitForFunction(() => { const b = document.getElementById('go'); retu
 await page.evaluate(() => document.getElementById('go').click()); await page.waitForFunction(() => window.__G && __G.P, null, { timeout: 180000 });
 const r = await page.evaluate(() => {
   const G = __G, H = G.H, ST = 2, R = v => Math.round(v * 100) / 100;
-  const nw = { linee: 0, m: 0, d15: 0, d30: 0, s25: 0, s50: 0, r25: 0, c25: 0, r50: 0, c50: 0, fl: 0, bu: 0 }, ti = {}, ld = [], ls = [];
+  const nw = { linee: 0, m: 0, d15: 0, d30: 0, s25: 0, s50: 0, r25: 0, c25: 0, r50: 0, c50: 0, fl: 0, bu: 0 }, ti = {}, ld = [], ls = [], lb = [];
   const each = (pts, t) => {
     let Ln = 0; const S = [0]; for (let k = 1; k < pts.length; k++) { Ln += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); S.push(Ln); }
     nw.linee++; nw.m += Ln; if (Ln < 2) return; const q = ti[t] || (ti[t] = { m: 0, d15: 0, s50: 0 }); q.m += Ln;
@@ -30,7 +30,7 @@ const r = await page.evaluate(() => {
       B.push(ba + (bc - ba) * f);
     }
     for (let i = 1; i < n; i++) { const a = Y[i] - Y[i - 1], b = Y[i + 1] - Y[i], D = Math.abs(Y[i] - (Y[i - 1] + Y[i + 1]) / 2); if (a * b < 0 && D > 0.15) { nw.d15 += ST; q.d15 += ST; if (ld.length < 400) ld.push([Math.round(X[i]), Math.round(Z[i]), R(D), t]); if (D > 0.3) nw.d30 += ST; } }
-    for (let i = 0; i <= n; i++) { const g = H.ground(X[i], Z[i]); if (B[i] - g > 0.1) nw.fl += ST; if (Y[i] - g < -0.25) nw.bu += ST; }
+    for (let i = 0; i <= n; i++) { const g = H.ground(X[i], Z[i]); if (B[i] - g > 0.1) nw.fl += ST; if (Y[i] - g < -0.25) { nw.bu += ST; q.bu = (q.bu || 0) + ST; if (lb.length < 3000) lb.push([Math.round(X[i]), Math.round(Z[i]), R(g - Y[i]), t]); } }
     for (const [th, sk, rk, ck] of [[0.25, 's25', 'r25', 'c25'], [0.5, 's50', 'r50', 'c50']]) { let run = 0; const end = i => { if (run > 0) { nw[rk]++; if (run < 20) nw[ck]++; if (th === 0.5 && ls.length < 800) ls.push([Math.round(X[Math.max(0, i - 1)]), Math.round(Z[Math.max(0, i - 1)]), run, t]); } run = 0; }; for (let i = 0; i <= n; i++) { const up = Y[i] - H.ground(X[i], Z[i]) > th; if (up) { run += ST; nw[sk] += ST; if (th === 0.5) q.s50 += ST; } else end(i); } end(n + 1); }
   };
   // the ground on the two sides of the railway fences, 0.5 m from the line: the teeth where a street or the rail bed meets the wall
@@ -43,16 +43,16 @@ const r = await page.evaluate(() => {
     salgono_oltre_25cm: { km: km(nw.s25), tratti: nw.r25, sotto_20m: nw.c25 }, salgono_oltre_50cm: { km: km(nw.s50), tratti: nw.r50, sotto_20m: nw.c50 },
     suolo_accanto_alle_recinzioni_ferroviarie: { km_lati: km(bm), dente_oltre_15cm_km: km(bd) },
     fondo_sospeso_oltre_10cm_km: km(nw.fl), sepolte_oltre_25cm_km: km(nw.bu),
-    per_tipo: Object.fromEntries(Object.entries(ti).map(([k, v]) => [k, { km: km(v.m), dente_km: km(v.d15), salgono_oltre_50cm_km: km(v.s50) }])),
-    tratti_sul_ciglio: window.__BAR_T || null, luoghi_dente: ld, luoghi_salgono_oltre_50cm: ls };
+    per_tipo: Object.fromEntries(Object.entries(ti).map(([k, v]) => [k, { km: km(v.m), dente_km: km(v.d15), salgono_oltre_50cm_km: km(v.s50), sepolte_km: km(v.bu || 0) }])),
+    tratti_sul_ciglio: window.__BAR_T || null, luoghi_dente: ld, luoghi_salgono_oltre_50cm: ls, luoghi_sepolte: lb };
 });
 await browser.close();
 const rep = fs.existsSync(out) ? JSON.parse(fs.readFileSync(out, 'utf-8')) : {};
 const P = process.env.PRIMA && fs.existsSync(process.env.PRIMA) ? JSON.parse(fs.readFileSync(process.env.PRIMA, 'utf-8')).piedi : null;
-rep.piedi = r; if (P) { const { tratti_sul_ciglio, luoghi_dente, luoghi_salgono_oltre_50cm, ...q } = P; rep.piedi_prima = q; }
+rep.piedi = r; if (P) { const { tratti_sul_ciglio, luoghi_dente, luoghi_salgono_oltre_50cm, luoghi_sepolte, ...q } = P; rep.piedi_prima = q; }
 const v = rep.varchi_verso_i_binari, c = rep.controlli = { limiti: LIM, errori_pagina: errs,
   dente_ok: r.dente_oltre_15cm_km <= LIM.dente_oltre_15cm_km, sospese_ok: r.fondo_sospeso_oltre_10cm_km <= LIM.fondo_sospeso_oltre_10cm_km, salgono_corti_ok: r.salgono_oltre_50cm.sotto_20m <= LIM.salgono_oltre_50cm_sotto_20m, sepolte_ok: r.sepolte_oltre_25cm_km <= LIM.sepolte_oltre_25cm_km,
   varchi_ok: !v || !v.da_chiudere };
 c.ok = !errs.length && c.dente_ok && c.sospese_ok && c.salgono_corti_ok && c.sepolte_ok && c.varchi_ok;
 fs.writeFileSync(out, JSON.stringify(rep, null, 0));
-const { tratti_sul_ciglio, luoghi_dente, luoghi_salgono_oltre_50cm, definizione, ...stampa } = r; console.log(JSON.stringify(stampa)); console.log('ciglio', tratti_sul_ciglio && tratti_sul_ciglio.length, 'controlli', JSON.stringify(c));
+const { tratti_sul_ciglio, luoghi_dente, luoghi_salgono_oltre_50cm, luoghi_sepolte, definizione, ...stampa } = r; console.log(JSON.stringify(stampa)); console.log('ciglio', tratti_sul_ciglio && tratti_sul_ciglio.length, 'controlli', JSON.stringify(c));

@@ -63,7 +63,8 @@ SPOSTI = (0, 1, -1, 2, -2, 3, -3, 4, -4, 6, -6)  # metri lungo la via per trovar
 
 
 def _carica(data_dir, proj, inside):
-    f = os.path.join(data_dir, 'mapillary', 'oggetti.json')
+    f = os.path.join(data_dir, 'mapillary_grande', 'oggetti.json')   # quello di tutta la mappa grande; data/mapillary è il vecchio, del riquadro di Meda
+    if not os.path.exists(f): f = os.path.join(data_dir, 'mapillary', 'oggetti.json')
     if not os.path.exists(f): return []
     out = []
     for o in json.load(open(f, encoding='utf-8')):
@@ -208,7 +209,7 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
             off = 0.5
             while off < hw + 6 and in_carreggiata(qx + side * rn[0] * off, qz + side * rn[1] * off): off += 0.25
             if off >= hw + 6: continue
-            off += 0.9; px, pz = qx + side * rn[0] * off, qz + side * rn[1] * off
+            off += 0.9; px, pz = round(qx + side * rn[0] * off, 1), round(qz + side * rn[1] * off, 1)   # i controlli sul punto che va nei dati, arrotondato a 10 cm
             if in_carreggiata(px, pz) or in_edificio(px, pz, 0.4) or su_barriera(px, pz) or not inside((px, pz), 0): continue
             if in_albero(px, pz): primo = primo or 'albero'; continue
             if privato(px, pz): primo = primo or 'privato'; continue
@@ -229,15 +230,16 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
     rep['cartelli']['dentro_un_edificio'] = sum(1 for s in sm if in_edificio(s[1], s[2], 0.0))
     rep['cartelli']['su_una_barriera'] = sum(1 for s in sm if su_barriera(s[1], s[2], 0.3))
     rep['cartelli']['in_lotto_privato'] = sum(1 for s in sm if privato(s[1], s[2])); rep['cartelli']['dentro_un_albero'] = sum(1 for s in sm if in_albero(s[1], s[2]))
+    rep['cartelli']['dove_fuori_posto'] = [[s[0], s[1], s[2]] for s in sm if in_carreggiata(s[1], s[2]) or privato(s[1], s[2]) or in_albero(s[1], s[2])]
 
     # ------------------------------------------------------------- (b) lampioni, semafori, pali, cestini
     def porta_fuori(o, sc_):
         """(x, z) fuori dalla carreggiata e dagli edifici, o None (il perche' in sc_)"""
-        p = (o['x'], o['z'])
+        p = (round(o['x'], 1), round(o['z'], 1))
         if not strade_vicine(p[0], p[1], LONTANO_OGGETTO): sc_['lontano da una via (>%d m)' % LONTANO_OGGETTO] += 1; return None
         if in_carreggiata(*p):
             q2, mosso = fuori(p)
-            if mosso: p = q2
+            if mosso: p = (round(q2[0], 1), round(q2[1], 1))   # i controlli sul punto che va nei dati, arrotondato a 10 cm
         if in_carreggiata(*p): sc_['in carreggiata'] += 1; return None
         if in_edificio(*p, 0.3): sc_['dentro un edificio'] += 1; return None
         if su_barriera(*p, 0.3): sc_['su un muro o una recinzione'] += 1; return None
@@ -310,6 +312,7 @@ def elabora(data_dir, proj, inside, segs, segtree, STR, edifici, osm_segn, lamps
     rep['lampioni']['sulla_carreggiata'] = sum(1 for p in lpn if in_carreggiata(*p))
     rep['lampioni']['in_lotto_privato_o_albero'] = sum(1 for p in lpn if privato(*p) or in_albero(*p)); rep['altri_oggetti']['in_lotto_privato_o_albero'] = sum(1 for r_ in og_new if privato(r_[1] / 10, r_[2] / 10) or in_albero(r_[1] / 10, r_[2] / 10))
     rep['altri_oggetti']['sulla_carreggiata'] = sum(1 for r_ in og_new if in_carreggiata(r_[1] / 10, r_[2] / 10))
+    rep['altri_oggetti']['dove_fuori_posto'] = [[OGG[r_[0]], r_[1] / 10, r_[2] / 10] for r_ in og_new if in_carreggiata(r_[1] / 10, r_[2] / 10) or privato(r_[1] / 10, r_[2] / 10) or in_albero(r_[1] / 10, r_[2] / 10)]
     rep['altri_oggetti']['su_una_barriera'] = sum(1 for r_ in og_new if su_barriera(r_[1] / 10, r_[2] / 10, 0.3)); rep['lampioni']['su_una_barriera'] = sum(1 for p in lpn if su_barriera(p[0], p[1], 0.3))
     log('MAPILLARY cartelli', rep['cartelli']['entrano'], rep['cartelli']['per_tipo'], 'scartati', rep['cartelli']['scartati'], 'doppioni con OSM', dop, 'in carreggiata', rep['cartelli']['sulla_carreggiata'])
     log('MAPILLARY lampioni', len(lpn), dict(scl), 'semafori nuovi', len(sf), dict(scs), 'altri', dict(per), dict(sco))

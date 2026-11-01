@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 8.7,
+  "tempo_s": 3.7,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1151,7 +1151,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 86.2,
+  "tempo_s": 92.7,
   "cortili_nei_cantieri_m2": 16051
  },
  "muri_doppi_fusi": {
@@ -1271,8 +1271,8 @@
  },
  "controlli": {
   "oggetti_in_carreggiata": {
-   "n": 10,
-   "di": 571,
+   "n": 9,
+   "di": 570,
    "dove": [
     "?x=43&z=-846",
     "?x=-1180&z=1523",
@@ -1282,8 +1282,7 @@
     "?x=58&z=-781",
     "?x=-58&z=-858",
     "?x=238&z=977",
-    "?x=-1208&z=1284",
-    "?x=1135&z=2127"
+    "?x=-1208&z=1284"
    ]
   },
   "lampioni_in_carreggiata": {
@@ -2061,6 +2060,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 15.1
+  "tempo_s": 14.6
  }
 }
