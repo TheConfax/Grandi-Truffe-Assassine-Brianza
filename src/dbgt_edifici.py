@@ -293,12 +293,19 @@ class Edifici:
             if v['por'] != '01' or v['zmin'] is None: continue
             g = rg[ro[k]:ro[k + 1]]
             if np.isfinite(g).sum() >= 3: v['gmed'] = float(np.nanmedian(g)); dz.append(v['zmin'] - v['gmed'])
+        dzc = {}   # one offset per comune, as the ground (dbgt_quote.load_dbgt_comuni): a single one for the whole map would move the roofs of a comune when another is added
+        for v in self.vol:
+            if 'gmed' in v: dzc.setdefault(self.ed[v['ed']]['comune'], []).append(v['zmin'] - v['gmed'])
+        self.off_c = {c: float(np.median(a)) for c, a in dzc.items()}
         dz = np.asarray(dz); self.off = float(np.median(dz)) if len(dz) else 0.0
+        self.rep['offset_per_comune'] = {self.rep['comuni'][c]: round(a, 3) for c, a in sorted(self.off_c.items())}
+        if len(self.off_c) == 1: self.off = next(iter(self.off_c.values()))
         self.rep['offset_dbgt_lidar'] = dict(valore=round(self.off, 3), p10=round(float(np.percentile(dz, 10)), 2) if len(dz) else None, p90=round(float(np.percentile(dz, 90)), 2) if len(dz) else None, n=int(len(dz)))
         for k, v in enumerate(self.vol):
+            off_v = self.off_c.get(self.ed[v['ed']]['comune'], self.off)
             if v['zmin'] is None:  # no height on the ring: the LiDAR under it
-                g = rg[ro[k]:ro[k + 1]]; v['zmin'] = float(np.nanmedian(g)) + self.off if np.isfinite(g).any() else None
-            v['z0'] = None if v['zmin'] is None else v['zmin'] - self.off      # base, m a.s.l. on the LiDAR
+                g = rg[ro[k]:ro[k + 1]]; v['zmin'] = float(np.nanmedian(g)) + off_v if np.isfinite(g).any() else None
+            v['z0'] = None if v['zmin'] is None else v['zmin'] - off_v      # base, m a.s.l. on the LiDAR
             if v['z0'] is not None and v['por'] in ('02', '03', '04', '05', '06', '07', '09'):
                 if 'gmed' not in v:
                     g = rg[ro[k]:ro[k + 1]]; v['gmed'] = float(np.nanmedian(g)) if np.isfinite(g).any() else v['z0']

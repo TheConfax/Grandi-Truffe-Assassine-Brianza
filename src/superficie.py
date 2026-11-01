@@ -2,10 +2,10 @@
 # tiles touching the comune plus 250 m) on one 2 m lattice anchored on the tile corners, so neighbouring tiles share their border nodes by
 # construction; then it is cut into tiles of 2 m or 10 m and written as terreno/<tx>_<tz>.bin. Grown out of src/mondo/terreno_unico.py.
 # Heights come from src/dbgt_quote.py (clean DBGT Z, comune offset removed). No change to the game yet.
-#   python src/superficie.py [--out DIR] [--comune Meda] [--margine 250] [--blend 4] [--no-png] [--accetta]
+#   python src/superficie.py [--out DIR] [--comune Meda+Seveso, di default i comuni accesi] [--margine 250] [--blend 4] [--no-png] [--accetta]
 import os, sys, json, time, gzip, struct, zlib, pickle, argparse, sqlite3
 import xml.etree.ElementTree as ET
-import numpy as np, shapely, shapely.affinity
+import numpy as np, shapely, shapely.affinity, tifffile
 from shapely.geometry import Polygon, LineString, box
 from pyproj import Transformer
 from scipy import ndimage, sparse
@@ -16,11 +16,12 @@ from scipy.interpolate import LinearNDInterpolator
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import dbgt_quote as dq
+import riquadro as RQ
 from presto import in_parallelo   # the TINs on all the cores (src/presto.py)
 from dbgt_quote import DATA, KX, KZ, LAT0, LON0, FT_RAW, FT_NONE
 
 # map frame, as src/build.py and the game: tile i,j has its corner at (-META.hw + i*TILE, -META.hh + j*TILE)
-BBOX = (45.6345, 45.6805, 9.117, 9.191)        # S N W E
+BBOX = RQ.BBOX        # S N W E (src/riquadro.py)
 HW_X, HH_X = (BBOX[3] - BBOX[2]) / 2 * KX, (BBOX[1] - BBOX[0]) / 2 * KZ
 HW, HH = round(HW_X, 1), round(HH_X, 1)          # what META.hw/hh carry and the game uses
 TILE = 250.0
@@ -177,7 +178,7 @@ def poly(L, i):
     return P if P.is_valid else P.buffer(0)
 
 
-def sed_ok(L, i): return 'sed' not in L['attr'] or L['attr']['sed'][i] in ('01', None)
+def sed_ok(L, i): return 'sed' not in L['attr'] or L['attr']['sed'][i] in dq.SED_A_RASO
 
 
 def pava_dec(y):  # the closest non-increasing sequence (least squares, pool adjacent violators)
@@ -305,12 +306,37 @@ def shade(H, st, ex=2.0):  # light from the north-west; rows grow southwards
     l = np.array([-1.0, -1.0, 1.4]); l /= np.linalg.norm(l); return np.clip((n * l).sum(2), 0, 1)
 
 
+# ---------- outside the LiDAR ----------
+def tinitaly_su(X, Z):
+    """TINITALY (10 m, UTM 32N, data/terreno/w50550_s10.tif), bilinear, at game metres"""
+    with tifffile.TiffFile(os.path.join(DATA, 'terreno', 'w50550_s10.tif')) as tf:
+        p = tf.pages[0]; tg = p.tags; a = p.asarray().astype(np.float64)
+        sx, sy = tg['ModelPixelScaleTag'].value[:2]; tp = tg['ModelTiepointTag'].value
+        gk = tg['GeoKeyDirectoryTag'].value if 'GeoKeyDirectoryTag' in tg else (); gk = {gk[i]: gk[i + 3] for i in range(4, len(gk) - 3, 4)}
+    x0, y0 = tp[3] - tp[0] * sx, tp[4] + tp[1] * sy
+    if gk.get(1025) != 2: x0, y0 = x0 + sx / 2, y0 - sy / 2   # the tie point at the corner of the first cell: to its centre
+    lon, lat = dq.game_to_lonlat(X, Z); ex, ny = Transformer.from_crs('EPSG:4326', 'EPSG:32632', always_xy=True).transform(lon, lat)
+    return ndimage.map_coordinates(a, [(y0 - ny) / sy, (ex - x0) / sx], order=1, mode='nearest')
+
+
+def fuori_dal_lidar(L, R, ramp=60.0):
+    """the nodes without LiDAR take TINITALY plus the difference LiDAR - TINITALY of the nearest node that has it, smoothed the farther from it: no step at the edge"""
+    B = np.isnan(L)
+    if not B.any(): return L
+    rr, cc = np.where(B); m = int(np.ceil(ramp / R.st)) + 2
+    r0, r1, c0, c1 = max(0, rr.min() - m), min(L.shape[0], rr.max() + 1 + m), max(0, cc.min() - m), min(L.shape[1], cc.max() + 1 + m)
+    X, Z = R.xz((r0, r1, c0, c1)); T = tinitaly_su(X, Z); D = L[r0:r1, c0:c1] - T; bu = np.isnan(D)
+    dist, idx = ndimage.distance_transform_edt(bu, return_indices=True); Dn = D[idx[0], idx[1]]
+    w = np.clip(dist * R.st / ramp, 0, 1); F = T + (1 - w) * Dn + w * ndimage.gaussian_filter(Dn, ramp / 2 / R.st)
+    L = L.copy(); L[r0:r1, c0:c1][bu] = F[bu]; return L
+
+
 # ---------- the surface ----------
 class Superficie:
-    def __init__(s, comune='Meda', gpkg=None, margine=250.0, blend=BLEND, log_=log):
-        s.comune, s.blend, s.log = comune, blend, log_
-        s.gpkg = gpkg or os.path.join(DATA, 'dbt', comune, 'dbgt.gpkg')
-        s.lid = dq.Lidar(); s.conf = dq.confine_comune(comune)
+    def __init__(s, comune=None, margine=250.0, blend=BLEND, log_=log):
+        s.comuni = dq.lista_comuni(comune); s.comune, s.blend, s.log = '+'.join(s.comuni), blend, log_
+        s.gpkgs = [dq.gpkg_di(n) for n in s.comuni]
+        s.lid = dq.Lidar(); s.conf = dq.confine_comuni(s.comuni)
         area = s.conf.buffer(margine)
         s.tiles = []  # (tx, tz) inside the map whose box touches the comune + margin
         for tz in range(NTZ):
@@ -338,20 +364,18 @@ class Superficie:
     def base(s):
         t0 = time.time(); s.L = lidar_media(s.lid, s.R, SF)
         s.nbuchi = int(np.isnan(s.L).sum())
-        if s.nbuchi:  # outside the LiDAR: the nearest LiDAR node (TINITALY with its 20 m blend is phase 8, out of the DBGT area)
-            idx = ndimage.distance_transform_edt(np.isnan(s.L), return_distances=False, return_indices=True); s.L = s.L[idx[0], idx[1]]
-        s.Lc = lidar_media(s.lid, s.Rc, SC)
-        if np.isnan(s.Lc).any():
-            idx = ndimage.distance_transform_edt(np.isnan(s.Lc), return_distances=False, return_indices=True); s.Lc = s.Lc[idx[0], idx[1]]
+        s.L = fuori_dal_lidar(s.L, s.R)   # outside the LiDAR: TINITALY, joined to the LiDAR with no step
+        s.Lc = fuori_dal_lidar(lidar_media(s.lid, s.Rc, SC), s.Rc)
         s.t['lidar'] = round(time.time() - t0, 1)
         s.log('lidar: griglia %dx%d a 2 m, %d buchi, quota %.1f..%.1f' % (s.R.nx, s.R.nz, s.nbuchi, s.L.min(), s.L.max()))
 
     # ----- 2. DBGT
     def dbgt(s):
-        t0 = time.time(); s.D = dq.load_dbgt(s.gpkg, s.lid, s.conf); s.info = s.D.pop('_info'); s.AX = Assi(s.D['EL_STR']); s.AXF = Assi(s.D['EL_FER'], name='EL_FER')
-        con = sqlite3.connect(s.gpkg); tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True)
-        E = dq._read_layer(con, tr, 'EDIFC_CR_EDF_ME', 'area', {}); con.close()
-        s.edifici = [poly(E, i) for i in range(len(E['off']) - 1)] if E is not None else []
+        t0 = time.time(); s.D = dq.load_dbgt_comuni(s.comuni, s.lid); s.info = s.D.pop('_info'); s.AX = Assi(s.D['EL_STR']); s.AXF = Assi(s.D['EL_FER'], name='EL_FER')
+        tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True); s.edifici = []
+        for g_ in s.gpkgs:
+            con = sqlite3.connect(g_); E = dq._read_layer(con, tr, 'EDIFC_CR_EDF_ME', 'area', {}); con.close()
+            if E is not None: s.edifici += [poly(E, i) for i in range(len(E['off']) - 1)]
         s.t['dbgt'] = round(time.time() - t0, 1)
         s.log('dbgt: offset %+.3f m, assi %d segmenti, edifici %d' % (s.info['offset']['valore'], len(s.AX.A), len(s.edifici)))
 
@@ -1170,8 +1194,9 @@ class Superficie:
 
 
 _S = {}
-def costruisci(comune='Meda', margine=250.0, blend=BLEND, osm=True, cache_dir=None):
-    """The whole surface of the comune + margine, all steps (about 40 s for Meda); cached per comune."""
+def costruisci(comune=None, margine=250.0, blend=BLEND, osm=True, cache_dir=None):
+    """The whole surface of the comuni + margine, all steps (about 40 s for Meda); cached per comuni."""
+    comune = '+'.join(dq.lista_comuni(comune))
     if comune in _S: return _S[comune]
     s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
     ob = None
@@ -1181,7 +1206,7 @@ def costruisci(comune='Meda', margine=250.0, blend=BLEND, osm=True, cache_dir=No
     s.tessere(ob); s.sotto.fosse(); _S[comune] = s; return s
 
 
-def build_S(tile, comune='Meda'):
+def build_S(tile, comune=None):
     """docs/motore.md fase 2: (step, base, h, m) of tile (tx, tz), h in cm above base, as written in terreno/<tx>_<tz>.bin"""
     return costruisci(comune).build_S(tuple(tile))
 
@@ -1473,7 +1498,7 @@ def main(argv=None):
     global AX_SIGMA
     ap = argparse.ArgumentParser(description='Superficie unica S (fase 2): griglia, tessere .bin e controlli C4-C7, C10')
     ap.add_argument('--out', default=os.path.normpath(os.path.join(HERE, '..', '..', 'motore_out')))
-    ap.add_argument('--comune', default='Meda'); ap.add_argument('--margine', type=float, default=250.0)
+    ap.add_argument('--comune', default=None); ap.add_argument('--margine', type=float, default=250.0)
     ap.add_argument('--blend', type=float, default=BLEND, help='0: quota dell asse piu vicino (il prototipo)')
     ap.add_argument('--sigma', type=float, default=AX_SIGMA, help='lisciatura degli assi (0: Z degli assi come nel DBGT)')
     ap.add_argument('--no-png', action='store_true'); ap.add_argument('--accetta', action='store_true')
@@ -1489,7 +1514,7 @@ def main(argv=None):
     s.tessere(osm); s.sotto.fosse(); s.sotto.scrivi(a.out)
     # the same steps as costruisci() with its defaults: impalcati.py, run after this in the same process (terreno_gioco.py --rigenera), takes
     # this surface instead of computing it all again (it was half the time of the terrain)
-    if a.margine == 250.0 and a.blend == BLEND and a.comune not in _S: _S[a.comune] = s
+    if a.margine == 250.0 and a.blend == BLEND and s.comune not in _S: _S[s.comune] = s
     tdir = os.path.join(a.out, 'terreno'); t0 = time.time(); peso = s.scrivi(tdir); s.t['scrittura'] = round(time.time() - t0, 1)
     import binari; json.dump(dict(binari=binari.per_gioco(s.binari)), open(os.path.join(a.out, 'binari_meda.json'), 'w', encoding='utf-8'), separators=(',', ':'))   # the height of the tracks, for the game (terreno_gioco.py)
     rep, punti = controlli(s, tdir)
@@ -1499,13 +1524,13 @@ def main(argv=None):
     np.save(os.path.join(a.out, 'maschere_2m.npy'), (s.CLS.astype(np.uint16) | (s.FIX << 4) | (s.BR << 5) | (s.AIR << 6) | (s.CAP << 7) | (s.SCARP << 8)).astype(np.uint16))
     dz = s.DZ[np.isin(s.CLS, (C_VEI, C_VEIT)) & ~np.isnan(s.DZ)]
     tot = round(time.time() - T0, 1)
-    out = dict(fase=2, comune=a.comune, griglia=dict(x0=s.R.x0, z0=s.R.z0, nx=s.R.nx, nz=s.R.nz, passo=SF, file_npy='S_2m.npy L_2m.npy maschere_2m.npy (classe | fisso<<4 | ponte<<5 | impalcato<<6 | tetto<<7 | scarpata<<8)'),
+    out = dict(fase=2, comune=s.comune, griglia=dict(x0=s.R.x0, z0=s.R.z0, nx=s.R.nx, nz=s.R.nz, passo=SF, file_npy='S_2m.npy L_2m.npy maschere_2m.npy (classe | fisso<<4 | ponte<<5 | impalcato<<6 | tetto<<7 | scarpata<<8)'),
                tessere=dict(totale=len(s.tiles), a_2m=sum(v == SF for v in s.passo.values()), a_10m=sum(v == SC for v in s.passo.values()), fuori_dalla_mappa=s.fuori_mappa,
                             elenco_10m=sorted('%d_%d' % t for t, v in s.passo.items() if v == SC)),
                parametri=dict(K=K, fascia_m=BAND, frangia_m=FRINGE, asse_proprio_m=AX_OWN, asse_vicino_m=AX_NEAR, fusione_assi_m=s.blend, lisciatura_assi_m=AX_SIGMA, livello_m=LEVEL, dz_elenco_m=DZ_WARN, dz_tetto_m=DZ_CAP,
                               vicino_ponte_m=NEAR_BR, raccordo_tetto_m=RAMP, buffer_passo_fine_m=FINE_BUF, infittimento_m=DENS, aggancio_cordolo_m=KERB_TOL, acqua_sotto_anello_m=ZW_MARG, fondo_sotto_acqua_m=ALV_D, sponda_sotto_acqua=ALV_G, quanto_10m=Q5),
-               dbgt=dict(offset_m=s.info['offset']['valore'], assi_lisciati_quanto_si_muovono=pct(np.abs(s.AX.dz_liscio)), carreggiate=s.nst, bordi_agganciati=s.nkerb, bordi_non_agganciati_oltre_1m=s.kerb_lontani, bordi_muro_non_visto_dal_lidar=s.kerb_falsi, punti_marciapiedi_aree_al_lidar=s.ped_lidar, punti_al_lidar_scarto=pct(np.abs(s.ped_lidar_dz)) if s.ped_lidar else None, scarto_aggancio=pct(np.abs(s.kerb_dz)), aree_interne_al_lidar=len(s.interne), alvei_bruciati=s.nalveo, ferrovia_fuori_sedi_punti=s.ferro_fuori),
-               lidar=dict(buchi=s.nbuchi, nota='nessun buco nel riquadro: TINITALY non serve qui'),
+               dbgt=dict(offset_m=s.info['offset']['valore'], offset_per_comune=s.info['offset'].get('per_comune'), assi_lisciati_quanto_si_muovono=pct(np.abs(s.AX.dz_liscio)), carreggiate=s.nst, bordi_agganciati=s.nkerb, bordi_non_agganciati_oltre_1m=s.kerb_lontani, bordi_muro_non_visto_dal_lidar=s.kerb_falsi, punti_marciapiedi_aree_al_lidar=s.ped_lidar, punti_al_lidar_scarto=pct(np.abs(s.ped_lidar_dz)) if s.ped_lidar else None, scarto_aggancio=pct(np.abs(s.kerb_dz)), aree_interne_al_lidar=len(s.interne), alvei_bruciati=s.nalveo, ferrovia_fuori_sedi_punti=s.ferro_fuori),
+               lidar=dict(buchi=s.nbuchi, nota='i nodi senza LiDAR prendono TINITALY raccordato (fuori_dal_lidar)'),
                superficie=dict(nodi_fissi=int(s.FIX.sum()), sotto_ponti=int(s.BR.sum()), nodi_impalcato_da_fase3=int(s.AIR.sum()), nodi_tetto=int(s.CAP.sum()), nodi_tombino_tenuti=int(s.TOMB.sum()), nodi_alveo_al_lidar=int(s.ALVCOP.sum()), nodi_scarpata=int(s.SCARP.sum()),
                                bordo_fascia_ancora_mosso=s.bordo_banda, dentro_ponte_a_livello_impalcato=int(s.ALTO.sum()), sotto_ponti_riempiti=s.n_sotto, sotto_ponti_modo=s.sotto_modo, sotto_ponti_abbassati_m=pct(-s.sotto_dz) if len(s.sotto_dz) else None, carreggiata_meno_lidar=pct(dz, (10, 50, 90)), ritocchi=s.nrit,
                                vie_disegnate=dict(s.nvie, definizione='nodi liberi dentro asfalto e marciapiedi disegnati (brianza.json as, sd) entro %.0f m da una carreggiata DBGT della stessa via, portati alla sua quota' % VIA_MAX, quota_meno_lidar=pct(s.vie_dz, (1, 10, 50, 90, 99)), luoghi_oltre_1_5m=len(s.vie_luoghi), elenco=s.vie_luoghi[:40])),

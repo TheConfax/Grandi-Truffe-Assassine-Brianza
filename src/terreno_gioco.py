@@ -27,13 +27,14 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description='Impacchetta S, impalcati e acqua per il gioco (fase 4)')
     ap.add_argument('--da', required=True, help='cartella con terreno/*.bin, decks_meda.json, acqua_fase2.json')
     ap.add_argument('--out', default=os.path.join(ROOT, 'terreno'))
-    ap.add_argument('--rigenera', action='store_true'); ap.add_argument('--no-controlli', action='store_true'); ap.add_argument('--comune', default='Meda')
+    ap.add_argument('--rigenera', action='store_true'); ap.add_argument('--no-controlli', action='store_true'); ap.add_argument('--comune', default=None, help='di default i comuni accesi (data/dbt/*/dbgt.gpkg)')
     a = ap.parse_args(argv)
     if a.rigenera:
         sys.path.insert(0, HERE)
         import superficie, impalcati
-        superficie.main(['--out', a.da, '--comune', a.comune, '--no-png', '--accetta'])
-        impalcati.main(['--out', a.da, '--comune', a.comune, '--no-png', '--accetta'])
+        co = ['--comune', a.comune] if a.comune else []
+        superficie.main(['--out', a.da, '--no-png', '--accetta'] + co)
+        impalcati.main(['--out', a.da, '--no-png', '--accetta'] + co)
     os.makedirs(a.out, exist_ok=True)
     sys.path.insert(0, HERE)
     import controlli_acqua as ca
@@ -66,7 +67,8 @@ def main(argv=None):
     pits = dk.get('pits', [])
     ff = os.path.join(a.da, 'fosse_meda.json')   # the ramps of src/sottoterra.py (docs/sottoterra.md, tappa 1)
     if os.path.exists(ff): pits = pits + json.load(open(ff, encoding='utf-8'))['fosse']
-    ind = dict(ver=1, fase=4, comune=a.comune, nota='docs/motore.md fase 4: quote in m sul mare; il gioco toglie terrain.base di brianza.json',
+    import dbgt_quote as dq
+    ind = dict(ver=1, fase=4, comune='+'.join(dq.lista_comuni(a.comune)), nota='docs/motore.md fase 4: quote in m sul mare; il gioco toglie terrain.base di brianza.json',
                tiles=tiles, decks=decks, pits=pits, acqua=acqua)
     fb = os.path.join(a.da, 'binari_meda.json')   # the height of the tracks (src/binari.py)
     if os.path.exists(fb): ind['binari'] = json.load(open(fb, encoding='utf-8'))['binari']

@@ -206,13 +206,13 @@ class Manufatti:
                 cnt['MN_IND %s %s' % (ty, TIPI_IND.get(ty, '?'))] += 1
                 if so == '02': continue  # sotterraneo
                 for p in _polys(g.buffer(0), 1.0): self.ind.append({'ty': ty, 'g': p})
-            for g, ty in rows('select Shape, MN_INT_TY from MN_INT'): cnt['MN_INT ' + ty] += 1; self.mnint.append((g, ty))
-            for g, ty in rows('select Shape, MN_RTC_TY from MN_RTC'): cnt['MN_RTC ' + ty] += 1; self.rtc.append((g, ty))
-            for g, ty in rows('select Shape, MN_ARR_TY from MN_ARR'): cnt['MN_ARR ' + ty] += 1; self.arr.append((g, ty))
-            for g, ty in rows('select Shape, PAR_AR_TY from PAR_AR'): cnt['PAR_AR ' + ty] += 1
-            for g, ty in rows('select s.Shape, m.MAN_TR_TY from MAN_TR_MAN_TR_SUP s join MAN_TR m on s.CLASSREF = m.CLASSID'): cnt['MAN_TR ' + ty] += 1
+            for g, ty in rows('select Shape, MN_INT_TY from MN_INT'): cnt['MN_INT %s' % ty] += 1; self.mnint.append((g, ty))
+            for g, ty in rows('select Shape, MN_RTC_TY from MN_RTC'): cnt['MN_RTC %s' % ty] += 1; self.rtc.append((g, ty))
+            for g, ty in rows('select Shape, MN_ARR_TY from MN_ARR'): cnt['MN_ARR %s' % ty] += 1; self.arr.append((g, ty))
+            for g, ty in rows('select Shape, PAR_AR_TY from PAR_AR'): cnt['PAR_AR %s' % ty] += 1
+            for g, ty in rows('select s.Shape, m.MAN_TR_TY from MAN_TR_MAN_TR_SUP s join MAN_TR m on s.CLASSREF = m.CLASSID'): cnt['MAN_TR %s' % ty] += 1
             for g, ty in rows('select Shape, AATT_TY from AATT'):
-                cnt['AATT ' + ty] += 1
+                cnt['AATT %s' % ty] += 1
                 for p in _polys(g.buffer(0), 0.5): self.aatt.append((ty, p))
             for g, z, sed in rows('select Shape, AC_VEI_ZON, AC_VEI_SED from AC_VEI_AC_VEI_SUP_SR'):
                 if z == '0301' and sed in (None, '01'): self.park += _polys(g.buffer(0), 0.5)
@@ -223,9 +223,9 @@ class Manufatti:
                     zs = [c[2] for p in _parts(g3) for c in p.exterior.coords if len(c) > 2 and c[2] > 100]
                     for p in _polys(g.buffer(0), 1.0): self.acqua.append({'tab': tab, 'g': p, 'z': float(np.median(zs)) if zs else None})
             for g, ty in rows('select s.Shape, t.TRAL_TY from TRALIC_TRAL_BAS s join TRALIC t on s.CLASSREF = t.CLASSID'):
-                cnt['TRALIC ' + ty] += 1; self.tral.append({'g': g.buffer(0), 'c': g.centroid})
+                cnt['TRALIC %s' % ty] += 1; self.tral.append({'g': g.buffer(0), 'c': g.centroid})
             for g, ty in rows('select Shape, TR_ELE_TY from TR_ELE'):
-                cnt['TR_ELE ' + ty] += 1; self.tre += [p for p in _parts(g) if p.geom_type == 'LineString' and p.length > 1]
+                cnt['TR_ELE %s' % ty] += 1; self.tre += [p for p in _parts(g) if p.geom_type == 'LineString' and p.length > 1]
             for (g,) in rows('select Shape from EDIFC_CR_EDF_IS') + rows('select Shape from EDI_MIN_CR_EDF_IS'): self.blds += _polys(g.buffer(0), 1.0)
         self.rep['censimento'] = dict(sorted(cnt.items()))
         cv = cover
@@ -777,7 +777,7 @@ class Manufatti:
 
 if __name__ == '__main__':  # census and the heights without OSM: python src/dbgt_manufatti.py [rapporto.json]
     DATA = dq.DATA; cov = dq.confine_comune('Meda').buffer(-3); prepare(cov)
-    HH = (45.6805 - 45.6345) / 2 * 110540.0; HW = (9.191 - 9.117) / 2 * dq.KX
+    import riquadro as RQ; HH = (RQ.N - RQ.S) / 2 * 110540.0; HW = (RQ.E - RQ.W) / 2 * dq.KX
     M = Manufatti(os.path.join(DATA, 'dbt'), {'meda': None}, cov, rect=box(-HW, -HH, HW, HH))
     b = M.edifici([]); a, l = M.aree([], [])
     o, pl = M.elettrico([], [], ['traliccio', 'antenna', 'torre_acqua'])

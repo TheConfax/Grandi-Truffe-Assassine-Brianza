@@ -13,12 +13,16 @@ from dbgt_quote import _geom, to_game_lonlat, DATA
 
 out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'confine_dbgt.json')
 tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True)
-comuni = []
+comuni, pezzi = [], []
 for f in sorted(glob.glob(os.path.join(DATA, 'dbt', '*', 'dbgt.gpkg'))):
     nome = os.path.basename(os.path.dirname(f)); cop = os.path.join(os.path.dirname(f), 'base_dbt_per_pianificazione.gpkg')
     if not os.path.exists(cop): print('confine DBGT:', nome, 'senza base_dbt_per_pianificazione.gpkg, saltato'); continue
     con = sqlite3.connect(cop)
     tutto = shapely.union_all([_geom(b).buffer(0.5) for (b,) in con.execute('select Shape from copertura_completa')]).buffer(-0.5)  # 0,5 m chiude le fessure fra i pezzi
+    pezzi.append((nome, tutto))
+# due comuni che si toccano sono una zona sola: il muro rosso sta attorno, non fra i due (3 m chiudono le fessure fra le coperture di due comuni)
+if len(pezzi) > 1: pezzi = [('+'.join(n for n, _ in pezzi), shapely.union_all([g.buffer(3) for _, g in pezzi]).buffer(-3))]
+for nome, tutto in pezzi:
     for part in getattr(tutto, 'geoms', [tutto]):
         if part.area < 10000: continue  # schegge staccate: il confine è il corpo del comune
         xs, ys = part.exterior.xy; lon, lat = tr.transform(list(xs), list(ys))

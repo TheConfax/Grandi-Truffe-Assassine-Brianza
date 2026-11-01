@@ -525,7 +525,7 @@ def _punte(raw_roads, nodes):
                     if math.dist(q, pn) < 2.5: nodes[n_] = (float(q[0]), float(q[1])); done = True; break
             if not done: break
             nsp += 1
-        if refs != r['refs']:
+        if len(refs) >= 2 and refs != r['refs']:   # a little closed way (A N A at Seveso) would come down to one node: it stays as it is
             for n_ in set(r['refs']) - set(refs): ways_of[n_].discard(wi)
             r['refs'] = refs
     return nsp

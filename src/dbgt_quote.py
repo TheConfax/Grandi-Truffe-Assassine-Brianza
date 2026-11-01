@@ -40,6 +40,7 @@ LAYERS = {
     'ARGINE': ('ARGINE_ARGN_SUP', 'area', {}),
     'EL_IDR': ('EL_IDR_EL_IDR_TRA_SG', 'linea', {'liv': 'EL_IDR_LIV', 'ty': 'EL_IDR_TY'}),
 }
+SED_A_RASO = ('01', None, '95', ' ', '-99991')   # sede: 02 ponte, 03 galleria, 04 diga; 95 (altro), vuoto e non compilato vogliono dire "non so", cioe a raso (docs/portabilita.md)
 DECK_LAYERS = ('PONTE', 'GALLER')  # never outlier-tested: their Z is meant to be off the ground
 # per-vertex codes
 SC_OK, SC_Z0, SC_NAN, SC_LOW, SC_OUT = 0, 1, 2, 3, 4           # 'scarto': why the raw Z was dropped
@@ -155,7 +156,7 @@ def pezzo_di(L):  # vertex -> piece index
 def is_deck(name, L):  # per piece: bridge or gallery cover (no outlier test)
     n = len(L['off']) - 1
     if name in DECK_LAYERS: return np.ones(n, bool)
-    if 'sed' in L['attr']: return np.array([s not in ('01', None) for s in L['attr']['sed']], bool)
+    if 'sed' in L['attr']: return np.array([s not in SED_A_RASO for s in L['attr']['sed']], bool)
     return np.zeros(n, bool)
 
 
@@ -245,6 +246,52 @@ def _gz_outliers(L, ax, outl):  # junctions: compared with the axes that meet th
         cand = [v for v in (zz, zd) if v is not None]
         if cand and min(abs(L['z0'][k] - v) for v in cand) > outl:
             L['scarto'][k] = SC_OUT; L['z'][k] = np.nan; L['fonte'][k] = FT_NONE
+
+
+# ---------- piu comuni insieme ----------
+def comuni_accesi():
+    """i comuni con data/dbt/<Comune>/dbgt.gpkg, la stessa regola di build.py e confine_dbgt.py"""
+    return sorted(os.path.basename(os.path.dirname(f)) for f in glob.glob(os.path.join(DATA, 'dbt', '*', 'dbgt.gpkg'))) or ['Meda']
+
+
+def lista_comuni(comune=None):
+    """None: i comuni accesi; 'Meda' o 'Meda+Seveso' o una lista: quelli"""
+    if comune is None: return comuni_accesi()
+    return list(comune) if isinstance(comune, (list, tuple)) else comune.split('+')
+
+
+def gpkg_di(nome): return os.path.join(DATA, 'dbt', nome, 'dbgt.gpkg')
+
+
+def confine_comuni(nomi):
+    if len(nomi) == 1: return confine_comune(nomi[0])
+    return unary_union([confine_comune(n) for n in nomi]).buffer(0)
+
+
+def unisci_strati(lista):
+    """[(k, strato)]: un solo strato, i pezzi uno dopo l'altro. OBJECTID si ripete da un gpkg all'altro: gli si aggiunge k * 10^7, k = il posto del comune (il primo resta com'e)"""
+    Ls = [L for _, L in lista]; L0 = Ls[0]; off = [np.array([0])]; n = 0
+    for L in Ls: off.append(L['off'][1:] + n); n += len(L['xy'])
+    out = dict(tipo=L0['tipo'], tabella=L0['tabella'], file={c: sum(L['file'][c] for L in Ls) for c in L0['file']},
+               id=np.concatenate([L['id'].astype(np.int64) + k * 10 ** 7 for k, L in lista]), attr={a: np.concatenate([L['attr'][a] for L in Ls]) for a in L0['attr']},
+               off=np.concatenate(off), anelli=[r for L in Ls for r in L['anelli']])
+    for c in ('xy', 'z0', 'z', 'scarto', 'fonte'): out[c] = np.concatenate([L[c] for L in Ls])
+    for c in ('nontest', 'salvati'): out[c] = sum(int(L.get(c, 0)) for L in Ls)
+    return out
+
+
+def load_dbgt_comuni(nomi, lidar=None, outl=OUTL, offset=True):
+    """load_dbgt di ogni comune, ognuno con il suo offset e il suo confine, poi gli strati uniti. Con un comune solo e load_dbgt e basta."""
+    if len(nomi) == 1: return load_dbgt(gpkg_di(nomi[0]), lidar, confine_comune(nomi[0]), outl, offset)
+    tutti = [load_dbgt(gpkg_di(n), lidar, confine_comune(n), outl, offset) for n in nomi]
+    D = {}
+    for name in LAYERS:
+        c = [(k, T[name]) for k, T in enumerate(tutti) if name in T]
+        if c: D[name] = unisci_strati(c)
+    infos = [T['_info'] for T in tutti]
+    D['_info'] = dict(file=[i['file'] for i in infos], outl=outl, offset=dict(valore=infos[0]['offset']['valore'], per_comune={n: i['offset']['valore'] for n, i in zip(nomi, infos)}),
+                      offset_tolto=offset, t_lettura=round(sum(i['t_lettura'] for i in infos), 1), t_pulizia=round(sum(i['t_pulizia'] for i in infos), 1))
+    return D
 
 
 def load_dbgt(path, lidar=None, confine=None, outl=OUTL, offset=True):

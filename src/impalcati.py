@@ -268,7 +268,7 @@ class Impalcati:
                 a, b = L['off'][i], L['off'][i + 1]
                 if b - a < 2: continue
                 sed, liv = L['attr']['sed'][i], L['attr']['liv'][i]; g = LineString(L['xy'][a:b])
-                if sed not in ('01', None): s.ax_on.append(dict(nm=nm, i=i, id=int(L['id'][i]), g=g, xy=L['xy'][a:b], z=L['z'][a:b]))
+                if sed not in dq.SED_A_RASO: s.ax_on.append(dict(nm=nm, i=i, id=int(L['id'][i]), g=g, xy=L['xy'][a:b], z=L['z'][a:b]))
                 elif liv == '01': s.ax_under.append(dict(nm=nm, i=i, id=int(L['id'][i]), g=g))
         s.ar_on = [dict(nm=nm, i=i, id=int(s.D[nm]['id'][i]), g=sf.poly(s.D[nm], i)) for nm in ('AC_VEI', 'AR_STR', 'AC_PED', 'AC_CIC', 'SD_FER')
                    for i in range(len(s.D[nm]['off']) - 1) if s.D[nm]['attr']['sed'][i] in ('02', '03')]
@@ -770,7 +770,7 @@ def immagini(imp, decks, pits, path):
     sf.png(path, big)
 
 
-def build_decks(comune='Meda', out=None):
+def build_decks(comune=None, out=None):
     """docs/motore.md fase 3: (decks, pits, Impalcati) of the comune, on the surface of superficie.costruisci()"""
     s = sf.costruisci(comune, cache_dir=out); R = s.R
     lo_, la_ = dq.game_to_lonlat(np.array([R.x0 - 50, R.x0 + R.nx * SF + 50]), np.array([R.z0 + R.nz * SF + 50, R.z0 - 50]))
@@ -782,7 +782,7 @@ def build_decks(comune='Meda', out=None):
 def main(argv=None):
     ap = argparse.ArgumentParser(description='Impalcati e fosse (fase 3): decks_meda.json e report_fase3.json')
     ap.add_argument('--out', default=os.path.normpath(os.path.join(HERE, '..', '..', 'motore_out')))
-    ap.add_argument('--comune', default='Meda'); ap.add_argument('--no-png', action='store_true'); ap.add_argument('--accetta', action='store_true')
+    ap.add_argument('--comune', default=None); ap.add_argument('--no-png', action='store_true'); ap.add_argument('--accetta', action='store_true')
     a = ap.parse_args(argv)
     decks, pits, imp = build_decks(a.comune, a.out); s = imp.s; osm = imp.osm
     bj = strade_bj(os.path.join(HERE, '..', 'brianza.json')); log('impalcati %d, osm %d vie, brianza.json %s strade' % (len(decks), len(osm), len(bj['roads']) if bj else 'senza'))
@@ -811,7 +811,7 @@ def main(argv=None):
     ponti = sorted({d['dbgt']['ponte'] for d in decks if d['dbgt'] and 'ponte' in d['dbgt']})
     per_tipo = {t: sum(1 for d in decks if d['tipo'] == t) for t in ('strada', 'ferro', 'pedonale', 'copertura')}
     cop = [d for d in decks if d['tipo'] == 'copertura']
-    info = dict(comune=a.comune, offset_m=s.info['offset']['valore'], impalcati=len(decks), per_tipo=per_tipo, ponti_dbgt=len(imp.D['PONTE']['off']) - 1,
+    info = dict(comune=s.comune, offset_m=s.info['offset']['valore'], impalcati=len(decks), per_tipo=per_tipo, ponti_dbgt=len(imp.D['PONTE']['off']) - 1,
                 ponti_dbgt_riconosciuti=len(ponti), ponti_non_segnati=sum(1 for d in decks if d['fonte'].startswith('ponte non segnato')),
                 pezzi_staccati=sum(1 for d in decks if 'staccato' in d['fonte']), copertura=bool(cop), fosse=len(pits), **imp.info)
     size = scrivi_json(decks, pits, os.path.join(a.out, 'decks_meda.json'), info)
@@ -835,7 +835,7 @@ def main(argv=None):
                   scale_osm_piu_vicine_m=[round(min(l.distance(LineString([g_['a'], g_['b']])) for l in steps), 1) if steps else None for g_ in p['gradini']],
                   galleria_osm_dal_pianerottolo_m=round(min(l.distance(Point(p['pianerottolo']['c'])) for l in tun), 1) if tun else None) for p in pits]
     esito = dict(C5=rep['C5']['ok'], ponti_18=len(ponti) >= 18, copertura=info['copertura'])
-    out = dict(fase=3, comune=a.comune, parametri=dict(spessori=SP, luce=LUCE, livello_spalla_m=LEVEL_TOL, raccordo_spalle_m=RC, anello_ponte_scartato_m=BAD_RING, assegna_air_m=ASSIGN_D,
+    out = dict(fase=3, comune=s.comune, parametri=dict(spessori=SP, luce=LUCE, livello_spalla_m=LEVEL_TOL, raccordo_spalle_m=RC, anello_ponte_scartato_m=BAD_RING, assegna_air_m=ASSIGN_D,
                                                        sotto_terreno_m=UNDER_MIN, osm_vicino_m=OSM_NEAR, buffer_confronto_vie_m=MATCH_BUF),
                sintesi=info, impalcati=elenco, scartati=scart, fosse=fosse, sottopassi_osm_senza_fossa=sottopassi, **rep, punti_da_guardare=punti[:50],
                file=dict(decks='decks_meda.json', peso_kb=round(size / 1024, 1), immagine='impalcati_meda.png'), esito=esito,

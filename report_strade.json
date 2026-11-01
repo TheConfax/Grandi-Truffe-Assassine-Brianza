@@ -1,16 +1,22 @@
 {
  "vie_tagliate_al_confine": {
-  "vie": 18,
-  "nodi_nuovi": 11
+  "vie": 53,
+  "nodi_nuovi": 39
  },
  "vie_nei_cortili_senza_traffico": {
-  "n": 23,
+  "n": 41,
   "dove": [
    "?x=-590&z=-966",
    "?x=-629&z=-1072",
    "?x=-598&z=-1019",
+   "?x=-1476&z=1309",
+   "?x=-1951&z=1921",
+   "?x=-1906&z=1591",
+   "?x=1553&z=1178",
    "?x=-1040&z=-404",
    "?x=-1056&z=-448",
+   "?x=-1304&z=1466",
+   "?x=190&z=2186",
    "?x=-249&z=-1941",
    "?x=-146&z=-1762",
    "?x=1003&z=-1249",
@@ -19,16 +25,27 @@
    "?x=-215&z=-154",
    "?x=-937&z=-542",
    "?x=-1071&z=-495",
-   "?x=191&z=-616",
+   "?x=399&z=-965",
+   "?x=1294&z=873",
+   "?x=1276&z=936",
    "?x=483&z=-874",
-   "?x=-299&z=622",
+   "?x=-299&z=621",
+   "?x=-75&z=1665",
    "?x=1819&z=-346",
    "?x=223&z=-662",
+   "?x=935&z=2048",
+   "?x=607&z=2187",
+   "?x=-1203&z=1702",
+   "?x=615&z=1928",
+   "?x=725&z=1979",
    "?x=-712&z=230",
    "?x=-743&z=191",
    "?x=1025&z=-165",
+   "?x=1586&z=1270",
    "?x=65&z=-170",
-   "?x=371&z=-898"
+   "?x=-1808&z=1547",
+   "?x=-13&z=1848",
+   "?x=359&z=1789"
   ],
   "code_nei_cortili": 5,
   "dove_code": [
@@ -40,8 +57,8 @@
   ]
  },
  "assi": {
-  "carreggiate_doppie_osm_su_un_asse": 9,
-  "tratti_contesi": 68,
+  "carreggiate_doppie_osm_su_un_asse": 18,
+  "tratti_contesi": 168,
   "tratti_contesi_elenco": [
    {
     "perde": "tertiary o",
@@ -66,6 +83,84 @@
     "vince": "residential o",
     "m": 15.0,
     "link": "?x=690&z=189"
+   },
+   {
+    "perde": "service o",
+    "vince": "trunk o",
+    "m": 57.0,
+    "link": "?x=314&z=1929"
+   },
+   {
+    "perde": "service o",
+    "vince": "trunk o",
+    "m": 57.0,
+    "link": "?x=276&z=1805"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk o",
+    "m": 18.0,
+    "link": "?x=411&z=2231"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk o",
+    "m": 42.0,
+    "link": "?x=373&z=2119"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 9.0,
+    "link": "?x=353&z=2170"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk o",
+    "m": 15.0,
+    "link": "?x=423&z=2227"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 27.0,
+    "link": "?x=301&z=2001"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk o",
+    "m": 42.0,
+    "link": "?x=390&z=2111"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 15.0,
+    "link": "?x=306&z=2026"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "tertiary",
+    "m": 21.0,
+    "link": "?x=-118&z=732"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 9.0,
+    "link": "?x=-144&z=681"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "tertiary",
+    "m": 12.0,
+    "link": "?x=-145&z=718"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "tertiary",
+    "m": 9.0,
+    "link": "?x=-154&z=714"
    },
    {
     "perde": "tertiary o",
@@ -129,9 +224,15 @@
    },
    {
     "perde": "trunk_link o",
+    "vince": "tertiary",
+    "m": 27.0,
+    "link": "?x=-190&z=703"
+   },
+   {
+    "perde": "tertiary",
     "vince": "trunk_link o",
-    "m": 9.0,
-    "link": "?x=-144&z=681"
+    "m": 12.0,
+    "link": "?x=-159&z=713"
    },
    {
     "perde": "trunk_link o",
@@ -266,6 +367,42 @@
     "link": "?x=1270&z=693"
    },
    {
+    "perde": "service o",
+    "vince": "residential",
+    "m": 66.0,
+    "link": "?x=-1109&z=1044"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 33.0,
+    "link": "?x=-1516&z=638"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 30.0,
+    "link": "?x=-1518&z=639"
+   },
+   {
+    "perde": "tertiary",
+    "vince": "trunk_link o",
+    "m": 15.0,
+    "link": "?x=512&z=2053"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 24.0,
+    "link": "?x=495&z=2063"
+   },
+   {
+    "perde": "tertiary",
+    "vince": "trunk_link o",
+    "m": 21.0,
+    "link": "?x=493&z=2047"
+   },
+   {
     "perde": "trunk_link o",
     "vince": "trunk_link o",
     "m": 24.0,
@@ -308,6 +445,12 @@
     "link": "?x=-742&z=100"
    },
    {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 18.0,
+    "link": "?x=-270&z=1823"
+   },
+   {
     "perde": "unclassified o",
     "vince": "unclassified",
     "m": 12.0,
@@ -324,6 +467,96 @@
     "vince": "unclassified o",
     "m": 12.0,
     "link": "?x=945&z=207"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 30.0,
+    "link": "?x=509&z=918"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 39.0,
+    "link": "?x=516&z=913"
+   },
+   {
+    "perde": "service o",
+    "vince": "tertiary o",
+    "m": 27.0,
+    "link": "?x=679&z=2087"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 9.0,
+    "link": "?x=675&z=2080"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential",
+    "m": 42.0,
+    "link": "?x=1113&z=1100"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 24.0,
+    "link": "?x=1117&z=1106"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential",
+    "m": 12.0,
+    "link": "?x=1133&z=1096"
+   },
+   {
+    "perde": "service",
+    "vince": "residential",
+    "m": 12.0,
+    "link": "?x=1572&z=1722"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 9.0,
+    "link": "?x=722&z=1872"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 9.0,
+    "link": "?x=740&z=1498"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 9.0,
+    "link": "?x=743&z=1506"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 21.0,
+    "link": "?x=730&z=1506"
+   },
+   {
+    "perde": "unclassified o",
+    "vince": "unclassified o",
+    "m": 21.0,
+    "link": "?x=-795&z=2291"
+   },
+   {
+    "perde": "unclassified o",
+    "vince": "unclassified o",
+    "m": 21.0,
+    "link": "?x=-795&z=2287"
+   },
+   {
+    "perde": "unclassified o",
+    "vince": "unclassified o",
+    "m": 12.0,
+    "link": "?x=-819&z=2272"
    },
    {
     "perde": "tertiary o",
@@ -368,10 +601,130 @@
     "link": "?x=1284&z=700"
    },
    {
+    "perde": "service",
+    "vince": "service",
+    "m": 12.0,
+    "link": "?x=-1171&z=1824"
+   },
+   {
+    "perde": "service",
+    "vince": "unclassified o",
+    "m": 9.0,
+    "link": "?x=-513&z=1357"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 27.0,
+    "link": "?x=-1279&z=1537"
+   },
+   {
+    "perde": "residential o",
+    "vince": "service",
+    "m": 30.0,
+    "link": "?x=-1175&z=1527"
+   },
+   {
+    "perde": "service",
+    "vince": "residential o",
+    "m": 15.0,
+    "link": "?x=-1194&z=1516"
+   },
+   {
+    "perde": "service",
+    "vince": "residential",
+    "m": 15.0,
+    "link": "?x=-1611&z=1358"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "unclassified o",
+    "m": 12.0,
+    "link": "?x=-788&z=806"
+   },
+   {
+    "perde": "unclassified o",
+    "vince": "unclassified o",
+    "m": 12.0,
+    "link": "?x=-800&z=815"
+   },
+   {
+    "perde": "service",
+    "vince": "residential",
+    "m": 9.0,
+    "link": "?x=-856&z=720"
+   },
+   {
+    "perde": "residential o",
+    "vince": "tertiary",
+    "m": 9.0,
+    "link": "?x=-2172&z=1704"
+   },
+   {
+    "perde": "residential o",
+    "vince": "tertiary",
+    "m": 63.0,
+    "link": "?x=-2175&z=1690"
+   },
+   {
+    "perde": "service",
+    "vince": "tertiary",
+    "m": 18.0,
+    "link": "?x=-1471&z=1595"
+   },
+   {
+    "perde": "residential",
+    "vince": "residential",
+    "m": 15.0,
+    "link": "?x=-2178&z=1253"
+   },
+   {
+    "perde": "unclassified",
+    "vince": "service",
+    "m": 42.0,
+    "link": "?x=-240&z=1672"
+   },
+   {
+    "perde": "service",
+    "vince": "residential",
+    "m": 21.0,
+    "link": "?x=884&z=1016"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 9.0,
+    "link": "?x=728&z=1867"
+   },
+   {
+    "perde": "residential",
+    "vince": "residential",
+    "m": 9.0,
+    "link": "?x=-2848&z=1634"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 135.0,
+    "link": "?x=1788&z=2055"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "residential o",
+    "m": 147.0,
+    "link": "?x=1784&z=2041"
+   },
+   {
     "perde": "residential o",
     "vince": "residential o",
     "m": 9.0,
     "link": "?x=490&z=-659"
+   },
+   {
+    "perde": "tertiary",
+    "vince": "residential o",
+    "m": 18.0,
+    "link": "?x=884&z=2143"
    },
    {
     "perde": "tertiary o",
@@ -396,6 +749,24 @@
     "vince": "residential",
     "m": 9.0,
     "link": "?x=-166&z=-925"
+   },
+   {
+    "perde": "residential o",
+    "vince": "unclassified",
+    "m": 9.0,
+    "link": "?x=-766&z=2272"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 27.0,
+    "link": "?x=686&z=2106"
+   },
+   {
+    "perde": "service",
+    "vince": "unclassified",
+    "m": 18.0,
+    "link": "?x=641&z=1967"
    },
    {
     "perde": "tertiary",
@@ -428,6 +799,36 @@
     "link": "?x=1896&z=-650"
    },
    {
+    "perde": "residential o",
+    "vince": "service o",
+    "m": 12.0,
+    "link": "?x=768&z=2146"
+   },
+   {
+    "perde": "residential o",
+    "vince": "service o",
+    "m": 12.0,
+    "link": "?x=815&z=2150"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 12.0,
+    "link": "?x=759&z=2136"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 9.0,
+    "link": "?x=764&z=2145"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 15.0,
+    "link": "?x=677&z=2094"
+   },
+   {
     "perde": "tertiary",
     "vince": "tertiary o",
     "m": 9.0,
@@ -446,227 +847,458 @@
     "link": "?x=1682&z=-851"
    },
    {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 21.0,
+    "link": "?x=657&z=2099"
+   },
+   {
+    "perde": "service o",
+    "vince": "tertiary o",
+    "m": 15.0,
+    "link": "?x=657&z=2101"
+   },
+   {
+    "perde": "service o",
+    "vince": "service o",
+    "m": 9.0,
+    "link": "?x=671&z=2107"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 63.0,
+    "link": "?x=-1342&z=1550"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 27.0,
+    "link": "?x=-1381&z=1550"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "secondary",
+    "m": 27.0,
+    "link": "?x=-1391&z=1544"
+   },
+   {
     "perde": "trunk_link o",
     "vince": "tertiary o",
     "m": 9.0,
     "link": "?x=236&z=469"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 12.0,
+    "link": "?x=667&z=2098"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 9.0,
+    "link": "?x=671&z=2092"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 9.0,
+    "link": "?x=669&z=2095"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 9.0,
+    "link": "?x=853&z=2155"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 15.0,
+    "link": "?x=311&z=2000"
+   },
+   {
+    "perde": "tertiary",
+    "vince": "trunk_link o",
+    "m": 12.0,
+    "link": "?x=311&z=1988"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "tertiary",
+    "m": 9.0,
+    "link": "?x=308&z=1988"
+   },
+   {
+    "perde": "tertiary",
+    "vince": "trunk_link o",
+    "m": 15.0,
+    "link": "?x=477&z=2042"
+   },
+   {
+    "perde": "trunk_link o",
+    "vince": "trunk_link o",
+    "m": 12.0,
+    "link": "?x=487&z=2057"
+   },
+   {
+    "perde": "tertiary",
+    "vince": "tertiary",
+    "m": 9.0,
+    "link": "?x=-1186&z=1570"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "residential o",
+    "m": 24.0,
+    "link": "?x=-1174&z=1581"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 66.0,
+    "link": "?x=-1169&z=1586"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 15.0,
+    "link": "?x=-1176&z=1581"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 27.0,
+    "link": "?x=-1175&z=1579"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 45.0,
+    "link": "?x=-1298&z=1549"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 54.0,
+    "link": "?x=-1305&z=1552"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "residential o",
+    "m": 48.0,
+    "link": "?x=-1304&z=1556"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 51.0,
+    "link": "?x=-1286&z=1557"
+   },
+   {
+    "perde": "residential o",
+    "vince": "tertiary",
+    "m": 9.0,
+    "link": "?x=-1293&z=1559"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 18.0,
+    "link": "?x=-1283&z=1549"
+   },
+   {
+    "perde": "residential o",
+    "vince": "tertiary",
+    "m": 18.0,
+    "link": "?x=-1280&z=1567"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "secondary",
+    "m": 117.0,
+    "link": "?x=-1372&z=1595"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "tertiary o",
+    "m": 75.0,
+    "link": "?x=-1345&z=1555"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "secondary",
+    "m": 12.0,
+    "link": "?x=-1387&z=1558"
+   },
+   {
+    "perde": "tertiary o",
+    "vince": "secondary",
+    "m": 15.0,
+    "link": "?x=-1385&z=1561"
+   },
+   {
+    "perde": "service",
+    "vince": "residential",
+    "m": 45.0,
+    "link": "?x=-1528&z=1497"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 24.0,
+    "link": "?x=1767&z=2004"
+   },
+   {
+    "perde": "residential o",
+    "vince": "residential o",
+    "m": 12.0,
+    "link": "?x=1767&z=2017"
+   },
+   {
+    "perde": "service",
+    "vince": "residential o",
+    "m": 21.0,
+    "link": "?x=1763&z=2023"
+   },
+   {
+    "perde": "service",
+    "vince": "residential o",
+    "m": 18.0,
+    "link": "?x=1766&z=2015"
    }
   ],
-  "buchi_riempiti": 3,
-  "nodi_spostati": 3649,
-  "nodi_su_giunzione_dbgt": 497,
-  "nodi_media": 204,
-  "nodi_senza_giunzione_comune": 18,
-  "nodi_uniti_sugli_assi": 208,
-  "punte_tolte": 77,
-  "nodi_nuovi_lungo_gli_assi": 4340,
+  "buchi_riempiti": 4,
+  "nodi_spostati": 8247,
+  "nodi_su_giunzione_dbgt": 936,
+  "nodi_media": 408,
+  "nodi_senza_giunzione_comune": 44,
+  "nodi_uniti_sugli_assi": 378,
+  "punte_tolte": 131,
+  "nodi_nuovi_lungo_gli_assi": 7181,
   "spostamento_nodi_m": {
-   "p50": 0.74,
-   "p90": 2.3,
-   "p99": 5.43,
-   "max": 12.5
+   "p50": 0.72,
+   "p90": 1.94,
+   "p99": 4.91,
+   "max": 15.38
   },
   "vie_abbinate": {
-   "str": 912,
-   "vms": 48,
-   "cic": 25
+   "str": 1897,
+   "vms": 156,
+   "cic": 63
   },
-  "tempo_s": 1.9,
+  "tempo_s": 8.7,
   "anelli_osm": {
-   "n": 3,
+   "n": 11,
    "dove": [
-    "?x=-76&z=-856",
+    "?x=856&z=2152",
+    "?x=846&z=2154",
+    "?x=356&z=1290",
     "?x=1674&z=-857",
-    "?x=251&z=478"
+    "?x=-2508&z=1968",
+    "?x=251&z=478",
+    "?x=673&z=2100",
+    "?x=-76&z=-856",
+    "?x=-2481&z=1965",
+    "?x=-786&z=803",
+    "?x=-262&z=1820"
    ]
   },
   "larghezze_da_ac_vei": {
-   "vie": 698,
+   "vie": 1454,
    "differenza_dalla_larghezza_osm_m": {
-    "p10": -1.75,
+    "p10": -1.45,
     "p50": 0.75,
-    "p90": 4.02
+    "p90": 4.25
    }
   }
  },
  "corsie_locali": {
-  "vie": 480,
-  "carreggiate_condivise": 91
+  "vie": 923,
+  "carreggiate_condivise": 162
  },
  "righe": {
-  "strade": 604,
-  "strade_con_righe": 490,
-  "carreggiate": 451,
-  "righe": 1188,
-  "km": 89.8,
+  "strade": 1190,
+  "strade_con_righe": 949,
+  "carreggiate": 855,
+  "righe": 2044,
+  "km": 158.0,
   "per_tipo": {
-   "tratteggio": 601,
-   "bordo": 573,
-   "mezzeria": 14
+   "bordo": 888,
+   "tratteggio": 1139,
+   "mezzeria": 17
   },
-  "su_ponte": 32,
-  "pieghe_oltre_15": 27,
-  "pieghe_oltre_5": 1298,
+  "su_ponte": 52,
+  "pieghe_oltre_15": 42,
+  "pieghe_oltre_5": 1798,
   "piega_max": 23.0,
-  "pieghe_oltre_15_strade": 0,
-  "piega_max_strade": 10.2,
-  "bordi_delle_rotatorie": 85,
-  "punti_doppi_tolti": 108,
-  "punti_fuori_tolti": 55,
-  "campioni_fuori_carreggiata": 0,
-  "campioni": 180744,
-  "sezioni": 80978,
-  "sezioni_disegnate": 71097
+  "pieghe_oltre_15_strade": 3,
+  "piega_max_strade": 15.9,
+  "bordi_delle_rotatorie": 93,
+  "punti_doppi_tolti": 156,
+  "punti_fuori_tolti": 103,
+  "campioni_fuori_carreggiata": 1,
+  "campioni": 317905,
+  "sezioni": 155384,
+  "sezioni_disegnate": 132721
  },
  "superfici": {
-  "osm_tenute_vie": 78,
-  "asfalto_m2": 860353,
-  "cortili_m2": 1040201,
-  "marciapiedi_m2": 62647,
-  "piazze_m2": 44081,
-  "vialetti_m2": 31976,
-  "isole_m2": 15408,
-  "tempo_s": 27.8,
-  "cortili_nei_cantieri_m2": 14174
+  "osm_tenute_vie": 229,
+  "asfalto_m2": 1686654,
+  "cortili_m2": 1739273,
+  "marciapiedi_m2": 150242,
+  "piazze_m2": 73153,
+  "vialetti_m2": 41985,
+  "isole_m2": 20500,
+  "tempo_s": 86.2,
+  "cortili_nei_cantieri_m2": 16051
  },
  "muri_doppi_fusi": {
-  "linee": 615,
-  "metri": 5971
+  "linee": 1568,
+  "metri": 13658
  },
  "muri_sul_confine": {
-  "dbgt": 16677,
-  "metri_dbgt": 227298,
-  "metri_tenuti": 209457,
-  "spostati": 444,
-  "metri_spostati": 2819,
+  "dbgt": 40203,
+  "metri_dbgt": 503792,
+  "metri_tenuti": 467174,
+  "spostati": 1441,
+  "metri_spostati": 8019,
   "spostamento_m": {
    "p50": 0.5,
-   "p90": 0.5,
-   "max": 4.81
+   "p90": 0.54,
+   "max": 7.0
   }
  },
  "cancelli_osm": {
-  "osm_nodi": 208,
-  "disegnati": 132,
-  "scartati_classe1_o_non_piana": 3,
+  "osm_nodi": 398,
+  "disegnati": 216,
+  "scartati_classe1_o_non_piana": 6,
   "lift_alzate": 0,
-  "senza_via_su_chiusura": 13,
+  "senza_via_su_chiusura": 17,
   "scartati_senza_via_senza_chiusura": 18,
-  "fuori": 55,
+  "fuori": 158,
   "entrance_kissing": 0,
   "entrance_kissing_scartati": 0
  },
  "cancelli_passi_carrai": {
   "porte": {
-   "p": 2042
+   "p": 2727
   },
-  "nuovi": 2108,
-  "pedonali": 174,
-  "senza_strada": 1809,
-  "senza_chiusure": 2863,
-  "carreggiata_o_marciapiede": 1322,
-  "strada_osm": 349,
-  "troppo_stretti": 2261,
-  "gia_cancello": 7489,
-  "fuori": 4,
-  "doppione_recinzione": 89,
-  "capo_nel_vuoto": 641,
-  "troppo_larghi": 471,
+  "nuovi": 3670,
+  "pedonali": 333,
+  "senza_strada": 4392,
+  "senza_chiusure": 4773,
+  "carreggiata_o_marciapiede": 1862,
+  "strada_osm": 740,
+  "troppo_stretti": 5182,
+  "gia_cancello": 14482,
+  "fuori": 21,
+  "doppione_recinzione": 185,
+  "capo_nel_vuoto": 1006,
+  "troppo_larghi": 621,
   "per_origine": {
-   "passo_carraio": 240,
-   "rampa": 9,
+   "passo_carraio": 492,
+   "rampa": 10,
    "vialetto": 0,
-   "varco": 1366,
-   "capo_recinzione": 493
+   "varco": 2106,
+   "capo_recinzione": 1062
   }
  },
- "divisori_tagliati_da_cancelli": 434,
+ "divisori_tagliati_da_cancelli": 896,
  "barriere_in_carreggiata": {
-  "linee": 72,
-  "metri": 591
+  "linee": 212,
+  "metri": 1938
  },
  "corsie_ia": {
-  "vie": 2562,
-  "corsie_spostate_nodi": 1921,
-  "vie_con_corsie": 564,
-  "tagli": 109,
-  "metri_tagliati": 961,
-  "nodi_aggiunti": 116,
+  "vie": 3015,
+  "corsie_spostate_nodi": 3888,
+  "vie_con_corsie": 1032,
+  "tagli": 204,
+  "metri_tagliati": 1816,
+  "nodi_aggiunti": 217,
   "punti_per_motivo": {
-   "muro o edificio": 1091,
-   "fuori asfalto": 336,
-   "stretta fra i muri": 123
+   "fuori asfalto": 580,
+   "muro o edificio": 1917,
+   "stretta fra i muri": 304
   },
-  "sensi_unici_tolti_metri": 491,
-  "pezzi_isolati_tolti_metri": 113,
-  "km_rete": 339.26,
-  "km_rete_ia": 337.7,
+  "sensi_unici_tolti_metri": 952,
+  "pezzi_isolati_tolti_metri": 411,
+  "km_rete": 405.33,
+  "km_rete_ia": 402.15,
   "dove": [
-   "?x=435&z=362 muro/stretta doppio senso 3.2 m 65 m",
-   "?x=-506&z=-934 muro/stretta doppio senso 2.8 m 49 m",
-   "?x=14&z=-2066 asfalto doppio senso 3.8 m 46 m",
+   "?x=435&z=362 muro/stretta doppio senso 3.8 m 65 m",
+   "?x=-506&z=-934 muro/stretta doppio senso 4.2 m 49 m",
+   "?x=15&z=-2061 asfalto doppio senso 3.8 m 46 m",
+   "?x=1425&z=1171 stretta doppio senso 3.2 m 45 m",
+   "?x=-1103&z=1691 muro/stretta doppio senso 3.8 m 44 m",
+   "?x=-72&z=-280 muro doppio senso 6.2 m 42 m",
+   "?x=195&z=-622 muro/stretta doppio senso 4.2 m 39 m",
    "?x=1383&z=-128 muro doppio senso 5.2 m 38 m",
-   "?x=-72&z=-280 muro doppio senso 6.2 m 37 m",
-   "?x=406&z=436 stretta doppio senso 3.2 m 36 m",
-   "?x=-231&z=-1043 muro doppio senso 4.8 m 34 m",
-   "?x=-66&z=-980 muro/stretta doppio senso 3.8 m 32 m",
+   "?x=406&z=436 muro/stretta doppio senso 3.8 m 36 m",
+   "?x=-231&z=-1043 muro doppio senso 4.8 m 35 m",
+   "?x=-66&z=-980 stretta doppio senso 4.2 m 32 m",
    "?x=335&z=-870 asfalto/muro senso unico 3.2 m 30 m",
-   "?x=-260&z=-1163 muro doppio senso 4.8 m 28 m",
-   "?x=-758&z=361 asfalto/muro doppio senso 4.8 m 28 m",
-   "?x=1575&z=259 muro/stretta doppio senso 4.8 m 24 m",
-   "?x=171&z=-1416 muro doppio senso 6.2 m 21 m",
-   "?x=-686&z=-1175 muro doppio senso 5.2 m 21 m",
+   "?x=612&z=1955 muro/stretta doppio senso 3.8 m 29 m",
+   "?x=-260&z=-1163 muro doppio senso 4.8 m 29 m",
+   "?x=-1492&z=1220 muro doppio senso 4.2 m 29 m",
+   "?x=-686&z=1905 muro/stretta doppio senso 4.2 m 27 m",
+   "?x=356&z=2013 asfalto senso unico 10.5 m 26 m",
+   "?x=-1427&z=1364 muro/stretta doppio senso 7.8 m 25 m",
+   "?x=-558&z=1621 muro doppio senso 3.8 m 24 m",
+   "?x=-1151&z=2004 muro doppio senso 5.8 m 23 m",
+   "?x=758&z=2134 asfalto/muro doppio senso 9.8 m 23 m",
+   "?x=1442&z=1103 muro/stretta doppio senso 3.2 m 22 m",
+   "?x=-686&z=-1175 muro doppio senso 5.8 m 21 m",
+   "?x=171&z=-1416 muro doppio senso 6.2 m 20 m",
    "?x=199&z=-560 muro doppio senso 4.2 m 20 m",
-   "?x=1819&z=24 muro doppio senso 7.2 m 19 m",
-   "?x=108&z=-808 muro senso unico 6.2 m 17 m",
+   "?x=-512&z=1634 muro doppio senso 3.8 m 20 m",
+   "?x=1819&z=24 muro doppio senso 7.2 m 20 m",
+   "?x=-26&z=-328 muro doppio senso 6.2 m 19 m",
+   "?x=-1098&z=1615 stretta doppio senso 3.8 m 19 m",
+   "?x=108&z=-808 muro senso unico 6.2 m 18 m",
    "?x=375&z=-775 muro senso unico 4.8 m 16 m",
+   "?x=-1007&z=671 muro/stretta doppio senso 5.8 m 16 m",
+   "?x=-478&z=1255 asfalto doppio senso 7.5 m 16 m",
+   "?x=-811&z=2301 asfalto senso unico 8.5 m 16 m",
+   "?x=-561&z=1632 muro doppio senso 5.8 m 16 m",
    "?x=430&z=-688 asfalto/muro doppio senso 6.5 m 15 m",
-   "?x=763&z=-1456 asfalto/muro doppio senso 8.0 m 15 m",
+   "?x=3080&z=-2336 muro doppio senso 6.5 m 15 m",
+   "?x=763&z=-1456 asfalto/muro doppio senso 8.2 m 15 m",
    "?x=1426&z=-188 muro doppio senso 9.2 m 15 m",
-   "?x=168&z=-1222 stretta doppio senso 4.8 m 14 m",
-   "?x=-768&z=429 asfalto doppio senso 6.2 m 12 m",
-   "?x=1329&z=792 asfalto doppio senso 6.5 m 12 m",
-   "?x=2429&z=520 muro doppio senso 6.5 m 12 m",
-   "?x=-773&z=214 asfalto doppio senso 5.8 m 12 m",
-   "?x=1533&z=270 muro doppio senso 3.2 m 10 m",
-   "?x=-107&z=-113 asfalto doppio senso 6.8 m 10 m",
-   "?x=-507&z=-1557 muro doppio senso 3.8 m 10 m",
-   "?x=1509&z=264 muro doppio senso 3.2 m 10 m",
-   "?x=170&z=-636 muro senso unico 3.2 m 10 m",
-   "?x=-1551&z=-150 muro doppio senso 6.5 m 9 m",
-   "?x=789&z=251 asfalto doppio senso 6.5 m 9 m",
-   "?x=-2535&z=-471 muro doppio senso 6.5 m 9 m",
-   "?x=-2318&z=-571 muro doppio senso 6.5 m 9 m",
-   "?x=-57&z=-1777 muro doppio senso 5.2 m 9 m",
-   "?x=2651&z=-1475 muro doppio senso 5.5 m 9 m",
-   "?x=-87&z=-266 muro doppio senso 6.2 m 8 m",
-   "?x=1385&z=-1162 asfalto doppio senso 8.8 m 8 m",
-   "?x=123&z=-1251 muro doppio senso 4.8 m 8 m"
+   "?x=-349&z=896 asfalto doppio senso 7.5 m 15 m"
   ]
  },
  "controlli": {
   "oggetti_in_carreggiata": {
-   "n": 3,
-   "di": 460,
+   "n": 10,
+   "di": 571,
    "dove": [
     "?x=43&z=-846",
+    "?x=-1180&z=1523",
+    "?x=269&z=1004",
+    "?x=1340&z=1246",
+    "?x=560&z=931",
     "?x=58&z=-781",
-    "?x=-58&z=-858"
+    "?x=-58&z=-858",
+    "?x=238&z=977",
+    "?x=-1208&z=1284",
+    "?x=1135&z=2127"
    ]
   },
   "lampioni_in_carreggiata": {
    "n": 0,
-   "di": 248,
+   "di": 255,
    "dove": []
   },
   "alberi_in_carreggiata": {
    "n": 0,
-   "di": 78089,
+   "di": 88738,
    "dove": []
   },
   "pali_dei_cartelli_in_carreggiata": {
    "n": 0,
-   "di": 32,
+   "di": 30,
    "dove": []
   },
   "barriere_in_carreggiata": {
@@ -675,114 +1307,123 @@
    "dove": []
   },
   "edifici_su_carreggiata": {
-   "n": 4,
+   "n": 10,
    "dove": [
     "?x=1341&z=-355",
+    "?x=1399&z=2128",
+    "?x=-1107&z=1524",
+    "?x=-952&z=814",
     "?x=640&z=-51",
+    "?x=1039&z=1937",
     "?x=599&z=-537",
-    "?x=609&z=-540"
+    "?x=609&z=-540",
+    "?x=-674&z=1142",
+    "?x=-674&z=1149"
    ]
   },
   "corsie_dentro_ac_vei": {
-   "campioni": 48745,
-   "fuori": 1414,
-   "quota": 0.029,
+   "campioni": 92757,
+   "fuori": 2621,
+   "quota": 0.0283,
    "fuori_per_motivo": {
-    "altro": 752,
-    "strettoia": 448,
-    "incrocio": 214
+    "altro": 1529,
+    "incrocio": 367,
+    "strettoia": 725
    },
-   "auto_fuori": 469,
+   "auto_fuori": 634,
    "nota_auto": "la linea della corsia a meno di 0,9 m (mezza auto) dal bordo o fuori",
    "margine_m": {
-    "p1": -0.49,
+    "p1": -0.41,
     "p10": -0.0,
-    "p50": 0.73
+    "p50": 0.71
    },
    "dove": [
-    "?x=1913&z=-488",
-    "?x=1914&z=-491",
-    "?x=-125&z=723",
+    "?x=1937&z=-611",
+    "?x=1937&z=-613",
     "?x=-15&z=473",
-    "?x=10&z=465",
+    "?x=15&z=463",
     "?x=972&z=-1498",
     "?x=971&z=-1495",
-    "?x=797&z=-894",
-    "?x=794&z=-896",
-    "?x=585&z=-979",
-    "?x=556&z=-984",
     "?x=859&z=-636",
-    "?x=1105&z=-532",
+    "?x=1108&z=-531",
     "?x=686&z=-1319",
+    "?x=695&z=-1432",
     "?x=633&z=-1453",
-    "?x=245&z=-1960",
-    "?x=330&z=-1859",
+    "?x=441&z=-1769",
+    "?x=342&z=-1849",
     "?x=470&z=-1020",
-    "?x=463&z=-1130",
+    "?x=463&z=-1125",
     "?x=436&z=-1077",
-    "?x=437&z=-1080",
+    "?x=438&z=-1080",
     "?x=444&z=-1392",
     "?x=444&z=-1388",
+    "?x=202&z=-664",
     "?x=200&z=-662",
-    "?x=198&z=-660",
     "?x=113&z=-809",
-    "?x=106&z=-806",
-    "?x=312&z=-599",
+    "?x=107&z=-808",
     "?x=1692&z=-566",
-    "?x=1617&z=-597"
+    "?x=1617&z=-597",
+    "?x=1430&z=-818",
+    "?x=1429&z=-815",
+    "?x=1136&z=-1101",
+    "?x=1138&z=-1104",
+    "?x=-1030&z=-1498"
    ]
   },
   "corsie_di_fronte": {
-   "n": 122,
-   "campioni": 124610,
-   "vie_diverse": 122,
-   "stessa_via": 7046,
+   "n": 224,
+   "campioni": 235560,
+   "vie_diverse": 224,
+   "stessa_via": 14227,
    "nota": "punti di corsia (1 m) con una corsia di verso opposto a meno di 1.8 m, lontano dagli incroci",
    "dove": [
-    "?x=-170&z=-929",
-    "?x=189&z=-1279",
-    "?x=257&z=-1253",
     "?x=863&z=58",
-    "?x=-290&z=-966",
-    "?x=863&z=55",
-    "?x=188&z=-1280",
+    "?x=-1390&z=1187",
+    "?x=409&z=-412",
+    "?x=1332&z=658",
+    "?x=-63&z=-971",
+    "?x=1332&z=658",
     "?x=188&z=-1281",
-    "?x=256&z=-1253",
-    "?x=407&z=-414",
-    "?x=411&z=-411",
-    "?x=408&z=-413",
-    "?x=863&z=59",
-    "?x=406&z=-414",
-    "?x=255&z=-1254",
-    "?x=250&z=-1257",
-    "?x=249&z=-1257",
-    "?x=863&z=58",
-    "?x=-374&z=-262",
-    "?x=-294&z=-967"
+    "?x=1332&z=657",
+    "?x=748&z=1910",
+    "?x=657&z=2100",
+    "?x=726&z=2123",
+    "?x=251&z=-1256",
+    "?x=190&z=-1279",
+    "?x=188&z=-1280",
+    "?x=1332&z=657",
+    "?x=410&z=-412",
+    "?x=-1246&z=1092",
+    "?x=185&z=-1282",
+    "?x=257&z=-1253",
+    "?x=-1177&z=1579"
    ]
   },
   "traffico_nei_cortili": {
-   "n": 2,
-   "metri": 36,
+   "n": 4,
+   "metri": 138,
    "nota": "vie con traffico IA per 12 m o piu sopra un cortile AC_VEI 0307",
    "dove": [
-    "?x=397&z=-968",
-    "?x=1426&z=-188"
+    "?x=-1474&z=1215",
+    "?x=192&z=-618",
+    "?x=1426&z=-188",
+    "?x=-38&z=2054"
    ]
   },
   "osm_senza_dbgt": {
-   "n": 78,
-   "metri": 6355,
+   "n": 229,
+   "metri": 20442,
    "per_classe": {
-    "service": 27,
-    "path": 13,
-    "cycleway": 2,
-    "steps": 5,
-    "footway": 24,
-    "unclassified": 1,
-    "track": 2,
-    "residential": 2,
-    "tertiary": 2
+    "service": 63,
+    "path": 52,
+    "residential": 4,
+    "footway": 77,
+    "cycleway": 10,
+    "steps": 6,
+    "unclassified": 2,
+    "track": 11,
+    "tertiary": 2,
+    "secondary": 2
    },
    "elenco": [
     {
@@ -799,6 +1440,26 @@
      "classe": "path",
      "m": 358,
      "link": "?x=-521&z=-2163"
+    },
+    {
+     "classe": "service",
+     "m": 92,
+     "link": "?x=1485&z=1251"
+    },
+    {
+     "classe": "residential",
+     "m": 68,
+     "link": "?x=-525&z=1630"
+    },
+    {
+     "classe": "footway",
+     "m": 118,
+     "link": "?x=-754&z=1608"
+    },
+    {
+     "classe": "cycleway",
+     "m": 75,
+     "link": "?x=-3120&z=1673"
     },
     {
      "classe": "service",
@@ -824,6 +1485,36 @@
      "classe": "path",
      "m": 281,
      "link": "?x=-791&z=-2078"
+    },
+    {
+     "classe": "footway",
+     "m": 380,
+     "link": "?x=-1701&z=1276"
+    },
+    {
+     "classe": "footway",
+     "m": 125,
+     "link": "?x=-1631&z=1189"
+    },
+    {
+     "classe": "footway",
+     "m": 75,
+     "link": "?x=-1600&z=1173"
+    },
+    {
+     "classe": "path",
+     "m": 635,
+     "link": "?x=96&z=1649"
+    },
+    {
+     "classe": "path",
+     "m": 332,
+     "link": "?x=82&z=1283"
+    },
+    {
+     "classe": "path",
+     "m": 123,
+     "link": "?x=-3113&z=1332"
     },
     {
      "classe": "path",
@@ -861,14 +1552,74 @@
      "link": "?x=401&z=-566"
     },
     {
+     "classe": "cycleway",
+     "m": 130,
+     "link": "?x=592&z=1447"
+    },
+    {
+     "classe": "path",
+     "m": 113,
+     "link": "?x=-109&z=884"
+    },
+    {
      "classe": "service",
      "m": 30,
      "link": "?x=1381&z=-346"
     },
     {
+     "classe": "footway",
+     "m": 111,
+     "link": "?x=1147&z=1569"
+    },
+    {
+     "classe": "footway",
+     "m": 118,
+     "link": "?x=1244&z=1579"
+    },
+    {
+     "classe": "service",
+     "m": 25,
+     "link": "?x=-2205&z=2383"
+    },
+    {
+     "classe": "service",
+     "m": 95,
+     "link": "?x=-1279&z=767"
+    },
+    {
+     "classe": "service",
+     "m": 59,
+     "link": "?x=-1332&z=1672"
+    },
+    {
+     "classe": "cycleway",
+     "m": 14,
+     "link": "?x=-1130&z=187"
+    },
+    {
+     "classe": "cycleway",
+     "m": 9,
+     "link": "?x=-1120&z=182"
+    },
+    {
      "classe": "path",
      "m": 267,
      "link": "?x=430&z=-2133"
+    },
+    {
+     "classe": "footway",
+     "m": 106,
+     "link": "?x=1166&z=1530"
+    },
+    {
+     "classe": "path",
+     "m": 155,
+     "link": "?x=15&z=1060"
+    },
+    {
+     "classe": "path",
+     "m": 353,
+     "link": "?x=12&z=1299"
     },
     {
      "classe": "footway",
@@ -911,6 +1662,11 @@
      "link": "?x=504&z=-578"
     },
     {
+     "classe": "path",
+     "m": 330,
+     "link": "?x=-2376&z=1407"
+    },
+    {
      "classe": "footway",
      "m": 31,
      "link": "?x=511&z=-519"
@@ -947,6 +1703,16 @@
     },
     {
      "classe": "track",
+     "m": 66,
+     "link": "?x=1276&z=1809"
+    },
+    {
+     "classe": "service",
+     "m": 93,
+     "link": "?x=1156&z=1787"
+    },
+    {
+     "classe": "track",
      "m": 63,
      "link": "?x=-696&z=-1605"
     },
@@ -956,149 +1722,35 @@
      "link": "?x=842&z=623"
     },
     {
-     "classe": "cycleway",
-     "m": 164,
-     "link": "?x=811&z=254"
-    },
-    {
-     "classe": "footway",
-     "m": 92,
-     "link": "?x=816&z=203"
-    },
-    {
-     "classe": "footway",
-     "m": 77,
-     "link": "?x=785&z=194"
-    },
-    {
-     "classe": "footway",
-     "m": 11,
-     "link": "?x=807&z=171"
-    },
-    {
-     "classe": "residential",
-     "m": 99,
-     "link": "?x=818&z=211"
-    },
-    {
-     "classe": "service",
-     "m": 98,
-     "link": "?x=871&z=173"
-    },
-    {
-     "classe": "footway",
-     "m": 150,
-     "link": "?x=925&z=472"
-    },
-    {
-     "classe": "tertiary",
-     "m": 25,
-     "link": "?x=74&z=214"
-    },
-    {
-     "classe": "tertiary",
-     "m": 25,
-     "link": "?x=77&z=214"
-    },
-    {
-     "classe": "residential",
-     "m": 43,
-     "link": "?x=803&z=-25"
-    },
-    {
-     "classe": "footway",
-     "m": 25,
-     "link": "?x=726&z=-31"
-    },
-    {
-     "classe": "footway",
-     "m": 20,
-     "link": "?x=733&z=-41"
-    },
-    {
-     "classe": "footway",
-     "m": 5,
-     "link": "?x=732&z=-45"
-    },
-    {
-     "classe": "footway",
-     "m": 5,
-     "link": "?x=737&z=-41"
-    },
-    {
-     "classe": "service",
-     "m": 34,
-     "link": "?x=533&z=564"
-    },
-    {
-     "classe": "service",
-     "m": 125,
-     "link": "?x=504&z=576"
-    },
-    {
-     "classe": "service",
-     "m": 25,
-     "link": "?x=552&z=902"
-    },
-    {
-     "classe": "footway",
-     "m": 14,
-     "link": "?x=571&z=908"
-    },
-    {
-     "classe": "service",
-     "m": 34,
-     "link": "?x=894&z=1012"
-    },
-    {
      "classe": "path",
-     "m": 156,
-     "link": "?x=324&z=-2347"
-    },
-    {
-     "classe": "service",
-     "m": 34,
-     "link": "?x=-664&z=97"
-    },
-    {
-     "classe": "service",
-     "m": 31,
-     "link": "?x=-624&z=100"
-    },
-    {
-     "classe": "service",
-     "m": 16,
-     "link": "?x=-653&z=96"
-    },
-    {
-     "classe": "service",
-     "m": 10,
-     "link": "?x=-642&z=91"
-    },
-    {
-     "classe": "service",
-     "m": 28,
-     "link": "?x=-625&z=104"
-    },
-    {
-     "classe": "service",
-     "m": 9,
-     "link": "?x=-643&z=100"
+     "m": 289,
+     "link": "?x=-112&z=868"
     }
    ]
   },
   "dbgt_senza_osm": {
-   "n": 117,
-   "metri": 6200,
+   "n": 225,
+   "metri": 11811,
    "per_tipo": {
-    "01": 76,
-    "0101": 3,
+    "01": 132,
+    "0101": 4,
+    "0301": 9,
     "0307": 2,
+    "0206": 72,
     "0102": 2,
-    "0206": 31,
-    "0205": 3
+    "0205": 4
    },
    "elenco": [
+    {
+     "tipo": "01",
+     "m": 1074,
+     "link": "?x=-2905&z=1265"
+    },
+    {
+     "tipo": "01",
+     "m": 384,
+     "link": "?x=-55&z=1232"
+    },
     {
      "tipo": "01",
      "m": 322,
@@ -1111,8 +1763,18 @@
     },
     {
      "tipo": "01",
+     "m": 288,
+     "link": "?x=-3352&z=1536"
+    },
+    {
+     "tipo": "01",
      "m": 276,
      "link": "?x=-826&z=-150"
+    },
+    {
+     "tipo": "01",
+     "m": 261,
+     "link": "?x=-117&z=999"
     },
     {
      "tipo": "01",
@@ -1136,8 +1798,18 @@
     },
     {
      "tipo": "01",
-     "m": 169,
-     "link": "?x=1493&z=889"
+     "m": 181,
+     "link": "?x=-2343&z=1507"
+    },
+    {
+     "tipo": "01",
+     "m": 173,
+     "link": "?x=-3330&z=1753"
+    },
+    {
+     "tipo": "01",
+     "m": 166,
+     "link": "?x=-186&z=1484"
     },
     {
      "tipo": "01",
@@ -1176,6 +1848,11 @@
     },
     {
      "tipo": "01",
+     "m": 128,
+     "link": "?x=-2334&z=1258"
+    },
+    {
+     "tipo": "01",
      "m": 121,
      "link": "?x=-404&z=-1462"
     },
@@ -1191,13 +1868,43 @@
     },
     {
      "tipo": "01",
+     "m": 117,
+     "link": "?x=-1502&z=2159"
+    },
+    {
+     "tipo": "01",
+     "m": 115,
+     "link": "?x=797&z=2099"
+    },
+    {
+     "tipo": "01",
+     "m": 114,
+     "link": "?x=1356&z=2054"
+    },
+    {
+     "tipo": "01",
      "m": 110,
      "link": "?x=568&z=-834"
     },
     {
      "tipo": "01",
+     "m": 110,
+     "link": "?x=386&z=1537"
+    },
+    {
+     "tipo": "01",
+     "m": 104,
+     "link": "?x=-3213&z=1709"
+    },
+    {
+     "tipo": "01",
      "m": 103,
      "link": "?x=-712&z=-1018"
+    },
+    {
+     "tipo": "01",
+     "m": 103,
+     "link": "?x=1122&z=1266"
     },
     {
      "tipo": "01",
@@ -1216,6 +1923,21 @@
     },
     {
      "tipo": "01",
+     "m": 92,
+     "link": "?x=1553&z=969"
+    },
+    {
+     "tipo": "0301",
+     "m": 88,
+     "link": "?x=-437&z=1207"
+    },
+    {
+     "tipo": "01",
+     "m": 86,
+     "link": "?x=882&z=2050"
+    },
+    {
+     "tipo": "01",
      "m": 85,
      "link": "?x=333&z=-1790"
     },
@@ -1223,6 +1945,11 @@
      "tipo": "01",
      "m": 83,
      "link": "?x=1439&z=-558"
+    },
+    {
+     "tipo": "01",
+     "m": 83,
+     "link": "?x=-2787&z=1709"
     },
     {
      "tipo": "01",
@@ -1236,6 +1963,11 @@
     },
     {
      "tipo": "01",
+     "m": 79,
+     "link": "?x=1352&z=1557"
+    },
+    {
+     "tipo": "01",
      "m": 76,
      "link": "?x=733&z=-1247"
     },
@@ -1243,6 +1975,21 @@
      "tipo": "01",
      "m": 72,
      "link": "?x=597&z=-1721"
+    },
+    {
+     "tipo": "01",
+     "m": 72,
+     "link": "?x=1325&z=2230"
+    },
+    {
+     "tipo": "01",
+     "m": 72,
+     "link": "?x=-2911&z=1832"
+    },
+    {
+     "tipo": "01",
+     "m": 69,
+     "link": "?x=-367&z=1288"
     },
     {
      "tipo": "01",
@@ -1256,8 +2003,18 @@
     },
     {
      "tipo": "01",
+     "m": 65,
+     "link": "?x=1511&z=1606"
+    },
+    {
+     "tipo": "01",
      "m": 64,
      "link": "?x=784&z=-1364"
+    },
+    {
+     "tipo": "01",
+     "m": 64,
+     "link": "?x=-2244&z=1207"
     },
     {
      "tipo": "01",
@@ -1265,160 +2022,45 @@
      "link": "?x=301&z=-441"
     },
     {
+     "tipo": "01",
+     "m": 61,
+     "link": "?x=1640&z=950"
+    },
+    {
      "tipo": "0307",
      "m": 60,
      "link": "?x=1250&z=-1151"
     },
     {
-     "tipo": "01",
-     "m": 57,
-     "link": "?x=-585&z=-1212"
+     "tipo": "0301",
+     "m": 60,
+     "link": "?x=-437&z=1267"
     },
     {
      "tipo": "01",
-     "m": 55,
-     "link": "?x=1749&z=-907"
-    },
-    {
-     "tipo": "01",
-     "m": 52,
-     "link": "?x=1521&z=-1026"
-    },
-    {
-     "tipo": "01",
-     "m": 51,
-     "link": "?x=-519&z=-1153"
-    },
-    {
-     "tipo": "01",
-     "m": 51,
-     "link": "?x=1613&z=-856"
-    },
-    {
-     "tipo": "01",
-     "m": 50,
-     "link": "?x=774&z=-937"
-    },
-    {
-     "tipo": "01",
-     "m": 50,
-     "link": "?x=1810&z=-875"
-    },
-    {
-     "tipo": "01",
-     "m": 49,
-     "link": "?x=-789&z=13"
-    },
-    {
-     "tipo": "01",
-     "m": 45,
-     "link": "?x=1679&z=-944"
-    },
-    {
-     "tipo": "0102",
-     "m": 41,
-     "link": "?x=36&z=444"
-    },
-    {
-     "tipo": "01",
-     "m": 41,
-     "link": "?x=-365&z=-1392"
-    },
-    {
-     "tipo": "01",
-     "m": 36,
-     "link": "?x=1607&z=-1025"
-    },
-    {
-     "tipo": "01",
-     "m": 35,
-     "link": "?x=-645&z=-1253"
-    },
-    {
-     "tipo": "01",
-     "m": 35,
-     "link": "?x=-776&z=-1021"
-    },
-    {
-     "tipo": "0206",
-     "m": 35,
-     "link": "?x=325&z=1"
-    },
-    {
-     "tipo": "01",
-     "m": 34,
-     "link": "?x=-550&z=-1183"
-    },
-    {
-     "tipo": "01",
-     "m": 34,
-     "link": "?x=1562&z=-880"
-    },
-    {
-     "tipo": "01",
-     "m": 34,
-     "link": "?x=1290&z=-640"
-    },
-    {
-     "tipo": "01",
-     "m": 33,
-     "link": "?x=535&z=-1719"
-    },
-    {
-     "tipo": "01",
-     "m": 32,
-     "link": "?x=-16&z=-1818"
-    },
-    {
-     "tipo": "01",
-     "m": 29,
-     "link": "?x=-79&z=-1194"
-    },
-    {
-     "tipo": "01",
-     "m": 29,
-     "link": "?x=574&z=-1761"
-    },
-    {
-     "tipo": "01",
-     "m": 26,
-     "link": "?x=1641&z=-964"
-    },
-    {
-     "tipo": "0206",
-     "m": 26,
-     "link": "?x=-91&z=-870"
-    },
-    {
-     "tipo": "01",
-     "m": 26,
-     "link": "?x=-620&z=-1235"
-    },
-    {
-     "tipo": "01",
-     "m": 25,
-     "link": "?x=75&z=214"
+     "m": 59,
+     "link": "?x=-1458&z=2061"
     }
    ]
   },
   "marciapiedi_e_piazze_contro_ac_ped": {
-   "disegnato_m2": 106137,
-   "dbgt_m2": 106937,
-   "iou": 0.993
+   "disegnato_m2": 222743,
+   "dbgt_m2": 223683,
+   "iou": 0.996
   },
   "asfalto_contro_ac_vei": {
-   "disegnato_m2": 855458,
-   "dbgt_m2": 848777,
-   "iou": 0.992
+   "disegnato_m2": 1685089,
+   "dbgt_m2": 1673171,
+   "iou": 0.993
   },
   "strada_disegnata_contro_ar_str": {
-   "ar_str_m2": 862068,
+   "ar_str_m2": 1700795,
    "coperta_dal_disegno": 0.998,
    "nota": "AR_STR e l unione di AC_VEI, AC_PED e MAN_TR pezzo per pezzo; il disegno ha in piu parcheggi (AC_VEI 0301) e aree pedonali fuori dalla sede stradale"
   },
   "attraversamenti": {
-   "n": 497
+   "n": 669
   },
-  "tempo_s": 7.7
+  "tempo_s": 15.1
  }
 }

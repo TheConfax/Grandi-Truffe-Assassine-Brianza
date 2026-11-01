@@ -5,7 +5,9 @@ import os, sys, glob, subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.environ.get('GTA_DATA', os.path.join(ROOT, 'data'))
-S, N, W, E = '45.6345', '45.6805', '9.117', '9.191'  # il riquadro della mappa: meta di brianza.json lat0 45.6575, lon0 9.154
+sys.path.insert(0, os.path.join(ROOT, 'src'))
+import riquadro as RQ
+S, N, W, E = map(repr, RQ.BBOX)  # il riquadro della mappa (src/riquadro.py): meta di brianza.json lat0 45.6575, lon0 9.154
 OSM = os.path.join(DATA, 'osm', 'maplarge.osm')
 DEM = os.path.join(DATA, 'terreno', 'w50550_s10.tif')
 
@@ -32,7 +34,7 @@ dbt = sorted(os.path.basename(os.path.dirname(f)) for f in glob.glob(os.path.joi
 print('dati a posto; DBGT usati:', ', '.join(dbt))
 # il LiDAR del Ministero è facoltativo: dove manca resta TINITALY. Il riquadro con il margine di 480 m sta in 54 tessere da 0,01 gradi
 lid = [f for f in glob.glob(os.path.join(DATA, 'terreno', 'lidar', '**', '*'), recursive=True) if f.lower().endswith(('.tif', '.tiff', '.asc'))]
-want = ['D%d%04d' % (la, lo) for la in range(4563, 4569) for lo in range(911, 920)]
+want = ['D%d%04d' % (la, lo) for la in range(int(RQ.S * 100), int(RQ.N * 100) + 1) for lo in range(int(RQ.W * 100), int(RQ.E * 100) + 1)]
 named = [t for t in want if any(t in os.path.basename(f).upper() for f in lid)]
 print('LiDAR: %d file in terreno/lidar' % len(lid) + ('' if not lid or not named else ', mancano le tessere ' + (', '.join(t for t in want if t not in named) or 'nessuna')))
 

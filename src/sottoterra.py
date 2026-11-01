@@ -109,17 +109,20 @@ def raster(geoms, X, Z):  # mask of the points inside any of the geometries
 
 
 # ---------- the other sources ----------
-def dbgt_extra(gpkg):
-    """ACC_PC (passi carrai), UN_VOL_POR 08 (underground volumes), EDI_MIN (minor buildings: box, sheds) of the DBGT, game metres."""
-    con = sqlite3.connect(gpkg); tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True)
-    A = dq._read_layer(con, tr, 'ACC_PC_ACC_PC_POS', 'punto', {})
-    V = dq._read_layer(con, tr, 'UN_VOL', 'area', {'por': 'UN_VOL_POR'})
-    M = dq._read_layer(con, tr, 'EDI_MIN_CR_EDF_IS', 'area', {})
-    con.close()
+def dbgt_extra(gpkgs):
+    """ACC_PC (passi carrai), UN_VOL_POR 08 (underground volumes), EDI_MIN (minor buildings: box, sheds) of the DBGT of the comuni, game metres."""
+    tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True); acc, v08, emin = [], [], []
     pol = lambda L, i: (lambda g: g if g.is_valid else g.buffer(0))(dq.poligono(L, i))
-    v08 = [pol(V, i) for i in range(len(V['off']) - 1) if V['attr']['por'][i] == '08'] if V is not None else []
-    emin = [pol(M, i) for i in range(len(M['off']) - 1)] if M is not None else []
-    return dict(acc=A['xy'] if A is not None else np.zeros((0, 2)), v08=v08, emin=emin)
+    for gpkg in gpkgs:
+        con = sqlite3.connect(gpkg)
+        A = dq._read_layer(con, tr, 'ACC_PC_ACC_PC_POS', 'punto', {})
+        V = dq._read_layer(con, tr, 'UN_VOL', 'area', {'por': 'UN_VOL_POR'})
+        M = dq._read_layer(con, tr, 'EDI_MIN_CR_EDF_IS', 'area', {})
+        con.close()
+        if A is not None: acc.append(A['xy'])
+        if V is not None: v08 += [pol(V, i) for i in range(len(V['off']) - 1) if V['attr']['por'][i] == '08']
+        if M is not None: emin += [pol(M, i) for i in range(len(M['off']) - 1)]
+    return dict(acc=np.vstack(acc) if acc else np.zeros((0, 2)), v08=v08, emin=emin)
 
 
 def osm_sotto(path, area, cache=None):
@@ -205,7 +208,7 @@ class Sottoterra:
         t0 = time.time(); sup = s.sup; conf = sup.conf
         b = conf.buffer(40).bounds; s.M = M = Mosaico(b, lid=sup.lid)
         s.F1, s.D1 = riempi(M.dtm)
-        s.ex = dbgt_extra(sup.gpkg)
+        s.ex = dbgt_extra(sup.gpkgs)
         s.osm = osm_sotto(os.path.join(DATA, 'osm', 'maplarge.osm'), conf.buffer(60), getattr(s, 'cache_osm', None))
         s.edifici = list(sup.edifici) + s.ex['emin'] + edifici_gioco(sup)   # what the game draws too (brianza.json): the ramp keeps off its walls
         s.vis = viste()
@@ -259,6 +262,7 @@ class Sottoterra:
         p['pc'] = p['pc_m'] = None
         if op.sum() < 6: p['forma'] = False; p['perche'] = 'tutta sotto un edificio'; return
         sh = op & (D < max(R_REG + 0.4, np.percentile(D[op], 15)))
+        if not sh.any(): sh = op & (D <= np.percentile(D[op], 15))   # a pit of the same depth everywhere: nothing strictly under the 15th percentile
         sr, sc = np.nonzero(sh); sx, sz = M.xz(sr + r0, sc + c0)
         dpc, jpc = s.acck.query(np.column_stack((sx, sz)))
         hi = int(np.argmin(dpc))
