@@ -10,8 +10,9 @@ function trainProfile(L, pos, old) {
   for (let k = 0; k < n; k++) {
     const s = Math.min(L, k * TRAIN_STEP), [x, z, h] = pos(s); fine[k] = H.fineAt(x, z) ? 1 : 0;
     if (!fine[k]) { raw[k] = old(s); prev = null; continue; }
-    const rx = Math.cos(h), rz = -Math.sin(h); let g = H.base(x, z); // across the line: S on the nearest cell of rail bed (material 6) within 3 m, else under the line
-    for (const o of [0, -0.75, 0.75, -1.5, 1.5, -2.25, 2.25, -3, 3]) if (H.mat(x + rx * o, z + rz * o) === 6) { g = H.base(x + rx * o, z + rz * o); break; }
+    const rx = Math.cos(h), rz = -Math.sin(h); let g = H.base(x, z); // across the line: the profile of the tracks (src/binari.py); else S on the nearest cell of rail bed (material 6) within 3 m, else under the line
+    const ry = H.railY(x, z, 4);
+    if (ry !== null) g = ry; else for (const o of [0, -0.75, 0.75, -1.5, 1.5, -2.25, 2.25, -3, 3]) if (H.mat(x + rx * o, z + rz * o) === 6) { g = H.base(x + rx * o, z + rz * o); break; }
     // the candidates: the rail bed and the railway decks within 3 m across; the one nearest the height the train has (a deck starts at the
     // level of the bed at its spalle, so a train runs onto its own bridge, and stays on the bed under the bridge of another line: PONTE 13
     // crosses the Milano-Asso 6 m over it at x -485, z 90, and the train jumped up onto it)
