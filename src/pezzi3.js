@@ -116,7 +116,9 @@ function tileTick(px, pz, budgetMs, force, soloDati) {
   }
   // the nearest tile not yet built is inside the ring it should have been built at: this frame may spend more, up to 4 times at 300 m (at speed in a town the front runs ahead of the budget; standing still nothing changes)
   cand.sort((a, b) => a.dist - b.dist); stend.sort((a, b) => a.dist - b.dist);
-  const fuori = cand.length ? Math.max(0, R_MESH - 110 - cand[0].dist) : 0, bud = force || soloDati ? budgetMs : budgetMs * (1 + Math.min(3, fuori / 117));
+  // while the front is on time a quarter of the frame is enough, whatever the frame rate: at 7 ms a frame the tiles alone would take the whole of a 165 Hz frame
+  const dtF = PZ.tf ? t0 - PZ.tf : 16; PZ.tf = t0;
+  const fuori = cand.length ? Math.max(0, R_MESH - 110 - cand[0].dist) : 0, bud = force || soloDati ? budgetMs : fuori > 0 || budgetMs > 7 ? budgetMs * (1 + Math.min(3, fuori / 117)) : clamp(dtF * 0.25, 1.2, budgetMs);
   // the pieces that have arrived: one at least per frame
   let k = 0;
   while (PZ.arrivi.length && (k++ === 0 || performance.now() - t0 < bud * 0.5)) { const [T, b] = PZ.arrivi.shift(), t1 = performance.now(); if (!T.l0) { try { pzArriva(T, b); } catch (e) { GRID_REC = null; console.error('pezzo ' + T.t, e); T.riprova = performance.now() + 3000; } } PZ.usa.arrivo += performance.now() - t1; }

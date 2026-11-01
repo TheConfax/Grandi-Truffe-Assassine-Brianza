@@ -1173,7 +1173,8 @@ function* buildTileGen(T) {
       if (tri & 1) { T.cellIdx[w] = B.b.i.length; T.cellMesh[w] = B.k; } const i0 = B.b.p.length / 3, vs = sy.vs;
       vtx(B.b, ax, ay, az, 0, 1, 0, ax / vs, az / vs, sy.col); vtx(B.b, bx, by, bz, 0, 1, 0, bx / vs, bz / vs, sy.col); vtx(B.b, cx, cy, cz, 0, 1, 0, cx / vs, cz / vs, sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
     });
-    for (const { b, sy } of byStyle.values()) T.ownMeshes.push(mkMesh(b, sy.m, -2, false, G));
+    { const s_ = srndT; yield 'terrain 2'; srndT = s_; } for (const { b, sy } of byStyle.values()) T.ownMeshes.push(mkMesh(b, sy.m, -2, false, G));
+    { const s_ = srndT; yield 'terrain 3'; srndT = s_; }
     // normals across the tile edges too (the neighbour's nodes, or one-sided where there is no tile of S): no seam in the light
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = j * n + i, x = FT.x0 + i * st, z = FT.z0 + j * st, y = FT.y[k];
@@ -1182,7 +1183,7 @@ function* buildTileGen(T) {
       const gx = e !== null && w !== null ? (e - w) / (2 * st) : e !== null ? (e - y) / st : (y - w) / st, gz = so !== null && no !== null ? (so - no) / (2 * st) : so !== null ? (so - y) / st : (y - no) / st;
       const L = Math.hypot(gx, 1, gz); nor[k * 3] = -gx / L; nor[k * 3 + 1] = 1 / L; nor[k * 3 + 2] = -gz / L;
     }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx.subarray(0, q), 1)); g.computeBoundingSphere();
+    { const s_ = srndT; yield 'terrain 4'; srndT = s_; } const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx.subarray(0, q), 1)); g.computeBoundingSphere();
     // phase 5: the mesh writes its own depth (the surfaces on it are cut on its cells and win by polygonOffset), so no depth mask under it
     const m = new THREE.Mesh(g, MAT.terrainS); m.renderOrder = -2; m.receiveShadow = true; G.add(m); T.terrMesh = m; T.st = st;
     if (H.PITS.length) buildPits(T, G);
@@ -1200,7 +1201,9 @@ function* buildTileGen(T) {
   {
     const gB = VBuf(), iB = VBuf(), pB = VBuf(), yB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
     gB.rk = 1; iB.rk = 1; pB.rk = 1.1; yB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
+    let tLu = performance.now();
     for (const a of d.a || []) {
+      if (performance.now() - tLu > 2.5) { const s_ = srndT; yield 'landuse'; srndT = s_; tLu = performance.now(); } // a town tile has hundreds of areas: this slice alone took 30 ms
       const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5) continue; // platforms are built raised, with their furniture
       if (T.fine && waterInBed(a, outer, holes, T)) continue; // water inside the bed: the water level below draws it
       try {
