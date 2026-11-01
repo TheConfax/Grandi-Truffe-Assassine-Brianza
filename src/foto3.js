@@ -80,7 +80,7 @@ const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
       U.uSunD.value.set(L.E, L.U, -L.Nn).normalize(); U.uSunC.value.copy(sun.color).multiplyScalar(sun.intensity * clamp(L.elDeg / 5, 0, 1) * (1 - WX.cloud * WX.cloud));
       WIN_SKY.value.setRGB(0, 0, 0);
     }
-    for (const T of TILES) if (T.sill) T.sill.visible = T.dist < 180; // the sills only round the player: thousands of them in a town
+    for (const T of VIVI) if (T.sill) T.sill.visible = T.dist < 180; // the sills only round the player: thousands of them in a town
     _far.material.color.convertSRGBToLinear(); _near.material.color.convertSRGBToLinear(); // the mountains' shade is set as a plain number
   };
 }

@@ -31,7 +31,7 @@ const TRAINS = D.trains.map((td, ti) => {
   const L = cum[cum.length - 1];
   const pos = s => { s = clamp(s, 0, L); let lo = 1, hi = cum.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cum[m] < s) lo = m + 1; else hi = m; } const i = lo, a = pts[i - 1], b = pts[i], f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), Math.atan2(b[0] - a[0], b[1] - a[1]), i, f]; };
   const old = s => { const [x, z, , i, f] = pos(s), a = pts[i - 1], b = pts[i]; if (hs[i - 1] == null && hs[i] == null) return H.base(x, z); return lerp(hs[i - 1] ?? H.base(a[0], a[1]), hs[i] ?? H.base(b[0], b[1]), f); };
-  let prof = null;
+  let prof = COT && COT.treni && COT.treni[ti] ? Float32Array.from(COT.treni[ti], v => v / 1000) : null; // the bake: it needs the ground along all the line
   const at = s => { s = clamp(s, 0, L); const [x, z, h] = pos(s); if (!prof) prof = trainProfile(L, pos, old); const k = Math.min(prof.length - 2, Math.floor(s / TRAIN_STEP)), f = s / TRAIN_STEP - k; return [x, z, h, lerp(prof[k], prof[k + 1], f)]; };
   const cars = [];
   const livery = ti % 2 ? ['#e9ece8', '#2b6fb3', '#1f2833'] : ['#eef0ec', '#2f8f55', '#1f2833'];
@@ -43,14 +43,15 @@ const TRAINS = D.trains.map((td, ti) => {
     scene.add(g); cars.push(g);
   }
   const stops = td.st.filter(s => s > 40 && s < L - 40).sort((a, b) => a - b);
-  return { pts, L, at, s: 30 + ti * 200, dir: 1, v: 0, wait: 4 + ti * 9, stops, done: new Set(), cars, circ: [], name: td.stn.join(', ') };
+  return { ti, prof: () => prof, pts, L, at, s: 30 + ti * 200, dir: 1, v: 0, wait: 4 + ti * 9, stops, done: new Set(), cars, circ: [], name: td.stn.join(', ') };
 }).filter(Boolean);
 const TR = TRAINS[0] || null;
-for (const g of LX) { // which train runs over each crossing
+function lxTreni() { for (const g of LX) { // which train runs over each crossing
   let best = null;
   TRAINS.forEach((T, ti) => { let bd = 1e9, bs = 0; for (let s = 0; s < T.L; s += 2) { const [x, z] = T.at(s), d = hyp(x - g.x, z - g.z); if (d < bd) { bd = d; bs = s; } } if (bd < 8 && (!best || bd < best[0])) best = [bd, ti, bs]; });
   if (best) { g.train = best[1]; g.sT = best[2]; }
-}
+} }
+if (!TUTTO) lxTreni();
 let bellT = 0;
 function updCrossings(dt) {
   let ring = 1e9;

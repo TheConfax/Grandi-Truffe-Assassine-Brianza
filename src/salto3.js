@@ -54,7 +54,7 @@ function saltoAbove(v) { return v === P.onV || (P.climb && P.climb.v === v) || P
 
 // ---- is a body with its feet at this height free here? null if so, else what is in the way. tol: walls lower than that over the feet do not count, as for the walker
 function capsuleFree(x, z, feet, r = SALTO.r, tol = 0.02, head = SALTO.head) {
-  if (Math.abs(x) > LIM_X || Math.abs(z) > LIM_Z) return 'limite';
+  if (x < ZONA[0] || x > ZONA[2] || z < ZONA[1] || z > ZONA[3]) return 'limite';
   if (H.surface(x, z) > feet + Math.max(tol, 0.02) + 0.02) return 'suolo';
   let hit = null;
   WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, s => {
@@ -260,7 +260,7 @@ function saltoCrosses(ax, az, bx, bz, y0, y1) {
 function footCollide() { // the walls push him out, feet and head when he is off the ground
   const pp = { x: P.x, z: P.z }; let air = P.air || P.knock > 0;
   for (let i = 0; i < 2; i++) { if (air) { collideStatic(pp, 0.4, P.y + 0.05); collideStatic(pp, 0.4, P.y + 1.7); } else collideStatic(pp, 0.4, P.y + 0.4); } // twice: in a sharp corner the second wall pushes him back into the first
-  P.x = clamp(pp.x, -LIM_X, LIM_X); P.z = clamp(pp.z, -LIM_Z, LIM_Z);
+  P.x = clamp(pp.x, ZONA[0], ZONA[2]); P.z = clamp(pp.z, ZONA[1], ZONA[3]);
 }
 const saltoLowBar = s => isBarrier(s) && s.y1 - (P.yg !== undefined ? P.yg : P.y) <= SALTO.maxBar + 0.8;
 function footGuard(x0, y0, z0, mx, mz) { // last word of the step. x0, y0, z0 where he was, mx, mz where his own step took him before any push

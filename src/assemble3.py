@@ -19,23 +19,20 @@ rep('<script id="mapdata" type="application/json">/*__MAP__*/</script>\n', '')
 rep("""<script>
 'use strict';""", """<script type="module">""")
 rep("const D = JSON.parse(document.getElementById('mapdata').textContent);", """const goBtn = document.getElementById('go');
-/* avvio veloce: l'indice e il pacco del terreno (src/terreno_pacco.py) partono insieme a brianza.json, e i tile si decomprimono in parallelo mentre il resto si legge; altezze3.js li prende da qui */
-/* i dati si leggono sempre ricontrollati col server (cache 'no-cache': 304 se non sono cambiati), mai dalla cache del browser senza chiedere (28/10: il server locale non dice Cache-Control e Chrome teneva per ore il terreno vecchio, cosi Carlo vedeva viale Francia e via Maroncelli come prima) */
-const FRESCO = { cache: 'no-cache' };
-const TERR_IND = fetch('terreno/indice.json', FRESCO).then(r => r.ok ? r.json() : null).catch(() => null);
-const TERR_BIN = TERR_IND.then(async j => { if (!j || j.ver !== 1 || !j.pacco) return null; try { const r = await fetch('terreno/' + j.pacco.file, FRESCO); if (!r.ok) return null; const b = new Uint8Array(await r.arrayBuffer()), m = new Map(); for (const k in j.pacco.tile) { const [o, l] = j.pacco.tile[k]; m.set(k, new Response(new Blob([b.subarray(o, o + l)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer().catch(() => null)); } return m; } catch (e) { return null; } });
+/* the world comes in pieces (pezzi3.js, docs/motore.md "Caricamento a pezzi"): at the start only what must be whole, mappa/globale.bin (the road graph, names, points of interest,
+   railways, what the bake decided on the whole map) and mappa/suolo.bin (the 10 m ground of all the playable zone). They are always checked with the server (cache 'no-cache');
+   the pieces carry the version in their address, so the browser can keep them without ever showing an old one */
+const QS = new URLSearchParams(location.search), COTTURA = QS.has('cuoci'), TUTTO = COTTURA || QS.has('tutto'); /* ?cuoci: the bake, src/cuoci.mjs; ?tutto: the whole map laid out, as the checks of the whole map need */
+const FRESCO = { cache: 'no-cache' }, PZ_DEC = new TextDecoder();
+const gunzip = async ab => new Uint8Array(await new Response(new Blob([ab]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+const leggiGz = async u => { const r = await fetch(u, FRESCO); if (!r.ok) throw new Error(u + ': HTTP ' + r.status); return gunzip(await r.arrayBuffer()); };
 goBtn.disabled = true; goBtn.textContent = 'CARICO LA BRIANZA…';
-const D = await (async () => {
-  const res = await fetch('brianza.json', FRESCO); const total = +res.headers.get('content-length') || 0;
-  if (!res.body || !total) return res.json();
-  const rd = res.body.getReader(), chunks = []; let got = 0;
-  for (;;) { const { done, value } = await rd.read(); if (done) break; chunks.push(value); got += value.length; goBtn.textContent = `CARICO LA BRIANZA… ${Math.round(got / total * 100)}%`; }
-  const all = new Uint8Array(got); let o = 0; for (const c of chunks) { all.set(c, o); o += c.length; }
-  return JSON.parse(new TextDecoder().decode(all));
-})();
+const [D, SUOLO] = await Promise.all([leggiGz('mappa/globale.bin').then(b => JSON.parse(PZ_DEC.decode(b))), leggiGz('mappa/suolo.bin').then(b => new Int16Array(b.buffer, b.byteOffset, b.byteLength >> 1))]);
+if (COTTURA) D.ng = (await (await fetch('mappa/solo_cottura.json', FRESCO)).json()).ng;
+const COT = TUTTO ? null : D.cotta;
 goBtn.textContent = 'COSTRUISCO LE STRADE…';
 await new Promise(r => setTimeout(r, 30));""")
-rep("const LIM_X = D.hw + 95, LIM_Z = D.hh + 95;", "const META = D.meta, LIM_X = META.hw - 4, LIM_Z = META.hh - 4;")
+rep("const LIM_X = D.hw + 95, LIM_Z = D.hh + 95;", "const META = D.meta, LIM_X = META.dati.hw - 4, LIM_Z = META.dati.hh - 4, ZONA = META.zona; /* LIM: where the data of the build reach (the graphs and what stands on them stop there, inLim); ZONA: how far you can go, all the playable zone */")
 rep("const N = D.nodes;", """const N = [], NHt = [];
 for (let i = 0; i < D.nodes.length; i += 3) { N.push([D.nodes[i] / 10, D.nodes[i + 1] / 10]); NHt.push(D.nodes[i + 2] === -32768 ? null : D.nodes[i + 2] / 10); }
 const dec = a => { const o = []; let x = 0, z = 0; for (let i = 0; i < a.length; i += 2) { x += a[i]; z += a[i + 1]; o.push([x / 10, z / 10]); } return o; };""")
@@ -55,7 +52,7 @@ const flatMat""", """  parent.add(m); return m;
 const flatMat""")
 
 # ---- world: replace everything from "the world" to "audio" with the tiled world + level-aware collisions
-world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'rotonde3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read()
+world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'rotonde3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'pezzi3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
 function collideStatic(p, r, y, veh) {
@@ -84,7 +81,7 @@ function rayWalls(ax, az, bx, bz, solidOnly) {
 }
 """
 cut("// ---------------------------------------------------------------- the world\n", "// ---------------------------------------------------------------- audio\n",
-    "// ---------------------------------------------------------------- the world\nconst ground = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false }));\ngroundTex.repeat.set(1200, 1200); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.5; ground.receiveShadow = true; ground.renderOrder = -4; scene.add(ground);\n" + coll + world + "\n")
+    "// ---------------------------------------------------------------- the world\nconst ground = new THREE.Mesh(new THREE.PlaneGeometry(14000, 14000), new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false }));\ngroundTex.repeat.set(1400, 1400); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.5; ground.receiveShadow = true; ground.renderOrder = -4; scene.add(ground);\n" + coll + world + "\n")
 # ---- trains
 cut("// ---------------------------------------------------------------- train (Ferrovia Milano-Asso)\n", "// ---------------------------------------------------------------- spawning helpers\n", open(os.path.join(HERE, 'trains3.js'), encoding='utf-8').read() + "\n")
 rep("if (TR) for (const c of TR.circ) check(c[0], c[1]);", "for (const c of TRAIN_CIRC) check(c[0], c[1]);")
@@ -130,7 +127,7 @@ function parkCheck(T) {
   for (const v of VEH.slice()) if (v.parkedTile && v.parkedTile !== T && v.driver === null && !v.moved && v !== P.car && v.speed < 0.1 && v.x > x0 && v.x < x1 && v.z > z0 && v.z < z1 && !carFree(v.spec, v.x, v.z, v.h, v.y)) v.remove();
 }
 function parkTile(T) {
-  T.parked = []; srndT = 77 + T.t * 131;
+  T.parked = []; srndT = 77 + T.seme * 131;
   const add = (m, x, z, h, src) => { if (H.inPit(x, z, 1.5)) return false; const y = H.surface(x, z); if (!carFree(MODELS[m], x, z, h, y)) return false; const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.src = src; v.y = y; v.sync(); T.parked.push(v); return true; };
   // car parks with painted stalls: about half of them taken, a car in each and never in the yellow one; lots without stalls keep a few loose cars
   let inStalls = 0;
@@ -178,7 +175,7 @@ function parkTile(T) {
   parkCaserme(T);
 }
 function parkTick() {
-  for (const T of TILES) {
+  for (const T of VIVI) {
     if (T.ready && T.pkChk !== T.group) { T.pkChk = T.group; parkCheck(T); } /* built again: its posts and benches are back in WALLS */
     if (!T.parked && T.ready && T.dist < 260) parkTile(T);
     else if (T.parked && T.dist > 480) {
@@ -193,10 +190,12 @@ function parkTick() {
 # ---- minimap drawn live from vector data, big map pre-rendered small
 a = s.index("// minimap source canvas (1 px = 1 m)"); b = s.index("const mm = $('minimap'), mg = mm.getContext('2d');")
 s = s[:a] + """// big map pre-rendered at 0.32 px/m
-const BIG_S = 0.32, BIGC = document.createElement('canvas'), BOX = Math.ceil(META.hw * BIG_S), BOZ = Math.ceil(META.hh * BIG_S);
-BIGC.width = BOX * 2; BIGC.height = BOZ * 2;
-{
-  const g = BIGC.getContext('2d'); g.fillStyle = '#20232b'; g.fillRect(0, 0, BIGC.width, BIGC.height); g.translate(BOX, BOZ); g.scale(BIG_S, BIG_S);
+// the bake draws it from the whole world (mappa/grande.png); the game takes the picture the first time the map opens
+const BIG_S = 0.32, BOX = Math.ceil(META.hw * BIG_S), BOZ = Math.ceil(META.hh * BIG_S); let BIGC = null;
+function bigLoad() { if (BIGC) return; BIGC = new Image(); BIGC.onload = () => { if (bigOpen) drawBig(); }; BIGC.src = 'mappa/grande.png?v=' + D.ver; }
+function bigCanvas() {
+  const C = document.createElement('canvas'); C.width = BOX * 2; C.height = BOZ * 2;
+  const g = C.getContext('2d'); g.fillStyle = '#20232b'; g.fillRect(0, 0, C.width, C.height); g.translate(BOX, BOZ); g.scale(BIG_S, BIG_S);
   for (const T of TILES) for (const a of T.d.a || []) if (a.t <= 3 || a.t >= 11) { const o = dec(a.p); g.beginPath(); o.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fillStyle = a.t === 11 ? '#2b4428' : a.t === 13 ? '#3a3f2c' : '#2f4a2c'; g.fill(); }
   g.fillStyle = '#3a3e49'; for (const b of BUILDINGS) { g.beginPath(); b.pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fill(); }
   g.lineCap = 'round'; g.lineJoin = 'round';
@@ -206,6 +205,7 @@ BIGC.width = BOX * 2; BIGC.height = BOZ * 2;
   }
   g.setLineDash([12, 10]); g.strokeStyle = '#c96b4a'; g.lineWidth = 4; for (const r of RAILPTS) { g.beginPath(); r.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); } g.setLineDash([]);
   g.strokeStyle = 'rgba(255,60,40,.9)'; g.lineWidth = 9; for (const c of CONFINE) { g.beginPath(); c.p.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.stroke(); } /* the edge of the area drawn from the DBGT (confine3.js) */
+  return C;
 }
 """ + s[b:]
 a = s.index("function drawMinimap() {"); b = s.index("function drawBig() {")
@@ -244,7 +244,7 @@ s = s[:a] + """function drawMinimap() {
 }
 """ + s[b:]
 rep("for (const p of D.pois) if (['stazione', 'chiesa', 'polizia', 'parco', 'monumento'].includes(p.k) && p.n.length < 30 && !p.n.startsWith('Grotta')) {",
-    "for (const p of [...PLACES.filter(p => (p.k === 'town' || p.k === 'village') && Math.abs(p.x) < META.hw - 150 && Math.abs(p.z) < META.hh - 60).map(p => ({ ...p, big: 1 })), ...D.pois.filter(p => ['stazione', 'chiesa', 'parco'].includes(p.k))]) if (p.n.length < 30 && !p.n.startsWith('Grotta')) {")
+    "for (const p of [...PLACES.filter(p => (p.k === 'town' || p.k === 'village') && Math.abs(p.x) < META.dati.hw - 150 && Math.abs(p.z) < META.dati.hh - 60).map(p => ({ ...p, big: 1 })), ...D.pois.filter(p => ['stazione', 'chiesa', 'parco'].includes(p.k))]) if (p.n.length < 30 && !p.n.startsWith('Grotta')) {")
 rep("lab(p, '#c9bfa8', 5 * dpr); g.fillStyle = '#e8e0cc'; g.fillText(p.n, p.x + 8 * dpr / sc, p.z + 5 * dpr / sc);",
     "if (p.big) { g.save(); g.font = `400 ${20 * dpr / sc}px Bungee, Impact, sans-serif`; g.fillStyle = '#f0b23c'; g.fillText(p.n.toUpperCase(), p.x, p.z); g.restore(); } else { lab(p, '#c9bfa8', 5 * dpr); g.fillStyle = '#e8e0cc'; g.fillText(p.n, p.x + 8 * dpr / sc, p.z + 5 * dpr / sc); }")
 rep("<div class=\"cap\">MEDA<span>", "<div class=\"cap\">BRIANZA<span>")
@@ -254,8 +254,8 @@ rep("$('street').textContent = (st || 'Meda') + (TER ? ` · ${Math.round(TER.bas
     "$('street').textContent = (st ? st + ' · ' : '') + (placeAt(P.x, P.z) || 'Brianza') + ` · ${Math.round(TER.base + (P.mode === 'car' ? P.car.y : P.y))} m`;")
 rep("const spot = D.pois.find(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')) || { x: 0, z: 0 };",
     "const cands = D.pois.filter(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')), spot = cands.sort((a, b) => hyp(a.x - P.x, a.z - P.z) - hyp(b.x - P.x, b.z - P.z))[0] || STATION;")
-rep("banner(kind === 'busted' ? 'Polizia Locale' : 'Stazione di Meda', 'DI NUOVO IN STRADA');", "banner(spot.n || 'Meda', 'DI NUOVO IN STRADA');")
-rep("const STATION = D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0 };", "const STATION = D.pois.find(p => p.n === 'Stazione di Meda') || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Meda' };\nconst START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && Math.abs(x) < META.hw && Math.abs(z) < META.hh) return { x, z, n: 'Punto', piedi: q.has('piedi'), mezzo: q.get('mezzo') }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */")
+rep("banner(kind === 'busted' ? 'Polizia Locale' : 'Stazione di Meda', 'DI NUOVO IN STRADA');", "banner(spot.n || 'Brianza', 'DI NUOVO IN STRADA');")
+rep("const STATION = D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0 };", "const STATION = D.pois.find(p => p.n === META.partenza.stazione) || D.pois.find(p => p.k === 'stazione') || { x: 0, z: 0, n: 'Brianza' };\nconst START = (() => { try { const q = new URLSearchParams(location.search), x = parseFloat(q.get('x')), z = parseFloat(q.get('z')); if (isFinite(x) && isFinite(z) && x > ZONA[0] && x < ZONA[2] && z > ZONA[1] && z < ZONA[3]) return { x, z, n: 'Punto', piedi: q.has('piedi'), mezzo: q.get('mezzo') }; } catch (e) { } return null; })() || STATION; /* ?x=..&z=.. in the address starts the game there (links in the reports and for the collaudo) */")
 rep("""function setupWorld(saved) {
   spawnParked();""", """function setupWorld(saved) {
   tileTick(STATION.x, STATION.z, 0, 420);
@@ -265,8 +265,8 @@ rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z
 rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
-rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, GATES, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };")
+rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { VIVI, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -424,10 +424,10 @@ rep("""  const n = nearestNode(TRAF_NODES, STATION.x, STATION.z), e = TRAF[n][0]
   const h = Math.atan2(p1[0] - p0[0], p1[1] - p0[1]);
   const mine = new Vehicle('sport', '#d0141a', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;""",
 """  const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
-  const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
+  const [sx, sz] = LL(META.partenza.lat, META.partenza.lon), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
   const h = Math.atan2(FO[0] - sx, FO[1] - sz);
   const mine = new Vehicle('sport', '#d0141a', sx, sz, h); mine.moved = true;""")
-rep("  tileTick(STATION.x, STATION.z, 0, 420);\n  for (const T of TILES) T.dist = hyp(T.cx - STATION.x, T.cz - STATION.z);", "  tileTick(STATION.x + 190, STATION.z + 66, 0, 260); /* avvio veloce: solo i tile attorno alla partenza prima del pulsante, gli altri entro 420 m si costruiscono sotto la schermata iniziale (12 ms a fotogramma) */\n  for (const T of TILES) T.dist = hyp(T.cx - STATION.x - 190, T.cz - STATION.z - 66);")
+rep("  tileTick(STATION.x, STATION.z, 0, 420);\n  for (const T of TILES) T.dist = hyp(T.cx - STATION.x, T.cz - STATION.z);", "  { const [p0x, p0z] = partenza(); tileTick(p0x, p0z, 0, 260); for (const T of TILES) T.dist = hyp(T.cx - p0x, T.cz - p0z); } /* avvio veloce: solo i tile attorno alla partenza prima del pulsante, gli altri entro 420 m si costruiscono sotto la schermata iniziale (12 ms a fotogramma) */")
 # title: everything yellow, only G T A in red
 rep("#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ink);", "#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ocra);")
 rep("#start h1 { font-family: var(--display);", "#start h1 { color: var(--ocra) !important; font-family: var(--display);")
@@ -449,7 +449,7 @@ rep("#health i {", "#clock { font-family: var(--display); font-size: 20px; lette
 rep("  if (e.code === 'KeyU') {", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyU') {")
 rep("      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>", "      <div><kbd>H</kbd> clacson · <kbd>P</kbd> pausa</div>\n      <div><kbd>N</kbd> avanti di 2 ore</div>")
 rep("<kbd>H</kbd> clacson · <kbd>U</kbd> audio</p>", "<kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>U</kbd> audio</p>")
-rep("banner('Stazione di Meda', 'BRIANZA')", "banner('Via Yuri Gagarin', 'MEDA')")
+rep("banner('Stazione di Meda', 'BRIANZA')", "banner(META.partenza.via, META.partenza.comune)")
 # open land defaults to Brianza meadow, not grey-white
 rep("const groundTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#a4a396'; g.fillRect(0, 0, w, h); noise(g, w, h, 7000, 0.3, ['#8b8c7c', '#b7b5a8', '#8f9a74', '#7d8a5e']); });",
     "const groundTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#7b8f4e'; g.fillRect(0, 0, w, h); noise(g, w, h, 9000, 0.4, ['#6a7f40', '#8ea05c', '#94875a', '#5f7438', '#a39a68']); });")
@@ -576,12 +576,12 @@ rep("const n = nearestNode(WALK_NODES, spot.x, spot.z); P.x = N[n][0]; P.z = N[n
 # ---- cheat codes in the pause menu: RESPAWN back to the start in Meda with the Ferari, FERARI spawns one
 rep("""function setupWorld(saved) {""", """function startSpot() { // the parking on via Yuri Gagarin in Meda, facing the fountain
   const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
-  const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
+  const [sx, sz] = LL(META.partenza.lat, META.partenza.lon), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
   return [sx, sz, Math.atan2(FO[0] - sx, FO[1] - sz)];
 }
 function setupWorld(saved) {""")
 rep("""  const LL = (la, lo) => [(lo - META.lon0) * 111320 * Math.cos(META.lat0 * Math.PI / 180), -(la - META.lat0) * 110540];
-  const [sx, sz] = LL(45.661706, 9.161211), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
+  const [sx, sz] = LL(META.partenza.lat, META.partenza.lon), FO = (D.fountains || []).map(f => [f[0] / 10, f[1] / 10]).sort((a, b) => hyp(a[0] - sx, a[1] - sz) - hyp(b[0] - sx, b[1] - sz))[0] || [STATION.x, STATION.z];
   const h = Math.atan2(FO[0] - sx, FO[1] - sz);
   const mine""", """  const [sx, sz, h] = startSpot();
   const mine""")
@@ -591,14 +591,14 @@ function ferari(x, z, h) { // a red Ferari at (x,z), clearing whatever is parked
   for (const o of VEH.slice()) if (o !== P.car && hyp(o.x - x, o.z - z) < 5) o.remove();
   const v = new Vehicle('sport', '#d0141a', x, z, h); v.moved = true; v.y = H.surface(x, z); v.sync(); return v;
 }
-function cheatRespawn() { // back to the start: via Yuri Gagarin, on foot next to the Ferari, no stars
+async function cheatRespawn() { // back to the start: via Yuri Gagarin, on foot next to the Ferari, no stars
   if (P.car) { P.car.driver = null; P.car.boost = false; P.car.inp = { thr: 0, brk: 0, steer: 0, hand: 1 }; P.car = null; }
-  const [sx, sz, h] = startSpot(); tileTick(sx, sz, 0, 420);
+  const [sx, sz, h] = startSpot(); await mondoPronto(sx, sz, 420); tileTick(sx, sz, 0, 420);
   const mine = ferari(sx, sz, h);
   P.x = mine.x + Math.cos(h) * 2.4; P.z = mine.z - Math.sin(h) * 2.4; if (inBuilding(P.x, P.z, 0.5)) { P.x = mine.x - Math.cos(h) * 2.4; P.z = mine.z + Math.sin(h) * 2.4; }
   P.h = h; P.y = H.surface(P.x, P.z); P.mode = 'foot'; P.model.g.visible = true; P.hp = 100; P.knock = 0; P.vx = P.vz = P.vy = 0;
   W.heat = 0; W.stars = 0; W.busted = 0; W.bustT = 0;
-  camInit = false; banner('Via Yuri Gagarin', 'MEDA');
+  camInit = false; banner(META.partenza.via, META.partenza.comune);
 }
 function cheatFerari() { // on foot: a Ferari right in front of you; driving: whatever you are in turns into one
   if (P.car) {
@@ -772,7 +772,7 @@ rep("if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - 
 rep("    const f = rayCam(px, pz, cx, cz, wy);", "    if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */\n    const f = rayCam(px, pz, cx, cz, wy);")
 rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = Math.max(fy, H.ground(cx, cz)) + ht;")
 rep("  camera.position.copy(camPos);\n  if (shake > 0)", "  if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */\n  camera.position.copy(camPos);\n  if (shake > 0)")
-rep("window.__G = { FUEL,", "window.__G = { FIS, step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
+rep("window.__G = { VIVI,", "window.__G = { FIS, step, updVisuals, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
 # ---- a car off its wheels (Carlo, 1/11): fisica3.js. It steps with no grip, it turns round its waist, on its roof it is finished, he always gets out in a free place
 rep("    if (this.air) { this.stepAir(dt); return; }\n", "    if (this.air || (this.F && this.F.rig)) { this.stepAir(dt); return; }\n")
 rep("    const i = this.inp, k = 1 - 0.0004 * this.speed * dt;\n", "    const i = this.ko ? KO_INP : this.inp, k = 1 - 0.0004 * this.speed * dt;\n")

@@ -2,7 +2,7 @@
 // What counts is what the game draws (the kinds of src/barriere.py), not the DBGT code: 5 wire mesh, 7 post and rail break one
 // panel at a time (the 2-3 m piece you hit), which flies off with a few bits; 3 a hedge opens only where the car passes, a hole as wide as the
 // car, and slows it; 1 wall, 2 low wall with railings, 4 retaining wall, 6 railway fence (drawn as a concrete kerb with mesh panels on top: it looks like a low wall with railings) never. Every break slows the car and does it a little harm. The broken
-// pieces stay broken while their tile is built: a tile built again (you went away and came back) has them all whole. The railway corridor
+// pieces stay broken for good (BAR_ROTTE), also when their tile goes away and comes back. The railway corridor
 // fences of OSM (T.fe: a 0.9 m concrete wall under the net) stay solid, the gates and the building-site panels as they were.
 // The collision segments are those of world3.js (one per drawn segment, in WALLS); a broken one is off (s.off, skipped by collideStatic and
 // rayWalls). The mesh stays one per material per tile: a broken piece knows its index ranges and has them zeroed.
@@ -12,7 +12,7 @@ const BAR_MIN_P = 3, BAR_VN_P = 1.2, BAR_MIN_H = 2.5, BAR_VN_H = 0.8; // m/s: sp
 const BAR_KEYS = ['wl', 'ft', 'hd', 'wlP0', 'wlP1', 'bars', 'mesh', 'rly', 'wood'];
 const BAR_CAST = { wl: 'cast', hd: 'cast', wlP0: 'cast', wlP1: 'cast', wood: 'cast' };
 const barMats = () => ({ wl: MAT.wall, ft: MAT.railing, hd: MAT.hedge, wlP0: MAT.wallPlaster, wlP1: MAT.wallOchre, bars: MAT.bars, mesh: MAT.mesh, rly: MAT.railPanel, wood: MAT.wood });
-const BARG = new Grid(8), BAR_FLY = [], BAR_DOWN = [];
+const BARG = new Grid(8), BAR_FLY = [], BAR_DOWN = [], BAR_ROTTE = new Map(); // BAR_ROTTE: what cars have broken, for good: a panel 1, a hedge its cuts. Its tile can go away and come back
 // the foot of a barrier (lisciatore, phase 2, 31/10; it was decided vertex by vertex, 28/10, and the 2 m cells made it come and go: fences up and down
 // like a saw along the tracks, a net rising alone for 3 m by a football pitch, Carlo). Now it is decided per stretch, on whole chains of lines (the
 // pieces the tiles and the junctions cut one line into, joined again), and it reads the same for the drawing, the pieces a car breaks and the collisions:
@@ -122,9 +122,9 @@ const barBufs = () => { const B = { posts: [] }; for (const k of BAR_KEYS) B[k] 
 
 // the pieces of one barrier of tile T (rec as world3.js keeps it in T.ba, segs[k - 1] the collision segment of its segment k or null)
 function barPieces(T, rec, segs) {
-  const sp = BAR_PANEL[rec.t], pts = rec.pts; rec.pc = [];
+  const sp = BAR_PANEL[rec.t], pts = rec.pts, ki = T.t + ':' + (T.ba.length - 1) + ':'; rec.pc = [];
   const add = pc => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const s of pc.segs) { x0 = Math.min(x0, s.ax, s.bx); z0 = Math.min(z0, s.az, s.bz); x1 = Math.max(x1, s.ax, s.bx); z1 = Math.max(z1, s.az, s.bz); }
-    pc.gy = (barFoot(pts[pc.k0 - 1]) + barFoot(pts[pc.k1])) / 2; BARG.add(x0 - 0.5, z0 - 0.5, x1 + 0.5, z1 + 0.5, pc); (T.barPc || (T.barPc = [])).push(pc); for (let k = pc.k0; k <= pc.k1; k++) rec.pc[k] = pc; };
+    pc.gy = (barFoot(pts[pc.k0 - 1]) + barFoot(pts[pc.k1])) / 2; BARG.add(x0 - 0.5, z0 - 0.5, x1 + 0.5, z1 + 0.5, pc); (T.barPc || (T.barPc = [])).push(pc); for (let k = pc.k0; k <= pc.k1; k++) rec.pc[k] = pc; pc.key = ki + pc.k0; if (BAR_ROTTE.get(pc.key) === 1) { pc.off = true; for (const s of pc.segs) s.off = true; } };
   if (!sp) { // a hedge: each segment on its own, cut where the car passes
     for (let k = 1; k < pts.length; k++) if (segs[k - 1]) add({ T, rec, t: 3, hedge: true, k0: k, k1: k, segs: [segs[k - 1]], seg: segs[k - 1], cut: [], subs: [] });
     return;
@@ -181,10 +181,13 @@ function barTile(T, B, G) {
     const pm = new THREE.InstancedMesh(pg, MAT.post, B.posts.length), mtx = new THREE.Matrix4(), sc = new THREE.Vector3(), qq = new THREE.Quaternion(), pp = new THREE.Vector3();
     B.posts.forEach(([x, z, y, h], i) => { mtx.compose(pp.set(x, y, z), qq, sc.set(1, Math.max(0.1, h), 1)); pm.setMatrixAt(i, mtx); }); G.add(pm); M.posts = pm;
   }
+  const tagli = [];
   for (const pc of T.barPc || []) {
-    pc.M = M; pc.off = false; for (const s of pc.segs) s.off = false;
-    if (pc.hedge) { pc.cut = []; pc.rep = null; pc.hid = false; pc.ext = 0; for (const s of pc.subs) s.off = true; }
+    pc.M = M; const st = BAR_ROTTE.get(pc.key);
+    if (pc.hedge) { pc.off = false; for (const s of pc.segs) s.off = false; pc.cut = st ? st.cut.map(c => c.slice()) : []; pc.rep = null; pc.hid = false; pc.ext = st ? st.ext : 0; for (const s of pc.subs) s.off = true; if (st) tagli.push(pc); continue; }
+    pc.off = !!st; for (const s of pc.segs) s.off = !!st; if (st) barHide(pc); // broken stays broken
   }
+  for (const pc of tagli) hedgeRedraw(pc);
   for (let i = BAR_FLY.length - 1; i >= 0; i--) if (BAR_FLY[i].T === T) BAR_FLY.splice(i, 1);
   for (let i = BAR_DOWN.length - 1; i >= 0; i--) if (BAR_DOWN[i].T === T) BAR_DOWN.splice(i, 1);
 }
@@ -206,7 +209,7 @@ function barHits(v) {
   });
 }
 function barBreak(pc, v) {
-  pc.off = true; for (const s of pc.segs) s.off = true; barHide(pc);
+  pc.off = true; BAR_ROTTE.set(pc.key, 1); for (const s of pc.segs) s.off = true; barHide(pc);
   const sp = BAR_PANEL[pc.t], speed = v.speed;
   v.vx *= sp.slow; v.vz *= sp.slow; v.health = Math.max(0, v.health - sp.dmg);
   if (v === P.car) { sfxCrash(Math.min(9, speed)); shake = Math.max(shake, 0.3); }
@@ -246,9 +249,9 @@ function hedgeHit(pc, v, cs, R) {
     got += hedgeCut(pc, t0, t1) * L;
   }
   if (got < 0.01) return;
-  hedgeRedraw(pc);
+  hedgeRedraw(pc); BAR_ROTTE.set(pc.key, { cut: pc.cut, ext: pc.ext });
   for (const [nb, at, e] of [[pc.rec.pc[pc.k0 - 1], 0, 2], [pc.rec.pc[pc.k0 + 1], 1, 1]]) // cut to its end: the next piece of hedge closed on that side
-    if (nb && nb.hedge && nb !== pc && !(nb.ext & e) && pc.cut.some(([a, b]) => at ? b > 1 - 1e-6 : a < 1e-6)) { nb.ext |= e; hedgeRedraw(nb); }
+    if (nb && nb.hedge && nb !== pc && !(nb.ext & e) && pc.cut.some(([a, b]) => at ? b > 1 - 1e-6 : a < 1e-6)) { nb.ext |= e; hedgeRedraw(nb); BAR_ROTTE.set(nb.key, { cut: nb.cut, ext: nb.ext }); }
   const f = Math.exp(-BAR_HEDGE.slowPerM * got), speed = v.speed; v.vx *= f; v.vz *= f; v.health = Math.max(0, v.health - BAR_HEDGE.dmgPerM * got);
   if (v === P.car) { if (got > 0.3) sfxCrash(Math.min(4, 2 + speed * 0.1)); shake = Math.max(shake, 0.12); }
   if (window.__BAR_LOG) __BAR_LOG.push({ t: 3, v0: speed, v1: v.speed, dmg: BAR_HEDGE.dmgPerM * got, m: got, d: v.driver, k: v.kind, x: v.x, z: v.z, ai: v.ai && (v.ai.state || v.ai.mode), vn: Math.abs(v.vx * pc.seg.nx + v.vz * pc.seg.nz), h: v.h });

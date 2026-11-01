@@ -162,10 +162,12 @@ const N = D.nodes;
 const COL = h => new THREE.Color(h);
 
 // ---------------------------------------------------------------- spatial grid
+let GRID_REC = null; // while a piece is laid out (pezzi3.js): what goes in any grid is noted here, so it can come out again
 class Grid {
   constructor(cs) { this.cs = cs; this.m = new Map(); this.q = 0; }
-  k(i, j) { return (i + 500) * 1000 + (j + 500); }
+  k(i, j) { return (i + 5000) * 20000 + (j + 5000); }
   add(x0, z0, x1, z1, it) {
+    if (GRID_REC) GRID_REC.push(this, x0, z0, x1, z1, it);
     const c = this.cs;
     for (let i = Math.floor(Math.min(x0, x1) / c); i <= Math.floor(Math.max(x0, x1) / c); i++)
       for (let j = Math.floor(Math.min(z0, z1) / c); j <= Math.floor(Math.max(z0, z1) / c); j++) {
@@ -997,8 +999,8 @@ class Vehicle {
       if (n) { this.x += p.x - c[0]; this.z += p.z - c[1]; hitN = n; }
     }
     // keep inside the playable area
-    if (Math.abs(this.x) > LIM_X) { this.x = Math.sign(this.x) * LIM_X; this.vx *= -0.3; }
-    if (Math.abs(this.z) > LIM_Z) { this.z = Math.sign(this.z) * LIM_Z; this.vz *= -0.3; }
+    if (this.x < ZONA[0] || this.x > ZONA[2]) { this.x = clamp(this.x, ZONA[0], ZONA[2]); this.vx *= -0.3; }
+    if (this.z < ZONA[1] || this.z > ZONA[3]) { this.z = clamp(this.z, ZONA[1], ZONA[3]); this.vz *= -0.3; }
     // ride over kerbs: front and rear axle heights
     const [cf, cb] = this.circles(), yf = surfY(cf[0], cf[1]), yb = surfY(cb[0], cb[1]), ty = (yf + yb) / 2;
     if (ty > this.y + 0.08 && this === P.car && this.speed > 6) shake = Math.max(shake, 0.12);
@@ -1344,7 +1346,7 @@ function drawBig() {
   const c = $('bigmap'), dpr = Math.min(2, devicePixelRatio || 1); if (c.width !== Math.round(innerWidth * dpr) || c.height !== Math.round(innerHeight * dpr)) { c.width = innerWidth * dpr; c.height = innerHeight * dpr; }
   const g = c.getContext('2d'); BIGV.fit = Math.min(c.width / (META.hw * 2), c.height / (META.hh * 2)) * 0.96; if (!BIGV.z) BIGV.z = BIGV.fit; const sc = BIGV.z;
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#16181e'; g.fillRect(0, 0, c.width, c.height); g.save(); g.translate(c.width / 2, c.height / 2); g.scale(sc, sc); g.translate(-BIGV.cx, -BIGV.cz);
-  g.drawImage(BIGC, -META.hw, -META.hh, META.hw * 2, META.hh * 2);
+  if (BIGC && BIGC.complete) g.drawImage(BIGC, -META.hw, -META.hh, META.hw * 2, META.hh * 2);
   if (sc > 0.7) { // close up: buildings and streets drawn sharp from the map data, only what is on screen
     const hx = c.width / 2 / sc, hz = c.height / 2 / sc, x0 = BIGV.cx - hx, x1 = BIGV.cx + hx, z0 = BIGV.cz - hz, z1 = BIGV.cz + hz;
     g.fillStyle = '#3a3e49'; BLD.each(x0, z0, x1, z1, b => { g.beginPath(); b.pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fill(); });
@@ -1405,7 +1407,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) K[k] = false; });
 addEventListener('blur', () => { for (const k in K) K[k] = false; });
 function togglePause() { if (bigOpen) return toggleBig(); paused = !paused; $('pause').hidden = !paused; if (AU.ctx) paused ? AU.ctx.suspend() : AU.ctx.resume(); }
-function toggleBig() { bigOpen = !bigOpen; $('big').hidden = !bigOpen; paused = bigOpen; if (bigOpen) drawBig(); }
+function toggleBig() { bigLoad(); bigOpen = !bigOpen; $('big').hidden = !bigOpen; paused = bigOpen; if (bigOpen) drawBig(); }
 $('big').addEventListener('click', toggleBig);
 // touch controls
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -1892,6 +1894,8 @@ function startGame() {
 $('go').addEventListener('click', startGame);
 function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
+if (TUTTO) await cuoci();
+{ const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
 window.__G = { D, LX, MODELS, Vehicle, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, TR };
 </script>

@@ -546,8 +546,8 @@ class Sottoterra:
 
 
     def scrivi(s, out):
-        """fosse_meda.json (the ramps for terreno_gioco.py) and sottoterra_casi.json (every pit and its outcome: the list of docs/sottoterra.md)"""
-        json.dump(dict(fosse=s.pits), open(os.path.join(out, 'fosse_meda.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+        """fosse.json (the ramps for terreno_gioco.py) and sottoterra_casi.json (every pit and its outcome: the list of docs/sottoterra.md)"""
+        json.dump(dict(fosse=s.pits), open(os.path.join(out, 'fosse.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
         np.save(os.path.join(out, 'sottoterra_riempiti.npy'), s.FILL)   # the nodes of L filled (2 m lattice of S): where S may change
         keep = ('cx', 'cz', 'area', 'dmax', 'largh', 'lung', 'r2', 'pend', 'salto', 'f_edi', 'cop', 'pc', 'pc_m', 'v08_m', 'osm', 'fonti', 'esito', 'perche', 'rampa_possibile')
         f1 = [dict({k: p.get(k) for k in keep}, vista=(p['vista'] or {}).get('nota')) for p in s.pits1]

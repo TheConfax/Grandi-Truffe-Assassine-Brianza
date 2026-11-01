@@ -13,9 +13,12 @@ const VBuf = () => Object.assign(Buf(), { drape: true, vis: true, hf: H.vis }); 
 }
 
 // ---------------------------------------------------------------- tiles & static data
-const TS = META.tile, NTX = META.ntx, NTZ = META.ntz;
-const TILES = D.tiles.map((d, t) => ({ t, d, cx: -META.hw + (t % NTX + 0.5) * TS, cz: -META.hh + (Math.floor(t / NTX) + 0.5) * TS, built: false, group: null, parked: null, bld: [], fe: [], tr: [], sd: [] }));
-const tileOf = (x, z) => clamp(Math.floor((x + META.hw) / TS), 0, NTX - 1) + NTX * clamp(Math.floor((z + META.hh) / TS), 0, NTZ - 1);
+const TS = META.tile, NTX = META.ntx, NTZ = META.ntz, TDX = Math.round((META.hw - META.dati.hw) / TS), TDZ = Math.round((META.hh - META.dati.hh) / TS); // TDX, TDZ: as DX, DZ in altezze3.js
+const NOD = Object.freeze({}), VIVI = new Set(); // a tile with no piece in it reads NOD; VIVI: the tiles with something loaded (pezzi3.js)
+// the draws of a tile (colours, trees, parked cars) hang on its place, not on the number it has in the grid of the moment: T.seme is the number of that place in the first grid of the game
+const semeDi = t => { const S = META.seme, a = t % NTX - Math.round((META.hw - S.hw) / TS), b = Math.floor(t / NTX) - Math.round((META.hh - S.hh) / TS); return a >= 0 && b >= 0 && a < S.nx && b < S.nz ? a + S.nx * b : S.nx * S.nz + t; };
+const TILES = Array.from({ length: NTX * NTZ }, (_, t) => ({ t, seme: semeDi(t), d: NOD, cx: -META.dati.hw + (t % NTX - TDX + 0.5) * TS, cz: -META.dati.hh + (Math.floor(t / NTX) - TDZ + 0.5) * TS, dist: 1e9, built: false, group: null, parked: null, bld: [], fe: [], tr: [], sd: [], l0: false, lw: false }));
+const tileOf = (x, z) => clamp(Math.floor((x + META.dati.hw) / TS) + TDX, 0, NTX - 1) + NTX * clamp(Math.floor((z + META.dati.hh) / TS) + TDZ, 0, NTZ - 1);
 const BUILDINGS = [];
 const SIDEG = new Grid(24), DECKG = new Grid(16), ROADSEG = new Grid(24), STREETS = new Grid(24), NODEG = new Grid(40);
 const SIDE_H = 0.15;
@@ -24,7 +27,7 @@ const PLATG = new Grid(24), PLAT_H = 0.55; // railway platforms (banchine), rais
 // engine and is in its trench in S: the signs of the junction by (108, 46) were placed as if it were up in the air, in the middle of it, collaudo 3)
 function atGrade(s) {
   if (!s.r.d) return true;
-  if (s.gr === undefined) { const mx = (s.a[0] + s.b[0]) / 2, mz = (s.a[1] + s.b[1]) / 2; s.gr = H.fineAt(mx, mz) && (H.node(s.ia) + H.node(s.ib)) / 2 - H.base(mx, mz) < 0.8; }
+  if (s.gr === undefined) { const mx = (s.a[0] + s.b[0]) / 2, mz = (s.a[1] + s.b[1]) / 2; if (H.has(tileOf(mx, mz)) && !H.fineAt(mx, mz)) return false; /* its tile of S is not here yet: asked again */ s.gr = H.fineAt(mx, mz) && (H.node(s.ia) + H.node(s.ib)) / 2 - H.base(mx, mz) < 0.8; }
   return s.gr;
 }
 // a thing of the street furniture standing on the asphalt of a road on the ground: moved square to it, 0.9 m past its edge, on the side it
@@ -45,7 +48,7 @@ function offRoad(x, z) {
 // corners) the band of the axis alone let them stand on it. A bit grid at 0.5 m per tile, made the first time a tile is asked
 const ASPH_S = 2, ASPH_N = TS * ASPH_S; let asphCv = null;
 function asphGrid(T, key = 'as') { // key 'ap': the carriageways on the bridges (AC_VEI SED 02, the deck draws them), for the guardrails of the ramps
-  const gk = key === 'as' ? 'asG' : 'apG'; if (T[gk] !== undefined) return T[gk]; const as = T.d[key] || []; if (!as.length) return (T[gk] = null);
+  const gk = key === 'as' ? 'asG' : 'apG'; if (T.d === NOD) return null; if (T[gk] !== undefined) return T[gk]; const as = T.d[key] || []; if (!as.length) return (T[gk] = null);
   if (!asphCv) { asphCv = document.createElement('canvas'); asphCv.width = asphCv.height = ASPH_N; }
   const g = asphCv.getContext('2d', { willReadFrequently: true }), x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, ASPH_N, ASPH_N); g.setTransform(ASPH_S, 0, 0, ASPH_S, -x0 * ASPH_S, -z0 * ASPH_S); g.fillStyle = '#fff';
@@ -95,13 +98,18 @@ const inWater = (x, z, gy) => { if (!H.fineAt(x, z)) return false; const w = H.w
 const treeNear = (x, z, r) => { let f = false; WALLS.each(x - r, z - r, x + r, z + r, o => { if (o.tree && hyp(o.x - x, o.z - z) < r) f = true; }); return f; };
 const EDIF = new Map(); // DBGT building -> its volumes on the ground (a shop looks for its front on all of them)
 // the barriers of the whole map, before the tiles keep them: their feet are decided on whole chains of lines (barFeetAll, sfondabili3.js)
-{ const all = []; for (const T of TILES) { T.feQ = []; T.baQ = []; for (const f of T.d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) { T.feQ.push(q); all.push(q); } for (const br of T.d.ba || []) for (const q of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) { T.baQ.push([br, q]); all.push(q); } } barFeetAll(all); }
-for (const T of TILES) {
+function tileLinee(T) { // the lines of a tile, cut at the ramps; their feet from the bake (bf: g0, fy - g0, g0 - lo in mm, pl), or barFeetAll when the whole map is there (pezzi3.js cuoci)
+  const d = T.d, bf = COT ? d.bf : null; T.feQ = []; T.baQ = []; let n = 0;
+  const piedi = q => { if (!bf) return; const a = bf[n++]; for (let i = 0; i < q.length; i++) { const p = q[i], g = a[i * 4] / 1000; p.g0 = g; p.fy = g + a[i * 4 + 1] / 1000; p.lo = g - a[i * 4 + 2] / 1000; p.pl = !!a[i * 4 + 3]; } };
+  for (const f of d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) { T.feQ.push(q); piedi(q); }
+  for (const br of d.ba || []) for (const q of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) { T.baQ.push([br, q]); piedi(q); }
+}
+function layMuri(T) {
   const d = T.d;
   for (const B of d.b || []) {
     const outer = dec(B.p); if (outer.length < 3) continue;
     const holes = (B.k || []).map(dec).filter(h => h.length >= 3), bb = bbox(outer);
-    const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g, mm: B.mm }; // g: 1 garages, 2 greenhouse, 3 stand, 4 water tower, 5 cabin; mm the model of a DBGT manufatto (paesaggio3.js)
+    const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g, mm: B.mm, ti: T.t, bi: T.bld.length }; // g: 1 garages, 2 greenhouse, 3 stand, 4 water tower, 5 cabin; mm the model of a DBGT manufatto (paesaggio3.js)
     // a volume of the DBGT (src/dbgt_edifici.py): zt the top of its walls and zb its raised base (a portico, a passage, an overhang) above
     // terrain.base, e its building, rk/rf/rc its roof (planes over the top of the walls), wc/rcol the colours OSM gives, st its state in the
     // 2015 survey when OSM does not say otherwise (2 a ruin with no roof over it in the DSM: bare walls only; 3 a ruin with its roof; 1 under
@@ -110,13 +118,13 @@ for (const T of TILES) {
     if (rec.st) rec.noSign = true;
     T.bld.push(rec);
     if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
-      BUILDINGS.push(rec); BLDR.add(bb[0], bb[1], bb[2], bb[3], rec); const y1 = B.zt + 3;
+      if (COTTURA) BUILDINGS.push(rec); BLDR.add(bb[0], bb[1], bb[2], bb[3], rec); const y1 = B.zt + 3;
       for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1 }); } }
       continue;
     }
     if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); { const w = { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }; WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, w); (rec.walls || (rec.walls = [])).push(w); } } continue; }
-    BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
-    if (B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
+    if (COTTURA) BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
+    if (COTTURA && B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
     if (B.g === 4) continue; // a water tower: its plan is the tank up in the air, the solid is its shaft (paesaggio3.js lsTower)
     const gys = outer.map(p => H.ground(p[0], p[1])), by0 = Math.min(...gys) - 3, by1 = Math.max(Math.max(...gys) + B.h, B.zt !== undefined ? B.zt + roofTop(rec) : -1e9) + 3;
     for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) {
@@ -135,13 +143,6 @@ for (const T of TILES) {
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + br.h, yv: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
     if (sp || br.t === 3) barPieces(T, rec, segs);
   }
-  for (const q of d.sd || []) {
-    const o = dec(q.p), k = q.k.map(dec), bb = bbox(o); if (o.length < 3) continue;
-    let per = 0; for (let i = 0; i < o.length; i++) per += hyp(o[(i + 1) % o.length][0] - o[i][0], o[(i + 1) % o.length][1] - o[i][1]);
-    const A = Math.abs(sArea(o)); if (A < 10 || A / per < 0.45) continue; // shards and slivers left between junctions are not sidewalks
-    const rec = { o, k, bb }; T.sd.push(rec); SIDEG.add(bb[0], bb[1], bb[2], bb[3], rec);
-  }
-  for (const q of d.a || []) if (q.t === 5) { const o = dec(q.p); if (o.length < 3) continue; const rec = { o, k: (q.k || []).map(dec), bb: bbox(o) }; (T.pf || (T.pf = [])).push(rec); PLATG.add(rec.bb[0], rec.bb[1], rec.bb[2], rec.bb[3], rec); }
 }
 // the roof of a DBGT volume (src/dbgt_edifici.py): over the top of its walls max(0, min_k f_k), f_k = A + Bx (x - cx) + Bz (z - cz)
 function roofPlanes(B) { if (B._pl !== undefined) return B._pl; let pl = null; if (B.rf && B.rc) { pl = []; for (let i = 0; i + 2 < B.rf.length; i += 3) pl.push([B.rf[i], B.rf[i + 1], B.rf[i + 2]]); } return (B._pl = pl); }
@@ -214,7 +215,7 @@ function onSide(x, z) {
 }
 
 // ---------------------------------------------------------------- roads, decks (sopraelevate), graphs
-const RIVER_RAILS = [];
+const RIVER_RAILS = [], DECKG0 = new Grid(16); // DECKG0: where the old elevated ways run, for what asks only that
 const NODE_DEG = new Array(N.length).fill(0);
 for (const r of D.roads) if (r.c <= 4) { const g = r.g; for (let k = 0; k < g.length; k++) NODE_DEG[g[k]] += (k === 0 || k === g.length - 1) ? 1 : 2; }
 N.forEach(([x, z], i) => NODEG.add(x, z, x, z, { i }));
@@ -224,7 +225,7 @@ D.roads.forEach((r, ri) => {
     const a = N[r.g[k - 1]], b = N[r.g[k]];
     ROADSEG.add(a[0], a[1], b[0], b[1], { a, b, r, ia: r.g[k - 1], ib: r.g[k] });
     if (r.n >= 0 && r.c <= 5) STREETS.add(a[0], a[1], b[0], b[1], { a, b, n: D.names[r.n], w: r.w });
-    if (r.d) { const ya = H.node(r.g[k - 1]), yb = H.node(r.g[k]), hw = r.w / 2, m = hw + (r.b ? 0 : 14); DECKG.add(Math.min(a[0], b[0]) - m, Math.min(a[1], b[1]) - m, Math.max(a[0], b[0]) + m, Math.max(a[1], b[1]) + m, { ax: a[0], az: a[1], bx: b[0], bz: b[1], ya, yb, hw, r, emb: !r.b }); }
+    if (r.d) { const hw = r.w / 2, m = hw + (r.b ? 0 : 14); DECKG0.add(Math.min(a[0], b[0]) - m, Math.min(a[1], b[1]) - m, Math.max(a[0], b[0]) + m, Math.max(a[1], b[1]) + m, { ax: a[0], az: a[1], bx: b[0], bz: b[1], hw, r }); }
   }
 });
 // the median between the two carriageways of an expressway as the tile draws it, or null (junction leftovers and slivers are not medians)
@@ -252,23 +253,24 @@ function medianDeck(m) {
 // the step layer of the tiles of S (H.addStep, docs/motore.md 1.4): sidewalks 0.15, platforms 0.55, medians 0.15 (those on S: a median on a
 // deck added 0.15 m to the road under the bridge)
 const MED_H = 0.15;
-for (const T of TILES) {
-  if (!H.tile(T.t)) continue;
+function stepsAdd(T, mds) { // mds: the medians of the tile that lie on S, as the bake found them; without it (the bake itself) worked out and returned
+  const out = [], md = T.d.md || [];
   for (const q of T.sd) H.addStep(1, SIDE_H, q.o, q.k);
   for (const q of T.pf || []) H.addStep(2, PLAT_H, q.o, q.k);
-  for (const q of T.d.md || []) { const m = medianOf(q); if (m && !medianDeck(m)) H.addStep(3, MED_H, m.o, m.k); }
+  if (mds) { for (const i of mds) { const m = medianOf(md[i]); if (m) H.addStep(3, MED_H, m.o, m.k); } return mds; }
+  md.forEach((q, i) => { const m = medianOf(q); if (m && !medianDeck(m)) { H.addStep(3, MED_H, m.o, m.k); out.push(i); } });
+  return out;
 }
 function roadBelow(x, z, y, m, self) { let f = false; ROADSEG.each(x - 14, z - 14, x + 14, z + 14, s => { if (f || s.r === self) return; const d = segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]); if (d >= s.r.w / 2 + m) return; if (!s.r.d) { f = true; return; } const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.a[0]) * ex + (z - s.a[1]) * ez) / L2, 0, 1); if (lerp(H.node(s.ia), H.node(s.ib), t) < y - 2) f = true; }); return f; }
 function nearLowRail(x, z, m) { let f = false; LOWRAILG.each(x - m, z - m, x + m, z + m, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < m) f = true; }); return f; }
 function nearRail(x, z, m) { let f = false; RAILG.each(x - m, z - m, x + m, z + m, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < m) f = true; }); return f; }
 const RAILG = new Grid(24), LOWRAILG = new Grid(24);
-for (const td of D.tiles) for (const f of td.rl || []) { if (f.h) continue; const pts = dec(f.p); for (let k = 1; k < pts.length; k++) LOWRAILG.add(Math.min(pts[k - 1][0], pts[k][0]), Math.min(pts[k - 1][1], pts[k][1]), Math.max(pts[k - 1][0], pts[k][0]), Math.max(pts[k - 1][1], pts[k][1]), { a: pts[k - 1], b: pts[k] }); }
-for (const td of D.tiles) for (const f of td.rl || []) { const pts = dec(f.p); for (let k = 1; k < pts.length; k++) RAILG.add(Math.min(pts[k - 1][0], pts[k][0]), Math.min(pts[k - 1][1], pts[k][1]), Math.max(pts[k - 1][0], pts[k][0]), Math.max(pts[k - 1][1], pts[k][1]), { a: pts[k - 1], b: pts[k] }); }
+for (const [, f] of D.rl) { if (f.h) continue; const pts = dec(f.p); for (let k = 1; k < pts.length; k++) LOWRAILG.add(Math.min(pts[k - 1][0], pts[k][0]), Math.min(pts[k - 1][1], pts[k][1]), Math.max(pts[k - 1][0], pts[k][0]), Math.max(pts[k - 1][1], pts[k][1]), { a: pts[k - 1], b: pts[k] }); }
+for (const [, f] of D.rl) { const pts = dec(f.p); for (let k = 1; k < pts.length; k++) RAILG.add(Math.min(pts[k - 1][0], pts[k][0]), Math.min(pts[k - 1][1], pts[k][1]), Math.max(pts[k - 1][0], pts[k][0]), Math.max(pts[k - 1][1], pts[k][1]), { a: pts[k - 1], b: pts[k] }); }
 // guardrails along ground-level expressways (both sides; links and junctions stay open). A way with a deck somewhere along it
 // gets them on its stretches less than 1.4 m up, at the road's height: the deck rails below only start there. Old engine only: in a tile
 // of S the guardrails come from S and the decks (sBarriers, below)
-const FLAT_RAILS = [];
-for (const r of D.roads) if (r.x && !r.t && r.c === 0) {
+function layFlat(T, r) {
   for (let k = 1; k < r.g.length; k++) {
     const a = N[r.g[k - 1]], b = N[r.g[k]], L = hyp(b[0] - a[0], b[1] - a[1]); if (L < 1) continue;
     const ya = r.d ? H.node(r.g[k - 1]) : 0, yb = r.d ? H.node(r.g[k]) : 0;
@@ -277,7 +279,7 @@ for (const r of D.roads) if (r.x && !r.t && r.c === 0) {
     for (let s0 = 0; s0 < L; s0 += 4) {
       const s1 = Math.min(L, s0 + 4), x0 = a[0] + ux * s0, z0 = a[1] + uz * s0, x1 = a[0] + ux * s1, z1 = a[1] + uz * s1;
       if ((NODE_DEG[r.g[k - 1]] >= 3 && s0 < 25) || (NODE_DEG[r.g[k]] >= 3 && s1 > L - 25)) continue;
-      if (H.fineAt((x0 + x1) / 2, (z0 + z1) / 2)) continue;
+      if (tileOf((x0 + x1) / 2, (z0 + z1) / 2) !== T.t || H.fineAt((x0 + x1) / 2, (z0 + z1) / 2)) continue;
       for (const sd of [1, -1]) {
         const w = r.w / 2 + 0.4, gx = (x0 + x1) / 2 + rx * sd * w, gz = (z0 + z1) / 2 + rz * sd * w;
         let other = false; ROADSEG.each(gx - 4, gz - 4, gx + 4, gz + 4, o => { if (!other && o.r !== r && o.r.c <= 5 && segDist(gx, gz, o.a[0], o.a[1], o.b[0], o.b[1]) < o.r.w / 2 + 0.3) other = true; });
@@ -285,48 +287,47 @@ for (const r of D.roads) if (r.x && !r.t && r.c === 0) {
         let y0 = H.ground(x0 + rx * sd * w, z0 + rz * sd * w), y1 = H.ground(x1 + rx * sd * w, z1 + rz * sd * w);
         if (r.d) { const r0 = lerp(ya, yb, s0 / L), r1 = lerp(ya, yb, s1 / L); if ((r0 + r1) / 2 - H.ground((x0 + x1) / 2, (z0 + z1) / 2) >= 1.4) continue; y0 = Math.max(y0, r0); y1 = Math.max(y1, r1); }
         const seg = { ax: x0 + rx * sd * w, az: z0 + rz * sd * w, bx: x1 + rx * sd * w, bz: z1 + rz * sd * w, nx: -rx * sd, nz: -rz * sd, two: true, y0: Math.min(y0, y1) - 2, y1: Math.max(y0, y1) + 2.5, deckw: true };
-        WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, seg); FLAT_RAILS.push({ x0: seg.ax, z0: seg.az, x1: seg.bx, z1: seg.bz, y0, y1 });
+        WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, seg); (T.flat || (T.flat = [])).push({ x0: seg.ax, z0: seg.az, x1: seg.bx, z1: seg.bz, y0, y1 });
       }
     }
   }
 }
 // collisions for elevated roads: guardrails on top, embankment toes and pillars below. Old engine only (DECK_SOLIDS): in a tile of S the
 // parapets and pillars come from the decks and the guardrails from S (sBarriers, below; before phase 6 the old rails stood on deckY there)
-const DECK_SOLIDS = [];
-for (const r of D.roads) if (r.d) {
+function laySolidi(T, r) {
   const pts = r.g.map(i => [N[i][0], N[i][1], H.node(i)]);
   for (let k = 1; k < pts.length; k++) {
     const a = pts[k - 1], b = pts[k], L = hyp(b[0] - a[0], b[1] - a[1]); if (L < 0.2) continue;
     const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, rx = -uz, rz = ux, n = Math.max(1, Math.ceil(L / 4));
     for (let s = 0; s < n; s++) {
       const t0 = s / n, t1 = (s + 1) / n, x0 = lerp(a[0], b[0], t0), z0 = lerp(a[1], b[1], t0), x1 = lerp(a[0], b[0], t1), z1 = lerp(a[1], b[1], t1);
-      if (H.fineAt((x0 + x1) / 2, (z0 + z1) / 2)) continue;
+      if (tileOf((x0 + x1) / 2, (z0 + z1) / 2) !== T.t || H.fineAt((x0 + x1) / 2, (z0 + z1) / 2)) continue;
       const y0 = lerp(a[2], b[2], t0), y1 = lerp(a[2], b[2], t1), ym = (y0 + y1) / 2, off = ym - H.ground((x0 + x1) / 2, (z0 + z1) / 2);
       if (off < 0.6) continue;
       for (const sd of [1, -1]) {
         const ex = rx * sd, ez = rz * sd, gx = (x0 + x1) / 2 + ex * (r.w / 2 + 0.3), gz = (z0 + z1) / 2 + ez * (r.w / 2 + 0.3);
-        let shared = false; DECKG.each(gx - 3, gz - 3, gx + 3, gz + 3, o => { if (o.r !== r && segDist(gx, gz, o.ax, o.az, o.bx, o.bz) < o.hw - 0.3) shared = true; });
+        let shared = false; DECKG0.each(gx - 3, gz - 3, gx + 3, gz + 3, o => { if (o.r !== r && segDist(gx, gz, o.ax, o.az, o.bx, o.bz) < o.hw - 0.3) shared = true; });
         if (off >= 1.4 && !shared) {
           const w = r.w / 2 + 0.3, seg = { ax: x0 + ex * w, az: z0 + ez * w, bx: x1 + ex * w, bz: z1 + ez * w, nx: -ex, nz: -ez, two: true, y0: ym - 0.7, y1: ym + 3, deckw: true };
-          WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, seg); DECK_SOLIDS.push({ k: 'rail', r, x0: seg.ax, z0: seg.az, x1: seg.bx, z1: seg.bz, y0, y1 });
+          WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, seg); (T.solidi || (T.solidi = [])).push({ k: 'rail', r, x0: seg.ax, z0: seg.az, x1: seg.bx, z1: seg.bz, y0, y1 });
         }
       }
     }
     if (r.b) for (let s = 12; s < L - 4; s += 24) {
-      const x = a[0] + ux * s, z = a[1] + uz * s; if (H.fineAt(x, z)) continue; const y = lerp(a[2], b[2], s / L), off = y - H.ground(x, z);
+      const x = a[0] + ux * s, z = a[1] + uz * s; if (tileOf(x, z) !== T.t || H.fineAt(x, z)) continue; const y = lerp(a[2], b[2], s / L), off = y - H.ground(x, z);
       if (off < 2.5) continue;
-      for (const o of r.w > 9 ? [-r.w / 3, r.w / 3] : [0]) { const px = x + rx * o, pz = z + rz * o; if (roadBelow(px, pz, y, 1.4, r) || nearRail(px, pz, 3.5)) continue; WALLS.add(px - 0.5, pz - 0.5, px + 0.5, pz + 0.5, { r: 0.45, x: px, z: pz, y0: -1e4, y1: y - 1.5, deckw: true }); DECK_SOLIDS.push({ k: 'pillar', x: px, z: pz, y }); }
+      for (const o of r.w > 9 ? [-r.w / 3, r.w / 3] : [0]) { const px = x + rx * o, pz = z + rz * o; if (roadBelow(px, pz, y, 1.4, r) || nearRail(px, pz, 3.5)) continue; WALLS.add(px - 0.5, pz - 0.5, px + 0.5, pz + 0.5, { r: 0.45, x: px, z: pz, y0: -1e4, y1: y - 1.5, deckw: true }); (T.solidi || (T.solidi = [])).push({ k: 'pillar', x: px, z: pz, y }); }
     }
   }
 }
 // railway fences: solid, following the ground, never across the track
-for (const T of TILES) {
+function layFence(T) {
   T.fe = T.fe.map(pts => pts.filter((p, i) => true)).map(pts => { const out = [], cur = []; for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (nearLowRail(mx, mz, 2.0)) { if (cur.length > 1) out.push(cur.slice()); cur.length = 0; continue; } if (!cur.length) cur.push(a); cur.push(c); } if (cur.length > 1) out.push(cur); return out; }).flat();
   for (const pts of T.fe) for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const gy = (barFoot(a) + barFoot(c)) / 2; WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + 2.2 }); }
 }
 // elevated railway: the embankment / viaduct sides are solid (open where a street passes underneath)
-for (const td of D.tiles) for (const r of td.rl || []) {
-  if (!r.h) continue; const p0 = dec(r.p), hs = r.h.map((v, i) => v === -32768 ? H.ground(p0[i][0], p0[i][1]) : v / 10);
+function layRilevati(r) {
+  if (!r.h) return; const p0 = dec(r.p), hs = r.h.map((v, i) => v === -32768 ? H.ground(p0[i][0], p0[i][1]) : v / 10);
   for (let k = 1; k < p0.length; k++) {
     const A = p0[k - 1], B = p0[k], L = hyp(B[0] - A[0], B[1] - A[1]); if (L < 0.1) continue;
     const n = Math.max(1, Math.ceil(L / 3)), ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, rx = -uz, rz = ux;
@@ -342,9 +343,9 @@ for (const td of D.tiles) for (const r of td.rl || []) {
 // banks are the ground (earth and grass, src/superficie.py acque) and the walls and fences the DBGT's and OSM's barriers (Carlo, 25/10: "nella
 // foresta mica ha i guardrail il fiume"). RIVER_RAIL = false: only the old tiles (no .bin) keep them, with their vertical cut
 const RIVER_RAIL = false;
-for (const td of D.tiles) for (const r of td.rv || []) {
+function layFiume(r) {
   const pts = dec(r.p), W = r.w + 0.25;
-  if (!RIVER_RAIL && pts.length && H.has(tileOf(pts[0][0], pts[0][1]))) continue;
+  if (!RIVER_RAIL && pts.length && H.has(tileOf(pts[0][0], pts[0][1]))) return;
   for (let k = 1; k < pts.length; k++) {
     const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue;
     const nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L;
@@ -413,9 +414,9 @@ const clearance = (x, z, dx, dz, max) => rayWalls(x, z, x + dx * max, z + dz * m
 
 // ---------------------------------------------------------------- level crossings (passaggi a livello)
 const RAILPTS = [];
-for (const T of TILES) for (const f of T.d.rl || []) { const p = dec(f.p); p.hs = f.h ? f.h.map(v => v === -32768 ? null : v / 10) : null; RAILPTS.push(p); }
-const LX = [];
-{
+for (const [, f] of D.rl) { const p = dec(f.p); p.ix = RAILPTS.length; p.hs = f.h ? f.h.map(v => v === -32768 ? null : v / 10) : null; RAILPTS.push(p); }
+const LX = [], LX_NO = new Set(COT ? COT.lxno : []); // LX_NO: the stretches of railway up in the air, the bake sees them with the ground of all the map
+function lxTrova() {
   const segInt = (a, b, c, d) => {
     const r1x = b[0] - a[0], r1z = b[1] - a[1], r2x = d[0] - c[0], r2z = d[1] - c[1], den = r1x * r2z - r1z * r2x; if (Math.abs(den) < 1e-9) return null;
     const t = ((c[0] - a[0]) * r2z - (c[1] - a[1]) * r2x) / den, u = ((c[0] - a[0]) * r1z - (c[1] - a[1]) * r1x) / den;
@@ -423,7 +424,7 @@ const LX = [];
   };
   for (const rp of RAILPTS) for (let j = 1; j < rp.length; j++) {
     const c = rp[j - 1], d = rp[j];
-    if (rp.hs && ((rp.hs[j - 1] !== null && rp.hs[j - 1] - H.ground(c[0], c[1]) > 1) || (rp.hs[j] !== null && rp.hs[j] - H.ground(d[0], d[1]) > 1))) continue;
+    if (COT) { if (LX_NO.has(rp.ix + ':' + j)) continue; } else if (rp.hs && ((rp.hs[j - 1] !== null && rp.hs[j - 1] - H.ground(c[0], c[1]) > 1) || (rp.hs[j] !== null && rp.hs[j] - H.ground(d[0], d[1]) > 1))) { LX_NO.add(rp.ix + ':' + j); continue; }
     ROADSEG.each(Math.min(c[0], d[0]), Math.min(c[1], d[1]), Math.max(c[0], d[0]), Math.max(c[1], d[1]), s => {
       const r = s.r; if (r.c > 6 || r.d || r.t || r.u) return;
       const p = segInt(s.a, s.b, c, d); if (!p || !inLim(p[0], p[1], 5)) return;
@@ -440,15 +441,16 @@ const LX = [];
     g.hw = Math.min(g.r.w / 2, g.r.mh + 0.2); g.drive = g.r.c <= 4; g.ang = 1; g.closed = false;
   }
 }
+if (!TUTTO) lxTrova();
 
 // ---------------------------------------------------------------- graphs (traffic keeps right; long tunnels are off-limits)
 const TRAF = N.map(() => []), DRIVE = N.map(() => []), WALK = N.map(() => []);
-for (const r of D.roads) {
-  if (r.t) continue;
+for (let ri = 0; ri < D.roads.length; ri++) {
+  const r = D.roads[ri]; if (r.t) continue;
   const nt = r.nt ? new Set(r.nt) : null; /* r.nt: the segments k without AI traffic, a lane there would be too close to a wall or off the asphalt (src/corsie_ia.py) */
   for (let k = 1; k < r.g.length; k++) {
     const a = r.g[k - 1], b = r.g[k], L = hyp(N[b][0] - N[a][0], N[b][1] - N[a][1]);
-    const ok = inLim(N[a][0], N[a][1], 2) && inLim(N[b][0], N[b][1], 2), open = r.d || !inBuilding((N[a][0] + N[b][0]) / 2, (N[a][1] + N[b][1]) / 2, 0);
+    const ok = inLim(N[a][0], N[a][1], 2) && inLim(N[b][0], N[b][1], 2), open = r.d || !(COT && COT.nb[ri] && COT.nb[ri].includes(k)); /* COT.nb: the segments inside a building, the bake sees them all */
     if (r.c <= 6 && ok && !r.x) { WALK[a].push({ to: b, L, off: r.walk }); WALK[b].push({ to: a, L, off: r.walk }); }
     if (r.c <= 5 && ok && open) { DRIVE[a].push({ to: b, L }); DRIVE[b].push({ to: a, L }); }
     // r.lf / r.lb: the lane right of the axis at each node, forward and backward, in cm (src/dbgt_strade.py corsie_locali: from the carriageway AC_VEI, not the axis); d2 the change along the edge (edgePts)
@@ -890,7 +892,6 @@ function drawDecks(T, top, side) {
 // for the underpass of via Milano and dropped: the DBGT carriageway there is 4 m flat against 8 m of OSM road, so the wall stood on the
 // drawn asphalt)
 const RAIL_DROP = 1.2, PIL_STEP = 15;
-const DECK_BAR = { rails: [], pillars: [] };
 function deckTopAt(dk, x, z) { for (const o of H.deckAt(x, z)) if (o.d === dk) return o; return null; }
 // the edges the parapets follow: the PONTE footprint (nucleo), straight, and the boundary edges of the triangles off it (the spalla cells, the
 // extensions and the approach ramps, in 2 m steps: past the end of the parapet of PONTE 16 a walker fell 3.3 m off them into the Seveso)
@@ -911,8 +912,10 @@ function busyGround(dk, x, z) {
   if (dk.tipo !== 'ferro') RAILG.each(x - 4, z - 4, x + 4, z + 4, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < 3.5) f = true; }); // (on a railway deck its own rails run over the point)
   const w = H.water(x, z); return f || (w !== null && w > H.base(x, z));
 }
-for (const dk of H.DECKS) {
-  if (dk.tipo === 'copertura') continue;
+// what a deck adds to the world, once, when all the tiles under it are here (pezzi3.js): its parapets, pillars, ramp walls. They go with it
+function deckInit(dk) { if (dk.pronto) return; dk.pronto = true; dk.bar = { rails: [], pillars: [] }; const r0 = GRID_REC; GRID_REC = dk.reg; try { deckInit2(dk); } finally { GRID_REC = r0; } }
+function deckInit2(dk) {
+  if (dk.tipo === 'copertura') return;
   const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null; rampWalls(dk); // the walls of its approach ramps and their collisions, once
   for (const [ax, az, bx, bz, core] of deckOutline(dk)) {
     const L = hyp(bx - ax, bz - az); if (L < 0.05) continue;
@@ -926,23 +929,23 @@ for (const dk of H.DECKS) {
       if (H.deckAt(x + nx * 0.25, z + nz * 0.25).some(o => o.tipo !== 'copertura' && Math.abs(o.top - top) < 0.6)) continue; // the deck goes on (its ramps, another deck)
       if (top - H.base(qx, qz) < 0.8) continue; // it rests on the ground there (a spalla)
       const seg = { ax: ax + (bx - ax) * k / n, az: az + (bz - az) * k / n, bx: ax + (bx - ax) * (k + 1) / n, bz: az + (bz - az) * (k + 1) / n };
-      DECK_BAR.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, dk.tipo === 'pedonale' ? 2 : 1, nx, nz]);
+      dk.bar.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, dk.tipo === 'pedonale' ? 2 : 1, nx, nz]);
       WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + 2.5, deckw: true });
     }
   }
   // pillars: on the long axis of the footprint (two lines on a wide deck), every PIL_STEP m, where the deck stands more than 2.5 m over
   // the ground and the ground is free (no road, railway or water under them: niente oggetti in mezzo alla strada)
-  const P = ring || dk.imp; if (!P || P.length < 3) continue;
+  const P = ring || dk.imp; if (!P || P.length < 3) return;
   const c = centroid(P); let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { sxx += (x - c[0]) ** 2; szz += (z - c[1]) ** 2; sxz += (x - c[0]) * (z - c[1]); }
   const an = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(an), uz = Math.sin(an);
   let s0 = 1e9, s1 = -1e9, v0 = 1e9, v1 = -1e9; for (const [x, z] of P) { const s = (x - c[0]) * ux + (z - c[1]) * uz, v = -(x - c[0]) * uz + (z - c[1]) * ux; s0 = Math.min(s0, s); s1 = Math.max(s1, s); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
-  const len = s1 - s0, wid = v1 - v0, nP = Math.floor((len - 6) / PIL_STEP); if (nP < 1) continue;
+  const len = s1 - s0, wid = v1 - v0, nP = Math.floor((len - 6) / PIL_STEP); if (nP < 1) return;
   const vs = wid > 12 ? [v0 + wid / 4, v1 - wid / 4] : [(v0 + v1) / 2];
   for (let k = 1; k <= nP; k++) for (const v of vs) {
     const s = s0 + len * k / (nP + 1), x = c[0] + ux * s - uz * v, z = c[1] + uz * s + ux * v;
     if (!inPoly(x, z, P)) continue; let edge = 1e9; for (let i = 0; i < P.length; i++) edge = Math.min(edge, segDist(x, z, P[i][0], P[i][1], P[(i + 1) % P.length][0], P[(i + 1) % P.length][1])); if (edge < 1.2) continue;
     const o = deckTopAt(dk, x, z); if (!o) continue; const g = H.base(x, z), bot = o.top - dk.sp; if (bot - g < 2.5 || busyGround(dk, x, z) || (dk.pieno && dk.pieno[o.i / 9])) continue; // (not inside a solid ramp)
-    DECK_BAR.pillars.push([x, z, g, bot]); WALLS.add(x - 0.5, z - 0.5, x + 0.5, z + 0.5, { r: 0.45, x, z, y0: g - 3, y1: bot - 0.3, deckw: true });
+    dk.bar.pillars.push([x, z, g, bot]); WALLS.add(x - 0.5, z - 0.5, x + 0.5, z + 0.5, { r: 0.45, x, z, y0: g - 3, y1: bot - 0.3, deckw: true });
   }
 }
 // guardrails along the roads of tile T (once per tile, with their collisions): [x0, z0, y0, x1, z1, y1]
@@ -952,13 +955,13 @@ for (const dk of H.DECKS) {
 // past the abutment. On the decks with approach ramps (rampWalls) the cells with a corner under the deck, more than 1 m under its top, take no street paint (H.ud2), but
 // those of a street at its own level and the cells beside them, and those where another street on the ground passes (within w/2 + 1 m
 // of its axis), keep their paint
-for (const dk of H.DECKS) {
-  if (!dk.pieno || !dk.rw.length) continue; const T = dk.tri, segs = dk.rw;
+function rampPaint(dk, tile) { // on the tile just laid out
+  if (!dk.pieno || !dk.rw.length) return; const T = dk.tri, segs = dk.rw;
   let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (let i = 0; i < T.length; i += 3) { x0 = Math.min(x0, T[i]); x1 = Math.max(x1, T[i]); z0 = Math.min(z0, T[i + 1]); z1 = Math.max(z1, T[i + 1]); }
   const onRamp = (x, z) => { for (const o of H.deckAt(x, z)) if (o.d === dk && o.top > H.base(x, z) + 1.0) return true; return false; }; // under the deck, more than 1 m under its top
   const own = roadsOn(dk), passes = (x, z) => { let f = false; ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!f && !own.has(s.r) && atGrade(s) && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 1) f = true; }); return f; }; // another street on the ground passes there
   for (let tz = Math.floor((z0 - 4 + META.hh) / TS); tz <= Math.floor((z1 + 4 + META.hh) / TS); tz++) for (let tx = Math.floor((x0 - 4 + META.hw) / TS); tx <= Math.floor((x1 + 4 + META.hw) / TS); tx++) {
-    if (tx < 0 || tz < 0 || tx >= META.ntx || tz >= META.ntz) continue; const F = H.tile(tx + META.ntx * tz); if (!F || !F.m) continue;
+    if (tx < 0 || tz < 0 || tx >= META.ntx || tz >= META.ntz || tx + META.ntx * tz !== tile.t) continue; const F = H.tile(tile.t); if (!F || !F.m) continue;
     const n = F.n, c = n - 1; if (F.ud2 === F.ud || !F.ud2) F.ud2 = F.ud ? F.ud.slice() : new Uint8Array(c * c);
     const str = w => F.m[w] === 1 || F.m[w] === 2;
     for (let j = 0; j < c; j++) for (let i = 0; i < c; i++) {
@@ -969,7 +972,7 @@ for (const dk of H.DECKS) {
     }
   }
 }
-const ROAD_BAR = new Map(), ON_DECK = new Set(); for (const dk of H.DECKS) for (const ri of dk.ra) ON_DECK.add(ri); // the roads that run on a deck
+const ROAD_BAR = new Map(), ON_DECK = new Set(D.ondeck); // the roads that run on a deck
 function* roadBarriers(T) {
   if (ROAD_BAR.has(T.t)) return ROAD_BAR.get(T.t);
   const res = { rails: [] }, nearJ = (x, z, r) => { let f = false; NODEG.each(x - r, z - r, x + r, z + r, ({ i }) => { if (!f && NODE_DEG[i] >= 3 && hyp(N[i][0] - x, N[i][1] - z) < r) f = true; }); return f; };
@@ -1024,13 +1027,13 @@ function* roadBarriers(T) {
 // draw them: guardrail strips on posts, the parapets (a concrete kerb with a rail, a railing on the footbridges), the pillars
 function* drawBarriers(T, grail, pil) {
   const rail = (x0, z0, y0, x1, z1, y1, a, b) => { const L = hyp(x1 - x0, z1 - z0) || 1, nx = (z1 - z0) / L, nz = -(x1 - x0) / L, b0 = grail.p.length / 3; vtx(grail, x0, y0 + a, z0, nx, 0, nz, 0, 0); vtx(grail, x1, y1 + a, z1, nx, 0, nz, 0, 0); vtx(grail, x1, y1 + b, z1, nx, 0, nz, 0, 0); vtx(grail, x0, y0 + b, z0, nx, 0, nz, 0, 0); grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
-  for (const [x0, z0, y0, x1, z1, y1, kind] of DECK_BAR.rails) {
+  for (const dk of H.DECKS) if (dk.bar) for (const [x0, z0, y0, x1, z1, y1, kind] of dk.bar.rails) {
     if (tileOf((x0 + x1) / 2, (z0 + z1) / 2) !== T.t) continue;
     const L = hyp(x1 - x0, z1 - z0) || 1, ry = Math.atan2(-(z1 - z0), x1 - x0);
     if (kind === 2) { rail(x0, z0, y0, x1, z1, y1, 1.0, 1.1); rail(x0, z0, y0, x1, z1, y1, 0.45, 0.5); addBox(pil, x0, y0 + 0.55, z0, 0.08, 1.1, 0.08, null); continue; } // a footbridge: a handrail and a bar on posts
     addBox(pil, (x0 + x1) / 2, (y0 + y1) / 2 + 0.2, (z0 + z1) / 2, L + 0.02, 0.5, 0.3, null, ry); rail(x0, z0, y0, x1, z1, y1, 0.6, 0.95); // a concrete kerb and a rail
   }
-  for (const [x, z, g, bot] of DECK_BAR.pillars) if (tileOf(x, z) === T.t) addBox(pil, x, (g + bot) / 2 - 0.2, z, 0.9, bot - g + 0.4, 0.9, null);
+  for (const dk of H.DECKS) if (dk.bar) for (const [x, z, g, bot] of dk.bar.pillars) if (tileOf(x, z) === T.t) addBox(pil, x, (g + bot) / 2 - 0.2, z, 0.9, bot - g + 0.4, 0.9, null);
   const R = yield* roadBarriers(T);
   for (const [x0, z0, y0, x1, z1, y1] of R.rails) { rail(x0, z0, y0, x1, z1, y1, 0.45, 0.8); const L = hyp(x1 - x0, z1 - z0); for (let s = 0; s < L; s += 2) { const f = s / L, x = lerp(x0, x1, f), z = lerp(z0, z1, f), y = lerp(y0, y1, f), g = Math.min(y, H.surface(x, z, y + 0.3)); addBox(pil, x, (g + y + 0.75) / 2 - 0.1, z, 0.1, y + 0.75 - g + 0.2, 0.1, null); } } // posts every 2 m, down to the ground or the deck under them (not through it to the road below: deck 10, verifica fase 6)
 }
@@ -1148,7 +1151,7 @@ function waterInBed(a, outer, holes, T) {
 }
 function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!g.next().done); }
 function* buildTileGen(T) {
-  if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.t * 7919;
+  if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.seme * 7919; for (const p of CAS_T.get(T.t) || []) if (!p.casFatta) { p.casFatta = true; casermeDi([p]); }
   T.tex0 = new THREE.Texture().id; // textures newer than this were made for this tile: freed with it
   const G = new THREE.Group(); G.visible = false; scene.add(G); T.group = G;
   const put = (b, mat, ro, shadow) => { if (b.i.length) mkMesh(b, mat, ro, shadow, G); };
@@ -1433,9 +1436,9 @@ function* buildTileGen(T) {
       }
     }
     // the old guardrails and pillars (old engine); in a tile of S the parapets, pillars and guardrails of sBarriers
-    for (const sp of DECK_SOLIDS) if (sp.k === 'pillar' && tileOf(sp.x, sp.z) === T.t) { const g0 = H.ground(sp.x, sp.z), h = sp.y - 0.9 - g0; if (h > 0.5) addBox(pil, sp.x, g0 + h / 2, sp.z, 0.9, h, 0.9, null); }
+    for (const sp of T.solidi || []) if (sp.k === 'pillar') { const g0 = H.ground(sp.x, sp.z), h = sp.y - 0.9 - g0; if (h > 0.5) addBox(pil, sp.x, g0 + h / 2, sp.z, 0.9, h, 0.9, null); }
     if (T.fine) { const s_ = srndT; yield* drawBarriers(T, grail, pil); srndT = s_; }
-    for (const sp of DECK_SOLIDS.concat(FLAT_RAILS.map(f => ({ k: 'rail', ...f })))) if (sp.k === 'rail' && tileOf((sp.x0 + sp.x1) / 2, (sp.z0 + sp.z1) / 2) === T.t) {
+    for (const sp of (T.solidi || []).concat((T.flat || []).map(f => ({ k: 'rail', ...f })))) if (sp.k === 'rail') {
       const b0 = grail.p.length / 3, nx = sp.z1 - sp.z0, nz = -(sp.x1 - sp.x0), L = hyp(nx, nz) || 1, y0 = sp.y0, y1 = sp.y1;
       vtx(grail, sp.x0, y0 + 0.4, sp.z0, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, y1 + 0.4, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, y1 + 0.85, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x0, y0 + 0.85, sp.z0, nx / L, 0, nz / L, 0, 0);
       grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
@@ -1674,7 +1677,7 @@ function* buildTileGen(T) {
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast'); put(doorB, MAT.roof, 10);
   }
-  for (const f of [buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
+  for (const f of [confineMesh, buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
@@ -1742,53 +1745,38 @@ function freeTile(T) {
   G.traverse(m => { if (m.geometry) m.geometry.dispose(); const mt = m.material; if (!mt || Array.isArray(mt)) return;
     if (own(mt.map) || own(mt.emissiveMap)) { const k = SIGN_MATS.indexOf(mt); if (k >= 0) SIGN_MATS.splice(k, 1); for (const t of [mt.map, mt.emissiveMap]) if (own(t)) t.dispose(); mt.dispose(); } });
   T.group = null; T.built = false; T.ready = false; T.gen = null;
+  for (const p of H.PITS) if (tileOf(p.c[0], p.c[1]) === T.t) { p.built = false; p.meshes = []; } else if (p.meshes) p.meshes = p.meshes.filter(M => M.parent && M.parent !== G); // its ramp is drawn again with it
+  for (const p of PROPS) if (tileOf(p.x, p.z) === T.t) { p.obj = p.lx ? p.obj : null; if (p.inst) p.inst.meshes = []; if (p.tile) p.onBreak = null; } // the props stay, as what was knocked down, but not the meshes they drew
 }
-function tileTick(px, pz, budgetMs, force) {
-  const t0 = performance.now(), cand = [];
-  H.tick(px, pz); // the .bin of the new engine come first: a tile waits for its own and its neighbours'
-  for (const T of TILES) { const dd = hyp(T.cx - px, T.cz - pz); T.dist = dd; if (!T.built && dd < 760 && H.ready(T.t)) cand.push(T); if (T.group) T.group.visible = T.ready && dd < 860; if (T.ready && dd > 1150 && !force) freeTile(T); }
-  cand.sort((a, b) => a.dist - b.dist);
-  if (force) { for (const T of cand) { buildTile(T); if (T.dist > force) break; } if (tileTick.cur) { buildTile(tileTick.cur); tileTick.cur = null; } return; }
-  // a slice at a time within the budget, the nearest tile first
-  while (performance.now() - t0 < budgetMs) {
-    let T = tileTick.cur;
-    if (!T || !T.gen) { T = cand.shift(); if (!T) break; T.gen = buildTileGen(T); tileTick.cur = T; }
-    if (T.gen.next().done) { T.gen = null; tileTick.cur = null; }
-  }
-}
-
 // ---------------------------------------------------------------- gates (cancelli): closed ones can be rammed open
-const GATES = [], GATEG = new Grid(16), GATE_FLY = [], GATE_OPEN = new Set();
+const GATE_ROTTI = new Set(), GATEG = new Grid(16), GATE_FLY = [], GATE_OPEN = new Set();
 const GATE_TEX = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d'); x.fillStyle = '#fff'; for (let i = 0; i < 4; i++) x.fillRect(i * 16 + 6, 0, 4, 128); x.fillRect(0, 0, 64, 9); x.fillRect(0, 119, 64, 9); x.fillRect(0, 54, 64, 6); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; })();
 const ARM_TEX = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 8; const x = c.getContext('2d'); for (let i = 0; i < 4; i++) { x.fillStyle = i % 2 ? '#f2f2ee' : '#d22a1e'; x.fillRect(i * 16, 0, 16, 8); } const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; })();
 const GATE_MAT = new THREE.MeshLambertMaterial({ color: 0x33413a, map: GATE_TEX, alphaTest: 0.5, side: THREE.DoubleSide });
-for (const [X0, Z0, X1, Z1, k, h, auto] of D.gates || []) {
+function layCancelli(T) { T.gates = []; for (const [X0, Z0, X1, Z1, k, h, auto] of T.d.gt || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
-  const g = { ax, az, bx, bz, ux, uz, W, k, h, gy, broken: false, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [] };
-  if (k !== 'o' && !g.perm) { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: true, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
-  GATES.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
-}
+  const key = X0 + ',' + Z0 + ',' + X1, rotto = GATE_ROTTI.has(key), g = { key, ax, az, bx, bz, ux, uz, W, k, h, gy, broken: rotto, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [] };
+  if (k !== 'o' && !g.perm) { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: !rotto, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
+  T.gates.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
+} }
 /* doors drawn flush on a facade (gaps along a house wall): p front door, n large door, b garage door; solid like the wall */
-const DOORS = [];
-for (const [X0, Z0, X1, Z1, k, h] of D.doors || []) {
+function layPorte(T) { T.doors = []; for (const [X0, Z0, X1, Z1, k, h] of T.d.dr || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
-  DOORS.push({ ax, az, bx, bz, ux, uz, W, k, h, gy });
+  T.doors.push({ ax, az, bx, bz, ux, uz, W, k, h, gy });
   WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, door: true, y0: gy - 2, y1: gy + h });
-}
+} }
 const DOOR_COL = { p: 0x5b3a26, n: 0x4a3426, b: 0x8f9296 };
 function buildDoors(T, G) {
-  for (const d of DOORS) {
-    if (tileOf((d.ax + d.bx) / 2, (d.az + d.bz) / 2) !== T.t) continue;
+  for (const d of T.doors || []) {
     const th = Math.atan2(-d.uz, d.ux), m = new THREE.Mesh(boxG(d.W, d.h, 0.14), lam(DOOR_COL[d.k] || 0x5b3a26));
     m.position.set((d.ax + d.bx) / 2 - d.uz * 0.07, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.07); m.rotation.y = th; m.castShadow = true; G.add(m);
     const fr = new THREE.Mesh(boxG(d.W + 0.16, d.h + 0.08, 0.1), lam(0xcfc8b8)); fr.position.set((d.ax + d.bx) / 2 - d.uz * 0.04, d.gy + d.h / 2, (d.az + d.bz) / 2 + d.ux * 0.04); fr.rotation.y = th; G.add(fr);
   }
 }
 function buildGates(T, G) {
-  for (const g of GATES) {
-    if (tileOf((g.ax + g.bx) / 2, (g.az + g.bz) / 2) !== T.t) continue;
+  for (const g of T.gates || []) {
     const th = Math.atan2(-g.uz, g.ux);
     if (g.k !== 'l') for (const [x, z] of [[g.ax, g.az], [g.bx, g.bz]]) { const p = new THREE.Mesh(boxG(0.32, g.h + 0.25, 0.32), lam(0x8d877c)); p.position.set(x, H.ground(x, z) + (g.h + 0.25) / 2, z); p.castShadow = true; G.add(p); }
     else { const p = new THREE.Mesh(boxG(0.25, 1.15, 0.25), lam(0xd9d6cf)); p.position.set(g.ax, H.ground(g.ax, g.az) + 0.57, g.az); G.add(p); }
@@ -1820,7 +1808,7 @@ function gateHits(v) {
 }
 function openGate(g) { g.open = true; g.openT = 5; if (g.seg) g.seg.on = false; GATE_OPEN.add(g); }
 function breakGate(g, v) {
-  g.broken = true; if (g.seg) g.seg.on = false;
+  g.broken = true; GATE_ROTTI.add(g.key); if (g.seg) g.seg.on = false;
   const sp = v.speed; v.vx *= 0.82; v.vz *= 0.82; v.health = Math.max(0, v.health - 1.5);
   if (v === P.car) { sfxCrash(Math.min(14, sp)); shake = Math.max(shake, 0.35); }
   if (!g.outer) return;
@@ -1854,7 +1842,7 @@ function updGates(dt) {
 
 // ---------------------------------------------------------------- fountains
 const FOUNT = (D.fountains || []).map(([X, Z, R]) => ({ x: X / 10, z: Z / 10, r: R }));
-for (const f of FOUNT) { f.gy = H.ground(f.x, f.z); WALLS.add(f.x - f.r - 0.5, f.z - f.r - 0.5, f.x + f.r + 0.5, f.z + f.r + 0.5, { r: f.r + 0.35, x: f.x, z: f.z, y0: f.gy - 3, y1: f.gy + 0.9 }); }
+function layFontana(f) { f.gy = H.ground(f.x, f.z); WALLS.add(f.x - f.r - 0.5, f.z - f.r - 0.5, f.x + f.r + 0.5, f.z + f.r + 0.5, { r: f.r + 0.35, x: f.x, z: f.z, y0: f.gy - 3, y1: f.gy + 0.9 }); }
 const SPRAY_MAT = new THREE.PointsMaterial({ color: 0xe6f2fb, size: 0.13, transparent: true, opacity: 0.8, depthWrite: false });
 function buildFountains(T, G) {
   for (const f of FOUNT) {
@@ -1917,7 +1905,7 @@ function signList() {
   }
   return SIGN_LIST;
 }
-function buildSigns(T, G) { drawSigns(signList().filter(s => tileOf(s.p.x, s.p.z) === T.t && !s.b.lm), G); }
+function buildSigns(T, G) { drawSigns(signDelTile(T), G); }
 const SIGN_RAY = new THREE.Raycaster();
 // fit: the landmark's meshes; each sign looks for what stands in front of its wall over its own width and height, tries a little lower (not under
 // 2.1 m) when something overhangs it, and is set just in front of the outermost surface left
@@ -1971,14 +1959,19 @@ for (const p of D.pois) {
   let ux = 1, uz = 0, bd = 1e9, bs = null; ROADSEG.each(p.x - 30, p.z - 30, p.x + 30, p.z + 30, sg => { if (sg.r.c > 3 || sg.r.d) return; const d = segDist(p.x, p.z, sg.a[0], sg.a[1], sg.b[0], sg.b[1]); if (d < bd) { bd = d; bs = sg; } });
   let x = p.x, z = p.z;
   if (bs) { const L = hyp(bs.b[0] - bs.a[0], bs.b[1] - bs.a[1]) || 1; ux = (bs.b[0] - bs.a[0]) / L; uz = (bs.b[1] - bs.a[1]) / L; let sx = -uz, sz = ux; if ((x - bs.a[0]) * sx + (z - bs.a[1]) * sz < 0) { sx = -sx; sz = -sz; } const want = bs.r.w / 2 + 9; if (bd < want) { const al = (x - bs.a[0]) * ux + (z - bs.a[1]) * uz; x = bs.a[0] + ux * al + sx * want; z = bs.a[1] + uz * al + sz * want; } var nx0 = sx, nz0 = sz; } else { var nx0 = 0, nz0 = 1; }
-  const f = { p, x, z, ux, uz, nx: nx0, nz: nz0, gy: H.ground(x, z), pumps: [] };
-  for (const o of [-3.2, 3.2]) { const px = x + ux * o, pz = z + uz * o; const pump = { x: px, z: pz, alive: true, f }; f.pumps.push(pump); WALLS.add(px - 1.3, pz - 1.3, px + 1.3, pz + 1.3, pump.wall = { r: 1.0, x: px, z: pz, y0: f.gy - 2, y1: f.gy + 2 }); }
-  for (const [a, b] of [[-6.5, -3.8], [6.5, -3.8], [-6.5, 3.8], [6.5, 3.8]]) { const qx = x + ux * a + nx0 * b, qz = z + uz * a + nz0 * b; WALLS.add(qx - 0.4, qz - 0.4, qx + 0.4, qz + 0.4, { r: 0.25, x: qx, z: qz, y0: f.gy - 2, y1: f.gy + 4 }); }
+  const f = { p, x, z, ux, uz, nx: nx0, nz: nz0, gy: 0, pumps: [] }; /* gy and the solids when its tile is laid out: layPompe */
+  for (const o of [-3.2, 3.2]) { const px = x + ux * o, pz = z + uz * o; f.pumps.push({ x: px, z: pz, alive: true, f }); }
+
   FUEL.push(f);
+}
+function layPompe(f) {
+  f.gy = H.ground(f.x, f.z);
+  for (const pump of f.pumps) WALLS.add(pump.x - 1.3, pump.z - 1.3, pump.x + 1.3, pump.z + 1.3, pump.wall = { r: 1.0, x: pump.x, z: pump.z, y0: f.gy - 2, y1: f.gy + 2 });
+  for (const [a, b] of [[-6.5, -3.8], [6.5, -3.8], [-6.5, 3.8], [6.5, 3.8]]) { const qx = f.x + f.ux * a + f.nx * b, qz = f.z + f.uz * a + f.nz * b; WALLS.add(qx - 0.4, qz - 0.4, qx + 0.4, qz + 0.4, { r: 0.25, x: qx, z: qz, y0: f.gy - 2, y1: f.gy + 4 }); }
 }
 /* a roof (OSM or DBGT) lying for more than half inside the canopy the game draws on a fuel station is not drawn: it would be a second canopy */
 let FUEL_ROOFS = 0;
-for (const T of TILES) for (const B of T.bld) {
+function tettiFuel(T) { for (const B of T.bld) {
   if (B.skipDraw || B.lm || B.big || B.g >= 2) continue;
   for (const f of FUEL) {
     if (B.bb[2] < f.x - 12 || B.bb[0] > f.x + 12 || B.bb[3] < f.z - 12 || B.bb[1] > f.z + 12) continue;
@@ -1997,7 +1990,7 @@ for (const T of TILES) for (const B of T.bld) {
       B.walls = null; BLD.del(B.bb[0], B.bb[1], B.bb[2], B.bb[3], B); const bi = BUILDINGS.indexOf(B); if (bi >= 0) BUILDINGS.splice(bi, 1); break;
     }
   }
-}
+} }
 function buildFuel(T, G) {
   for (const f of FUEL) {
     if (tileOf(f.x, f.z) !== T.t) continue;
@@ -2035,8 +2028,8 @@ function updFuel(dt) { for (const f of FUEL) for (const pump of f.pumps) if (pum
 
 // ---------------------------------------------------------------- caserme: Carabinieri stations and Polizia Locale headquarters (door, sign, lantern, flags, parking)
 const CASERME = [];
-for (const p of D.pois) {
-  if (p.k !== 'polizia') continue;
+function casermeDi(lista) { for (const p of lista) { // once, when the tile of the station is about to be built (COT.cas: which); the police station looks at the buildings and streets round it
+  if (p.k !== 'polizia' || p.casDone) continue; p.casDone = true;
   const cc = /carabinier|compagnia/i.test(p.n || '');
   // the building: the one around the point, else a big one close by (the point is often the middle of the fenced compound)
   let B = null, bs = 1e9;
@@ -2091,8 +2084,8 @@ for (const p of D.pois) {
   st.posts.push({ lx: -2.3, lz: pz }, { lx: 2.3, lz: pz }, { lx: 0, lz: Math.min(0.75, pz), beat: Math.max(2.5, Math.min(F.L / 2 - 1, 12)) });
   CASERME.push(st);
   for (const [lx, lz] of [[-1.55, 1.45], [1.55, 1.45]]) { const [x, z] = st.at(lx, lz); WALLS.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, { r: 0.1, x, z, y0: st.gy - 2, y1: st.gy + 3 }); } // canopy posts
-}
-const townOf = st => placeAt(st.x, st.z) || 'Meda';
+} }
+const townOf = st => placeAt(st.x, st.z) || 'Brianza';
 function caserma2Lines(st) {
   const n = st.p.n || '', town = townOf(st);
   if (st.cc) return ['CARABINIERI', /compagnia/i.test(n) ? 'Comando Compagnia di ' + town : 'Stazione di ' + town];
@@ -2259,7 +2252,7 @@ const BUS_PROPS = new Map();
 
 // ---------------------------------------------------------------- barriers (sbarre)
 const armTex = canvasTex(256, 16, (g, w, h) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f3f1ea' : '#d22c22'; g.fillRect(i * 32, 0, 32, h); } }, false);
-for (const g of LX) if (g.drive) {
+function lxSbarre(g) { // the first time its tile is laid out; they stay, like the lamps
   const nx = -g.uz, nz = g.ux; g.bars = []; g.lampA = new THREE.MeshLambertMaterial({ color: 0x3a0806, emissive: 0xff2a14, emissiveIntensity: 0 }); g.lampB = g.lampA.clone();
   for (const s of [-1, 1]) {
     // the post off the drawn carriageway (AC_VEI, docs/motore.md 7): sideways, the arm longer, or the barrier nearer the track (at least 1.2 m from the
@@ -2285,7 +2278,7 @@ for (const g of LX) if (g.drive) {
     WALLS.add(px, pz, ex, ez, seg);
     const probe = []; for (let t = 0.1; t <= 1; t += 0.2) probe.push([lerp(px, ex, t), lerp(pz, ez, t)]);
     const bar = { arm, seg, probe, root }; g.bars.push(bar);
-    addProp({ x: px, z: pz, y: H.ground(px, pz), r: 0.2, h: 3, obj: root, onBreak: () => { bar.broken = true; seg.on = false; bar.probe = []; } }); // the post knocked down takes its arm with it
+    addProp({ lx: true, x: px, z: pz, y: H.ground(px, pz), r: 0.2, h: 3, obj: root, onBreak: () => { bar.broken = true; seg.on = false; bar.probe = []; } }); // the post knocked down takes its arm with it
   }
 }
 

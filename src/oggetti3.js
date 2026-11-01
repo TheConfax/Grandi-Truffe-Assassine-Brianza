@@ -111,11 +111,11 @@ function bumpAt(x, z) {
   return y;
 }
 OGG_BUMPS = new Grid(16);
-for (const T of TILES) for (const o of T.d.og || []) {
+function layDossi(T) { for (const o of T.d.og || []) {
   const k = OGG_KINDS[o[0]]; if (!BUMP_SHAPE[k]) continue;
   const x = o[1] / 10, z = o[2] / 10, ux = Math.sin(o[3]), uz = Math.cos(o[3]), w = Math.max(3, Math.min(14, o[4] || 6)), R = Math.max(BUMP_SHAPE[k].half, w / 2) + 0.5;
   OGG_BUMPS.add(x - R, z - R, x + R, z + R, { k, x, z, ux, uz, w });
-}
+} }
 let bumpT = 0;
 function updOggetti(dt) { // a jolt in the car when you take a bump fast
   bumpT -= dt; const v = P.mode === 'car' ? P.car : null; if (!v || bumpT > 0 || v.speed < 7) return;
@@ -185,7 +185,6 @@ function buildOggetti(T, G) {
 // k 2 the same not round: a horizontal tank on two saddles if long and low, else the footprint raised to h; k 3 an open basin (MN_IND 11):
 // concrete walls up to h, the water 12 cm under the rim. Colours as the 2018-19 orthophoto shows them (m walls, t top, a water, b rim;
 // src/manufatti_foto.json), else light metal and plain concrete. Heights from the DSM where it sees them. Solid
-let MF_SILOS = null; // the round silos of every tile, for the catwalks between them
 const mfRise = (r, h) => Math.min(1.5, 0.25 * r, h * 0.12); // the cone on top of a silo
 function buildManufatti(T, G) {
   const list = T.d.mf || []; if (!list.length) return;
@@ -238,7 +237,7 @@ function buildManufatti(T, G) {
     for (let i = 0; i < n; i++) { const t0 = i * TAU / n, t1 = (i + 1) * TAU / n, R = S.r * 0.98; lsRod(b, [S.x + Math.cos(t0) * R, S.eave + 1.0, S.z + Math.sin(t0) * R], [S.x + Math.cos(t1) * R, S.eave + 1.0, S.z + Math.sin(t1) * R], 0.025, STEEL); if (i % 2 === 0) lsRod(b, [S.x + Math.cos(t0) * R, S.eave, S.z + Math.sin(t0) * R], [S.x + Math.cos(t0) * R, S.eave + 1.0, S.z + Math.sin(t0) * R], 0.02, STEEL); }
   }
   // a catwalk from each silo of this tile to a neighbour of any tile (the four of via Cadorna stand on two tiles), drawn once: by the silo first in x
-  if (!MF_SILOS) { MF_SILOS = []; for (const T2 of TILES) for (const q of T2.d.mf || []) if (q.k === 1 && q.h > 35 && q.r > 8) { const x = q.c[0] / 10, z = q.c[1] / 10, r = q.r / 10, h = q.h / 10; MF_SILOS.push({ x, z, r, h }); } }
+  const MF_SILOS = []; for (const T2 of vicini(T)) for (const q of T2.d.mf || []) if (q.k === 1 && q.h > 35 && q.r > 8) { const x = q.c[0] / 10, z = q.c[1] / 10, r = q.r / 10, h = q.h / 10; MF_SILOS.push({ x, z, r, h }); }
   for (const A of silos) for (const Q of MF_SILOS) {
     if (Q.x < A.x || (Q.x === A.x && Q.z <= A.z) || Math.abs(Q.x - A.x) > 14 || Math.abs(Q.z - A.z) > 14) continue;
     const C = { x: Q.x, z: Q.z, r: Q.r, eave: H.ground(Q.x, Q.z) + Q.h - mfRise(Q.r, Q.h) };

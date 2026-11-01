@@ -5,7 +5,7 @@
 #     extended to that lattice line and its top is pulled onto S there: the terrain is never moved. A PONTE end that reaches no ground
 #     where OSM says the bridge goes on is carried on to the first ground at its level (EXT_MAX).
 #   build_pits(): the underpass stairwells (landmarks3.js STAIRWELLS, the only source of their depth) as {imp, fondo, gradini}.
-# Writes decks_meda.json and report_fase3.json (C5 on the spalle, C11). No change to brianza.json or to the game.
+# Writes decks.json and report_fase3.json (C5 on the spalle, C11). No change to brianza.json or to the game.
 #   python src/impalcati.py [--out DIR] [--comune Meda] [--no-png] [--accetta]
 import os, sys, re, json, time, pickle, argparse, types, warnings
 import xml.etree.ElementTree as ET
@@ -780,7 +780,7 @@ def build_decks(comune=None, out=None):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description='Impalcati e fosse (fase 3): decks_meda.json e report_fase3.json')
+    ap = argparse.ArgumentParser(description='Impalcati e fosse (fase 3): decks.json e report_fase3.json')
     ap.add_argument('--out', default=os.path.normpath(os.path.join(HERE, '..', '..', 'motore_out')))
     ap.add_argument('--comune', default=None); ap.add_argument('--no-png', action='store_true'); ap.add_argument('--accetta', action='store_true')
     a = ap.parse_args(argv)
@@ -814,8 +814,8 @@ def main(argv=None):
     info = dict(comune=s.comune, offset_m=s.info['offset']['valore'], impalcati=len(decks), per_tipo=per_tipo, ponti_dbgt=len(imp.D['PONTE']['off']) - 1,
                 ponti_dbgt_riconosciuti=len(ponti), ponti_non_segnati=sum(1 for d in decks if d['fonte'].startswith('ponte non segnato')),
                 pezzi_staccati=sum(1 for d in decks if 'staccato' in d['fonte']), copertura=bool(cop), fosse=len(pits), **imp.info)
-    size = scrivi_json(decks, pits, os.path.join(a.out, 'decks_meda.json'), info)
-    if not a.no_png: immagini(imp, decks, pits, os.path.join(a.out, 'impalcati_meda.png'))
+    size = scrivi_json(decks, pits, os.path.join(a.out, 'decks.json'), info)
+    if not a.no_png: immagini(imp, decks, pits, os.path.join(a.out, 'impalcati.png'))
     elenco = []
     for d in decks:
         e = dict(id=d['id'], tipo=d['tipo'], fonte=d['fonte'], x=round(d['imp'].centroid.x, 1), z=round(d['imp'].centroid.y, 1), area=round(d['imp'].area, 1), area_nucleo=d['area_nucleo'],
@@ -838,7 +838,7 @@ def main(argv=None):
     out = dict(fase=3, comune=s.comune, parametri=dict(spessori=SP, luce=LUCE, livello_spalla_m=LEVEL_TOL, raccordo_spalle_m=RC, anello_ponte_scartato_m=BAD_RING, assegna_air_m=ASSIGN_D,
                                                        sotto_terreno_m=UNDER_MIN, osm_vicino_m=OSM_NEAR, buffer_confronto_vie_m=MATCH_BUF),
                sintesi=info, impalcati=elenco, scartati=scart, fosse=fosse, sottopassi_osm_senza_fossa=sottopassi, **rep, punti_da_guardare=punti[:50],
-               file=dict(decks='decks_meda.json', peso_kb=round(size / 1024, 1), immagine='impalcati_meda.png'), esito=esito,
+               file=dict(decks='decks.json', peso_kb=round(size / 1024, 1), immagine='impalcati.png'), esito=esito,
                tempi_s=dict(s.t, impalcati=imp.info['t_impalcati'], totale=round(time.time() - T0, 1)))
     json.dump(out, open(os.path.join(a.out, 'report_fase3.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, default=float)
     log('impalcati %d %s; PONTE riconosciuti %d su %d; non segnati %d; pezzi staccati %d; copertura %s; fosse %d; scartati %s' % (

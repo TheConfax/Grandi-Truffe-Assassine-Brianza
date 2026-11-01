@@ -1478,7 +1478,7 @@ def immagini(s, out):
     img[coarse] = img[coarse] * 0.8 + np.array([120, 160, 110]) * 0.2
     img[fuori] = img[fuori] * 0.5 + 110
     img[ed] = (20, 20, 20)
-    png(os.path.join(out, 'S_meda.png'), img)
+    png(os.path.join(out, 'S.png'), img)
     sh = shade(G, SF, 2.0); lo, hi = np.percentile(G, 1), np.percentile(G, 99); t = np.clip((G - lo) / max(1e-6, hi - lo), 0, 1)[..., None]
     img = ((1 - t) * np.array([70, 120, 80]) + t * np.array([215, 200, 160])) * (0.3 + 0.7 * sh[..., None]); img[fuori] = img[fuori] * 0.5 + 110; img[ed] = (20, 20, 20)
     png(os.path.join(out, 'S_intero.png'), img)
@@ -1516,7 +1516,7 @@ def main(argv=None):
     # this surface instead of computing it all again (it was half the time of the terrain)
     if a.margine == 250.0 and a.blend == BLEND and s.comune not in _S: _S[s.comune] = s
     tdir = os.path.join(a.out, 'terreno'); t0 = time.time(); peso = s.scrivi(tdir); s.t['scrittura'] = round(time.time() - t0, 1)
-    import binari; json.dump(dict(binari=binari.per_gioco(s.binari)), open(os.path.join(a.out, 'binari_meda.json'), 'w', encoding='utf-8'), separators=(',', ':'))   # the height of the tracks, for the game (terreno_gioco.py)
+    import binari; json.dump(dict(binari=binari.per_gioco(s.binari)), open(os.path.join(a.out, 'binari.json'), 'w', encoding='utf-8'), separators=(',', ':'))   # the height of the tracks, for the game (terreno_gioco.py)
     rep, punti = controlli(s, tdir)
     import lisciatore; lisciatore.controlli(s, s.GQ, os.path.join(a.out, 'report_lisciatore.json'), log=log)
     if not a.no_png: t0 = time.time(); immagini(s, a.out); s.t['immagini'] = round(time.time() - t0, 1)

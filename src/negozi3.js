@@ -525,7 +525,7 @@ const ngHas = p => (NG_NAMED.get((p.n || '').toLowerCase()) || []).some(([x, z])
 // ---- big supermarkets: a low building of their own (Unes, Carrefour, Iperal...) becomes a whole supermarket, built like the fuel stations,
 // instead of a shop front on a generic block. The supermarket in a block of flats keeps its front
 const NG_SUPER_PAL = [['#c8102e', '#ffffff'], ['#1d5aa8', '#ffffff'], ['#2a7a3a', '#ffffff'], ['#ff7a1e', '#ffffff'], ['#f2c230', '#1d3a8a']];
-for (const e of D.ng || []) {
+function ngSuperTutti() { for (const e of D.ng || []) { // (the bake: T.d.sup in the game)
   if (NG_CLASSES[e[2]] !== 'supermercato') continue;
   const x = e[0] / 10, z = e[1] / 10, ok = b => !b.lm && !b.big && !b.noSign && Math.abs(sArea(b.pts)) >= 700 && b.h <= (b.t === 3 ? 14 : 10.5);
   let host = null, inside = null, bd = 25;
@@ -536,7 +536,7 @@ for (const e of D.ng || []) {
   const name = e[4] || 'Supermercato', h0 = NG_HASH('super|' + name + '|' + e[0]);
   let pal = NG_SUPER_PAL[Math.floor(h0 * NG_SUPER_PAL.length)]; for (const [re, c] of NG_BRANDS) if (re.test(name)) { pal = c; break; }
   host.big = { e, x, z, name, pal, h0, v: Math.floor(h0 * 997) % 4 }; host.h = clamp(host.h, 6.8, 10);
-}
+} }
 function ngList() {
   if (NG_LIST) return NG_LIST; NG_LIST = []; const walls = new Map(), use = new Map(), retry = []; // use: the width the shops already on a DBGT wall take
   for (const e of D.ng || []) {
@@ -665,7 +665,7 @@ let ngTick = 0;
 function updNegozi(dt) {
   ngTick -= dt; if (ngTick > 0) return; ngTick = 1;
   const h = ngTOD(); if (NG_CLOCK.last >= 0 && h < NG_CLOCK.last - 12) NG_CLOCK.day = (NG_CLOCK.day + 1) % 7; NG_CLOCK.last = h;
-  for (const T of TILES) if (T.ngShut && T.group) ngShutters(T);
+  for (const T of VIVI) if (T.ngShut && T.group) ngShutters(T);
 }
 
 // ---- modelling in a wall's own frame: x along the wall, y up from the pavement, z out of the wall
@@ -895,7 +895,7 @@ function ngDepth(s) { // free pavement in front: up to the carriageway, a buildi
 }
 // car parks: nothing of the shops' goes on them (the parked cars would land on the tables)
 const NG_PARK = new Grid(24);
-for (const T of TILES) for (const a of T.d.a || []) if (a.t === 4) { const o = dec(a.p); if (o.length < 3) continue; const bb = bbox(o); NG_PARK.add(bb[0], bb[1], bb[2], bb[3], { o, bb }); }
+function layParcheggi(T) { for (const a of T.d.a || []) if (a.t === 4) { const o = dec(a.p); if (o.length < 3) continue; const bb = bbox(o); NG_PARK.add(bb[0], bb[1], bb[2], bb[3], { o, bb }); } }
 const ngInPark = (x, z, r) => { let f = false; NG_PARK.each(x - r, z - r, x + r, z + r, q => { if (!f && x >= q.bb[0] - r && x <= q.bb[2] + r && z >= q.bb[1] - r && z <= q.bb[3] + r && (inPoly(x, z, q.o) || q.o.some(p => hyp(p[0] - x, p[1] - z) < r))) f = true; }); return f; };
 // ---- the whole supermarket: clad walls with a band in the chain's colour all round, the name big on it, a glass front with sliding doors under
 // a canopy, a loading bay at the back, plant on the roof, a trolley shelter by the door and the pylon by the road
@@ -992,7 +992,7 @@ function ngBig(B, C) {
   S.walls = true;
 }
 function* buildNegozi(T, G) { // a generator: the tile builder yields between slices, so a street of shops never stalls a frame
-  const list = ngList().filter(s => s.tile === T.t), bigs = T.bld.filter(B => B.big); if (!list.length && !bigs.length) return;
+  const list = ngDelTile(T), bigs = T.bld.filter(B => B.big); if (!list.length && !bigs.length) return;
   const C = { solid: Buf(), sign: Buf(), shut: Buf(), shuts: [], dark: Buf(), darks: [], sq: [], cells: [], glass: {}, neon: {}, props: [], solids: [], depth: ngDepth };
   T.ngShut = null;
   for (const B of bigs) { try { ngBig(B, C); } catch (e) { console.warn('supermercato', B.big.name, e); } yield 'negozi'; }

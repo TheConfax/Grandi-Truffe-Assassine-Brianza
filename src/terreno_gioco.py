@@ -1,6 +1,6 @@
 # Motore nuovo, fase 4 (docs/motore.md 2.2, 3): what the game reads of the new engine, in the folder terreno/ next to index.html.
 #   terreno/<tx>_<tz>.bin.gz   the tiles of S written by src/superficie.py, gzip (the game unpacks them with DecompressionStream)
-#   terreno/indice.json        which tiles have a .bin and their step, the decks and pits of src/impalcati.py (decks_meda.json) and
+#   terreno/indice.json        which tiles have a .bin and their step, the decks and pits of src/impalcati.py (decks.json) and
 #                              the water level zw along the DBGT river axes (acqua_fase2.json of superficie.py), in metres above sea
 # Until brianza.json carries decks, rv.zw and meta.ver = 2 (the build, phase 7-8) these are read from here; the game falls back to the
 # old engine where a tile has no .bin.
@@ -25,7 +25,7 @@ def r2(v): return round(float(v), 2)
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description='Impacchetta S, impalcati e acqua per il gioco (fase 4)')
-    ap.add_argument('--da', required=True, help='cartella con terreno/*.bin, decks_meda.json, acqua_fase2.json')
+    ap.add_argument('--da', required=True, help='cartella con terreno/*.bin, decks.json, acqua_fase2.json')
     ap.add_argument('--out', default=os.path.join(ROOT, 'terreno'))
     ap.add_argument('--rigenera', action='store_true'); ap.add_argument('--no-controlli', action='store_true'); ap.add_argument('--comune', default=None, help='di default i comuni accesi (data/dbt/*/dbgt.gpkg)')
     a = ap.parse_args(argv)
@@ -39,7 +39,7 @@ def main(argv=None):
     sys.path.insert(0, HERE)
     import controlli_acqua as ca
     from superficie import HW, HH, TILE
-    dk = json.load(open(os.path.join(a.da, 'decks_meda.json'), encoding='utf-8'))
+    dk = json.load(open(os.path.join(a.da, 'decks.json'), encoding='utf-8'))
     decks = []
     for d in dk['decks']:
         e = dict(id=d['id'], tipo=d['tipo'], fonte=d['fonte'], sp=d['sp'], luce=r2(d['luce']), imp=[[r2(x), r2(z)] for x, z in d['imp']],
@@ -65,12 +65,12 @@ def main(argv=None):
         for s in json.load(open(fa, encoding='utf-8')):
             acqua.append(dict(p=[v for q in s['p'] for v in (r2(q[0]), r2(q[1]))], zw=[r2(v) for v in s['zw']]))
     pits = dk.get('pits', [])
-    ff = os.path.join(a.da, 'fosse_meda.json')   # the ramps of src/sottoterra.py (docs/sottoterra.md, tappa 1)
+    ff = os.path.join(a.da, 'fosse.json')   # the ramps of src/sottoterra.py (docs/sottoterra.md, tappa 1)
     if os.path.exists(ff): pits = pits + json.load(open(ff, encoding='utf-8'))['fosse']
     import dbgt_quote as dq
     ind = dict(ver=1, fase=4, comune='+'.join(dq.lista_comuni(a.comune)), nota='docs/motore.md fase 4: quote in m sul mare; il gioco toglie terrain.base di brianza.json',
                tiles=tiles, decks=decks, pits=pits, acqua=acqua)
-    fb = os.path.join(a.da, 'binari_meda.json')   # the height of the tracks (src/binari.py)
+    fb = os.path.join(a.da, 'binari.json')   # the height of the tracks (src/binari.py)
     if os.path.exists(fb): ind['binari'] = json.load(open(fb, encoding='utf-8'))['binari']
     open(os.path.join(a.out, 'indice.json'), 'w', encoding='utf-8').write(json.dumps(ind, ensure_ascii=False, separators=(',', ':')))
     import terreno_pacco; terreno_pacco.impacchetta(a.out)  # i .bin.gz in un file solo (avvio veloce)

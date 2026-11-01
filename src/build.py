@@ -1,5 +1,5 @@
 """Rigenera brianza.json: controlla che in data/ ci sia tutto, poi lancia build_data.py con gli argomenti giusti.
-uso: python src/build.py [out.json]      (di default brianza.json nella cartella del repo; dura circa 4 minuti per Meda)
+uso: python src/build.py [out.json]      (di default brianza.json nella cartella del repo; dura una ventina di minuti con due comuni; dopo: terreno_gioco.py, poi pezzi.py)
 La cartella dei dati si può spostare con la variabile GTA_DATA. Le fonti sono descritte in docs/dati.md."""
 import os, sys, glob, subprocess
 
@@ -19,7 +19,6 @@ NEEDED = [
     (os.path.join(DATA, 'overture', 'edifici_overture.geojson'), 'edifici Overture Maps'),
     (os.path.join(DATA, 'worldcover', 'wc', 'wc.npy'), 'ritaglio ESA WorldCover (python src/wccrop.py)'),
     (os.path.join(DATA, 'worldcover', 'wc', 'wc_meta.txt'), 'ritaglio ESA WorldCover (python src/wccrop.py)'),
-    (os.path.join(DATA, 'dbt', 'Meda', 'dbgt.gpkg'), 'DBGT di Meda (Geoportale Lombardia)'),
 ]
 
 missing = [(f, what) for f, what in NEEDED if not os.path.exists(f)]
@@ -31,6 +30,7 @@ if missing:
     print('vedi docs/dati.md per dove scaricarli')
     sys.exit(1)
 dbt = sorted(os.path.basename(os.path.dirname(f)) for f in glob.glob(os.path.join(DATA, 'dbt', '*', 'dbgt.gpkg')))
+if not dbt: print('MANCA almeno un DBGT in dbt/<comune>/dbgt.gpkg (Geoportale Lombardia), vedi docs/dati.md'); sys.exit(1)
 print('dati a posto; DBGT usati:', ', '.join(dbt))
 # il LiDAR del Ministero è facoltativo: dove manca resta TINITALY. Il riquadro con il margine di 480 m sta in 54 tessere da 0,01 gradi
 lid = [f for f in glob.glob(os.path.join(DATA, 'terreno', 'lidar', '**', '*'), recursive=True) if f.lower().endswith(('.tif', '.tiff', '.asc'))]

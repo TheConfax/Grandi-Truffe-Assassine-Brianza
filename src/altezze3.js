@@ -4,7 +4,7 @@
 // triangles per cell (diagonal u >= v), so H.base is the drawn ground to the float32 rounding (H.check). Elsewhere, and in a tile of Meda
 // until its .bin has arrived, the old engine answers: the 10 m grid with the trenches of D.cut and the river cut (they go in phase 6)
 const TER = D.terrain;
-const TH = (() => { const bin = atob(TER.h16), n = bin.length >> 1, f = new Float32Array(n); for (let i = 0; i < n; i++) f[i] = (bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8)) / 10; return f; })();
+const TH = (() => { const f = new Float32Array(SUOLO.length), nx = TER.nx; let v = 0; for (let j = 0, k = 0; j < TER.nz; j++) { v = j ? f[(j - 1) * nx] * 10 + SUOLO[k] : SUOLO[k]; v = Math.round(v); f[k++] = v / 10; for (let i = 1; i < nx; i++) { v += SUOLO[k]; f[k++] = v / 10; } } return f; })(); // mappa/suolo.bin: tenths of a metre over TER.base, as differences along the row
 // The DROP of the Diaz - Anna Frank stair (3.2 m dug into the coarse grid at the foot of the bank, made for TINITALY) and the trenches of D.cut
 // (trenchCut, CUT_S) are gone (docs/motore.md 3.1, fase 6): S has the bank and the trenches, and all the trenches of D.cut lie in tiles of S.
 // The old ground of the tiles without .bin is the coarse grid as it is
@@ -14,7 +14,7 @@ function farH(x, z) { // the old ground: the coarse grid, same two triangles per
   return u >= v ? h00 + u * (h10 - h00) + v * (h11 - h10) : h00 + v * (h01 - h00) + u * (h11 - h01);
 }
 const RIVG = new Grid(24), RIV_D = 2.4;
-for (const td of D.tiles) for (const r of td.rv || []) { const pts = dec(r.p); for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], m = r.w + 1; RIVG.add(Math.min(a[0], b[0]) - m, Math.min(a[1], b[1]) - m, Math.max(a[0], b[0]) + m, Math.max(a[1], b[1]) + m, { a, b, w: r.w, ca: k === 1 && !!(r.e && r.e[0]), cb: k === pts.length - 1 && !!(r.e && r.e[1]) }); } }
+for (const [, r] of D.rv) { const pts = dec(r.p); for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], m = r.w + 1; RIVG.add(Math.min(a[0], b[0]) - m, Math.min(a[1], b[1]) - m, Math.max(a[0], b[0]) + m, Math.max(a[1], b[1]) + m, { a, b, w: r.w, ca: k === 1 && !!(r.e && r.e[0]), cb: k === pts.length - 1 && !!(r.e && r.e[1]) }); } }
 function riverCut(x, z) { // old engine only (the tiles without .bin, outside Meda until phase 8): the river bed dug RIV_D into the drawn ground; S has the bed in it
   let c = 0;
   RIVG.each(x, z, x, z, s => {
@@ -25,38 +25,32 @@ function riverCut(x, z) { // old engine only (the tiles without .bin, outside Me
   });
   return c;
 }
-// the new engine's files: which tiles have a .bin, the decks, the pits and the water level (terreno/indice.json, src/terreno_gioco.py);
-// without it the whole map runs on the old engine
-const TERRENO = await TERR_IND.then(j => j && j.ver === 1 ? j : null); // started with brianza.json (assemble3.py)
+// what the new engine has for the whole map: which tiles have a .bin (D.pezzi: its step, 0 none) and the height of the tracks; the rest of it (the tiles of S, the decks, the pits, the water) comes with the pieces (H.dentro)
+
+const TERRENO = { binari: D.binari };
+const disfaGriglie = reg => { for (let i = 0; i < reg.length; i += 6) reg[i].del(reg[i + 1], reg[i + 2], reg[i + 3], reg[i + 4], reg[i + 5]); };
 const H = (() => {
-  const TSZ = META.tile, HW = META.hw, HHt = META.hh, NX = META.ntx, NZ = META.ntz, B0 = TER.base, LOAD_R = 1150;
-  const STEP = new Uint8Array(NX * NZ), FT = new Array(NX * NZ).fill(null), LS = new Uint8Array(NX * NZ); // LS: 0 not asked, 1 coming, 2 here, 3 failed
-  if (TERRENO) for (const k in TERRENO.tiles) { const [tx, tz] = k.split('_').map(Number); if (tx >= 0 && tz >= 0 && tx < NX && tz < NZ) STEP[tx + NX * tz] = TERRENO.tiles[k]; }
-  const tx0 = t => -HW + (t % NX) * TSZ, tz0 = t => -HHt + Math.floor(t / NX) * TSZ;
-  const onLoad = [];
-  async function load(t) {
-    LS[t] = 1; const tx = t % NX, tz = Math.floor(t / NX);
-    try {
-      let b = null; const pk = await TERR_BIN, pm = pk && pk.get(tx + '_' + tz); // terreno/pacco.bin: already unpacked, in parallel
-      if (pm) { const ab = await pm; if (ab) b = new Uint8Array(ab); }
-      if (!b) { const r = await fetch(`terreno/${tx}_${tz}.bin.gz`, { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status); b = new Uint8Array(await r.arrayBuffer()); } // one .bin.gz at a time, the old way
-      if (b[0] === 0x1f && b[1] === 0x8b) b = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
-      const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
-      if (b[0] !== 71 || b[1] !== 84 || b[2] !== 65 || b[3] !== 83 || b[4] !== 1) throw new Error('non è un GTAS 1');
-      const st = b[5], n = dv.getUint16(6, true), base = dv.getFloat32(8, true), y = new Float32Array(n * n), x0 = tx0(t), z0 = tz0(t);
-      if (Math.round(TSZ / st) + 1 !== n || b.length < 12 + 2 * n * n) throw new Error('misure sbagliate');
-      for (let k = 0; k < n * n; k++) { const q = dv.getUint16(12 + 2 * k, true); y[k] = q === 65535 ? farH(x0 + (k % n) * st, z0 + Math.floor(k / n) * st) : (base * 100 + q) / 100 - B0; } // 65535: empty, the old ground
-      const mo = 12 + 2 * n * n, m = b.length >= mo + (n - 1) * (n - 1) ? b.slice(mo, mo + (n - 1) * (n - 1)) : null;
-      let ud = null; if (m) for (let k = 0; k < m.length; k++) if (m[k] & 128) { if (!ud) ud = new Uint8Array(m.length); ud[k] = 1; m[k] &= 127; } // bit 7: a cell under a deck where S is no street (terreno_gioco.py): no street paint there
-      FT[t] = { t, st, n, x0, z0, y, m, ud, pc: pitCells(tx, tz, n - 1) }; FT[t].ud2 = ud; LS[t] = 2; /* ud2: where no street paint goes, ud widened by world3.js along the approach ramps (rampPaint) */
-      for (const f of onLoad) f(t);
-    } catch (e) { LS[t] = 3; console.warn('terreno ' + tx + '_' + tz + ': ' + e.message + ' (resta il motore vecchio)'); }
+  const TSZ = META.tile, HW = META.dati.hw, HHt = META.dati.hh, DX = Math.round((META.hw - HW) / TSZ), DZ = Math.round((META.hh - HHt) / TSZ), NX = META.ntx, NZ = META.ntz, B0 = TER.base; // the corners of the tiles counted from where the data were cut: DX, DZ tiles of grid before them. Polygons end on these lines to the last bit
+  const STEP = new Uint8Array(NX * NZ), FT = new Array(NX * NZ).fill(null);
+  for (const k in D.pezzi) STEP[+k] = D.pezzi[k];
+  const tx0 = t => -HW + (t % NX - DX) * TSZ, tz0 = t => -HHt + (Math.floor(t / NX) - DZ) * TSZ;
+  // a piece has arrived: its tile of S out of the bytes. 65535: empty, the old ground
+  function apriS(t, b) {
+    const tx = t % NX, tz = Math.floor(t / NX), dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    if (b[0] !== 71 || b[1] !== 84 || b[2] !== 65 || b[3] !== 83 || b[4] !== 1) throw new Error('non è un GTAS 1');
+    const st = b[5], n = dv.getUint16(6, true), base = dv.getFloat32(8, true), y = new Float32Array(n * n), x0 = tx0(t), z0 = tz0(t);
+    if (Math.round(TSZ / st) + 1 !== n || b.length < 12 + 2 * n * n) throw new Error('misure sbagliate');
+    for (let k = 0; k < n * n; k++) { const q = dv.getUint16(12 + 2 * k, true); y[k] = q === 65535 ? farH(x0 + (k % n) * st, z0 + Math.floor(k / n) * st) : (base * 100 + q) / 100 - B0; }
+    const mo = 12 + 2 * n * n, m = b.length >= mo + (n - 1) * (n - 1) ? b.slice(mo, mo + (n - 1) * (n - 1)) : null;
+    let ud = null; if (m) for (let k = 0; k < m.length; k++) if (m[k] & 128) { if (!ud) ud = new Uint8Array(m.length); ud[k] = 1; m[k] &= 127; } // bit 7: a cell under a deck where S is no street (terreno_gioco.py): no street paint there
+    FT[t] = { t, st, n, x0, z0, y, m, ud, pc: pitCells(tx, tz, n - 1) }; FT[t].ud2 = ud; /* ud2: where no street paint goes, ud widened by world3.js along the approach ramps (rampPaint) */
+    NFADE.clear();
   }
   // the loaded tile under (x, z); a point on the edge of a tile without .bin takes the neighbour's, so the old tiles meet S without a crack
   function fineAt(x, z) {
-    const fx = (x + HW) / TSZ, fz = (z + HHt) / TSZ, i = Math.floor(fx), j = Math.floor(fz);
+    const fx = (x + HW) / TSZ, fz = (z + HHt) / TSZ, i = Math.floor(fx) + DX, j = Math.floor(fz) + DZ;
     if (i >= 0 && j >= 0 && i < NX && j < NZ) { const F = FT[i + NX * j]; if (F) return F; }
-    const e = 1e-3 / TSZ, di = fx - i < e ? -1 : i + 1 - fx < e ? 1 : 0, dj = fz - j < e ? -1 : j + 1 - fz < e ? 1 : 0;
+    const e = 1e-3 / TSZ, gx = fx - Math.floor(fx), gz = fz - Math.floor(fz), di = gx < e ? -1 : 1 - gx < e ? 1 : 0, dj = gz < e ? -1 : 1 - gz < e ? 1 : 0;
     if (!di && !dj) return null;
     for (const [a, c] of [[di, 0], [0, dj], [di, dj]]) { if (!a && !c) continue; const I = i + a, J = j + c; if (I >= 0 && J >= 0 && I < NX && J < NZ && FT[I + NX * J]) return FT[I + NX * J]; }
     return null;
@@ -73,7 +67,7 @@ const H = (() => {
   // up to 4.6 m in 2 m in the ground
   const FADE_R = 120, smooth = d => { const t = 1 - d / FADE_R; return t * t * (3 - 2 * t); };
   function oldG(x, z) {
-    const y = farH(x, z), i = Math.floor((x + HW) / TSZ), j = Math.floor((z + HHt) / TSZ); let sw = 0, sc = 0, dmin = FADE_R;
+    const y = farH(x, z), i = Math.floor((x + HW) / TSZ) + DX, j = Math.floor((z + HHt) / TSZ) + DZ; let sw = 0, sc = 0, dmin = FADE_R;
     for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
       const I = i + a, J = j + b; if (I < 0 || J < 0 || I >= NX || J >= NZ) continue; const F = FT[I + NX * J]; if (!F) continue;
       const px = clamp(x, F.x0, F.x0 + TSZ), pz = clamp(z, F.z0, F.z0 + TSZ), d = hyp(x - px, z - pz); if (d >= FADE_R) continue;
@@ -83,7 +77,7 @@ const H = (() => {
     return sw ? y + smooth(dmin) * sc / sw : y;
   }
   function dS(x, z) { // distance to the nearest loaded tile of S, FADE_R if none is nearer
-    const i = Math.floor((x + HW) / TSZ), j = Math.floor((z + HHt) / TSZ); let dmin = FADE_R;
+    const i = Math.floor((x + HW) / TSZ) + DX, j = Math.floor((z + HHt) / TSZ) + DZ; let dmin = FADE_R;
     for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
       const I = i + a, J = j + b; if (I < 0 || J < 0 || I >= NX || J >= NZ) continue; const F = FT[I + NX * J]; if (!F) continue;
       dmin = Math.min(dmin, hyp(x - clamp(x, F.x0, F.x0 + TSZ), z - clamp(z, F.z0, F.z0 + TSZ)));
@@ -132,7 +126,7 @@ const H = (() => {
   for (const b of TERRENO && TERRENO.binari || []) for (let k = 1; k < b.y.length; k++) {
     const ax = b.p[2 * k - 2], az = b.p[2 * k - 1], bx = b.p[2 * k], bz = b.p[2 * k + 1], dx = bx - ax, dz = bz - az, s = { ax, az, dx, dz, l2: dx * dx + dz * dz || 1e-9, ya: b.y[k - 1] - B0, yb: b.y[k] - B0 };
     BING.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s);
-    for (const q of [[ax - 3, az - 3], [ax + 3, az - 3], [ax - 3, az + 3], [ax + 3, az + 3]]) { const i = Math.floor((q[0] + HW) / TSZ), j = Math.floor((q[1] + HHt) / TSZ); if (i >= 0 && j >= 0 && i < NX && j < NZ) RAILT[i + NX * j] = 1; }
+    for (const q of [[ax - 3, az - 3], [ax + 3, az - 3], [ax - 3, az + 3], [ax + 3, az + 3]]) { const i = Math.floor((q[0] + HW) / TSZ) + DX, j = Math.floor((q[1] + HHt) / TSZ) + DZ; if (i >= 0 && j >= 0 && i < NX && j < NZ) RAILT[i + NX * j] = 1; }
   }
   const railRd = [], railRy = [];
   function railY(x, z, R = 7) { // the profile at (x, z), null further than R from every track at grade
@@ -144,7 +138,7 @@ const H = (() => {
   }
   const railTop = (x, z) => railY(x, z, RAIL_W); // the strip of the ballast
   const STG = new Grid(10);
-  function stepAt(x, z) { let r = null; STG.each(x, z, x, z, s => { if ((!r || s.h > r.h) && x >= s.bb[0] && x <= s.bb[2] && z >= s.bb[1] && z <= s.bb[3] && inPoly(x, z, s.o) && !s.k.some(q => inPoly(x, z, q))) r = s; }); return r; }
+  function stepAt(x, z) { let r = null; if (!H.gradini) return null; STG.each(x, z, x, z, s => { if ((!r || s.h > r.h) && x >= s.bb[0] && x <= s.bb[2] && z >= s.bb[1] && z <= s.bb[3] && inPoly(x, z, s.o) && !s.k.some(q => inPoly(x, z, q))) r = s; }); return r; }
   const step = (x, z) => { const s = stepAt(x, z); return s ? s.h : 0; };
   // surfaces clipped on the grid (docs/motore.md 3, phase 5). A drawn surface in a tile of S is cut on the cells of its grid and on their
   // diagonal (u >= v, the mesh's own two triangles), so each piece is flat on one triangle of S and lies on it exactly; the terrain of a
@@ -247,7 +241,7 @@ const H = (() => {
       put(i, j);
     }
   }
-  const tileRange = (x0, z0, x1, z1) => [clamp(Math.floor((x0 + HW) / TSZ), 0, NX - 1), clamp(Math.floor((z0 + HHt) / TSZ), 0, NZ - 1), clamp(Math.floor((x1 + HW) / TSZ), 0, NX - 1), clamp(Math.floor((z1 + HHt) / TSZ), 0, NZ - 1)];
+  const tileRange = (x0, z0, x1, z1) => [clamp(Math.floor((x0 + HW) / TSZ) + DX, 0, NX - 1), clamp(Math.floor((z0 + HHt) / TSZ) + DZ, 0, NZ - 1), clamp(Math.floor((x1 + HW) / TSZ) + DX, 0, NX - 1), clamp(Math.floor((z1 + HHt) / TSZ) + DZ, 0, NZ - 1)];
   // a polygon with holes on the grid: emit(piece, fine) with piece [[x, z, y]...] convex, y the height of S, in a tile of S; [[x, z]...]
   // and fine false over a tile without .bin (drape it the old way). The cells no edge crosses and whose middle is inside are whole: their two
   // triangles as they are; the others take the polygon's triangles cut on them. false when no tile of S is under the polygon
@@ -325,13 +319,16 @@ const H = (() => {
     return ts.map(t => { const x = ax + dx * t, z = az + dz * t; return [x, z, hf(x, z)]; });
   }
   // decks (docs/motore.md 1.5): triangles of the top in game heights, indexed on a 16 m grid
-  const DECKS = [], DKG = new Grid(16);
-  for (const d of TERRENO ? TERRENO.decks : []) {
+  const DECKS = [], DECK_ORD = new Map(), DKG = new Grid(16);
+  function deckDentro(d) { // the first piece that brings a deck makes it; the others count (pezzi3.js): what goes in the grids is noted in o.reg
+    let o = DECK_ORD.get(d.ord); if (o) { o.refs++; return o; }
     const tri = new Float64Array(d.tri.length); for (let i = 0; i < tri.length; i += 3) { tri[i] = d.tri[i]; tri[i + 1] = d.tri[i + 1]; tri[i + 2] = d.tri[i + 2] - B0; }
     const free = d.tipo !== 'copertura' && !(d.sotto && (d.sotto.strade || d.sotto.ferrovia)); // nothing passes under it but water or field
-    const o = { id: d.id, tipo: d.tipo, fonte: d.fonte, sp: d.sp, luce: d.luce - B0, tri, imp: d.imp, nucleo: d.nucleo || null, spalle: d.spalle || [], ra: d.ra || [], free };
-    DECKS.push(o);
+    o = { id: d.id, ord: d.ord, tiles: d.tiles, refs: 1, reg: [], tipo: d.tipo, fonte: d.fonte, sp: d.sp, luce: d.luce - B0, tri, imp: d.imp, nucleo: d.nucleo || null, spalle: d.spalle || [], ra: d.ra || [], free };
+    DECKS.push(o); DECK_ORD.set(d.ord, o);
+    const rec0 = GRID_REC; GRID_REC = o.reg;
     for (let i = 0; i < tri.length; i += 9) { const xs = [tri[i], tri[i + 3], tri[i + 6]], zs = [tri[i + 1], tri[i + 4], tri[i + 7]]; DKG.add(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), { d: o, i }); }
+    GRID_REC = rec0; return o;
   }
   function deckAt(x, z) { // [{id, top, bot, tipo}] of the decks over (x, z)
     const out = [];
@@ -343,30 +340,40 @@ const H = (() => {
       if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) return;
       const top = l1 * T[i + 2] + l2 * T[i + 5] + l3 * T[i + 8]; out.push({ id: d.id, top, bot: top - d.sp, tipo: d.tipo, d, i }); /* i: the triangle (its offset in d.tri) */
     });
+    if (out.length > 1) out.sort((a, b) => a.d.ord - b.d.ord); // in the order of the build, whatever came first
     return out;
   }
-  // the deck under road node i that one of its roads runs on (decks[].ra), its top there, or null; worked out once for all nodes
-  let NDK = null;
-  function nodeDeck(i) {
-    if (!NDK) {
-      NDK = new Map(); const on = new Map(); for (const d of DECKS) for (const r of d.ra) { let l = on.get(r); if (!l) on.set(r, l = []); l.push(d); }
-      D.roads.forEach((r, ri) => { const l = on.get(ri); if (!l) return; for (const n of r.g) { if (NDK.has(n)) continue; const [x, z] = N[n]; for (const o of deckAt(x, z)) if (l.includes(o.d)) { NDK.set(n, o.top); break; } } });
-    }
-    const v = NDK.get(i); return v === undefined ? null : v;
+  // the deck under road node i that one of its roads runs on (decks[].ra), its top there, or null: worked out once on the whole map by the bake (mappa/globale.bin), since a road may
+  // start far from the decks it comes to
+  let NDK = COT && COT.ndk ? new Map(COT.ndk.map(([i, y]) => [i, y / 1000])) : null;
+  function nodeDeckCalc() {
+    NDK = new Map(); const on = new Map(); for (const d of DECKS) for (const r of d.ra) { let l = on.get(r); if (!l) on.set(r, l = []); l.push(d); }
+    D.roads.forEach((r, ri) => { const l = on.get(ri); if (!l) return; for (const n of r.g) { if (NDK.has(n)) continue; const [x, z] = N[n]; for (const o of deckAt(x, z)) if (l.includes(o.d)) { NDK.set(n, o.top); break; } } });
+    return NDK;
   }
+  function nodeDeck(i) { if (!NDK) return null; const v = NDK.get(i); return v === undefined ? null : v; }
   // pits (docs/sottoterra.md, tappa 1): ramps of the underground garages, from src/sottoterra.py. Each takes the 2 m cells of S its outline
   // touches (F.pc, a flag per cell); inside its outline its floor triangles are the ground (H.base, H.ground, H.surface), outside it S. The
   // terrain mesh leaves those cells out, world3.js draws the floor, the ground of the cells around it (anello), the walls and the door
-  const PITS = [], PG = new Grid(8), PCELL = new Map();
-  for (const q of TERRENO ? TERRENO.pits : []) {
-    if (q.tipo !== 'rampa') continue;
+  const PITS = [], PIT_ORD = new Map(), PG = new Grid(8), PCELL = new Map();
+  function pitDentro(q) { // as deckDentro
+    let o = PIT_ORD.get(q.ord); if (o) { o.refs++; return o; }
+    if (q.tipo !== 'rampa') { PIT_ORD.set(q.ord, o = { refs: 1, vuota: true }); return o; }
     const n = q.sx.length, tri = new Float64Array((n - 1) * 18), imp = q.sx.map(v => [v[0], v[1]]).concat(q.dx.slice().reverse().map(v => [v[0], v[1]])); // the strip between the two sides, as src/sottoterra.py
     for (let k = 0, i = 0; k < n - 1; k++) for (const t of [[q.sx[k], q.sx[k + 1], q.dx[k + 1]], [q.sx[k], q.dx[k + 1], q.dx[k]]]) for (const v of t) { tri[i++] = v[0]; tri[i++] = v[1]; tri[i++] = v[2] - B0; }
-    const o = { id: PITS.length, src: q, tri, imp, sx: q.sx.map(([x, z, y]) => [x, z, y - B0]), dx: q.dx.map(([x, z, y]) => [x, z, y - B0]), anello: q.anello, porta_h: q.porta_h || 2.4, c: q.c, bb: [Math.min(...imp.map(v => v[0])), Math.min(...imp.map(v => v[1])), Math.max(...imp.map(v => v[0])), Math.max(...imp.map(v => v[1]))] };
-    PITS.push(o);
+    o = { id: q.ord, ord: q.ord, refs: 1, reg: [], src: q, tri, imp, sx: q.sx.map(([x, z, y]) => [x, z, y - B0]), dx: q.dx.map(([x, z, y]) => [x, z, y - B0]), anello: q.anello, porta_h: q.porta_h || 2.4, c: q.c, bb: [Math.min(...imp.map(v => v[0])), Math.min(...imp.map(v => v[1])), Math.max(...imp.map(v => v[0])), Math.max(...imp.map(v => v[1]))] };
+    PITS.push(o); PIT_ORD.set(q.ord, o);
+    const rec0 = GRID_REC; GRID_REC = o.reg;
     for (let i = 0; i < tri.length; i += 9) PG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i });
+    GRID_REC = rec0;
     for (const k in q.celle) { let l = PCELL.get(k); if (!l) PCELL.set(k, l = []); for (const w of q.celle[k]) l.push(w); }
+    return o;
   }
+  function pitFuori(o) {
+    if (--o.refs > 0) return; PIT_ORD.delete(o.ord); if (o.vuota) return; PITS.splice(PITS.indexOf(o), 1); disfaGriglie(o.reg);
+    for (const k in o.src.celle) { const l = PCELL.get(k); if (!l) continue; const a = new Set(o.src.celle[k]), m = l.filter(w => !a.has(w)); if (m.length) PCELL.set(k, m); else PCELL.delete(k); }
+  }
+  function deckFuori(o) { if (--o.refs > 0) return; DECK_ORD.delete(o.ord); DECKS.splice(DECKS.indexOf(o), 1); disfaGriglie(o.reg); }
   function pitCells(tx, tz, c) { const l = PCELL.get(tx + '_' + tz); if (!l) return null; const a = new Uint8Array(c * c); for (const w of l) a[w] = 1; return a; }
   function pitY(x, z) { // the floor of a pit at (x, z), or null outside every floor
     let y = null;
@@ -381,10 +388,10 @@ const H = (() => {
   const pitIn = (F, x, z) => { if (!F.pc) return null; const c = F.n - 1, i = clamp(Math.floor((x - F.x0) / F.st), 0, c - 1), j = clamp(Math.floor((z - F.z0) / F.st), 0, c - 1); return F.pc[j * c + i] ? pitY(x, z) : null; };
   const onG = (F, x, z) => { const p = pitIn(F, x, z); return p !== null ? p : onF(F, x, z); }; // S, or the floor of a ramp
   // the step of the old engine (tiles without .bin): the sidewalks and platforms the tile draws raised; world3.js fills them in later
-  const oldStep = (x, z) => { try { return onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : 0; } catch (e) { return 0; } }; // (before world3.js has its grids: 0)
+  const oldStep = (x, z) => { if (!H.gradini) return 0; try { return onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : 0; } catch (e) { return 0; } }; // (before world3.js has its grids: 0)
   // water level (docs/motore.md 1.3): zw along the DBGT river axes, every 2 m; elsewhere the lowest S across an OSM river + 0.3
   const WG = new Grid(16), WMAX = 12;
-  for (const a of TERRENO ? TERRENO.acqua : []) { const p = a.p, zw = a.zw; for (let k = 1; k < zw.length; k++) { const ax = p[2 * k - 2], az = p[2 * k - 1], bx = p[2 * k], bz = p[2 * k + 1]; WG.add(Math.min(ax, bx) - WMAX, Math.min(az, bz) - WMAX, Math.max(ax, bx) + WMAX, Math.max(az, bz) + WMAX, { ax, az, bx, bz, ya: zw[k - 1] - B0, yb: zw[k] - B0 }); } }
+  function acquaDentro(a) { const p = a.p, zw = a.zw; for (let k = 1; k < zw.length; k++) { const ax = p[2 * k - 2], az = p[2 * k - 1], bx = p[2 * k], bz = p[2 * k + 1]; WG.add(Math.min(ax, bx) - WMAX, Math.min(az, bz) - WMAX, Math.max(ax, bx) + WMAX, Math.max(az, bz) + WMAX, { ax, az, bx, bz, ya: zw[k - 1] - B0, yb: zw[k] - B0 }); } }
   function water(x, z) {
     let best = null, bd = WMAX;
     WG.each(x, z, x, z, s => { const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.ax) * ex + (z - s.az) * ez) / L2, 0, 1), d = hyp(x - s.ax - ex * t, z - s.az - ez * t); if (d < bd) { bd = d; best = s.ya + (s.yb - s.ya) * t; } });
@@ -401,7 +408,18 @@ const H = (() => {
   }
   const KIND = [null, 'road', 'side', 'green', 'river', 'slope', 'rail'];
   const H = {
-    B0, DECKS, PITS, onLoad, farH, deckAt, water, railY, railTop,
+    B0, DECKS, PITS, farH, deckAt, water, railY, railTop,
+    gradini: true, // false while a piece lays out what the build decided on the ground without the step layer (pezzi3.js)
+    // a piece comes in (what H needs of it: S, decks, pits, water) and goes out; what goes in the grids is noted by the caller (GRID_REC)
+    dentro(t, d, s) {
+      if (d.pt) for (const q of d.pt) pitDentro(q); if (d.dk) for (const q of d.dk) deckDentro(q); if (d.aq) for (const a of d.aq) acquaDentro(a);
+      if (s && s.length) apriS(t, s);
+    },
+    fuori(t, d) {
+      if (d.pt) for (const q of d.pt) pitFuori(PIT_ORD.get(q.ord)); if (d.dk) for (const q of d.dk) deckFuori(DECK_ORD.get(q.ord));
+      FT[t] = null; NFADE.clear();
+    },
+    deck: ord => DECK_ORD.get(ord), nodeDeckCalc,
     baseS(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); }, // S alone, without the ramps (their walls stand on it)
     pitAt(x, z) { const F = fineAt(x, z); return F ? pitIn(F, x, z) : null; }, // the floor of a ramp here, or null
     inPit(x, z, m = 0) { for (const p of PITS) { if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) continue; if (inPoly(x, z, p.imp)) return p; if (m > 0) for (let k = 0; k < p.imp.length; k++) { const a = p.imp[k], b = p.imp[(k + 1) % p.imp.length]; if (segDist(x, z, a[0], a[1], b[0], b[1]) < m) return p; } } return null; }, // within m of a ramp: no tree, car or bench there
@@ -469,16 +487,8 @@ const H = (() => {
       }
       return true;
     },
-    // loading (tileTick): the .bin within LOAD_R. They all come at the start (below) and are never given back: what the world builds once
-    // at the start (guardrails, pillars and walls of the old roads, the old decks of surfAt) must see S wherever S is, not only near the
-    // station (it left invisible pillars of the old viaduct by PONTE 20); Meda's 202 tiles are 16 MB in memory
-    tick(px, pz) {
-      for (let t = 0; t < NX * NZ; t++) if (STEP[t] && !LS[t] && hyp(tx0(t) + TSZ / 2 - px, tz0(t) + TSZ / 2 - pz) < LOAD_R) load(t);
-    },
-    ready(t) { for (const u of near(t)) if (STEP[u] && LS[u] !== 2 && LS[u] !== 3) { if (!LS[u]) load(u); return false; } return true; }, // a tile is built once its .bin and its neighbours' are here
     nearFine: t => near(t).some(u => FT[u]),
-    async preload(x, z, R) { const w = []; for (let t = 0; t < NX * NZ; t++) if (STEP[t] && !LS[t] && hyp(tx0(t) + TSZ / 2 - x, tz0(t) + TSZ / 2 - z) < R) w.push(load(t)); await Promise.all(w); },
-    stato: () => ({ con_bin: STEP.reduce((a, v) => a + (v > 0), 0), caricate: FT.filter(Boolean).length, fallite: LS.reduce((a, v) => a + (v === 3), 0), impalcati: DECKS.length }),
+    stato: () => ({ con_bin: STEP.reduce((a, v) => a + (v > 0), 0), caricate: FT.filter(Boolean).length, impalcati: DECKS.length, fosse: PITS.length }),
     // G1 (docs/motore.md 5): on every built tile with a .bin, the drawn mesh against H.base on 1000 random points (the mesh's own triangle,
     // read back from its index and float32 positions) and on 20 vertical rays; expected 0.000 m
     check() {
@@ -533,8 +543,6 @@ const H = (() => {
   function near(t) { const i = t % NX, j = Math.floor(t / NX), o = []; for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const I = i + a, J = j + b; if (I >= 0 && J >= 0 && I < NX && J < NZ) o.push(I + NX * J); } return o; }
   return H;
 })();
-// every tile of S is here before the world is built (see H.tick)
-if (TERRENO) await H.preload(0, 0, 1e9);
 // the old height functions (groundH, visH, surfAt, nodeY) are gone (docs/motore.md 3.1, fase 6): every consumer asks H.* itself, and H.*
 // answers with the old engine in the tiles without .bin (outside Meda until phase 8), so no alias is needed there either
 const streetH = (x, z) => H.street(x, z);
