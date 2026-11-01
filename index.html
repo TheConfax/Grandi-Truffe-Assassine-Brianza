@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo fps-disegno · dopo 16c91a9 · assemblato 01/11 21:31 · porta ' + location.port;
+    const txt = 'locale · ramo fps-disegno · dopo 65ce095 · assemblato 01/11 21:33 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3271,6 +3271,7 @@ function* buildTileGen(T) {
     for (const p of PROPS) if (p.tile === T && p.broken && p.onBreak) p.onBreak(); // and dark
     T.lampsDone = true;
   }
+  tileLimiti(T, G);
   T.ready = true; G.visible = T.dist < 860;
 }
 // tiles far behind are taken apart (their geometry and their sign textures freed) and built again if you come back
@@ -6483,6 +6484,36 @@ async function mondoPronto(x, z, R) {
   }
 }
 const partenza = () => START !== STATION ? [START.x, START.z] : [STATION.x + 190, STATION.z + 66];
+
+// ---- what neither the camera nor the sun can see costs nothing: a tile out of both is switched off before the renderer walks it, the instanced meshes get a sphere of their own.
+// An InstancedMesh is born with frustumCulled = false, because the sphere of its geometry says nothing of where its copies are: each one of them, trees and lamps by the hundred, was drawn in both passes wherever it stood.
+{ const io = THREE.Frustum.prototype.intersectsObject; THREE.Frustum.prototype.intersectsObject = function (o) { return o.cullS ? this.intersectsSphere(o.cullS) : io.call(this, o); }; }
+const CULL_MARGINE = 12; // what falls or flies stays in its tile: a lamp, a gate
+function tileLimiti(T, G) {
+  G.updateMatrixWorld(true);
+  const B = T.box || (T.box = new THREE.Box3()), v = new THREE.Vector3(), S = new THREE.Sphere(); B.makeEmpty();
+  G.traverse(o => {
+    const g = o.geometry; if (!g || !g.attributes || !g.attributes.position || !g.attributes.position.count) return;
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    if (o.isInstancedMesh) {
+      const a = o.instanceMatrix.array, r = g.boundingSphere.radius, c = g.boundingSphere.center; let n = 0, mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9], rr = 0;
+      for (let i = 0; i < o.count; i++) { const k = i * 16, sx = Math.hypot(a[k], a[k + 1], a[k + 2]), sy = Math.hypot(a[k + 4], a[k + 5], a[k + 6]), sz = Math.hypot(a[k + 8], a[k + 9], a[k + 10]), ms = Math.max(sx, sy, sz); if (ms === 0 && a[k + 12] === 0 && a[k + 14] === 0) continue;
+        v.set(c.x, c.y, c.z).applyMatrix4({ elements: a.subarray(k, k + 16) }); n++; if (v.x < mn[0]) mn[0] = v.x; if (v.y < mn[1]) mn[1] = v.y; if (v.z < mn[2]) mn[2] = v.z; if (v.x > mx[0]) mx[0] = v.x; if (v.y > mx[1]) mx[1] = v.y; if (v.z > mx[2]) mx[2] = v.z; if (ms * r > rr) rr = ms * r; }
+      if (!n) return;
+      const Q = new THREE.Sphere(new THREE.Vector3((mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2), Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) / 2 + rr + CULL_MARGINE); Q.applyMatrix4(o.matrixWorld);
+      o.cullS = Q; o.frustumCulled = true; S.copy(Q);
+    } else S.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
+    if (S.radius > 2000 || S.center.y < -2000) return; // a lamp already knocked down keeps its pool at -9999: not a place
+    B.expandByPoint(v.copy(S.center).addScalar(S.radius)); B.expandByPoint(v.copy(S.center).addScalar(-S.radius));
+  });
+  B.expandByScalar(CULL_MARGINE);
+}
+const _vistaF = new THREE.Frustum(), _vistaM = new THREE.Matrix4();
+scene.onBeforeRender = (r, sc, cam) => { // after the matrices of the frame, before the renderer walks the scene
+  _vistaF.setFromProjectionMatrix(_vistaM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+  const om = sun.castShadow && sun.visible; let SF = null; if (om) { sun.shadow.updateMatrices(sun); SF = sun.shadow.getFrustum(); }
+  for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
+};
 
 // ---- the whole map at once. ?cuoci (src/cuoci.mjs): what depends on all the map, decided once by the same code, goes into mappa/ and the game stops there. ?tutto: the same and then the game goes on with
 // nothing taken away, for the checks of the whole map (src/controlli_barriere.mjs)

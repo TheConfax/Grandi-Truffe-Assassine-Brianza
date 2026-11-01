@@ -1736,6 +1736,7 @@ function* buildTileGen(T) {
     for (const p of PROPS) if (p.tile === T && p.broken && p.onBreak) p.onBreak(); // and dark
     T.lampsDone = true;
   }
+  tileLimiti(T, G);
   T.ready = true; G.visible = T.dist < 860;
 }
 // tiles far behind are taken apart (their geometry and their sign textures freed) and built again if you come back
