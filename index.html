@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo f7e5f40 · assemblato 01/11 23:52 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo a0acf41 · assemblato 01/11 23:53 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -6778,8 +6778,6 @@ const FIS = {
   airMin: 0.05,     // m over the full droop of the springs, or...
   airT: 0.1,        // ...seconds with no wheel on the ground: then it is "in the air" (no grip). A wheel light for an instant over a wave keeps its grip
   rampMax: 0.4,     // rise over run of the ground under a wheel in a step: steeper is a step (a kerb, a deck joint), it lifts the car and does not launch it
-  humpMax: 0.33,    // rise over run of the ground under the car, over a few metres: steeper is a hump of S no street has
-  stickT: 0.5,      // s the car keeps to the ground after such a hump (a street over an embankment it should pass under: no ski jump)
   bankMax: 0.25,    // side slope the body follows, rise over run: past it is no road but the bank of S beside one (outside Meda, the old ground), the wheels take it as this
   launch: 0.32,     // vy at take-off, at most this share of the speed
   rightK: 40, rightP: 0.5, // on any wheel, a body leaning past what the ground asks (bankMax + 0.15, or rightP from its slope) comes back with this: nothing tips over on its springs
@@ -6819,7 +6817,7 @@ function fisInit(v) {
   const T = FIS.tipi[v.kind] || FIS.tipi.panda, W = v.m.wheels, n = W.length, om = 2 * Math.PI * T.f, F = v.F = { T, n, om, k: om * om / n, c: 2 * T.z * om / n, droop: FIS.g / (om * om), sx: [], sz: [], g: [], gf: [], dg: [], x: [], off: [], lx: v.x, lz: v.z, lh: v.h, lf: v.fwdSpeed, off0: 0, Ir: 0, Ip: 0, mid: vehMaxTop(v) / 2, rig: false };
   for (let i = 0; i < n; i++) { const p = W[i].piv.position; F.sx.push(p.x); F.sz.push(p.z); F.Ir += p.x * p.x / n; F.Ip += p.z * p.z / n; F.dg.push(0); F.x.push(0); F.off.push(0); F.g.push(0); F.gf.push(0); }
   F.Ir = Math.max(F.Ir, 0.2); F.Ip = Math.max(F.Ip, 0.2); F.kr = T.rollG / 9.81 * om * om; F.kp = T.pitchG / 9.81 * om * om; /* what holds rollG, pitchG rad at 1 g against springs of frequency om */
-  v.ap = v.slope; v.ar = 0; v.wp = v.wr = 0; if (!(v.vy > 2)) v.vy = 0; if (!v.exploded && !v.spec.two) v.roll = 0; if (!v.spec.two) v.pitch = 0; F.stick = 0; F.sl = 0; F.lty = v.y; F.kick = v.vy > 2; fisGround(v, 0, true);
+  v.ap = v.slope; v.ar = 0; v.wp = v.wr = 0; if (!(v.vy > 2)) v.vy = 0; if (!v.exploded && !v.spec.two) v.roll = 0; if (!v.spec.two) v.pitch = 0; F.kick = v.vy > 2; fisGround(v, 0, true);
   v.m.body.position.y = v.spec.two ? v.m.body.position.y : 0;
 }
 function fisGround(v, mv, first, yf, yb) { // the ground under each wheel: F.gf follows a ramp at once and a step in a few frames, F.dg is how fast it rises under the wheel, never for a step
@@ -6837,10 +6835,9 @@ function fisGround(v, mv, first, yf, yb) { // the ground under each wheel: F.gf 
 function fisVert(v, cf, cb, yf, yb, ty) { // once a step from Vehicle.collide, after the move and the walls
   const dt = 1 / 60, F = v.F, T = F.T, n = F.n, fs = v.fwdSpeed, G = FIS.g, gs = Math.atan2(yb - yf, v.co * 2), mv = hyp(v.x - F.lx, v.z - F.lz);
   v.slope = lerp(v.slope, gs, 0.35); /* what the hills do to the speed in Vehicle.step, as it was */
-  if (mv > 8 && !F.rig) { v.y = ty; v.vy = 0; v.wp = v.wr = 0; v.ap = gs; v.ar = 0; v.air = false; F.lx = v.x; F.lz = v.z; F.lh = v.h; F.lf = fs; F.sl = 0; fisGround(v, 0, true, yf, yb); F.lty = ty; return; } /* a teleport */
+  if (mv > 8 && !F.rig) { v.y = ty; v.vy = 0; v.wp = v.wr = 0; v.ap = gs; v.ar = 0; v.air = false; F.lx = v.x; F.lz = v.z; F.lh = v.h; F.lf = fs; fisGround(v, 0, true, yf, yb); return; } /* a teleport */
   const yawR = wrapA(v.h - F.lh) / dt, aLon = clamp((fs - F.lf) / dt, -FIS.lonMax, FIS.lonMax), aLat = FIS.latMax * Math.tanh(yawR * fs / FIS.latMax);
   F.lx = v.x; F.lz = v.z; F.lh = v.h; F.lf = fs;
-  const rise = ty - F.lty; F.lty = ty; if (mv > 0.01 && Math.abs(rise) < 1.5) F.sl += (rise / mv - F.sl) * Math.min(1, mv / 3); if (Math.abs(F.sl) > FIS.humpMax && (F.sl > 0 || F.stick > 0 || onAnyRoad(v.x, v.z, 1))) F.stick = FIS.stickT; else if (F.stick > 0) F.stick -= dt; /* up the hump and down it; a street does not drop like this, the bank of S beside it does: off the road it falls */
   if (F.rig) { fisRig(v, yf, yb, ty, fs); return; }
   const kerb = fisGround(v, mv, false, yf, yb); if (kerb > 0.09 && kerb < 0.25 && v === P.car && v.speed > 6) shake = Math.max(shake, 0.12);
   let sF = 0, tr = 0, tp = 0, on = 0, hit = 0; const sr = Math.sin(v.ar), sp = Math.sin(v.ap), cr = Math.cos(v.ar), cp = Math.cos(v.ap);
@@ -6873,7 +6870,6 @@ function fisVert(v, cf, cb, yf, yb, ty) { // once a step from Vehicle.collide, a
     }
     v.vy += dv; v.wr += dr; v.wp += dp; v.y += dy; v.ar += da; v.ap += db;
   }
-  if (F.stick > 0 && !v.air) { const y0 = v.y; if (v.y > ty) v.y = lerp(v.y, ty, 0.35); v.vy = Math.min(v.y === y0 ? v.vy : (v.y - y0) / dt, FIS.humpMax * v.speed); v.ap = lerp(v.ap, gs, 0.35); v.ar = lerp(v.ar, 0, 0.2); v.wp = v.wr = 0; on = Math.max(on, 1); } /* a hump of S: as the old height, on the ground */
   // the wheels as drawn: on the ground, at most the full droop below the body
   for (let i = 0; i < n; i++) { const x = F.gf[i] - (v.y + F.sx[i] * Math.sin(v.ar) - F.sz[i] * Math.sin(v.ap)); F.x[i] = x; F.off[i] = lerp(F.off[i], clamp(x, -Math.min(F.droop, 0.2), T.up), 0.5); }
   // on the wheels or in the air
@@ -6912,7 +6908,7 @@ function fisRigOut(v, yf, yb) { // back on the springs
   const F = v.F; F.rig = false; F.free = false;
   if (Math.cos(v.ap) < 0) { v.h = wrapA(v.h + Math.PI); v.ap = wrapA(Math.PI - v.ap); v.ar = wrapA(v.ar + Math.PI); v.wp = -v.wp; const p = v._p; if (p) { p[3] = v.h; p[7] = v.ap; p[8] = v.ar; } } /* over on both axes is the same as turned round: the springs want it told that way */
   if (!v.air) { v.air = true; v.airT = 0; v.airTop = 0; v.air0 = [v.x, v.z]; }
-  F.lh = v.h; F.lf = v.fwdSpeed; F.stick = 0; F.off0 = 0; v.wr = clamp(v.wr, -4, 4); v.wp = clamp(v.wp, -4, 4); fisGround(v, 0, true, yf, yb);
+  F.lh = v.h; F.lf = v.fwdSpeed; F.off0 = 0; v.wr = clamp(v.wr, -4, 4); v.wp = clamp(v.wp, -4, 4); fisGround(v, 0, true, yf, yb);
 }
 function fisRig(v, yf, yb, ty, fs) {
   const dt = 1 / 60, F = v.F, G = FIS.g;
