@@ -793,5 +793,5 @@ rep("  renderer.render(scene, camera);\n  if (ipol) interpEnd(ipol);\n}", "  if 
 rep("if (!DEBUG) { el.hidden = true; return; }", "if (!DEBUG) { el.hidden = true; if (MIS.el && !MIS.el.hidden) dbgOff(); return; }")
 rep("  spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }", "  rec.misure = MIS.txt; spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }")
 rep("  if (e.code === 'KeyB') reportSpot();", "  if (e.code === 'KeyB') reportSpot();\n  if (e.code === 'KeyK' && DEBUG) dbgCopy();")
-rep("window.__G = { FIS, VIVI,", "window.__G = { MIS, FIS, VIVI,")
+rep("window.__G = { FIS, VIVI,", "window.__G = { MIS, openGate, PROPS, FIS, VIVI,")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
