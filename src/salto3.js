@@ -26,7 +26,7 @@ function isBarrier(s) { return s.ax !== undefined && s.two && !s.off && !s.deckw
 function vehLocal(v, x, z) { const dx = x - v.x, dz = z - v.z, s = Math.sin(v.h), c = Math.cos(v.h); return [dx * c - dz * s, dx * s + dz * c]; } // [side, along]
 function vehWorld(v, lx, lz) { const s = Math.sin(v.h), c = Math.cos(v.h); return [v.x + lx * c + lz * s, v.z - lx * s + lz * c]; }
 function vehUpper(v) { const S = v.spec; return S.van ? [S.W / 2, -0.475, S.L / 2 - 0.475] : [S.cab[0] / 2, S.cab[3], S.cab[2] / 2]; } // the cab: half side, centre along, half along
-function vehCan(v) { return !v.spec.two && !v.spec.ape && !v.air; }
+function vehCan(v) { return !v.spec.two && !v.spec.ape && !v.air && (!v.F || !v.F.rig || !!v.ko); } /* never on one that is tumbling; a car finished on its roof is the same height, he can get up on it */
 function vehMinTop(v) { const S = v.spec; return S.two ? 1 : S.ape ? 1.2 : S.van ? 1.23 : S.wr * 0.9 + S.bh; }
 function vehMaxTop(v) { const S = v.spec; return S.two ? 1.2 : S.ape ? 1.7 : S.van ? 2.19 : S.wr * 0.9 + S.bh + S.cab[1]; }
 function vehTopAt(v, lx, lz) { // the top under a point of the car, else null
