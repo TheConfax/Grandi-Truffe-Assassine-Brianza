@@ -155,7 +155,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo fps-disegno · dopo f96ce18 · assemblato 01/11 21:45 · porta ' + location.port;
+    const txt = 'locale · ramo fps-disegno · dopo 8ffdf53 · assemblato 01/11 21:47 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -6524,6 +6524,25 @@ scene.onBeforeRender = (r, sc, cam) => { // after the matrices of the frame, bef
   for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
 };
 
+// ---- the shaders of the whole map, compiled at the start and kept: a shader seen for the first time at speed stopped the game 80 to 200 ms, and one whose last user went with its tile was compiled again the next time.
+// One small material per kind found on the map (type; m map, a alphaMap, e emissiveMap, v vertex colours, t transparent, n no fog, i instanced, c instance colours; side; alphaTest). Never drawn. A kind missing here only costs its stop, as before.
+const VETRINA = [['B', 'mt', 0, 0], ['B', 'vt', 0, 0], ['B', 'vtn', 2, 0], ['B', 't', 0, 0], ['B', '', 0, 0], ['B', 'tn', 2, 0], ['S', 'mtn', 0, 0], ['S', 'atn', 0, 0], ['S', 'at', 0, 0], ['P', 'mvtn', 0, 0], ['P', 'mtn', 0, 0], ['P', 'vtn', 0, 0], ['P', 't', 0, 0], ['K', '', 0, 0], ['K', 't', 0, 0],
+  ['L', 'me', 0, 0.5], ['L', 'me', 0, 0], ['L', 'me', 2, 0], ['L', 'mv', 0, 0], ['L', 'mvic', 2, 0.5], ['L', 'mv', 2, 0], ['L', 'mt', 0, 0], ['L', 'm', 0, 0.5], ['L', 'mic', 0, 0], ['L', 'mi', 0, 0], ['L', 'm', 0, 0], ['L', 'm', 2, 0.12], ['L', 'm', 2, 0.35], ['L', 'm', 2, 0.4], ['L', 'm', 2, 0.5], ['L', 'm', 2, 0],
+  ['L', 'vic', 0, 0], ['L', 'vi', 0, 0], ['L', 'v', 0, 0], ['L', 'vt', 2, 0], ['L', 'v', 2, 0], ['L', 't', 0, 0], ['L', 'i', 0, 0], ['L', '', 0, 0], ['L', '', 1, 0], ['L', 't', 2, 0], ['L', '', 2, 0]];
+const VETRINA_TIENI = [];
+function vetrinaShader() {
+  const tex = new THREE.Texture(), geo = new THREE.BufferGeometry(), cl = { L: THREE.MeshLambertMaterial, B: THREE.MeshBasicMaterial, S: THREE.SpriteMaterial, P: THREE.PointsMaterial, K: THREE.LineBasicMaterial }, oggetti = [];
+  geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3));
+  for (const [t, f, side, alphaTest] of VETRINA) {
+    const has = c => f.includes(c), o = { transparent: has('t') }; if (has('m')) o.map = tex; if (has('a')) o.alphaMap = tex; if (has('e')) o.emissiveMap = tex; if (has('v')) o.vertexColors = true; if (has('n')) o.fog = false; if (t !== 'S') o.side = side; if (alphaTest) o.alphaTest = alphaTest;
+    const m = new cl[t](o); let q;
+    if (has('i')) { q = new THREE.InstancedMesh(geo, m, 1); if (has('c')) q.setColorAt(0, new THREE.Color()); } else q = new THREE.Mesh(geo, m);
+    oggetti.push(q); VETRINA_TIENI.push(m);
+  }
+  for (const k of ['old', 'mod', 'plain']) if (MAT[k]) oggetti.push(new THREE.Mesh(geo, MAT[k]));
+  const g = new THREE.Group(); g.visible = false; g.add(...oggetti); scene.add(g); renderer.compile(scene, camera); scene.remove(g);
+}
+
 // ---- the whole map at once. ?cuoci (src/cuoci.mjs): what depends on all the map, decided once by the same code, goes into mappa/ and the game stops there. ?tutto: the same and then the game goes on with
 // nothing taken away, for the checks of the whole map (src/controlli_barriere.mjs)
 async function cuoci() {
@@ -9432,7 +9451,7 @@ function startGame() {
   camInit = false; banner(META.partenza.via, META.partenza.comune); setTimeout(() => { if (P.mode === 'foot') toast('Entra nella Ferari! (' + (GP.seen ? (GP.ps ? '△' : 'Y') : 'F') + ')'); }, 1600);
 }
 $('go').addEventListener('click', startGame);
-function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
+function boot(saved) { setupWorld(saved || {}); vetrinaShader(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
