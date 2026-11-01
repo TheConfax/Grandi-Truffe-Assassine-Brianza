@@ -282,7 +282,7 @@ dbt_cover = unary_union(_cov).buffer(-3) if _cov else GeometryCollection()  # a 
 prepare(dbt_cover)
 log('dbgt: muri e recinzioni', len(dbt_walls), 'volumi', len(dbt_vols), 'passi carrai', len(dbt_pc), 'comuni', len(_cov))
 import riquadro
-OVT = os.path.join(DATA, 'overture', 'edifici_overture.geojson'); OVT_MARGINE = 0.00097   # gradi, 75 m
+OVT = os.path.join(DATA, 'overture', 'edifici_overture.geojson'); OVT_MARGINE = 0.00096072   # gradi, 75 m
 ms_h, ms_only = {}, []
 def _overture():
     """edifici_overture.geojson copre il riquadro di prima (lon 9,117..9,191); fuori da lì, finché il riquadro cresce, gli edifici vengono da edifici_mappa_grande.geojson, quello di tutta la mappa grande"""
