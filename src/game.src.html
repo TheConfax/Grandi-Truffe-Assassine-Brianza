@@ -1825,7 +1825,7 @@ function updAudio() {
   let nd = 1e9; if (W.stars) for (const c of cops()) nd = Math.min(nd, hyp(c.x - P.x, c.z - P.z));
   AU.sir.so.frequency.setValueAtTime((now % 1.3) < 0.65 ? 435 : 580, t); // bitonale
   AU.sir.sg.gain.setTargetAtTime(m * (nd < 220 ? 0.16 * (1 - nd / 220) : 0), t, 0.1);
-  AU.horn.gain.setTargetAtTime(m * Math.max((K.horn && P.mode === 'car') ? 0.12 : hornOther > 0 ? 0.05 : 0, hornRoof * ((now % 0.9) < 0.7 ? 1 : 0)), t, 0.02); hornRoof = 0;
+  AU.horn.gain.setTargetAtTime(m * Math.max((K.horn && P.mode === 'car') ? 0.12 : hornOther > 0 ? 0.05 : 0, hornRoof), t, 0.02); hornRoof = 0;
 }
 
 // ---------------------------------------------------------------- HUD per frame
