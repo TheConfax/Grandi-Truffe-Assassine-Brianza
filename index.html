@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo correzioni-1-11 · dopo 9b0e5bc · assemblato 02/11 03:14 · porta ' + location.port;
+    const txt = 'locale · ramo correzioni-1-11 · dopo 00c9a6e · assemblato 02/11 03:18 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -5966,12 +5966,10 @@ function* buildPaesaggio(T, G) {
       for (let k = 0; k <= n; k++) { const [x, z] = A.at(s0 + k * 4.5, vm); box(0.15, 2.4, dp * 0.85, x, gy + 1.2, z, '#d9dcde', ry - Math.PI / 2); box(0.2, 3.5, 0.2, ...(() => { const [px, pz] = A.at(s0 + k * 4.5, vm + dp / 2); return [px, gy + 1.75, pz]; })(), '#8f949a'); solidAt(x, z, 0.3, 2.4); }
       for (let k = 0; k < n; k++) { const [x, z] = A.at(s0 + k * 4.5 + 2.25, vm - dp / 2 + 0.4); box(0.6, 1.5, 0.4, x, gy + 0.75, z, '#3a3d40', ry); }
     } else if (kind.startsWith('torre_acqua')) { lsTower(solid, cx, cz, Math.sqrt(area / Math.PI), +kind.split(':')[1] || 28, solidAt);
-    } else if (kind.startsWith('sport:skateboard') || kind.startsWith('sport:roller')) { // concrete, a quarter pipe at each end, a fun box in the middle
-      try { polyFill(drape, P, [], 0.05, 10, COL('#a9a8a2')); } catch (e) { }
-      const ry = Math.atan2(A.ux, A.uz), wv = Math.min(8, A.v1 - A.v0 - 1);
-      for (const e of [-1, 1]) for (let k = 0; k < 4; k++) { const [x, z] = A.at((e > 0 ? A.s1 : A.s0) - e * (0.6 + k * 0.5), (A.v0 + A.v1) / 2), gy = H.ground(x, z), h = [1.6, 1.0, 0.55, 0.22][k]; box(0.5, h, wv, x, gy + h / 2, z, '#b8b6ae', ry - Math.PI / 2); }
-      const [fx, fz] = A.at((A.s0 + A.s1) / 2, (A.v0 + A.v1) / 2), fy = H.ground(fx, fz); box(2.4, 0.5, 2.4, fx, fy + 0.25, fz, '#b8b6ae', ry); for (const e of [-1, 1]) { const g = new THREE.BoxGeometry(1.6, 0.06, 2.4).rotateZ(e * 0.3).rotateY(ry - Math.PI / 2).translate(fx + Math.sin(ry) * e * 2, fy + 0.24, fz + Math.cos(ry) * e * 2); F0.geo(solid, g, null, COL('#b8b6ae')); }
-    } else if (kind.startsWith('sport:equestrian')) { // a riding arena: sand, a wooden fence with a gate, two jumps
+    } else if (kind.startsWith('sport:skateboard')) lsSkate(A, P, drape, solid, box, solidAt);
+    else if (kind.startsWith('sport:roller') || kind.startsWith('sport:ice')) lsRink(A, P, kind.startsWith('sport:ice'), drape, lines, solid, box, solidAt);
+    else if (kind.startsWith('sport:shooting')) lsRange(A, P, solid, box, solidAt);
+    else if (kind.startsWith('sport:equestrian')) { // a riding arena: sand, a wooden fence with a gate, two jumps
       try { polyFill(drape, P, [], 0.05, 10, COL('#d2bd8f')); } catch (e) { }
       lsRail(solid, P, 0, box);
       const ry = Math.atan2(A.ux, A.uz);
@@ -6138,6 +6136,72 @@ function lsBaseball(P, drape, lines, net, solid, box, solidAt) {
     F0.geo(solid, lmBox(0.1, h + 0.1, 0.1, p[0], g0 + h / 2, p[1]), null, COL('#3e4a42')); solidAt(p[0], p[1], 0.2, h);
     for (let t = 0.5; t < L; t += 0.5) solidAt(p[0] + (c[0] - p[0]) * t / L, p[1] + (c[1] - p[1]) * t / L, 0.15, h); acc += L; }
   { const q = pts[pts.length - 1]; F0.geo(solid, lmBox(0.1, h + 0.1, 0.1, q[0], H.ground(q[0], q[1]) + h / 2, q[1]), null, COL('#3e4a42')); solidAt(q[0], q[1], 0.2, h); }
+}
+// a skate park on its outline: a concrete floor, a quarter pipe at each end (the real curve, a deck on top, a steel coping), a fun box with two
+// bevelled sides, a ledge, a rail on two legs, a short flight of steps; everything is solid (a ramp by the discs of its footprint, as high as it is there)
+function lsSkate(A, P, drape, solid, box, solidAt) {
+  const F0 = lmFrame(new THREE.Matrix4()), CON = '#a9a8a2', CON2 = '#b8b6ae', STEEL = '#8f949a', ry = Math.atan2(A.ux, A.uz);
+  try { polyFill(drape, P, [], 0.05, 10, COL(CON)); } catch (e) { return; }
+  const W = A.v1 - A.v0, L = A.s1 - A.s0, wv = Math.max(3, Math.min(8, W - 2.4)), vm = (A.v0 + A.v1) / 2, R = clamp(L * 0.09, 1.0, 1.6), DK = 1.2;
+  const W3 = (s, v, y) => { const [x, z] = A.at(s, v); return [x, H.ground(x, z) + y, z]; };
+  const both = (b, q, col) => { F0.face(b, q, 2, col); F0.face(b, q.slice().reverse(), 2, col); };
+  for (const e of [-1, 1]) { /* e > 0: the ramp at the far end, its vertical face towards the end line */
+    const sb = (e > 0 ? A.s1 : A.s0) - e * (R + DK + 0.5), N = 8, prof = [];
+    for (let j = 0; j <= N; j++) { const f = j / N * Math.PI / 2; prof.push([sb + e * R * Math.sin(f), R - R * Math.cos(f)]); }
+    for (let j = 0; j < N; j++) { const a = prof[j], c = prof[j + 1]; both(solid, [W3(a[0], vm - wv / 2, a[1]), W3(c[0], vm - wv / 2, c[1]), W3(c[0], vm + wv / 2, c[1]), W3(a[0], vm + wv / 2, a[1])], COL(CON2)); }
+    for (const v of [vm - wv / 2, vm + wv / 2]) for (let j = 0; j < N; j++) { const a = prof[j], c = prof[j + 1]; both(solid, [W3(a[0], v, 0), W3(c[0], v, 0), W3(c[0], v, c[1]), W3(a[0], v, a[1])], COL(CON)); } /* the cheeks of the ramp */
+    const [dx, dz] = A.at(sb + e * (R + DK / 2), vm); box(DK, R, wv, dx, H.ground(dx, dz) + R / 2, dz, CON2, ry - Math.PI / 2); /* the deck on top, solid down to the ground */
+    lsRod(solid, W3(sb + e * R, vm - wv / 2 - 0.05, R + 0.03), W3(sb + e * R, vm + wv / 2 + 0.05, R + 0.03), 0.045, STEEL, 8); /* the coping */
+    for (let v = vm - wv / 2 + 0.4; v <= vm + wv / 2 - 0.3; v += 0.8) {
+      for (const [k, hh] of [[0.15, R * 0.12], [0.45, R * 0.35], [0.7, R * 0.7]]) { const [x, z] = A.at(sb + e * R * (1 - k), v); solidAt(x, z, 0.5, hh + 0.2); }
+      const [x, z] = A.at(sb + e * (R + DK / 2), v); solidAt(x, z, 0.7, R);
+    }
+  }
+  const fs = (A.s0 + A.s1) / 2, fv = vm + (W > 8 ? W * 0.12 : 0), [fx, fz] = A.at(fs, fv), fy = H.ground(fx, fz); /* the fun box */
+  box(2.6, 0.45, 2.6, fx, fy + 0.225, fz, CON2, ry);
+  for (const e of [-1, 1]) { const g = new THREE.BoxGeometry(1.6, 0.06, 2.6).rotateZ(e * 0.28).rotateY(ry - Math.PI / 2).translate(fx + Math.sin(ry) * e * 2.0, fy + 0.2, fz + Math.cos(ry) * e * 2.0); F0.geo(solid, g, null, COL(CON2)); }
+  for (const o of [-1.3, 0, 1.3]) for (const t of [-1.3, 0, 1.3]) solidAt(fx + Math.sin(ry) * o + Math.cos(ry) * t, fz + Math.cos(ry) * o - Math.sin(ry) * t, 0.7, 0.45);
+  const ls = A.s0 + L * 0.2, [lx0, lz0] = A.at(ls, A.v0 + 1.2), [lx1, lz1] = A.at(ls + 4.8, A.v0 + 1.2); /* a ledge */
+  box(hyp(lx1 - lx0, lz1 - lz0), 0.42, 0.4, (lx0 + lx1) / 2, H.ground((lx0 + lx1) / 2, (lz0 + lz1) / 2) + 0.21, (lz0 + lz1) / 2, CON, ry + Math.PI / 2);
+  for (let t = 0.4; t <= 4.5; t += 0.7) { const [x, z] = A.at(ls + t, A.v0 + 1.2); solidAt(x, z, 0.35, 0.45); }
+  const [rx0, rz0] = A.at(ls + 8.5, A.v1 - 1.4), [rx1, rz1] = A.at(ls + 12.5, A.v1 - 1.4); /* a rail on two legs */
+  if (inPoly(rx0, rz0, P) && inPoly(rx1, rz1, P)) {
+    lsRod(solid, [rx0, H.ground(rx0, rz0) + 0.5, rz0], [rx1, H.ground(rx1, rz1) + 0.5, rz1], 0.035, STEEL, 8);
+    for (const [x, z] of [[rx0, rz0], [rx1, rz1]]) lsRod(solid, [x, H.ground(x, z), z], [x, H.ground(x, z) + 0.5, z], 0.03, STEEL, 6);
+    for (let k = 0; k <= 8; k++) solidAt(rx0 + (rx1 - rx0) * k / 8, rz0 + (rz1 - rz0) * k / 8, 0.12, 0.55);
+  }
+  for (let k = 0; k < 3; k++) { const [x, z] = A.at(A.s1 - L * 0.28 - k * 0.6, A.v0 + W * 0.3), hh = 0.18 * (3 - k); box(0.6, hh, 2.4, x, H.ground(x, z) + hh / 2, z, CON2, ry - Math.PI / 2); solidAt(x, z, 1.2, hh + 0.05); } /* three steps, solid */
+}
+// a skating rink (roller or ice) on its outline: a smooth floor, a white line inside, boards a metre high all round with a way in on the side nearest a street
+function lsRink(A, P, ice, drape, lines, solid, box, solidAt) {
+  try { polyFill(drape, P, [], 0.05, 10, COL(ice ? '#dcecf2' : '#a39b92')); } catch (e) { return; }
+  const WH = COL(ice ? '#f4f2ea' : '#d9d6cf'); let gate = 0, gd = 1e9;
+  P.forEach((p, i) => { const q = P[(i + 1) % P.length], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let d = 1e9; ROADSEG.each(mx - 30, mz - 30, mx + 30, mz + 30, s => { d = Math.min(d, segDist(mx, mz, s.a[0], s.a[1], s.b[0], s.b[1])); }); if (d < gd && hyp(q[0] - p[0], q[1] - p[1]) > 3) { gd = d; gate = i; } });
+  const In = lsGrow(P, -0.5); for (let i = 0; i < In.length; i++) lsSeg(lines, In[i], In[(i + 1) % In.length], 0.05, WH, 0.07);
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.2) continue;
+    for (const [t0, t1] of i === gate && L > 3.2 ? [[0, L / 2 - 0.8], [L / 2 + 0.8, L]] : [[0, L]]) {
+      if (t1 - t0 < 0.1) continue;
+      const x0 = a[0] + (c[0] - a[0]) * t0 / L, z0 = a[1] + (c[1] - a[1]) * t0 / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, gy = H.ground(mx, mz), ry = Math.atan2(c[0] - a[0], c[1] - a[1]) - Math.PI / 2;
+      box(t1 - t0, 0.5, 0.07, mx, gy + 0.25, mz, ice ? '#2f5f9a' : '#9a9690', ry); box(t1 - t0, 0.6, 0.07, mx, gy + 0.8, mz, '#e9e7e0', ry); box(t1 - t0 + 0.04, 0.06, 0.12, mx, gy + 1.13, mz, '#3a3d40', ry); /* a coloured kick plate, the white board, the rail on top */
+      const n = Math.max(1, Math.ceil((t1 - t0) / 0.6)); for (let k = 0; k <= n; k++) solidAt(x0 + (x1 - x0) * k / n, z0 + (z1 - z0) * k / n, 0.2, 1.15);
+    }
+  }
+}
+// a shooting range on its outline (the long way is the way the shots go): at one end a roofed firing stand with a counter and low walls between the
+// lanes, at the other a bank of earth across the field with a target frame at its foot per lane
+function lsRange(A, P, solid, box, solidAt) {
+  const L = A.s1 - A.s0, W = A.v1 - A.v0; if (L < 14 || W < 6) return;
+  const ry = Math.atan2(A.ux, A.uz) - Math.PI / 2, lanes = clamp(Math.floor(W / 3), 2, 8), lw = (W - 1.6) / lanes, sS = A.s0 + 2.2, hS = 2.5, vm = (A.v0 + A.v1) / 2;
+  const at = (s, v) => { const [x, z] = A.at(s, v); return [x, H.ground(x, z), z]; };
+  { const [x, y, z] = at(sS + 1.2, vm); box(4.4, 0.18, W - 0.8, x, y + hS + 0.09, z, '#6b6e72', ry); } /* the roof */
+  for (const v of [A.v0 + 0.6, A.v1 - 0.6]) for (const s of [sS - 0.8, sS + 3.2]) { const [x, y, z] = at(s, v); box(0.16, hS, 0.16, x, y + hS / 2, z, '#7d8288'); solidAt(x, z, 0.2, hS); } /* the posts */
+  for (let k = 0; k <= lanes; k++) { const v = A.v0 + 0.8 + k * lw, [x, y, z] = at(sS + 1.0, v); box(2.8, 1.5, 0.08, x, y + 0.75, z, '#b8b3a8', ry + Math.PI / 2); for (let t = -1.2; t <= 1.2; t += 0.6) { const [qx, qz] = A.at(sS + 1.0 + t, v); solidAt(qx, qz, 0.2, 1.5); } } /* the walls between the lanes */
+  { const [x, y, z] = at(sS - 0.1, vm); box(0.5, 1.05, W - 1.0, x, y + 0.525, z, '#8a6a4a', ry); for (let v = A.v0 + 1; v <= A.v1 - 1; v += 0.6) { const [qx, qz] = A.at(sS - 0.1, v); solidAt(qx, qz, 0.3, 1.05); } } /* the counter */
+  const sE = A.s1 - 3.0; /* the bank of earth across the far end, in three steps up to 3 m */
+  for (let j = 0; j < 3; j++) { const hh = [1.2, 2.2, 3.0][j], [x, y, z] = at(sE + 1.2, vm); box(2.4 - j * 0.5, hh, W - 0.4, x + A.ux * j * 0.45, y + hh / 2, z + A.uz * j * 0.45, j ? '#6d5a3e' : '#7a6444', ry); }
+  for (let v = A.v0 + 0.8; v <= A.v1 - 0.8; v += 1.2) { const [qx, qz] = A.at(sE + 1.4, v); solidAt(qx, qz, 0.8, 2.6); }
+  for (let k = 0; k < lanes; k++) { const v = A.v0 + 0.8 + (k + 0.5) * lw, [x, y, z] = at(sE - 1.0, v); box(0.05, 1.5, 0.05, x - 0.3, y + 0.75, z, '#7d8288'); box(0.05, 1.5, 0.05, x + 0.3, y + 0.75, z, '#7d8288'); box(0.04, 0.9, 0.62, x, y + 1.0, z, '#f4f2ea', ry + Math.PI / 2); box(0.045, 0.3, 0.3, x, y + 1.0, z, '#2a2d30', ry + Math.PI / 2); solidAt(x, z, 0.4, 1.5); } /* a target frame per lane */
 }
 // a net that is a net: thin pale threads on clear cloth (goals, hoops, tennis and volleyball), unlike the dark fence mesh
 const LS_RETE = new THREE.MeshLambertMaterial({ map: canvasTex(32, 32, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#eceff0'; g.fillRect(0, 0, w, 3); g.fillRect(0, 0, 3, h); }), alphaTest: 0.12, side: THREE.DoubleSide, color: 0xffffff });
