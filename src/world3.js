@@ -1127,7 +1127,7 @@ function cellOwners(T, F) {
     else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
     else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
-    else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
+    else if (a.t === 17 || a.t === 7) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); /* a building site (7) is plain gravel too: the asphalt texture came out black */ // yards of the DBGT (AATT): plain paving, no asphalt texture
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
   for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('c', MAT.cortileS, 10), true); // yards and drives of the DBGT (AC_VEI 0307)
@@ -1212,7 +1212,7 @@ function* buildTileGen(T) {
         else if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
-        else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
+        else if (a.t === 17 || a.t === 7) polyFill(yB, outer, holes, 0.025 * fy, 10);
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
