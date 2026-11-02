@@ -684,8 +684,26 @@ function aoGround(b, ring, E, i, innerA) {
   }
 }
 const _aoC = new THREE.Color(), SILL_COL = new THREE.Color('#e8e3d8');
-function addSill(b, x, y, z, ux, uz, nx, nz) { // a stone sill 1.16 m long sticking 10 cm out of the wall: top, front and underside only (6 triangles)
-  const W = 0.58, D = 0.1, H = 0.035, q = (s, d, dy) => [x + ux * s + nx * d, y + dy, z + uz * s + nz * d];
+// the windows of the facades (Carlo, 2/11: never cut by a corner, the eaves, a gable or the ground). Each wall (a run of sides turning less than 12
+// degrees, BEND) has a whole number of bays, centred on it and stretched a little (bay from 0.85 to 1.2 of the drawing; shorter than that, a bare wall);
+// the floors are the same all round the house, from F0, the highest ground along its walls (the base of a raised volume), each FMIN to FMAX high: the
+// height nearest to FL with which whole rows of windows fill the facade up to the eaves (Carlo, 2/11; the drawing is stretched like the bays).
+// Each bay draws its windows only in the floors kLo..kTop where they are whole: kLo the lowest whose plinth top
+// (ZH over the floor) is over the ground under the window, so where the ground falls by more than a floor the low bays get a whole floor more; kTop the
+// highest whose window top stays EM under the eaves (or the slope of a gable) across the whole window. Under the plinth's top the plaster is darker.
+// facD per vertex: kLo, kTop, plinth top, in v (floors); FAC_WALL (chained in foto3.js) draws bare plaster elsewhere, lit and mirroring panes included
+const FAC = { FL: 3.1, FMIN: 2.8, FMAX: 3.4, ZH: 0.3, EM: 0.2, MIN: 0.85, MAX: 1.2, BEND: 0.978, old: [0.9, 2.38, 0.2, 0.8], mod: [0.7, 2.48, 0.1, 0.9] }; // per kind: window bottom and top over the floor (m), its sides in the bay (with the shutters)
+const FAC_WALL = s => {
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 facD;\nvarying vec3 vFac;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFac = facD;');
+  const plaster = '0.25 * ( texture2D( map, vec2( 0.03, 0.86 ) ) + texture2D( map, vec2( 0.5, 0.95 ) ) + texture2D( map, vec2( 0.97, 0.9 ) ) + texture2D( map, vec2( 0.3, 0.99 ) ) )';
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFac;')
+    .replace('void main() {', 'void main() {\n  float facF = floor( vUv.y ), facW = step( vFac.x - 0.5, facF ) * step( facF, vFac.y + 0.5 ) * step( vFac.z, vUv.y );')
+    .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('texture2D( map, vUv )', `mix( ${plaster}, texture2D( map, vUv ), facW )`) + '\n  diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;')
+    .replace('#include <emissivemap_fragment>', THREE.ShaderChunk.emissivemap_fragment.replace('texture2D( emissiveMap, vUv )', '( texture2D( emissiveMap, vUv ) * facW )'))
+    .replace('texture2D( emissiveMap, vUv ).r', '( texture2D( emissiveMap, vUv ).r * facW )');
+};
+function addSill(b, x, y, z, ux, uz, nx, nz, W = 0.58) { // a stone sill 1.16 m long (W half of it) sticking 10 cm out of the wall: top, front and underside only (6 triangles)
+  const D = 0.1, H = 0.035, q = (s, d, dy) => [x + ux * s + nx * d, y + dy, z + uz * s + nz * d];
   for (const [n, vs] of [[[0, 1, 0], [q(-W, 0, H), q(W, 0, H), q(W, D, H), q(-W, D, H)]], [[nx, 0, nz], [q(-W, D, -H), q(W, D, -H), q(W, D, H), q(-W, D, H)]], [[0, -1, 0], [q(-W, 0, -H), q(W, 0, -H), q(W, D, -H), q(-W, D, -H)]]]) {
     const k = b.p.length / 3; for (const p of vs) vtx(b, p[0], p[1], p[2], n[0], n[1], n[2], 0, 0, SILL_COL);
     const e = [vs[1][0] - vs[0][0], vs[1][1] - vs[0][1], vs[1][2] - vs[0][2]], f = [vs[3][0] - vs[0][0], vs[3][1] - vs[0][1], vs[3][2] - vs[0][2]];
@@ -1613,36 +1631,76 @@ function* buildTileGen(T) {
       // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
       const planes = roofPlanes(B), flatDbgt = B.rk === 4;
       const pitched = planes ? true : !flatDbgt && !holes.length && outer.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(outer) || (t === 10 && outer.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && h >= 5;
-      if (!b.ao) b.ao = [];
-      for (const [ring, isHole] of [[outer, false], ...holes.map(hh => [hh, true])]) {
-        const A = sArea(ring), nr = ring.length; let acc = 0;
+      if (!b.ao) { b.ao = []; b.fac = []; }
+      // the facades (FAC): the bays along each wall and the ground under each window first, then the floors F0 + FL k the same all round the house.
+      // A wall is a run of sides that go on nearly straight (the DBGT draws a facade in many short sides): its bays run along all of it
+      const fw = FAC[kind], rings = [[outer, false], ...holes.map(hh => [hh, true])].map(([ring, isHole]) => {
+        const A = sArea(ring), nr = ring.length;
         const E = ring.map((a, i) => { const c = ring[(i + 1) % nr], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1e-6; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } return [dx, dz, L, nx, nz]; });
+        const st = []; for (let i = 0; i < nr; i++) { const p = E[(i - 1 + nr) % nr], e = E[i]; if ((p[0] * e[0] + p[1] * e[1]) / (p[2] * e[2]) < FAC.BEND) st.push(i); } if (!st.length) st.push(0);
+        const W = [];
+        const runs = st.map((i0, k) => {
+          const i1 = st[(k + 1) % st.length], ed = [], off = []; let j = i0, Lr = 0;
+          do { ed.push(j); off.push(Lr); W[j] = null; Lr += E[j][2]; j = (j + 1) % nr; } while (j !== i1);
+          const at = s => { let q = 0; while (q < ed.length - 1 && s > off[q] + E[ed[q]][2]) q++; const e = E[ed[q]], a = ring[ed[q]], f = clamp((s - off[q]) / e[2], 0, 1); return [a[0] + e[0] * f, a[1] + e[1] * f]; };
+          const rp = []; // the top of the wall along the run: straight between these (the roof's breaks over each side, src roofBreaks)
+          ed.forEach((i, q) => { const a = ring[i], c = ring[(i + 1) % nr], e = E[i]; for (const t of planes && !isHole ? roofBreaks(B, a, c) : [0, 1]) { const s = off[q] + t * e[2]; if (rp.length && Math.abs(rp[rp.length - 1][0] - s) < 1e-4) continue; rp.push([s, top + (planes ? roofAt(B, a[0] + e[0] * t, a[1] + e[1] * t) : 0)]); } });
+          const x = Lr / tile, gAt = s => { const p = at(s); return H.ground(p[0], p[1]); }, sp = []; let n = fw ? Math.round(x) : 0; if (n && x / n < FAC.MIN) n--;
+          const bw = n ? Math.min(x / n, FAC.MAX) * tile : Lr, pad = n ? (Lr - n * bw) / 2 : 0, span = (s0, s1, ss, bay) => { const g = ss.map(gAt); sp.push([s0, s1, Math.max(...g), Math.min(...g), bay]); };
+          if (!n) span(0, Lr, [0, Lr / 2, Lr], false);
+          else { if (pad > 0.01) span(0, pad, [0, pad], false); for (let j = 0; j < n; j++) { const s0 = pad + j * bw; span(s0, s0 + bw, [s0 + fw[2] * bw, s0 + bw / 2, s0 + fw[3] * bw], true); } if (pad > 0.01) span(Lr - pad, Lr, [Lr - pad, Lr], false); }
+          const R = { ed, off, Lr, at, rp, n, bw, pad, sp, uoff: Math.floor(hashRnd(Math.round(ring[i0][0] * 31 + ring[i0][1] * 17)) * 32) };
+          ed.forEach((i, q) => { W[i] = [R, off[q]]; }); return R;
+        });
+        return { ring, nr, E, W, runs };
+      });
+      let gHi = gmax, gLo = gmin; for (const r of rings) for (const R of r.runs) for (const p of R.sp) { gHi = Math.max(gHi, p[2]); gLo = Math.min(gLo, p[3]); }
+      // the height of a floor, from FAC.FMIN to FAC.FMAX (the drawing stretched like the bays): the whole windows fill the facade up to the eaves, nearest to FAC.FL
+      const F0 = raised ? bot : gHi, hRef = top - F0 - FAC.EM; let FL = FAC.FL;
+      if (fw) { const t1 = fw[1] / FAC.FL; let fb = null; for (let nf = 1; nf < 60; nf++) { const f = hRef / (nf - 1 + t1); if (f < FAC.FMIN) break; if (f <= FAC.FMAX && (fb === null || Math.abs(f - FAC.FL) < Math.abs(fb - FAC.FL))) fb = f; } FL = fb || (hRef > t1 * FAC.FMAX ? FAC.FMAX : FAC.FL); }
+      const sc = FL / FAC.FL, wLo = fw ? fw[0] * sc : 0.9, wHi = fw ? fw[1] * sc : 0, wbot = raised ? bot : Math.min(bot, gLo - 0.6), voff = Math.floor(hashRnd(Math.round(outer[0][0] * 3.7 + outer[0][1] * 11.3)) * 16), vOf = y => (y - F0) / FL + voff;
+      const kLoAt = g => { let k = -4; while (k < 60 && ((!raised && F0 + k * FL + FAC.ZH < g) || F0 + k * FL + wLo < wbot + 0.3)) k++; return k; }; // the plinth's top over the ground, the window over the base of a raised volume
+      for (const { ring, nr, E, W, runs } of rings) {
+        // each span's floors with windows (kLo..kTop, plus voff) and the plinth's top; a span the same as the one before makes one piece of wall with it
+        for (const R of runs) {
+          const { rp, bw, sp } = R, rlAt = s => { for (let k = 1; k < rp.length; k++) if (s <= rp[k][0] || k === rp.length - 1) { const [p0, y0] = rp[k - 1], [p1, y1] = rp[k]; return y0 + (y1 - y0) * clamp((s - p0) / ((p1 - p0) || 1), 0, 1); } return rp[0][1]; };
+          R.rlAt = rlAt; const grp = R.grp = [];
+          for (const [s0, s1, g, , bay] of sp) {
+            const kl = kLoAt(g); let f = [999, -999];
+            if (bay) { const w0 = s0 + fw[2] * bw, w1 = s0 + fw[3] * bw; let rl = Math.min(rlAt(w0), rlAt(w1)); for (const [p, y] of rp) if (p > w0 && p < w1) rl = Math.min(rl, y); const kt = Math.floor((rl - FAC.EM - wHi - F0) / FL + 1e-4); if (kt >= kl) f = [kl, kt]; }
+            f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : vOf(F0 + kl * FL + FAC.ZH)];
+            const last = grp[grp.length - 1];
+            if (last && last[2][0] === f[0] && last[2][1] === f[1] && Math.abs(last[2][2] - f[2]) < 1e-6) last[1] = s1; else grp.push([s0, s1, f]);
+            if (bay && kind === 'old' && f[0] < 900) { // stone sills under the painted windows (middle of the bay, 0.9-1 m up the floor), not on the lowest floor: the ground floor is shops
+              const sm = (s0 + s1) / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + E[R.ed[q]][2]) q++;
+              const e = E[R.ed[q]], ux = e[0] / e[2], uz = e[1] / e[2], [sx, sz] = R.at(sm);
+              for (let k = f[0] - voff + 1; k <= f[1] - voff; k++) addSill(sillB, sx, F0 + FL * k + 0.96 * sc, sz, ux, uz, e[3], e[4], 0.58 * bw / tile);
+            }
+          }
+        }
         const inner = i => { const p = E[(i - 1 + nr) % nr], e = E[i]; return p[3] * e[0] + p[4] * e[1] > 0.05 * e[2]; }; // the wall before turns towards this one: an inside corner
         for (let i = 0; i < nr; i++) {
-          const a = ring[i], c = ring[(i + 1) % nr], [dx, dz, L, nx, nz] = E[i]; if (L < 0.05) continue;
-          const ia = inner(i) ? 0 : 99, ic = inner((i + 1) % nr) ? 0 : 99, ts = planes && !isHole ? roofBreaks(B, a, c) : [0, 1], v0 = (bot - gmax) / 3.1;
-          for (let k = 1; k < ts.length; k++) { // the wall in pieces where the roof over it changes slope (a gable end), each piece straight on top
-            const s0 = ts[k - 1] * L, s1 = ts[k] * L, ax = a[0] + dx * ts[k - 1], az = a[1] + dz * ts[k - 1], cx = a[0] + dx * ts[k], cz = a[1] + dz * ts[k];
-            const ya = top + (planes ? roofAt(B, ax, az) : 0), yc = top + (planes ? roofAt(B, cx, cz) : 0), u0 = (acc + s0) / tile, u1 = (acc + s1) / tile, base = b.p.length / 3;
-            vtx(b, ax, bot, az, nx, 0, nz, u0, v0, wallCol); vtx(b, cx, bot, cz, nx, 0, nz, u1, v0, wallCol);
-            vtx(b, cx, yc, cz, nx, 0, nz, u1, (yc - gmax) / 3.1, wallCol); vtx(b, ax, ya, az, nx, 0, nz, u0, (ya - gmax) / 3.1, wallCol);
+          const a = ring[i], [dx, dz, L, nx, nz] = E[i], [R, o] = W[i]; if (L < 0.05) continue;
+          const ia = inner(i) ? 0 : 99, ic = inner((i + 1) % nr) ? 0 : 99, { grp, rp, rlAt, n, bw, pad, uoff } = R;
+          const uOf = s => uoff + (n ? (s - pad) / bw : s / tile); // s along the run
+          const cuts = [...new Set([o, o + L, ...grp.map(q => q[0]), ...rp.map(q => q[0])].filter(s => s >= o - 1e-4 && s <= o + L + 1e-4).map(s => Math.round(s * 1e4) / 1e4))].sort((p, q) => p - q);
+          for (let k = 1; k < cuts.length; k++) { // the side in pieces where the roof over it changes slope (a gable end) or the windows of a bay change, each piece straight on top
+            const s0 = cuts[k - 1], s1 = cuts[k]; if (s1 - s0 < 1e-3) continue;
+            const l0 = clamp(s0 - o, 0, L) / L, l1 = clamp(s1 - o, 0, L) / L, sm = (s0 + s1) / 2, f = (grp.find(q => sm >= q[0] && sm <= q[1]) || grp[grp.length - 1])[2];
+            const ax = a[0] + dx * l0, az = a[1] + dz * l0, cx = a[0] + dx * l1, cz = a[1] + dz * l1, ya = rlAt(s0), yc = rlAt(s1), u0 = uOf(s0), u1 = uOf(s1), v0 = vOf(wbot), base = b.p.length / 3, e0 = l0 * L, e1 = l1 * L;
+            vtx(b, ax, wbot, az, nx, 0, nz, u0, v0, wallCol); vtx(b, cx, wbot, cz, nx, 0, nz, u1, v0, wallCol);
+            vtx(b, cx, yc, cz, nx, 0, nz, u1, vOf(yc), wallCol); vtx(b, ax, ya, az, nx, 0, nz, u0, vOf(ya), wallCol);
             // occlusion: height over the ground, depth under the eaves, distance from the inside corners at either end (linear along the wall, so exact per pixel)
-            const ga = raised ? bot - 3 : H.ground(ax, az), gc = raised ? bot - 3 : H.ground(cx, cz);
-            b.ao.push(bot - ga, pitched ? ya - bot : 99, ia + s0, ic + L - s0, bot - gc, pitched ? yc - bot : 99, ia + s1, ic + L - s1, yc - gc, pitched ? 0 : 99, ia + s1, ic + L - s1, ya - ga, pitched ? 0 : 99, ia + s0, ic + L - s0);
+            const ga = raised ? wbot - 3 : H.ground(ax, az), gc = raised ? wbot - 3 : H.ground(cx, cz);
+            b.ao.push(wbot - ga, pitched ? ya - wbot : 99, ia + e0, ic + L - e0, wbot - gc, pitched ? yc - wbot : 99, ia + e1, ic + L - e1, yc - gc, pitched ? 0 : 99, ia + e1, ic + L - e1, ya - ga, pitched ? 0 : 99, ia + e0, ic + L - e0);
+            for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2]);
             if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
             if (B.st === 2) { // a ruin has no roof: the inside of its walls shows from above
               const bi = b.p.length / 3;
-              vtx(b, ax, bot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, bot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, (yc - gmax) / 3.1, wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, (ya - gmax) / 3.1, wallCol);
-              b.ao.push(bot - ga, 99, 99, 99, bot - gc, 99, 99, 99, yc - gc, 99, 99, 99, ya - ga, 99, 99, 99);
+              vtx(b, ax, wbot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, wbot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, vOf(yc), wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, vOf(ya), wallCol);
+              b.ao.push(wbot - ga, 99, 99, 99, wbot - gc, 99, 99, 99, yc - gc, 99, 99, 99, ya - ga, 99, 99, 99);
+              for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2]);
               if (nx * (-dz) + nz * dx > 0) b.i.push(bi, bi + 2, bi + 1, bi, bi + 3, bi + 2); else b.i.push(bi, bi + 1, bi + 2, bi, bi + 2, bi + 3);
-            }
-          }
-          const u0 = acc / tile; acc += L;
-          if (kind === 'old') { // stone sills under the painted windows (middle of each bay, 0.9-1 m up each 3.1 m floor), from the first floor: the ground floor is shops
-            const ux = dx / L, uz = dz / L, fl = raised ? bot - 3.1 : gmax;
-            for (let n = Math.ceil((u0 * tile + 0.7) / tile - 0.5); (n + 0.5) * tile - u0 * tile <= L - 0.7; n++) {
-              const s = (n + 0.5) * tile - u0 * tile, sx = a[0] + ux * s, sz = a[1] + uz * s;
-              for (let k = 1; fl + 3.1 * k + 2.5 <= top - 0.2; k++) if (fl + 3.1 * k > bot + 0.5) addSill(sillB, sx, fl + 3.1 * k + 0.96, sz, ux, uz, nx, nz);
             }
           }
         }
@@ -1676,7 +1734,7 @@ function* buildTileGen(T) {
       for (const [ss, yy] of [[-0.6, 0], [0.6, 0], [0.6, 2.3], [-0.6, 2.3]]) vtx(doorB, px + ux * ss + nx * o, gy + yy, pz + uz * ss + nz * o, nx, 0, nz, 0, 0, col);
       if (nx * (-uz) + nz * ux > 0) doorB.i.push(k0, k0 + 1, k0 + 2, k0, k0 + 2, k0 + 3); else doorB.i.push(k0, k0 + 2, k0 + 1, k0, k0 + 3, k0 + 2);
     }
-    for (const k of ['old', 'mod', 'plain']) if (wb[k].i.length) mkMesh(wb[k], MAT[k], 10, 'cast', G).geometry.setAttribute('aoD', new THREE.Float32BufferAttribute(wb[k].ao, 4));
+    for (const k of ['old', 'mod', 'plain']) if (wb[k].i.length) { const g = mkMesh(wb[k], MAT[k], 10, 'cast', G).geometry; g.setAttribute('aoD', new THREE.Float32BufferAttribute(wb[k].ao, 4)); g.setAttribute('facD', new THREE.Float32BufferAttribute(wb[k].fac, 3)); }
     if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast'); put(doorB, MAT.roof, 10);
