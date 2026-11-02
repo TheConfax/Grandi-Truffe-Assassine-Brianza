@@ -1026,7 +1026,7 @@ if dbt_pc:
     _dbi = [i_ for i_, (p_, k_, h_) in enumerate(barriers) if len(p_) >= 2 and k_ != 6]
     _dbl = [LineString(barriers[i_][0]) for i_ in _dbi]; _dbt_ = STRtree(_dbl)
     _main_r = [r['line'] for r in raw_roads if r['c'] <= 3 and flat(r) and r['line'].length > 0.1]; _mrt = STRtree(_main_r)
-    _done = []; _pcmv = []
+    _done = []; _pcmv = []; _pcfr = []
     for p_ in dbt_pc:
         P_ = Point(p_)
         if not inside(p_, 0) or any(math.dist(p_, d_) < PC_W for d_ in _done): continue
@@ -1046,11 +1046,28 @@ if dbt_pc:
                 if _best_ is None or sc_ > _best_[0]: _best_ = (sc_, k_)
             if _best_ is not None and _best_[1] != j_ and _best_[0][0] > 0.85:   # at most 32 degrees off the street
                 _pcmv.append((round(P_.x, 1), round(P_.y, 1))); j_ = _best_[1]; L_ = _dbl[j_]
-        s_ = min(max(L_.project(P_), PC_W / 2), L_.length - PC_W / 2); a_, b_ = L_.interpolate(s_ - PC_W / 2), L_.interpolate(s_ + PC_W / 2)
-        _done.append(p_); pc_cuts.append(L_.interpolate(s_).buffer(PC_W / 2))
-        if any(_main_r[k].distance(L_.interpolate(s_)) < 2 for k in _mrt.query(L_.interpolate(s_).buffer(2))): continue
+        s_ = min(max(L_.project(P_), PC_W / 2), L_.length - PC_W / 2); a_, b_ = L_.interpolate(s_ - PC_W / 2), L_.interpolate(s_ + PC_W / 2); _fr_ = False
+        # a gate of a driveway never hangs on a divider that runs across the street (the side wall of the ramp): it stands on the front, parallel to the street,
+        # from the end of that wall to where the next divider begins (the net, the house corner): the width of the mouth (Carlo, 2/11, via Gagarin x 546 z -490)
+        if _rs_ and _rl_.distance(P_) <= 20:
+            _sk_ = L_.project(P_); _ta_, _tb_ = L_.interpolate(max(0, _sk_ - 1)), L_.interpolate(min(L_.length, _sk_ + 1)); _td_ = (_tb_.x - _ta_.x, _tb_.y - _ta_.y)
+            if abs((_td_[0] * _rd_[0] + _td_[1] * _rd_[1]) / ((math.hypot(*_td_) or 1) * _rn_)) < 0.5:
+                _ux_, _uz_ = _rd_[0] / _rn_, _rd_[1] / _rn_; _E_ = min((Point(L_.coords[0]), Point(L_.coords[-1])), key=lambda e_: _rl_.distance(e_))
+                _sg_ = 1 if ((P_.x - _E_.x) * _ux_ + (P_.y - _E_.y) * _uz_) >= 0 else -1; _bst_ = None
+                for k_ in _dbt_.query(_E_.buffer(12)):
+                    if k_ == j_: continue
+                    for e_ in (Point(_dbl[k_].coords[0]), Point(_dbl[k_].coords[-1])):
+                        dx_, dz_ = e_.x - _E_.x, e_.y - _E_.y; al2_ = (dx_ * _ux_ + dz_ * _uz_) * _sg_; lat_ = abs(-dx_ * _uz_ + dz_ * _ux_)
+                        if 0.5 < al2_ <= 12 and lat_ <= 1.5 and (_bst_ is None or al2_ < _bst_[0]): _bst_ = (al2_, e_)
+                if _bst_ is not None: a_, b_ = _E_, _bst_[1]
+                else: a_, b_ = _E_, Point(_E_.x + _sg_ * _ux_ * PC_W, _E_.y + _sg_ * _uz_ * PC_W)
+                _fr_ = True; _pcfr.append((round(P_.x, 1), round(P_.y, 1), round(a_.distance(b_), 1)))
+        _done.append(p_)
+        if _fr_: _gm_ = LineString([(a_.x, a_.y), (b_.x, b_.y)]); pc_cuts.append(_gm_.buffer(0.5)); _mid_ = _gm_.interpolate(0.5, normalized=True)
+        else: pc_cuts.append(L_.interpolate(s_).buffer(PC_W / 2)); _mid_ = L_.interpolate(s_)
+        if any(_main_r[k].distance(_mid_) < 2 for k in _mrt.query(_mid_.buffer(2))): continue
         hb_ = barriers[_dbi[j_]][2]; pc_gates.append(((a_.x, a_.y), (b_.x, b_.y), round(min(2.2, max(1.2, hb_)), 1), barriers[_dbi[j_]][1]))
-    log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates), 'agganciati al tratto verso la strada invece del piu vicino', len(_pcmv)); _campioni['cancelli_spostati'] = _pcmv
+    log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates), 'agganciati al tratto verso la strada invece del piu vicino', len(_pcmv), 'sul fronte strada (era su un divisore di traverso)', len(_pcfr)); _campioni['cancelli_spostati'] = _pcmv; _campioni['cancelli_fronte'] = _pcfr
 # cancellate DBGT (EL_DIV_TY 02) fino a GATE02_MAX m che danno su strada o cortile sono cancelli, anche senza un passo carraio (Carlo, 1/11)
 _c02 = Counter(); _prep_paved = [g_ for g_ in (asph, side, pedz, parking) if g_ is not None and not g_.is_empty]
 for pts_, k_, h_ in dbt_02:
@@ -2025,7 +2042,13 @@ for k_, pts in land:
         try: g_ = Polygon(pts).buffer(0); c_ = g_.centroid; _sport_c.append((c_.x, c_.y, g_))
         except Exception: pass
 _sport_t = STRtree([g_[2] for g_ in _sport_c]) if _sport_c else None
+_gs_ = [b for b in buildings if b.get('bt') == 'grandstand']
+if _gs_:  # le tribune automatiche non si disegnano piu (Carlo, 2/11): gli stadi saranno edifici fatti a mano; sul loro posto resta il terreno
+    _gso_ = [Polygon(b['p']).buffer(0) for b in _gs_]
+    _ov_ = [(round(centroid(b['p'])[0]), round(centroid(b['p'])[1])) for b in buildings + (ED.alti if ED else []) if b.get('bt') != 'grandstand' and any(g_.intersects(Polygon(b['p']).buffer(0)) for g_ in _gso_)]
+    log('tribune tolte', len(_gs_), 'edifici che le toccano (non toccati)', _ov_); _campioni['tribune_tolte'] = [(round(centroid(b['p'])[0]), round(centroid(b['p'])[1])) for b in _gs_]
 for b in buildings + (ED.alti if ED else []):
+    if b.get('bt') == 'grandstand': continue
     c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b.get('t', BTYPE.get(b.get('bt'), 0))}
     for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
         if b.get(k_) is not None: rec[k_] = b[k_]
