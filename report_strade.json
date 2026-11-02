@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 19.2,
+  "tempo_s": 3.6,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1146,12 +1146,12 @@
  "superfici": {
   "osm_tenute_vie": 229,
   "asfalto_m2": 1686654,
-  "cortili_m2": 1739276,
+  "cortili_m2": 1739273,
   "marciapiedi_m2": 150242,
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 77.9,
+  "tempo_s": 52.2,
   "cortili_nei_cantieri_m2": 16051
  },
  "barriere_solo_osm": {
@@ -1166,19 +1166,19 @@
   "metri_osm_nella_copertura": 92163
  },
  "cancelli_02": {
-  "cancelli": 1673,
+  "cancelli": 1672,
   "in_carreggiata": 1148,
-  "gia_passo_carraio": 189,
-  "non_da_su_strada_o_cortile": 325
+  "non_da_su_strada_o_cortile": 325,
+  "gia_passo_carraio": 190
  },
  "muri_doppi_fusi": {
-  "linee": 1357,
-  "metri": 12926
+  "linee": 1358,
+  "metri": 12912
  },
  "muri_sul_confine": {
   "dbgt": 40203,
   "metri_dbgt": 503792,
-  "metri_tenuti": 461297,
+  "metri_tenuti": 461367,
   "spostati": 1441,
   "metri_spostati": 8019,
   "spostamento_m": {
@@ -1200,50 +1200,51 @@
  },
  "cancelli_passi_carrai": {
   "porte": {
-   "p": 2608
+   "p": 2694
   },
-  "nuovi": 3547,
-  "pedonali": 379,
-  "senza_strada": 5113,
-  "senza_chiusure": 4836,
-  "carreggiata_o_marciapiede": 2127,
-  "strada_osm": 707,
-  "troppo_stretti": 5340,
-  "gia_cancello": 16038,
-  "fuori": 19,
-  "doppione_recinzione": 171,
-  "capo_nel_vuoto": 959,
-  "troppo_larghi": 602,
+  "nuovi": 3629,
+  "pedonali": 384,
+  "senza_strada": 5118,
+  "senza_chiusure": 4851,
+  "carreggiata_o_marciapiede": 2173,
+  "strada_osm": 717,
+  "troppo_stretti": 5368,
+  "gia_cancello": 16020,
+  "fuori": 21,
+  "doppione_recinzione": 175,
+  "capo_nel_vuoto": 978,
+  "troppo_larghi": 615,
   "per_origine": {
-   "passo_carraio": 372,
-   "rampa": 10,
+   "passo_carraio": 387,
+   "rampa": 9,
    "vialetto": 0,
-   "varco": 1899,
+   "varco": 1967,
    "capo_recinzione": 1266
   }
  },
- "divisori_tagliati_da_cancelli": 775,
- "cancelli_in_carreggiata_tolti": 710,
+ "divisori_tagliati_da_cancelli": 786,
+ "monconi_in_carreggiata_tolti": 207,
+ "cancelli_in_carreggiata_tolti": 769,
  "barriere_in_carreggiata": {
-  "linee": 255,
-  "metri": 2211
+  "linee": 88,
+  "metri": 1163
  },
  "corsie_ia": {
   "vie": 3015,
-  "corsie_spostate_nodi": 3866,
+  "corsie_spostate_nodi": 3863,
   "vie_con_corsie": 1029,
-  "tagli": 196,
-  "metri_tagliati": 1813,
-  "nodi_aggiunti": 208,
+  "tagli": 198,
+  "metri_tagliati": 1845,
+  "nodi_aggiunti": 211,
   "punti_per_motivo": {
    "fuori asfalto": 580,
-   "muro o edificio": 1839,
+   "muro o edificio": 1907,
    "stretta fra i muri": 308
   },
   "sensi_unici_tolti_metri": 952,
-  "pezzi_isolati_tolti_metri": 411,
+  "pezzi_isolati_tolti_metri": 412,
   "km_rete": 405.33,
-  "km_rete_ia": 402.15,
+  "km_rete_ia": 402.12,
   "dove": [
    "?x=435&z=362 muro/stretta doppio senso 3.8 m 65 m",
    "?x=1421&z=1183 stretta doppio senso 3.2 m 63 m",
@@ -1256,6 +1257,7 @@
    "?x=406&z=436 muro/stretta doppio senso 3.8 m 36 m",
    "?x=-231&z=-1043 muro doppio senso 4.8 m 35 m",
    "?x=-66&z=-980 stretta doppio senso 4.2 m 32 m",
+   "?x=-873&z=-470 muro doppio senso 3.8 m 31 m",
    "?x=335&z=-870 asfalto/muro senso unico 3.2 m 30 m",
    "?x=612&z=1955 muro/stretta doppio senso 3.8 m 29 m",
    "?x=-260&z=-1163 muro doppio senso 4.8 m 29 m",
@@ -1283,8 +1285,7 @@
    "?x=430&z=-688 asfalto/muro doppio senso 6.5 m 15 m",
    "?x=3080&z=-2336 muro doppio senso 6.5 m 15 m",
    "?x=763&z=-1456 asfalto/muro doppio senso 8.2 m 15 m",
-   "?x=1426&z=-188 muro doppio senso 9.2 m 15 m",
-   "?x=-349&z=896 asfalto doppio senso 7.5 m 15 m"
+   "?x=1426&z=-188 muro doppio senso 9.2 m 15 m"
   ]
  },
  "controlli": {
@@ -1305,12 +1306,12 @@
   },
   "lampioni_in_carreggiata": {
    "n": 0,
-   "di": 254,
+   "di": 255,
    "dove": []
   },
   "alberi_in_carreggiata": {
    "n": 0,
-   "di": 88802,
+   "di": 88738,
    "dove": []
   },
   "pali_dei_cartelli_in_carreggiata": {
@@ -1319,22 +1320,21 @@
    "dove": []
   },
   "barriere_in_carreggiata": {
-   "n": 16,
-   "metri": 83.9,
+   "n": 15,
+   "metri": 78.1,
    "dove": [
     "?x=783&z=-114",
     "?x=-867&z=695",
     "?x=-504&z=-483",
     "?x=-503&z=-483",
     "?x=-397&z=-227",
-    "?x=52&z=-249",
-    "?x=65&z=-229",
     "?x=-3039&z=1898",
     "?x=-3043&z=1893",
     "?x=-3042&z=1889",
     "?x=-63&z=-636",
     "?x=-75&z=-615",
     "?x=-116&z=-727",
+    "?x=-8&z=-582",
     "?x=-46&z=-524",
     "?x=-2158&z=1400",
     "?x=-2025&z=1652"
@@ -1356,15 +1356,15 @@
    ]
   },
   "corsie_dentro_ac_vei": {
-   "campioni": 92753,
-   "fuori": 2623,
+   "campioni": 92755,
+   "fuori": 2624,
    "quota": 0.0283,
    "fuori_per_motivo": {
     "altro": 1530,
     "incrocio": 368,
-    "strettoia": 725
+    "strettoia": 726
    },
-   "auto_fuori": 636,
+   "auto_fuori": 647,
    "nota_auto": "la linea della corsia a meno di 0,9 m (mezza auto) dal bordo o fuori",
    "margine_m": {
     "p1": -0.41,
@@ -1408,29 +1408,29 @@
    "n": 224,
    "campioni": 235566,
    "vie_diverse": 224,
-   "stessa_via": 14221,
+   "stessa_via": 14163,
    "nota": "punti di corsia (1 m) con una corsia di verso opposto a meno di 1.8 m, lontano dagli incroci",
    "dove": [
-    "?x=655&z=2100",
-    "?x=686&z=-556",
-    "?x=-292&z=-967",
-    "?x=-1299&z=1555",
-    "?x=408&z=-413",
-    "?x=-290&z=-966",
-    "?x=-1337&z=673",
-    "?x=1332&z=658",
-    "?x=657&z=2100",
-    "?x=724&z=1901",
-    "?x=407&z=-414",
-    "?x=-1515&z=641",
-    "?x=-1345&z=669",
-    "?x=-293&z=-967",
+    "?x=249&z=-1257",
+    "?x=-1390&z=1187",
+    "?x=189&z=-1279",
     "?x=656&z=2100",
-    "?x=-292&z=-967",
-    "?x=734&z=1486",
-    "?x=748&z=1911",
-    "?x=-349&z=894",
-    "?x=-374&z=-263"
+    "?x=734&z=1490",
+    "?x=257&z=-1253",
+    "?x=-374&z=-263",
+    "?x=863&z=56",
+    "?x=-293&z=-967",
+    "?x=863&z=59",
+    "?x=-1515&z=640",
+    "?x=-374&z=-262",
+    "?x=659&z=2100",
+    "?x=407&z=-414",
+    "?x=185&z=-1282",
+    "?x=250&z=-1257",
+    "?x=406&z=-414",
+    "?x=-769&z=117",
+    "?x=-1299&z=1555",
+    "?x=-1342&z=671"
    ]
   },
   "traffico_nei_cortili": {
@@ -2095,6 +2095,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 8.7
+  "tempo_s": 7.6
  }
 }
