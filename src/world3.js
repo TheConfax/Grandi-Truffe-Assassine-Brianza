@@ -1060,7 +1060,7 @@ function pitLook(T, x, z) { // the look of the highest layer of the tile over th
 // part, a front that closes each head of it. The ground and the paint are cut round it: nothing of them is seen from inside
 const OP_SP = 0.3; // m: the thickness of the parapets
 function opSotto(o) { const w = H.inPit(o[0], o[1]); if (w && w.src && w.src.sotto && o[2] < H.baseS(o[0], o[1]) - 0.3) return true; const u = H.gallAt(o[0], o[1]); return !!u && o[2] < u.soff; } // a point [x, z, y] inside the work
-function opQuad(b, Q, nx, ny, nz) { const i0 = b.p.length / 3; for (const q of Q) vtx(b, q[0], q[1], q[2], nx, ny, nz, (q[0] + q[2]) / 2, q[1] / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
+function opQuad(b, Q0, nx, ny, nz) { const ux = Q0[1][0] - Q0[0][0], uy = Q0[1][1] - Q0[0][1], uz = Q0[1][2] - Q0[0][2], vx = Q0[3][0] - Q0[0][0], vy = Q0[3][1] - Q0[0][1], vz = Q0[3][2] - Q0[0][2], Q = (uy * vz - uz * vy) * nx + (uz * vx - ux * vz) * ny + (ux * vy - uy * vx) * nz < 0 ? [Q0[0], Q0[3], Q0[2], Q0[1]] : Q0; const i0 = b.p.length / 3; for (const q of Q) vtx(b, q[0], q[1], q[2], nx, ny, nz, (q[0] + q[2]) / 2, q[1] / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
 function opPareti(Wb, p, roof) { // roof[k]: the ceiling over station k, or null: open
   const q0 = p.src, B0 = H.B0;
   for (const [L, O, C] of [[p.sx, p.dx, q0.csx], [p.dx, p.sx, q0.cdx]]) for (let k = 1; k < L.length; k++) {
@@ -1101,8 +1101,9 @@ function buildGallerie(T, G) {
     for (const [b, mt, r] of [[F, MAT.asph, -2], [C, MAT.pitWall, 0], [W_, MAT.pitWall, 0]]) if (b.i.length) { const M = mkMesh(b, mt, r, false); scene.remove(M); G.add(M); p.meshes.push(M); }
   }
 }
-function opAnello(f) { // the triangles of the ground round an underpass in small ones, so that the border of the paint on them is not a row of teeth
-  const out = [], go = (ax, az, bx, bz, cx, cz) => { const ab = hyp(ax - bx, az - bz), bc = hyp(bx - cx, bz - cz), ca = hyp(cx - ax, cz - az), m = Math.max(ab, bc, ca); if (m < 0.8) { out.push(ax, az, bx, bz, cx, cz); return; } if (m === ab) { const x = (ax + bx) / 2, z = (az + bz) / 2; go(ax, az, x, z, cx, cz); go(x, z, bx, bz, cx, cz); } else if (m === bc) { const x = (bx + cx) / 2, z = (bz + cz) / 2; go(ax, az, bx, bz, x, z); go(ax, az, x, z, cx, cz); } else { const x = (cx + ax) / 2, z = (cz + az) / 2; go(ax, az, bx, bz, x, z); go(x, z, bx, bz, cx, cz); } };
+function opLook(T, x, z) { let sy = pitLook(T, x, z); if (!sy) for (const [ox, oz] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) { sy = pitLook(T, x + ox, z + oz); if (sy) break; } /* (the paint stops a little short of the wall: the parapet covers that) */ return sy; }
+function opAnello(T, f) { // the triangles of the ground round an underpass, small where the border of a paint crosses them: not a row of teeth
+  const out = [], go = (ax, az, bx, bz, cx, cz) => { const ab = hyp(ax - bx, az - bz), bc = hyp(bx - cx, bz - cz), ca = hyp(cx - ax, cz - az), m = Math.max(ab, bc, ca); if (m < 0.2) { out.push(ax, az, bx, bz, cx, cz); return; } if (m < 1.6) { const la = opLook(T, ax, az); if (la === opLook(T, bx, bz) && la === opLook(T, cx, cz) && la === opLook(T, (ax + bx + cx) / 3, (az + bz + cz) / 3)) { out.push(ax, az, bx, bz, cx, cz); return; } } if (m === ab) { const x = (ax + bx) / 2, z = (az + bz) / 2; go(ax, az, x, z, cx, cz); go(x, z, bx, bz, cx, cz); } else if (m === bc) { const x = (bx + cx) / 2, z = (bz + cz) / 2; go(ax, az, bx, bz, x, z); go(ax, az, x, z, cx, cz); } else { const x = (cx + ax) / 2, z = (cz + az) / 2; go(ax, az, bx, bz, x, z); go(x, z, bx, bz, cx, cz); } };
   for (let i = 0; i < f.length; i += 6) go(f[i], f[i + 1], f[i + 2], f[i + 3], f[i + 4], f[i + 5]);
   return out;
 }
@@ -1115,10 +1116,9 @@ function buildPits(T, G) {
     const op_ = p.src && p.src.sotto;
     for (const [k, w, f0] of p.anello) {
       if (k !== key) continue;
-      const f = op_ ? opAnello(f0) : f0;
+      const f = op_ ? opAnello(T, f0) : f0;
       for (let i = 0; i < f.length; i += 6) {
-        const xs = [f[i], f[i + 2], f[i + 4]], zs = [f[i + 1], f[i + 3], f[i + 5]], cx = (xs[0] + xs[1] + xs[2]) / 3, cz = (zs[0] + zs[1] + zs[2]) / 3; let sy = pitLook(T, cx, cz);
-        if (!sy && op_) for (const [ox, oz] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) { sy = pitLook(T, cx + ox, cz + oz); if (sy) break; } /* (the paint stops a little short of the wall: the parapet covers that) */
+        const xs = [f[i], f[i + 2], f[i + 4]], zs = [f[i + 1], f[i + 3], f[i + 5]], cx = (xs[0] + xs[1] + xs[2]) / 3, cz = (zs[0] + zs[1] + zs[2]) / 3, sy = op_ ? opLook(T, cx, cz) : pitLook(T, cx, cz);
         let B = byLook.get(sy); if (!B) byLook.set(sy, B = Buf());
         const ys = xs.map((x, q) => H.baseS(x, zs[q])), vs = sy ? sy.vs : 10, i0 = B.p.length / 3;
         for (let q = 0; q < 3; q++) vtx(B, xs[q], ys[q], zs[q], 0, 1, 0, xs[q] / vs, zs[q] / vs, sy ? sy.col : null);
@@ -1403,7 +1403,7 @@ function* buildTileGen(T) {
       const P = []; let px = 0, pz = 0; for (let i = 0; i < E.length; i += 2) { px += E[i]; pz += E[i + 1]; P.push([px / 100, pz / 100]); }
       if (P.length < 2 || (lev === 2 && H.GALL.length && P.some(q => H.gallAt(q[0], q[1])))) continue; /* the lines of a carriageway in gallery are not on the ground over it */
       if (H.PITS.length) { const ins = P.map(q => !!H.inPit(q[0], q[1], 0.1)); if (ins.some(v => v) && ins.some(v => !v)) { let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i; while (j < P.length && ins[j] === ins[i]) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* a line does not climb the wall of a trench: only the longest run on one side of it */
-      if (H.PITS.length && P.some(q => { const p_ = H.inPit(q[0], q[1], 12); return p_ && p_.src && p_.src.sotto; })) { let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i + 1; while (j < P.length && Math.abs(H.base(P[j][0], P[j][1]) - H.base(P[j - 1][0], P[j - 1][1])) <= 0.3 * hyp(P[j][0] - P[j - 1][0], P[j][1] - P[j - 1][1])) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } if (bn < P.length) { const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* nor the bank beside a work: no white post */
+      if (H.PITS.length && P.some(q => { const p_ = H.inPit(q[0], q[1], 12); return p_ && p_.src && p_.src.sotto; })) { const dentro_ = (x, z) => { const p_ = H.inPit(x, z); return (p_ && p_.src && p_.src.sotto) || H.gallAt(x, z); }, male = (a, c) => { if (Math.abs(H.base(c[0], c[1]) - H.base(a[0], a[1])) > 0.3 * hyp(c[0] - a[0], c[1] - a[1])) return true; for (const t of [0.15, 0.5, 0.85]) if (dentro_(a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t)) return true; return false; }; { const fitta = [P[0]]; for (let i = 1; i < P.length; i++) { const L_ = hyp(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]), n_ = Math.max(1, Math.ceil(L_ / 2)); for (let q = 1; q <= n_; q++) fitta.push(q === n_ ? P[i] : [P[i - 1][0] + (P[i][0] - P[i - 1][0]) * q / n_, P[i - 1][1] + (P[i][1] - P[i - 1][1]) * q / n_]); } P.length = 0; P.push(...fitta); } /* (every 2 m: the climb is only in its last metres) */ let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i + 1; while (j < P.length && !male(P[j - 1], P[j])) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } if (bn < P.length) { const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* nor the bank beside a work: no white post */
       const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + hyp(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
       const at = s => { let i = 1; while (i < P.length - 1 && cum[i] < s) i++; const f = clamp((s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), 0, 1); return [lerp(P[i - 1][0], P[i][0], f), lerp(P[i - 1][1], P[i][1], f)]; };
       const piece = (a, b) => { const o = [at(a)]; for (let i = 1; i < P.length - 1; i++) if (cum[i] > a && cum[i] < b) o.push(P[i]); o.push(at(b)); return o; }; // the line from a to b m along it
