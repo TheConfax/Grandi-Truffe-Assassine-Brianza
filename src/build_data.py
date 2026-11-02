@@ -960,11 +960,14 @@ prepare(bar_cut)
 # is comes from the map first (OSM's type where it drew the same line), then from where it stands: by the tracks, along a street, in an
 # industrial zone, in the fields; between houses it is a mix (wire mesh, hedge, low wall), the one choice not taken from the data
 _ctl_aiuole = None
+GATE02_MAX = 6.5; OSM_SOLO_D = 2.5; OSM_SOLO_MIN = 2.0   # a DBGT cancellata (EL_DIV_TY 02) up to GATE02_MAX m is a gate; an OSM barrier stretch farther than OSM_SOLO_D from every DBGT divider and at least OSM_SOLO_MIN long stays
+dbt_02 = []
 _dbt_i0 = _dbt_i1 = 0  # barriers[_dbt_i0:_dbt_i1] are the dividers of the DBGT
 if dbt_walls:
     nrep_, osm_in = 0, []
+    _osm_orig = {}   # the OSM barriers the DBGT replaces: the stretches the DBGT has no divider along come back below
     for i_, (pts, k_, h_) in enumerate(barriers):
-        if len(pts) >= 2 and dbt_cover.contains(LineString(pts).centroid): osm_in.append((LineString(pts).buffer(1.5), k_, h_)); barriers[i_] = ([], k_, h_); nrep_ += 1
+        if len(pts) >= 2 and dbt_cover.contains(LineString(pts).centroid): osm_in.append((LineString(pts).buffer(1.5), k_, h_)); _osm_orig[i_] = (pts, k_, h_); barriers[i_] = ([], k_, h_); nrep_ += 1
     _ot = STRtree([o[0] for o in osm_in]) if osm_in else None
     _rail_z = unary_union([l.buffer(12) for l in railL]) if railL else GeometryCollection()
     _street_z = unary_union([r['line'].buffer(r['w'] / 2 + 4, quad_segs=2) for r in raw_roads if r['c'] <= 4 and flat(r) and r['line'].length > 0.1]).intersection(dbt_cover)
@@ -996,7 +999,20 @@ if dbt_walls:
                 if kh[0] != 1 or kh[1] != AIUOLA_H: n_aiu[kh[0]] += 1
                 kh = (1, AIUOLA_H)
         barriers.append((pts, kh[0], round(kh[1], 1))); kinds_[kh[0]] += 1
+        if ty == '02' and not closed and 1.0 <= L.length <= GATE02_MAX and math.dist(pts[0], pts[-1]) >= 1.0: dbt_02.append((pts, kh[0], round(kh[1], 1)))
     _dbt_i1 = len(barriers)
+    # barriers only in OSM (Carlo, 1/11): where the DBGT has no divider along an OSM hedge or wall, this one is drawn (the DBGT does not map every one)
+    _dbt_z = unary_union([LineString(b_[0]).buffer(OSM_SOLO_D) for b_ in barriers[_dbt_i0:_dbt_i1] if len(b_[0]) >= 2]) if _dbt_i1 > _dbt_i0 else GeometryCollection()
+    prepare(_dbt_z); _osm_solo = Counter(); _osm_solo_m = Counter(); _osm_all_m = 0.0
+    for i_, (pts, k_, h_) in _osm_orig.items():
+        L0_ = LineString(pts); _osm_all_m += L0_.length
+        rest_ = L0_.difference(_dbt_z); keep_ = [r_ for r_ in (list(rest_.geoms) if hasattr(rest_, 'geoms') else [rest_]) if isinstance(r_, LineString) and r_.length >= OSM_SOLO_MIN]
+        if not keep_: continue
+        keep_.sort(key=lambda r_: -r_.length); barriers[i_] = (list(keep_[0].coords), k_, h_)
+        for r_ in keep_[1:]: barriers.append((list(r_.coords), k_, h_))
+        for r_ in keep_: _osm_solo[k_] += 1; _osm_solo_m[k_] += r_.length
+    log('barriere solo in OSM rimesse: tratti', dict(_osm_solo), 'metri', {k_: round(v_) for k_, v_ in _osm_solo_m.items()}, 'su', round(_osm_all_m), 'm di OSM sostituiti dal DBGT')
+    if STR: STR.rep['barriere_solo_osm'] = {'tratti': sum(_osm_solo.values()), 'metri': round(sum(_osm_solo_m.values())), 'per_tipo': {str(k_): round(v_) for k_, v_ in _osm_solo_m.items()}, 'metri_osm_nella_copertura': round(_osm_all_m)}
     log('dbgt: muri OSM sostituiti', nrep_, 'aggiunti', sum(kinds_.values()), 'per tipo', dict(kinds_), 'bordi di aiuole e vasche', nring, 'bordi di aiuola resi bassi (0,5 m) invece di', dict(n_aiu), 'aiuole DBGT', len(dbt_aiuole))
     _ctl_aiuole = {'aiuole_dbgt': len(dbt_aiuole), 'divisori_resi_cordolo_basso_per_tipo_di_prima': {str(k_): v_ for k_, v_ in n_aiu.items()}}
 # passi carrai: each DBGT driveway point within PC_D of a divider opens it PC_W wide and closes it with a gate as tall as the wall;
@@ -1020,6 +1036,17 @@ if dbt_pc:
         if any(_main_r[k].distance(L_.interpolate(s_)) < 2 for k in _mrt.query(L_.interpolate(s_).buffer(2))): continue
         hb_ = barriers[_dbi[j_]][2]; pc_gates.append(((a_.x, a_.y), (b_.x, b_.y), round(min(2.2, max(1.2, hb_)), 1), barriers[_dbi[j_]][1]))
     log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates))
+# cancellate DBGT (EL_DIV_TY 02) fino a GATE02_MAX m che danno su strada o cortile sono cancelli, anche senza un passo carraio (Carlo, 1/11)
+_c02 = Counter(); _prep_paved = [g_ for g_ in (asph, side, pedz, parking) if g_ is not None and not g_.is_empty]
+for pts_, k_, h_ in dbt_02:
+    L_ = LineString(pts_); a_, b_ = pts_[0], pts_[-1]; m_ = L_.interpolate(0.5, normalized=True)
+    if not inside((m_.x, m_.y), 0): _c02['fuori'] += 1; continue
+    if not any(g_.distance(L_) < 2.5 for g_ in _prep_paved): _c02['non_da_su_strada_o_cortile'] += 1; continue
+    if asph.contains(m_): _c02['in_carreggiata'] += 1; continue
+    if any(math.dist((m_.x, m_.y), ((p0_[0] + p1_[0]) / 2, (p0_[1] + p1_[1]) / 2)) < 2.0 for p0_, p1_, _h, _k in pc_gates): _c02['gia_passo_carraio'] += 1; continue
+    pc_cuts.append(L_.buffer(0.3, cap_style=2)); pc_gates.append((a_, b_, round(min(2.2, max(1.2, h_)), 1), k_)); _c02['cancelli'] += 1
+log('cancellate 02 corte -> cancelli', dict(_c02), 'su', len(dbt_02))
+if STR: STR.rep['cancelli_02'] = dict(_c02)
 # police stations (amenity=police): the door looks onto the street, so the barrier between them opens there, as wide as the door and its canopy
 # (src/barriere.py facciata_su_strada; the game finds the same front, and takes it from the POI: pois[].fr). Where no front looks onto a street
 # nothing is opened
@@ -1390,6 +1417,16 @@ for o, a, w in front_gates:
     if _cut_f.contains(m) and not any(r['line'].distance(m) < r['w'] / 2 + 0.8 for r in _drive): continue
     if any(math.dist((m.x, m.y), ((gg[0] + gg[2]) / 20, (gg[1] + gg[3]) / 20)) < 3 for gg in gate_out): continue
     gate_out.append([q(g0.x), q(g0.y), q(g1.x), q(g1.y), 'g', 1.6, 0]); ng += 1
+# a gate never stands in the carriageway (Carlo, 1/11, via delle Grigne): a gate of the DBGT or of the villas (flag 0, 'g') that falls on the asphalt is dropped
+def _gate_in_strada(g_):
+    G_ = LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)])
+    if _asph_in.intersects(G_) and _asph_in.intersection(G_).length > 0.3: return True
+    if _ucarr_in is not None and _ucarr_in.intersects(G_) and _ucarr_in.intersection(G_).length > 0.3: return True
+    return any(r_['c'] <= 5 and r_['line'].distance(G_) < r_['w'] / 2 - 0.2 for r_ in raw_roads if flat(r_) and not r_['x'] and r_['line'].distance(G_) < 12)
+_gtol = [(round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) for g_ in gate_out if g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and _gate_in_strada(g_)]
+gate_out = [g_ for g_ in gate_out if not (g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and (round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) in _gtol)]
+log('cancelli in carreggiata tolti', len(_gtol), _gtol[:30])
+if STR: STR.rep['cancelli_in_carreggiata_tolti'] = len(_gtol)
 log('villa frontages', nf, 'gates', ng, 'villas with pool', sum(1 for b, g in _vil if b['h'] >= 6.6))
 
 # ---- fountains
@@ -1941,6 +1978,11 @@ tiles = [{} for _ in range(ntx * ntz)]
 def tid(x, z): return min(ntx - 1, max(0, int((x + HW) // TILE))) + ntx * min(ntz - 1, max(0, int((z + HH) // TILE)))
 def tbox(t): i, j = t % ntx, t // ntx; return box(-HW + i * TILE, -HH + j * TILE, -HW + (i + 1) * TILE, -HH + (j + 1) * TILE)
 def push(t, k, v): tiles[t].setdefault(k, []).append(v)
+_sport_c = []   # centre of every sports pitch of the map: a stand looks at the nearest one, which may lie in the next tile (Carlo, 1/11)
+for k_, pts in land:
+    if k_.startswith('sport'):
+        try: c_ = Polygon(pts).buffer(0).centroid; _sport_c.append((c_.x, c_.y))
+        except Exception: pass
 for b in buildings + (ED.alti if ED else []):
     c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b.get('t', BTYPE.get(b.get('bt'), 0))}
     for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
@@ -1948,7 +1990,11 @@ for b in buildings + (ED.alti if ED else []):
     if b.get('k'): rec['k'] = [enc(h) for h in b['k']]
     if b.get('bt') in ('garage', 'garages'): rec['g'] = 1  # rows of up-and-over doors
     elif b.get('bt') == 'greenhouse': rec['g'] = 2  # glass
-    elif b.get('bt') == 'grandstand': rec['g'] = 3  # stepped seats under a roof
+    elif b.get('bt') == 'grandstand':  # stepped seats under a roof, looking at the nearest pitch of the whole map (pt, decimetres)
+        rec['g'] = 3
+        if _sport_c:
+            j_ = min(range(len(_sport_c)), key=lambda i_: math.dist(_sport_c[i_], c))
+            if math.dist(_sport_c[j_], c) < 150: rec['pt'] = [round(_sport_c[j_][0] * 10), round(_sport_c[j_][1] * 10)]
     elif b.get('wt'): rec['g'] = 4  # a water tower mapped as a building
     elif b.get('mn') in ('01', '02', '03'): rec['g'] = 5  # a cabin of the DBGT (dbgt_manufatti.py): its own model in paesaggio3.js
     if b.get('mm'): rec['mm'] = b['mm']  # the model of a manufatto and what the photos say of it (src/manufatti_foto.json)
