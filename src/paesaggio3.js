@@ -259,7 +259,7 @@ function* buildPaesaggio(T, G) {
   // stands by the pitches: rows of steps up to a back wall, seats on them, a roof reaching out over the front
   for (const B of T.bld) {
     if (B.g !== 3 || B.lm) continue; const Ax = lsAxis(B.pts), gy = Math.min(...B.pts.map(p => H.ground(p[0], p[1])));
-    let pitch = null, pd = 1e9; for (const L0 of d.ls || []) if (L0.s.startsWith('sport')) { const Q = dec(L0.p), [qx, qz] = centroid(Q), dd = hyp(qx - Ax.cx, qz - Ax.cz); if (dd < pd) { pd = dd; pitch = [qx, qz]; } }
+    let pitch = B.pt ? [B.pt[0] / 10, B.pt[1] / 10] : null, pd = 1e9; if (!pitch) for (const L0 of d.ls || []) if (L0.s.startsWith('sport')) { const Q = dec(L0.p), [qx, qz] = centroid(Q), dd = hyp(qx - Ax.cx, qz - Ax.cz); if (dd < pd) { pd = dd; pitch = [qx, qz]; } }
     const face = pitch && ((pitch[0] - Ax.cx) * Ax.nx + (pitch[1] - Ax.cz) * Ax.nz) < 0 ? -1 : 1, D_ = Ax.v1 - Ax.v0, rows = clamp(Math.floor(D_ / 0.85), 2, 14), Ls = Ax.s1 - Ax.s0, sm = (Ax.s0 + Ax.s1) / 2, ry = Math.atan2(Ax.ux, Ax.uz) - Math.PI / 2;
     const seat = ['#c8102e', '#1d4f9a', '#2a7a3a', '#e8b520', '#8f949a'][Math.floor(LS_HASH(Ax.cx, Ax.cz, 'seat') * 5)];
     for (let k = 0; k < rows; k++) { const v = face > 0 ? Ax.v1 - (k + 0.5) * D_ / rows : Ax.v0 + (k + 0.5) * D_ / rows, [x, z] = Ax.at(sm, v), hh = (k + 1) * 0.42; box(Ls, hh, D_ / rows, x, gy + hh / 2, z, '#b8b3a8', ry); box(Ls - 0.4, 0.12, 0.35, x, gy + hh + 0.06, z, seat, ry); }
