@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo correzioni-1-11 · dopo 00c9a6e · assemblato 02/11 03:18 · porta ' + location.port;
+    const txt = 'locale · ramo correzioni-1-11 · dopo 0ed93e8 · assemblato 02/11 03:26 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -5851,6 +5851,8 @@ function* buildPaesaggio(T, G) {
   }
   yield 'serre';
   // ---- the land
+  const stadia = new Map(); for (const L0 of d.ls || []) if (L0.s.startsWith('pista')) { const P0 = dec(L0.p); stadia.set(L0, P0.length > 6 ? lsStadium(P0) : null); }
+  const stadiaL = [...stadia.values()].filter(Boolean);
   for (const L0 of d.ls || []) {
     const P = dec(L0.p); if (P.length < 3) continue;
     const kind = L0.s, A = lsAxis(P), [cx, cz] = [A.cx, A.cz], h = LS_HASH(cx, cz, kind), area = Math.abs(sArea(P));
@@ -5928,43 +5930,17 @@ function* buildPaesaggio(T, G) {
         }
       }
       void ry;
-    } else if (kind === 'piscina') { // the stone round the water and a ladder
-      const gy = Math.min(...P.map(p => H.ground(p[0], p[1])));
-      try { const wb = Buf(); polyFill(wb, P, [], gy + 0.06, 10, COL('#5fb8d6')); mkMesh(wb, MAT.mark, 6, false, G); } catch (e) { }
-      const Ap = sArea(P);
-      for (let i = 0; i < P.length; i++) {
-        const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.1) continue; let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (Ap < 0) { nx = -nx; nz = -nz; }
-        box(L + 0.9, 0.12, 0.45, (a[0] + c[0]) / 2 + nx * 0.22, gy + 0.08, (a[1] + c[1]) / 2 + nz * 0.22, '#e8e2d4', Math.atan2(c[0] - a[0], c[1] - a[1]) - Math.PI / 2);
-      }
-      const [lx0, lz0] = P[0], [lx1, lz1] = P[1], lm = [(lx0 + lx1) / 2, (lz0 + lz1) / 2];
-      for (const o of [-0.25, 0.25]) { const ux = (lx1 - lx0) / (hyp(lx1 - lx0, lz1 - lz0) || 1), uz = (lz1 - lz0) / (hyp(lx1 - lx0, lz1 - lz0) || 1); cyl(0.025, 1.0, lm[0] + ux * o, gy + 0.6, lm[1] + uz * o, '#d9dcde', 6); }
-    } else if (kind === 'cani') { // a dog run: a mesh fence with a way in on the side nearest a street, a bench and a bin inside
+    } else if (kind === 'piscina') lsPool(P, A, drape, lines, solid);
+    else if (kind === 'cani') { // a dog run: a mesh fence with a way in on the side nearest a street, a bench and a bin inside
       let gate = 0, gd = 1e9; P.forEach((p, i) => { const q = P[(i + 1) % P.length], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let d = 1e9; ROADSEG.each(mx - 30, mz - 30, mx + 30, mz + 30, s => { d = Math.min(d, segDist(mx, mz, s.a[0], s.a[1], s.b[0], s.b[1])); }); if (d < gd && hyp(q[0] - p[0], q[1] - p[1]) > 3) { gd = d; gate = i; } });
       lsFence(net, solid, P, 1.2, gate, '#3e4a42');
       const [bx, bz] = A.at(A.s0 * 0.4, A.v0 * 0.4); if (inPoly(bx, bz, P)) { const gy = H.ground(bx, bz), ry = Math.atan2(A.ux, A.uz); const qx = bx + Math.sin(ry) * 1.4, qz = bz + Math.cos(ry) * 1.4; parkProps(G, 'panchina', [[bx, bz, ry, gy]]); parkProps(G, 'cestino', [[qx, qz, ry, H.ground(qx, qz)]]); } // knocked down like the street lamps (landmarks3.js)
-    } else if (kind.startsWith('pista')) { /* an athletics track: the ring of lanes inside the outline the map gives, whatever its shape, with the white lines between them */
-      if (area < 800 || P.length < 4) continue;
-      const LW = 1.22, grass = kind.endsWith('grass'), RED = COL(grass ? '#6b8f3e' : '#b5543f'), Wc = COL('#f4f2ea');
-      /* the outline resampled every 2.5 m and smoothed a little (the jogs of a hand-drawn outline would fold the offsets), then each lane is the same curve moved inward along its normal */
-      const S0 = lsResample(P, 2.5); let Sm = S0; for (let it = 0; it < 5; it++) Sm = Sm.map((p, i) => { const a_ = Sm[(i + Sm.length - 1) % Sm.length], c_ = Sm[(i + 1) % Sm.length]; return [(a_[0] + 2 * p[0] + c_[0]) / 4, (a_[1] + 2 * p[1] + c_[1]) / 4]; });
-      const sgn = sArea(Sm) < 0 ? -1 : 1, nrm = Sm.map((p, i) => { const a_ = Sm[(i + Sm.length - 1) % Sm.length], c_ = Sm[(i + 1) % Sm.length], tx = c_[0] - a_[0], tz = c_[1] - a_[1], l = hyp(tx, tz) || 1; return [tz / l * sgn, -tx / l * sgn]; }); /* outward normals */
-      const ringAt = k => Sm.map((p, i) => [p[0] - nrm[i][0] * LW * k, p[1] - nrm[i][1] * LW * k]), inside = R => R.filter(([x, z]) => !inPoly(x, z, P)).length <= 0.04 * R.length && Math.abs(sArea(R)) > 0.2 * area;
-      let lanes = 6; while (lanes > 1 && !inside(ringAt(lanes))) lanes--;
-      const rings = []; for (let k = 0; k <= lanes; k++) rings.push(ringAt(k));
-      const seg = (a, c, w, col, y) => { const L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) return; const n = Math.max(1, Math.ceil(L / 3)); for (let t = 0; t < n; t++) { const x0 = a[0] + (c[0] - a[0]) * t / n, z0 = a[1] + (c[1] - a[1]) * t / n, x1 = a[0] + (c[0] - a[0]) * (t + 1) / n, z1 = a[1] + (c[1] - a[1]) * (t + 1) / n, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, q = lines.p.length / 3; for (const [px, pz, o] of [[x0, z0, -w], [x1, z1, -w], [x1, z1, w], [x0, z0, w]]) vtx(lines, px - uz * o, y, pz + ux * o, 0, 1, 0, 0, 0, col); triUp(lines, q, q + 1, q + 2); triUp(lines, q, q + 2, q + 3); } };
-      for (let k = 0; k < lanes; k++) { const o = rings[k], inn = rings[k + 1]; for (let i = 0; i < o.length; i++) { const j = (i + 1) % o.length, n = Math.max(1, Math.ceil(hyp(o[j][0] - o[i][0], o[j][1] - o[i][1]) / 3)); for (let t = 0; t < n; t++) { const f0 = t / n, f1 = (t + 1) / n, q = drape.p.length / 3; for (const [A_, B_, f] of [[o[i], o[j], f0], [o[i], o[j], f1], [inn[i], inn[j], f1], [inn[i], inn[j], f0]]) vtx(drape, A_[0] + (B_[0] - A_[0]) * f, 0.045, A_[1] + (B_[1] - A_[1]) * f, 0, 1, 0, 0, 0, RED); drape.i.push(q, q + 1, q + 2, q, q + 2, q + 3, q, q + 2, q + 1, q, q + 3, q + 2); } } }
-      for (let k = 0; k <= lanes; k++) { const R_ = rings[k]; for (let i = 0; i < R_.length; i++) seg(R_[i], R_[(i + 1) % R_.length], k === 0 || k === lanes ? 0.06 : 0.04, Wc, 0.065); }
-      { const [a_, c_] = [rings[0][0], rings[lanes][0]]; seg(a_, c_, 0.08, Wc, 0.065); } /* the start line across the lanes at the first vertex */
+    } else if (kind.startsWith('pista')) { if (!lsTrack(kind, P, area, stadia.get(L0), drape, lines)) window.__PISTE_NEUTRE = (window.__PISTE_NEUTRE || 0) + 1; /* no stadium and no straight of lanes in the outline: nothing drawn */
     } else if (kind === 'aiuola') { // a flower bed: dark soil, flowers in the colours of a garden centre
       try { polyFill(drape, P, [], 0.06, 10, COL('#5a4030')); } catch (e) { }
       const n = Math.min(140, Math.floor(area * 1.5));
       for (let k = 0; k < n * 2 && k < 400; k++) { const x = A.cx + (LS_HASH(cx + k, cz, 'fl') - 0.5) * (A.s1 - A.s0 + A.v1 - A.v0), z = A.cz + (LS_HASH(cx, cz + k, 'fl') - 0.5) * (A.s1 - A.s0 + A.v1 - A.v0); if (!inPoly(x, z, P)) continue; const gy = H.ground(x, z); F0.geo(solid, new THREE.IcosahedronGeometry(0.13, 0).translate(x, gy + 0.22, z), null, COL(['#c8331f', '#f2c230', '#f4a6b8', '#ffffff', '#8c6bb1', '#ff7a1e', '#3d6a2a'][Math.floor(LS_HASH(x, z, 'c') * 7)])); }
-    } else if (kind === 'lavaggio') { // a self-service car wash: bays under one roof, walls between them, the coin box at the back of each
-      if (area > 1500 || onAnyRoad(cx, cz, 0)) continue;
-      const n = clamp(Math.floor((A.s1 - A.s0) / 4.5), 1, 6), w = n * 4.5, s0 = (A.s0 + A.s1) / 2 - w / 2, dp = Math.min(6, A.v1 - A.v0), vm = (A.v0 + A.v1) / 2, ry = Math.atan2(A.ux, A.uz), gy = H.ground(cx, cz);
-      const [rcx, rcz] = A.at(s0 + w / 2, vm); box(w + 0.4, 0.3, dp + 0.6, rcx, gy + 3.6, rcz, '#1d4f9a', ry - Math.PI / 2); box(w + 0.42, 0.12, dp + 0.62, rcx, gy + 3.4, rcz, '#e8e6e0', ry - Math.PI / 2);
-      for (let k = 0; k <= n; k++) { const [x, z] = A.at(s0 + k * 4.5, vm); box(0.15, 2.4, dp * 0.85, x, gy + 1.2, z, '#d9dcde', ry - Math.PI / 2); box(0.2, 3.5, 0.2, ...(() => { const [px, pz] = A.at(s0 + k * 4.5, vm + dp / 2); return [px, gy + 1.75, pz]; })(), '#8f949a'); solidAt(x, z, 0.3, 2.4); }
-      for (let k = 0; k < n; k++) { const [x, z] = A.at(s0 + k * 4.5 + 2.25, vm - dp / 2 + 0.4); box(0.6, 1.5, 0.4, x, gy + 0.75, z, '#3a3d40', ry); }
+    } else if (kind === 'lavaggio') { if (area > 1500 || onAnyRoad(cx, cz, 0)) continue; lsWash(A, P, drape, solid, box, solidAt);
     } else if (kind.startsWith('torre_acqua')) { lsTower(solid, cx, cz, Math.sqrt(area / Math.PI), +kind.split(':')[1] || 28, solidAt);
     } else if (kind.startsWith('sport:skateboard')) lsSkate(A, P, drape, solid, box, solidAt);
     else if (kind.startsWith('sport:roller') || kind.startsWith('sport:ice')) lsRink(A, P, kind.startsWith('sport:ice'), drape, lines, solid, box, solidAt);
@@ -5975,7 +5951,7 @@ function* buildPaesaggio(T, G) {
       const ry = Math.atan2(A.ux, A.uz);
       for (const f of [-0.25, 0.25]) { const [x, z] = A.at((A.s0 + A.s1) / 2 + (A.s1 - A.s0) * f, (A.v0 + A.v1) / 2), gy = H.ground(x, z); for (const o of [-1.5, 1.5]) box(0.12, 1.3, 0.12, x + Math.cos(ry) * o, gy + 0.65, z - Math.sin(ry) * o, '#f4f2ea'); for (const y of [0.5, 0.9]) box(3, 0.08, 0.08, x, gy + y, z, y > 0.7 ? '#c8331f' : '#f4f2ea', ry + Math.PI / 2); }
     } else if (kind.startsWith('sport:baseball')) lsBaseball(P, drape, lines, net, solid, box, solidAt);
-    else if (kind.startsWith('sport:')) lsPitch(A, P, kind.split(':')[1], kind.split(':')[2], lines, solid, box, cyl, G, solidAt);
+    else if (kind.startsWith('sport:')) lsPitch(A, P, kind.split(':')[1], kind.split(':')[2], lines, solid, box, cyl, G, solidAt, stadiaL);
   }
   // stands by the pitches: rows of steps up to a back wall, seats on them, a roof reaching out over the front
   for (const B of T.bld) {
@@ -6203,13 +6179,121 @@ function lsRange(A, P, solid, box, solidAt) {
   for (let v = A.v0 + 0.8; v <= A.v1 - 0.8; v += 1.2) { const [qx, qz] = A.at(sE + 1.4, v); solidAt(qx, qz, 0.8, 2.6); }
   for (let k = 0; k < lanes; k++) { const v = A.v0 + 0.8 + (k + 0.5) * lw, [x, y, z] = at(sE - 1.0, v); box(0.05, 1.5, 0.05, x - 0.3, y + 0.75, z, '#7d8288'); box(0.05, 1.5, 0.05, x + 0.3, y + 0.75, z, '#7d8288'); box(0.04, 0.9, 0.62, x, y + 1.0, z, '#f4f2ea', ry + Math.PI / 2); box(0.045, 0.3, 0.3, x, y + 1.0, z, '#2a2d30', ry + Math.PI / 2); solidAt(x, z, 0.4, 1.5); } /* a target frame per lane */
 }
+// an outline moved d metres inward, with as many points as it had when it is a plain rectangle (mitred), else resampled and smoothed a little so the
+// bends of a free-form shape do not fold; null when it has run out of room
+function lsInset(P, d) {
+  if (P.length <= 6) { const R = lsGrow(P, -d); return Math.abs(sArea(R)) > 0.15 * Math.abs(sArea(P)) && sArea(R) * sArea(P) > 0 && R.every(([x, z]) => inPoly(x, z, P)) ? R : null; }
+  let S = lsResample(P, 1.2); for (let it = 0; it < 2; it++) S = S.map((p, i) => { const a = S[(i + S.length - 1) % S.length], c = S[(i + 1) % S.length]; return [(a[0] + 2 * p[0] + c[0]) / 4, (a[1] + 2 * p[1] + c[1]) / 4]; });
+  const sg = sArea(S) < 0 ? -1 : 1, R = S.map((p, i) => { const a = S[(i + S.length - 1) % S.length], c = S[(i + 1) % S.length], tx = c[0] - a[0], tz = c[1] - a[1], l = hyp(tx, tz) || 1; return [p[0] - tz / l * sg * d, p[1] + tx / l * sg * d]; });
+  return Math.abs(sArea(R)) > 0.1 * Math.abs(sArea(P)) && R.filter(([x, z]) => !inPoly(x, z, P)).length <= 0.03 * R.length ? R : null;
+}
+// a swimming pool: stone coping all round, the water in three bands going darker towards the middle, lane lines when it is long and straight, steel ladders
+function lsPool(P, A, drape, lines, solid) {
+  const F0 = lmFrame(new THREE.Matrix4()), area = Math.abs(sArea(P)), STONE = COL('#e9e4d6'); if (area < 4) return;
+  const o0 = P.length <= 6 ? P : lsResample(P, 1.2), i0 = lsInset(P, 0.5); if (!i0) { try { polyFill(drape, P, [], 0.06, 10, COL('#4aa9cc')); } catch (e) { } return; }
+  const ring = (R1, R2, col, y) => { const n = Math.min(R1.length, R2.length); for (let i = 0; i < n; i++) { const j = (i + 1) % n, q = drape.p.length / 3; for (const p of [R1[i], R1[j], R2[j], R2[i]]) vtx(drape, p[0], y, p[1], 0, 1, 0, 0, 0, col); drape.i.push(q, q + 1, q + 2, q, q + 2, q + 3, q, q + 2, q + 1, q, q + 3, q + 2); } };
+  const outer = P.length <= 6 ? lsGrow(P, 0.35) : (lsInset(P, -0.35) || o0), polyOut = P.length <= 6 ? outer : outer;
+  if (outer.length === i0.length) ring(outer, i0, STONE, 0.055);
+  const bands = [[0.5, '#6cc6df', 0.058], [1.5, '#4aaed0', 0.061], [3.0, '#2f93bd', 0.064]]; let last = i0;
+  try { polyFill(drape, i0, [], 0.058, 10, COL('#6cc6df')); } catch (e) { }
+  for (const [d, col, y] of bands.slice(1)) { const r = lsInset(P, d); if (!r) break; try { polyFill(drape, r, [], y, 10, COL(col)); last = r; } catch (e) { break; } }
+  void polyOut; void last;
+  const rect = P.length <= 6 && isConvex(P), L = A.s1 - A.s0, W = A.v1 - A.v0; /* lane lines along a long straight pool */
+  if (rect && L >= 18 && W >= 7) { const lanes = Math.floor((W - 1.2) / 2.2); for (let k = 1; k < lanes; k++) { const v = A.v0 + 0.6 + (W - 1.2) * k / lanes; lsSeg(lines, A.at(A.s0 + 0.9, v), A.at(A.s1 - 0.9, v), 0.07, COL('#1f5f8a'), 0.07); } for (let k = 0; k < lanes; k++) { const v = A.v0 + 0.6 + (W - 1.2) * (k + 0.5) / lanes; for (const s of [A.s0 + 0.9, A.s1 - 0.9]) lsSeg(lines, A.at(s - 0.0, v - 0.4), A.at(s - 0.0, v + 0.4), 0.06, COL('#1f5f8a'), 0.07); } }
+  const nl = P.length, pick = rect ? [0, 2] : [0]; /* ladders at the middle of an edge */
+  for (const e of pick) { const a = P[e % nl], c = P[(e + 1) % nl], L1 = hyp(c[0] - a[0], c[1] - a[1]); if (L1 < 1.5) continue; const ux = (c[0] - a[0]) / L1, uz = (c[1] - a[1]) / L1, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, gy = H.ground(mx, mz);
+    for (const o of [-0.25, 0.25]) { const x = mx + ux * o, z = mz + uz * o; lsRod(solid, [x, gy + 0.9, z], [x, gy - 0.05, z], 0.022, '#d9dcde', 6); }
+    for (const y of [0.2, 0.5, 0.8]) lsRod(solid, [mx - ux * 0.25, gy + y, mz - uz * 0.25], [mx + ux * 0.25, gy + y, mz + uz * 0.25], 0.015, '#d9dcde', 6); }
+  void F0;
+}
+// a self-service car wash on its outline: a concrete slab, a back wall the length of the bays, a wall between the bays, a flat steel roof on posts over them,
+// a lance post and a pay box in each bay (the lance on the back wall, the box by the wall at the side), a drain along the middle; open on the side towards the street
+function lsWash(A, P, drape, solid, box, solidAt) {
+  const L = A.s1 - A.s0, W = A.v1 - A.v0; if (L < 3.5 || W < 4) return;
+  try { polyFill(drape, P, [], 0.05, 10, COL('#8d9094')); } catch (e) { return; }
+  const ry = Math.atan2(A.ux, A.uz), n = clamp(Math.floor(L / 3.6), 1, 8), bw = Math.min(3.8, L / n), w = n * bw, s0 = (A.s0 + A.s1) / 2 - w / 2, dp = Math.min(6.2, W - 0.6);
+  let dN = 1e9, dS = 1e9; for (const sg of [1, -1]) { const [x, z] = A.at((A.s0 + A.s1) / 2, (sg > 0 ? A.v1 : A.v0) + sg * 3); let d = 1e9; ROADSEG.each(x - 40, z - 40, x + 40, z + 40, s => { d = Math.min(d, segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1])); }); if (sg > 0) dN = d; else dS = d; }
+  const front = dN < dS ? 1 : -1, vb = front > 0 ? A.v0 + 0.3 : A.v1 - 0.3, vf = vb + front * dp, vmid = (vb + vf) / 2; /* the open side is the one towards the street */
+  const at = (s, v) => { const [x, z] = A.at(s, v); return [x, H.ground(x, z), z]; };
+  const wallDisc = (s, v0, v1, h) => { const n2 = Math.max(1, Math.ceil(Math.abs(v1 - v0) / 0.6)); for (let k = 0; k <= n2; k++) { const [x, z] = A.at(s, v0 + (v1 - v0) * k / n2); solidAt(x, z, 0.2, h); } };
+  { const [x, y, z] = at(s0 + w / 2, vb); box(w + 0.3, 3.0, 0.25, x, y + 1.5, z, '#c9c4b8', ry - Math.PI / 2); for (let s = s0; s <= s0 + w; s += 0.6) { const [qx, qz] = A.at(s, vb); solidAt(qx, qz, 0.25, 3.0); } } /* the back wall */
+  for (let k = 0; k <= n; k++) { const s = s0 + k * bw, [x, y, z] = at(s, vb + front * dp * 0.35); box(0.2, 2.6, dp * 0.7, x, y + 1.3, z, '#d9dcde', ry); wallDisc(s, vb, vb + front * dp * 0.7, 2.6); /* a wall between bays, from the back */
+    const [px, py, pz] = at(s, vf); box(0.22, 3.8, 0.22, px, py + 1.9, pz, '#7d8288'); solidAt(px, pz, 0.25, 3.8); } /* the post of the roof at the front */
+  { const [x, y, z] = at(s0 + w / 2, vmid + front * 0.2); box(w + 0.6, 0.22, dp + 0.9, x, y + 3.85, z, '#e8e6e0', ry - Math.PI / 2); box(w + 0.62, 0.3, 0.12, ...(() => { const [fx, fy, fz] = at(s0 + w / 2, vf + front * 0.45); return [fx, fy + 3.78, fz]; })(), '#1d4f9a', ry - Math.PI / 2); } /* the roof and a coloured fascia at its edge */
+  for (let k = 0; k < n; k++) {
+    const sm = s0 + (k + 0.5) * bw, [dx, dy, dz] = at(sm, vmid); box(0.14, 0.02, dp * 0.8, dx, dy + 0.02, dz, '#3a3d40', ry); /* the drain */
+    const [lx, ly, lz] = at(sm, vb + front * 0.5); box(0.5, 1.2, 0.2, lx, ly + 1.3, lz, '#3a3d40', ry - Math.PI / 2); lsRod(solid, [lx, ly + 2.4, lz], [lx, ly + 1.0, lz + A.uz * 0 + (front > 0 ? 0.25 : -0.25) * A.nz], 0.03, '#c9a227', 6); /* the panel on the back wall, the lance hanging from it */
+    const [cx, cy, cz] = at(sm + bw / 2 - 0.4, vb + front * 1.6); box(0.5, 1.4, 0.3, cx, cy + 0.7, cz, '#8f949a', ry - Math.PI / 2); box(0.3, 0.25, 0.04, cx, cy + 1.15, cz, '#c9a227', ry - Math.PI / 2); solidAt(cx, cz, 0.3, 1.4); /* the pay box by the wall */
+  }
+  { const [x, y, z] = at(s0 + w + 1.4, vf - front * 0.6); if (inPoly(x, z, P)) { box(0.5, 1.8, 0.5, x, y + 0.9, z, '#8f949a'); solidAt(x, z, 0.4, 1.8); } } /* a vacuum post at the end */
+}
+// ---- athletics tracks. The outline of a track in the map is the oval and whatever hangs on it (run-ups, a straight of 100 m, jumping pits): the stadium
+// (two straights and two half circles) is found in it by fitting two circles of the same radius to the points of the outline; what does not lie on them is
+// ignored. A track that has no oval in it (a straight strip of lanes) is a rectangle of lanes. Nothing credible to draw: nothing drawn
+const LS_LANE = 1.22, LS_LANES = 6;
+function lsFitCircle(pts, idx) { /* least squares circle (Kasa) through the points idx */
+  let sx = 0, sz = 0, n = idx.length; for (const i of idx) { sx += pts[i][0]; sz += pts[i][1]; } const mx = sx / n, mz = sz / n; let suu = 0, svv = 0, suv = 0, suuu = 0, svvv = 0, suvv = 0, svuu = 0;
+  for (const i of idx) { const u = pts[i][0] - mx, v = pts[i][1] - mz; suu += u * u; svv += v * v; suv += u * v; suuu += u * u * u; svvv += v * v * v; suvv += u * v * v; svuu += v * u * u; }
+  const det = suu * svv - suv * suv; if (Math.abs(det) < 1e-9) return null; const uc = (svv * (suuu + suvv) - suv * (svvv + svuu)) / (2 * det), vc = (suu * (svvv + svuu) - suv * (suuu + suvv)) / (2 * det);
+  return { x: mx + uc, z: mz + vc, r: Math.sqrt(uc * uc + vc * vc + (suu + svv) / n) };
+}
+function lsStadium(P) { /* { c1, c2, r, ux, uz } or null */
+  const pts = lsResample(P, 1.0); if (pts.length < 60) return null; let seed = Math.floor(Math.abs(P[0][0] * 7 + P[0][1] * 13) * 10) % 2147483647 || 1; const rnd = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+  const find = (mask, rWant) => {
+    let best = null; const ids = []; pts.forEach((_, i) => { if (mask[i]) ids.push(i); }); if (ids.length < 30) return null;
+    for (let t = 0; t < 1500; t++) {
+      const a = pts[ids[Math.floor(rnd() * ids.length)]], b = pts[ids[Math.floor(rnd() * ids.length)]], c = pts[ids[Math.floor(rnd() * ids.length)]];
+      const d = 2 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1])); if (Math.abs(d) < 1e-6) continue;
+      const ux = ((a[0] ** 2 + a[1] ** 2) * (b[1] - c[1]) + (b[0] ** 2 + b[1] ** 2) * (c[1] - a[1]) + (c[0] ** 2 + c[1] ** 2) * (a[1] - b[1])) / d, uz = ((a[0] ** 2 + a[1] ** 2) * (c[0] - b[0]) + (b[0] ** 2 + b[1] ** 2) * (a[0] - c[0]) + (c[0] ** 2 + c[1] ** 2) * (b[0] - a[0])) / d, r = hyp(a[0] - ux, a[1] - uz);
+      if (r < 9 || r > 85 || (rWant && Math.abs(r - rWant) > 0.15 * rWant)) continue;
+      let n = 0; for (const i of ids) if (Math.abs(hyp(pts[i][0] - ux, pts[i][1] - uz) - r) < 0.8) n++;
+      if (!best || n > best.n) best = { x: ux, z: uz, r, n };
+    }
+    if (!best || best.n < 25) return null;
+    const inl = ids.filter(i => Math.abs(hyp(pts[i][0] - best.x, pts[i][1] - best.z) - best.r) < 0.8), f = lsFitCircle(pts, inl); /* refined on its inliers */
+    if (f && Math.abs(f.r - best.r) < 3) { best.x = f.x; best.z = f.z; best.r = f.r; }
+    best.in = pts.map((p, i) => mask[i] && Math.abs(hyp(p[0] - best.x, p[1] - best.z) - best.r) < 1.0); return best;
+  };
+  const all = pts.map(() => true), c1 = find(all); if (!c1) return null;
+  const m2 = pts.map((_, i) => !c1.in[i] && hyp(pts[i][0] - c1.x, pts[i][1] - c1.z) > c1.r * 0.5), c2 = find(m2, c1.r); if (!c2) return null;
+  const d = hyp(c2.x - c1.x, c2.z - c1.z); if (d < 6) return null;
+  const r = (c1.r + c2.r) / 2, ux = (c2.x - c1.x) / d, uz = (c2.z - c1.z) / d, S = { c1: [c1.x, c1.z], c2: [c2.x, c2.z], r, ux, uz, nx: -uz, nz: ux, d };
+  let near = 0; for (const p of pts) { const s = clamp((p[0] - c1.x) * ux + (p[1] - c1.z) * uz, 0, d), px = c1.x + ux * s, pz = c1.z + uz * s; if (Math.abs(hyp(p[0] - px, p[1] - pz) - r) < 1.5) near++; }
+  return near >= 0.55 * pts.length && r > LS_LANE * 2 + 3 ? S : null;
+}
+function lsInStadium(S, x, z, rho) { const s = clamp((x - S.c1[0]) * S.ux + (z - S.c1[1]) * S.uz, 0, S.d); return hyp(x - S.c1[0] - S.ux * s, z - S.c1[1] - S.uz * s) <= rho; }
+function lsStadiumRing(S, rho, M = 18) { /* the stadium curve of radius rho: a half circle at c2, then one at c1; the straights are the closing edges */
+  const out = []; for (const [c, a0] of [[S.c2, -Math.PI / 2], [S.c1, Math.PI / 2]]) for (let i = 0; i <= M; i++) { const a = a0 + Math.PI * i / M, ca = Math.cos(a), sa = Math.sin(a); out.push([c[0] + rho * (ca * S.ux + sa * S.nx), c[1] + rho * (ca * S.uz + sa * S.nz)]); }
+  return out;
+}
+function lsTrack(kind, P, area, S, drape, lines) {
+  const grass = kind.endsWith('grass'), RED = COL(grass ? '#6b8f3e' : '#b5543f'), Wc = COL('#f4f2ea');
+  const quad = (a, b, c, d, col, y) => { const q = drape.p.length / 3; for (const p of [a, b, c, d]) vtx(drape, p[0], y, p[1], 0, 1, 0, 0, 0, col); drape.i.push(q, q + 1, q + 2, q, q + 2, q + 3, q, q + 2, q + 1, q, q + 3, q + 2); };
+  const strip = (R1, R2, col, y) => { const n = R1.length; for (let i = 0; i < n; i++) { const j = (i + 1) % n, L = Math.max(hyp(R1[j][0] - R1[i][0], R1[j][1] - R1[i][1]), hyp(R2[j][0] - R2[i][0], R2[j][1] - R2[i][1])), k = Math.max(1, Math.ceil(L / 3)); for (let t = 0; t < k; t++) { const f0 = t / k, f1 = (t + 1) / k, mix = (A_, B_, f) => [A_[0] + (B_[0] - A_[0]) * f, A_[1] + (B_[1] - A_[1]) * f]; quad(mix(R1[i], R1[j], f0), mix(R1[i], R1[j], f1), mix(R2[i], R2[j], f1), mix(R2[i], R2[j], f0), col, y); } } };
+  if (S) { /* the stadium: six lanes of constant width inside the outer radius */
+    const lanes = Math.min(LS_LANES, Math.floor((S.r - 3) / LS_LANE)), rings = []; for (let k = 0; k <= lanes; k++) rings.push(lsStadiumRing(S, S.r - k * LS_LANE));
+    for (let k = 0; k < lanes; k++) strip(rings[k], rings[k + 1], RED, 0.045);
+    for (let k = 0; k <= lanes; k++) { const R_ = rings[k]; for (let i = 0; i < R_.length; i++) lsSeg(lines, R_[i], R_[(i + 1) % R_.length], k === 0 || k === lanes ? 0.06 : 0.04, Wc, 0.065); }
+    const f = [S.c1[0] + S.ux * S.d * 0.5 + S.nx * (S.r), S.c1[1] + S.uz * S.d * 0.5 + S.nz * S.r], g = [S.c1[0] + S.ux * S.d * 0.5 + S.nx * (S.r - lanes * LS_LANE), S.c1[1] + S.uz * S.d * 0.5 + S.nz * (S.r - lanes * LS_LANE)]; lsSeg(lines, f, g, 0.08, Wc, 0.065); /* the finish line across the lanes, on the straight */
+    return true;
+  }
+  const A = lsRect(P); if (!A) return false; const L = A.s1 - A.s0, W = A.v1 - A.v0; if (L < 20 || W < 2.4 || L < 2.5 * W) return false; /* a straight of lanes */
+  const lanes = clamp(Math.round(W / LS_LANE), 1, 8), lw = W / lanes, c = (s, v) => A.at(s, v);
+  quad(c(A.s0, A.v0), c(A.s1, A.v0), c(A.s1, A.v1), c(A.s0, A.v1), RED, 0.045);
+  for (let k = 0; k <= lanes; k++) lsSeg(lines, c(A.s0, A.v0 + lw * k), c(A.s1, A.v0 + lw * k), k === 0 || k === lanes ? 0.06 : 0.04, Wc, 0.065);
+  for (const s of [A.s0 + 0.15, A.s1 - 0.15]) lsSeg(lines, c(s, A.v0), c(s, A.v1), 0.06, Wc, 0.065);
+  return true;
+}
 // a net that is a net: thin pale threads on clear cloth (goals, hoops, tennis and volleyball), unlike the dark fence mesh
 const LS_RETE = new THREE.MeshLambertMaterial({ map: canvasTex(32, 32, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#eceff0'; g.fillRect(0, 0, w, 3); g.fillRect(0, 0, 3, h); }), alphaTest: 0.12, side: THREE.DoubleSide, color: 0xffffff });
 // ---- pitches: the lines of the game the map says, and the gear of that game in its place (frame = the minimum rectangle of the polygon):
 // goals at the middle of the two SHORT sides, on the end line, net behind them and inside the polygon; hoops on the short sides too;
 // a net across the middle of a tennis or volleyball court. Only the sport the map names (the first of a list), nothing mixed on top of it
-function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
-  const A = lsRect(P); if (!A) return;
+function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt, stadiaL = []) {
+  let A = lsRect(P); if (!A) return;
+  for (const S of stadiaL) if (lsInStadium(S, A.cx, A.cz, S.r)) { /* a pitch inside a track stays inside its lanes: shrunk until its corners are */
+    const rho = S.r - LS_LANES * LS_LANE - 1.4; let k = 1; for (; k > 0.45; k -= 0.02) { const hs = (A.s1 - A.s0) / 2 * k, hv = (A.v1 - A.v0) / 2 * k; if ([[-hs, -hv], [hs, -hv], [hs, hv], [-hs, hv], [0, -hv], [0, hv]].every(([a, b]) => { const [x, z] = A.at(a, b); return lsInStadium(S, x, z, rho); })) break; }
+    if (k < 1) A = { ...A, s0: A.s0 * k, s1: A.s1 * k, v0: A.v0 * k, v1: A.v1 * k }; break; }
   const W = COL('#f4f2ea'), Ls = A.s1 - A.s0, Wv = A.v1 - A.v0, sm = 0, vm = 0;
   if (Ls < 6 || Wv < 4) return;
   const S = (a, b) => A.at(sm + a, vm + b), line = (a0, b0, a1, b1, w = 0.1) => lsLine(lines, A, sm + a0, vm + b0, sm + a1, vm + b1, w, W);
