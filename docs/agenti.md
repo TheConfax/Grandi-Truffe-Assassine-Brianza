@@ -11,6 +11,7 @@ Leggi questo, `CLAUDE.md` e solo le parti di `docs/motore.md` che servono al tuo
 - Python: `C:/Users/theco/GitHub/GTA-Brianza/.venv/Scripts/python.exe` (pacchetti mancanti: installali nella venv).
 
 ## Regole
+- Se ti manca un'informazione, chiedi prima di indovinare (Carlo, 2/11): `SendMessage` con `to: "main"`, una domanda corta, poi continua con quello che non dipende dalla risposta. Vale anche per il compito se ti sembra sbagliato o inutile.
 - Ramo tuo da `origin/dev` in una worktree nella tua scratchpad. Mai nella cartella principale, mai `main`.
 - Build e terreno solo col gettone (vedi `CLAUDE.md`).
 - Niente dati inventati: forme e quote dal DBGT, nomi e attributi da OSM, aspetto da ortofoto o foto; dove non si sa, neutro. Niente regole o coordinate scritte per un comune: regole generali.
