@@ -44,15 +44,25 @@ const FOTO_SKY = (() => {
   s.scale.setScalar(SKY_R * 1.6); s.renderOrder = -100; s.frustumCulled = false; scene.add(s);
   const probe = new THREE.Mesh(s.geometry, Object.assign(m.clone(), { uniforms: m.uniforms, blending: THREE.NoBlending })); probe.scale.copy(s.scale); probe.frustumCulled = false;
   const ps = new THREE.Scene(); ps.add(probe);
-  return { s, probe, ps, rt: new THREE.WebGLRenderTarget(8, 2), cam: new THREE.PerspectiveCamera(12, 4, 1, SKY_R * 2), px: new Uint8Array(64), col: new THREE.Color(0xc9ced4), zen: new THREE.Color(0x6f8fbf), t: -1e9, tod: -1, yaw: 0, a: 0 };
+  return { s, probe, ps, rt: new THREE.WebGLRenderTarget(8, 2), cam: new THREE.PerspectiveCamera(12, 4, 1, SKY_R * 2), px: new Uint8Array(64), att: [], pbo: [], col: new THREE.Color(0xc9ced4), zen: new THREE.Color(0x6f8fbf), t: -1e9, tod: -1, yaw: 0, a: 0 };
 })();
 function fotoSkyHorizon() { // the mean colour of the sky just over the horizon ahead (linear, before the filmic curve: as the fog needs it)
   const F = FOTO_SKY, d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z);
   F.probe.position.copy(camera.position); F.cam.position.copy(camera.position); F.cam.lookAt(camera.position.x + d.x, camera.position.y + Math.tan(0.05) * Math.hypot(d.x, d.z), camera.position.z + d.z);
-  const was = renderer.getRenderTarget(), read = c => { renderer.setRenderTarget(F.rt); renderer.render(F.ps, F.cam); renderer.readRenderTargetPixels(F.rt, 0, 0, 8, 2, F.px); let r = 0, g = 0, b = 0; for (let i = 0; i < 16; i++) { r += F.px[i * 4]; g += F.px[i * 4 + 1]; b += F.px[i * 4 + 2]; } c.setRGB(r / 4080, g / 4080, b / 4080); };
+  const gl = renderer.getContext(), asinc = renderer.capabilities.isWebGL2 && F.t > 0, leggi = (c, px) => { let r = 0, g = 0, b = 0; for (let i = 0; i < 16; i++) { r += px[i * 4]; g += px[i * 4 + 1]; b += px[i * 4 + 2]; } c.setRGB(r / 4080, g / 4080, b / 4080); };
+  if (asinc && F.att.length) { F.t = performance.now(); return; } /* the last answer has not come yet: no second question on top of it */
+  const was = renderer.getRenderTarget(), read = c => { renderer.setRenderTarget(F.rt); renderer.render(F.ps, F.cam);
+    if (!asinc) { renderer.readRenderTargetPixels(F.rt, 0, 0, 8, 2, F.px); leggi(c, F.px); return; } /* the first of all, before the first frame: it can wait */
+    /* a read from the GPU waits for all the GPU has yet to draw, 20 ms and more twice a second: asked here, the answer is picked up a frame or two later (fotoSkyArrivi) */
+    const pbo = F.pbo.pop() || gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, 64, gl.STREAM_READ); gl.readPixels(0, 0, 8, 2, gl.RGBA, gl.UNSIGNED_BYTE, 0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    F.att.push({ c, pbo, s: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0), leggi }); gl.flush(); };
   read(F.col);
   F.cam.lookAt(camera.position.x + d.x * 0.6, camera.position.y + 1, camera.position.z + d.z * 0.6); read(F.zen); // and higher up, for the panes
   renderer.setRenderTarget(was); F.t = performance.now(); F.tod = TOD; F.yaw = yaw;
+}
+function fotoSkyArrivi() { // the answers that have come: the colours, a frame or two after the question
+  const F = FOTO_SKY, A = F.att; if (!A.length) return; const gl = renderer.getContext();
+  while (A.length) { const q = A[0], st = gl.clientWaitSync(q.s, 0, 0); if (st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) return; gl.deleteSync(q.s); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, q.pbo); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, F.px); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); q.leggi(q.c, F.px); F.pbo.push(q.pbo); A.shift(); }
 }
 const _fotoV = new THREE.Vector3();
 // in linear light the sky's fill counts for less than in the old sums, and the fog took the curve's warm cast: more fill in the
@@ -68,7 +78,7 @@ const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
       F.a = clamp((L.elDeg + 7) / 9, 0, 1) * (1 - 0.95 * clamp((WX.cloud - 0.25) / 0.55, 0, 1)) * (1 - WX.fog);
       F.s.material.uniforms.uSkyA.value = F.a; F.s.visible = F.a > 0.01;
       F.s.material.uniforms.uSkyS.value = 1.2 + 0.6 * clamp(L.elDeg / 15, 0, 1); // less boost with the sun low: twilight would turn teal
-      if (F.s.visible) {
+      if (F.s.visible) { fotoSkyArrivi();
         const d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z), dy = Math.abs(((yaw - F.yaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
         if (performance.now() - F.t > 500 || Math.abs(TOD - F.tod) > 0.05 || dy > 0.4) fotoSkyHorizon();
       }

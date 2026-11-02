@@ -717,7 +717,7 @@ function clipDrape(b, hf, ro, mat) {
   const P = b.p, ab = b.ab || [], nv = P.length / 3, I = b.i, hasC = b.c.length === P.length;
   let bx0 = 1e9, bz0 = 1e9, bx1 = -1e9, bz1 = -1e9; for (let v = 0; v < nv; v++) { const x = P[v * 3], z = P[v * 3 + 2]; if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (z < bz0) bz0 = z; if (z > bz1) bz1 = z; }
   if (!H.anyFine() || b.noclip || !nv || !H.anyFineIn(bx0, bz0, bx1, bz1)) { /* no tile of S under the buffer (outside Meda): the old drape, without cutting every triangle for nothing */ for (let v = 0; v < nv; v++) if (!ab[v]) P[v * 3 + 1] += hf(P[v * 3], P[v * 3 + 2]); return; } // noclip: thin strips over a smooth S (rails), each vertex on it
-  const o = { p: [], n: [], uv: [], c: [], i: [] }, remap = new Int32Array(nv).fill(-1);
+  const o = Buf(), remap = new Int32Array(nv).fill(-1);
   const keep = v => { let r = remap[v]; if (r < 0) { r = remap[v] = o.p.length / 3; o.p.push(P[v * 3], ab[v] ? P[v * 3 + 1] : P[v * 3 + 1] + hf(P[v * 3], P[v * 3 + 2]), P[v * 3 + 2]); o.n.push(b.n[v * 3], b.n[v * 3 + 1], b.n[v * 3 + 2]); o.uv.push(b.uv[v * 2], b.uv[v * 2 + 1]); if (hasC) o.c.push(b.c[v * 3], b.c[v * 3 + 1], b.c[v * 3 + 2]); } return r; };
   // the attributes of a source triangle as affine functions of (x, z): relative height, normal, uv, colour; pieces of triangles with the same
   // functions on the same cell triangle are joined again (the two halves of a quad, the quads of a strip, strips of one colour)
@@ -729,7 +729,7 @@ function clipDrape(b, hf, ro, mat) {
       const x = p[0], z = p[1], l1 = ((cz - dz) * (x - dx) + (dx - cx) * (z - dz)) / den, l2 = ((dz - az) * (x - dx) + (ax - dx) * (z - dz)) / den, l3 = 1 - l1 - l2;
       const yr = l1 * P[a * 3 + 1] + l2 * P[c * 3 + 1] + l3 * P[d * 3 + 1];
       o.p.push(x, yr + (F ? (b.free ? H.overFree(x, z, p[2]) : p[2]) : hf(x, z)), z);
-      for (const [A, s, o0, m] of attrs.slice(1)) { const D = A === b.n ? o.n : A === b.uv ? o.uv : o.c; for (let e = o0; e < o0 + m; e++) D.push(l1 * A[a * s + e] + l2 * A[c * s + e] + l3 * A[d * s + e]); }
+      for (let q_ = 1; q_ < attrs.length; q_++) { const [A, s, o0, m] = attrs[q_], D = A === b.n ? o.n : A === b.uv ? o.uv : o.c; for (let e = o0; e < o0 + m; e++) D.push(l1 * A[a * s + e] + l2 * A[c * s + e] + l3 * A[d * s + e]); }
     }
     return q0;
   };
@@ -1208,7 +1208,7 @@ function waterInBed(a, outer, holes, T) {
   if (tot >= 4) return bed >= tot * 0.3;
   const pts = [...outer, centroid(outer)]; return pts.filter(([x, z]) => bedC(clamp(Math.floor((z - F.z0) / F.st), 0, c - 1) * c + clamp(Math.floor((x - F.x0) / F.st), 0, c - 1))).length >= pts.length * 0.3;
 }
-function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!g.next().done); }
+function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!passoTile(g).done); }
 function* buildTileGen(T) {
   if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.seme * 7919; for (const p of CAS_T.get(T.t) || []) if (!p.casFatta) { p.casFatta = true; casermeDi([p]); }
   T.tex0 = new THREE.Texture().id; // textures newer than this were made for this tile: freed with it
