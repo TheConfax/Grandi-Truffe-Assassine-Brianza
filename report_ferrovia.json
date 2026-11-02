@@ -43,7 +43,7 @@
    "3": 68,
    "4": 26
   },
-  "tempo_s": 2.1
+  "tempo_s": 1.0
  },
  "banchine": {
   "tagliate": 4,
@@ -87,7 +87,7 @@
  "recinzioni_dentro_l_area": {
   "recinzioni": {
    "linee_toccate": 4,
-   "metri_tolti": 87.6
+   "metri_tolti": 76.1
   },
   "divisori_tipo_6": {
    "linee_toccate": 7,
@@ -269,6 +269,6 @@
   "cartelli_di_paese": {
    "n": 15
   },
-  "tempo_s": 10.7
+  "tempo_s": 13.5
  }
 }
