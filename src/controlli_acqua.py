@@ -60,9 +60,6 @@ def cima_impalcati(tri, tree, x, z):
     return out
 
 
-CELLA_RIPIDA, M_SCARPATA = 0.9, 5   # m di dislivello su una cella da 2 m; il materiale della scarpata
-
-
 def segna_sotto_impalcati(b, x0, z0, tri, tree):
     """a tile of S (.bin bytes) with bit 7 of the cell material set where the cell is under a deck (tri, tree: the decks that are not
     free, triangoli_impalcati(liberi=False)) (its middle more than SOTTO_DK under the
@@ -77,11 +74,6 @@ def segna_sotto_impalcati(b, x0, z0, tri, tree):
     if not np.isfinite(tp).any(): return b[:mo] + m.tobytes() + b[mo + c * c:], 0
     hc = (h[:-1, :-1] + h[1:, 1:]) / 2      # the middle of the cell: on the diagonal of its two triangles
     k = np.isfinite(tp) & (tp > hc + SOTTO_DK) & ~np.isin(m, STRADA_MAT)
-    # src/opere.py: under a deck and within 8 m of it a cell that climbs is a slope, whatever polygon of the DBGT covers it: no street there (Carlo, x 349 z 2002: "l'asfalto sale sulle scarpate")
-    vic = np.isfinite(tp)
-    for dx, dz in ((8, 0), (-8, 0), (0, 8), (0, -8), (6, 6), (6, -6), (-6, 6), (-6, -6)): vic = vic | np.isfinite(cima_impalcati(tri, tree, x.ravel() + dx, z.ravel() + dz).reshape(c, c))
-    rng = np.max([h[:-1, :-1], h[1:, 1:], h[:-1, 1:], h[1:, :-1]], 0) - np.min([h[:-1, :-1], h[1:, 1:], h[:-1, 1:], h[1:, :-1]], 0)
-    ripida = vic & (rng > CELLA_RIPIDA) & np.isin(m, STRADA_MAT); m[ripida] = M_SCARPATA; k = k | ripida
     m[k] |= 128
     return b[:mo] + m.tobytes() + b[mo + c * c:], int(k.sum())
 

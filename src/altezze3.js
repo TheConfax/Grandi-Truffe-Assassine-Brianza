@@ -355,9 +355,9 @@ const H = (() => {
   // pits (docs/sottoterra.md, tappa 1): ramps of the underground garages, from src/sottoterra.py. Each takes the 2 m cells of S its outline
   // touches (F.pc, a flag per cell); inside its outline its floor triangles are the ground (H.base, H.ground, H.surface), outside it S. The
   // terrain mesh leaves those cells out, world3.js draws the floor, the ground of the cells around it (anello), the walls and the door
-  const PITS = [], PIT_ORD = new Map(), PG = new Grid(8), PCELL = new Map(), GALL = [], UG = new Grid(8);
+  const PITS = [], PIT_ORD = new Map(), PG = new Grid(8), PCELL = new Map(), GALL = [], UG = new Grid(8); let TETTI = 0;
   function gallAt(x, z) { // the covered part of an underpass at (x, z): { floor, soff }, or null
-    if (!GALL.length) return null; let u = null;
+    if (!GALL.length && !TETTI) return null; let u = null;
     UG.each(x, z, x, z, ({ p, i }) => {
       if (u) return; const T = p.tri, ax = T[i], az = T[i + 1], bx = T[i + 3], bz = T[i + 4], cx = T[i + 6], cz = T[i + 7], den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(den) < 1e-12) return;
       const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / den, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / den, l3 = 1 - l1 - l2; if (l1 < -1e-7 || l2 < -1e-7 || l3 < -1e-7) return;
@@ -383,12 +383,16 @@ const H = (() => {
     PITS.push(o); PIT_ORD.set(q.ord, o);
     const rec0 = GRID_REC; GRID_REC = o.reg;
     for (let i = 0; i < tri.length; i += 9) PG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i });
+    if (q.tetto) { // the part of an underpass that takes the cells of S and is covered: its ceiling, as gallAt reads it
+      o.sof = new Float64Array(tri.length / 3); TETTI++; o.tetti = true;
+      for (let k = 0, j = 0; k < n - 1; k++) for (const t of [[k, k + 1, k + 1], [k, k + 1, k]]) { const i = j * 3; if (q.tetto[k] !== null && q.tetto[k + 1] !== null) { for (let w = 0; w < 3; w++) o.sof[j + w] = q.tetto[t[w]] - B0; UG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i }); } j += 3; }
+    }
     GRID_REC = rec0;
     for (const k in q.celle) { let l = PCELL.get(k); if (!l) PCELL.set(k, l = []); for (const w of q.celle[k]) l.push(w); }
     return o;
   }
   function pitFuori(o) {
-    if (--o.refs > 0) return; PIT_ORD.delete(o.ord); if (o.vuota) return; if (o.galleria) { GALL.splice(GALL.indexOf(o), 1); disfaGriglie(o.reg); return; } PITS.splice(PITS.indexOf(o), 1); disfaGriglie(o.reg);
+    if (--o.refs > 0) return; PIT_ORD.delete(o.ord); if (o.vuota) return; if (o.galleria) { GALL.splice(GALL.indexOf(o), 1); disfaGriglie(o.reg); return; } PITS.splice(PITS.indexOf(o), 1); disfaGriglie(o.reg); if (o.tetti) TETTI--;
     for (const k in o.src.celle) { const l = PCELL.get(k); if (!l) continue; const a = new Set(o.src.celle[k]), m = l.filter(w => !a.has(w)); if (m.length) PCELL.set(k, m); else PCELL.delete(k); }
   }
   function deckFuori(o) { if (--o.refs > 0) return; DECK_ORD.delete(o.ord); DECKS.splice(DECKS.indexOf(o), 1); disfaGriglie(o.reg); }

@@ -7,8 +7,10 @@
 #   - larghezza dalla GALLER (taglio trasversale), altrimenti dalle aree SED=03, altrimenti neutra (LARGA_NEUTRA); stretta dove accanto corre una strada a un altro livello
 #   - coperto dove c'e la GALLER o la via tunnel e sopra resta abbastanza suolo; altrove aperto
 # La superficie S non si tocca: chi sta sopra (la ferrovia con la sua quota, la Milano-Meda) resta dov'e, treno compreso.
-# Il tratto aperto e una fossa come le rampe (tipo 'rampa', sotto=True: niente serranda, fondo d'asfalto; prende le sue celle di S); il tratto coperto e una 'galleria':
-# S resta disegnata sopra, sotto c'e un livello in piu che legge solo H.surface(x, z, cy) con cy sotto il soffitto (src/altezze3.js).
+# L'opera e un pezzo solo, e prima viene lei: un fondo, due pareti continue dal fondo alla cima, una soletta a una quota sola lungo tutto il tratto coperto, un fronte che chiude
+# ogni testata del coperto, un parapetto con spessore sopra le pareti aperte e sopra il fronte. Poi il terreno e la vernice si tagliano attorno al suo contorno, a filo.
+# Dove sopra la soletta c'e S abbastanza, S resta disegnata ('galleria': sotto c'e un livello in piu che legge solo H.surface(x, z, cy) con cy sotto il soffitto, src/altezze3.js);
+# altrove l'opera prende le celle di S (tipo 'rampa', sotto=True, con tetto dove e coperta: sopra c'e l'impalcato). Niente serranda, fondo d'asfalto.
 #
 # CAVALCAVIA (un PONTE con sotto assi EL_STR_LIV 01), in ordine: 1. la strada sotto, alla sua quota, comprese le aree con qualche vertice preso dal livello di sopra;
 # 2. l'impalcato (impalcati.py); 3-4. spalle e scarpate: il suolo libero attorno alla strada sotto non sta sopra la scarpata 1:K che parte dal bordo della strada, e sotto
@@ -18,13 +20,17 @@ from shapely.geometry import LineString, Polygon, box, Point
 from scipy import ndimage
 
 LUCE_MIN = 2.5     # m: sotto meno di questo non ci passa niente
-SP_SOLETTA = 0.9   # m: spessore della soletta sopra la galleria (come impalcati.SP: valore generico, il DBGT non lo dice)
+SP_SOLETTA = 0.9   # m: spessore della soletta dei cavalcavia (come impalcati.SP: valore generico, il DBGT non lo dice)
+SP_OPERA = 1.25    # m: dalla cima al soffitto dell'opera (generico: la soletta, e la pancia degli impalcati sopra non sporge sotto)
+PIANO = 1.0        # m: la cima dell'opera e il suolo entro tanto dal punto piu alto del tratto coperto (le testate stanno piu in basso, sulla scarpata)
+PARAPETTO = 1.0    # m sopra il suolo, come PIT_PAR di world3.js
 BOCCA = 0.15       # m: dove il fondo arriva a tanto dal suolo finisce la trincea
 LARGA_NEUTRA = 3.5 # m: mezza larghezza quando il DBGT non la da (neutra, una corsia per senso)
 MEZZA_STRADA = 2.75  # m: quanto si tiene lontano dall'asse di una strada a un altro livello ...
 MARGINE = 0.3      # ... piu questo
-MEZZA_MIN = 2.75   # m: la trincea non si stringe sotto questo
+MEZZA_MIN = 3.25   # m: la trincea non si stringe sotto questo (due corsie)
 PASSO = 1.0        # m fra le stazioni lungo l'asse
+RAMO_MAX, RAMO_DZ, RAMO_LARGO, RAMO_SOTTO = 9.0, 0.6, 3.0, 0.2   # m: un altro asse del fondo entro tanto dall'asse, a tanto di quota, il margine che gli si lascia verso la parete, e quanto sta sotto il suolo (sopra e un'altra strada)
 ALLUNGA_MAX = 160.0  # m: per lato, oltre questo non e una trincea
 COPERTO_OSM = 6.0  # m: una stazione cosi vicina alla via tunnel di OSM e coperta
 K_SCARPATA = 1.5   # come superficie.K
@@ -194,17 +200,43 @@ def _stazioni(cat, assi, gr, gall, quota, D):
                 if abs(zq - y[k]) > 1.0: lim[k] = min(lim[k], dd - MEZZA_STRADA - MARGINE)
         lim = ndimage.minimum_filter1d(lim, 7, mode='nearest'); arr[:] = np.maximum(np.minimum(arr, lim), MEZZA_MIN)
         arr[:] = ndimage.gaussian_filter1d(arr, 1.5, mode='nearest')
+    # dove la strada si biforca verso la bocca l'altro ramo, alla stessa quota, resta dentro: la trincea si apre
+    for arr, sg in ((hl, 1), (hr, -1)):
+        ap = arr.copy()
+        for k in range(n):
+            if dentro[k]: continue
+            r = LineString([C[k], C[k] + sg * Nn[k] * RAMO_MAX])
+            for a_ in altri:
+                if not r.intersects(a_['g']): continue
+                q = r.intersection(a_['g']).representative_point(); dd = np.hypot(q.x - C[k][0], q.y - C[k][1])
+                zq = np.interp(a_['g'].project(q), np.concatenate(([0], np.cumsum(np.hypot(*np.diff(a_['xy'], axis=0).T)))), a_['z'])
+                if abs(zq - y[k]) < RAMO_DZ and float(quota(q.x, q.y)) - zq > RAMO_SOTTO and dd + RAMO_LARGO > ap[k]: ap[k] = dd + RAMO_LARGO
+        arr[:] = ndimage.gaussian_filter1d(ap, 2.0, mode='nearest')
     Lft, Rgt = C + Nn * hl[:, None], C - Nn * hr[:, None]
     tl, tr = np.array([float(quota(*q)) for q in Lft]), np.array([float(quota(*q)) for q in Rgt]); tp = np.minimum(np.minimum(tl, tr), np.array([float(quota(*q)) for q in C]))
     # alle bocche il fondo prende il suolo su ogni lato, in piano entro 3 m
     bl = np.clip(1 - np.arange(n) / 3.0, 0, 1); br = bl[::-1]
     cl = lambda v: np.clip(v, -0.3, 0.3)   # (non oltre: se accanto il suolo sale, e la scarpata, non la strada)
     yl = y + cl(tl[0] - y[0]) * bl + cl(tl[-1] - y[-1]) * br; yr = y + cl(tr[0] - y[0]) * bl + cl(tr[-1] - y[-1]) * br
-    # coperta: dentro la GALLER, o vicino alla via tunnel, con suolo sopra che basta per la soletta e la luce
+    # coperta: dentro la GALLER (senza GALLER vicino alla via tunnel). Una soletta sola: la quota viene dal tratto piu alto del coperto, e vale per tutto il coperto
     vie = [LineString(w['p']) for w in gr['vie'] if w['t'].get('tunnel') in ('yes', 'covered')]
-    cop = np.array([(dentro[k] or (not gs and any(v.distance(Point(C[k])) < COPERTO_OSM for v in vie))) and tp[k] - SP_SOLETTA - y[k] >= LUCE_MIN for k in range(n)])
-    cop = ndimage.binary_opening(cop, np.ones(3, bool)) | (cop & (ndimage.uniform_filter1d(cop.astype(float), 3) > 0.9))
-    return dict(C=C, y=y, yl=yl, yr=yr, Lft=Lft, Rgt=Rgt, tp=tp, hl=hl, hr=hr, cop=cop, fonte=fonte, prof=float((tp - y).max()), lung=float(n - 1) * PASSO)
+    cop = np.array([dentro[k] or (not gs and any(v.distance(Point(C[k])) < COPERTO_OSM for v in vie)) for k in range(n)]); cop = ndimage.binary_closing(cop, np.ones(5, bool)) | cop
+    soff = None; gal = np.zeros(n, bool)
+    if cop.any():
+        vt = tp[cop]; soff = float(np.median(vt[vt > vt.max() - PIANO]) - SP_OPERA)
+        if soff - max(yl[cop].max(), yr[cop].max()) < LUCE_MIN: cop[:] = False; soff = None
+    if soff is not None:
+        idx = np.nonzero(cop & (tp >= soff + SP_OPERA - PIANO * 0.5))[0]      # S resta sopra da qui a qui; verso le testate l'opera prende le celle
+        if len(idx):
+            gal[idx[0]:idx[-1] + 1] = True
+            if idx[-1] + 1 < n: cop[idx[-1] + 1] = True     # (il tratto arriva alla stazione di confine)
+        r_ = np.nonzero(cop)[0]
+        if r_[0] <= 3: cop[:r_[0]] = True                   # la testata e la bocca: niente tre metri di aperto davanti al fronte
+        if r_[-1] >= n - 4: cop[r_[-1]:] = True
+    def cima(tq, yq):   # la riga del parapetto: una linea continua sopra il suolo liscio, mai sotto il suolo vero
+        ts = ndimage.gaussian_filter1d(tq, 3.0, mode='nearest'); par = np.minimum(PARAPETTO, np.maximum(0.0, ts - yq)); t = np.maximum(ts + par, tq + np.minimum(par, 0.3))
+        return ndimage.gaussian_filter1d(t, 1.0, mode='nearest')
+    return dict(C=C, y=y, yl=yl, yr=yr, Lft=Lft, Rgt=Rgt, N=Nn, tp=tp, hl=hl, hr=hr, cop=cop, gal=gal, soff=soff, csx=cima(tl, yl), cdx=cima(tr, yr), fonte=fonte, prof=float((tp - y).max()), lung=float(n - 1) * PASSO)
 
 
 def _su_catena(a_, catg):
@@ -236,42 +268,93 @@ def celle_anello(poly):
 
 
 def tratti(s):
-    """i tratti consecutivi aperti o coperti di un sottopasso: (coperto, k0, k1), con la stazione di confine in tutti e due"""
-    cop = s['cop']; out = []; k0 = 0
-    for k in range(1, len(cop)):
-        if cop[k] != cop[k - 1]: out.append((bool(cop[k - 1]), k0, k)); k0 = k
-    out.append((bool(cop[-1]), k0, len(cop) - 1))
+    """i tratti consecutivi che lasciano S o prendono le sue celle: (S resta sopra, k0, k1), con la stazione di confine in tutti e due"""
+    gal = s['gal']; out = []; k0 = 0
+    for k in range(1, len(gal)):
+        if gal[k] != gal[k - 1]: out.append((bool(gal[k - 1]), k0, k)); k0 = k
+    out.append((bool(gal[-1]), k0, len(gal) - 1))
     return out
 
 
-def impronte(sotto):
-    """per la build dei dati: i contorni dei tratti aperti (la vernice di strada non ci va) e quelli coperti"""
+def _sagoma(s, a, b, m=0.0):
+    N_ = s['N'][a:b + 1]; p = Polygon(np.vstack((s['Lft'][a:b + 1] + N_ * m, (s['Rgt'][a:b + 1] - N_ * m)[::-1])))
+    return p if p.is_valid else p.buffer(0)
+
+
+def impronte(sotto, m=0.0):
+    """per la build dei dati: i contorni, allargati di m solo di lato (alle bocche la vernice arriva al fondo), di quel che prende le celle di S e di quel che le lascia"""
     ap, co = [], []
     for s in sotto:
-        for cp, a, b in tratti(s):
-            if b - a < 1: continue
-            p = Polygon(np.vstack((s['Lft'][a:b + 1], s['Rgt'][a:b + 1][::-1])))
-            if not p.is_valid: p = p.buffer(0)
-            (co if cp else ap).append(p)
+        for g, a, b in tratti(s):
+            if b - a >= 1: (co if g else ap).append(_sagoma(s, a, b, m))
     return ap, co
 
 
 def fosse_gioco(sotto, nodo=lambda x, z: None):
-    """le fosse per terreno/indice.json: un oggetto per tratto, tipo 'rampa' (aperto, sotto=True) o 'galleria'"""
-    r3 = lambda A, y: [[round(float(q[0]), 3), round(float(q[1]), 3), round(float(h), 3)] for q, h in zip(A, y)]; out = []
+    """le fosse per terreno/indice.json: un oggetto per tratto, tipo 'rampa' (prende le celle di S, sotto=True, tetto dove e coperto) o 'galleria'. fronti: [testa, coda] del tratto chiuse da un fronte"""
+    r3 = lambda A, y: [[round(float(q[0]), 3), round(float(q[1]), 3), round(float(h), 3)] for q, h in zip(A, y)]; rr = lambda v: [round(float(q), 3) for q in v]; out = []
     for n, s in enumerate(sotto):
-        for cp, a, b in tratti(s):
+        cop = s['cop']; N = len(cop)
+        for g, a, b in tratti(s):
             if b - a < 1: continue
             sx, dx = r3(s['Lft'][a:b + 1], s['yl'][a:b + 1]), r3(s['Rgt'][a:b + 1], s['yr'][a:b + 1]); m = (a + b) // 2
-            e = dict(sottopasso=n, nome=s.get('nome'), sotto=True, c=[round(float(s['C'][m][0]), 1), round(float(s['C'][m][1]), 1)], sx=sx, dx=dx, lung=b - a, fonte_larghezza=s['fonte'], osm=s.get('vie'))
-            if cp:
-                sof = s['tp'][a:b + 1] - SP_SOLETTA; e.update(tipo='galleria', soffitto=[round(float(v), 3) for v in sof], celle={}, anello=[])
+            fr = [bool(cop[a] and (a == 0 or not cop[a - 1])), bool(cop[b] and (b == N - 1 or not cop[b + 1]))]
+            e = dict(sottopasso=n, nome=s.get('nome'), sotto=True, c=[round(float(s['C'][m][0]), 1), round(float(s['C'][m][1]), 1)], sx=sx, dx=dx, lung=b - a, fonte_larghezza=s['fonte'], osm=s.get('vie'), csx=rr(s['csx'][a:b + 1]), cdx=rr(s['cdx'][a:b + 1]), fronti=fr)
+            if g:
+                e.update(tipo='galleria', soffitto=[round(float(s['soff']), 3)] * (b - a + 1), celle={}, anello=[])
             else:
-                p = Polygon(np.vstack((s['Lft'][a:b + 1], s['Rgt'][a:b + 1][::-1])))
-                if not p.is_valid: p = p.buffer(0)
-                ce, an = celle_anello(p); e.update(tipo='rampa', celle=ce, anello=an, porta_h=0, testa=bool(s['cop'][a]), coda=bool(s['cop'][b]))
+                ce, an = celle_anello(_sagoma(s, a, b)); e.update(tipo='rampa', celle=ce, anello=an, porta_h=0)
+                te = [cop[k] and ((k > a and cop[k - 1]) or (k < b and cop[k + 1])) for k in range(a, b + 1)]
+                if any(te): e['tetto'] = [round(float(s['soff']), 3) if v else None for v in te]
             out.append(e)
     return out
+
+
+def corsie_opere(sotto, raw_roads, nodes, log=lambda *a: None):
+    """dopo corsie_ia: dentro l'opera le corsie stanno a meta fra l'asse e la parete, e la rete non si taglia; il nodo appena fuori non le manda contro la parete"""
+    tot = tolti = 0
+    for s in sotto:
+        foot = _sagoma(s, 0, len(s['C']) - 1); bordo = foot.exterior; shapely.prepare(foot)
+        lat = lambda p, u: min((np.hypot(*(np.asarray(q) - p)) for q in _tagli(LineString([p, p + u * 30]), bordo)), default=0.0)
+        pareti = [LineString(L_[d_ >= 0.25]) for L_, d_ in ((s['Lft'], s['csx'] - s['yl']), (s['Rgt'], s['cdx'] - s['yr'])) if (d_ >= 0.25).sum() >= 2]
+        libera = lambda a_, b_: not any(LineString([a_, b_]).intersects(w_) for w_ in pareti)
+        for r in raw_roads:
+            g = r.get('refs') or []
+            if r.get('c', 9) > 3 or len(g) < 2: continue
+            xy = np.array([nodes[q] for q in g], float); den = [foot.contains(Point(q)) for q in xy]
+            if not any(den): continue
+            l0 = 0.0 if r.get('o') else min(r['w'] * 0.24, r['mh'] * 0.5)
+            F = list(r.get('lf') or [int(round(l0 * 100))] * len(g)); B = (list(r.get('lb') or [int(round(l0 * 100))] * len(g))) if not r.get('o') else None
+            Rg = []
+            for k in range(len(g)):
+                T = xy[min(k + 1, len(g) - 1)] - xy[max(k - 1, 0)]; T = T / max(np.hypot(*T), 1e-9); Rg.append(np.array([-T[1], T[0]]))
+                if den[k]:
+                    hR, hL = lat(xy[k], Rg[k]), lat(xy[k], -Rg[k])
+                    if r.get('o'): F[k] = int(round(100 * (hR - hL) / 2))     # senso unico: in mezzo
+                    else: F[k] = int(round(100 * min(hR / 2, max(hR - 1.4, 0.5)))); B[k] = int(round(100 * min(hL / 2, max(hL - 1.4, 0.5))))
+                    tot += 1
+            # il nodo appena fuori: la corsia piu vicina alla sua che esce dalla bocca senza passare da una parete
+            for k in range(len(g)):
+                if den[k]: continue
+                for j in (k - 1, k + 1):
+                    if not (0 <= j < len(g) and den[j]): continue
+                    for A, sg in ((F, 1), (B, -1)):
+                        if A is None: continue
+                        pin = xy[j] + sg * Rg[j] * A[j] / 100; pv = sorted(np.arange(-900, 901, 25), key=lambda v: abs(v - A[k]))
+                        A[k] = int(next((v for v in pv if libera(pin, xy[k] + sg * Rg[k] * v / 100)), A[k]))
+            r['lf'] = F
+            if B is not None: r['lb'] = B
+            if r.get('nt'):
+                nn = [k for k in r['nt'] if not (den[k] or den[k - 1] or foot.contains(Point((xy[k] + xy[k - 1]) / 2)))]; tolti += len(r['nt']) - len(nn)
+                if nn: r['nt'] = nn
+                else: r.pop('nt')
+    log('corsie nelle opere: %d nodi, %d tratti rimessi nella rete del traffico' % (tot, tolti))
+
+
+def _tagli(linea, bordo):
+    x = linea.intersection(bordo)
+    if x.is_empty: return []
+    return [(q.x, q.y) for q in (x.geoms if hasattr(x, 'geoms') else [x]) if q.geom_type == 'Point']
 
 
 # ---------- i cavalcavia ----------

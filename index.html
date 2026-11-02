@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 150fa99 · assemblato 02/11 00:45 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 40b32b8 · assemblato 02/11 01:05 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -788,9 +788,9 @@ const H = (() => {
   // pits (docs/sottoterra.md, tappa 1): ramps of the underground garages, from src/sottoterra.py. Each takes the 2 m cells of S its outline
   // touches (F.pc, a flag per cell); inside its outline its floor triangles are the ground (H.base, H.ground, H.surface), outside it S. The
   // terrain mesh leaves those cells out, world3.js draws the floor, the ground of the cells around it (anello), the walls and the door
-  const PITS = [], PIT_ORD = new Map(), PG = new Grid(8), PCELL = new Map(), GALL = [], UG = new Grid(8);
+  const PITS = [], PIT_ORD = new Map(), PG = new Grid(8), PCELL = new Map(), GALL = [], UG = new Grid(8); let TETTI = 0;
   function gallAt(x, z) { // the covered part of an underpass at (x, z): { floor, soff }, or null
-    if (!GALL.length) return null; let u = null;
+    if (!GALL.length && !TETTI) return null; let u = null;
     UG.each(x, z, x, z, ({ p, i }) => {
       if (u) return; const T = p.tri, ax = T[i], az = T[i + 1], bx = T[i + 3], bz = T[i + 4], cx = T[i + 6], cz = T[i + 7], den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(den) < 1e-12) return;
       const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / den, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / den, l3 = 1 - l1 - l2; if (l1 < -1e-7 || l2 < -1e-7 || l3 < -1e-7) return;
@@ -816,12 +816,16 @@ const H = (() => {
     PITS.push(o); PIT_ORD.set(q.ord, o);
     const rec0 = GRID_REC; GRID_REC = o.reg;
     for (let i = 0; i < tri.length; i += 9) PG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i });
+    if (q.tetto) { // the part of an underpass that takes the cells of S and is covered: its ceiling, as gallAt reads it
+      o.sof = new Float64Array(tri.length / 3); TETTI++; o.tetti = true;
+      for (let k = 0, j = 0; k < n - 1; k++) for (const t of [[k, k + 1, k + 1], [k, k + 1, k]]) { const i = j * 3; if (q.tetto[k] !== null && q.tetto[k + 1] !== null) { for (let w = 0; w < 3; w++) o.sof[j + w] = q.tetto[t[w]] - B0; UG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i }); } j += 3; }
+    }
     GRID_REC = rec0;
     for (const k in q.celle) { let l = PCELL.get(k); if (!l) PCELL.set(k, l = []); for (const w of q.celle[k]) l.push(w); }
     return o;
   }
   function pitFuori(o) {
-    if (--o.refs > 0) return; PIT_ORD.delete(o.ord); if (o.vuota) return; if (o.galleria) { GALL.splice(GALL.indexOf(o), 1); disfaGriglie(o.reg); return; } PITS.splice(PITS.indexOf(o), 1); disfaGriglie(o.reg);
+    if (--o.refs > 0) return; PIT_ORD.delete(o.ord); if (o.vuota) return; if (o.galleria) { GALL.splice(GALL.indexOf(o), 1); disfaGriglie(o.reg); return; } PITS.splice(PITS.indexOf(o), 1); disfaGriglie(o.reg); if (o.tetti) TETTI--;
     for (const k in o.src.celle) { const l = PCELL.get(k); if (!l) continue; const a = new Set(o.src.celle[k]), m = l.filter(w => !a.has(w)); if (m.length) PCELL.set(k, m); else PCELL.delete(k); }
   }
   function deckFuori(o) { if (--o.refs > 0) return; DECK_ORD.delete(o.ord); DECKS.splice(DECKS.indexOf(o), 1); disfaGriglie(o.reg); }
@@ -2617,30 +2621,54 @@ function pitLook(T, x, z) { // the look of the highest layer of the tile over th
   for (const [o, k, rank, st] of T.layers || []) if ((!best || rank >= best[0]) && inPoly(x, z, o) && !k.some(h => inPoly(x, z, h))) best = [rank, st];
   return best ? best[1] : null;
 }
-// the top of a wall of a trench under a deck stops at the deck
-function pitWallTop(A, y) { let t = y; for (const o of H.deckAt(A[0], A[1])) if (o.tipo !== 'copertura' && o.bot > y) { t = o.bot; break; } return t; }
-function gallLintel(Wb, quad, p, a, b, id) {
-  const ya = H.baseS(a[0], a[1]), yb = H.baseS(b[0], b[1]), lo = Math.max(Math.min(ya, yb) - 0.9, a[2] + 2.5);
-  quad(Wb, [a[0], a[1]], [b[0], b[1]], lo, ya + PIT_PAR, lo, yb + PIT_PAR, 0, hyp(b[0] - a[0], b[1] - a[1]) / 2);
-  const L = hyp(b[0] - a[0], b[1] - a[1]) || 1; WALLS.add(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1]), { ax: a[0], az: a[1], bx: b[0], bz: b[1], nx: (b[1] - a[1]) / L, nz: -(b[0] - a[0]) / L, two: true, y0: lo, y1: Math.max(ya, yb) + PIT_PAR, pit: id });
+// an underpass is one piece (src/opere.py): walls unbroken from the floor to their top, on the open ones a parapet with a real thickness, one ceiling at one height along the covered
+// part, a front that closes each head of it. The ground and the paint are cut round it: nothing of them is seen from inside
+const OP_SP = 0.3; // m: the thickness of the parapets
+function opQuad(b, Q, nx, ny, nz) { const i0 = b.p.length / 3; for (const q of Q) vtx(b, q[0], q[1], q[2], nx, ny, nz, (q[0] + q[2]) / 2, q[1] / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
+function opPareti(Wb, p, roof) { // roof[k]: the ceiling over station k, or null: open
+  const q0 = p.src, B0 = H.B0;
+  for (const [L, O, C] of [[p.sx, p.dx, q0.csx], [p.dx, p.sx, q0.cdx]]) for (let k = 1; k < L.length; k++) {
+    const A = L[k - 1], E = L[k], cov = roof && roof[k - 1] !== null && roof[k] !== null, ta = cov ? roof[k - 1] : C[k - 1] - B0, tb = cov ? roof[k] : C[k] - B0; if (Math.max(ta - A[2], tb - E[2]) < 0.3) continue;
+    const n = hyp(E[0] - A[0], E[1] - A[1]) || 1, nx = (E[1] - A[1]) / n, nz = -(E[0] - A[0]) / n;
+    opQuad(Wb, [[A[0], A[2] - 0.1, A[1]], [E[0], E[2] - 0.1, E[1]], [E[0], tb, E[1]], [A[0], ta, A[1]]], nx, 0, nz);
+    if (!cov) { // the parapet: on the outer side down into the ground, and its top
+      const la = hyp(A[0] - O[k - 1][0], A[1] - O[k - 1][1]) || 1, lb = hyp(E[0] - O[k][0], E[1] - O[k][1]) || 1, A2 = [A[0] + (A[0] - O[k - 1][0]) / la * OP_SP, A[1] + (A[1] - O[k - 1][1]) / la * OP_SP], E2 = [E[0] + (E[0] - O[k][0]) / lb * OP_SP, E[1] + (E[1] - O[k][1]) / lb * OP_SP];
+      opQuad(Wb, [[A2[0], Math.min(ta, H.baseS(A2[0], A2[1])) - 0.3, A2[1]], [E2[0], Math.min(tb, H.baseS(E2[0], E2[1])) - 0.3, E2[1]], [E2[0], tb, E2[1]], [A2[0], ta, A2[1]]], nx, 0, nz);
+      opQuad(Wb, [[A[0], ta, A[1]], [E[0], tb, E[1]], [E2[0], tb, E2[1]], [A2[0], ta, A2[1]]], 0, 1, 0);
+    }
+    WALLS.add(Math.min(A[0], E[0]), Math.min(A[1], E[1]), Math.max(A[0], E[0]), Math.max(A[1], E[1]), { ax: A[0], az: A[1], bx: E[0], bz: E[1], nx, nz, two: true, y0: Math.min(A[2], E[2]) - 3, y1: Math.max(ta, tb), pit: p.id });
+  }
 }
-// the covered part of an underpass (altezze3.js gallAt): floor, side walls with their collisions, ceiling. Its top is S, drawn as everywhere
+function opSoffitto(C, p, roof) { for (let k = 1; k < p.sx.length; k++) { if (roof[k - 1] === null || roof[k] === null) continue; const a = p.sx[k - 1], b = p.sx[k], c = p.dx[k], d = p.dx[k - 1]; opQuad(C, [[a[0], roof[k - 1], a[1]], [b[0], roof[k], b[1]], [c[0], roof[k], c[1]], [d[0], roof[k - 1], d[1]]], 0, -1, 0); } }
+function opFronte(Wb, p, k, kin, soff) { // the front at station k, the covered part going towards station kin. Under a deck it goes up to the deck and runs along it as far as the ground stays under the deck; else up to the parapets at its two ends, with its own parapet on the ground over the tunnel
+  const a = p.sx[k], b = p.dx[k], L = hyp(b[0] - a[0], b[1] - a[1]) || 1, ex = (b[0] - a[0]) / L, ez = (b[1] - a[1]) / L, B0 = H.B0, ya = p.src.csx[k] - B0, yb = p.src.cdx[k] - B0;
+  const at = s => [a[0] + ex * s, a[1] + ez * s], dk = (x, z) => { let t = null; for (const o of H.deckAt(x, z)) if (o.tipo !== 'copertura' && o.top > soff + 0.3 && (t === null || o.top > t)) t = o.top; return t; };
+  const lungo = (s0, sg) => { let e = s0; for (let d = 0.5; d <= 10; d += 0.5) { const [x, z] = at(s0 + sg * d), t = dk(x, z); if (t === null || H.baseS(x, z) >= t - 0.5) break; e = s0 + sg * d; } return e; };
+  const s0 = lungo(0, -1), s1 = lungo(L, 1), S = [s0]; for (let s = Math.ceil(s0); s < 0; s++) if (s > s0) S.push(s); S.push(0); for (let s = 1; s < L; s++) S.push(s); S.push(L); for (let s = Math.ceil(L) + 1; s < s1; s++) S.push(s); if (s1 > L) S.push(s1);
+  const Ss = [...new Set(S)].sort((u, v) => u - v), nx = ez, nz = -ex, topAt = s => { const [x, z] = at(s), t = dk(x, z); return t !== null ? t - 0.05 : ya + (yb - ya) * clamp(s / L, 0, 1); };
+  let wx = p.sx[kin][0] - a[0], wz = p.sx[kin][1] - a[1]; { const d = wx * ex + wz * ez; wx -= ex * d; wz -= ez * d; const l = hyp(wx, wz) || 1; wx *= OP_SP / l; wz *= OP_SP / l; }
+  for (let i = 1; i < Ss.length; i++) {
+    const u = Ss[i - 1], v = Ss[i], m = (u + v) / 2, [ux, uz] = at(u), [vx, vz] = at(v), tu = topAt(u), tv = topAt(v), dentro = m >= 0 && m <= L, bu = dentro ? soff : H.baseS(ux, uz) - 0.3, bv = dentro ? soff : H.baseS(vx, vz) - 0.3, deck = dk(ux + (vx - ux) / 2, uz + (vz - uz) / 2) !== null;
+    opQuad(Wb, [[ux, bu, uz], [vx, bv, vz], [vx, tv, vz], [ux, tu, uz]], nx, 0, nz);
+    if (!deck) { opQuad(Wb, [[ux + wx, H.baseS(ux + wx, uz + wz) - 0.3, uz + wz], [vx + wx, H.baseS(vx + wx, vz + wz) - 0.3, vz + wz], [vx + wx, tv, vz + wz], [ux + wx, tu, uz + wz]], nx, 0, nz); opQuad(Wb, [[ux, tu, uz], [vx, tv, vz], [vx + wx, tv, vz + wz], [ux + wx, tu, uz + wz]], 0, 1, 0); }
+    WALLS.add(Math.min(ux, vx), Math.min(uz, vz), Math.max(ux, vx), Math.max(uz, vz), { ax: ux, az: uz, bx: vx, bz: vz, nx, nz, two: true, y0: dentro ? soff : Math.min(bu, bv) - 1, y1: Math.max(tu, tv) - (deck ? 0.3 : 0), pit: p.id });
+  }
+}
+// the covered part of an underpass with S over it (altezze3.js gallAt): floor, walls, ceiling and fronts. Its top is S, drawn as everywhere
 function buildGallerie(T, G) {
   for (const p of H.GALL) {
     if (tileOf(p.c[0], p.c[1]) !== T.t || p.built) continue;
-    p.built = true; p.meshes = []; const F = Buf(), C = Buf(), W_ = Buf(), tr = p.tri, sf = p.sof;
-    for (let i = 0, j = 0; i < tr.length; i += 9, j += 3) {
-      const a = F.p.length / 3; for (let q = 0; q < 3; q++) vtx(F, tr[i + q * 3], tr[i + q * 3 + 2], tr[i + q * 3 + 1], 0, 1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4); triUp(F, a, a + 1, a + 2);
-      const u = C.p.length / 3; for (let q = 0; q < 3; q++) vtx(C, tr[i + q * 3], sf[j + q], tr[i + q * 3 + 1], 0, -1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4); triUp(C, u, u + 1, u + 2); const t3 = C.i.splice(-3); C.i.push(t3[0], t3[2], t3[1]);
-    }
-    const side = (L, s) => { let u = 0;
-      for (let k = 1; k < L.length; k++) { const [ax, az, ay] = L[k - 1], [bx, bz, by] = L[k], n = hyp(bx - ax, bz - az) || 1, nx = (bz - az) / n, nz = -(bx - ax) / n, sa = p.soffitto[k - 1], sb = p.soffitto[k];
-        for (const sg of [1, -1]) { const i0 = W_.p.length / 3; vtx(W_, ax, ay, az, nx * sg, 0, nz * sg, u, ay / 2); vtx(W_, bx, by, bz, nx * sg, 0, nz * sg, u + n / 2, by / 2); vtx(W_, bx, sb, bz, nx * sg, 0, nz * sg, u + n / 2, sb / 2); vtx(W_, ax, sa, az, nx * sg, 0, nz * sg, u, sa / 2); if (sg > 0) W_.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); else W_.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); }
-        u += n / 2; WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx, nz, two: true, y0: Math.min(ay, by) - 3, y1: Math.max(sa, sb), pit: p.id });
-      } };
-    side(p.sx); side(p.dx);
+    p.built = true; p.meshes = []; const F = Buf(), C = Buf(), W_ = Buf(), tr = p.tri, n = p.sx.length;
+    for (let i = 0; i < tr.length; i += 9) { const a = F.p.length / 3; for (let q = 0; q < 3; q++) vtx(F, tr[i + q * 3], tr[i + q * 3 + 2], tr[i + q * 3 + 1], 0, 1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4); triUp(F, a, a + 1, a + 2); }
+    opSoffitto(C, p, p.soffitto); opPareti(W_, p, p.soffitto);
+    if (p.src.fronti[0]) opFronte(W_, p, 0, 1, p.soffitto[0]); if (p.src.fronti[1]) opFronte(W_, p, n - 1, n - 2, p.soffitto[n - 1]);
     for (const [b, mt, r] of [[F, MAT.asph, -2], [C, MAT.pitWall, 0], [W_, MAT.pitWall, 0]]) if (b.i.length) { const M = mkMesh(b, mt, r, false); scene.remove(M); G.add(M); p.meshes.push(M); }
   }
+}
+function opAnello(f) { // the triangles of the ground round an underpass in small ones, so that the border of the paint on them is not a row of teeth
+  const out = [], go = (ax, az, bx, bz, cx, cz) => { const ab = hyp(ax - bx, az - bz), bc = hyp(bx - cx, bz - cz), ca = hyp(cx - ax, cz - az), m = Math.max(ab, bc, ca); if (m < 0.8) { out.push(ax, az, bx, bz, cx, cz); return; } if (m === ab) { const x = (ax + bx) / 2, z = (az + bz) / 2; go(ax, az, x, z, cx, cz); go(x, z, bx, bz, cx, cz); } else if (m === bc) { const x = (bx + cx) / 2, z = (bz + cz) / 2; go(ax, az, bx, bz, x, z); go(ax, az, x, z, cx, cz); } else { const x = (cx + ax) / 2, z = (cz + az) / 2; go(ax, az, bx, bz, x, z); go(x, z, bx, bz, cx, cz); } };
+  for (let i = 0; i < f.length; i += 6) go(f[i], f[i + 1], f[i + 2], f[i + 3], f[i + 4], f[i + 5]);
+  return out;
 }
 function buildPits(T, G) {
   const key = (T.t % NTX) + '_' + Math.floor(T.t / NTX);
@@ -2648,10 +2676,13 @@ function buildPits(T, G) {
     p.meshes = p.meshes || [];
     // the ground of this tile's cells around the ramp
     const byLook = new Map();
-    for (const [k, w, f] of p.anello) {
+    const op_ = p.src && p.src.sotto;
+    for (const [k, w, f0] of p.anello) {
       if (k !== key) continue;
+      const f = op_ ? opAnello(f0) : f0;
       for (let i = 0; i < f.length; i += 6) {
-        const xs = [f[i], f[i + 2], f[i + 4]], zs = [f[i + 1], f[i + 3], f[i + 5]], cx = (xs[0] + xs[1] + xs[2]) / 3, cz = (zs[0] + zs[1] + zs[2]) / 3, sy = pitLook(T, cx, cz);
+        const xs = [f[i], f[i + 2], f[i + 4]], zs = [f[i + 1], f[i + 3], f[i + 5]], cx = (xs[0] + xs[1] + xs[2]) / 3, cz = (zs[0] + zs[1] + zs[2]) / 3; let sy = pitLook(T, cx, cz);
+        if (!sy && op_) for (const [ox, oz] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) { sy = pitLook(T, cx + ox, cz + oz); if (sy) break; } /* (the paint stops a little short of the wall: the parapet covers that) */
         let B = byLook.get(sy); if (!B) byLook.set(sy, B = Buf());
         const ys = xs.map((x, q) => H.baseS(x, zs[q])), vs = sy ? sy.vs : 10, i0 = B.p.length / 3;
         for (let q = 0; q < 3; q++) vtx(B, xs[q], ys[q], zs[q], 0, 1, 0, xs[q] / vs, zs[q] / vs, sy ? sy.col : null);
@@ -2670,7 +2701,7 @@ function buildPits(T, G) {
     const MF = mkMesh(F, p.src && p.src.sotto ? MAT.asph : MAT.pitFloor, -2, false); scene.remove(MF); G.add(MF); MF.userData.suolo = true; p.meshes.push(MF);
     // walls and parapets along the two sides, the door at the end
     const Wb = Buf(), D = Buf(), quad = (b, a, c, ya0, ya1, yc0, yc1, u0, u1) => { const dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1, nx = dz / L, nz = -dx / L, i0 = b.p.length / 3; vtx(b, a[0], ya0, a[1], nx, 0, nz, u0, ya0 / 2); vtx(b, c[0], yc0, c[1], nx, 0, nz, u1, yc0 / 2); vtx(b, c[0], yc1, c[1], nx, 0, nz, u1, yc1 / 2); vtx(b, a[0], ya1, a[1], nx, 0, nz, u0, ya1 / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); };
-    for (const side of [p.sx, p.dx]) {
+    if (!op_) for (const side of [p.sx, p.dx]) {
       let u = 0;
       for (let k = 1; k < side.length; k++) {
         const [ax, az, ay] = side[k - 1], [bx, bz, by] = side[k], L = hyp(bx - ax, bz - az) || 1;
@@ -2678,16 +2709,17 @@ function buildPits(T, G) {
         for (let q = 1; q < pts.length; q++) {
           const A = pts[q - 1], C = pts[q], fa = ay + (by - ay) * hyp(A[0] - ax, A[1] - az) / L, fc = ay + (by - ay) * hyp(C[0] - ax, C[1] - az) / L, da = A[2] - fa, dc = C[2] - fc;
           if (Math.max(da, dc) < 0.25) continue; deep = true;
-          const ta = pitWallTop(A, A[2] + Math.min(PIT_PAR, Math.max(0, da))), tc = pitWallTop(C, C[2] + Math.min(PIT_PAR, Math.max(0, dc))); lo = Math.min(lo, fa, fc); hi = Math.max(hi, ta, tc);
+          const ta = A[2] + Math.min(PIT_PAR, Math.max(0, da)), tc = C[2] + Math.min(PIT_PAR, Math.max(0, dc)); lo = Math.min(lo, fa, fc); hi = Math.max(hi, ta, tc);
           const ua = u + hyp(A[0] - ax, A[1] - az) / 2, uc = u + hyp(C[0] - ax, C[1] - az) / 2; quad(Wb, A, C, Math.min(fa, A[2]), ta, Math.min(fc, C[2]), tc, ua, uc);
         }
         u += L / 2;
         if (deep) { const L2 = hyp(bx - ax, bz - az); WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L2, nz: -(bx - ax) / L2, two: true, y0: lo - 3, y1: hi, pit: p.id }); }
       }
     }
-    if (p.src && p.src.sotto) { // an underpass: no door. Where the trench goes under the cover, a lintel from the ceiling up to the parapet
-      for (const [on, k] of [[p.src.testa, 0], [p.src.coda, p.sx.length - 1]]) if (on) gallLintel(Wb, quad, p, p.sx[k], p.dx[k], p.id);
-      for (const [b, mt] of [[Wb, MAT.pitWall]]) if (b.i.length) { const M = mkMesh(b, mt, 0, 'cast'); scene.remove(M); G.add(M); p.meshes.push(M); }
+    if (op_) { // an underpass: no door
+      const q_ = p.src, n_ = p.sx.length, roof = q_.tetto ? q_.tetto.map(v => v === null ? null : v - H.B0) : null, C_ = Buf(); opPareti(Wb, p, roof);
+      if (roof) { opSoffitto(C_, p, roof); if (q_.fronti[0]) opFronte(Wb, p, 0, 1, roof[0]); if (q_.fronti[1]) opFronte(Wb, p, n_ - 1, n_ - 2, roof[n_ - 1]); }
+      for (const [b, mt, cs] of [[Wb, MAT.pitWall, 'cast'], [C_, MAT.pitWall, false]]) if (b.i.length) { const M = mkMesh(b, mt, 0, cs); scene.remove(M); G.add(M); p.meshes.push(M); }
       continue;
     }
     const [lx, lz, ly] = p.sx[p.sx.length - 1], [rx, rz, ry] = p.dx[p.dx.length - 1], dl = H.baseS(lx, lz), dr = H.baseS(rx, rz), ph = p.porta_h;
@@ -2935,6 +2967,7 @@ function* buildTileGen(T) {
       const P = []; let px = 0, pz = 0; for (let i = 0; i < E.length; i += 2) { px += E[i]; pz += E[i + 1]; P.push([px / 100, pz / 100]); }
       if (P.length < 2 || (lev === 2 && H.GALL.length && P.some(q => H.gallAt(q[0], q[1])))) continue; /* the lines of a carriageway in gallery are not on the ground over it */
       if (H.PITS.length) { const ins = P.map(q => !!H.inPit(q[0], q[1], 0.1)); if (ins.some(v => v) && ins.some(v => !v)) { let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i; while (j < P.length && ins[j] === ins[i]) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* a line does not climb the wall of a trench: only the longest run on one side of it */
+      if (H.PITS.length && P.some(q => { const p_ = H.inPit(q[0], q[1], 12); return p_ && p_.src && p_.src.sotto; })) { let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i + 1; while (j < P.length && Math.abs(H.base(P[j][0], P[j][1]) - H.base(P[j - 1][0], P[j - 1][1])) <= 0.3 * hyp(P[j][0] - P[j - 1][0], P[j][1] - P[j - 1][1])) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } if (bn < P.length) { const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* nor the bank beside a work: no white post */
       const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + hyp(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
       const at = s => { let i = 1; while (i < P.length - 1 && cum[i] < s) i++; const f = clamp((s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), 0, 1); return [lerp(P[i - 1][0], P[i][0], f), lerp(P[i - 1][1], P[i][1], f)]; };
       const piece = (a, b) => { const o = [at(a)]; for (let i = 1; i < P.length - 1; i++) if (cum[i] > a && cum[i] < b) o.push(P[i]); o.push(at(b)); return o; }; // the line from a to b m along it

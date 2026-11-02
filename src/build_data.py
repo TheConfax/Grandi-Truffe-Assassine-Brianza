@@ -1903,11 +1903,24 @@ _cia_n = [0]
 def _cia_id(): _cia_n[0] += 1; return 'ia%d' % _cia_n[0]
 _cia_ost = [b_[0] for b_ in bar_out] + list(fences) + [[(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)] for g_ in gate_out]
 _cia_ost += [list(b_['p']) + [b_['p'][0]] for b_ in buildings if b_.get('t') != 9 and len(b_['p']) >= 3] + [list(h_) + [h_[0]] for b_ in buildings if b_.get('t') != 9 for h_ in b_.get('k', []) if len(h_) >= 3]
-_cia_asf = [asph, _cv_f.result()] if STR else None  # the asphalt drawn (AC_VEI, the OSM ways without it) and the paved yards
+import opere as _op, impalcati as _imp, dbgt_quote as _dq   # the underpasses (src/opere.py): their floor is asphalt for the lanes, what stands inside their outline is not in the way
+_lid = _dq.Lidar(); _Dop = _dq.load_dbgt_comuni(_dq.lista_comuni(None), _lid); _Dop.pop('_info', None)
+_lo, _la = _dq.game_to_lonlat(np.array([-5000.0, 5000.0]), np.array([5000.0, -5000.0]))
+_vie = _imp.osm_vie(sys.argv[1], (_lo[0], _la[0], _lo[1], _la[1]))
+_sott, _ = _op.trova(_Dop, lambda x, z: float(_lid.at(np.array([float(x)]), np.array([float(z)]))[0]), _vie, log)
+_opf = unary_union([g_ for l_ in _op.impronte(_sott) for g_ in l_])
+def _fuori_opera(pl_):
+    g_ = LineString(pl_) if len(pl_) >= 2 else None
+    if g_ is None or not g_.intersects(_opf): return [pl_]
+    d_ = g_.difference(_opf)
+    return [list(q_.coords) for q_ in (d_.geoms if hasattr(d_, 'geoms') else [d_]) if not q_.is_empty and q_.geom_type == 'LineString']
+_cia_ost = [q_ for pl_ in _cia_ost for q_ in _fuori_opera(pl_)]
+_cia_asf = [unary_union([asph, _opf]), _cv_f.result()] if STR else None  # the asphalt drawn (AC_VEI, the OSM ways without it) and the paved yards
 if os.environ.get('GTA_DUMP_CORSIE'):  # development of src/corsie_ia.py: its inputs, to work on it without the whole build
     import pickle
     pickle.dump(dict(raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], nodes=nodes, deckH=deckH, ostacoli=_cia_ost, asfalto=_cia_asf, cover=dbt_cover if STR else None), open(os.environ['GTA_DUMP_CORSIE'], 'wb'))
 _cia_rep = corsie_ia.corsie(raw_roads, nodes, deckH, _cia_ost, _cia_asf, dbt_cover if STR else None, _cia_id, log)
+_op.corsie_opere(_sott, raw_roads, nodes, log)
 if STR: STR.rep['corsie_ia'] = _cia_rep
 del _cia_ost, _cia_asf
 # ------------------------------------------------------------------ graph & tiles
@@ -2003,15 +2016,10 @@ if PARCHEGGI_ATTACCATI:
     asph, pedz, side, foot = unary_union([asph, _pa]), pedz.difference(_pa), side.difference(_pa), foot.difference(_pa)
     area_geoms[:] = [(at, g.difference(_pa) if (at in (1, 2, 3) and g.intersects(_pa)) else g) for at, g in area_geoms]
     log('parcheggi attaccati a mano', len(PARCHEGGI_ATTACCATI), 'm2', round(_pa.area))
-import opere as _op, impalcati as _imp, dbgt_quote as _dq   # the underpasses (src/opere.py): no paint in the open trench, nor over the tunnel what the DBGT has in gallery; the floor is drawn by the game
-_lid = _dq.Lidar(); _Dop = _dq.load_dbgt_comuni(_dq.lista_comuni(None), _lid); _Dop.pop('_info', None)
-_b = riquadro.BBOX; _lo, _la = _dq.game_to_lonlat(np.array([-5000.0, 5000.0]), np.array([5000.0, -5000.0]))
-_vie = _imp.osm_vie(sys.argv[1], (_lo[0], _la[0], _lo[1], _la[1]))
-_sott, _ = _op.trova(_Dop, lambda x, z: float(_lid.at(np.array([float(x)]), np.array([float(z)]))[0]), _vie, log)
-_ap, _co = _op.impronte(_sott)
+_ap, _co = _op.impronte(_sott, 0.2)   # no paint in the open part of an underpass (src/opere.py), nor over the covered part what the DBGT has in gallery; the floor is drawn by the game
 _top = unary_union([p for nm in ('AC_VEI', 'AR_STR') for p, q in zip(_op.poligoni(_Dop, nm), _Dop[nm]['attr']['sed']) if q == '03' and any(p.intersects(c_) for c_ in _co)])
 _raso = unary_union([p for p, q in zip(_op.poligoni(_Dop, 'AC_VEI'), _Dop['AC_VEI']['attr']['sed']) if q != '03' and p.intersects(_top)]) if not _top.is_empty else _top
-_via = unary_union(_ap + ([_top.difference(_raso)] if not _top.is_empty else [])).buffer(0.25)   # (a poco dal muro: un vertice sul muro prenderebbe la quota del fondo)
+_via = unary_union(_ap + ([_top.intersection(unary_union(_co)).difference(_raso)] if not _top.is_empty else []))   # (only inside the work: what the DBGT has in gallery past its mouths is a street on the ground)
 def _togli(g_):   # only the pieces it touches: the others stay as they are, in the same order
     ps_ = list(g_.geoms) if hasattr(g_, 'geoms') else [g_]
     if not any(p_.intersects(_via) for p_ in ps_): return g_
