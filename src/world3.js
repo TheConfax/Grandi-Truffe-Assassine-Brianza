@@ -705,11 +705,24 @@ function terrDrawnH(x, z) { // the terrain patch as drawn: visH on its tile's gr
 // ---- surfaces on the grid of S (docs/motore.md 3, phase 5): polyFill and mkMesh hand their draped polygons and triangles here
 // a polygon y over the ground, cut on the cells of S (H.clipPoly); false where no tile of S is under it, and polyFill drapes it the old way.
 // Its vertices are absolute (b.ab), mkMesh leaves them alone; a piece over a tile without .bin stays relative and drapes as before
+/* angle of the long side of the paving blocks to the kerb: 0 = along it, Math.PI / 2 = across it (from the kerb towards the wall); the one number to turn them */
+const PAVER_ROT = Math.PI / 2;
 function clipFill(b, outer, holes, y, vScale, col) {
   const ab = b.ab || (b.ab = []);
+  // b.orient (the pavement): the rows of blocks run along the edges of the polygon. For each piece cut on the cells, the angle is the average of the
+  // directions of the polygon's edges (axis, doubled angle), each weighted by its length over the squared distance from the piece: a long kerb or
+  // wall beside it counts, the short ends and the little segments of a bend little. Rounded to 2 degrees, so the pieces of a straight stretch
+  // share one angle and one texture, and a curve turns by small steps
+  let sg = null;
+  if (b.orient) { sg = []; for (const r of [outer, ...holes]) for (let i = 0; i < r.length; i++) { const a = r[i], c = r[(i + 1) % r.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L > 0.05) sg.push([(a[0] + c[0]) / 2, (a[1] + c[1]) / 2, L, (c[0] - a[0]) / L, (c[1] - a[1]) / L]); } }
   return H.clipPoly(outer, holes, (P, fine) => {
-    const i0 = b.p.length / 3;
-    for (let k = 0; k < P.length; k++) { const x = P[k][0], z = P[k][1]; let yy = y; if (fine) { yy += b.free ? H.overFree(x, z, P[k][2]) : P[k][2]; ab[i0 + k] = 1; } vtx(b, x, yy, z, 0, 1, 0, x / vScale, z / vScale, col); }
+    const i0 = b.p.length / 3; let co = 1 / vScale, si = 0;
+    if (sg) {
+      let mx = 0, mz = 0; for (const p of P) { mx += p[0]; mz += p[1]; } mx /= P.length; mz /= P.length;
+      let sx = 0, sz = 0; for (const [x, z, L, dx, dz] of sg) { const d = hyp(x - mx, z - mz), w = L / ((d + 1) * (d + 1)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
+      const th = Math.round(Math.atan2(sz, sx) / 2 / 0.0349) * 0.0349 + PAVER_ROT; co = Math.cos(th) / vScale; si = Math.sin(th) / vScale;
+    }
+    for (let k = 0; k < P.length; k++) { const x = P[k][0], z = P[k][1]; let yy = y; if (fine) { yy += b.free ? H.overFree(x, z, P[k][2]) : P[k][2]; ab[i0 + k] = 1; } vtx(b, x, yy, z, 0, 1, 0, x * co + z * si, -x * si + z * co, col); }
     for (let k = 1; k < P.length - 1; k++) triUp(b, i0, i0 + k, i0 + k + 1);
   }, b.rk, b.street);
 }
@@ -1326,7 +1339,7 @@ function* buildTileGen(T) {
   yield 'streets';
   // street surfaces
   {
-    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; por.rk = 5.1; foot.rk = 3; asp.street = por.street = foot.street = sw.street = mark.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
+    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
     const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
     fill(d.as, asp, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fill(d.pz, por, 0.06 * fy, 4); fill(d.ft, foot, 0.045 * fy, 4);
