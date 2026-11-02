@@ -1026,17 +1026,31 @@ if dbt_pc:
     _dbi = [i_ for i_, (p_, k_, h_) in enumerate(barriers) if len(p_) >= 2 and k_ != 6]
     _dbl = [LineString(barriers[i_][0]) for i_ in _dbi]; _dbt_ = STRtree(_dbl)
     _main_r = [r['line'] for r in raw_roads if r['c'] <= 3 and flat(r) and r['line'].length > 0.1]; _mrt = STRtree(_main_r)
-    _done = []
+    _done = []; _pcmv = []
     for p_ in dbt_pc:
         P_ = Point(p_)
         if not inside(p_, 0) or any(math.dist(p_, d_) < PC_W for d_ in _done): continue
         j_ = _dbt_.nearest(P_); L_ = _dbl[j_]
         if L_.distance(P_) > PC_D or L_.length < PC_W + 0.6: continue
+        # near a corner or between several dividers the nearest one may be a diagonal; the gate goes on the one that faces the street (the one that runs most nearly along the nearest street),
+        # among those not farther than 2 m more than the nearest (Carlo, 2/11, via Gagarin x 546 z -490)
+        _rs_ = [k for k in _mrt.query(P_.buffer(PC_D + 25))]
+        if _rs_:
+            _rl_ = _main_r[min(_rs_, key=lambda k: _main_r[k].distance(P_))]; _q_ = _rl_.project(P_); _ra_, _rb_ = _rl_.interpolate(max(0, _q_ - 1)), _rl_.interpolate(min(_rl_.length, _q_ + 1)); _rd_ = (_rb_.x - _ra_.x, _rb_.y - _ra_.y); _rn_ = math.hypot(*_rd_) or 1
+            _d0_ = L_.distance(P_); _best_ = None
+            for k_ in _dbt_.query(P_.buffer(_d0_ + 2.0)):
+                Lk_ = _dbl[k_]
+                if Lk_.distance(P_) > _d0_ + 2.0 or Lk_.length < PC_W + 0.6: continue
+                sk_ = Lk_.project(P_); ta_, tb_ = Lk_.interpolate(max(0, sk_ - 1)), Lk_.interpolate(min(Lk_.length, sk_ + 1)); td_ = (tb_.x - ta_.x, tb_.y - ta_.y); tn_ = math.hypot(*td_) or 1
+                al_ = abs((td_[0] * _rd_[0] + td_[1] * _rd_[1]) / (tn_ * _rn_)); sc_ = (al_, -Lk_.distance(P_))
+                if _best_ is None or sc_ > _best_[0]: _best_ = (sc_, k_)
+            if _best_ is not None and _best_[1] != j_ and _best_[0][0] > 0.85:   # at most 32 degrees off the street
+                _pcmv.append((round(P_.x, 1), round(P_.y, 1))); j_ = _best_[1]; L_ = _dbl[j_]
         s_ = min(max(L_.project(P_), PC_W / 2), L_.length - PC_W / 2); a_, b_ = L_.interpolate(s_ - PC_W / 2), L_.interpolate(s_ + PC_W / 2)
         _done.append(p_); pc_cuts.append(L_.interpolate(s_).buffer(PC_W / 2))
         if any(_main_r[k].distance(L_.interpolate(s_)) < 2 for k in _mrt.query(L_.interpolate(s_).buffer(2))): continue
         hb_ = barriers[_dbi[j_]][2]; pc_gates.append(((a_.x, a_.y), (b_.x, b_.y), round(min(2.2, max(1.2, hb_)), 1), barriers[_dbi[j_]][1]))
-    log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates))
+    log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates), 'agganciati al tratto verso la strada invece del piu vicino', len(_pcmv)); _campioni['cancelli_spostati'] = _pcmv
 # cancellate DBGT (EL_DIV_TY 02) fino a GATE02_MAX m che danno su strada o cortile sono cancelli, anche senza un passo carraio (Carlo, 1/11)
 _c02 = Counter(); _prep_paved = [g_ for g_ in (asph, side, pedz, parking) if g_ is not None and not g_.is_empty]
 for pts_, k_, h_ in dbt_02:
@@ -1419,24 +1433,23 @@ for o, a, w in front_gates:
     if any(math.dist((m.x, m.y), ((gg[0] + gg[2]) / 20, (gg[1] + gg[3]) / 20)) < 3 for gg in gate_out): continue
     gate_out.append([q(g0.x), q(g0.y), q(g1.x), q(g1.y), 'g', 1.6, 0]); ng += 1
 # a gate never stands in the carriageway (Carlo, 1/11, via delle Grigne): a gate of the DBGT or of the villas (flag 0, 'g') that falls on the asphalt is dropped
-_cp_ = [g_ for g_ in getattr(asph, 'geoms', [asph])] + ([g_ for g_ in getattr(STR.U_carr, 'geoms', [STR.U_carr])] if STR else [])
-_cpt_ = STRtree(_cp_)
-def _carr_chiusa(G_, r_=6.0):
-    """the carriageway around G_ with its slivers closed (a hole of 2 m or less, like the one a wall leaves in the asphalt): None where there is none"""
-    zone_ = G_.buffer(r_); parts_ = [_cp_[j_] for j_ in _cpt_.query(zone_)]
-    if not parts_: return None
-    u_ = unary_union(parts_).intersection(zone_.buffer(2.0))
-    return u_.buffer(1.0).buffer(-1.0) if not u_.is_empty else None
+# the carriageway with its slivers closed once (a hole of 2 m or less, like the one a wall leaves in the asphalt), prepared: a gate or a wall is "in the middle of the carriageway" when
+# most of the points of a strip round it fall inside (fast: a point test against a prepared polygon, not an intersection with the whole network per gate)
+_carr_all = unary_union([asph] + ([STR.U_carr] if STR else [])); _carr_cl = _carr_all.buffer(1.0, quad_segs=2).buffer(-1.0, quad_segs=2); prepare(_carr_cl)
+_carr_ok = lambda x_, z_: _carr_cl.contains(Point(x_, z_))
+def _frac_carr(G_, w_=1.2):
+    """share of points on and beside the line G_ (w_ each side) that lie in the carriageway"""
+    n_ = max(2, int(G_.length / 1.0) + 1); hit_ = tot_ = 0
+    for i_ in range(n_ + 1):
+        p_ = G_.interpolate(i_ / n_, normalized=True); q_ = G_.interpolate(min(1.0, i_ / n_ + 0.01), normalized=True); dx_, dz_ = q_.x - p_.x, q_.y - p_.y; l_ = math.hypot(dx_, dz_) or 1; nx_, nz_ = -dz_ / l_, dx_ / l_
+        for o_ in (-w_, 0.0, w_): tot_ += 1; hit_ += _carr_ok(p_.x + nx_ * o_, p_.y + nz_ * o_)
+    return hit_ / tot_
 def _gate_in_strada(g_):
     G_ = LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)])
     if _asph_in.intersects(G_) and _asph_in.intersection(G_).length > 0.3: return True
     if _ucarr_in is not None and _ucarr_in.intersects(G_) and _ucarr_in.intersection(G_).length > 0.3: return True
     if any(r_['c'] <= 5 and r_['line'].distance(G_) < r_['w'] / 2 - 0.2 for r_ in raw_roads if flat(r_) and not r_['x'] and r_['line'].distance(G_) < 12): return True
-    c_ = _carr_chiusa(G_)   # the gate in the middle of a carriageway whose own polygon has a sliver round the wall (via delle Grigne, x 687.8 z 2159)
-    if c_ is not None:
-        z_ = G_.buffer(1.2)
-        if c_.intersection(z_).area >= 0.7 * z_.area: return True
-    return False
+    return _frac_carr(G_) >= 0.7   # the gate in the middle of a carriageway whose own polygon has a sliver round the wall (via delle Grigne, x 687.8 z 2159)
 _gtol = [(round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) for g_ in gate_out if g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and _gate_in_strada(g_)]
 gate_out = [g_ for g_ in gate_out if not (g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and (round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) in _gtol)]
 _campioni['in_carreggiata_tolti'] = _gtol
@@ -1446,11 +1459,8 @@ _mon = []; _bo_keep = []
 for b_ in bar_out:
     if b_[1] != 6 and len(b_[0]) >= 2:
         L_ = LineString(b_[0])
-        if 1.0 <= L_.length <= 20:
-            c_ = _carr_chiusa(L_, 4.0)
-            if c_ is not None:
-                z_ = L_.buffer(1.2, cap_style=2)
-                if c_.intersection(z_).area >= 0.9 * z_.area: _mon.append(b_); _campioni['monconi_tolti'].append((round(L_.centroid.x, 1), round(L_.centroid.y, 1), b_[1], round(L_.length, 1))); continue
+        if 1.0 <= L_.length <= 20 and _frac_carr(L_) >= 0.9:
+            _mon.append(b_); _campioni['monconi_tolti'].append((round(L_.centroid.x, 1), round(L_.centroid.y, 1), b_[1], round(L_.length, 1))); continue
     _bo_keep.append(b_)
 bar_out = _bo_keep
 log('monconi di muro nella carreggiata tolti', len(_mon))
