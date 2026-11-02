@@ -267,7 +267,8 @@ function* buildPaesaggio(T, G) {
       lsRail(solid, P, 0, box);
       const ry = Math.atan2(A.ux, A.uz);
       for (const f of [-0.25, 0.25]) { const [x, z] = A.at((A.s0 + A.s1) / 2 + (A.s1 - A.s0) * f, (A.v0 + A.v1) / 2), gy = H.ground(x, z); for (const o of [-1.5, 1.5]) box(0.12, 1.3, 0.12, x + Math.cos(ry) * o, gy + 0.65, z - Math.sin(ry) * o, '#f4f2ea'); for (const y of [0.5, 0.9]) box(3, 0.08, 0.08, x, gy + y, z, y > 0.7 ? '#c8331f' : '#f4f2ea', ry + Math.PI / 2); }
-    } else if (kind.startsWith('sport:')) lsPitch(A, P, kind.split(':')[1], kind.split(':')[2], lines, solid, box, cyl, G, solidAt);
+    } else if (kind.startsWith('sport:baseball')) lsBaseball(P, drape, lines, net, solid, box, solidAt);
+    else if (kind.startsWith('sport:')) lsPitch(A, P, kind.split(':')[1], kind.split(':')[2], lines, solid, box, cyl, G, solidAt);
   }
   // stands by the pitches: rows of steps up to a back wall, seats on them, a roof reaching out over the front
   for (const B of T.bld) {
@@ -388,6 +389,47 @@ function* buildPaesaggio(T, G) {
   }
   T.lsDone = true;
 }
+// a flat strip between two points, w wide, laid on the ground (a painted line, a dirt path)
+function lsSeg(b, a, c, w, col, y) {
+  const L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) return; const n = Math.max(1, Math.ceil(L / 3)), ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L;
+  for (let t = 0; t < n; t++) { const x0 = a[0] + (c[0] - a[0]) * t / n, z0 = a[1] + (c[1] - a[1]) * t / n, x1 = a[0] + (c[0] - a[0]) * (t + 1) / n, z1 = a[1] + (c[1] - a[1]) * (t + 1) / n, q = b.p.length / 3; for (const [px, pz, o] of [[x0, z0, -w], [x1, z1, -w], [x1, z1, w], [x0, z0, w]]) vtx(b, px - uz * o, y, pz + ux * o, 0, 1, 0, 0, 0, col); triUp(b, q, q + 1, q + 2); triUp(b, q, q + 2, q + 3); }
+}
+// a baseball field in the outline the map gives: the two long straight sides of the outline are the foul lines and meet at home plate; from there the
+// diamond (27.4 m, shrunk if the lines are shorter), the infield in dirt with the grass inside, dirt round the bases and home, the mound, white
+// lines, bases, and a backstop of mesh behind home
+function lsBaseball(P, drape, lines, net, solid, box, solidAt) {
+  const n = P.length, E = P.map((p, i) => { const c = P[(i + 1) % n]; return { i, L: hyp(c[0] - p[0], c[1] - p[1]) }; }).filter(e => e.L > 12).sort((a, b) => b.L - a.L);
+  const e1 = E[0], e2 = E.find(e => e !== e1 && Math.abs(e.i - e1.i) > 1 && Math.abs(e.i - e1.i) < n - 1); if (!e1 || !e2) return;
+  const dirOf = e => { const a = P[e.i], c = P[(e.i + 1) % n]; return [(c[0] - a[0]) / e.L, (c[1] - a[1]) / e.L, a, c]; };
+  const [ax, az, a0, a1] = dirOf(e1), [bx, bz, b0, b1] = dirOf(e2), den = ax * bz - az * bx; if (Math.abs(den) < 0.2) return;
+  const t = ((b0[0] - a0[0]) * bz - (b0[1] - a0[1]) * bx) / den, Hm = [a0[0] + ax * t, a0[1] + az * t]; /* the lines of the two sides meet at home */
+  const far1 = hyp(a0[0] - Hm[0], a0[1] - Hm[1]) > hyp(a1[0] - Hm[0], a1[1] - Hm[1]) ? a0 : a1, far2 = hyp(b0[0] - Hm[0], b0[1] - Hm[1]) > hyp(b1[0] - Hm[0], b1[1] - Hm[1]) ? b0 : b1;
+  let d1 = [far1[0] - Hm[0], far1[1] - Hm[1]], d2 = [far2[0] - Hm[0], far2[1] - Hm[1]]; const l1 = hyp(...d1), l2 = hyp(...d2); d1 = [d1[0] / l1, d1[1] / l1]; d2 = [d2[0] / l2, d2[1] / l2];
+  const cosA = d1[0] * d2[0] + d1[1] * d2[1]; if (cosA > 0.5 || cosA < -0.5 || Math.min(l1, l2) < 14) return; /* about a right angle */
+  const D = Math.min(27.43, 0.95 * Math.min(l1, l2)), sc = D / 27.43, bis = [d1[0] + d2[0], d1[1] + d2[1]], bl = hyp(...bis), u = [bis[0] / bl, bis[1] / bl];
+  const at = (a, b) => [Hm[0] + d1[0] * a + d2[0] * b, Hm[1] + d1[1] * a + d2[1] * b], B1 = at(D, 0), B3 = at(0, D), B2 = at(D, D), M = [Hm[0] + u[0] * 18.44 * sc, Hm[1] + u[1] * 18.44 * sc];
+  const DIRT = COL('#b88a5c'), WHITE = COL('#f4f2ea'), Rs = 24.5 * sc;
+  /* the skin: from home, along every direction between the two lines, as far as the circle of 24.5 m round the mound */
+  const a1_ = Math.atan2(d1[1], d1[0]); let da = Math.atan2(d2[1], d2[0]) - a1_; while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
+  const skin = [[Hm[0] - u[0] * 4, Hm[1] - u[1] * 4]]; /* a little dirt behind home too */
+  for (let k = 0; k <= 24; k++) { const th = a1_ + da * k / 24, dx = Math.cos(th), dz = Math.sin(th), px = Hm[0] - M[0], pz = Hm[1] - M[1], bq = px * dx + pz * dz, cq = px * px + pz * pz - Rs * Rs, r = -bq + Math.sqrt(Math.max(0, bq * bq - cq)); skin.push([Hm[0] + dx * r, Hm[1] + dz * r]); }
+  const C = [(Hm[0] + B2[0]) / 2, (Hm[1] + B2[1]) / 2], toC = (p, d) => { const dx = C[0] - p[0], dz = C[1] - p[1], l = hyp(dx, dz) || 1; return [p[0] + dx / l * d, p[1] + dz / l * d]; };
+  const hole = [toC(Hm, 6.5 * sc), toC(B1, 3.3 * sc), toC(B2, 3.3 * sc), toC(B3, 3.3 * sc)];
+  const disc = (c, r, k = 14) => Array.from({ length: k }, (_, i) => [c[0] + Math.cos(i / k * TAU) * r, c[1] + Math.sin(i / k * TAU) * r]);
+  try { polyFill(drape, skin, [hole], 0.05, 10, DIRT); polyFill(drape, disc(M, 2.74), [], 0.055, 10, DIRT); polyFill(drape, disc(Hm, 3.3 * sc + 0.4), [], 0.055, 10, DIRT); } catch (e) { return; }
+  const ext1 = [Hm[0] + d1[0] * l1, Hm[1] + d1[1] * l1], ext2 = [Hm[0] + d2[0] * l2, Hm[1] + d2[1] * l2];
+  lsSeg(lines, Hm, ext1, 0.07, WHITE, 0.07); lsSeg(lines, Hm, ext2, 0.07, WHITE, 0.07);
+  for (const B of [B1, B2, B3]) box(0.5, 0.09, 0.5, B[0], H.ground(B[0], B[1]) + 0.045, B[1], '#f4f2ea', Math.atan2(u[0], u[1]));
+  box(0.43, 0.09, 0.43, Hm[0], H.ground(Hm[0], Hm[1]) + 0.045, Hm[1], '#f4f2ea', Math.atan2(u[0], u[1]));
+  box(0.6, 0.08, 0.15, M[0], H.ground(M[0], M[1]) + 0.1, M[1], '#f4f2ea', Math.atan2(u[0], u[1]) + Math.PI / 2);
+  /* the backstop: an arc of mesh 4 m high, 6 m behind home, on posts every 2 m */
+  const F0 = lmFrame(new THREE.Matrix4()), h = 4, R = 6, pts = []; for (let k = 0; k <= 8; k++) { const th = Math.atan2(-u[1], -u[0]) + (k / 8 - 0.5) * 2.4; pts.push([Hm[0] + Math.cos(th) * R, Hm[1] + Math.sin(th) * R]); }
+  let acc = 0; for (let i = 0; i + 1 < pts.length; i++) { const p = pts[i], c = pts[i + 1], L = hyp(c[0] - p[0], c[1] - p[1]), g0 = H.ground(p[0], p[1]), g1 = H.ground(c[0], c[1]), j = net.p.length / 3, nx = (c[1] - p[1]) / L, nz = -(c[0] - p[0]) / L;
+    vtx(net, p[0], g0, p[1], nx, 0, nz, acc / 2.6, 0); vtx(net, c[0], g1, c[1], nx, 0, nz, (acc + L) / 2.6, 0); vtx(net, c[0], g1 + h, c[1], nx, 0, nz, (acc + L) / 2.6, 1); vtx(net, p[0], g0 + h, p[1], nx, 0, nz, acc / 2.6, 1); net.i.push(j, j + 1, j + 2, j, j + 2, j + 3);
+    F0.geo(solid, lmBox(0.1, h + 0.1, 0.1, p[0], g0 + h / 2, p[1]), null, COL('#3e4a42')); solidAt(p[0], p[1], 0.2, h);
+    for (let t = 0.5; t < L; t += 0.5) solidAt(p[0] + (c[0] - p[0]) * t / L, p[1] + (c[1] - p[1]) * t / L, 0.15, h); acc += L; }
+  { const q = pts[pts.length - 1]; F0.geo(solid, lmBox(0.1, h + 0.1, 0.1, q[0], H.ground(q[0], q[1]) + h / 2, q[1]), null, COL('#3e4a42')); solidAt(q[0], q[1], 0.2, h); }
+}
 // a net that is a net: thin pale threads on clear cloth (goals, hoops, tennis and volleyball), unlike the dark fence mesh
 const LS_RETE = new THREE.MeshLambertMaterial({ map: canvasTex(32, 32, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#eceff0'; g.fillRect(0, 0, w, 3); g.fillRect(0, 0, 3, h); }), alphaTest: 0.12, side: THREE.DoubleSide, color: 0xffffff });
 // ---- pitches: the lines of the game the map says, and the gear of that game in its place (frame = the minimum rectangle of the polygon):
@@ -401,7 +443,7 @@ function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
   const rect = (hl, hw) => { line(-hl, -hw, hl, -hw); line(hl, -hw, hl, hw); line(hl, hw, -hl, hw); line(-hl, hw, -hl, -hw); };
   const circle = (a, b, r, from = 0, to = TAU) => { const n = Math.max(8, Math.ceil(r * 3)); for (let k = 0; k < n; k++) { const t0 = from + (to - from) * k / n, t1 = from + (to - from) * (k + 1) / n; line(a + Math.cos(t0) * r, b + Math.sin(t0) * r, a + Math.cos(t1) * r, b + Math.sin(t1) * r, 0.08); } };
   const gyAt = (a, b) => { const [x, z] = S(a, b); return [x, H.ground(x, z), z]; };
-  const surf = { clay: '#c0663f', sand: '#e2cf9a', grass: null, artificial_turf: '#5e9a4a', asphalt: '#6e7378', concrete: '#9a9a96', tartan: '#b5523c' }[surface] || (sport === 'basketball' && surface !== 'grass' ? { acrylic: '#3f6e9a', rubber: '#a8503c' }[surface] || '#6e7378' : null); /* a basketball court has a hard floor: the paving unless OSM says it is grass (Carlo, 1/11) */
+  const surf = { clay: '#c0663f', sand: '#e2cf9a', grass: null, artificial_turf: '#5e9a4a', asphalt: '#6e7378', concrete: '#9a9a96', tartan: '#b5523c' }[surface] || (sport === 'basketball' && surface !== 'grass' ? { acrylic: '#3f6e9a', rubber: '#a8503c' }[surface] || '#6e7378' : (sport === 'boules' || sport === 'bowls') && surface !== 'grass' ? { clay: '#c0663f', sand: '#e2cf9a', asphalt: '#6e7378', concrete: '#9a9a96' }[surface] || '#c2aa82' : null); /* a basketball court has a hard floor: the paving unless OSM says it is grass (Carlo, 1/11) */
   if (surf) { try { const sb = VBuf(); polyFill(sb, P, [], 0.05, 10, COL(surf)); mkMesh(sb, MAT.mark, 2, false, G); } catch (e) { } }
   const rec = window.__CAMPI ? { sport, surface, P, rc: [A.cx, A.cz, A.ux, A.uz, A.s1, A.v1], it: [] } : null; if (rec) window.__CAMPI.push(rec);
   const F0 = lmFrame(new THREE.Matrix4()), gnet = Buf(), V3 = THREE.Vector3, Y = new V3(0, 1, 0);
@@ -474,6 +516,7 @@ function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
     }
   } else if (sport === 'boules' || sport === 'bowls') { /* the boards round a bocce court */
     const hl = Ls / 2 - 0.6;
+    for (const a of [-hl * 0.5, 0, hl * 0.5]) line(a, -hw, a, hw); /* the lines across the court (the jack line, the middle) */
     for (const [a0, b0, a1, b1] of [[-hl, -hw, hl, -hw], [-hl, hw, hl, hw], [-hl, -hw, -hl, hw], [hl, -hw, hl, hw]]) { const [x0, y0, z0] = gyAt(a0, b0), [x1, , z1] = gyAt(a1, b1); box(hyp(x1 - x0, z1 - z0) + 0.2, 0.3, 0.12, (x0 + x1) / 2, y0 + 0.15, (z0 + z1) / 2, '#8a6a4a', Math.atan2(x1 - x0, z1 - z0) - Math.PI / 2); }
   }
   if (gnet.i.length) mkMesh(gnet, LS_RETE, 11, false, G);
