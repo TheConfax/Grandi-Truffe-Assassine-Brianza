@@ -436,6 +436,31 @@ def righe(STR, raw_roads, nodes, log=print):
         p = np.array(l['p']); m = shapely.contains_xy(STR.U_carr, p[:, 0], p[:, 1]); nfuori += int((~m).sum())
         for i0, i1 in _runs(m, 3): kept.append(dict(l, p=l['p'][i0:i1]))
     lines = kept
+    # a line on a carriageway the DBGT has in gallery (AC_VEI SED=03) gets level 3: the game draws it on the floor of the underpass (src/opere.py),
+    # not on the ground over it nor on a deck (the dashes of via Montecassino and of x -768 z 103 under the Milano-Meda)
+    # (a line of the road over the gallery crosses the same area in plan: only a line running along the carriageway in gallery is its own. The
+    # direction of each SED=03 area: the long side of its smallest rectangle)
+    p3 = []
+    for g, a in D['vei']:
+        if a.get('sed') != '03' or g.is_empty: continue
+        r = np.asarray(g.minimum_rotated_rectangle.exterior.coords)[:3]; e1, e2 = r[1] - r[0], r[2] - r[1]; e = e1 if np.hypot(*e1) >= np.hypot(*e2) else e2
+        p3.append((g, e / max(np.hypot(*e), 1e-9)))
+    if p3:
+        tr3 = STRtree([g for g, _ in p3]); kept = []; n3 = 0
+        for l in lines:
+            p = np.array(l['p'], float)
+            if len(p) < 2: kept.append(l); continue
+            d = np.gradient(p, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]; m = np.zeros(len(p), bool)
+            for i, q in enumerate(p):
+                for j in tr3.query(shapely.points(q)):
+                    g, e = p3[j]
+                    if abs(float(d[i] @ e)) > 0.85 and g.contains(shapely.points(q)): m[i] = True; break
+            if not m.any(): kept.append(l); continue
+            cut = [0] + [i for i in range(1, len(m)) if m[i] != m[i - 1]] + [len(m)]
+            for a_, b_ in zip(cut[:-1], cut[1:]):
+                a0, b0 = max(0, a_ - (1 if m[a_] else 0)), min(len(m), b_ + (1 if m[a_] else 0))   # (the run in gallery takes the point before and after: no gap at the edge)
+                if b0 - a0 >= 2: kept.append(dict(l, p=l['p'][a0:b0], lev=3 if m[a_] else l['lev'])); n3 += int(m[a_])
+        lines = kept; log('dbgt righe: pezzi in galleria (livello 3) %d' % n3)
     # the report: bends and lines off the carriageway
     bends = np.concatenate([_bends(l['p']) for l in lines]) if lines else np.zeros(0)
     out = 0; tot = 0; U = STR.U_carr

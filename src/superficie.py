@@ -670,12 +670,22 @@ class Superficie:
         s.DZ = np.where(FIX, s.ZF - s.L, np.nan)
         dbr = ndimage.distance_transform_edt(~s.BR, sampling=SF) if s.BR.any() else np.full(s.BR.shape, 1e9)
         st8 = np.ones((3, 3), bool); dz = np.nan_to_num(s.DZ)
+        # over a road gallery (src/opere.py gallerie_stradali: a GALLER with a SED=03 axis in it) the DBGT has solid ground, not a bridge: the roads
+        # over it keep their DBGT height on S, never a deck part nor the cap (the DTM sees through the underpass there). The work under them is opere.py's
+        GS = np.zeros(RT.shape, bool)
+        for P in opere.gallerie_stradali(s.D):
+            w, m = s.raster(P.buffer(1.0))
+            if w is not None: GS[w[0]:w[1], w[2]:w[3]] |= m
         s.AIR = ndimage.binary_propagation(RT & (dbr <= NEAR_BR) & (dz > DZ_CAP), structure=st8, mask=RT & (dz > DZ_WARN))
+        if GS.any():   # a patch of deck parts that reaches over a road gallery is all the gallery's ground (the DTM hole is wider than the GALLER)
+            lab, _ = ndimage.label(s.AIR, st8); hit = np.unique(lab[s.AIR & GS]); hit = hit[hit > 0]
+            if len(hit): GS = GS | (np.isin(lab, hit) & (ndimage.distance_transform_edt(~GS, sampling=SF) <= 15.0)); s.AIR &= ~GS   # (within 15 m: not a deck further along the same road)
+        s.GSTR = GS
         # a road under the LiDAR under a bridge or the gallery cover, or by them, keeps the DBGT: the DTM is filled across the deck and a few m
         # past its edges (via Busnelli under PONTE 12 is flat at 215.2 in the DBGT, the LiDAR rises to 219.7 and shut the road; the streets
         # over the station underpass took the stair holes of the LiDAR)
         s.UND = (dbr <= NEAR_UNDER) & (dz < 0)
-        s.CAP = ndimage.binary_propagation(RT & (np.abs(dz) > DZ_CAP) & ~s.AIR & ~s.UND, structure=st8, mask=RT & (np.abs(dz) > DZ_WARN) & ~s.AIR & ~s.UND)
+        s.CAP = ndimage.binary_propagation(RT & (np.abs(dz) > DZ_CAP) & ~s.AIR & ~s.UND & ~GS, structure=st8, mask=RT & (np.abs(dz) > DZ_WARN) & ~s.AIR & ~s.UND & ~GS)
         # a capped patch over the river is a culvert (tombino) the LiDAR sees through: the road keeps the DBGT
         s.TOMB = np.zeros(s.CAP.shape, bool); s.PNS = np.zeros(s.CAP.shape, bool)
         if s.CAP.any():
@@ -697,7 +707,7 @@ class Superficie:
         s.ZRAW = s.ZF.copy(); s.NEARCAP = np.zeros(s.CAP.shape, bool)
         if s.CAP.any():
             dc = ndimage.distance_transform_edt(~s.CAP, sampling=SF); wt = np.clip(dc / RAMP, 0, 1); s.NEARCAP = dc < RAMP
-            k = RT & ~s.AIR & ~s.UND; s.ZF[k] = s.L[k] + s.DZ[k] * wt[k]
+            k = RT & ~s.AIR & ~s.UND & ~GS; s.ZF[k] = s.L[k] + s.DZ[k] * wt[k]
         s.RANK[s.AIR] = 0; s.BR |= s.AIR
         # river bed more than DZ_CAP under the LiDAR (and not under a bridge): a covered stretch (the street over the Seveso in the centre,
         # x 260 z -525, is flat in the DTM 3.5 m over the DBGT bed) or the walls of the ravine in the north. The LiDAR is kept there, else

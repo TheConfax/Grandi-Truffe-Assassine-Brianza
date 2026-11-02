@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo sottopassi-cavalcavia · dopo 48541fc · assemblato 02/11 22:29 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 51d2aa9 · assemblato 03/11 00:14 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2664,21 +2664,39 @@ function pitLook(T, x, z) { // the look of the highest layer of the tile over th
 // an underpass is one piece (src/opere.py): walls unbroken from the floor to their top, on the open ones a parapet with a real thickness, one ceiling at one height along the covered
 // part, a front that closes each head of it. The ground and the paint are cut round it: nothing of them is seen from inside
 const OP_SP = 0.3; // m: the thickness of the parapets
+function opDentro(x, z, lev, dx, dz) { const u = H.gallAt(x, z); if (u) return lev === 3; const p_ = H.inPit(x, z); if (lev === 2 || !(p_ && p_.src && p_.src.sotto)) return false; if (dx === undefined) return true; let k = 0, b = 1e18; for (let i = 0; i < p_.sx.length; i++) { const d = (p_.sx[i][0] + p_.dx[i][0]) / 2 - x, e = (p_.sx[i][1] + p_.dx[i][1]) / 2 - z, q = d * d + e * e; if (q < b) { b = q; k = i; } } const k1 = Math.min(k + 1, p_.sx.length - 1), k0 = Math.max(k1 - 1, 0), ax = (p_.sx[k1][0] + p_.dx[k1][0] - p_.sx[k0][0] - p_.dx[k0][0]) / 2, az = (p_.sx[k1][1] + p_.dx[k1][1] - p_.sx[k0][1] - p_.dx[k0][1]) / 2; return Math.abs(ax * dx + az * dz) > 0.85 * (hyp(ax, az) * hyp(dx, dz) || 1); } /* in the open part only a line running along it: the edge of the road over the mouth crosses it in plan, and that road is cut there */ // a point of a road line on the floor of an underpass: in its open part any line, under its cover only those of the carriageway in gallery (lev 3, dbgt_righe.py)
+function opFondo(x, z) { const u = H.gallAt(x, z); if (u) return u.floor; const f = H.pitAt(x, z); return f !== null ? f : H.surface(x, z); } // the floor of the underpass at (x, z)
 function opSotto(o) { const w = H.inPit(o[0], o[1]); if (w && w.src && w.src.sotto && o[2] < H.baseS(o[0], o[1]) - 0.3) return true; const u = H.gallAt(o[0], o[1]); return !!u && o[2] < u.soff; } // a point [x, z, y] inside the work
 function opQuad(b, Q0, nx, ny, nz) { const ux = Q0[1][0] - Q0[0][0], uy = Q0[1][1] - Q0[0][1], uz = Q0[1][2] - Q0[0][2], vx = Q0[3][0] - Q0[0][0], vy = Q0[3][1] - Q0[0][1], vz = Q0[3][2] - Q0[0][2], Q = (uy * vz - uz * vy) * nx + (uz * vx - ux * vz) * ny + (ux * vy - uy * vx) * nz < 0 ? [Q0[0], Q0[3], Q0[2], Q0[1]] : Q0; const i0 = b.p.length / 3; for (const q of Q) vtx(b, q[0], q[1], q[2], nx, ny, nz, (q[0] + q[2]) / 2, q[1] / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
-function opPareti(Wb, p, roof) { // roof[k]: the ceiling over station k, or null: open
+function opPareti(Wb, p, roof) { // roof[k]: the ceiling over station k, or null: open. Every wall is solid: its face to the road, and where it is open a parapet with a real thickness: the outer face down into the ground, the top, and the end where a run of wall stops (no face without a back)
   const q0 = p.src, B0 = H.B0;
-  for (const [L, O, C] of [[p.sx, p.dx, q0.csx], [p.dx, p.sx, q0.cdx]]) for (let k = 1; k < L.length; k++) {
-    const A = L[k - 1], E = L[k], cov = roof && roof[k - 1] !== null && roof[k] !== null, ta = cov ? roof[k - 1] : C[k - 1] - B0, tb = cov ? roof[k] : C[k] - B0; if (Math.max(ta - A[2], tb - E[2]) < 0.3) continue;
-    const n = hyp(E[0] - A[0], E[1] - A[1]) || 1, nx = (E[1] - A[1]) / n, nz = -(E[0] - A[0]) / n;
-    opQuad(Wb, [[A[0], A[2] - 0.1, A[1]], [E[0], E[2] - 0.1, E[1]], [E[0], tb, E[1]], [A[0], ta, A[1]]], nx, 0, nz);
-    if (!cov) { // the parapet: on the outer side down into the ground, and its top
-      const la = hyp(A[0] - O[k - 1][0], A[1] - O[k - 1][1]) || 1, lb = hyp(E[0] - O[k][0], E[1] - O[k][1]) || 1, A2 = [A[0] + (A[0] - O[k - 1][0]) / la * OP_SP, A[1] + (A[1] - O[k - 1][1]) / la * OP_SP], E2 = [E[0] + (E[0] - O[k][0]) / lb * OP_SP, E[1] + (E[1] - O[k][1]) / lb * OP_SP];
-      opQuad(Wb, [[A2[0], Math.min(ta, H.baseS(A2[0], A2[1])) - 0.3, A2[1]], [E2[0], Math.min(tb, H.baseS(E2[0], E2[1])) - 0.3, E2[1]], [E2[0], tb, E2[1]], [A2[0], ta, A2[1]]], nx, 0, nz);
-      opQuad(Wb, [[A[0], ta, A[1]], [E[0], tb, E[1]], [E2[0], tb, E2[1]], [A2[0], ta, A2[1]]], 0, 1, 0);
+  for (const [L, O, C] of [[p.sx, p.dx, q0.csx], [p.dx, p.sx, q0.cdx]]) {
+    let fine = null; // the end of the run of parapet drawn so far: closed when the run stops
+    const chiudi = () => { if (!fine) return; const [E, E2, tb, bi, bo, tx, tz] = fine; opQuad(Wb, [[E[0], bi, E[1]], [E2[0], bo, E2[1]], [E2[0], tb, E2[1]], [E[0], tb, E[1]]], tx, 0, tz); fine = null; };
+    for (let k = 1; k < L.length; k++) {
+      const A = L[k - 1], E = L[k], cov = roof && roof[k - 1] !== null && roof[k] !== null, ta = cov ? roof[k - 1] : C[k - 1] - B0, tb = cov ? roof[k] : C[k] - B0;
+      if (Math.max(ta - A[2], tb - E[2]) < 0.3) { chiudi(); continue; }
+      const n = hyp(E[0] - A[0], E[1] - A[1]) || 1, tx = (E[0] - A[0]) / n, tz = (E[1] - A[1]) / n; let nx = tz, nz = -tx;
+      if (nx * ((O[k - 1][0] + O[k][0]) / 2 - (A[0] + E[0]) / 2) + nz * ((O[k - 1][1] + O[k][1]) / 2 - (A[1] + E[1]) / 2) < 0) { nx = -nx; nz = -nz; } // the face looks at the road
+      opQuad(Wb, [[A[0], A[2] - 0.1, A[1]], [E[0], E[2] - 0.1, E[1]], [E[0], tb, E[1]], [A[0], ta, A[1]]], nx, 0, nz);
+      if (!cov) { // the parapet: on the outer side down into the ground, and its top
+        const la = hyp(A[0] - O[k - 1][0], A[1] - O[k - 1][1]) || 1, lb = hyp(E[0] - O[k][0], E[1] - O[k][1]) || 1, A2 = [A[0] + (A[0] - O[k - 1][0]) / la * OP_SP, A[1] + (A[1] - O[k - 1][1]) / la * OP_SP], E2 = [E[0] + (E[0] - O[k][0]) / lb * OP_SP, E[1] + (E[1] - O[k][1]) / lb * OP_SP];
+        const ba = Math.min(ta, H.baseS(A2[0], A2[1])) - 0.3, bb = Math.min(tb, H.baseS(E2[0], E2[1])) - 0.3;
+        opQuad(Wb, [[A2[0], ba, A2[1]], [E2[0], bb, E2[1]], [E2[0], tb, E2[1]], [A2[0], ta, A2[1]]], -nx, 0, -nz);
+        opQuad(Wb, [[A[0], ta, A[1]], [E[0], tb, E[1]], [E2[0], tb, E2[1]], [A2[0], ta, A2[1]]], 0, 1, 0);
+        if (!fine) opQuad(Wb, [[A[0], A[2] - 0.1, A[1]], [A2[0], ba, A2[1]], [A2[0], ta, A2[1]], [A[0], ta, A[1]]], -tx, 0, -tz); // the start of a run
+        fine = [E, E2, tb, E[2] - 0.1, bb, tx, tz];
+      } else chiudi();
+      WALLS.add(Math.min(A[0], E[0]), Math.min(A[1], E[1]), Math.max(A[0], E[0]), Math.max(A[1], E[1]), { ax: A[0], az: A[1], bx: E[0], bz: E[1], nx, nz, two: true, y0: Math.min(A[2], E[2]) - 3, y1: Math.max(ta, tb), pit: p.id });
     }
-    WALLS.add(Math.min(A[0], E[0]), Math.min(A[1], E[1]), Math.max(A[0], E[0]), Math.max(A[1], E[1]), { ax: A[0], az: A[1], bx: E[0], bz: E[1], nx, nz, two: true, y0: Math.min(A[2], E[2]) - 3, y1: Math.max(ta, tb), pit: p.id });
+    chiudi();
   }
+}
+// the walls of a garage ramp (src/sottoterra.py) are walls as those of an underpass (Carlo 2/11, via Gagarin x 546 z -490: the curved wall was a dark sheet one could see
+// through): solid, the parapet PIT_PAR over the ground beside it (never under it), a top, collision. The top is read at the stations, not on the cuts of the cells (the steps)
+function rampaPareti(Wb, p) {
+  const B0 = H.B0, tops = L => { const g = L.map(v => H.baseS(v[0], v[1])), m = g.length - 1, gm = g.map((_, k) => { let x = -1e9; for (let d = -4; d <= 4; d++) x = Math.max(x, g[clamp(k + d, 0, m)]); return x; }); return L.map((v, k) => { let s_ = 0; for (let d = -4; d <= 4; d++) s_ += gm[clamp(k + d, 0, m)]; const gg = s_ / 9, dd = gg - v[2]; return (g[k] - v[2] < 0.25 ? v[2] : gg + Math.min(PIT_PAR, dd)) + B0; }); }; // (the top: the highest ground within 4 stations, averaged: never under the ground, no steps)
+  opPareti(Wb, { sx: p.sx, dx: p.dx, src: { csx: tops(p.sx), cdx: tops(p.dx) }, id: p.id }, null);
 }
 function opSoffitto(C, p, roof) { for (let k = 1; k < p.sx.length; k++) { if (roof[k - 1] === null || roof[k] === null) continue; const a = p.sx[k - 1], b = p.sx[k], c = p.dx[k], d = p.dx[k - 1]; opQuad(C, [[a[0], roof[k - 1], a[1]], [b[0], roof[k], b[1]], [c[0], roof[k], c[1]], [d[0], roof[k - 1], d[1]]], 0, -1, 0); } }
 function opFronte(Wb, p, k, kin, soff) { // the front at station k, the covered part going towards station kin. Under a deck it goes up to the deck and runs along it as far as the ground stays under the deck; else up to the parapets at its two ends, with its own parapet on the ground over the tunnel
@@ -2742,21 +2760,7 @@ function buildPits(T, G) {
     const MF = mkMesh(F, p.src && p.src.sotto ? MAT.asph : MAT.pitFloor, -2, false); scene.remove(MF); G.add(MF); MF.userData.suolo = true; p.meshes.push(MF);
     // walls and parapets along the two sides, the door at the end
     const Wb = Buf(), D = Buf(), quad = (b, a, c, ya0, ya1, yc0, yc1, u0, u1) => { const dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1, nx = dz / L, nz = -dx / L, i0 = b.p.length / 3; vtx(b, a[0], ya0, a[1], nx, 0, nz, u0, ya0 / 2); vtx(b, c[0], yc0, c[1], nx, 0, nz, u1, yc0 / 2); vtx(b, c[0], yc1, c[1], nx, 0, nz, u1, yc1 / 2); vtx(b, a[0], ya1, a[1], nx, 0, nz, u0, ya1 / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); };
-    if (!op_) for (const side of [p.sx, p.dx]) {
-      let u = 0;
-      for (let k = 1; k < side.length; k++) {
-        const [ax, az, ay] = side[k - 1], [bx, bz, by] = side[k], L = hyp(bx - ax, bz - az) || 1;
-        const pts = H.cutLine(ax, az, bx, bz, H.baseS); let lo = 1e9, hi = -1e9, deep = false;
-        for (let q = 1; q < pts.length; q++) {
-          const A = pts[q - 1], C = pts[q], fa = ay + (by - ay) * hyp(A[0] - ax, A[1] - az) / L, fc = ay + (by - ay) * hyp(C[0] - ax, C[1] - az) / L, da = A[2] - fa, dc = C[2] - fc;
-          if (Math.max(da, dc) < 0.25) continue; deep = true;
-          const ta = A[2] + Math.min(PIT_PAR, Math.max(0, da)), tc = C[2] + Math.min(PIT_PAR, Math.max(0, dc)); lo = Math.min(lo, fa, fc); hi = Math.max(hi, ta, tc);
-          const ua = u + hyp(A[0] - ax, A[1] - az) / 2, uc = u + hyp(C[0] - ax, C[1] - az) / 2; quad(Wb, A, C, Math.min(fa, A[2]), ta, Math.min(fc, C[2]), tc, ua, uc);
-        }
-        u += L / 2;
-        if (deep) { const L2 = hyp(bx - ax, bz - az); WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L2, nz: -(bx - ax) / L2, two: true, y0: lo - 3, y1: hi, pit: p.id }); }
-      }
-    }
+    if (!op_) rampaPareti(Wb, p);
     if (op_) { // an underpass: no door
       const q_ = p.src, n_ = p.sx.length, roof = q_.tetto ? q_.tetto.map(v => v === null ? null : v - H.B0) : null, C_ = Buf(); opPareti(Wb, p, roof);
       if (roof) { opSoffitto(C_, p, roof); if (q_.fronti[0]) opFronte(Wb, p, 0, 1, roof[0]); if (q_.fronti[1]) opFronte(Wb, p, n_ - 1, n_ - 2, roof[n_ - 1]); }
@@ -3006,16 +3010,16 @@ function* buildTileGen(T) {
     const top = (x, z) => { let y = null; for (const o of H.deckAt(x, z)) if (o.tipo !== 'copertura' && (y === null || o.top > y)) y = o.top; return y; }; // the highest deck over (x, z)
     for (const [ty, lev, s0, E] of d.sg || []) {
       const P = []; let px = 0, pz = 0; for (let i = 0; i < E.length; i += 2) { px += E[i]; pz += E[i + 1]; P.push([px / 100, pz / 100]); }
-      if (P.length < 2 || (lev === 2 && H.GALL.length && P.some(q => H.gallAt(q[0], q[1])))) continue; /* the lines of a carriageway in gallery are not on the ground over it */
-      if (H.PITS.length) { const ins = P.map(q => !!H.inPit(q[0], q[1], 0.1)); if (ins.some(v => v) && ins.some(v => !v)) { let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i; while (j < P.length && ins[j] === ins[i]) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* a line does not climb the wall of a trench: only the longest run on one side of it */
-      if (H.PITS.length && P.some(q => { const p_ = H.inPit(q[0], q[1], 12); return p_ && p_.src && p_.src.sotto; })) { const dentro_ = (x, z) => { const p_ = H.inPit(x, z); return (p_ && p_.src && p_.src.sotto) || H.gallAt(x, z); }, male = (a, c) => { if (Math.abs(H.base(c[0], c[1]) - H.base(a[0], a[1])) > 0.3 * hyp(c[0] - a[0], c[1] - a[1])) return true; for (const t of [0.15, 0.5, 0.85]) if (dentro_(a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t)) return true; return false; }; { const fitta = [P[0]]; for (let i = 1; i < P.length; i++) { const L_ = hyp(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]), n_ = Math.max(1, Math.ceil(L_ / 2)); for (let q = 1; q <= n_; q++) fitta.push(q === n_ ? P[i] : [P[i - 1][0] + (P[i][0] - P[i - 1][0]) * q / n_, P[i - 1][1] + (P[i][1] - P[i - 1][1]) * q / n_]); } P.length = 0; P.push(...fitta); } /* (every 2 m: the climb is only in its last metres) */ let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i + 1; while (j < P.length && !male(P[j - 1], P[j])) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } if (bn < P.length) { const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* nor the bank beside a work: no white post */
+      if (P.length < 2) continue;
+      if (H.PITS.length) { const ins = P.map(q => { const p_ = H.inPit(q[0], q[1], 0.1); return !!p_ && !(p_.src && p_.src.sotto); }); if (ins.some(v => v) && ins.some(v => !v)) { let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i; while (j < P.length && ins[j] === ins[i]) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* a line does not climb the wall of a garage ramp: only the longest run on one side of it */
+      const opL = (H.GALL.length || H.PITS.length) && P.some(q => { const p_ = H.inPit(q[0], q[1], 12); return (p_ && p_.src && p_.src.sotto) || H.gallAt(q[0], q[1]); }); /* near an underpass (src/opere.py): what of the line is on its floor is drawn there, a vertex every metre */
+      if (opL) { const fitta = [P[0]]; for (let i = 1; i < P.length; i++) { const L_ = hyp(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]), n_ = Math.max(1, Math.ceil(L_)); for (let q = 1; q <= n_; q++) fitta.push(q === n_ ? P[i] : [P[i - 1][0] + (P[i][0] - P[i - 1][0]) * q / n_, P[i - 1][1] + (P[i][1] - P[i - 1][1]) * q / n_]); } P.length = 0; P.push(...fitta); }
       const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + hyp(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
       const at = s => { let i = 1; while (i < P.length - 1 && cum[i] < s) i++; const f = clamp((s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), 0, 1); return [lerp(P[i - 1][0], P[i][0], f), lerp(P[i - 1][1], P[i][1], f)]; };
       const piece = (a, b) => { const o = [at(a)]; for (let i = 1; i < P.length - 1; i++) if (cum[i] > a && cum[i] < b) o.push(P[i]); o.push(at(b)); return o; }; // the line from a to b m along it
       const runs = []; if (ty !== 2) runs.push([0, cum[cum.length - 1]]);
       else { const S0 = s0 / 10, L = cum[cum.length - 1]; for (let k = Math.floor(S0 / 7.5); k * 7.5 - S0 < L; k++) { const a = Math.max(0, k * 7.5 - S0), b = Math.min(L, k * 7.5 + 3 - S0); if (b - a > 0.2) runs.push([a, b]); } }
-      for (const [a, b] of runs) {
-        let Q = piece(a, b); if (Q.length < 2) continue;
+      const drawQ = Q => {
         if (lev === 2 && T.fine) { // on the bridge: on the top of the deck where there is one (absolute heights, a vertex every 2 m at most), on S past its ends
           const Q2 = [Q[0]]; for (let i = 1; i < Q.length; i++) { const p = Q[i - 1], q = Q[i], n = Math.max(1, Math.ceil(hyp(q[0] - p[0], q[1] - p[1]) / 2)); for (let k = 1; k <= n; k++) Q2.push([lerp(p[0], q[0], k / n), lerp(p[1], q[1], k / n)]); }
           const on = Q2.map(q => top(q[0], q[1]) !== null);
@@ -3028,9 +3032,19 @@ function* buildTileGen(T) {
             }
             i = j + 1;
           }
-          continue;
+          return;
         }
         ribbon(mark, Q, -0.075, 0.075, 0.08 * fy, 1, 'along', white);
+      };
+      for (const [a, b] of runs) {
+        const Q = piece(a, b); if (Q.length < 2) continue;
+        if (opL) { const fl = Q.map((q, i) => { const a_ = Q[Math.max(i - 1, 0)], b_ = Q[Math.min(i + 1, Q.length - 1)]; return opDentro(q[0], q[1], lev, b_[0] - a_[0], b_[1] - a_[1]); }); if (fl.some(v => v)) { /* on the floor of the underpass: absolute heights; past its edge as everywhere */
+          for (let i = 0; i < Q.length;) { let j = i; while (j + 1 < Q.length && fl[j + 1] === fl[i]) j++; const R = Q.slice(i, j + 1);
+            if (fl[i] && j + 1 < Q.length) R.push([(Q[j][0] + Q[j + 1][0]) / 2, (Q[j][1] + Q[j + 1][1]) / 2]); if (fl[i] && i > 0) R.unshift([(Q[i - 1][0] + Q[i][0]) / 2, (Q[i - 1][1] + Q[i][1]) / 2]); /* (to the middle of the step to the next: no gap at the mouth) */
+            if (R.length >= 2) { if (fl[i]) { let fm = -1e9; for (let q = i; q <= j; q++) fm = Math.max(fm, opFondo(Q[q][0], Q[q][1])); const i0 = dmark.p.length / 3; ribbon(dmark, R, -0.075, 0.075, 0, 1, 'along', white); for (let v = i0; v < dmark.p.length / 3; v++) dmark.p[v * 3 + 1] = Math.min(opFondo(dmark.p[v * 3], dmark.p[v * 3 + 2]), fm + 0.1) + 0.04; } /* (the ends past the edge of the floor stay at the floor: no climb up the wall) */ else { const inT = q => { const p_ = H.inPit(R[q][0], R[q][1]); return !!(p_ && p_.src && p_.src.sotto) && !H.gallAt(R[q][0], R[q][1]); }; let c0 = inT(0) ? 1 : 0; for (let q = Math.max(1, c0); q <= R.length; q++) { if (q === R.length) { if (q - c0 >= 2) drawQ(R.slice(c0, q)); break; } if (inT(q)) { if (q - c0 >= 2) drawQ(R.slice(c0, q)); c0 = q + 1; continue; } if (q > c0 && Math.abs(H.surface(R[q][0], R[q][1]) - H.surface(R[q - 1][0], R[q - 1][1])) > 0.3 * hyp(R[q][0] - R[q - 1][0], R[q][1] - R[q - 1][1]) + 0.15) { if (q - c0 >= 2) drawQ(R.slice(c0, q)); c0 = q; } } } } /* past the edge: never a step that climbs the wall of the work */
+            i = j + 1; }
+          continue; } }
+        drawQ(Q);
       }
     }
     for (const ri of d.rp || []) {

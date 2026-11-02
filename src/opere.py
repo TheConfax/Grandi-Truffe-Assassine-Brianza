@@ -30,6 +30,8 @@ MEZZA_STRADA = 2.75  # m: quanto si tiene lontano dall'asse di una strada a un a
 MARGINE = 0.3      # ... piu questo
 MEZZA_MIN = 3.25   # m: la trincea non si stringe sotto questo (due corsie)
 PASSO = 1.0        # m fra le stazioni lungo l'asse
+OLTRE_GALLER = 3   # stazioni: il coperto va oltre il bordo della GALLER al massimo di tanto
+MARGINE_S = 1      # stazioni: il coperto comincia dove S e alta anche tante stazioni prima e dopo (una cella di S e 2 m)
 RAMO_MAX, RAMO_DZ, RAMO_LARGO, RAMO_SOTTO = 9.0, 0.6, 3.0, 0.2   # m: un altro asse del fondo entro tanto dall'asse, a tanto di quota, il margine che gli si lascia verso la parete, e quanto sta sotto il suolo (sopra e un'altra strada)
 ALLUNGA_MAX = 160.0  # m: per lato, oltre questo non e una trincea
 COPERTO_OSM = 6.0  # m: una stazione cosi vicina alla via tunnel di OSM e coperta
@@ -54,6 +56,19 @@ def poligoni(D, nm, cond=lambda i: True):
     import superficie as sf
     L = D.get(nm)
     return [] if L is None else [sf.poly(L, i) for i in range(len(L['off']) - 1) if cond(i)]
+
+
+def gallerie_stradali(D, minimo=5.0):
+    """i poligoni GALLER con dentro almeno `minimo` m di assi EL_STR in galleria (SED=03): una strada passa sotto. Per il DBGT sopra non c'e un ponte ma
+    il suolo pieno (il rilevato della Milano-Meda, x -768 z 103): le strade di sopra stanno su S alla loro quota e non diventano impalcati (superficie.tetto)"""
+    assi = [a['g'] for a in assi_dbgt(D) if a['sed'] == '03']
+    if not assi: return []
+    tree = shapely.STRtree(assi); out = []
+    for p in poligoni(D, 'GALLER'):
+        if not p.is_valid: p = p.buffer(0)
+        if p.area < 20: continue
+        if sum(assi[j].intersection(p).length for j in tree.query(p)) >= minimo: out.append(p)
+    return out
 
 
 def tunnel_osm(osm):
@@ -99,8 +114,91 @@ def trova(D, quota, osm, log=lambda *a: None):
         s = _stazioni(c, assi, gr, gall, quota, D)
         if s is None: scartati.append(dict(osm=[w['id'] for w in gr['vie']], motivo='fondo a meno di %.1f m dal suolo' % LUCE_MIN)); continue
         s['vie'] = [w['id'] for w in gr['vie']]; s['nome'] = next((w['t'].get('name') for w in gr['vie'] if w['t'].get('name')), None); out.append(s)
-    log('sottopassi: %d (vie OSM in galleria per auto %d, scartate %d)' % (len(out), len(W), len(scartati)))
+    # i sottopassi pedonali: una via OSM a piedi in galleria dentro una GALLER senza strade (il sottopasso della stazione di Meda, x 325 z -500)
+    npd = 0; gs_str = gallerie_stradali(D)
+    for w in osm:
+        t = w['t']
+        if t.get('highway') not in PIEDI or t.get('tunnel') not in ('yes', 'covered'): continue
+        g = LineString(w['p'])
+        if g.length < 4: continue
+        gg = [p for p in gall if p.intersection(g).length > 0.6 * g.length and not any(p.intersects(q) for q in gs_str)]
+        if not gg: continue
+        s = _pedonale(w, osm, gg, quota)
+        if s is None: scartati.append(dict(osm=w['id'], motivo='pedonale: fondo non trovato o luce sotto %.1f m' % LUCE_PED, c=_c(g))); continue
+        s['vie'] = [w['id']]; s['nome'] = t.get('name'); out.append(s); npd += 1
+    log('sottopassi: %d, di cui pedonali %d (vie OSM in galleria per auto %d, scartate %d)' % (len(out), npd, len(W), len(scartati)))
     return out, scartati
+
+
+PIEDI = ('footway', 'path', 'pedestrian', 'cycleway', 'steps')
+LUCE_PED = 2.1     # m: sotto meno di questo un pedone non passa
+SP_PED = 0.9       # m: la soletta di un sottopasso pedonale (come impalcati.SP)
+MEZZA_PED = 1.5    # m: mezza larghezza quando non c'e la GALLER (neutra)
+
+
+def coperto(dentro, alto):
+    """the stations under the cover: the runs where S stands high enough over the ceiling that touch the GALLER (past its edge, OLTRE_GALLER at most, as long as the bank
+    stays high: the edge of the Milano-Meda carriageway is 2 m past the GALLER at x -768 z 88), less MARGINE_S at each end (a cell of S across the
+    edge of the bank dipped under the ceiling: a V of ground in the mouth)"""
+    lab, _ = ndimage.label(alto); k = np.unique(lab[dentro & alto]); k = k[k > 0]
+    vicino = ndimage.binary_dilation(dentro, np.ones(2 * OLTRE_GALLER + 1, bool))   # (not further: over an open trench S stays at grade, the trench is not in S)
+    return ndimage.binary_erosion(np.isin(lab, k) & vicino, np.ones(2 * MARGINE_S + 1, bool), border_value=1)
+
+
+def _pedonale(w, osm, gall, quota):
+    """un sottopasso pedonale: la via in galleria fra le due bocche, il fondo dalle buche delle scale che il LiDAR vede alle due teste (S, il punto piu
+    basso entro 6 m lungo la via che continua), allungato verso ogni buca finche S non arriva al fondo: quel tratto e aperto (le pareti della buca)"""
+    P = np.asarray(w['p'], float)
+    def cont(end, d0):   # the way that goes on from this end (the steps): its direction, else the tunnel's own
+        best = None
+        for v in osm:
+            if v is w or not v['t'].get('highway'): continue
+            q = np.asarray(v['p'], float)
+            for a, b in ((q[0], q[min(1, len(q) - 1)]), (q[-1], q[max(len(q) - 2, 0)])):
+                if np.hypot(*(a - end)) < 0.5 and np.hypot(*(b - a)) > 0.5:
+                    d = (b - a) / np.hypot(*(b - a))
+                    if d @ d0 > 0.3 and (best is None or d @ d0 > best @ d0): best = d
+        return best if best is not None else d0
+    capi = []
+    for end, nxt in ((P[0], P[1]), (P[-1], P[-2])):
+        d0 = (end - nxt) / max(np.hypot(*(end - nxt)), 1e-9); d = cont(end, d0)
+        ss = np.arange(0, 6.01, 0.25); zz = np.array([float(quota(*(end + d * s))) for s in ss]); i = int(np.argmin(zz))
+        capi.append((d, ss, zz, i))
+    yb = [float(c[2][c[3]]) for c in capi]
+    if any(not np.isfinite(v) for v in yb): return None
+    # the chain: from the bottom of the first hole, along the tunnel, to the bottom of the other
+    (d0, s0, z0, i0), (d1, s1, z1, i1) = capi
+    pre = [P[0] + d0 * s for s in np.arange(s0[i0], 0, -0.5)]; post = [P[-1] + d1 * s for s in np.arange(0.5, s1[i1] + 0.01, 0.5)]
+    Q = np.array(pre + [p for p in P] + post); sv = np.concatenate(([0], np.cumsum(np.hypot(*np.diff(Q, axis=0).T)))); k_ = np.concatenate(([True], np.diff(sv) > 1e-6)); Q, sv = Q[k_], sv[k_]
+    st = np.arange(0, sv[-1] + PASSO / 2, PASSO); C = np.column_stack((np.interp(st, sv, Q[:, 0]), np.interp(st, sv, Q[:, 1]))); n = len(C)
+    y = np.interp(st, [0, sv[-1]], yb)
+    T = np.gradient(C, axis=0); T /= np.maximum(np.hypot(*T.T), 1e-9)[:, None]; Nn = np.column_stack((-T[:, 1], T[:, 0]))
+    hl, hr = np.full(n, np.nan), np.full(n, np.nan)
+    for k in range(n):
+        for g in gall:
+            if not g.contains(Point(C[k])): continue
+            for arr, sg in ((hl, 1), (hr, -1)):
+                r = LineString([C[k], C[k] + sg * Nn[k] * 15]).intersection(g)
+                if not r.is_empty: arr[k] = r.length if r.geom_type == 'LineString' else max(q.length for q in r.geoms if q.geom_type == 'LineString')
+    def stende(v):
+        ok = np.isfinite(v)
+        return np.full(n, MEZZA_PED) if not ok.any() else np.full(n, float(np.clip(np.median(v[ok]), 1.0, 4.0)))
+    hl, hr = stende(hl), stende(hr)
+    Lft, Rgt = C + Nn * hl[:, None], C - Nn * hr[:, None]
+    tl, tr = np.array([float(quota(*q)) for q in Lft]), np.array([float(quota(*q)) for q in Rgt]); tp = np.minimum(np.minimum(tl, tr), np.array([float(quota(*q)) for q in C]))
+    dentro = np.array([any(g.contains(Point(q)) for g in gall) for q in C])
+    if not dentro.any(): return None
+    vt = tp[dentro]; soff = float(np.median(vt[vt > vt.max() - PIANO]) - SP_PED)
+    if soff - y[dentro].max() < LUCE_PED: return None
+    gal = coperto(dentro, tp >= soff + SP_PED - PIANO * 0.5); idx = np.nonzero(gal)[0]
+    if not len(idx): return None
+    gal[:] = False; gal[idx[0]:idx[-1] + 1] = True; cop = gal.copy()
+    if idx[-1] + 1 < n: cop[idx[-1] + 1] = True
+    def cima(tq, yq):
+        ts = ndimage.gaussian_filter1d(tq, 3.0, mode='nearest'); par = np.minimum(PARAPETTO, np.maximum(0.0, ts - yq)); t = np.maximum(ts + par, tq + np.minimum(par, 0.3))
+        return ndimage.gaussian_filter1d(t, 1.0, mode='nearest')
+    return dict(C=C, y=y, yl=y.copy(), yr=y.copy(), Lft=Lft, Rgt=Rgt, N=Nn, tp=tp, hl=hl, hr=hr, cop=cop, gal=gal, soff=soff, csx=cima(tl, y), cdx=cima(tr, y), fonte='GALLER pedonale',
+                prof=float((tp - y).max()), lung=float(n - 1) * PASSO, pedonale=True)
 
 
 def _z_poly(D, nm, i):
@@ -226,13 +324,15 @@ def _stazioni(cat, assi, gr, gall, quota, D):
         vt = tp[cop]; soff = float(np.median(vt[vt > vt.max() - PIANO]) - SP_OPERA)
         if soff - max(yl[cop].max(), yr[cop].max()) < LUCE_MIN: cop[:] = False; soff = None
     if soff is not None:
-        idx = np.nonzero(cop & (tp >= soff + SP_OPERA - PIANO * 0.5))[0]      # S resta sopra da qui a qui; verso le testate l'opera prende le celle
+        # coperto e solo dove sopra la soletta resta S abbastanza: li c'e la galleria e S resta disegnata sopra. Dove S scende sotto la cima della soletta
+        # (la scarpata davanti alla testata) la trincea e aperta: un tetto senza niente sopra era un buco nel suolo, e un fronte appeso a un impalcato
+        # che non c'e piu (le gallerie stradali non hanno impalcati sopra: galleria_stradale, superficie.tetto)
+        idx = np.nonzero(coperto(cop, tp >= soff + SP_OPERA - PIANO * 0.5))[0]
+        cop[:] = False
         if len(idx):
-            gal[idx[0]:idx[-1] + 1] = True
+            gal[idx[0]:idx[-1] + 1] = True; cop[idx[0]:idx[-1] + 1] = True
             if idx[-1] + 1 < n: cop[idx[-1] + 1] = True     # (il tratto arriva alla stazione di confine)
-        r_ = np.nonzero(cop)[0]
-        if r_[0] <= 3: cop[:r_[0]] = True                   # la testata e la bocca: niente tre metri di aperto davanti al fronte
-        if r_[-1] >= n - 4: cop[r_[-1]:] = True
+        else: soff = None
     def cima(tq, yq):   # la riga del parapetto: una linea continua sopra il suolo liscio, mai sotto il suolo vero
         ts = ndimage.gaussian_filter1d(tq, 3.0, mode='nearest'); par = np.minimum(PARAPETTO, np.maximum(0.0, ts - yq)); t = np.maximum(ts + par, tq + np.minimum(par, 0.3))
         return ndimage.gaussian_filter1d(t, 1.0, mode='nearest')
