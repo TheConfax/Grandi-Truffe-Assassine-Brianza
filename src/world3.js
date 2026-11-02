@@ -2245,12 +2245,12 @@ function buildCemetery(T, G) {
   const mk = (geo, mat, list, f) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((t, i) => { f(t, pp); qq.setFromAxisAngle(up, -t[2] || 0); m.compose(pp, qq, sc); im.setMatrixAt(i, m); }); im.castShadow = true; G.add(im); };
   mk(TOMB_G, lam(0xb8b4ac), tombs, (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.14, t[1]));
   mk(STONE_G, lam(0x8e8a84), tombs.map(t => [t[0] - Math.sin(t[2]) * 0.95, t[1] + Math.cos(t[2]) * 0.95, t[2]]), (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.5, t[1])); // headstone at the head end
-  if (cyps.length) { // the cypresses are trees like the others: trunk and crown of TREE_G (leaf tufts), stretched to a narrow column (height th, crown td across, as the narrow DSM trees above)
-    const trunks = new THREE.InstancedMesh(TREE_G.trunk, MAT.trunk, cyps.length), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, cyps.length), sc2 = new THREE.Vector3(), e2 = new THREE.Euler();
+  if (cyps.length) { // the cypresses are trees like the others: the plain stem and the crown of TREE_G (leaf tufts), stretched to a narrow column (height th, crown td across, as the narrow DSM trees above)
+    const trunks = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, cyps.length), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, cyps.length), sc2 = new THREE.Vector3(), e2 = new THREE.Euler();
     cyps.forEach((c, i) => {
       const x = c[0], z = c[1], gy = H.ground(x, z), h = trHash(x, z), th = 7.5 + 3 * h, td = 2.2 + 0.6 * trHash(z, x), yb = Math.min(th - 1.2, Math.max(0.5, Math.min(0.15 * th, th - 0.55 * td))), hc = th - yb;
       const sx = td / 5.4, sy = hc / 4.5, yc = th - 2.5 * sy, tw = clamp(Math.min(Math.sqrt(th / 7), 0.4 * td), 0.5, 1.8);
-      qq.identity(); m.compose(pp.set(x, gy, z), qq, sc2.set(tw, Math.max(0.3, Math.min((yb + 0.2 * hc) / 2.6, (th - 0.15 * hc) / 4.4)), tw)); trunks.setMatrixAt(i, m);
+      qq.identity(); m.compose(pp.set(x, gy, z), qq, sc2.set(tw, yb + 0.5 * hc, tw)); trunks.setMatrixAt(i, m); /* the plain stem: the branches of the tall trunk come out of so narrow a crown */
       qq.setFromEuler(e2.set(0, h * TAU * 7, 0)); m.compose(pp.set(x, gy + yc, z), qq, sc2.set(sx, sy, sx)); crowns.setMatrixAt(i, m); crowns.setColorAt(i, COL('#3d5a34'));
     });
     trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns);
