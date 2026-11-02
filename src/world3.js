@@ -509,6 +509,8 @@ const fenceTex = canvasTex(128, 64, (g, w, h) => {
   for (let x = -64; x < w + 64; x += 12) { g.beginPath(); g.moveTo(x, 6); g.lineTo(x + 52, h - 4); g.stroke(); g.beginPath(); g.moveTo(x + 52, 6); g.lineTo(x, h - 4); g.stroke(); }
   g.fillStyle = '#3e4a42'; g.fillRect(0, 0, w, 5);
 });
+// the kerb (cordolo): grey concrete block, a joint every metre (u runs in metres along the kerb), the rounded edge lighter on the top strip
+const kerbTex = canvasTex(256, 32, (g, w, h) => { g.fillStyle = '#9a958b'; g.fillRect(0, 0, w, h); noise(g, w, h, 900, 0.35, ['#8a857b', '#c2bdb2', '#98938a', '#b6b1a6']); g.fillStyle = 'rgba(50,46,42,.5)'; g.fillRect(0, 0, 2, h); g.fillStyle = 'rgba(255,255,255,.1)'; g.fillRect(2, 0, 1, h); });
 const concreteTex = canvasTex(128, 64, (g, w, h) => { g.fillStyle = '#b3aea4'; g.fillRect(0, 0, w, h); noise(g, w, h, 1400, 0.3, ['#8f8a80', '#cbc6bb', '#9d988d']); g.fillStyle = 'rgba(60,55,50,.35)'; g.fillRect(0, 0, 2, h); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(0, 0, w, 4); });
 // leaves: an atlas drawn once, three tufts and a dense patch for the crown's core, in light greys the instance colour tints.
 // Colour and cut-out are drawn apart and joined with straight alpha (canvas alpha would blacken the edges), and every mip level
@@ -564,7 +566,7 @@ const barkTex = canvasTex(64, 128, (g, w, h) => { g.fillStyle = '#e0dad0'; g.fil
 const MAT = {
   terrain: new THREE.MeshLambertMaterial({ map: groundTex, depthWrite: false }), depth: new THREE.MeshBasicMaterial({ colorWrite: false }), terrainS: new THREE.MeshLambertMaterial({ map: groundTex }),
   grass: flatMat({ map: grassTex, vertexColors: true }), paved: flatMat({ vertexColors: true, map: asphaltTex }), piazza: flatMat({ map: porfidoTex }), water: flatMat({ color: 0x45738c }), bank: flatMat({ color: 0x6d7d55 }),
-  foot: flatMat({ color: 0xc8b89c }), cortile: flatMat({ color: CORTILE_COL }), asph: flatMat({ map: asphaltTex }), mark: flatMat({ vertexColors: true }), side: new THREE.MeshLambertMaterial({ map: sidewalkTex }), kerb: new THREE.MeshLambertMaterial({ color: 0xa29c90, side: THREE.DoubleSide }),
+  foot: flatMat({ color: 0xc8b89c }), cortile: flatMat({ color: CORTILE_COL }), asph: flatMat({ map: asphaltTex }), mark: flatMat({ vertexColors: true }), side: new THREE.MeshLambertMaterial({ map: sidewalkTex }), kerb: new THREE.MeshLambertMaterial({ map: kerbTex, side: THREE.DoubleSide }),
   ballast: flatMat({ map: ballastTex }), steel: flatMat({ color: 0xc9ccd1 }),
   old: new THREE.MeshLambertMaterial({ map: TEX_OLD, vertexColors: true }), mod: new THREE.MeshLambertMaterial({ map: TEX_MOD, vertexColors: true }), plain: new THREE.MeshLambertMaterial({ map: TEX_PLAIN, vertexColors: true }),
   roof: new THREE.MeshLambertMaterial({ vertexColors: true }), canopy: new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }),
@@ -761,7 +763,16 @@ function clipDrape(b, hf, ro, mat) {
 // a kerb (cordolo): the vertical strip from the surface yf to h over it along a ring, outward normal; in a tile of S each edge is cut where
 // it crosses the cells (H.cutLine) and then thinned to the points the profile of S needs within 1 cm (the bottom goes 0.1 m into the ground,
 // the top 1 cm over the edge of the cover, so no chord opens a slit); elsewhere one quad per edge on the old ground
-function kerbRing(b, ring, h, yf, flip) {
+// kerb with its top: the vertical face (to 2 cm under the top), a 45 degree chamfer of 2 cm (the rounded edge towards the street) and the strip
+// of the top 15 cm wide on the pavement side, 1 cm over it; (x,z,y) of both ends already at the top of the face, n the outward normal
+function kerbCap(b, px, pz, py, qx, qz, qy, nx, nz, u0, u1, pl, ql) {
+  const C = 0.02, W = 0.15, T = 0.01, quad4 = (A, B, C_, D, n) => { const b0 = b.p.length / 3; for (const [v, u, w] of [A, B, C_, D]) vtx(b, v[0], v[1], v[2], n[0], n[1], n[2], u, w); const e1 = [B[0][0] - A[0][0], B[0][1] - A[0][1], B[0][2] - A[0][2]], e2 = [C_[0][0] - A[0][0], C_[0][1] - A[0][1], C_[0][2] - A[0][2]]; /* wound so the front side looks along n: the light of a DoubleSide material follows it */ if ((e1[1] * e2[2] - e1[2] * e2[1]) * n[0] + (e1[2] * e2[0] - e1[0] * e2[2]) * n[1] + (e1[0] * e2[1] - e1[1] * e2[0]) * n[2] >= 0) b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); else b.i.push(b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); };
+  const t = py + T, r = qy + T, s2 = Math.SQRT1_2;
+  quad4([[px, pl, pz], u0, 0], [[qx, ql, qz], u1, 0], [[qx, r - C, qz], u1, .8], [[px, t - C, pz], u0, .8], [nx, 0, nz]);
+  quad4([[px, t - C, pz], u0, .5], [[qx, r - C, qz], u1, .5], [[qx - nx * C, r, qz - nz * C], u1, .5], [[px - nx * C, t, pz - nz * C], u0, .5], [nx * s2, s2, nz * s2]);
+  quad4([[px - nx * C, t, pz - nz * C], u0, .5], [[qx - nx * C, r, qz - nz * C], u1, .5], [[qx - nx * W, r, qz - nz * W], u1, .5], [[px - nx * W, t, pz - nz * W], u0, .5], [0, 1, 0]);
+}
+function kerbRing(b, ring, h, yf, flip, top) {
   const A = sArea(ring);
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02) continue;
@@ -777,7 +788,8 @@ function kerbRing(b, ring, h, yf, flip) {
     let acc = 0;
     for (let k = 1; k < keepP.length; k++) {
       const p = keepP[k - 1], q = keepP[k], l = hyp(q[0] - p[0], q[1] - p[1]), b0 = b.p.length / 3;
-      vtx(b, p[0], p[2] - lo, p[1], nx, 0, nz, acc / 4, 0); vtx(b, q[0], q[2] - lo, q[1], nx, 0, nz, (acc + l) / 4, 0); vtx(b, q[0], q[2] + h + up, q[1], nx, 0, nz, (acc + l) / 4, 1); vtx(b, p[0], p[2] + h + up, p[1], nx, 0, nz, acc / 4, 1);
+      if (top) { kerbCap(b, p[0], p[1], p[2] + h + up, q[0], q[1], q[2] + h + up, nx, nz, acc, acc + l, p[2] - lo, q[2] - lo); acc += l; continue; }
+      vtx(b, p[0], p[2] - lo, p[1], nx, 0, nz, acc, 0); vtx(b, q[0], q[2] - lo, q[1], nx, 0, nz, acc + l, 0); vtx(b, q[0], q[2] + h + up, q[1], nx, 0, nz, acc + l, 1); vtx(b, p[0], p[2] + h + up, p[1], nx, 0, nz, acc, 1);
       b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); acc += l;
     }
   }
@@ -1321,12 +1333,11 @@ function* buildTileGen(T) {
     { const s_ = srndT; yield 'sidewalks'; srndT = s_; } /* a tile of S cuts its surfaces on the cells: in slices, so building it never stops the game for long */
     for (const q of T.sd) {
       try { polyFill(sw, q.o, q.k, SIDE_H, 4); } catch (e) { } // the cover of the step: S + SIDE_H on the cells (clipFill)
-      if (T.fine) { for (const ring of [q.o, ...q.k]) kerbRing(kerbS, ring, SIDE_H, streetY); continue; }
+      if (T.fine) { for (const ring of [q.o, ...q.k]) kerbRing(kerbS, ring, SIDE_H, streetY, undefined, true); continue; }
       for (const ring of [q.o, ...q.k]) for (let i = 0; i < ring.length; i++) {
         const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02) continue;
-        const nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L, base = kerb.p.length / 3;
-        vtx(kerb, a[0], 0, a[1], nx, 0, nz, 0, 0); vtx(kerb, c[0], 0, c[1], nx, 0, nz, L / 4, 0); vtx(kerb, c[0], SIDE_H, c[1], nx, 0, nz, L / 4, 1); vtx(kerb, a[0], SIDE_H, a[1], nx, 0, nz, 0, 1);
-        kerb.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        const nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L;
+        kerbCap(kerb, a[0], a[1], SIDE_H, c[0], c[1], SIDE_H, nx, nz, 0, L, 0, 0);
       }
     }
     { const s_ = srndT; yield 'crossings'; srndT = s_; } 
