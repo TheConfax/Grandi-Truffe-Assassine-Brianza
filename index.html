@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 32db25e · assemblato 02/11 00:30 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo c8166b4 · assemblato 02/11 04:01 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -195,7 +195,7 @@ const TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const wrapA = a => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
-const hyp = Math.hypot;
+function hyp(a, b, c) { return c === undefined ? Math.sqrt(a * a + b * b) : Math.hypot(a, b, c); }
 let seed = 20821;
 const srnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const rnd = Math.random;
@@ -287,7 +287,47 @@ sun.shadow.bias = -0.0007; sun.shadow.normalBias = 0.03;
 scene.add(sun, sun.target);
 
 // ---------------------------------------------------------------- geometry buffers
-const Buf = () => ({ p: [], n: [], uv: [], c: [], i: [] });
+// ---------------------------------------------------------------- the blocks of numbers a tile is built in (Buf): the same blocks again, tile after tile
+// A plain array has to grow, and each size it passes through is rubbish: gigabytes a minute at speed, and from a certain size in the old generation of the memory, where the long cleanups come from (50 ms). A plain array cannot be emptied and kept either: JS gives its memory back.
+// So during the building of a tile (BLOCCHI.on) Buf hands out typed arrays from a pool, one pool per size, that go back when the tile is finished. They read and write like the arrays they replace: [i], length, push. Doubles for the coordinates, so the numbers are the same to the last bit. One too small hands over to a bigger one, in its Buf: reach it through the Buf (b.p.push); a local copy of b.p is for reading. Outside the building (start of the game, a hedge cut by a car) Buf stays plain.
+// Not on resizable buffers: tried, a push on them costs seven times as much once there are many.
+const BLOCCHI = { on: false, F: new Map(), U: new Map(), usati: [], giro: 1, MIN: 1 << 12 };
+const bloccoRendi = (P, a) => { let l = P.get(a.cap); if (!l) P.set(a.cap, l = []); if (l.length < (a.cap >= 1 << 19 ? 2 : a.cap >= 1 << 16 ? 6 : a.cap >= 1 << 13 ? 30 : 400)) l.push(a); }; /* the bigger, the fewer kept: the rest to the collector, once in a while */
+const bloccoDa = (P, K, cap) => { const l = P.get(cap); let a = l && l.pop(); if (!a) { try { a = new K(cap); } catch (e) { BLOCCHI.F.clear(); BLOCCHI.U.clear(); a = new K(cap); } } a.n = 0; a.resa = false; a.dopo = null; BLOCCHI.usati.push(a); return a; };
+const bloccoIdem = (a, P, K, k) => { let c = a.cap * 2; while (c < k) c *= 2; const q = bloccoDa(P, K, c); q.set(a.subarray(0, a.n)); q.n = a.n; q.own = a.own; q.key = a.key; a.own[a.key] = q; a.resa = true; a.dopo = q; a.n = a.cap; bloccoRendi(P, a); return q; }; /* a.dopo: a push through a local copy kept across the handover still lands in the right place */
+// Two classes written out, not one made twice: each keeps its own push, or the speed of a push seen on both kinds of number goes
+class BloccoF extends Float64Array {
+  constructor(cap) { super(cap); this.n = 0; this.cap = cap; this.own = null; this.key = ''; this.resa = false; this.giro = 0; this.dopo = null; }
+  static get [Symbol.species]() { return Float64Array; }
+  get length() { return this.n; }
+  fBlocco() { return this.subarray(0, this.n); }
+  push(a, b, c) { const k = arguments.length, n = this.n; if (n + k > this.cap) { if (this.dopo) return this.dopo.push(...arguments); const q = bloccoIdem(this, BLOCCHI.F, BloccoF, n + k); for (let i = 0; i < k; i++) q[n + i] = arguments[i]; return q.n = n + k; } if (k === 3) { this[n] = a; this[n + 1] = b; this[n + 2] = c; } else if (k === 2) { this[n] = a; this[n + 1] = b; } else if (k === 1) this[n] = a; else for (let i = 0; i < k; i++) this[n + i] = arguments[i]; return this.n = n + k; }
+  splice(s) { const a = s < 0 ? this.n + s : s, r = Array.from(this.subarray(a, this.n)); this.n = a; return r; } /* only "take the last ones", as the world uses it */
+  slice(a, b) { return Array.from(this.subarray(0, this.n).slice(a, b)); }
+  [Symbol.iterator]() { return this.subarray(0, this.n)[Symbol.iterator](); }
+}
+class BloccoU extends Uint32Array {
+  constructor(cap) { super(cap); this.n = 0; this.cap = cap; this.own = null; this.key = ''; this.resa = false; this.giro = 0; this.dopo = null; }
+  static get [Symbol.species]() { return Uint32Array; }
+  get length() { return this.n; }
+  fBlocco() { return this.subarray(0, this.n); }
+  push(a, b, c, d, e, f) { const k = arguments.length, n = this.n; if (n + k > this.cap) { if (this.dopo) return this.dopo.push(...arguments); const q = bloccoIdem(this, BLOCCHI.U, BloccoU, n + k); for (let i = 0; i < k; i++) q[n + i] = arguments[i]; return q.n = n + k; } if (k === 3) { this[n] = a; this[n + 1] = b; this[n + 2] = c; } else if (k === 6) { this[n] = a; this[n + 1] = b; this[n + 2] = c; this[n + 3] = d; this[n + 4] = e; this[n + 5] = f; } else for (let i = 0; i < k; i++) this[n + i] = arguments[i]; return this.n = n + k; }
+  splice(s) { const a = s < 0 ? this.n + s : s, r = Array.from(this.subarray(a, this.n)); this.n = a; return r; }
+  slice(a, b) { return Array.from(this.subarray(0, this.n).slice(a, b)); }
+  [Symbol.iterator]() { return this.subarray(0, this.n)[Symbol.iterator](); }
+}
+const Buf = () => { if (!BLOCCHI.on) return { p: [], n: [], uv: [], c: [], i: [] }; const m = BLOCCHI.MIN, b = { p: bloccoDa(BLOCCHI.F, BloccoF, m), n: bloccoDa(BLOCCHI.F, BloccoF, m), uv: bloccoDa(BLOCCHI.F, BloccoF, m), c: bloccoDa(BLOCCHI.F, BloccoF, m), i: bloccoDa(BLOCCHI.U, BloccoU, m) }; for (const k of ['p', 'n', 'uv', 'c', 'i']) { b[k].own = b; b[k].key = k; } return b; };
+function blocchiResi() { // the tile is finished: nothing reads its buffers any more, the geometries have their own copy.
+  const g = ++BLOCCHI.giro;
+  for (const a of BLOCCHI.usati) { if (a.giro === g) continue; a.giro = g; a.own = null; a.dopo = null; if (a.resa) continue; a.resa = true; a.n = 0; bloccoRendi(a instanceof BloccoU ? BLOCCHI.U : BLOCCHI.F, a); }
+  BLOCCHI.usati.length = 0;
+}
+{ // what makes a geometry out of a buffer takes the blocks too, at their real length
+  const F0 = THREE.Float32BufferAttribute; THREE.Float32BufferAttribute = class extends F0 { constructor(a, k, nz) { super(a.fBlocco ? a.fBlocco() : a, k, nz); } };
+  const si = THREE.BufferGeometry.prototype.setIndex; THREE.BufferGeometry.prototype.setIndex = function (x) { if (x && x.fBlocco) { const v = x.fBlocco(); let m = 0; for (let i = 0; i < v.length; i++) if (v[i] > m) m = v[i]; x = new (m > 65535 ? THREE.Uint32BufferAttribute : THREE.Uint16BufferAttribute)(v, 1); } return si.call(this, x); };
+}
+function passoTile(g) { BLOCCHI.on = true; try { const r = g.next(); if (r.done) blocchiResi(); return r; } finally { BLOCCHI.on = false; } } /* one slice of the building of a tile */
+
 function vtx(b, x, y, z, nx, ny, nz, u, v, col) { b.p.push(x, y, z); b.n.push(nx, ny, nz); b.uv.push(u, v); if (col) b.c.push(col.r, col.g, col.b); return b.p.length / 3 - 1; }
 function triUp(b, i, j, k) {
   const P = b.p; const ax = P[i * 3], az = P[i * 3 + 2];
@@ -2254,7 +2294,7 @@ function clipDrape(b, hf, ro, mat) {
   const P = b.p, ab = b.ab || [], nv = P.length / 3, I = b.i, hasC = b.c.length === P.length;
   let bx0 = 1e9, bz0 = 1e9, bx1 = -1e9, bz1 = -1e9; for (let v = 0; v < nv; v++) { const x = P[v * 3], z = P[v * 3 + 2]; if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (z < bz0) bz0 = z; if (z > bz1) bz1 = z; }
   if (!H.anyFine() || b.noclip || !nv || !H.anyFineIn(bx0, bz0, bx1, bz1)) { /* no tile of S under the buffer (outside Meda): the old drape, without cutting every triangle for nothing */ for (let v = 0; v < nv; v++) if (!ab[v]) P[v * 3 + 1] += hf(P[v * 3], P[v * 3 + 2]); return; } // noclip: thin strips over a smooth S (rails), each vertex on it
-  const o = { p: [], n: [], uv: [], c: [], i: [] }, remap = new Int32Array(nv).fill(-1);
+  const o = Buf(), remap = new Int32Array(nv).fill(-1);
   const keep = v => { let r = remap[v]; if (r < 0) { r = remap[v] = o.p.length / 3; o.p.push(P[v * 3], ab[v] ? P[v * 3 + 1] : P[v * 3 + 1] + hf(P[v * 3], P[v * 3 + 2]), P[v * 3 + 2]); o.n.push(b.n[v * 3], b.n[v * 3 + 1], b.n[v * 3 + 2]); o.uv.push(b.uv[v * 2], b.uv[v * 2 + 1]); if (hasC) o.c.push(b.c[v * 3], b.c[v * 3 + 1], b.c[v * 3 + 2]); } return r; };
   // the attributes of a source triangle as affine functions of (x, z): relative height, normal, uv, colour; pieces of triangles with the same
   // functions on the same cell triangle are joined again (the two halves of a quad, the quads of a strip, strips of one colour)
@@ -2266,7 +2306,7 @@ function clipDrape(b, hf, ro, mat) {
       const x = p[0], z = p[1], l1 = ((cz - dz) * (x - dx) + (dx - cx) * (z - dz)) / den, l2 = ((dz - az) * (x - dx) + (ax - dx) * (z - dz)) / den, l3 = 1 - l1 - l2;
       const yr = l1 * P[a * 3 + 1] + l2 * P[c * 3 + 1] + l3 * P[d * 3 + 1];
       o.p.push(x, yr + (F ? (b.free ? H.overFree(x, z, p[2]) : p[2]) : hf(x, z)), z);
-      for (const [A, s, o0, m] of attrs.slice(1)) { const D = A === b.n ? o.n : A === b.uv ? o.uv : o.c; for (let e = o0; e < o0 + m; e++) D.push(l1 * A[a * s + e] + l2 * A[c * s + e] + l3 * A[d * s + e]); }
+      for (let q_ = 1; q_ < attrs.length; q_++) { const [A, s, o0, m] = attrs[q_], D = A === b.n ? o.n : A === b.uv ? o.uv : o.c; for (let e = o0; e < o0 + m; e++) D.push(l1 * A[a * s + e] + l2 * A[c * s + e] + l3 * A[d * s + e]); }
     }
     return q0;
   };
@@ -2686,7 +2726,7 @@ function waterInBed(a, outer, holes, T) {
   if (tot >= 4) return bed >= tot * 0.3;
   const pts = [...outer, centroid(outer)]; return pts.filter(([x, z]) => bedC(clamp(Math.floor((z - F.z0) / F.st), 0, c - 1) * c + clamp(Math.floor((x - F.x0) / F.st), 0, c - 1))).length >= pts.length * 0.3;
 }
-function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!g.next().done); }
+function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!passoTile(g).done); }
 function* buildTileGen(T) {
   if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.seme * 7919; for (const p of CAS_T.get(T.t) || []) if (!p.casFatta) { p.casFatta = true; casermeDi([p]); }
   T.tex0 = new THREE.Texture().id; // textures newer than this were made for this tile: freed with it
@@ -6030,18 +6070,23 @@ function* buildPaesaggio(T, G) {
   }
   yield 'terreni';
   if (net.i.length) mkMesh(net, MAT.net, 10, false, G);
+  yield 'terreni reti';
   if (drape.i.length) mkMesh(drape, MAT.mark, 2, false, G);
+  yield 'terreni fondo';
   if (lines.i.length) mkMesh(lines, MAT.mark, 3, false, G);
+  yield 'terreni linee';
   if (solid.i.length) mkMesh(solid, LMAT.trim, 10, 'cast', G);
   if (doors.i.length) mkMesh(doors, LS_DOOR_MAT, 10, false, G);
   if (glass.i.length) mkMesh(glass, LS_GLASS, 12, false, G);
   if (film.i.length) mkMesh(film, LS_FILM, 12, false, G);
+  yield 'terreni pieni';
   const o3 = new THREE.Object3D(), inst = (geo, mat, list, sc, colOf) => {
     if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length); im.castShadow = true;
     list.forEach(([x, z, r], i) => { o3.position.set(x, H.ground(x, z), z); o3.rotation.set(0, r || 0, 0); const k = sc ? sc(x, z) : 1; o3.scale.set(k, k, k); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); if (colOf) im.setColorAt(i, COL(colOf(x, z))); });
     G.add(im); return im;
   };
   inst(LS_BALE_G, LS_BALE_M, bales);
+  yield 'terreni balle';
   if (panels.length) { // building-site hoarding: one instance per panel, each knocked over on its own like the street lamps
     const im = new THREE.InstancedMesh(LS_PANEL_G, LS_PANEL_M, panels.length); im.castShadow = true;
     panels.forEach(([x0, z0, x1, z1, col], i) => {
@@ -6053,7 +6098,9 @@ function* buildPaesaggio(T, G) {
     });
     G.add(im);
   }
+  yield 'terreni pannelli';
   inst(TREE_G.trunk, MAT.trunk, trees, () => 0.55);
+  yield 'terreni alberi';
   const crowns = inst(TREE_G.crown, MAT.crown, trees); // small fruit trees: the crown low on a short trunk
   if (crowns) crowns.customDepthMaterial = TREE_DEPTH;
   if (crowns) trees.forEach(([x, z], i) => { o3.position.set(x, H.ground(x, z) + 3.4 * 0.55 + 0.6, z); o3.rotation.set(0, LS_HASH(x, z, 'r') * TAU, 0); o3.scale.set(0.6, 0.6, 0.6); o3.updateMatrix(); crowns.setMatrixAt(i, o3.matrix); crowns.setColorAt(i, COL(GREENS[Math.floor(LS_HASH(x, z, 'f') * 3)])); });
@@ -6475,8 +6522,8 @@ function tileTick(px, pz, budgetMs, force, soloDati) {
   while (performance.now() - t0 < bud) {
     let T = tileTick.cur;
     if (!T || !T.gen) { T = cand.shift(); if (!T) break; T.gen = buildTileGen(T); tileTick.cur = T; }
-    if (DEBUG) { const a = performance.now(), r = T.gen.next(), b = performance.now() - a, k = T.fetta || 'inizio', e = PZ.fette[k] || (PZ.fette[k] = [0, 0, 0]); e[0]++; e[1] += b; if (b > e[2]) e[2] = b; T.fetta = r.value; if (r.done) { T.gen = null; tileTick.cur = null; T.fetta = null; } continue; } /* the slices, in the debug numbers */
-    if (T.gen.next().done) { T.gen = null; tileTick.cur = null; }
+    if (DEBUG) { const a = performance.now(), r = passoTile(T.gen), b = performance.now() - a, k = T.fetta || 'inizio', e = PZ.fette[k] || (PZ.fette[k] = [0, 0, 0]); e[0]++; e[1] += b; if (b > e[2]) { e[2] = b; e[3] = T.t; } T.fetta = r.value; if (r.done) { T.gen = null; tileTick.cur = null; T.fetta = null; } continue; } /* the slices, in the debug numbers */
+    if (passoTile(T.gen).done) { T.gen = null; tileTick.cur = null; }
   }
   PZ.usa.mesh += performance.now() - t2;
 }
@@ -6524,13 +6571,14 @@ scene.onBeforeRender = (r, sc, cam) => { // after the matrices of the frame, bef
   _vistaF.setFromProjectionMatrix(_vistaM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
   const om = sun.castShadow && sun.visible; let SF = null; if (om) { sun.shadow.updateMatrices(sun); SF = sun.shadow.getFrustum(); }
   for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
+  fusiDisegna(_vistaF, om ? SF : null);
 };
 
 // ---- the shaders of the whole map, compiled at the start and kept: a shader seen for the first time at speed stopped the game 80 to 200 ms, and one whose last user went with its tile was compiled again the next time.
 // One small material per kind found on the map (type; m map, a alphaMap, e emissiveMap, v vertex colours, t transparent, n no fog, i instanced, c instance colours; side; alphaTest). Never drawn. A kind missing here only costs its stop, as before.
 const VETRINA = [['B', 'mt', 0, 0], ['B', 'vt', 0, 0], ['B', 'vtn', 2, 0], ['B', 't', 0, 0], ['B', '', 0, 0], ['B', 'tn', 2, 0], ['S', 'mtn', 0, 0], ['S', 'atn', 0, 0], ['S', 'at', 0, 0], ['P', 'mvtn', 0, 0], ['P', 'mtn', 0, 0], ['P', 'vtn', 0, 0], ['P', 't', 0, 0], ['K', '', 0, 0], ['K', 't', 0, 0],
   ['L', 'me', 0, 0.5], ['L', 'me', 0, 0], ['L', 'me', 2, 0], ['L', 'mv', 0, 0], ['L', 'mvic', 2, 0.5], ['L', 'mv', 2, 0], ['L', 'mt', 0, 0], ['L', 'm', 0, 0.5], ['L', 'mic', 0, 0], ['L', 'mi', 0, 0], ['L', 'm', 0, 0], ['L', 'm', 2, 0.12], ['L', 'm', 2, 0.35], ['L', 'm', 2, 0.4], ['L', 'm', 2, 0.5], ['L', 'm', 2, 0],
-  ['L', 'vic', 0, 0], ['L', 'vi', 0, 0], ['L', 'v', 0, 0], ['L', 'vt', 2, 0], ['L', 'v', 2, 0], ['L', 't', 0, 0], ['L', 'i', 0, 0], ['L', '', 0, 0], ['L', '', 1, 0], ['L', 't', 2, 0], ['L', '', 2, 0]];
+  ['L', 'vic', 0, 0], ['L', 'vi', 0, 0], ['L', 'v', 0, 0], ['L', 'vt', 2, 0], ['L', 'v', 2, 0], ['L', 't', 0, 0], ['L', 'i', 0, 0], ['L', 'ic', 0, 0], ['L', '', 0, 0], ['L', '', 1, 0], ['L', 't', 2, 0], ['L', '', 2, 0]];
 const VETRINA_TIENI = [];
 function vetrinaShader() {
   const tex = new THREE.Texture(), geo = new THREE.BufferGeometry(), cl = { L: THREE.MeshLambertMaterial, B: THREE.MeshBasicMaterial, S: THREE.SpriteMaterial, P: THREE.PointsMaterial, K: THREE.LineBasicMaterial }, oggetti = [];
@@ -6648,8 +6696,59 @@ const M_SIR_A = new THREE.MeshLambertMaterial({ color: 0x2a5cff, emissive: 0x2a5
 const CAR_COLS = ['#c8332b', '#f2f2ee', '#2f3540', '#9aa3ad', '#2c4f8f', '#e0b23b', '#3f6b4a', '#7b2d3a', '#d8d0c0', '#16181c', '#5b8fb8', '#b85d2a'];
 const MODEL_COLS = { scooter: ['#9cc8b4', '#e8e2d2', '#c8332b', '#2c4f8f', '#f2c230', '#16181c'], moto: ['#c8102e', '#1f5fbf', '#16181c', '#f2f2ee', '#e2562a', '#3f6b4a'], bici: ['#2c4f8f', '#c8332b', '#16181c', '#e8e2d2', '#3f6b4a', '#e0b23b'], sport: ['#c8102e', '#f2c230', '#16181c', '#e8e6e0', '#1f5fbf', '#e2562a'], van: ['#f2f2ee', '#d8d0c0', '#9aa3ad', '#c9cdd2'], ape: ['#7fb3c8', '#e8e4d8', '#9dbb6a', '#d9cf9a', '#c94f3d'], suv: ['#2f3540', '#9aa3ad', '#f2f2ee', '#16181c', '#5a6b4e', '#7b2d3a'] };
 const colorFor = (m, r = rnd) => { const a = MODEL_COLS[m] || CAR_COLS; return a[Math.floor(r() * a.length)]; };
+// ---------------------------------------------------------------- cars and people drawn together (docs/motore.md "Caricamento a pezzi", FPS): each stays the tree of objects the game has always moved, turned, lit, dented and hidden, but the renderer no longer draws its parts one by one.
+// Every frame, after the matrices and before the renderer walks the scene, the parts of what the camera or the sun can see go into one instanced mesh per kind of geometry and material. A part fused leaves the renderer's sight by its layer: its matrix is still worked out, and nothing else changes.
+// Boxes share one unit box scaled to size. The plain lit materials share one material, their colour read each frame per part (a car that scorches, a new paint); a lit one (lamps, brake lights, sirens) has its own batch with its own material, so what the game does to it shows. Not fused, and drawn as ever: what is see-through or has a map (the cab of the police, the pool of the headlights) and a dented body, whose geometry is its own (geo.fFuori).
+const FUSI = { n: 0, sf: new THREE.Sphere(new THREE.Vector3(), 9), gu: {}, lista: [], opaca: new THREE.MeshLambertMaterial({ color: 0xffffff }), slot: new Map(), mask: 1 << 20, ogg: new THREE.Matrix4() };
+FUSI.slot.set(FUSI.opaca, 0); const FUSI_MAT = [FUSI.opaca];
+// The matrices: what is hidden needs none (it has them the frame it shows again), and a parked car that has not moved has the ones it had, some twenty parts each, every frame
+const _fusiUMW = THREE.Object3D.prototype.updateMatrixWorld;
+function fusiMatrici(force) {
+  if (!this.visible) return; const v = this.fVeh;
+  if (v && !force) { const q = this.fQ || (this.fQ = [NaN, 0, 0, 0, 0, 0, 0, 0]); if (v.sleep && !v.driver && !v.F && q[0] === v.x && q[1] === v.y && q[2] === v.z && q[3] === v.h && q[4] === v.roll && q[5] === v.pitch && q[6] === v.spin && q[7] === v.steer) return; q[0] = v.x; q[1] = v.y; q[2] = v.z; q[3] = v.h; q[4] = v.roll; q[5] = v.pitch; q[6] = v.spin; q[7] = v.steer; }
+  _fusiUMW.call(this, force);
+}
+function fusiSlot(M) { // 0: the shared plain material; n: a batch with M itself; -1: drawn as ever
+  let s = FUSI.slot.get(M); if (s !== undefined) return s;
+  if (!M.isMeshLambertMaterial || M.transparent || M.map || M.alphaMap || M.emissiveMap || M.vertexColors || M.side !== THREE.FrontSide || M.alphaTest || M.polygonOffset || M.opacity !== 1 || !M.fog || !M.depthWrite || !M.depthTest || !M.colorWrite) s = -1;
+  else if (M.emissive.r || M.emissive.g || M.emissive.b) { s = FUSI_MAT.length; FUSI_MAT.push(M); } else s = 0;
+  FUSI.slot.set(M, s); return s;
+}
+function fusiLotto(g, s, c) { // the batch of a geometry, a material, cast or not
+  const k = s * 2 + (c ? 1 : 0); return (g.fL || (g.fL = []))[k] || (g.fL[k] = fusiNuovo(g, s, c, s ? 64 : 512));
+}
+function fusiNuovo(g, s, c, cap) {
+  const m = new THREE.InstancedMesh(g, FUSI_MAT[s], cap); m.castShadow = c; m.receiveShadow = false; m.frustumCulled = false; m.matrixAutoUpdate = false; m.visible = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const l = { m, n: 0, cap, mt: m.instanceMatrix.array, col: null, g, s, c };
+  if (!s) { m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage); l.col = m.instanceColor.array; }
+  scene.add(m); FUSI.lista.push(l); FUSI.n++; return l;
+}
+function fusiCresci(l) { // a batch too small: the next size up; what is in it stays
+  const q = fusiNuovoSenza(l); q.mt.set(l.mt); if (l.col) q.col.set(l.col); q.n = l.n; scene.remove(l.m); l.m.dispose(); l.m = q.m; l.mt = q.mt; l.col = q.col; l.cap = q.cap;
+}
+function fusiNuovoSenza(l) { const q = fusiNuovo(l.g, l.s, l.c, l.cap * 2); FUSI.lista.pop(); return q; }
+function fusiGeo(g) { // what a part's geometry draws: the unit box (fU = size) or itself
+  const u = g.fU; if (!u) return g; const k = u[3] ? 'b' + u[3] : 's'; return FUSI.gu[k] || (FUSI.gu[k] = u[3] ? new THREE.BoxGeometry(1, 1, 1, u[3], u[4], u[5]) : new THREE.BoxGeometry(1, 1, 1));
+}
+function fusiParte(o) {
+  const M = o.material, gg = o.geometry, s = gg.fFuori ? -1 : fusiSlot(M); if (s < 0) { o.layers.mask = 1; return; }
+  o.layers.mask = FUSI.mask;
+  const u = gg.fU, l = fusiLotto(fusiGeo(gg), s, o.castShadow); if (l.n === l.cap) fusiCresci(l);
+  const e = o.matrixWorld.elements, a = l.mt, k = l.n * 16;
+  if (u) { const sx = u[0], sy = u[1], sz = u[2]; a[k] = e[0] * sx; a[k + 1] = e[1] * sx; a[k + 2] = e[2] * sx; a[k + 3] = 0; a[k + 4] = e[4] * sy; a[k + 5] = e[5] * sy; a[k + 6] = e[6] * sy; a[k + 7] = 0; a[k + 8] = e[8] * sz; a[k + 9] = e[9] * sz; a[k + 10] = e[10] * sz; a[k + 11] = 0; a[k + 12] = e[12]; a[k + 13] = e[13]; a[k + 14] = e[14]; a[k + 15] = 1; }
+  else for (let q = 0; q < 16; q++) a[k + q] = e[q];
+  if (l.col) { const c = M.color, j = l.n * 3; l.col[j] = c.r; l.col[j + 1] = c.g; l.col[j + 2] = c.b; }
+  l.n++;
+}
+function fusiGiro(o) { const K = o.children; for (let i = 0; i < K.length; i++) { const c = K[i]; if (!c.visible) continue; if (c.isMesh) fusiParte(c); if (c.children.length) fusiGiro(c); } }
+function fusiDisegna(F, SF) { // F, SF: what the camera and the sun see (pezzi3.js)
+  const L = FUSI.lista, K = scene.children, sf = FUSI.sf; for (let i = 0; i < L.length; i++) L[i].n = 0;
+  for (let i = 0; i < K.length; i++) { const c = K[i]; if (!c.fRadice || !c.visible) continue; sf.center.setFromMatrixPosition(c.matrixWorld); if (!F.intersectsSphere(sf) && !(SF && SF.intersectsSphere(sf))) continue; fusiGiro(c); }
+  for (let i = 0; i < L.length; i++) { const l = L[i], m = l.m; m.count = l.n; m.visible = l.n > 0; if (!l.n) continue; const a = m.instanceMatrix; a.updateRange.count = l.n * 16; a.needsUpdate = true; if (l.col) { const b = m.instanceColor; b.updateRange.count = l.n * 3; b.needsUpdate = true; } }
+}
+
 const _geo = {};
-const boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; return _geo[k] || (_geo[k] = new THREE.BoxGeometry(w, h, l)); };
+const boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; if (_geo[k]) return _geo[k]; const g = new THREE.BoxGeometry(w, h, l); g.fU = [w, h, l]; return _geo[k] = g; };
 const wheelG = r => { const k = 'w' + r; return _geo[k] || (_geo[k] = new THREE.CylinderGeometry(r, r, 0.26, 12).rotateZ(Math.PI / 2)); };
 function makeCar(model, color) {
   const S = MODELS[model], g = new THREE.Group(), body = new THREE.Group(), hl = S.L / 2, paint = lam(color); g.add(body); g.rotation.order = 'YXZ';
@@ -6708,7 +6807,7 @@ function makeCar(model, color) {
     wheelPos = [[-S.W / 2 + 0.05, hl - 0.8, 1], [S.W / 2 - 0.05, hl - 0.8, 1], [-S.W / 2 + 0.05, -hl + 0.85, 0], [S.W / 2 - 0.05, -hl + 0.85, 0]]; lightY = 0.9;
   } else {
     const bot = S.wr * 0.9, by = bot + S.bh / 2, [cw, ch, cl, cz] = S.cab, cy = bot + S.bh + ch / 2;
-    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);
+    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0); bm.geometry.fU = [S.W, S.bh, S.L, 3, 2, 6];
     add(boxG(cw, ch, cl), model === 'police' ? M_GLASS_SEE : M_GLASS, 0, cy, cz, false);
     add(boxG(cw + 0.04, 0.07, cl - 0.12), paint, 0, cy + ch / 2 + 0.03, cz);
     for (const x of [-1, 1]) add(boxG(0.06, ch, 0.12), paint, x * (cw / 2 + 0.005), cy, cz + cl / 2 - 0.08, false);
@@ -6735,7 +6834,7 @@ function makeCar(model, color) {
     const piv = new THREE.Group(); piv.position.set(x, S.wr, z); (S.two ? body : g).add(piv); const w = new THREE.Mesh(S.two ? thinWheelG(S.wr, S.pedal) : wheelG(S.wr), M_TYRE); piv.add(w); wheels.push({ piv, w, front });
   }
   if (!S.ape) { const hp = new THREE.Mesh(makeCar.hp || (makeCar.hp = new THREE.PlaneGeometry(3.4, 9).rotateX(-Math.PI / 2)), HEADPOOL_MAT); hp.position.set(0, 0.14, hl + 4.4); if (S.two) hp.scale.set(0.6, 1, 0.75); hp.renderOrder = 12; g.add(hp); body.userData.hp = hp; }
-  scene.add(g);
+  scene.add(g); g.fRadice = true; g.updateMatrixWorld = fusiMatrici;
   return { g, body, wheels, rider, crew, bm: typeof bm !== 'undefined' ? bm : null, paint };
 }
 const thinWheelG = (r, spoke) => { const k = 't' + r + spoke; if (_geo[k]) return _geo[k]; const t = new THREE.TorusGeometry(r - (spoke ? 0.025 : 0.05), spoke ? 0.025 : 0.06, 6, 16).rotateY(Math.PI / 2); return _geo[k] = t; };
@@ -6757,7 +6856,7 @@ function makePed(shirt, pants, skin, hair) {
   const L = add(PGEO.leg, pants, -0.11, 0.84, 0), R = add(PGEO.leg, pants, 0.11, 0.84, 0);
   add(PGEO.torso, shirt, 0, 1.16, 0); add(PGEO.head, skin, 0, 1.62, 0); add(PGEO.hair, hair, 0, 1.78, -0.01);
   const AL = add(PGEO.arm, shirt, -0.3, 1.44, 0), AR = add(PGEO.arm, shirt, 0.3, 1.44, 0);
-  scene.add(g); return { g, inner, L, R, AL, AR };
+  scene.add(g); g.fRadice = true; g.updateMatrixWorld = fusiMatrici; return { g, inner, L, R, AL, AR };
 }
 const makeCop = () => makePed('#1d2f5a', '#1a2238', pick(SKIN), '#f2f2ee'); // Polizia Locale: dark blue uniform, white cap
 function animPed(m, phase, amp) { const s = Math.sin(phase) * amp; m.L.rotation.x = s; m.R.rotation.x = -s; m.AL.rotation.x = -s * 0.8; m.AR.rotation.x = s * 0.8; }
@@ -7003,7 +7102,7 @@ class Vehicle {
     this.spec = MODELS[kind]; this.color = color; this.m = makeCar(kind, color); if (this.spec.two) { this.roll = 0.1; this.wh = this.whv = this.whHold = 0; } // parked on its stand; wh = wheelie (+) / stoppie (-) pitch
     this.rad = this.spec.W / 2 + 0.02; this.co = Math.max(0.2, this.spec.L / 2 - this.rad);
     this.inp = { thr: 0, brk: 0, steer: 0, hand: 0 }; this.ai = null; this.maxV = this.spec.maxV;
-    VEH.push(this); this.sync();
+    this.m.g.fVeh = this; VEH.push(this); this.sync();
   }
   get speed() { return hyp(this.vx, this.vz); }
   get fwdSpeed() { return this.vx * Math.sin(this.h) + this.vz * Math.cos(this.h); }
@@ -8291,7 +8390,7 @@ function step(dt) {
   // ----- train
   updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWeather(dt); updWrecks(dt); updFuel(dt); updCaserme(dt); updProps(dt); updOggetti(dt); updNegozi(dt);
   for (const [cx, cz, tvx, tvz] of TRAIN_CIRC) {
-    for (const v of VEH) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad; if (d < RT && d > 1e-5) { const nx = dx / d, nz = dz / d; v.x += nx * (RT - d); v.z += nz * (RT - d); v.vx = tvx + nx * 6; v.vz = tvz + nz * 6; v.sleep = false; v.impact(12 + hyp(tvx, tvz)); } }
+    for (const v of VEH) if (Math.abs(v.x - cx) <= 1.75 + v.rad + v.co && Math.abs(v.z - cz) <= 1.75 + v.rad + v.co) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad; if (d < RT && d > 1e-5) { const nx = dx / d, nz = dz / d; v.x += nx * (RT - d); v.z += nz * (RT - d); v.vx = tvx + nx * 6; v.vz = tvz + nz * 6; v.sleep = false; v.impact(12 + hyp(tvx, tvz)); } }
   }
   // ----- pedestrians
   const pc = P.car;
@@ -8653,7 +8752,7 @@ function dentCar(v, sev, nx, nz) {
   }
   // contact point in the car's frame: opposite to the push normal
   const c = Math.cos(v.h), s = Math.sin(v.h), lx = -nx * c + nz * s, lz = -nx * s - nz * c; // world -> local (x right, z forward)
-  const geo = m.bm.geometry, pos = geo.attributes.position, org = m.org || (m.org = pos.array.slice()), S = v.spec;
+  const geo = m.bm.geometry; geo.fFuori = true; /* dented: its own shape, drawn on its own (fusi3.js) */ const pos = geo.attributes.position, org = m.org || (m.org = pos.array.slice()), S = v.spec;
   const cx = lx * S.W / 2 * 1.2, cz = lz * S.L / 2 * 1.2, R = 1.25;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), d = hyp(x - cx, z - cz), w = Math.max(0, 1 - d / R); if (!w) continue;
@@ -8856,7 +8955,7 @@ function updDebugHud(dt) {
 /* misure del fotogramma (debug, &debug=1): valori mediati su circa 1 secondo, nella riga #dbgmis sopra quella di debug.
    A debug spento non gira niente: frame() non chiama queste funzioni e le query GPU vengono tolte.
    Tasto K (solo debug): copia la riga negli appunti. Tasto B: la riga finisce nella segnalazione (campo "misure"). */
-const MIS = { a: { sim: 0, tile: 0, vis: 0, draw: 0 }, n: 0, sum: 0, max: 0, prev: 0, t0: 0, t1: 0, gpuSum: 0, gpuN: 0, txt: 'misure: in raccolta…', out: null, el: null, gpu: undefined, qs: [], cur: null };
+const MIS = { log: null, f: { sim: 0, tile: 0, vis: 0, draw: 0 }, a: { sim: 0, tile: 0, vis: 0, draw: 0 }, n: 0, sum: 0, max: 0, prev: 0, t0: 0, t1: 0, gpuSum: 0, gpuN: 0, txt: 'misure: in raccolta…', out: null, el: null, gpu: undefined, qs: [], cur: null };
 function dbgBegin(t) {
   const now_ = performance.now(); MIS.t0 = now_;
   if (!MIS.el) { const e = document.createElement('div'); e.id = 'dbgmis'; e.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:30px;z-index:8;font:12px ui-monospace,monospace;color:#9fe;background:rgba(0,0,0,.6);padding:3px 8px;border-radius:4px;pointer-events:none;white-space:pre;max-width:calc(100vw - 32px);overflow:hidden'; document.body.appendChild(e); MIS.el = e; }
@@ -8865,7 +8964,7 @@ function dbgBegin(t) {
   MIS.prev = t; if (!MIS.t1) MIS.t1 = now_;
   return MIS;
 }
-function dbgMk(m, k) { const n = performance.now(); m.a[k] += n - m.t0; m.t0 = n; }
+function dbgMk(m, k) { const n = performance.now(); m.a[k] += n - m.t0; m.f[k] += n - m.t0; m.t0 = n; }
 function dbgGpuBegin() {
   const M = MIS;
   if (M.gpu === undefined) { const gl = renderer.getContext(); M.gl = gl; M.ext = gl.createQuery && gl.getExtension('EXT_disjoint_timer_query_webgl2'); M.gpu = !!M.ext; }
@@ -8874,6 +8973,7 @@ function dbgGpuBegin() {
 }
 function dbgGpuEnd(b) { if (!b) return; MIS.gl.endQuery(MIS.ext.TIME_ELAPSED_EXT); MIS.qs.push(MIS.cur); MIS.cur = null; }
 function dbgEnd(m) {
+  { const f = m.f; if (m.log) m.log.push([performance.now(), f.sim, f.tile, f.vis, f.draw, renderer.info.render.calls]); f.sim = f.tile = f.vis = f.draw = 0; } /* MIS.log = []: one row a frame, for the scripts */
   if (m.gpu) { const gl = m.gl; while (m.qs.length && gl.getQueryParameter(m.qs[0], gl.QUERY_RESULT_AVAILABLE)) { const q = m.qs.shift(); if (!gl.getParameter(m.ext.GPU_DISJOINT_EXT)) { m.gpuSum += gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; m.gpuN++; } gl.deleteQuery(q); } }
   const now_ = performance.now(); if (now_ - m.t1 < 1000 || !m.n) return;
   const n = m.n, f = x => (x / n).toFixed(1), cpu = m.a.sim + m.a.tile + m.a.vis + m.a.draw, avg = m.sum / n, inf = renderer.info;
@@ -9302,15 +9402,25 @@ const FOTO_SKY = (() => {
   s.scale.setScalar(SKY_R * 1.6); s.renderOrder = -100; s.frustumCulled = false; scene.add(s);
   const probe = new THREE.Mesh(s.geometry, Object.assign(m.clone(), { uniforms: m.uniforms, blending: THREE.NoBlending })); probe.scale.copy(s.scale); probe.frustumCulled = false;
   const ps = new THREE.Scene(); ps.add(probe);
-  return { s, probe, ps, rt: new THREE.WebGLRenderTarget(8, 2), cam: new THREE.PerspectiveCamera(12, 4, 1, SKY_R * 2), px: new Uint8Array(64), col: new THREE.Color(0xc9ced4), zen: new THREE.Color(0x6f8fbf), t: -1e9, tod: -1, yaw: 0, a: 0 };
+  return { s, probe, ps, rt: new THREE.WebGLRenderTarget(8, 2), cam: new THREE.PerspectiveCamera(12, 4, 1, SKY_R * 2), px: new Uint8Array(64), att: [], pbo: [], col: new THREE.Color(0xc9ced4), zen: new THREE.Color(0x6f8fbf), t: -1e9, tod: -1, yaw: 0, a: 0 };
 })();
 function fotoSkyHorizon() { // the mean colour of the sky just over the horizon ahead (linear, before the filmic curve: as the fog needs it)
   const F = FOTO_SKY, d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z);
   F.probe.position.copy(camera.position); F.cam.position.copy(camera.position); F.cam.lookAt(camera.position.x + d.x, camera.position.y + Math.tan(0.05) * Math.hypot(d.x, d.z), camera.position.z + d.z);
-  const was = renderer.getRenderTarget(), read = c => { renderer.setRenderTarget(F.rt); renderer.render(F.ps, F.cam); renderer.readRenderTargetPixels(F.rt, 0, 0, 8, 2, F.px); let r = 0, g = 0, b = 0; for (let i = 0; i < 16; i++) { r += F.px[i * 4]; g += F.px[i * 4 + 1]; b += F.px[i * 4 + 2]; } c.setRGB(r / 4080, g / 4080, b / 4080); };
+  const gl = renderer.getContext(), asinc = renderer.capabilities.isWebGL2 && F.t > 0, leggi = (c, px) => { let r = 0, g = 0, b = 0; for (let i = 0; i < 16; i++) { r += px[i * 4]; g += px[i * 4 + 1]; b += px[i * 4 + 2]; } c.setRGB(r / 4080, g / 4080, b / 4080); };
+  if (asinc && F.att.length) { F.t = performance.now(); return; } /* the last answer has not come yet: no second question on top of it */
+  const was = renderer.getRenderTarget(), read = c => { renderer.setRenderTarget(F.rt); renderer.render(F.ps, F.cam);
+    if (!asinc) { renderer.readRenderTargetPixels(F.rt, 0, 0, 8, 2, F.px); leggi(c, F.px); return; } /* the first of all, before the first frame: it can wait */
+    /* a read from the GPU waits for all the GPU has yet to draw, 20 ms and more twice a second: asked here, the answer is picked up a frame or two later (fotoSkyArrivi) */
+    const pbo = F.pbo.pop() || gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, 64, gl.STREAM_READ); gl.readPixels(0, 0, 8, 2, gl.RGBA, gl.UNSIGNED_BYTE, 0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    F.att.push({ c, pbo, s: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0), leggi }); gl.flush(); };
   read(F.col);
   F.cam.lookAt(camera.position.x + d.x * 0.6, camera.position.y + 1, camera.position.z + d.z * 0.6); read(F.zen); // and higher up, for the panes
   renderer.setRenderTarget(was); F.t = performance.now(); F.tod = TOD; F.yaw = yaw;
+}
+function fotoSkyArrivi() { // the answers that have come: the colours, a frame or two after the question
+  const F = FOTO_SKY, A = F.att; if (!A.length) return; const gl = renderer.getContext();
+  while (A.length) { const q = A[0], st = gl.clientWaitSync(q.s, 0, 0); if (st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) return; gl.deleteSync(q.s); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, q.pbo); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, F.px); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); q.leggi(q.c, F.px); F.pbo.push(q.pbo); A.shift(); }
 }
 const _fotoV = new THREE.Vector3();
 // in linear light the sky's fill counts for less than in the old sums, and the fog took the curve's warm cast: more fill in the
@@ -9326,7 +9436,7 @@ const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
       F.a = clamp((L.elDeg + 7) / 9, 0, 1) * (1 - 0.95 * clamp((WX.cloud - 0.25) / 0.55, 0, 1)) * (1 - WX.fog);
       F.s.material.uniforms.uSkyA.value = F.a; F.s.visible = F.a > 0.01;
       F.s.material.uniforms.uSkyS.value = 1.2 + 0.6 * clamp(L.elDeg / 15, 0, 1); // less boost with the sun low: twilight would turn teal
-      if (F.s.visible) {
+      if (F.s.visible) { fotoSkyArrivi();
         const d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z), dy = Math.abs(((yaw - F.yaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
         if (performance.now() - F.t > 500 || Math.abs(TOD - F.tod) > 0.05 || dy > 0.4) fotoSkyHorizon();
       }

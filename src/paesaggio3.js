@@ -341,18 +341,23 @@ function* buildPaesaggio(T, G) {
   }
   yield 'terreni';
   if (net.i.length) mkMesh(net, MAT.net, 10, false, G);
+  yield 'terreni reti';
   if (drape.i.length) mkMesh(drape, MAT.mark, 2, false, G);
+  yield 'terreni fondo';
   if (lines.i.length) mkMesh(lines, MAT.mark, 3, false, G);
+  yield 'terreni linee';
   if (solid.i.length) mkMesh(solid, LMAT.trim, 10, 'cast', G);
   if (doors.i.length) mkMesh(doors, LS_DOOR_MAT, 10, false, G);
   if (glass.i.length) mkMesh(glass, LS_GLASS, 12, false, G);
   if (film.i.length) mkMesh(film, LS_FILM, 12, false, G);
+  yield 'terreni pieni';
   const o3 = new THREE.Object3D(), inst = (geo, mat, list, sc, colOf) => {
     if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length); im.castShadow = true;
     list.forEach(([x, z, r], i) => { o3.position.set(x, H.ground(x, z), z); o3.rotation.set(0, r || 0, 0); const k = sc ? sc(x, z) : 1; o3.scale.set(k, k, k); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); if (colOf) im.setColorAt(i, COL(colOf(x, z))); });
     G.add(im); return im;
   };
   inst(LS_BALE_G, LS_BALE_M, bales);
+  yield 'terreni balle';
   if (panels.length) { // building-site hoarding: one instance per panel, each knocked over on its own like the street lamps
     const im = new THREE.InstancedMesh(LS_PANEL_G, LS_PANEL_M, panels.length); im.castShadow = true;
     panels.forEach(([x0, z0, x1, z1, col], i) => {
@@ -364,7 +369,9 @@ function* buildPaesaggio(T, G) {
     });
     G.add(im);
   }
+  yield 'terreni pannelli';
   inst(TREE_G.trunk, MAT.trunk, trees, () => 0.55);
+  yield 'terreni alberi';
   const crowns = inst(TREE_G.crown, MAT.crown, trees); // small fruit trees: the crown low on a short trunk
   if (crowns) crowns.customDepthMaterial = TREE_DEPTH;
   if (crowns) trees.forEach(([x, z], i) => { o3.position.set(x, H.ground(x, z) + 3.4 * 0.55 + 0.6, z); o3.rotation.set(0, LS_HASH(x, z, 'r') * TAU, 0); o3.scale.set(0.6, 0.6, 0.6); o3.updateMatrix(); crowns.setMatrixAt(i, o3.matrix); crowns.setColorAt(i, COL(GREENS[Math.floor(LS_HASH(x, z, 'f') * 3)])); });
