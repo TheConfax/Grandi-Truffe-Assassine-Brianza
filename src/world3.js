@@ -498,7 +498,6 @@ function edgePts(a, b, off, e) { // e: the edge, whose lane may change along it 
 
 // ---------------------------------------------------------------- tile builder
 const CORTILE_COL = 0xb9b5ac; // the paving of yards and drives (tiles[t].cv): a plain light grey, the DBGT does not say what it is made of
-const TERRA_CANT = '#d4967a'; /* the earth of a building site: AREA_COL[7] made redder and lighter, because the photographic ground texture is green and the plain colour came out mustard and olive */
 const AREA_COL = { 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6', 17: '#b9b5ac' }; // 17: yards of the DBGT (AATT, dbgt_manufatti.py), a plain light grey paving (MAT.aatt)
 const PAL_OLD = ['#dfae62', '#e8c98a', '#dba08a', '#ece4d3', '#d99060', '#c7c9a6', '#e3b98f', '#f0dcb0'];
 const PAL_MOD = ['#dcd7cd', '#cbc4b7', '#bdb5a8', '#e6e0d5', '#c9b9a0', '#d5cbbb'];
@@ -581,7 +580,7 @@ const MAT = {
 const incoltoTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#9c9a58'; g.fillRect(0, 0, w, h); noise(g, w, h, 7000, 0.45, ['#8a8a4a', '#b0aa6a', '#7a7a40', '#a89c60']); g.globalAlpha = .5; g.fillStyle = '#7d6643'; for (let i = 0; i < 14; i++) { g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 8 + rnd() * 26, 6 + rnd() * 18, rnd() * 3, 0, TAU); g.fill(); } g.globalAlpha = 1; });
 incoltoTex.repeat.set(1.5, 1.5);
 Object.assign(MAT, { incolto: flatMat({ map: incoltoTex }), incoltoS: new THREE.MeshLambertMaterial({ map: incoltoTex }) });
-Object.assign(MAT, { terraS: new THREE.MeshLambertMaterial({ map: groundTex, vertexColors: true }), terra: flatMat({ map: groundTex, vertexColors: true }), aattS: new THREE.MeshLambertMaterial({ color: 0xb9b5ac }), aatt: flatMat({ color: 0xb9b5ac }), grassS: new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }), pavedS: new THREE.MeshLambertMaterial({ vertexColors: true, map: asphaltTex }), waterS: new THREE.MeshLambertMaterial({ color: 0x45738c }),
+Object.assign(MAT, { aattS: new THREE.MeshLambertMaterial({ color: 0xb9b5ac }), aatt: flatMat({ color: 0xb9b5ac }), grassS: new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }), pavedS: new THREE.MeshLambertMaterial({ vertexColors: true, map: asphaltTex }), waterS: new THREE.MeshLambertMaterial({ color: 0x45738c }),
   piazzaS: new THREE.MeshLambertMaterial({ map: porfidoTex }), cortileS: new THREE.MeshLambertMaterial({ color: CORTILE_COL }), footS: new THREE.MeshLambertMaterial({ color: 0xc8b89c }), asphS: new THREE.MeshLambertMaterial({ map: asphaltTex }) });
 // the rail bed of the DBGT (SD_FER, tiles[t].sf): the gravel of the ballast without the sleepers, which each track draws over it
 const gravelTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#7e766b'; g.fillRect(0, 0, w, h); noise(g, w, h, 900, 0.5, ['#5d564d', '#9c9487', '#4a443d']); });
@@ -1128,7 +1127,6 @@ function cellOwners(T, F) {
     else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
     else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
-    else if (a.t === 7) cover(outer, holes, 1.1, S('t', MAT.terraS, 10, COL(TERRA_CANT))); /* a building site is earth: the photographic ground texture tinted with the site colour (the asphalt texture came out black, the plain gravel grey: Carlo, 2/11) */
     else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
@@ -1202,8 +1200,8 @@ function* buildTileGen(T) {
   yield 'landuse';
   // land use
   {
-    const gB = VBuf(), iB = VBuf(), pB = VBuf(), yB = VBuf(), tB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
-    gB.rk = 1; iB.rk = 1; pB.rk = 1.1; yB.rk = 1.1; tB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
+    const gB = VBuf(), iB = VBuf(), pB = VBuf(), yB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
+    gB.rk = 1; iB.rk = 1; pB.rk = 1.1; yB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
     let tLu = performance.now();
     for (const a of d.a || []) {
       if (performance.now() - tLu > 2.5) { const s_ = srndT; yield 'landuse'; srndT = s_; tLu = performance.now(); } // a town tile has hundreds of areas: this slice alone took 30 ms
@@ -1214,14 +1212,13 @@ function* buildTileGen(T) {
         else if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
-        else if (a.t === 7) polyFill(tB, outer, holes, 0.025 * fy, 10, COL(TERRA_CANT));
         else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
     const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 10); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): their own paving, no traffic
     const sB = FBuf(); sB.rk = 1.3; for (const q of d.sf || []) { try { polyFill(sB, dec(q.p), q.k.map(dec), 0.03 * fy, 3); } catch (e) { } } // the rail bed (DBGT SD_FER)
-    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(tB, MAT.terra, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {

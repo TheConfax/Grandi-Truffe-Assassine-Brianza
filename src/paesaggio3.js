@@ -620,17 +620,20 @@ function lsOrchard(A, P, drape, ftrees, solidAt) {
 function lsOrchardMeshes(G, ftrees, H) {
   if (!ftrees.length) return; const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), fruits = [];
   for (let v = 0; v < 3; v++) {
-    const list = ftrees.filter(t => t.v === v); if (!list.length) continue; const pa = TREE_G.crownS[v].attributes.position.array, cand = [];
-    for (let i = 0; i < pa.length; i += 3) { const x = pa[i], y = pa[i + 1], z = pa[i + 2]; if (y < -1.7 || y > 0.5 || Math.hypot(x / 2.25, y / 2.05, z / 2.25) < 0.7) continue; cand.push([x, y, z]); }
-    if (!cand.length) cand.push([0, 0, 2]);
-    const tr  = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, list.length), cr = new THREE.InstancedMesh(TREE_G.crownS[v], MAT.crown, list.length);
+    const list = ftrees.filter(t => t.v === v); if (!list.length) continue;
+    const probe = new THREE.Mesh(TREE_G.crownS[v], new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); probe.matrixAutoUpdate = false; /* the real crown, to throw rays at */
+    const leafA = TREE_LEAF.image, leafAt = u => { const x = Math.min(leafA.width - 1, Math.max(0, Math.floor(u.x * leafA.width))), y = Math.min(leafA.height - 1, Math.max(0, Math.floor(u.y * leafA.height))); return leafA.data[(y * leafA.width + x) * 4 + 3]; }; /* alpha of the leaf atlas at a uv */
+    const ray = new THREE.Raycaster(), ro = new THREE.Vector3(), rd = new THREE.Vector3(), FR = 0.075 * 2; /* a fruit is 0.15 m across */
+    const tr = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, list.length), cr = new THREE.InstancedMesh(TREE_G.crownS[v], MAT.crown, list.length);
     list.forEach((t, j) => {
       const gy = H.ground(t.x, t.z), th = t.th, yb = Math.max(0.7, 0.3 * th), hc = th - yb, D = th + 0.8, sx = D / 5.4, sy = hc / 4.5, yc = th - 2.5 * sy;
       q.identity(); m.compose(p.set(t.x, gy, t.z), q, s.set(0.5, yb + 0.65 * hc, 0.5)); tr.setMatrixAt(j, m);
       m.compose(p.set(t.x, gy + yc, t.z), q, s.set(sx, sy, sx)); cr.setMatrixAt(j, m); cr.setColorAt(j, COL(GREENS[t.g]));
-      for (let k = 0; k < t.nf; k++) { /* a fruit hangs on a real point of this crown (a vertex of its shape, lower and middle half), drawn 0.1 m in toward the centre: inside the leaves, never floating round them */
-        const c = cand[Math.floor(LS_HASH(t.x + k, t.z, 'fr') * cand.length) % cand.length], fx = t.x + c[0] * sx, fy = gy + yc + c[1] * sy, fz = t.z + c[2] * sx, dx = t.x - fx, dy = gy + yc - fy, dz = t.z - fz, dl = Math.hypot(dx, dy, dz) || 1;
-        fruits.push([fx + dx / dl * 0.1, fy + dy / dl * 0.1, fz + dz / dl * 0.1, 1, 1, 1, t.pal[k % 3]]); }
+      probe.matrix.copy(m); probe.matrixWorld.copy(m); ro.set(t.x, gy + yc, t.z);
+      for (let k = 0; k < t.nf; k++) { /* a fruit: a ray from the middle of the crown outward, against the real crown with this instance's matrix; the farthest hit on a visible leaf (not a clear corner of a card) is the surface, and the fruit sits half its width plus 5 cm in from it, half inside the leaves */
+        const ly = -0.78 + LS_HASH(t.x + k, t.z, 'fr') * 1.0, rr = Math.sqrt(1 - ly * ly), ph = LS_HASH(t.x, t.z + k, 'ph') * TAU; rd.set(Math.cos(ph) * rr * sx, ly * sy, Math.sin(ph) * rr * sx).normalize(); ray.set(ro, rd);
+        const hits = ray.intersectObject(probe, false); let hit = null; for (let h = hits.length - 1; h >= 0; h--) if (!hits[h].uv || leafAt(hits[h].uv) >= 128) { hit = hits[h]; break; } if (!hit) continue;
+        const d = Math.max(0, hit.distance - FR / 2 - 0.05); fruits.push([ro.x + rd.x * d, ro.y + rd.y * d, ro.z + rd.z * d, 1, 1, 1, t.pal[k % 3]]); }
     });
     tr.castShadow = cr.castShadow = true; cr.receiveShadow = true; cr.customDepthMaterial = TREE_DEPTH; G.add(tr, cr);
   }
