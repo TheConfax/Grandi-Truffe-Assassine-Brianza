@@ -5,6 +5,11 @@
 // Garages get their up-and-over doors on the side you drive up to, greenhouses are glass. Variety comes from a hash of the place, never from
 // what a real place looks like: nothing here pretends to know more than the map says
 const LS_HASH = (x, z, k = '') => NG_HASH(k + Math.round(x * 10) + ',' + Math.round(z * 10));
+function lsResample(P, step) { /* a closed outline walked again with a vertex every step metres */
+  const out = []; let carry = 0;
+  for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1e-6) continue; let t = carry; while (t < L) { out.push([a[0] + (c[0] - a[0]) * t / L, a[1] + (c[1] - a[1]) * t / L]); t += step; } carry = t - L; }
+  return out.length >= 4 ? out : P;
+}
 function lsAxis(P) { // the long axis of a polygon, and its extent along and across it
   const [cx, cz] = centroid(P); let sxx = 0, szz = 0, sxz = 0;
   for (const [x, z] of P) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); }
@@ -228,11 +233,19 @@ function* buildPaesaggio(T, G) {
       let gate = 0, gd = 1e9; P.forEach((p, i) => { const q = P[(i + 1) % P.length], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let d = 1e9; ROADSEG.each(mx - 30, mz - 30, mx + 30, mz + 30, s => { d = Math.min(d, segDist(mx, mz, s.a[0], s.a[1], s.b[0], s.b[1])); }); if (d < gd && hyp(q[0] - p[0], q[1] - p[1]) > 3) { gd = d; gate = i; } });
       lsFence(net, solid, P, 1.2, gate, '#3e4a42');
       const [bx, bz] = A.at(A.s0 * 0.4, A.v0 * 0.4); if (inPoly(bx, bz, P)) { const gy = H.ground(bx, bz), ry = Math.atan2(A.ux, A.uz); const qx = bx + Math.sin(ry) * 1.4, qz = bz + Math.cos(ry) * 1.4; parkProps(G, 'panchina', [[bx, bz, ry, gy]]); parkProps(G, 'cestino', [[qx, qz, ry, H.ground(qx, qz)]]); } // knocked down like the street lamps (landmarks3.js)
-    } else if (kind.startsWith('pista')) { // an athletics track: six red lanes inside the oval, white lines between them
-      if (area < 1500 || !isConvex(P)) continue;
-      const ring = k => P.map(([x, z]) => { const dx = cx - x, dz = cz - z, l = hyp(dx, dz) || 1; return [x + dx / l * k * 1.22, z + dz / l * k * 1.22]; }), outer = ring(0), inner = ring(6), RED = COL(kind.endsWith('grass') ? '#6b8f3e' : '#b5543f');
-      for (let i = 0; i < P.length; i++) { const j = (i + 1) % P.length, q = drape.p.length / 3; for (const p of [outer[i], outer[j], inner[j], inner[i]]) vtx(drape, p[0], 0.05, p[1], 0, 1, 0, 0, 0, RED); drape.i.push(q, q + 1, q + 2, q, q + 2, q + 3, q, q + 2, q + 1, q, q + 3, q + 2); }
-      for (let k = 0; k <= 6; k++) { const R_ = ring(k); for (let i = 0; i < R_.length; i++) { const a = R_[i], c = R_[(i + 1) % R_.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, q = lines.p.length / 3, Wc = COL('#f4f2ea'); for (const [s, o] of [[0, -0.04], [L, -0.04], [L, 0.04], [0, 0.04]]) vtx(lines, a[0] + ux * s - uz * o, 0.07, a[1] + uz * s + ux * o, 0, 1, 0, 0, 0, Wc); triUp(lines, q, q + 1, q + 2); triUp(lines, q, q + 2, q + 3); } }
+    } else if (kind.startsWith('pista')) { /* an athletics track: the ring of lanes inside the outline the map gives, whatever its shape, with the white lines between them */
+      if (area < 800 || P.length < 4) continue;
+      const LW = 1.22, grass = kind.endsWith('grass'), RED = COL(grass ? '#6b8f3e' : '#b5543f'), Wc = COL('#f4f2ea');
+      /* the outline resampled every 2.5 m and smoothed a little (the jogs of a hand-drawn outline would fold the offsets), then each lane is the same curve moved inward along its normal */
+      const S0 = lsResample(P, 2.5); let Sm = S0; for (let it = 0; it < 5; it++) Sm = Sm.map((p, i) => { const a_ = Sm[(i + Sm.length - 1) % Sm.length], c_ = Sm[(i + 1) % Sm.length]; return [(a_[0] + 2 * p[0] + c_[0]) / 4, (a_[1] + 2 * p[1] + c_[1]) / 4]; });
+      const sgn = sArea(Sm) < 0 ? -1 : 1, nrm = Sm.map((p, i) => { const a_ = Sm[(i + Sm.length - 1) % Sm.length], c_ = Sm[(i + 1) % Sm.length], tx = c_[0] - a_[0], tz = c_[1] - a_[1], l = hyp(tx, tz) || 1; return [tz / l * sgn, -tx / l * sgn]; }); /* outward normals */
+      const ringAt = k => Sm.map((p, i) => [p[0] - nrm[i][0] * LW * k, p[1] - nrm[i][1] * LW * k]), inside = R => R.filter(([x, z]) => !inPoly(x, z, P)).length <= 0.04 * R.length && Math.abs(sArea(R)) > 0.2 * area;
+      let lanes = 6; while (lanes > 1 && !inside(ringAt(lanes))) lanes--;
+      const rings = []; for (let k = 0; k <= lanes; k++) rings.push(ringAt(k));
+      const seg = (a, c, w, col, y) => { const L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) return; const n = Math.max(1, Math.ceil(L / 3)); for (let t = 0; t < n; t++) { const x0 = a[0] + (c[0] - a[0]) * t / n, z0 = a[1] + (c[1] - a[1]) * t / n, x1 = a[0] + (c[0] - a[0]) * (t + 1) / n, z1 = a[1] + (c[1] - a[1]) * (t + 1) / n, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, q = lines.p.length / 3; for (const [px, pz, o] of [[x0, z0, -w], [x1, z1, -w], [x1, z1, w], [x0, z0, w]]) vtx(lines, px - uz * o, y, pz + ux * o, 0, 1, 0, 0, 0, col); triUp(lines, q, q + 1, q + 2); triUp(lines, q, q + 2, q + 3); } };
+      for (let k = 0; k < lanes; k++) { const o = rings[k], inn = rings[k + 1]; for (let i = 0; i < o.length; i++) { const j = (i + 1) % o.length, n = Math.max(1, Math.ceil(hyp(o[j][0] - o[i][0], o[j][1] - o[i][1]) / 3)); for (let t = 0; t < n; t++) { const f0 = t / n, f1 = (t + 1) / n, q = drape.p.length / 3; for (const [A_, B_, f] of [[o[i], o[j], f0], [o[i], o[j], f1], [inn[i], inn[j], f1], [inn[i], inn[j], f0]]) vtx(drape, A_[0] + (B_[0] - A_[0]) * f, 0.045, A_[1] + (B_[1] - A_[1]) * f, 0, 1, 0, 0, 0, RED); drape.i.push(q, q + 1, q + 2, q, q + 2, q + 3, q, q + 2, q + 1, q, q + 3, q + 2); } } }
+      for (let k = 0; k <= lanes; k++) { const R_ = rings[k]; for (let i = 0; i < R_.length; i++) seg(R_[i], R_[(i + 1) % R_.length], k === 0 || k === lanes ? 0.06 : 0.04, Wc, 0.065); }
+      { const [a_, c_] = [rings[0][0], rings[lanes][0]]; seg(a_, c_, 0.08, Wc, 0.065); } /* the start line across the lanes at the first vertex */
     } else if (kind === 'aiuola') { // a flower bed: dark soil, flowers in the colours of a garden centre
       try { polyFill(drape, P, [], 0.06, 10, COL('#5a4030')); } catch (e) { }
       const n = Math.min(140, Math.floor(area * 1.5));
