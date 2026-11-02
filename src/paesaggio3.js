@@ -388,7 +388,7 @@ function lsPitch(A0, P, sport, surface, lines, solid, box, cyl, G, solidAt) {
   const rect = (hl, hw) => { line(-hl, -hw, hl, -hw); line(hl, -hw, hl, hw); line(hl, hw, -hl, hw); line(-hl, hw, -hl, -hw); };
   const circle = (a, b, r, from = 0, to = TAU) => { const n = Math.max(8, Math.ceil(r * 3)); for (let k = 0; k < n; k++) { const t0 = from + (to - from) * k / n, t1 = from + (to - from) * (k + 1) / n; line(a + Math.cos(t0) * r, b + Math.sin(t0) * r, a + Math.cos(t1) * r, b + Math.sin(t1) * r, 0.08); } };
   const gyAt = (a, b) => { const [x, z] = S(a, b); return [x, H.ground(x, z), z]; };
-  const surf = { clay: '#c0663f', sand: '#e2cf9a', grass: null, artificial_turf: '#5e9a4a', asphalt: '#6e7378', concrete: '#9a9a96', tartan: '#b5523c' }[surface];
+  const surf = { clay: '#c0663f', sand: '#e2cf9a', grass: null, artificial_turf: '#5e9a4a', asphalt: '#6e7378', concrete: '#9a9a96', tartan: '#b5523c' }[surface] || (sport === 'basketball' && surface !== 'grass' ? { acrylic: '#3f6e9a', rubber: '#a8503c' }[surface] || '#6e7378' : null); /* a basketball court has a hard floor: the paving unless OSM says it is grass (Carlo, 1/11) */
   if (surf) { try { const sb = VBuf(); polyFill(sb, P, [], 0.05, 10, COL(surf)); mkMesh(sb, MAT.mark, 2, false, G); } catch (e) { } }
   const rec = window.__CAMPI ? { sport, surface, P, rc: [A.cx, A.cz, A.ux, A.uz, A.s1, A.v1], it: [] } : null; if (rec) window.__CAMPI.push(rec);
   const F0 = lmFrame(new THREE.Matrix4()), gnet = Buf(), V3 = THREE.Vector3, Y = new V3(0, 1, 0);
