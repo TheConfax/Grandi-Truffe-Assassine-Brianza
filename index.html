@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo correzioni-1-11 · dopo 16c5b32 · assemblato 02/11 03:35 · porta ' + location.port;
+    const txt = 'locale · ramo correzioni-1-11 · dopo c547bff · assemblato 02/11 03:47 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3779,6 +3779,13 @@ function buildCemetery(T, G) {
     for (let i = 0; i < outer.length; i++) { const p = outer[i], q = outer[(i + 1) % outer.length], L = hyp(q[0] - p[0], q[1] - p[1]); for (let s = 4; s < L - 2; s += 9) { const t = s / L, x = lerp(p[0], q[0], t), z = lerp(p[1], q[1], t), mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let nx = -(q[1] - p[1]) / L, nz = (q[0] - p[0]) / L; if (!inPoly(x + nx * 2, z + nz * 2, outer)) { nx = -nx; nz = -nz; } const X = x + nx * 2.2, Z = z + nz * 2.2; if (inside(X, Z, 1)) cyps.push([X, Z]); } }
   }
   if (!tombs.length && !cyps.length) return;
+  if (!T.cemDone) { /* graves are solid (Carlo, 2/11): two discs per slab, which you can walk up onto (28 cm), a disc for the headstone; a disc for each cypress */
+    T.cemDone = true; window.__COLL = window.__COLL || {}; window.__COLL.tombe = (window.__COLL.tombe || 0) + tombs.length;
+    for (const [x, z, a] of tombs) { const gy = H.ground(x, z), dx = -Math.sin(a), dz = Math.cos(a);
+      for (const o of [-0.5, 0.5]) { const px = x + dx * o, pz = z + dz * o; WALLS.add(px - 0.5, pz - 0.5, px + 0.5, pz + 0.5, { r: 0.5, x: px, z: pz, y0: gy - 3, y1: gy + 0.3, sali: { rs: 0.5, top: gy + 0.3 } }); }
+      const hx = x + dx * 0.95, hz = z + dz * 0.95; WALLS.add(hx - 0.42, hz - 0.42, hx + 0.42, hz + 0.42, { r: 0.42, x: hx, z: hz, y0: gy - 3, y1: gy + 1.0 }); }
+    for (const c of cyps) WALLS.add(c[0] - 0.35, c[1] - 0.35, c[0] + 0.35, c[1] + 0.35, { r: 0.35, x: c[0], z: c[1], y0: H.ground(c[0], c[1]) - 3, y1: H.ground(c[0], c[1]) + 8 });
+  }
   const m = new THREE.Matrix4(), qq = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), pp = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const mk = (geo, mat, list, f) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((t, i) => { f(t, pp); qq.setFromAxisAngle(up, -t[2] || 0); m.compose(pp, qq, sc); im.setMatrixAt(i, m); }); im.castShadow = true; G.add(im); };
   mk(TOMB_G, lam(0xb8b4ac), tombs, (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.14, t[1]));
@@ -4419,7 +4426,7 @@ const OGG_MAT = new THREE.MeshLambertMaterial({ vertexColors: true }), WIRE_MAT 
 const OGG_SPEC = {
   traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8, sali: 0.5 },
   idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true, sali: 0.5 }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
-  panchina: { r: 0.8, h: 0.9, knock: true, sali: 0.4 }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: {},
+  panchina: { r: 0.8, h: 0.9, knock: true, sali: 0.4 }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: { r: 0.8, h: 2.3, parts: [[-1.6, 0, 0.7, 2.3], [1.6, 0, 0.7, 2.3], [3.4, 0, 0.7, 1.5], [3.4, -1.4, 0.7, 0.8], [0, 0, 0.9, 0.5]] }, /* swing frame, seats, slide: solid */
   telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true, sali: 0.35 }, rastrelliera: { r: 0.6, h: 0.8, knock: true }, cassetta: { r: 0.22, h: 1.2, knock: true },
   armadietti: { r: 1.0, h: 2.1, sali: 0.4 }, pannello: { r: 0.4, h: 2.3 }, picnic: { r: 0.9, h: 0.8, knock: true, sali: 0.6 }, fitness: { r: 0.8, h: 2.3 }, torre_acqua: { r: 3.2, h: 28, scale: 28 }, lavaggio: {},
 };
@@ -4564,7 +4571,9 @@ function buildOggetti(T, G) {
       if (S.knock) {
         if (!T.ogDone) addProp({ x, z, y: gy, r: S.r, h: S.h, inst: { meshes: [im], i, ry: a, base: gy }, ogTile: T, og: oi, sali: S.sali ? { rs: S.sali, dy: S.h * sy } : null });
         else for (const p of PROPS) if (p.ogTile === T && p.og === oi) { p.inst.meshes = [im]; if (p.broken) { o3.scale.set(0, 0, 0); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); } } // built again: what was knocked down stays down
+
       } else if (!T.ogDone) WALLS.add(x - S.r, z - S.r, x + S.r, z + S.r, { r: S.r, x, z, y0: gy - 3, y1: gy + S.h * sy, ...(S.sali ? { sali: { rs: S.sali, top: gy + S.h * sy } } : {}) });
+      if (S.parts && !S.knock && !T.ogDone) for (const [dx, dz, rr, hh] of S.parts) { const wx = x + dx * Math.cos(a) + dz * Math.sin(a), wz = z - dx * Math.sin(a) + dz * Math.cos(a); WALLS.add(wx - rr, wz - rr, wx + rr, wz + rr, { r: rr, x: wx, z: wz, y0: gy - 3, y1: gy + hh }); }
     });
     G.add(im);
   }
@@ -6266,7 +6275,8 @@ function lsTrack(kind, P, area, S, drape, lines) {
   }
   const A = lsRect(P); if (!A) return false; const L = A.s1 - A.s0, W = A.v1 - A.v0; if (L < 20 || W < 2.4 || L < 2.5 * W) return false; /* a straight of lanes */
   const lanes = clamp(Math.round(W / LS_LANE), 1, 8), lw = W / lanes, c = (s, v) => A.at(s, v);
-  quad(c(A.s0, A.v0), c(A.s1, A.v0), c(A.s1, A.v1), c(A.s0, A.v1), RED, 0.045);
+  /* the red in pieces of 3 m both ways: the mesh is draped by its vertices, one long quad would run flat under a rise of the ground (Carlo, 2/11: grass on the track at x -586 z -828) */
+  for (let k = 0; k < lanes; k++) lsStrip(drape, A, A.s0, A.s1, A.v0 + lw * (k + 0.5), lw, RED, 0.045); /* lsStrip halves a piece where S rises over its chord */
   for (let k = 0; k <= lanes; k++) lsSeg(lines, c(A.s0, A.v0 + lw * k), c(A.s1, A.v0 + lw * k), k === 0 || k === lanes ? 0.06 : 0.04, Wc, 0.065);
   for (const s of [A.s0 + 0.15, A.s1 - 0.15]) lsSeg(lines, c(s, A.v0), c(s, A.v1), 0.06, Wc, 0.065);
   return true;

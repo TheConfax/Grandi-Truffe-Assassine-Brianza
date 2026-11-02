@@ -556,7 +556,8 @@ function lsTrack(kind, P, area, S, drape, lines) {
   }
   const A = lsRect(P); if (!A) return false; const L = A.s1 - A.s0, W = A.v1 - A.v0; if (L < 20 || W < 2.4 || L < 2.5 * W) return false; /* a straight of lanes */
   const lanes = clamp(Math.round(W / LS_LANE), 1, 8), lw = W / lanes, c = (s, v) => A.at(s, v);
-  quad(c(A.s0, A.v0), c(A.s1, A.v0), c(A.s1, A.v1), c(A.s0, A.v1), RED, 0.045);
+  /* the red in pieces of 3 m both ways: the mesh is draped by its vertices, one long quad would run flat under a rise of the ground (Carlo, 2/11: grass on the track at x -586 z -828) */
+  for (let k = 0; k < lanes; k++) lsStrip(drape, A, A.s0, A.s1, A.v0 + lw * (k + 0.5), lw, RED, 0.045); /* lsStrip halves a piece where S rises over its chord */
   for (let k = 0; k <= lanes; k++) lsSeg(lines, c(A.s0, A.v0 + lw * k), c(A.s1, A.v0 + lw * k), k === 0 || k === lanes ? 0.06 : 0.04, Wc, 0.065);
   for (const s of [A.s0 + 0.15, A.s1 - 0.15]) lsSeg(lines, c(s, A.v0), c(s, A.v1), 0.06, Wc, 0.065);
   return true;
