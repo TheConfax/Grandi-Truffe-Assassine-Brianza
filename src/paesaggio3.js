@@ -318,18 +318,23 @@ function* buildPaesaggio(T, G) {
   }
   yield 'terreni';
   if (net.i.length) mkMesh(net, MAT.net, 10, false, G);
+  yield 'terreni reti';
   if (drape.i.length) mkMesh(drape, MAT.mark, 2, false, G);
+  yield 'terreni fondo';
   if (lines.i.length) mkMesh(lines, MAT.mark, 3, false, G);
+  yield 'terreni linee';
   if (solid.i.length) mkMesh(solid, LMAT.trim, 10, 'cast', G);
   if (doors.i.length) mkMesh(doors, LS_DOOR_MAT, 10, false, G);
   if (glass.i.length) mkMesh(glass, LS_GLASS, 12, false, G);
   if (film.i.length) mkMesh(film, LS_FILM, 12, false, G);
+  yield 'terreni pieni';
   const o3 = new THREE.Object3D(), inst = (geo, mat, list, sc, colOf) => {
     if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length); im.castShadow = true;
     list.forEach(([x, z, r], i) => { o3.position.set(x, H.ground(x, z), z); o3.rotation.set(0, r || 0, 0); const k = sc ? sc(x, z) : 1; o3.scale.set(k, k, k); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); if (colOf) im.setColorAt(i, COL(colOf(x, z))); });
     G.add(im); return im;
   };
   inst(LS_BALE_G, LS_BALE_M, bales);
+  yield 'terreni balle';
   if (panels.length) { // building-site hoarding: one instance per panel, each knocked over on its own like the street lamps
     const im = new THREE.InstancedMesh(LS_PANEL_G, LS_PANEL_M, panels.length); im.castShadow = true;
     panels.forEach(([x0, z0, x1, z1, col], i) => {
@@ -341,7 +346,9 @@ function* buildPaesaggio(T, G) {
     });
     G.add(im);
   }
+  yield 'terreni pannelli';
   lsOrchardMeshes(G, ftrees, H);
+  yield 'terreni alberi';
   lsInstances(G, LS_POTP_G, pots); lsInstances(G, LS_BLOB_G, potPlants); lsInstances(G, LS_BLOB_G, crops); lsInstances(G, LS_STAKE_G, stakes); lsInstances(G, LS_FRUIT_G, fruitG.map(f => [f[0], f[1], f[2], 1.4, 1.4, 1.4, f[6]]));
   if (!T.lsDone) {
     for (const [x, z, r, hh] of solids) { const gy = H.ground(x, z); WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: gy - 3, y1: gy + hh }); }
