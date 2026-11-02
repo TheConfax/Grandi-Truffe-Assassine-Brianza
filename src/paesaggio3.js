@@ -87,7 +87,7 @@ function* buildPaesaggio(T, G) {
   const d = T.d, solid = Buf(), drape = Object.assign(VBuf(), { noclip: !!H.tile(T.t) }), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), film = Buf(), F0 = lmFrame(new THREE.Matrix4());
   const box = (w, h, dd, x, y, z, col, ry = 0) => F0.geo(solid, lmBox(w, h, dd, x, y, z, ry), null, COL(col));
   const cyl = (r, h, x, y, z, col, seg = 10) => F0.geo(solid, new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z), null, COL(col));
-  const solids = [], bales = [], trees = [], pots = [], panels = [];
+  const solids = [], bales = [], pots = [], panels = [], ftrees = [], potPlants = [], crops = [], stakes = [], fruitG = [];
   const solidAt = (x, z, r, h) => solids.push([x, z, r, h]);
   // ---- garages: doors on the open side, one per box
   for (const B of T.bld) {
@@ -160,21 +160,10 @@ function* buildPaesaggio(T, G) {
           bales.push([x, z, LS_HASH(x, z, 'r') * TAU]); got++;
         }
       }
-    } else if (kind === 'frutteto') { // trees in rows
-      for (let v = A.v0 + 2.5; v < A.v1 - 2; v += 4.5) for (const [a, b] of lsSpans(A.Q, v)) for (let s = a + 2.5; s < b - 2; s += 4.5) { const [x, z] = A.at(s, v); if (trees.length < 400 && lsFreeAt(x, z, 1)) trees.push([x, z]); }
-    } else if (kind === 'vivaio') {
-      for (let v = A.v0 + 1.5; v < A.v1 - 1; v += 1.4) for (const [a, b] of lsSpans(A.Q, v)) for (let s = a + 1.5; s < b - 1; s += 0.9) { const [x, z] = A.at(s, v); if (pots.length < 900 && lsFreeAt(x, z, 0.4)) pots.push([x, z]); }
-    } else if (kind === 'orti') { // plots 6 x 8 m: rows of vegetables, a shed or a water tank in some
-      const soil = COL('#7a5a3c'), greens = ['#5d8a3b', '#6b8f3e', '#4f7a35', '#8fae5a'];
-      for (let s = A.s0 + 1; s < A.s1 - 6; s += 6.6) for (let v = A.v0 + 1; v < A.v1 - 7; v += 8.6) {
-        const [mx, mz] = A.at(s + 3, v + 4); if (!inPoly(mx, mz, P) || !lsFreeAt(mx, mz, 3)) continue; const hp = LS_HASH(mx, mz, 'orto');
-        for (let r = 0; r < 6; r++) { lsStrip(drape, A, s, s + 6, v + 0.7 + r * 1.2, 0.9, soil, 0.04); if (hp > 0.15) lsStrip(drape, A, s + 0.3, s + 5.7, v + 0.7 + r * 1.2, 0.35, COL(greens[(r + Math.floor(hp * 9)) % 4]), 0.06); }
-        const gy = H.ground(mx, mz), [px, pz] = A.at(s + 5, v + 7.3), ry = Math.atan2(A.ux, A.uz);
-        if (hp > 0.6) { box(1.8, 2.0, 1.4, px, H.ground(px, pz) + 1.0, pz, ['#7a6a52', '#6b7a6b', '#8f949a', '#5a4a3a'][Math.floor(hp * 40) % 4], ry); box(2.1, 0.08, 1.7, px, H.ground(px, pz) + 2.05, pz, '#4a4d52', ry); solidAt(px, pz, 1.1, 2.1); }
-        else if (hp > 0.35) { cyl(0.5, 1.1, px, H.ground(px, pz) + 0.55, pz, '#2a6fb0'); solidAt(px, pz, 0.55, 1.1); }
-        void gy;
-      }
-    } else if (kind === 'cantiere') { // the hoarding round it (not across streets), containers, a sand heap, a tower crane on the big ones
+    } else if (kind === 'frutteto') lsOrchard(A, P, drape, ftrees, solidAt);
+    else if (kind === 'vivaio') lsNursery(A, P, drape, pots, potPlants);
+    else if (kind === 'orti') lsGarden(A, P, drape, solid, box, solidAt, crops, stakes, fruitG);
+    else if (kind === 'cantiere') { // the hoarding round it (not across streets), containers, a sand heap, a tower crane on the big ones
       // L0.w: the walls and fences of the map along its edge, which the hoarding replaces on their own line (the build took them out, src/barriere.py
       // cantieri): drawn as they are, they already keep off the carriageway; L0.h: the rest of the edge, which gets the hoarding as before
       const runs = L0.w ? [...(L0.h || []).map(q => [dec(q), 1]), ...L0.w.map(q => [dec(q), 0])] : [[[...P, P[0]], 1]];
@@ -352,11 +341,8 @@ function* buildPaesaggio(T, G) {
     });
     G.add(im);
   }
-  inst(TREE_G.trunk, MAT.trunk, trees, () => 0.55);
-  const crowns = inst(TREE_G.crown, MAT.crown, trees); // small fruit trees: the crown low on a short trunk
-  if (crowns) crowns.customDepthMaterial = TREE_DEPTH;
-  if (crowns) trees.forEach(([x, z], i) => { o3.position.set(x, H.ground(x, z) + 3.4 * 0.55 + 0.6, z); o3.rotation.set(0, LS_HASH(x, z, 'r') * TAU, 0); o3.scale.set(0.6, 0.6, 0.6); o3.updateMatrix(); crowns.setMatrixAt(i, o3.matrix); crowns.setColorAt(i, COL(GREENS[Math.floor(LS_HASH(x, z, 'f') * 3)])); });
-  inst(LS_POT_G, lam(0x4f7a35), pots, (x, z) => 0.7 + LS_HASH(x, z, 'p') * 0.6);
+  lsOrchardMeshes(G, ftrees, H);
+  lsInstances(G, LS_POTP_G, pots); lsInstances(G, LS_BLOB_G, potPlants); lsInstances(G, LS_BLOB_G, crops); lsInstances(G, LS_STAKE_G, stakes); lsInstances(G, LS_FRUIT_G, fruitG.map(f => [f[0], f[1], f[2], 1.4, 1.4, 1.4, f[6]]));
   if (!T.lsDone) {
     for (const [x, z, r, hh] of solids) { const gy = H.ground(x, z); WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: gy - 3, y1: gy + hh }); }
     for (const [x, z] of bales) { const gy = H.ground(x, z); WALLS.add(x - 0.8, z - 0.8, x + 0.8, z + 0.8, { r: 0.75, x, z, y0: gy - 3, y1: gy + 1.5, sali: { rs: 0.55, top: gy + 1.5 } }); }
@@ -574,6 +560,75 @@ function lsTrack(kind, P, area, S, drape, lines) {
   for (let k = 0; k <= lanes; k++) lsSeg(lines, c(A.s0, A.v0 + lw * k), c(A.s1, A.v0 + lw * k), k === 0 || k === lanes ? 0.06 : 0.04, Wc, 0.065);
   for (const s of [A.s0 + 0.15, A.s1 - 0.15]) lsSeg(lines, c(s, A.v0), c(s, A.v1), 0.06, Wc, 0.065);
   return true;
+}
+// ---- nurseries, allotments, orchards: small instanced models (one mesh per kind per tile), each instance [x, y, z, sx, sy, sz, colour]
+const LS_BLOB_G = new THREE.IcosahedronGeometry(1, 1), LS_STAKE_G = (() => { const g = new THREE.CylinderGeometry(0.018, 0.018, 1, 5); g.translate(0, 0.5, 0); return g; })();
+const LS_POTP_G = (() => { const g = new THREE.CylinderGeometry(0.17, 0.12, 0.28, 8); g.translate(0, 0.14, 0); return g; })(), LS_FRUIT_G = new THREE.IcosahedronGeometry(0.075, 0);
+const LS_WHITE_M = new THREE.MeshLambertMaterial({ color: 0xffffff });
+function lsInstances(G, geo, list, mat = LS_WHITE_M) {
+  if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length), o = new THREE.Object3D(); im.castShadow = true;
+  list.forEach(([x, y, z, sx, sy, sz, col], i) => { o.position.set(x, y, z); o.rotation.set(0, (x * 12.9898 + z * 78.233) % TAU, 0); o.scale.set(sx, sy, sz); o.updateMatrix(); im.setMatrixAt(i, o.matrix); im.setColorAt(i, COL(col)); });
+  G.add(im); return im;
+}
+const LS_FLOWERS = ['#e07aa0', '#f2c230', '#f4f2ea', '#8c6bb1', '#d94a3a'], LS_LEAFS = ['#4f7a35', '#5d8a3b', '#6b8f3e', '#47703a', '#7f9a45'];
+// a nursery: gravel ground, beds of black fabric, two rows of potted shrubs on each (some in flower), a path between the beds
+function lsNursery(A, P, drape, pots, potsPlants) {
+  try { polyFill(drape, P, [], 0.04, 10, COL('#9a8f78')); } catch (e) { return; }
+  for (let v = A.v0 + 1.4; v < A.v1 - 2.0; v += 2.5) for (const [a, b] of lsSpans(A.Q, v + 0.45)) {
+    if (b - a < 3) continue; lsStrip(drape, A, a + 0.5, b - 0.5, v + 0.45, 1.8, COL('#34383a'), 0.05);
+    for (let s = a + 0.9; s < b - 0.8; s += 0.62) for (const dv of [0, 0.9]) {
+      const [x, z] = A.at(s, v + dv); if (pots.length >= 1400 || !lsFreeAt(x, z, 0.4) || !inPoly(x, z, P)) continue; const y = H.ground(x, z), h = LS_HASH(x, z, 'viv');
+      pots.push([x, y, z, 1, 1, 1, '#b5603f']);
+      const r = 0.24 + h * 0.2, flower = h > 0.82; potsPlants.push([x, y + 0.42 + r * 0.45, z, r, r * 0.85, r, flower ? LS_FLOWERS[Math.floor(LS_HASH(x, z, 'fl') * LS_FLOWERS.length)] : LS_LEAFS[Math.floor(h * 5) % 5]]);
+    }
+  }
+}
+// an allotment garden: the whole ground trodden earth, plots of 6 x 8 m with four raised beds each (cabbages, lettuces, tomatoes on stakes, beans on poles),
+// a shed or a water butt in some
+function lsGarden(A, P, drape, solid, box, solidAt, crops, stakes, fruit) {
+  try { polyFill(drape, P, [], 0.04, 10, COL('#8f8465')); } catch (e) { }
+  const soil = COL('#4f3a2a'), F0 = lmFrame(new THREE.Matrix4()), ry = Math.atan2(A.ux, A.uz);
+  for (let s = A.s0 + 1; s < A.s1 - 6; s += 6.8) for (let v = A.v0 + 1; v < A.v1 - 7; v += 8.8) {
+    const [mx, mz] = A.at(s + 3, v + 4); if (!inPoly(mx, mz, P) || !lsFreeAt(mx, mz, 3)) continue; const hp = LS_HASH(mx, mz, 'orto');
+    for (let b = 0; b < 4; b++) {
+      const v0 = v + 0.35 + b * 1.65, kind = Math.floor(LS_HASH(mx + b, mz, 'col') * 4), n = Math.floor(5.2 / [0.55, 0.32, 0.8, 0.7][kind]);
+      lsStrip(drape, A, s + 0.3, s + 5.7, v0 + 0.5, 1.05, soil, 0.05);
+      for (let k = 0; k < n; k++) {
+        const t = s + 0.55 + k * 5 / n, [x, z] = A.at(t, v0 + 0.5), y = H.ground(x, z), hh = LS_HASH(x, z, 'pl');
+        if (kind === 0) crops.push([x, y + 0.18, z, 0.24, 0.2, 0.24, ['#7d9b6b', '#5f8a4a', '#8fae7a'][Math.floor(hh * 3)]]);
+        else if (kind === 1) crops.push([x, y + 0.08, z, 0.15, 0.08, 0.15, ['#9ac25a', '#b45f4a', '#7fb04a'][Math.floor(hh * 3)]]);
+        else if (kind === 2) { stakes.push([x, y, z, 1, 1.5, 1, '#b79a6a']); crops.push([x, y + 0.75, z, 0.28, 0.45, 0.28, '#4f7a35']); if (hh > 0.3) fruit.push([x + 0.12, y + 0.35 + hh * 0.5, z + 0.05, 1, 1, 1, '#d33a2a'], [x - 0.1, y + 0.55 + hh * 0.4, z - 0.08, 1, 1, 1, '#d94a3a']); }
+        else { stakes.push([x, y, z, 1, 1.9, 1, '#b79a6a']); crops.push([x, y + 1.05, z, 0.18, 0.75, 0.18, '#5d8a3b']); }
+      }
+    }
+    const [px, pz] = A.at(s + 5.6, v + 7.6);
+    if (hp > 0.6) { const col = ['#7a6a52', '#6b7a6b', '#8f949a', '#5a4a3a'][Math.floor(hp * 40) % 4]; box(1.8, 2.0, 1.4, px, H.ground(px, pz) + 1.0, pz, col, ry); box(2.1, 0.08, 1.7, px, H.ground(px, pz) + 2.05, pz, '#4a4d52', ry); solidAt(px, pz, 1.1, 2.1); }
+    else if (hp > 0.35) { F0.geo(solid, new THREE.CylinderGeometry(0.5, 0.5, 1.1, 12).translate(px, H.ground(px, pz) + 0.55, pz), null, COL('#2a6fb0')); solidAt(px, pz, 0.55, 1.1); }
+  }
+}
+// an orchard: rows of small fruit trees (the small-tree model, its plain stem, so no branch shows through a narrow crown), a disc of bare earth under each,
+// and the fruit hanging low on the crown
+function lsOrchard(A, P, drape, ftrees, solidAt) {
+  const pal = [['#c0261c', '#d8452e', '#e0b13a'], ['#e8821e', '#f0a030', '#d96a1a'], ['#b9c43e', '#cdd04a', '#a5b832'], ['#7a1f2e', '#a02a3a', '#c24a52']][Math.floor(LS_HASH(A.cx, A.cz, 'pal') * 4)];
+  for (let v = A.v0 + 2.8; v < A.v1 - 2; v += 5.2) for (const [a, b] of lsSpans(A.Q, v)) for (let s = a + 2.6; s < b - 2; s += 3.6) {
+    const [x, z] = A.at(s, v); if (ftrees.length >= 360 || !lsFreeAt(x, z, 1.2) || !inPoly(x, z, P)) continue; const h = LS_HASH(x, z, 'ft');
+    ftrees.push({ x, z, th: 3.0 + h * 1.0, v: Math.floor(LS_HASH(x, z, 'fv') * 3), g: Math.floor(LS_HASH(x, z, 'fg') * 3), pal, nf: 12 + Math.floor(h * 10) }); solidAt(x, z, 0.22, 3);
+    try { const d = Array.from({ length: 10 }, (_, i) => [x + Math.cos(i / 10 * TAU) * 1.0, z + Math.sin(i / 10 * TAU) * 1.0]); polyFill(drape, d, [], 0.045, 10, COL('#6a5640')); } catch (e) { }
+  }
+}
+function lsOrchardMeshes(G, ftrees, H) {
+  if (!ftrees.length) return; const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), fruits = [];
+  for (let v = 0; v < 3; v++) {
+    const list = ftrees.filter(t => t.v === v); if (!list.length) continue; const tr = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, list.length), cr = new THREE.InstancedMesh(TREE_G.crownS[v], MAT.crown, list.length);
+    list.forEach((t, j) => {
+      const gy = H.ground(t.x, t.z), th = t.th, yb = Math.max(0.7, 0.3 * th), hc = th - yb, D = th + 0.8, sx = D / 5.4, sy = hc / 4.5, yc = th - 2.5 * sy;
+      q.identity(); m.compose(p.set(t.x, gy, t.z), q, s.set(0.5, yb + 0.65 * hc, 0.5)); tr.setMatrixAt(j, m);
+      m.compose(p.set(t.x, gy + yc, t.z), q, s.set(sx, sy, sx)); cr.setMatrixAt(j, m); cr.setColorAt(j, COL(GREENS[t.g]));
+      for (let k = 0; k < t.nf; k++) { const f = LS_HASH(t.x + k, t.z, 'fr'), ly = -1.6 + f * 2.2, rad = 2.25 * Math.sqrt(Math.max(0.05, 1 - (ly / 2.05) ** 2)) * 0.88, ph = LS_HASH(t.x, t.z + k, 'ph') * TAU; fruits.push([t.x + Math.cos(ph) * rad * sx, gy + yc + ly * sy + 0.25 * sy, t.z + Math.sin(ph) * rad * sx, 1, 1, 1, t.pal[k % 3]]); }
+    });
+    tr.castShadow = cr.castShadow = true; cr.receiveShadow = true; cr.customDepthMaterial = TREE_DEPTH; G.add(tr, cr);
+  }
+  lsInstances(G, LS_FRUIT_G, fruits);
 }
 // a net that is a net: thin pale threads on clear cloth (goals, hoops, tennis and volleyball), unlike the dark fence mesh
 const LS_RETE = new THREE.MeshLambertMaterial({ map: canvasTex(32, 32, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#eceff0'; g.fillRect(0, 0, w, 3); g.fillRect(0, 0, 3, h); }), alphaTest: 0.12, side: THREE.DoubleSide, color: 0xffffff });
