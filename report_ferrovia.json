@@ -43,7 +43,7 @@
    "3": 68,
    "4": 26
   },
-  "tempo_s": 2.1
+  "tempo_s": 4.7
  },
  "banchine": {
   "tagliate": 4,
@@ -87,7 +87,7 @@
  "recinzioni_dentro_l_area": {
   "recinzioni": {
    "linee_toccate": 4,
-   "metri_tolti": 87.6
+   "metri_tolti": 76.1
   },
   "divisori_tipo_6": {
    "linee_toccate": 7,
@@ -95,8 +95,8 @@
   }
  },
  "confini": {
-  "pezzi_lim_com": 13,
-  "metri_lim_com": 1461,
+  "pezzi_lim_com": 26,
+  "metri_lim_com": 2922,
   "pezzi_usati": 4,
   "metri_usati": 31,
   "scarto_da_osm_m": {
@@ -107,6 +107,71 @@
    "n": 15
   },
   "pezzi": [
+   {
+    "comune": "Barlassina",
+    "metri": 5,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 8,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 214,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 240,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 15,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 103,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 263,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 79,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 14,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 3,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 26,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 182,
+    "dal_bordo_del_dbgt_max_m": null
+   },
+   {
+    "comune": "Barlassina",
+    "metri": 308,
+    "dal_bordo_del_dbgt_max_m": null
+   },
    {
     "comune": "Meda",
     "metri": 5,
@@ -269,6 +334,6 @@
   "cartelli_di_paese": {
    "n": 15
   },
-  "tempo_s": 10.7
+  "tempo_s": 10.8
  }
 }
