@@ -1905,9 +1905,7 @@ _cia_ost = [b_[0] for b_ in bar_out] + list(fences) + [[(g_[0] / 10, g_[1] / 10)
 _cia_ost += [list(b_['p']) + [b_['p'][0]] for b_ in buildings if b_.get('t') != 9 and len(b_['p']) >= 3] + [list(h_) + [h_[0]] for b_ in buildings if b_.get('t') != 9 for h_ in b_.get('k', []) if len(h_) >= 3]
 import opere as _op, impalcati as _imp, dbgt_quote as _dq   # the underpasses (src/opere.py): their floor is asphalt for the lanes, what stands inside their outline is not in the way
 _lid = _dq.Lidar(); _Dop = _dq.load_dbgt_comuni(_dq.lista_comuni(None), _lid); _Dop.pop('_info', None)
-_lo, _la = _dq.game_to_lonlat(np.array([-5000.0, 5000.0]), np.array([5000.0, -5000.0]))
-_vie = _imp.osm_vie(sys.argv[1], (_lo[0], _la[0], _lo[1], _la[1]))
-_sott, _ = _op.trova(_Dop, lambda x, z: float(_lid.at(np.array([float(x)]), np.array([float(z)]))[0]), _vie, log)
+_sott = _op.da_indice(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json')); log('opere dal terreno', len(_sott))   # one outline: the one the terrain made (the terrain comes first)
 _opf = unary_union([g_ for l_ in _op.impronte(_sott) for g_ in l_])
 def _fuori_opera(pl_):
     g_ = LineString(pl_) if len(pl_) >= 2 else None

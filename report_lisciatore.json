@@ -1912,9 +1912,9 @@
 "profondita_minima_m": 0.4,
 "massimo_m2": 12.0,
 "riempiti": 5191,
-"nodi": 36223,
+"nodi": 36224,
 "alzati_m": {
-"n": 36223,
+"n": 36224,
 "p50": 0.591,
 "p90": 1.367,
 "p99": 2.473,
@@ -1922,9 +1922,9 @@
 }
 },
 "dente": {
-"nodi_mossi": 433206,
+"nodi_mossi": 433203,
 "spostamento_m": {
-"n": 433206,
+"n": 433203,
 "p50": 0.085,
 "p90": 0.277,
 "p99": 0.655,
@@ -1989,7 +1989,7 @@
 }
 },
 "totale_prima": {
-"oltre_8cm": 126.68,
+"oltre_8cm": 126.69,
 "oltre_15cm": 38.18,
 "oltre_30cm": 6.53
 },
@@ -2588,19 +2588,19 @@
 "dente_su_m": 1.5,
 "dente_giu_m": -1.5,
 "buche_m": {
-"n": 114568,
+"n": 114569,
 "p50": 0.48,
 "p90": 1.56,
 "p99": 2.77,
 "max": 6.0
 },
-"nodi_mossi": 541911,
+"nodi_mossi": 541912,
 "nodi_griglia": 7880626,
 "limite_dente_m": 1.5
 },
 "invariati": {
 "nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 0,
-"nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 24,
+"nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 25,
 "carreggiate_cambiate": 0,
 "carreggiate_ai_passaggi_a_livello": 578,
 "bordo_carreggiate_alle_recinzioni": 180,

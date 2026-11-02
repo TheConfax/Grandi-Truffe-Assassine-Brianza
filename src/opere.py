@@ -320,8 +320,11 @@ def corsie_opere(sotto, raw_roads, nodes, log=lambda *a: None):
         libera = lambda a_, b_: not any(LineString([a_, b_]).intersects(w_) for w_ in pareti)
         for r in raw_roads:
             g = r.get('refs') or []
-            if r.get('c', 9) > 3 or len(g) < 2: continue
+            if r.get('c', 9) > 3 or len(g) < 2 or r.get('deck') or r.get('x') or r.get('bridge'): continue     # (chi passa sopra l'opera non e nell'opera)
             xy = np.array([nodes[q] for q in g], float); den = [foot.contains(Point(q)) for q in xy]
+            if any(den):   # una strada a raso che attraversa sopra il coperto non e nell'opera: quella dell'opera le corre lungo
+                dd = xy[-1] - xy[0]; j_ = int(np.argmin(np.hypot(*(s['C'] - xy[len(xy) // 2]).T))); t_ = s['C'][min(j_ + 2, len(s['C']) - 1)] - s['C'][max(j_ - 2, 0)]
+                if abs(dd @ t_) < 0.7 * max(np.hypot(*dd) * np.hypot(*t_), 1e-9): continue
             if not any(den): continue
             l0 = 0.0 if r.get('o') else min(r['w'] * 0.24, r['mh'] * 0.5)
             F = list(r.get('lf') or [int(round(l0 * 100))] * len(g)); B = (list(r.get('lb') or [int(round(l0 * 100))] * len(g))) if not r.get('o') else None
@@ -330,7 +333,7 @@ def corsie_opere(sotto, raw_roads, nodes, log=lambda *a: None):
                 T = xy[min(k + 1, len(g) - 1)] - xy[max(k - 1, 0)]; T = T / max(np.hypot(*T), 1e-9); Rg.append(np.array([-T[1], T[0]]))
                 if den[k]:
                     hR, hL = lat(xy[k], Rg[k]), lat(xy[k], -Rg[k])
-                    if r.get('o'): F[k] = int(round(100 * (hR - hL) / 2))     # senso unico: in mezzo
+                    if r.get('o'): F[k] = int(round(100 * min(hR / 2, hR - 1.4)))     # senso unico: a destra anche lui, chi viene dall'altra parte ha l'altra meta (in mezzo si incontravano di fronte)
                     else: F[k] = int(round(100 * min(hR / 2, max(hR - 1.4, 0.5)))); B[k] = int(round(100 * min(hL / 2, max(hL - 1.4, 0.5))))
                     tot += 1
             # il nodo appena fuori: la corsia piu vicina alla sua che esce dalla bocca senza passare da una parete
@@ -355,6 +358,25 @@ def _tagli(linea, bordo):
     x = linea.intersection(bordo)
     if x.is_empty: return []
     return [(q.x, q.y) for q in (x.geoms if hasattr(x, 'geoms') else [x]) if q.geom_type == 'Point']
+
+
+def da_indice(percorso):
+    """le opere come le ha fatte il terreno (terreno/indice.json): per la build dei dati. Il contorno e uno solo: ricalcolato qui sul LiDAR veniva piu lungo di quello su S, e la vernice spariva oltre le bocche, sulle rotonde"""
+    import json
+    per = {}
+    for f in json.load(open(percorso, encoding='utf-8'))['pits']:
+        if f.get('sotto'): per.setdefault(f['sottopasso'], []).append(f)
+    out = []
+    for n in sorted(per):
+        L, R, gl, cs, cd = [], [], [], [], []
+        for j, f in enumerate(per[n]):
+            i0 = 0 if j == 0 else 1
+            L += f['sx'][i0:]; R += f['dx'][i0:]; cs += f['csx'][i0:]; cd += f['cdx'][i0:]; gl += [f['tipo'] == 'galleria'] * (len(f['sx']) - i0)
+        L, R = np.array(L, float), np.array(R, float); C = (L[:, :2] + R[:, :2]) / 2
+        T = np.gradient(C, axis=0); T /= np.maximum(np.hypot(*T.T), 1e-9)[:, None]; gal = np.array(gl)
+        # (il primo tratto dopo una galleria: la stazione di confine appartiene al tratto dopo, come in tratti())
+        out.append(dict(C=C, y=(L[:, 2] + R[:, 2]) / 2, yl=L[:, 2], yr=R[:, 2], Lft=L[:, :2], Rgt=R[:, :2], N=np.column_stack((-T[:, 1], T[:, 0])), gal=gal, csx=np.array(cs), cdx=np.array(cd), nome=per[n][0].get('nome')))
+    return out
 
 
 # ---------- i cavalcavia ----------

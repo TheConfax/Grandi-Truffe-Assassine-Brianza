@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 40b32b8 · assemblato 02/11 01:05 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo ba2f739 · assemblato 02/11 01:39 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2624,6 +2624,7 @@ function pitLook(T, x, z) { // the look of the highest layer of the tile over th
 // an underpass is one piece (src/opere.py): walls unbroken from the floor to their top, on the open ones a parapet with a real thickness, one ceiling at one height along the covered
 // part, a front that closes each head of it. The ground and the paint are cut round it: nothing of them is seen from inside
 const OP_SP = 0.3; // m: the thickness of the parapets
+function opSotto(o) { const w = H.inPit(o[0], o[1]); if (w && w.src && w.src.sotto && o[2] < H.baseS(o[0], o[1]) - 0.3) return true; const u = H.gallAt(o[0], o[1]); return !!u && o[2] < u.soff; } // a point [x, z, y] inside the work
 function opQuad(b, Q, nx, ny, nz) { const i0 = b.p.length / 3; for (const q of Q) vtx(b, q[0], q[1], q[2], nx, ny, nz, (q[0] + q[2]) / 2, q[1] / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
 function opPareti(Wb, p, roof) { // roof[k]: the ceiling over station k, or null: open
   const q0 = p.src, B0 = H.B0;
@@ -3006,6 +3007,7 @@ function* buildTileGen(T) {
           const rx = -uz, rz = ux, onB = r.c <= 4 ? asp : r.c === 5 ? por : foot; // the surface of a way of its class, where it runs on S
           for (let s = 1; s < pts.length; s++) {
             const p = pts[s - 1], q = pts[s], gp = H.ground(p[0], p[1]), gq = H.ground(q[0], q[1]);
+            if (opSotto(p) || opSotto(q)) continue; // a way of the level above does not come down into an underpass: over it there is the deck, or the ground
             if (p[3] && q[3]) { // an old elevated way that runs on S in a tile of S (no deck of the new engine under it): drawn on the cells of S, like
               // the surfaces of the ways at grade; a flat ribbon at the height of its middle stood over the banks and sank in the slopes (collaudo 4-5)
               const i0 = onB.p.length / 3; for (const [o, sd] of [[p, -1], [p, 1], [q, -1], [q, 1]]) { const x = o[0] + rx * hw * sd, z = o[1] + rz * hw * sd; vtx(onB, x, 0, z, 0, 1, 0, x / (onB === asp ? 9 : 4), z / (onB === asp ? 9 : 4)); }
