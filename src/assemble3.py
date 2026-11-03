@@ -352,7 +352,7 @@ function pollPad() {
   GP.horn = kind === 'car' || kind === 'moto' ? b(10) : 0;
   /* sprint: each cross/A press adds a push that fades away, so the faster it is mashed the closer to the top it gets; 4.8 m/s over the jog = 9 m/s */
   GP.sprint *= Math.exp(-1.2 * dt); if (E[0] && (!veh || kind === 'bici')) GP.sprint = Math.min(4.8, GP.sprint + 1.5);
-  if (E[8]) camMode = camMode === 0 ? 2 : 0; /* third person <-> first person; the top view is gone from the pad */
+  if (E[8] && P.mode === 'car') camMode = camMode === 0 ? 2 : 0; /* third person <-> first person; the top view is gone from the pad */
   if (E[12]) reportSpot();
   if (E[13]) ni('Zoom della minimappa');
   /* radio wheel: the right stick picks the slice, the camera does not move, the car keeps being driven; letting go of the d-pad confirms */
@@ -699,7 +699,7 @@ rep("camPos.lerp(want, k); camLook.lerp(look, 1 - Math.exp(-12 * dt));", "camPos
 rep("if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd); camPos.x = px + (camPos.x - px) * kk; camPos.z = pz + (camPos.z - pz) * kk; }",
     "if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd), tx_ = px + (camPos.x - px) * kk, tz_ = pz + (camPos.z - pz) * kk, sl_ = hyp(tx_ - camPos.x, tz_ - camPos.z) > 0.4 ? 1 - Math.exp(-CAM_WALL * dt) : 1; /* a small correction is exact; a big one (the walker jumped past a wall edge) is a quick glide, not a jump */ camPos.x += (tx_ - camPos.x) * sl_; camPos.z += (tz_ - camPos.z) * sl_; }")
 # a third view, first person (Carlo, 24/10): the walker's eyes, or just above the bonnet; the right stick looks about, R3 behind
-rep("camMode = (camMode + 1) % 2", "camMode = (camMode + 1) % 3", 2)
+rep("camMode = (camMode + 1) % 2", "camMode = P.mode === 'car' ? (camMode + 1) % 3 : camMode", 2)
 rep("  if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,",
     "  if (!inCar) P.model.g.visible = !((camMode === 2 && fpDone) || (hyp(camPos.x - px, camPos.z - pz) < 0.9 && camPos.y - P.y < 2.2)); /* the body is hidden only once the camera is close to the eyes */\n"
     "  if (camMode === 2) {\n"
@@ -812,5 +812,5 @@ rep("window.__G = { FIS, VIVI,", "window.__G = { GPS, BIGV, drawBig, gpsCalc, gp
 # ---- GPS (gps3.js): the route follows the waypoint, drawn above the roads on the big map too
 rep("  // places and landmarks\n", "  gpsDraw(g, px_(6)); /* the GPS route: above the roads, under the icons */\n  // places and landmarks\n")
 rep("toast(had ? 'Segnaposto tolto' : 'Segnaposto messo'); drawBig();", "toast(had ? 'Segnaposto tolto' : 'Segnaposto messo'); gpsTick(0); drawBig();")
-rep("  drawMinimap();\n  hudT -= dt;", "  gpsTick(dt); drawMinimap();\n  hudT -= dt;")
+rep("  drawMinimap();\n  hudT -= dt;", "  if (P.mode !== 'car' && camMode === 2) camMode = 0; /* no first person on foot (Carlo, 3/11) */\n  gpsTick(dt); drawMinimap();\n  hudT -= dt;")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)

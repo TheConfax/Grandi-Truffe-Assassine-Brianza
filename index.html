@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo b19adb5 · assemblato 03/11 02:24 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 5b7f9c4 · assemblato 03/11 02:27 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -8284,7 +8284,7 @@ addEventListener('keydown', e => {
   const k = KEYMAP[e.code]; if (k) { K[k] = true; e.preventDefault(); }
   if (e.repeat) return;
   if (e.code === 'KeyF' || e.code === 'Enter') K.use = true;
-  if (e.code === 'KeyC') camMode = (camMode + 1) % 3;
+  if (e.code === 'KeyC') camMode = P.mode === 'car' ? (camMode + 1) % 3 : camMode;
   if (e.code === 'KeyM') toggleBig();
   if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
   if (e.code === 'KeyN') skipTime(2);
@@ -8306,7 +8306,7 @@ if (isTouch) {
   const sb = 'env(safe-area-inset-bottom, 0px)', sl = 'env(safe-area-inset-left, 0px)', sr = 'env(safe-area-inset-right, 0px)';
   const btn = (label, css, key, cls = '') => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'tb ' + cls; b.textContent = label; b.setAttribute('aria-label', key); Object.assign(b.style, css); T.appendChild(b);
-    const on = e => { e.preventDefault(); if (key === 'use') K.use = true; else if (key === 'cam') camMode = (camMode + 1) % 3; else if (key === 'map') toggleBig(); else K[key] = true; b.classList.add('on'); };
+    const on = e => { e.preventDefault(); if (key === 'use') K.use = true; else if (key === 'cam') camMode = P.mode === 'car' ? (camMode + 1) % 3 : camMode; else if (key === 'map') toggleBig(); else K[key] = true; b.classList.add('on'); };
     const off = e => { e.preventDefault(); if (!['use', 'cam', 'map'].includes(key)) K[key] = false; b.classList.remove('on'); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
   };
@@ -8375,7 +8375,7 @@ function pollPad() {
   GP.horn = kind === 'car' || kind === 'moto' ? b(10) : 0;
   /* sprint: each cross/A press adds a push that fades away, so the faster it is mashed the closer to the top it gets; 4.8 m/s over the jog = 9 m/s */
   GP.sprint *= Math.exp(-1.2 * dt); if (E[0] && (!veh || kind === 'bici')) GP.sprint = Math.min(4.8, GP.sprint + 1.5);
-  if (E[8]) camMode = camMode === 0 ? 2 : 0; /* third person <-> first person; the top view is gone from the pad */
+  if (E[8] && P.mode === 'car') camMode = camMode === 0 ? 2 : 0; /* third person <-> first person; the top view is gone from the pad */
   if (E[12]) reportSpot();
   if (E[13]) ni('Zoom della minimappa');
   /* radio wheel: the right stick picks the slice, the camera does not move, the car keeps being driven; letting go of the d-pad confirms */
@@ -10122,6 +10122,7 @@ function updHud(dt) {
     if (near) { const T = { bici: ['la bici', 'monta sulla bici'], scooter: ['lo scooter', 'monta sullo scooter'], moto: ['la moto', 'monta sulla moto'] }[near.kind] || ['l\'auto', 'sali in auto'];
       hint(`<kbd>F</kbd> ${near.caserma && !near.taken && near.driver !== 'ai' ? 'ruba ' + (near.caserma.cc ? 'la gazzella dei Carabinieri' : 'l\'auto della Polizia Locale') : near.driver === 'ai' ? (near.kind === 'police' ? 'ruba ' + (near.color === CC_COL ? 'la gazzella dei Carabinieri' : 'l\'auto della Polizia') : 'ruba ' + T[0]) : near.fallen ? 'rialza ' + T[0] : T[1]}`); }
   }
+  if (P.mode !== 'car' && camMode === 2) camMode = 0; /* no first person on foot (Carlo, 3/11) */
   gpsTick(dt); drawMinimap();
   hudT -= dt; if (hudT > 0) return; hudT = 0.08;
   $('money').textContent = fmtEur(P.money);
