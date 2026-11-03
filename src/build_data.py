@@ -961,7 +961,8 @@ prepare(bar_cut)
 # industrial zone, in the fields; between houses it is a mix (wire mesh, hedge, low wall), the one choice not taken from the data
 _ctl_aiuole = None
 GATE02_MAX = 6.5; OSM_SOLO_D = 2.5; OSM_SOLO_MIN = 2.0   # a DBGT cancellata (EL_DIV_TY 02) up to GATE02_MAX m is a gate; an OSM barrier stretch farther than OSM_SOLO_D from every DBGT divider and at least OSM_SOLO_MIN long stays
-dbt_02 = []
+GATE02_LOT_MAX = 10.0   # up to this length when a car park or a yard opens behind it and it stands alone between other dividers (Carlo, 2/11, via Eritrea x -749 z 1168: 8,1 m)
+dbt_02 = []; _e02 = []   # the short cancellate; the ends of every cancellata (a long railing in pieces is no gate)
 _campioni = {'cancelli_02': [], 'osm_solo': [], 'in_carreggiata_tolti': [], 'monconi_tolti': []}   # points for the eye (GTA_CAMPIONI), nothing in the data
 _dbt_i0 = _dbt_i1 = 0  # barriers[_dbt_i0:_dbt_i1] are the dividers of the DBGT
 if dbt_walls:
@@ -1000,7 +1001,8 @@ if dbt_walls:
                 if kh[0] != 1 or kh[1] != AIUOLA_H: n_aiu[kh[0]] += 1
                 kh = (1, AIUOLA_H)
         barriers.append((pts, kh[0], round(kh[1], 1))); kinds_[kh[0]] += 1
-        if ty == '02' and not closed and 1.0 <= L.length <= GATE02_MAX and math.dist(pts[0], pts[-1]) >= 1.0: dbt_02.append((pts, kh[0], round(kh[1], 1)))
+        if ty == '02' and not closed: _e02 += [pts[0], pts[-1]]
+        if ty == '02' and not closed and 1.0 <= L.length <= GATE02_LOT_MAX and math.dist(pts[0], pts[-1]) >= 1.0: dbt_02.append((pts, kh[0], round(kh[1], 1)))
     _dbt_i1 = len(barriers)
     # barriers only in OSM (Carlo, 1/11): where the DBGT has no divider along an OSM hedge or wall, this one is drawn (the DBGT does not map every one)
     _dbt_z = unary_union([LineString(b_[0]).buffer(OSM_SOLO_D) for b_ in barriers[_dbt_i0:_dbt_i1] if len(b_[0]) >= 2]) if _dbt_i1 > _dbt_i0 else GeometryCollection()
@@ -1070,15 +1072,51 @@ if dbt_pc:
     log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates), 'agganciati al tratto verso la strada invece del piu vicino', len(_pcmv), 'sul fronte strada (era su un divisore di traverso)', len(_pcfr)); _campioni['cancelli_spostati'] = _pcmv; _campioni['cancelli_fronte'] = _pcfr
 # cancellate DBGT (EL_DIV_TY 02) fino a GATE02_MAX m che danno su strada o cortile sono cancelli, anche senza un passo carraio (Carlo, 1/11)
 _c02 = Counter(); _prep_paved = [g_ for g_ in (asph, side, pedz, parking) if g_ is not None and not g_.is_empty]
+_lotti = [g_ for g_ in ([parking] + (list(STR.cortili) if STR else [])) if g_ is not None and not g_.is_empty]; _lotti_t = STRtree(_lotti) if _lotti else None
 for pts_, k_, h_ in dbt_02:
     L_ = LineString(pts_); a_, b_ = pts_[0], pts_[-1]; m_ = L_.interpolate(0.5, normalized=True)
     if not inside((m_.x, m_.y), 0): _c02['fuori'] += 1; continue
+    if L_.length > GATE02_MAX:   # a long one: the mouth of a car park or a yard, alone between other dividers
+        if sum(1 for e_ in _e02 if math.dist(e_, a_) < 0.5) > 1 or sum(1 for e_ in _e02 if math.dist(e_, b_) < 0.5) > 1: _c02['lunga_in_una_cancellata_a_pezzi'] += 1; continue
+        if _lotti_t is None or not any(_lotti[i_].distance(m_) < 2.0 for i_ in _lotti_t.query(m_.buffer(2.0))): _c02['lunga_senza_parcheggio_o_cortile_dietro'] += 1; continue
+        if asph.distance(L_) > 2.5: _c02['lunga_non_da_su_strada'] += 1; continue
     if not any(g_.distance(L_) < 2.5 for g_ in _prep_paved): _c02['non_da_su_strada_o_cortile'] += 1; continue
     if asph.contains(m_): _c02['in_carreggiata'] += 1; continue
     if any(math.dist((m_.x, m_.y), ((p0_[0] + p1_[0]) / 2, (p0_[1] + p1_[1]) / 2)) < 2.0 for p0_, p1_, _h, _k in pc_gates): _c02['gia_passo_carraio'] += 1; continue
     pc_cuts.append(L_.buffer(0.3, cap_style=2)); pc_gates.append((a_, b_, round(min(2.2, max(1.2, h_)), 1), k_)); _c02['cancelli'] += 1; _campioni['cancelli_02'].append((round(m_.x, 1), round(m_.y, 1), round(L_.length, 1)))
+    if L_.length > GATE02_MAX: _c02['cancelli_lunghi_davanti_a_parcheggio_o_cortile'] += 1
 log('cancellate 02 corte -> cancelli', dict(_c02), 'su', len(dbt_02))
 if STR: STR.rep['cancelli_02'] = dict(_c02)
+# the mouth of a yard (Carlo, 2/11, via Generale Cantore x 308 z -313): a divider of the DBGT, of any type, that is the one place where the drive of a
+# yard (AC_VEI 0307) meets the surface of the street (carriageway, lay-by, car park, sidewalk) is the yard's gate: the DBGT draws the drive running
+# up to the street through it. Where the yard meets the street anywhere else (an open mouth, a long front) the divider stays as it is
+GATE_CV_MIN, GATE_CV_MAX, GATE_CV_TOL = 2.5, 8.0, 1.5
+_ccv = Counter(); _campioni['cancelli_cortile'] = []
+if STR and STR.cortili and _dbt_i1 > _dbt_i0:
+    _cvs = list(STR.cortili); _cvt = STRtree(_cvs); _sts = list(STR.asfalto) + list(STR.marciapiedi); _stt = STRtree(_sts)
+    _main_r2 = [r['line'] for r in raw_roads if r['c'] <= 3 and flat(r) and r['line'].length > 0.1]; _mrt2 = STRtree(_main_r2)
+    for i_ in range(_dbt_i0, _dbt_i1):
+        pts_, k_, h_ = barriers[i_]
+        if len(pts_) < 2 or math.dist(pts_[0], pts_[-1]) < 1.0: continue
+        L_ = LineString(pts_)
+        if not GATE_CV_MIN <= L_.length <= GATE_CV_MAX: continue
+        m_ = L_.interpolate(0.5, normalized=True)
+        if not inside((m_.x, m_.y), 0): continue
+        Lb_ = L_.buffer(0.3, cap_style=2)
+        cv_ = [_cvs[j_] for j_ in _cvt.query(Lb_) if _cvs[j_].boundary.intersection(Lb_).length >= 0.8 * L_.length]
+        if not cv_: continue
+        _ccv['su_un_cortile'] += 1
+        st_ = [_sts[j_] for j_ in _stt.query(Lb_) if _sts[j_].boundary.intersection(Lb_).length >= 0.8 * L_.length]
+        if not st_: _ccv['non_da_su_strada'] += 1; continue
+        c_ = cv_[0]; near_st_ = unary_union([_sts[j_].buffer(0.3) for j_ in _stt.query(c_.buffer(0.3))])
+        cont_ = c_.boundary.intersection(near_st_).length
+        if cont_ > L_.length + GATE_CV_TOL: _ccv['cortile_aperto_anche_altrove'] += 1; continue
+        if any(math.dist((m_.x, m_.y), ((p0_[0] + p1_[0]) / 2, (p0_[1] + p1_[1]) / 2)) < 2.0 for p0_, p1_, _h, _k in pc_gates): _ccv['gia_cancello'] += 1; continue
+        if any(_main_r2[j_].distance(m_) < 2 for j_ in _mrt2.query(m_.buffer(2))): _ccv['una_strada_ci_passa'] += 1; continue
+        pc_cuts.append(L_.buffer(0.3, cap_style=2)); pc_gates.append((tuple(pts_[0]), tuple(pts_[-1]), round(min(2.2, max(1.2, h_)), 1), k_)); _ccv['cancelli'] += 1
+        _campioni['cancelli_cortile'].append((round(m_.x, 1), round(m_.y, 1), round(L_.length, 1)))
+log('bocche dei cortili -> cancelli', dict(_ccv))
+if STR: STR.rep['cancelli_cortile'] = dict(_ccv, dove=_campioni['cancelli_cortile'][:60])
 # police stations (amenity=police): the door looks onto the street, so the barrier between them opens there, as wide as the door and its canopy
 # (src/barriere.py facciata_su_strada; the game finds the same front, and takes it from the POI: pois[].fr). Where no front looks onto a street
 # nothing is opened
@@ -2211,6 +2249,60 @@ MAPI = mapillary_obj.elabora(DATA, proj, inside, _segs, _segtree, STR, [g_ for g
                              _ctl_incroci, [(c_[0], c_[1]) for c_ in crossings], [b_[0] for b_ in bar_out] + _cw, near_street, off_carriageway, log,
                              cortili=list(STR.cortili) if STR is not None else [], alberi=trees)
 lamps = lamps + MAPI['lp']; ogg = ogg + MAPI['og']
+# an object of the street (lamp, sign, pole, bollard and the rest of the furniture) never stands in a wall, a fence or a building (Carlo, 2/11, via San
+# Martino x -58 z -860: a post left inside the wall). It goes to the nearest free place within POST_MOVE m, off the carriageway and on the street's side
+# of the wall (nothing between it and the nearest street); with no such place it is taken away. The game does the same after its own moves (world3.js postFree)
+POST_CLR, POST_MOVE = 0.3, 3.0
+_ps_lin = [LineString(p_) for p_ in [b_[0] for b_ in bar_out] + _cw + list(fences) if len(p_) >= 2]
+_ps_bld = [g_ for g_ in (P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9) if g_ is not None]
+_ps_lt, _ps_bt = STRtree(_ps_lin), STRtree(_ps_bld); prepare(asph)
+def _ps_dentro(x_, z_):
+    p_ = Point(x_, z_)
+    if any(_ps_lin[i_].distance(p_) < POST_CLR for i_ in _ps_lt.query(p_.buffer(POST_CLR))): return True
+    return any(_ps_bld[i_].distance(p_) < 0.1 or _ps_bld[i_].contains(p_) for i_ in _ps_bt.query(p_.buffer(0.1)))
+def _ps_lato(x_, z_):  # nothing solid between the place and the nearest street axis
+    best_ = None
+    for i_ in _segtree.query(Point(x_, z_).buffer(20)):
+        d_ = _segs[i_][0].distance(Point(x_, z_))
+        if best_ is None or d_ < best_[0]: best_ = (d_, _segs[i_][0])
+    if best_ is None or best_[0] < 0.05: return True
+    S_ = LineString([(x_, z_), best_[1].interpolate(best_[1].project(Point(x_, z_))).coords[0]])
+    if any(_ps_lin[i_].intersects(S_) for i_ in _ps_lt.query(S_)): return False
+    return not any(_ps_bld[i_].intersects(S_) for i_ in _ps_bt.query(S_))
+def _ps_posto(x_, z_):
+    """(x, z) where the object stands: the same place if it is free, the nearest free one, or None"""
+    if not _ps_dentro(x_, z_): return (x_, z_)
+    for k_ in range(1, int(POST_MOVE / 0.25) + 1):
+        d_ = k_ * 0.25
+        for j_ in range(24):
+            a_ = j_ / 24 * 2 * math.pi; cx_, cz_ = round(x_ + math.cos(a_) * d_, 1), round(z_ + math.sin(a_) * d_, 1)   # on the decimetre the tiles keep
+            if _ps_dentro(cx_, cz_) or asph.contains(Point(cx_, cz_)) or not _ps_lato(cx_, cz_): continue
+            return (cx_, cz_)
+    return None
+_ps_n = Counter(); _ps_dove = []
+def _ps_fai(nome_, x_, z_):
+    q_ = _ps_posto(x_, z_)
+    if q_ is None: _ps_n[nome_ + '_tolti'] += 1; _ps_dove.append((nome_, 'tolto', round(x_, 1), round(z_, 1)))
+    elif q_ != (x_, z_): _ps_n[nome_ + '_spostati'] += 1; _ps_dove.append((nome_, 'spostato', round(x_, 1), round(z_, 1)))
+    return q_
+_l2 = []
+for l_ in lamps:
+    q_ = _ps_fai('lampioni', l_[0], l_[1])
+    if q_ is not None: _l2.append([q_[0], q_[1]])
+lamps = _l2; _o2 = []
+for o_ in ogg:
+    if OGG[o_[0]] in OGG_ON_ROAD: _o2.append(o_); continue
+    q_ = _ps_fai('oggetti_' + OGG[o_[0]], o_[1] / 10, o_[2] / 10)
+    if q_ is not None: _o2.append([o_[0], q(q_[0]), q(q_[1])] + list(o_[3:]))
+ogg = _o2; _s2 = []
+for s_ in MAPI['sm']:
+    q_ = _ps_fai('cartelli_mapillary', s_[1], s_[2])
+    if q_ is not None: _s2.append([s_[0], q_[0], q_[1]] + list(s_[3:]))
+MAPI['sm'] = _s2
+_ps_resto = sum(1 for l_ in lamps if _ps_dentro(*l_)) + sum(1 for o_ in ogg if OGG[o_[0]] not in OGG_ON_ROAD and _ps_dentro(o_[1] / 10, o_[2] / 10)) + sum(1 for s_ in MAPI['sm'] if _ps_dentro(s_[1], s_[2]))
+log('oggetti della via dentro muri, recinzioni o edifici:', dict(_ps_n), 'spostati', sum(v_ for k_, v_ in _ps_n.items() if k_.endswith('spostati')), 'tolti', sum(v_ for k_, v_ in _ps_n.items() if k_.endswith('tolti')))
+log('CONTROLLO oggetti della via dentro un muro, una recinzione o un edificio (deve essere 0):', _ps_resto)
+if STR: STR.rep['oggetti_della_via_nei_muri'] = {'conta': dict(_ps_n), 'restano_dentro': _ps_resto, 'dove': _ps_dove[:60]}
 signals_extra = [node_index[r_] for r_ in MAPI['sf']]
 for s_ in MAPI['sm']: push(tid(s_[1], s_[2]), 'sm', s_)
 for x, z in lamps: push(tid(x, z), 'lp', [q(x), q(z)])
