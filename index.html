@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo sottopassi-cavalcavia · dopo c8cbf93 · assemblato 03/11 22:49 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo a44ddad · assemblato 03/11 23:16 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2859,13 +2859,15 @@ function opSoglia(Wb, p) {
   }
 }
 function opSoffitto(C, p, roof) { for (let k = 1; k < p.sx.length; k++) { if (roof[k - 1] === null || roof[k] === null) continue; const a = p.sx[k - 1], b = p.sx[k], c = p.dx[k], d = p.dx[k - 1]; opQuad(C, [[a[0], roof[k - 1], a[1]], [b[0], roof[k], b[1]], [c[0], roof[k], c[1]], [d[0], roof[k - 1], d[1]]], 0, -1, 0); } }
+const PARAPETTO_F = 1.0; // m: the parapet of a front over the road behind it
 function opFronte(Wb, p, k, kin, soff) { // the front at station k, the covered part going towards station kin. Under a deck it goes up to the deck and runs along it as far as the ground stays under the deck; else up to the parapets at its two ends, with its own parapet on the ground over the tunnel
   const a = p.sx[k], b = p.dx[k], L = hyp(b[0] - a[0], b[1] - a[1]) || 1, ex = (b[0] - a[0]) / L, ez = (b[1] - a[1]) / L, B0 = H.B0, ya = p.src.csx[k] - B0, yb = p.src.cdx[k] - B0;
   const at = s => [a[0] + ex * s, a[1] + ez * s], dk = (x, z) => { let t = null; for (const o of H.deckAt(x, z)) if (o.tipo !== 'copertura' && o.top > soff + 0.3 && (t === null || o.top > t)) t = o.top; return t; };
   const lungo = (s0, sg) => { let e = s0; for (let d = 0.5; d <= 10; d += 0.5) { const [x, z] = at(s0 + sg * d), t = dk(x, z); if (t === null || H.baseS(x, z) >= t - 0.5) break; e = s0 + sg * d; } return e; };
   const s0 = lungo(0, -1), s1 = lungo(L, 1), S = [s0]; for (let s = Math.ceil(s0); s < 0; s++) if (s > s0) S.push(s); S.push(0); for (let s = 1; s < L; s++) S.push(s); S.push(L); for (let s = Math.ceil(L) + 1; s < s1; s++) S.push(s); if (s1 > L) S.push(s1);
-  const Ss = [...new Set(S)].sort((u, v) => u - v), nx = ez, nz = -ex, topAt = s => { const [x, z] = at(s), t = dk(x, z); return t !== null ? t - 0.05 : ya + (yb - ya) * clamp(s / L, 0, 1); };
-  let wx = p.sx[kin][0] - a[0], wz = p.sx[kin][1] - a[1]; { const d = wx * ex + wz * ez; wx -= ex * d; wz -= ez * d; const l = hyp(wx, wz) || 1; wx *= OP_SP / l; wz *= OP_SP / l; }
+  let wx = p.sx[kin][0] - a[0], wz = p.sx[kin][1] - a[1], wl = 1; { const d = wx * ex + wz * ez; wx -= ex * d; wz -= ez * d; wl = hyp(wx, wz) || 1; wx *= OP_SP / wl; wz *= OP_SP / wl; }
+  // over the tunnel the front stands a parapet over the road behind it (Carlo 3/11, x -768 z 94 and 116 under the Milano-Meda: the road over it had no parapet at its edge)
+  const Ss = [...new Set(S)].sort((u, v) => u - v), nx = ez, nz = -ex, topAt = s => { const [x, z] = at(s), t = dk(x, z); if (t !== null) return t - 0.05; const lin = ya + (yb - ya) * clamp(s / L, 0, 1); return s >= 0 && s <= L ? Math.max(lin, H.baseS(x + wx / OP_SP * 1.5, z + wz / OP_SP * 1.5) + PARAPETTO_F) : lin; };
   for (let i = 1; i < Ss.length; i++) {
     const u = Ss[i - 1], v = Ss[i], m = (u + v) / 2, [ux, uz] = at(u), [vx, vz] = at(v), tu = topAt(u), tv = topAt(v), dentro = m >= 0 && m <= L, bu = dentro ? soff : H.baseS(ux, uz) - 0.3, bv = dentro ? soff : H.baseS(vx, vz) - 0.3, deck = dk(ux + (vx - ux) / 2, uz + (vz - uz) / 2) !== null;
     opQuad(Wb, [[ux, bu, uz], [vx, bv, vz], [vx, tv, vz], [ux, tu, uz]], nx, 0, nz);

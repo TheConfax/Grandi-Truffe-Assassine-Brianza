@@ -40,6 +40,7 @@ RAMO_MAX, RAMO_DZ, RAMO_LARGO, RAMO_SOTTO = 9.0, 0.6, 3.0, 0.2   # m: un altro a
 ALLUNGA_MAX = 160.0  # m: per lato, oltre questo non e una trincea
 COPERTO_OSM = 6.0  # m: una stazione cosi vicina alla via tunnel di OSM e coperta
 GALLER_M = 1.0     # m: oltre il bordo della GALLER il coperto va ancora tanto, se sopra c'e la strada (il fronte col suo parapetto sta oltre il bordo della strada)
+BOCCA_M = 7.0      # m: attorno all'asse di un sottopasso S non si alza fuori dalla GALLER (galleria_piena)
 PIENA_M = 1.5      # m: S sopra una galleria stradale e alla quota della strada di sopra fin tanto oltre la GALLER (galleria_piena)
 SOPRA_MIN = 0.7    # m: un vertice di un'area piu di tanto sopra il livello della strada sotto e del livello di sopra
 
@@ -655,7 +656,7 @@ def opere_dbgt(sup, S):
         # sidewalk cut 2 m short of the abutment). The nodes within SPALLA_FUORI past an abutment go down too: the step of S (a cell of 2 m) then lies behind the wall
         ps_ = [q for q in ponti_s if q[0].intersection(g).area > 0.5 * g.area]
         if ps_:
-            _, v_, b_, c_ = ps_[0]; ring = np.asarray(g.exterior.coords); lati = []
+            _, v_, b_, c_ = ps_[0]; ring = np.asarray(g.simplify(0.5).exterior.coords); lati = []   # (simplified: the DBGT splits a side in pieces under 1 m, and they were left out)
             for a_, e_ in zip(ring[:-1], ring[1:]):
                 d_ = e_ - a_; n_ = np.hypot(*d_)
                 if n_ > 1.0 and abs(d_ @ v_) / n_ < SPALLA_COS: lati.append(LineString([a_, e_]).buffer(SPALLA_FUORI, cap_style=2))
@@ -1051,8 +1052,12 @@ def galleria_piena(sup, S):
         if not zs: continue
         basso = float(np.median(zs))
         # (past the GALLER, not the street under it: its mouth stays open. A node of it raised 1.5 m past the edge made a slope of asphalt into the mouth at z 120)
+        # nor the ground by the mouth: within BOCCA_M of the axes under it (their ends included) only what is inside the GALLER. A node raised by the mouth
+        # made the face that closes the end of the floor (world3.js opSoglia) a wall 7 m high across half the road
         bassa = np.isin(sup.CLS[r0:r1, c0:c1], sf.ROADTYPE) & sup.FIX[r0:r1, c0:c1] & (W < basso + LUCE_MIN)
-        zona = shapely.contains(P.buffer(PIENA_M), pts) & ~(bassa & ~shapely.contains(P, pts))
+        ax_ = shapely.union_all([a['g'] for a in assi if a['g'].intersects(P)])
+        bocca = shapely.distance(ax_, pts) < BOCCA_M
+        zona = shapely.contains(P.buffer(PIENA_M), pts) & ~((bassa | bocca) & ~shapely.contains(P, pts))
         strada = np.isin(sup.CLS[r0:r1, c0:c1], sf.ROADTYPE) & sup.FIX[r0:r1, c0:c1] & (W > basso + LUCE_MIN + 1.0) & shapely.contains(P.buffer(PIENA_M + 3.0), pts)
         if not strada.any() or not zona.any(): continue
         idx = ndimage.distance_transform_edt(~strada, return_distances=False, return_indices=True); vs = W[idx[0], idx[1]]
