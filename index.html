@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 5b7f9c4 · assemblato 03/11 02:27 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo f2e74b2 · assemblato 03/11 02:40 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -7101,9 +7101,16 @@ function gpsAStar(G, s, e, foot) {
   const adj = G.adj[foot], nn = G.nn, S = G.segs, minC = foot ? 0.8 : 0.5;
   const ss = S[s.si], es = S[e.si], cs = foot ? ss.cp : ss.ca, ce = foot ? es.cp : es.ca;
   if (s.si === e.si && (foot || !ss.o || e.t >= s.t)) return [[s.x, s.z], [e.x, e.z]]; /* both on the same stretch */
-  const g = new Float64Array(nn).fill(Infinity), from = new Int32Array(nn).fill(-1), done = new Uint8Array(nn), heap = [];
-  const push = (n, f) => { let i = heap.length; heap.push([f, n]); while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
-  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+  const g = new Float64Array(nn).fill(Infinity), from = new Int32Array(nn).fill(-1), done = new Uint8Array(nn);
+  let hn = 0, cap = 4096, hk = new Float64Array(cap), hv = new Int32Array(cap); /* binary heap on two typed arrays */
+  const push = (n, f) => {
+    if (hn === cap) { cap *= 2; const k2 = new Float64Array(cap), v2 = new Int32Array(cap); k2.set(hk); v2.set(hv); hk = k2; hv = v2; }
+    let i = hn++; while (i > 0) { const q = (i - 1) >> 1; if (hk[q] <= f) break; hk[i] = hk[q]; hv[i] = hv[q]; i = q; } hk[i] = f; hv[i] = n;
+  };
+  let pf = 0, pn = 0;
+  const pop = () => {
+    pf = hk[0]; pn = hv[0]; hn--; if (hn > 0) { const f = hk[hn], n = hv[hn]; let i = 0; for (;;) { let c = 2 * i + 1; if (c >= hn) break; if (c + 1 < hn && hk[c + 1] < hk[c]) c++; if (hk[c] >= f) break; hk[i] = hk[c]; hv[i] = hv[c]; i = c; } hk[i] = f; hv[i] = n; }
+  };
   const h = n => Math.hypot(N[n][0] - e.x, N[n][1] - e.z) * minC;
   const seed = (n, c) => { if (c < g[n]) { g[n] = c; from[n] = -2; push(n, c + h(n)); } };
   /* start: along the stretch to its end b, and back to a (only where it is not one-way) */
@@ -7111,8 +7118,8 @@ function gpsAStar(G, s, e, foot) {
   /* end: entering the stretch from a (towards b), and from b (only where it is not one-way) */
   const tail = new Map(); tail.set(es.a, es.L * e.t * ce); if (foot || !es.o) tail.set(es.b, es.L * (1 - e.t) * ce);
   let bestTotal = Infinity, bestN = -1;
-  while (heap.length) {
-    const [f, n] = pop(); if (done[n]) continue; done[n] = 1;
+  while (hn > 0) {
+    pop(); const f = pf, n = pn; if (done[n]) continue; done[n] = 1;
     if (f >= bestTotal) break;
     if (tail.has(n)) { const tot = g[n] + tail.get(n); if (tot < bestTotal) { bestTotal = tot; bestN = n; } }
     const a = adj[n]; if (!a) continue;
@@ -7131,17 +7138,30 @@ function gpsCalc(px, pz, foot) {
 }
 function gpsDist(route, px, pz) { /* the distance from the player to the route (dashed bits included) */
   let best = 1e9;
-  for (const pl of [route.d0, route.main, route.d1]) for (let i = 1; i < pl.length; i++) {
+  for (const pl of [route.d0, route.main, route.d1]) if (pl) for (let i = 1; i < pl.length; i++) {
     const A = pl[i - 1], B = pl[i], ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((px - A[0]) * ex + (pz - A[1]) * ez) / L2));
     const d = Math.hypot(px - (A[0] + ex * t), pz - (A[1] + ez * t)); if (d < best) best = d;
   }
   return best;
+}
+/* the part already driven goes away: the player is projected on the next stretches of the route (only the ones close to the last, so it never jumps onto a parallel bit or a loop), the line is cut from there on, and the dashed bit at the start goes once he is on the road */
+const GPS_TAGLIO = 40, GPS_SUSTRADA = 6;
+function gpsTaglia(R, px, pz) {
+  const m = R.main; let best = null;
+  for (let k = 0; k < Math.min(GPS_TAGLIO, m.length - 1); k++) {
+    const A = m[k], B = m[k + 1], ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((px - A[0]) * ex + (pz - A[1]) * ez) / L2)), qx = A[0] + ex * t, qz = A[1] + ez * t, d = Math.hypot(px - qx, pz - qz), sc = d + 0.3 * k;
+    if (!best || sc < best.sc) best = { k, qx, qz, d, sc };
+  }
+  if (!best || best.d > GPS_FUORI) return;
+  if (best.k > 0 || best.qx !== m[0][0] || best.qz !== m[0][1]) { R.main = [[best.qx, best.qz]].concat(m.slice(best.k + 1)); if (R.main.length < 2) R.main.push([best.qx, best.qz]); }
+  R.d0 = best.d > GPS_SUSTRADA ? [[px, pz], [best.qx, best.qz]] : null;
 }
 function gpsTick(dt) {
   if (!WAYPT) { if (GPS.route || GPS.lastKey) { GPS.route = null; GPS.lastKey = ''; if (bigOpen) drawBig(); } return; }
   const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z, foot = GPS.modo !== undefined ? GPS.modo : P.mode !== 'car' ? 1 : 0, key = WAYPT.x.toFixed(1) + ',' + WAYPT.z.toFixed(1) + ',' + foot;
   if (key !== GPS.lastKey) GPS.fuori = 99;
   else if (GPS.route) GPS.fuori = gpsDist(GPS.route, px, pz) > GPS_FUORI ? GPS.fuori + dt : 0;
+  if (GPS.route && key === GPS.lastKey) gpsTaglia(GPS.route, px, pz);
   if (GPS.fuori >= GPS_TEMPO) { GPS.lastKey = key; GPS.fuori = 0; GPS.route = gpsCalc(px, pz, foot); if (bigOpen) drawBig(); }
 }
 /* g is in world coordinates; w is the line width in world units */
@@ -7150,7 +7170,7 @@ function gpsDraw(g, w) {
   g.save(); g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = '#FF00FF'; g.lineWidth = w;
   g.beginPath(); R.main.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke();
   g.setLineDash([w * 1.6, w * 1.4]); g.lineCap = 'butt';
-  for (const pl of [R.d0, R.d1]) { g.beginPath(); g.moveTo(pl[0][0], pl[0][1]); g.lineTo(pl[1][0], pl[1][1]); g.stroke(); }
+  for (const pl of [R.d0, R.d1]) if (pl) { g.beginPath(); g.moveTo(pl[0][0], pl[0][1]); g.lineTo(pl[1][0], pl[1][1]); g.stroke(); }
   g.restore();
 }
 setTimeout(() => { try { gpsGraph(); } catch (e) { } }, 5000); /* the graph is built once, a few seconds after the start, not at the first waypoint */
