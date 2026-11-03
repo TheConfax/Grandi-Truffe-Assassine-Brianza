@@ -117,7 +117,7 @@
   "bordo_luoghi": 17
  },
  "A3": {
-  "celle_sotto_impalcati_con_strada_disegnata": 87,
+  "celle_sotto_impalcati_con_strada_disegnata": 198,
   "dipinte": 0,
   "m2": 0.0,
   "impalcati": [],
@@ -133,10 +133,11 @@
    36,
    40,
    44,
+   46,
    47,
    48
   ],
-  "celle_segnate_sotto_impalcato": 1042,
+  "celle_segnate_sotto_impalcato": 1143,
   "luoghi": []
  },
  "A4": {
@@ -856,6 +857,6 @@
   "tombini_sotto_strade": 48,
   "tombini_sotto_strade_sfondati": 1,
   "prove_fisse_ok": "3 su 4",
-  "tempo_s": 101.8
+  "tempo_s": 117.2
  }
 }

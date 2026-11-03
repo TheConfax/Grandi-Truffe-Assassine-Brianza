@@ -1890,8 +1890,8 @@
 }
 },
 "bordo_barriere": {
-"metri_di_recinzione": 2542,
-"nodi": 1257,
+"metri_di_recinzione": 2548,
+"nodi": 1258,
 "mossi_m": {
 "p50": 0.41,
 "p90": 0.72,
@@ -1903,9 +1903,9 @@
 "profondita_minima_m": 0.4,
 "massimo_m2": 12.0,
 "riempiti": 5175,
-"nodi": 36122,
+"nodi": 36132,
 "alzati_m": {
-"n": 36122,
+"n": 36132,
 "p50": 0.592,
 "p90": 1.368,
 "p99": 2.477,
@@ -1913,12 +1913,12 @@
 }
 },
 "dente": {
-"nodi_mossi": 422988,
+"nodi_mossi": 422975,
 "spostamento_m": {
-"n": 422988,
+"n": 422975,
 "p50": 0.085,
 "p90": 0.278,
-"p99": 0.659,
+"p99": 0.658,
 "max": 1.504
 },
 "su_m": 5.854036912089725,
@@ -1929,13 +1929,13 @@
 "definizione": "S a 0,3 m dentro e fuori da ogni anello AC_VEI, AC_PED, AC_CIC, AR_STR, ogni 0,5 m: km fuori dalla media dei suoi 4 m oltre la soglia; nodi protetti esclusi",
 "prima": {
 "AC_VEI": {
-"km": 2357.19,
+"km": 2357.17,
 "oltre_8cm": 87.05,
 "oltre_15cm": 28.22,
 "oltre_30cm": 5.08
 },
 "AC_PED": {
-"km": 401.72,
+"km": 401.7,
 "oltre_8cm": 16.14,
 "oltre_15cm": 4.09,
 "oltre_30cm": 0.56
@@ -1947,7 +1947,7 @@
 "oltre_30cm": 0.0
 },
 "AR_STR": {
-"km": 1228.34,
+"km": 1228.31,
 "oltre_8cm": 21.49,
 "oltre_15cm": 5.51,
 "oltre_30cm": 0.87
@@ -1955,13 +1955,13 @@
 },
 "dopo": {
 "AC_VEI": {
-"km": 2357.19,
+"km": 2357.17,
 "oltre_8cm": 40.69,
 "oltre_15cm": 10.47,
 "oltre_30cm": 1.5
 },
 "AC_PED": {
-"km": 401.72,
+"km": 401.7,
 "oltre_8cm": 4.07,
 "oltre_15cm": 1.1,
 "oltre_30cm": 0.17
@@ -1973,7 +1973,7 @@
 "oltre_30cm": 0.0
 },
 "AR_STR": {
-"km": 1228.34,
+"km": 1228.31,
 "oltre_8cm": 5.65,
 "oltre_15cm": 1.43,
 "oltre_30cm": 0.23
@@ -2570,7 +2570,7 @@
 },
 "spostamento": {
 "dente_m": {
-"n": 417250,
+"n": 417237,
 "p50": 0.09,
 "p90": 0.28,
 "p99": 1.02,
@@ -2579,28 +2579,28 @@
 "dente_su_m": 2.44,
 "dente_giu_m": -1.5,
 "buche_m": {
-"n": 109164,
+"n": 109167,
 "p50": 0.5,
 "p90": 1.59,
 "p99": 2.79,
 "max": 6.0
 },
-"nodi_mossi": 526414,
+"nodi_mossi": 526404,
 "nodi_griglia": 7880626,
 "limite_dente_m": 1.5
 },
 "invariati": {
 "nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 1,
-"nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 19,
+"nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 20,
 "carreggiate_cambiate": 5,
 "carreggiate_ai_passaggi_a_livello": 565,
-"bordo_carreggiate_alle_recinzioni": 148,
+"bordo_carreggiate_alle_recinzioni": 149,
 "carreggiate_nei_pozzetti_riempiti": 284,
 "impalcati_e_sotto": 0,
 "acqua_e_alvei": 0,
 "tombini_sotto_i_binari": 6,
 "ferrovia": 0,
-"ferrovia_sul_profilo": 11875,
+"ferrovia_sul_profilo": 11867,
 "ferrovia_sotto_le_recinzioni_sulle_strade": 618,
 "rampe": 0
 },
@@ -4265,7 +4265,7 @@
 }
 ],
 "punte_verso_alto": {
-"totale": 1096,
+"totale": 1093,
 "fuori_dalle_cose_protette": 990,
 "peggiori": [
 {
