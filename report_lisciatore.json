@@ -13,18 +13,18 @@
 },
 "buche": {
 "conta": {
-"riempita": 1400,
-"protetta": 66,
-"troppo_grande": 75,
+"riempita": 1399,
+"protetta": 70,
+"troppo_grande": 72,
 "strada_in_fondo": 35,
 "rampa_nei_dati": 2
 },
-"nodi": 56047,
+"nodi": 55988,
 "alzati_m": {
-"n": 56047,
-"p50": 0.807,
+"n": 55988,
+"p50": 0.808,
 "p90": 1.905,
-"p99": 2.981,
+"p99": 2.982,
 "max": 5.997
 },
 "rimaste_oltre_soglia": [
@@ -628,33 +628,21 @@
 "esito": "protetta"
 },
 {
-"x": -806.8,
-"z": -92.4,
-"m2": 6120,
-"prof": 1.66,
-"sotto_edificio": 0.25,
-"era": "altro",
-"fonti": [
-"LiDAR 2008"
-],
-"esito": "troppo_grande"
-},
-{
 "x": -622.8,
 "z": -56.4,
-"m2": 8008,
-"prof": 3.68,
-"sotto_edificio": 0.16,
+"m2": 18908,
+"prof": 4.19,
+"sotto_edificio": 0.22,
 "era": "altro",
 "fonti": [
 "LiDAR 2008"
 ],
-"esito": "troppo_grande"
+"esito": "protetta"
 },
 {
 "x": -184.8,
 "z": 197.6,
-"m2": 12924,
+"m2": 13128,
 "prof": 6.54,
 "sotto_edificio": 0.25,
 "era": "altro",
@@ -678,8 +666,8 @@
 {
 "x": 123.2,
 "z": 205.6,
-"m2": 27084,
-"prof": 1.32,
+"m2": 47220,
+"prof": 1.55,
 "sotto_edificio": 0.04,
 "esito": "protetta"
 },
@@ -736,7 +724,7 @@
 {
 "x": -468.8,
 "z": 115.6,
-"m2": 48,
+"m2": 44,
 "prof": 1.33,
 "sotto_edificio": 0.0,
 "esito": "protetta"
@@ -744,8 +732,36 @@
 {
 "x": -2.8,
 "z": 217.6,
-"m2": 1368,
-"prof": 1.19,
+"m2": 1896,
+"prof": 1.82,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": 69.2,
+"z": 219.6,
+"m2": 16,
+"prof": 1.11,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
+"x": -264.8,
+"z": 675.6,
+"m2": 6096,
+"prof": 4.4,
+"sotto_edificio": 0.0,
+"era": "altro",
+"fonti": [
+"LiDAR 2008"
+],
+"esito": "protetta"
+},
+{
+"x": 81.2,
+"z": 221.6,
+"m2": 16,
+"prof": 1.08,
 "sotto_edificio": 0.0,
 "esito": "protetta"
 },
@@ -806,6 +822,14 @@
 "esito": "protetta"
 },
 {
+"x": -86.8,
+"z": 433.6,
+"m2": 96,
+"prof": 1.17,
+"sotto_edificio": 0.0,
+"esito": "protetta"
+},
+{
 "x": 1215.2,
 "z": 503.6,
 "m2": 1788,
@@ -819,18 +843,6 @@
 "m2": 768,
 "prof": 1.86,
 "sotto_edificio": 0.01,
-"esito": "protetta"
-},
-{
-"x": -264.8,
-"z": 675.6,
-"m2": 936,
-"prof": 1.15,
-"sotto_edificio": 0.0,
-"era": "altro",
-"fonti": [
-"LiDAR 2008"
-],
 "esito": "protetta"
 },
 {
@@ -854,27 +866,6 @@
 "era": "altro",
 "fonti": [
 "LiDAR 2008"
-],
-"esito": "troppo_grande"
-},
-{
-"x": -1768.8,
-"z": 663.6,
-"m2": 1028,
-"prof": 1.1,
-"sotto_edificio": 0.0,
-"esito": "troppo_grande"
-},
-{
-"x": 1201.2,
-"z": 753.6,
-"m2": 5260,
-"prof": 2.41,
-"sotto_edificio": 0.56,
-"era": "dubbio",
-"fonti": [
-"LiDAR 2008",
-"DBGT volume interrato a 0 m"
 ],
 "esito": "troppo_grande"
 }
@@ -1834,40 +1825,40 @@
 "ponti_ferroviari": 3,
 "scarto_da_S_m": {
 "n": 14376,
-"p50": 0.021,
+"p50": 0.019,
 "p90": 0.072,
-"p99": 0.221,
+"p99": 0.213,
 "p100": 1.213,
 "max": 1.213
 },
 "scarto_ancore_m": {
 "n": 157,
-"p50": 0.008,
+"p50": 0.009,
 "p90": 0.026,
-"p99": 0.047,
-"p100": 0.052,
-"max": 0.052
+"p99": 0.055,
+"p100": 0.096,
+"max": 0.096
 },
 "scarto_dal_lidar_m": {
 "n": 14433,
 "p1": -0.198,
 "p50": 0.031,
-"p99": 0.411,
+"p99": 0.413,
 "max": 6.176
 },
 "pendenza_per_mille": {
 "n": 1414,
-"p50": 3.618,
-"p99": 11.655,
-"p100": 16.673,
-"max": 16.673
+"p50": 3.681,
+"p99": 11.684,
+"p100": 21.703,
+"max": 21.703
 },
-"raggio_verticale_minimo_m": 3349
+"raggio_verticale_minimo_m": 2299
 },
 "passaggi_a_livello": {
-"nodi_di_strada": 843,
+"nodi_di_strada": 832,
 "mossi_m": {
-"n": 843,
+"n": 832,
 "p50": 0.027,
 "p90": 0.089,
 "p100": 0.341,
@@ -1875,59 +1866,59 @@
 }
 },
 "terreno": {
-"nodi_sul_profilo": 52273,
-"nodi_attorno": 1975,
+"nodi_sul_profilo": 47364,
+"nodi_attorno": 812,
 "mossi_sul_profilo_m": {
-"n": 52273,
-"p50": 0.04,
-"p90": 0.32,
-"p99": 0.727,
-"p100": 1.49,
-"max": 1.49
+"n": 47364,
+"p50": 0.041,
+"p90": 0.308,
+"p99": 0.659,
+"p100": 1.482,
+"max": 1.482
 },
 "mossi_attorno_m": {
-"n": 1975,
-"p50": 0.324,
-"p90": 1.269,
+"n": 812,
+"p50": 0.383,
+"p90": 1.5,
 "p100": 1.5,
 "max": 1.5
 },
 "su_m": 1.5,
 "giu_m": -1.5,
-"oltre_il_massimo_lasciati": 174,
-"carreggiate_sotto_le_traverse_ferme": 659
+"oltre_il_massimo_lasciati": 172,
+"carreggiate_sotto_le_traverse_ferme": 570
 }
 },
 "bordo_barriere": {
-"metri_di_recinzione": 2534,
-"nodi": 1354,
+"metri_di_recinzione": 2543,
+"nodi": 1257,
 "mossi_m": {
-"p50": 0.4,
-"p90": 0.73,
-"su": 1.48,
+"p50": 0.41,
+"p90": 0.72,
+"su": 0.62,
 "giu": -1.47
 }
 },
 "pozzetti": {
 "profondita_minima_m": 0.4,
 "massimo_m2": 12.0,
-"riempiti": 5191,
-"nodi": 36224,
+"riempiti": 5175,
+"nodi": 36123,
 "alzati_m": {
-"n": 36224,
-"p50": 0.591,
-"p90": 1.367,
-"p99": 2.473,
+"n": 36123,
+"p50": 0.592,
+"p90": 1.368,
+"p99": 2.477,
 "max": 5.854
 }
 },
 "dente": {
-"nodi_mossi": 433235,
+"nodi_mossi": 422986,
 "spostamento_m": {
-"n": 433235,
+"n": 422986,
 "p50": 0.085,
-"p90": 0.277,
-"p99": 0.655,
+"p90": 0.278,
+"p99": 0.659,
 "max": 1.504
 },
 "su_m": 5.854036912089725,
@@ -1938,98 +1929,98 @@
 "definizione": "S a 0,3 m dentro e fuori da ogni anello AC_VEI, AC_PED, AC_CIC, AR_STR, ogni 0,5 m: km fuori dalla media dei suoi 4 m oltre la soglia; nodi protetti esclusi",
 "prima": {
 "AC_VEI": {
-"km": 2387.54,
-"oltre_8cm": 88.06,
-"oltre_15cm": 28.44,
-"oltre_30cm": 5.1
+"km": 2357.19,
+"oltre_8cm": 87.06,
+"oltre_15cm": 28.22,
+"oltre_30cm": 5.08
 },
 "AC_PED": {
-"km": 402.02,
-"oltre_8cm": 16.16,
+"km": 401.72,
+"oltre_8cm": 16.14,
 "oltre_15cm": 4.09,
 "oltre_30cm": 0.56
 },
 "AC_CIC": {
-"km": 17.07,
-"oltre_8cm": 0.38,
+"km": 16.36,
+"oltre_8cm": 0.37,
 "oltre_15cm": 0.04,
 "oltre_30cm": 0.0
 },
 "AR_STR": {
-"km": 1252.96,
-"oltre_8cm": 22.1,
-"oltre_15cm": 5.62,
+"km": 1228.34,
+"oltre_8cm": 21.49,
+"oltre_15cm": 5.51,
 "oltre_30cm": 0.87
 }
 },
 "dopo": {
 "AC_VEI": {
-"km": 2387.54,
-"oltre_8cm": 41.22,
-"oltre_15cm": 10.61,
-"oltre_30cm": 1.52
+"km": 2357.19,
+"oltre_8cm": 40.69,
+"oltre_15cm": 10.47,
+"oltre_30cm": 1.5
 },
 "AC_PED": {
-"km": 402.02,
-"oltre_8cm": 4.06,
+"km": 401.72,
+"oltre_8cm": 4.05,
 "oltre_15cm": 1.07,
 "oltre_30cm": 0.15
 },
 "AC_CIC": {
-"km": 17.07,
-"oltre_8cm": 0.07,
+"km": 16.36,
+"oltre_8cm": 0.06,
 "oltre_15cm": 0.0,
 "oltre_30cm": 0.0
 },
 "AR_STR": {
-"km": 1252.96,
-"oltre_8cm": 5.84,
-"oltre_15cm": 1.47,
-"oltre_30cm": 0.24
+"km": 1228.34,
+"oltre_8cm": 5.65,
+"oltre_15cm": 1.43,
+"oltre_30cm": 0.23
 }
 },
 "totale_prima": {
-"oltre_8cm": 126.69,
-"oltre_15cm": 38.19,
-"oltre_30cm": 6.53
+"oltre_8cm": 125.06,
+"oltre_15cm": 37.86,
+"oltre_30cm": 6.5
 },
 "totale_dopo": {
-"oltre_8cm": 51.19,
-"oltre_15cm": 13.16,
-"oltre_30cm": 1.9
+"oltre_8cm": 50.45,
+"oltre_15cm": 12.97,
+"oltre_30cm": 1.88
 },
 "soglia_15cm_km": 15.0
 },
 "buche_vicino_alle_strade": {
 "definizione": "depressioni chiuse di S oltre 1.0 m, almeno 12 m2, entro 12 m da una strada, nodi protetti esclusi",
 "prima": {
-"n": 1484,
+"n": 1480,
 "prof_m": {
-"n": 1484,
+"n": 1480,
 "p50": 1.74,
 "p90": 2.73,
 "max": 27.85
 },
 "area_m2": {
-"n": 1484,
+"n": 1480,
 "p50": 108.0,
-"p90": 542.8,
+"p90": 540.0,
 "max": 84148.0
 },
-"riempibili": 1371
+"riempibili": 1370
 },
 "dopo": {
-"n": 90,
+"n": 87,
 "prof_m": {
-"n": 90,
+"n": 87,
 "p50": 1.89,
-"p90": 3.87,
+"p90": 3.9,
 "max": 27.49
 },
 "area_m2": {
-"n": 90,
-"p50": 1568.0,
-"p90": 6104.8,
+"n": 87,
+"p50": 1424.0,
+"p90": 5363.2,
 "max": 83936.0
 },
 "riempibili": 0
@@ -2253,28 +2244,10 @@
 },
 {
 "dati": false,
-"x": -806.8,
-"z": -96.4,
-"m2": 6096,
-"prof": 1.66,
-"grande": true,
-"strada_in_fondo": false
-},
-{
-"dati": false,
-"x": -620.8,
-"z": -52.4,
-"m2": 7964,
-"prof": 2.86,
-"grande": true,
-"strada_in_fondo": false
-},
-{
-"dati": false,
 "x": 301.2,
 "z": -72.4,
-"m2": 1196,
-"prof": 1.5,
+"m2": 1224,
+"prof": 1.55,
 "grande": true,
 "strada_in_fondo": false
 },
@@ -2309,7 +2282,7 @@
 "dati": false,
 "x": 1215.2,
 "z": 503.6,
-"m2": 1784,
+"m2": 1788,
 "prof": 2.83,
 "grande": true,
 "strada_in_fondo": false
@@ -2574,12 +2547,30 @@
 "prof": 1.4,
 "grande": false,
 "strada_in_fondo": true
+},
+{
+"dati": false,
+"x": 1153.2,
+"z": 1627.6,
+"m2": 1332,
+"prof": 1.29,
+"grande": true,
+"strada_in_fondo": false
+},
+{
+"dati": false,
+"x": -3034.8,
+"z": 1675.6,
+"m2": 1644,
+"prof": 1.45,
+"grande": true,
+"strada_in_fondo": false
 }
 ]
 },
 "spostamento": {
 "dente_m": {
-"n": 427376,
+"n": 417236,
 "p50": 0.09,
 "p90": 0.28,
 "p99": 1.01,
@@ -2588,35 +2579,35 @@
 "dente_su_m": 1.5,
 "dente_giu_m": -1.5,
 "buche_m": {
-"n": 114569,
-"p50": 0.48,
-"p90": 1.56,
-"p99": 2.77,
+"n": 109165,
+"p50": 0.5,
+"p90": 1.59,
+"p99": 2.79,
 "max": 6.0
 },
-"nodi_mossi": 541945,
+"nodi_mossi": 526401,
 "nodi_griglia": 7880626,
 "limite_dente_m": 1.5
 },
 "invariati": {
 "nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 0,
-"nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 25,
+"nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 20,
 "carreggiate_cambiate": 0,
-"carreggiate_ai_passaggi_a_livello": 578,
-"bordo_carreggiate_alle_recinzioni": 180,
+"carreggiate_ai_passaggi_a_livello": 565,
+"bordo_carreggiate_alle_recinzioni": 148,
 "carreggiate_nei_pozzetti_riempiti": 284,
 "impalcati_e_sotto": 0,
 "acqua_e_alvei": 0,
 "tombini_sotto_i_binari": 6,
 "ferrovia": 0,
-"ferrovia_sul_profilo": 14514,
-"ferrovia_sotto_le_recinzioni_sulle_strade": 628,
+"ferrovia_sul_profilo": 11875,
+"ferrovia_sotto_le_recinzioni_sulle_strade": 618,
 "rampe": 0
 },
 "gradini_cresciuti": {
 "definizione": "coppie di nodi vicini (anche in diagonale), fuori dagli edifici e dalle buche riempite, con il salto cresciuto oltre la soglia",
-"oltre_0.3m": 13093,
-"oltre_0.5m": 2182,
+"oltre_0.3m": 13024,
+"oltre_0.5m": 2179,
 "oltre_1.0m": 75,
 "peggiori": [
 {
@@ -2773,23 +2764,23 @@
 },
 "luoghi_oltre_30cm": [
 {
-"x": 44.8,
-"z": 510.6,
-"scarto": 1.15
+"x": -1450.8,
+"z": 1447.3,
+"scarto": 1.09
 },
 {
-"x": 662.9,
-"z": 1279.4,
+"x": -1464.5,
+"z": 980.4,
 "scarto": 0.64
 },
 {
-"x": 286.2,
-"z": -959.9,
+"x": -1382.2,
+"z": 1249.5,
 "scarto": 0.58
 },
 {
-"x": 33.4,
-"z": -1283.9,
+"x": -1299.0,
+"z": 1118.8,
 "scarto": 0.54
 },
 {
@@ -2798,178 +2789,178 @@
 "scarto": 0.51
 },
 {
-"x": 269.2,
-"z": -967.7,
+"x": -1375.4,
+"z": 1659.8,
 "scarto": 0.49
 },
 {
-"x": -1717.4,
-"z": 1024.6,
+"x": 855.3,
+"z": -1080.2,
 "scarto": 0.48
 },
 {
-"x": 1287.7,
-"z": 1951.8,
+"x": -1462.6,
+"z": 984.3,
 "scarto": 0.47
 },
 {
-"x": -1398.7,
-"z": 1494.1,
-"scarto": 0.45
+"x": -1045.7,
+"z": 2329.7,
+"scarto": 0.46
 },
 {
-"x": -837.2,
-"z": -272.9,
+"x": -561.5,
+"z": 550.5,
 "scarto": 0.44
 },
 {
-"x": -545.1,
-"z": -834.6,
+"x": -1603.7,
+"z": 1622.5,
 "scarto": 0.43
 },
 {
-"x": -1362.7,
-"z": 1625.4,
+"x": -740.7,
+"z": 2042.7,
 "scarto": 0.42
 },
 {
-"x": 61.5,
-"z": -781.8,
+"x": 1569.4,
+"z": 643.7,
 "scarto": 0.41
 },
 {
-"x": 46.2,
-"z": -1285.2,
+"x": -1567.0,
+"z": 1347.0,
+"scarto": 0.41
+},
+{
+"x": 1065.5,
+"z": -469.2,
 "scarto": 0.4
 },
 {
-"x": -1849.4,
-"z": 757.5,
-"scarto": 0.4
-},
-{
-"x": 769.8,
-"z": -997.0,
+"x": 1236.6,
+"z": -834.1,
 "scarto": 0.39
 },
 {
-"x": 1202.0,
-"z": -553.8,
+"x": 490.3,
+"z": 1173.4,
 "scarto": 0.38
 },
 {
-"x": 223.5,
-"z": -923.0,
+"x": 898.1,
+"z": -510.1,
 "scarto": 0.38
 },
 {
-"x": -2955.5,
-"z": 2004.8,
+"x": 239.4,
+"z": 1781.5,
 "scarto": 0.37
 },
 {
-"x": 292.4,
-"z": 1909.6,
+"x": 527.6,
+"z": -1285.2,
 "scarto": 0.37
 },
 {
-"x": -338.6,
-"z": -1201.9,
+"x": -335.0,
+"z": -1260.6,
 "scarto": 0.36
 },
 {
-"x": -1706.4,
-"z": 835.5,
+"x": -1164.9,
+"z": 1389.7,
 "scarto": 0.36
 },
 {
-"x": 50.1,
-"z": -756.8,
+"x": 561.0,
+"z": -1444.8,
 "scarto": 0.36
 },
 {
-"x": 1017.9,
-"z": -1228.2,
+"x": -312.1,
+"z": -745.9,
 "scarto": 0.35
 },
 {
-"x": 925.9,
-"z": 209.9,
+"x": -1532.0,
+"z": 1353.7,
 "scarto": 0.35
 },
 {
-"x": -2295.4,
-"z": 2370.5,
+"x": 452.8,
+"z": -1156.0,
 "scarto": 0.34
 },
 {
-"x": 58.9,
-"z": -780.9,
+"x": -1437.1,
+"z": 1017.7,
 "scarto": 0.34
 },
 {
-"x": 1233.1,
-"z": -620.3,
+"x": 442.7,
+"z": 2063.8,
 "scarto": 0.34
 },
 {
-"x": 487.2,
-"z": -1356.8,
+"x": -188.4,
+"z": -760.0,
 "scarto": 0.33
 },
 {
-"x": -1592.9,
-"z": 1630.3,
+"x": 362.3,
+"z": 996.6,
 "scarto": 0.33
 },
 {
-"x": 1092.9,
-"z": 1457.2,
+"x": 361.8,
+"z": -1180.6,
 "scarto": 0.33
 },
 {
-"x": -467.2,
-"z": 1035.7,
+"x": -2240.0,
+"z": 1592.4,
 "scarto": 0.32
 },
 {
-"x": -973.8,
-"z": 1020.2,
+"x": 468.3,
+"z": -1182.4,
 "scarto": 0.32
 },
 {
-"x": 1095.9,
-"z": 672.3,
+"x": -1527.8,
+"z": 1373.5,
 "scarto": 0.32
 },
 {
-"x": 449.5,
-"z": -1165.7,
+"x": 236.5,
+"z": 1780.7,
+"scarto": 0.32
+},
+{
+"x": 296.8,
+"z": -1005.1,
 "scarto": 0.31
 },
 {
-"x": 255.0,
-"z": 1890.1,
+"x": 13.4,
+"z": -644.1,
 "scarto": 0.31
 },
 {
-"x": -42.7,
-"z": -1790.2,
+"x": 159.6,
+"z": -1000.8,
 "scarto": 0.31
 },
 {
-"x": 271.2,
-"z": -1237.2,
+"x": -1514.5,
+"z": 978.8,
 "scarto": 0.31
 },
 {
-"x": -1291.5,
-"z": 1119.2,
-"scarto": 0.3
-},
-{
-"x": 847.0,
-"z": -597.3,
+"x": -140.6,
+"z": -1148.6,
 "scarto": 0.3
 }
 ],
@@ -2978,21 +2969,21 @@
 "controlli_pozzetti": {
 "definizione": "depressioni chiuse di S (piena dal minimo fino al punto di sfioro) profonde almeno 0.4 m con al massimo 3 nodi (12 m2), su tutta la mappa",
 "prima": {
-"totale": 3859,
-"senza_motivo": 3779,
-"oltre_1m": 481,
+"totale": 3914,
+"senza_motivo": 3765,
+"oltre_1m": 484,
 "oltre_2m": 32
 },
 "dopo": {
-"totale": 84,
+"totale": 153,
 "senza_motivo": 0,
-"oltre_1m": 5,
+"oltre_1m": 9,
 "oltre_2m": 0
 },
 "eccezioni_per_motivo": {
-"a meno di 4 m da ponte, acqua o ferrovia": 16,
+"a meno di 4 m da ponte, acqua o ferrovia": 21,
 "acqua o alveo": 52,
-"impalcato o ponte": 5,
+"impalcato o ponte": 69,
 "rampa disegnata": 11
 },
 "eccezioni": [
@@ -3032,11 +3023,53 @@
 "motivo": "rampa disegnata"
 },
 {
-"x": 361.2,
-"z": 1993.6,
-"m2": 20,
+"x": 81.2,
+"z": 225.6,
+"m2": 4,
+"prof": 1.16,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -78.8,
+"z": 457.6,
+"m2": 8,
+"prof": 1.13,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -262.8,
+"z": 693.6,
+"m2": 4,
+"prof": 1.06,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 69.2,
+"z": 199.6,
+"m2": 24,
+"prof": 1.01,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -76.8,
+"z": 467.6,
+"m2": 8,
+"prof": 0.99,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -544.8,
+"z": 123.6,
+"m2": 16,
 "prof": 0.93,
-"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+"motivo": "impalcato o ponte"
+},
+{
+"x": 19.2,
+"z": 517.6,
+"m2": 8,
+"prof": 0.87,
+"motivo": "impalcato o ponte"
 },
 {
 "x": 387.2,
@@ -3095,6 +3128,34 @@
 "motivo": "rampa disegnata"
 },
 {
+"x": -74.8,
+"z": 475.6,
+"m2": 8,
+"prof": 0.74,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -234.8,
+"z": 169.6,
+"m2": 24,
+"prof": 0.73,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 25.2,
+"z": 503.6,
+"m2": 4,
+"prof": 0.73,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 17.2,
+"z": 523.6,
+"m2": 8,
+"prof": 0.73,
+"motivo": "impalcato o ponte"
+},
+{
 "x": 563.2,
 "z": -2104.4,
 "m2": 8,
@@ -3102,11 +3163,53 @@
 "motivo": "acqua o alveo"
 },
 {
+"x": -4.8,
+"z": 763.6,
+"m2": 8,
+"prof": 0.72,
+"motivo": "impalcato o ponte"
+},
+{
 "x": 449.2,
 "z": -2304.4,
 "m2": 8,
 "prof": 0.71,
 "motivo": "acqua o alveo"
+},
+{
+"x": -662.8,
+"z": 3.6,
+"m2": 4,
+"prof": 0.7,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -86.8,
+"z": 433.6,
+"m2": 8,
+"prof": 0.7,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -84.8,
+"z": 437.6,
+"m2": 8,
+"prof": 0.7,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -82.8,
+"z": 443.6,
+"m2": 8,
+"prof": 0.7,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -80.8,
+"z": 449.6,
+"m2": 8,
+"prof": 0.7,
+"motivo": "impalcato o ponte"
 },
 {
 "x": 379.2,
@@ -3137,10 +3240,24 @@
 "motivo": "rampa disegnata"
 },
 {
+"x": -88.8,
+"z": 427.6,
+"m2": 8,
+"prof": 0.65,
+"motivo": "impalcato o ponte"
+},
+{
 "x": -656.8,
 "z": 1431.6,
 "m2": 8,
 "prof": 0.65,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -148.8,
+"z": 319.6,
+"m2": 4,
+"prof": 0.64,
 "motivo": "impalcato o ponte"
 },
 {
@@ -3149,6 +3266,13 @@
 "m2": 4,
 "prof": 0.63,
 "motivo": "acqua o alveo"
+},
+{
+"x": -666.8,
+"z": 1.6,
+"m2": 4,
+"prof": 0.62,
+"motivo": "impalcato o ponte"
 },
 {
 "x": 687.2,
@@ -3221,11 +3345,39 @@
 "motivo": "acqua o alveo"
 },
 {
+"x": 21.2,
+"z": 427.6,
+"m2": 24,
+"prof": 0.56,
+"motivo": "impalcato o ponte"
+},
+{
 "x": 621.2,
 "z": -2040.4,
 "m2": 16,
 "prof": 0.55,
 "motivo": "acqua o alveo"
+},
+{
+"x": -112.8,
+"z": 373.6,
+"m2": 4,
+"prof": 0.55,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -296.8,
+"z": 159.6,
+"m2": 16,
+"prof": 0.54,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -36.8,
+"z": 785.6,
+"m2": 40,
+"prof": 0.54,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
 },
 {
 "x": -3242.8,
@@ -3256,11 +3408,25 @@
 "motivo": "acqua o alveo"
 },
 {
+"x": 113.2,
+"z": 163.6,
+"m2": 8,
+"prof": 0.53,
+"motivo": "impalcato o ponte"
+},
+{
 "x": -912.8,
 "z": 493.6,
 "m2": 44,
 "prof": 0.53,
 "motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": 401.2,
+"z": 2099.6,
+"m2": 8,
+"prof": 0.53,
+"motivo": "impalcato o ponte"
 },
 {
 "x": 1073.2,
@@ -3277,11 +3443,53 @@
 "motivo": "acqua o alveo"
 },
 {
+"x": 1011.2,
+"z": 393.6,
+"m2": 28,
+"prof": 0.51,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 199.2,
+"z": 1471.6,
+"m2": 24,
+"prof": 0.51,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 201.2,
+"z": 1475.6,
+"m2": 8,
+"prof": 0.51,
+"motivo": "impalcato o ponte"
+},
+{
 "x": 193.2,
 "z": -1010.4,
 "m2": 8,
 "prof": 0.5,
 "motivo": "rampa disegnata"
+},
+{
+"x": -536.8,
+"z": 107.6,
+"m2": 32,
+"prof": 0.5,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": -302.8,
+"z": 157.6,
+"m2": 16,
+"prof": 0.5,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1275.2,
+"z": 457.6,
+"m2": 28,
+"prof": 0.5,
+"motivo": "impalcato o ponte"
 },
 {
 "x": -3272.8,
@@ -3291,6 +3499,13 @@
 "motivo": "acqua o alveo"
 },
 {
+"x": 97.2,
+"z": 1283.6,
+"m2": 40,
+"prof": 0.5,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
 "x": 697.2,
 "z": -1760.4,
 "m2": 16,
@@ -3298,9 +3513,9 @@
 "motivo": "acqua o alveo"
 },
 {
-"x": -74.8,
-"z": 475.6,
-"m2": 12,
+"x": -308.8,
+"z": 155.6,
+"m2": 24,
 "prof": 0.49,
 "motivo": "impalcato o ponte"
 },
@@ -3319,6 +3534,20 @@
 "motivo": "acqua o alveo"
 },
 {
+"x": -598.8,
+"z": 113.6,
+"m2": 12,
+"prof": 0.48,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": 1415.2,
+"z": 509.6,
+"m2": 4,
+"prof": 0.48,
+"motivo": "impalcato o ponte"
+},
+{
 "x": 617.2,
 "z": -2060.4,
 "m2": 16,
@@ -3335,7 +3564,7 @@
 {
 "x": -570.8,
 "z": 47.6,
-"m2": 8,
+"m2": 12,
 "prof": 0.47,
 "motivo": "a meno di 4 m da ponte, acqua o ferrovia"
 },
@@ -3410,18 +3639,32 @@
 "motivo": "a meno di 4 m da ponte, acqua o ferrovia"
 },
 {
-"x": 927.2,
-"z": 375.6,
-"m2": 12,
+"x": -234.8,
+"z": 189.6,
+"m2": 32,
 "prof": 0.46,
 "motivo": "a meno di 4 m da ponte, acqua o ferrovia"
 },
 {
-"x": 1057.2,
-"z": 401.6,
-"m2": 20,
+"x": 991.2,
+"z": 389.6,
+"m2": 28,
 "prof": 0.46,
-"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1215.2,
+"z": 445.6,
+"m2": 24,
+"prof": 0.46,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 203.2,
+"z": 1481.6,
+"m2": 8,
+"prof": 0.46,
+"motivo": "impalcato o ponte"
 },
 {
 "x": 1095.2,
@@ -3445,11 +3688,46 @@
 "motivo": "acqua o alveo"
 },
 {
+"x": -1044.8,
+"z": -252.4,
+"m2": 4,
+"prof": 0.45,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1001.2,
+"z": 391.6,
+"m2": 28,
+"prof": 0.45,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1251.2,
+"z": 441.6,
+"m2": 20,
+"prof": 0.45,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 3.2,
+"z": 731.6,
+"m2": 44,
+"prof": 0.45,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
 "x": -1266.8,
 "z": 1223.6,
 "m2": 40,
 "prof": 0.45,
 "motivo": "acqua o alveo"
+},
+{
+"x": 183.2,
+"z": 1413.6,
+"m2": 40,
+"prof": 0.45,
+"motivo": "impalcato o ponte"
 },
 {
 "x": -1264.8,
@@ -3515,6 +3793,27 @@
 "motivo": "a meno di 4 m da ponte, acqua o ferrovia"
 },
 {
+"x": 1015.2,
+"z": 405.6,
+"m2": 28,
+"prof": 0.44,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 35.2,
+"z": 481.6,
+"m2": 4,
+"prof": 0.44,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 127.2,
+"z": 1235.6,
+"m2": 16,
+"prof": 0.44,
+"motivo": "impalcato o ponte"
+},
+{
 "x": 627.2,
 "z": -1954.4,
 "m2": 12,
@@ -3534,6 +3833,41 @@
 "m2": 8,
 "prof": 0.43,
 "motivo": "acqua o alveo"
+},
+{
+"x": -650.8,
+"z": 43.6,
+"m2": 44,
+"prof": 0.43,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": -468.8,
+"z": 115.6,
+"m2": 24,
+"prof": 0.43,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": -110.8,
+"z": 377.6,
+"m2": 4,
+"prof": 0.43,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1055.2,
+"z": 413.6,
+"m2": 28,
+"prof": 0.43,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 149.2,
+"z": 1307.6,
+"m2": 8,
+"prof": 0.43,
+"motivo": "impalcato o ponte"
 },
 {
 "x": 283.2,
@@ -3557,18 +3891,74 @@
 "motivo": "rampa disegnata"
 },
 {
-"x": 887.2,
-"z": 367.6,
-"m2": 16,
+"x": -354.8,
+"z": 185.6,
+"m2": 12,
 "prof": 0.42,
 "motivo": "a meno di 4 m da ponte, acqua o ferrovia"
 },
 {
-"x": 917.2,
-"z": 373.6,
-"m2": 16,
+"x": 897.2,
+"z": 371.6,
+"m2": 24,
 "prof": 0.42,
-"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+"motivo": "impalcato o ponte"
+},
+{
+"x": 981.2,
+"z": 387.6,
+"m2": 28,
+"prof": 0.42,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1019.2,
+"z": 395.6,
+"m2": 28,
+"prof": 0.42,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 995.2,
+"z": 401.6,
+"m2": 20,
+"prof": 0.42,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1071.2,
+"z": 405.6,
+"m2": 24,
+"prof": 0.42,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1065.2,
+"z": 415.6,
+"m2": 28,
+"prof": 0.42,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1241.2,
+"z": 439.6,
+"m2": 20,
+"prof": 0.42,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 63.2,
+"z": 1023.6,
+"m2": 12,
+"prof": 0.42,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 327.2,
+"z": 1865.6,
+"m2": 8,
+"prof": 0.42,
+"motivo": "impalcato o ponte"
 },
 {
 "x": 313.2,
@@ -3578,10 +3968,94 @@
 "motivo": "acqua o alveo"
 },
 {
+"x": 969.2,
+"z": 397.6,
+"m2": 16,
+"prof": 0.41,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1081.2,
+"z": 407.6,
+"m2": 32,
+"prof": 0.41,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -94.8,
+"z": 411.6,
+"m2": 44,
+"prof": 0.41,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1095.2,
+"z": 421.6,
+"m2": 28,
+"prof": 0.41,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -8.8,
+"z": 731.6,
+"m2": 24,
+"prof": 0.41,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 325.2,
+"z": 1857.6,
+"m2": 8,
+"prof": 0.41,
+"motivo": "impalcato o ponte"
+},
+{
 "x": 1233.2,
 "z": 1893.6,
 "m2": 36,
 "prof": 0.41,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": -380.8,
+"z": 133.6,
+"m2": 8,
+"prof": 0.4,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -484.8,
+"z": 171.6,
+"m2": 24,
+"prof": 0.4,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 959.2,
+"z": 383.6,
+"m2": 24,
+"prof": 0.4,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 961.2,
+"z": 395.6,
+"m2": 20,
+"prof": 0.4,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 1075.2,
+"z": 417.6,
+"m2": 28,
+"prof": 0.4,
+"motivo": "impalcato o ponte"
+},
+{
+"x": 251.2,
+"z": 1637.6,
+"m2": 28,
+"prof": 0.4,
 "motivo": "a meno di 4 m da ponte, acqua o ferrovia"
 }
 ],
@@ -3769,8 +4243,8 @@
 }
 ],
 "punte_verso_alto": {
-"totale": 1051,
-"fuori_dalle_cose_protette": 1002,
+"totale": 1097,
+"fuori_dalle_cose_protette": 990,
 "peggiori": [
 {
 "x": 15.2,
@@ -3805,6 +4279,12 @@
 ],
 "peggiori_tutte": [
 {
+"x": 407.2,
+"z": 2247.6,
+"m2": 4,
+"alta": 6.53
+},
+{
 "x": 15.2,
 "z": 2469.6,
 "m2": 8,
@@ -3827,12 +4307,6 @@
 "z": -1000.4,
 "m2": 20,
 "alta": 1.34
-},
-{
-"x": -2954.8,
-"z": 2005.6,
-"m2": 8,
-"alta": 1.21
 }
 ],
 "nota": "contate, non corrette"
