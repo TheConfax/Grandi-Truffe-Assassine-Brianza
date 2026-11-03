@@ -22,6 +22,19 @@ def presto(fn, *a, **k):
     return _POOL.submit(fn, *a, **k)
 
 
+def subito(fn, *a, **k):
+    """fn(*a, **k) started now on a thread of its own, not in the queue of presto (for a union taken much later, which must not hold up the
+    queue): .result() gives its value (and raises its exception)"""
+    import threading
+    from concurrent.futures import Future
+    f = Future()
+    def run():
+        try: f.set_result(fn(*a, **k))
+        except BaseException as e: f.set_exception(e)
+    threading.Thread(target=run, name='subito', daemon=True).start()
+    return f
+
+
 def in_parallelo(fn, items, nt=NT):
     """[fn(x) for x in items] on nt threads, in order"""
     items = list(items)

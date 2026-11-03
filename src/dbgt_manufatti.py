@@ -234,7 +234,7 @@ class Manufatti:
         self.arr = [o for o in self.arr if inside(o[0])]; self.aatt = [(t, q) for t, p in self.aatt for q in (_polys(p.intersection(cv), 0.5) if not cv.contains(p) else [p])]
         self.park = [q for p in self.park for q in (_polys(p.intersection(cv), 0.5) if not cv.contains(p) else [p])]
         self.acqua = [o for o in self.acqua if inside(o['g'])]; self.tral = [o for o in self.tral if cv.contains(o['c'])]
-        self.tre = [q for p in self.tre for q in _parts(p.intersection(cv.buffer(50))) if q.geom_type == 'LineString']
+        cv50 = cv.buffer(50); self.tre = [q for p in self.tre for q in _parts(p.intersection(cv50)) if q.geom_type == 'LineString']
         self.grid = Grid(cv.bounds, d_dsm=dsm_dir) if not cv.is_empty else None
         self.bld_mask = self.grid.mask(self.blds, 0.5) if self.grid is not None else None
         self._misura()
@@ -445,7 +445,7 @@ class Manufatti:
         OSM pylons inside the cover replaced by the DBGT bases (height from the DSM), the lines through them kept here with a height per
         vertex (self.pw), masts where only the DBGT has them, the OSM water tower object where the DBGT draws it."""
         cv, G = self.cover, self.grid
-        self.lines_all = [(p, h) for p, h in power_lines if len(p) >= 2 and LineString(p).intersects(cv.buffer(20))]  # the trees under them (alberi)
+        cv20 = cv.buffer(20); self.lines_all = [(p, h) for p, h in power_lines if len(p) >= 2 and LineString(p).intersects(cv20)]  # the trees under them (alberi)
         if cv.is_empty: return ogg, power_lines
         kt, ka, kw = OGG.index('traliccio'), OGG.index('antenna'), OGG.index('torre_acqua')
         osm_t = [(i, o[1] / 10, o[2] / 10, o[4]) for i, o in enumerate(ogg) if o[0] == kt]
@@ -568,7 +568,7 @@ class Manufatti:
                 c = list(L.coords); return [LineString(c[i:i + 2]) for i in range(len(c) - 1) if c[i] != c[i + 1]]
             zone = [s.buffer(WIRE_R) for g in big for s in pieces(g)] + [s.buffer(WIRE_R_MT) for g in small for s in pieces(g)]
             if zone:
-                Mz = G.mask([p for z_ in zone for p in _polys(z_.intersection(cv.buffer(10)))])
+                cv10 = cv.buffer(10); Mz = G.mask([p for z_ in zone for p in _polys(z_.intersection(cv10))])   # the cover's buffer once, not once per span
                 No = grey_opening(np.where(np.isfinite(N), N, 0.0), size=(3, 3)); self.n_wire_px = int(Mz.sum())
                 N = np.where(Mz & np.isfinite(N), np.minimum(N, No), N); Nc = np.where(Mz & np.isfinite(Nc), np.minimum(Nc, No), Nc)
             tw = [Point(t['x'], t['z']).buffer(PYL_R) for t in getattr(self, 'towers', [])]
