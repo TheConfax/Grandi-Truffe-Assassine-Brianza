@@ -7,6 +7,7 @@
    (the site declares no size: 2 m assumed), 2 Poly Haven asphalt_04 (4.04 m declared). &asfsh=0 turns the asphalt details off (for the cost measure) */
 const ASF_N = (/[?&]asfalto=([123])/.exec(location.search) || [0, '1'])[1], ASF_FILE = 'asfalto_' + ASF_N, ASF_M = [0, 2, 4.04, 2][+ASF_N];
 const ASF_U = { value: /[?&]asfsh=0/.test(location.search) ? 0 : 1 }; window.__ASFU = ASF_U;
+const ASF_T = { value: +((/[?&]asftono=([0-9.]+)/.exec(location.search) || [0, '1'])[1]) || 1 }; /* &asftono=N: multiplier of the asphalt brightness (default 1) */
 const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 2], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
 {
   const ld = new THREE.TextureLoader();
@@ -183,7 +184,7 @@ for (const [k, m, tile] of [['old', MAT.old, 3.4], ['mod', MAT.mod, 4.2], ['plai
    tone variation over 20-40 m, rare sealed cracks (edges of a Voronoi net, 12 m cells, only some edges kept, warped to wander, 2-4 cm wide), rare patches
    (rectangles of 1-4 m, a little turned, darker and blacker, sharp edge). All in world coordinates. The wheel tracks are not done: the asphalt UVs do not know the road direction */
 const ASF_GLSL = `
-uniform float uAsf;
+uniform float uAsf, uAsT;
 vec2 h22(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); q += dot(q, q.yzx + 33.33); return fract((q.xx + q.yz) * q.zy); }
 `;
 const ASF_FRAG = `
@@ -235,9 +236,10 @@ const ASF_FRAG = `
         float g = dot(texelColor.rgb, vec3(.3, .59, .11));
         texelColor.rgb = mix(texelColor.rgb, vec3(g) * .5 * (.85 + .3 * r3.y), m * .9); } }
   }
+  texelColor.rgb *= uAsT;
   diffuseColor *= texelColor;`;
 const ASF_PATCH = s => {
-  VAR_VERT(s); s.uniforms.uAsf = ASF_U;
+  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T;
   s.fragmentShader = ASF_GLSL + VAR_GLSL + s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
 };
 for (const k of ['asph', 'asphS', 'paved', 'pavedS', 'deck']) { MAT[k].onBeforeCompile = ASF_PATCH; MAT[k].customProgramCacheKey = () => 'asfalto-var'; MAT[k].needsUpdate = true; }
