@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 segnalazioni*.json
 segnalazioni_live.jsonl
+cache_build/
