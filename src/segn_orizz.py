@@ -202,6 +202,7 @@ Riga: [dash, kerb, [bx, bz, ux, uz]]: dash, kerb: x, z in cm lungo la zona (un p
 in (bx, bz) cm, con il verso di marcia (ux, uz)."""
 FB_LUNG = 14.0
 FB_DIST = 2.70
+FB_UNISCI = 30.0   # m: due fermate dalla stessa parte piu' vicine di cosi' sono una (Carlo, 3/11)
 FB_LISCIO = 0.15   # m: il bordo puo' scostarsi tanto dalla sua parabola; di piu' e' un passo carraio o un angolo
 
 
@@ -232,7 +233,7 @@ def _anello_di(U, Q):
     return best[1] if best and best[0] < 0.05 else None
 
 
-def fermate(nodes, ntags, car_nodes, STR, inside, log, banchine=(), vie_nodo=None, misure=None, crossings=()):
+def fermate(nodes, ntags, car_nodes, STR, inside, log, banchine=(), vie_nodo=None, misure=None, crossings=(), tolte=None):
     """banchine: [((x, z), 'pensilina' | 'banchina')] le pensiline e le banchine di OSM disegnate come vie; vie_nodo: nodo -> quante vie per auto o di servizio ci passano"""
     from shapely.geometry import Point, box, LineString
     cnt = collections.Counter(); out = []
@@ -260,7 +261,7 @@ def fermate(nodes, ntags, car_nodes, STR, inside, log, banchine=(), vie_nodo=Non
                     if d <= 14 and (best is None or d < best[0]): best = (d, r_, k, u)
         return best
 
-    fatte = []
+    fatte = []; cands = []
     for nid, t in sorted(ntags.items()):
         if nid not in nodes or not inside(nodes[nid], 0): continue
         if not (t.get('highway') == 'bus_stop' or (t.get('public_transport') == 'platform' and t.get('bus') == 'yes')): continue
@@ -278,7 +279,24 @@ def fermate(nodes, ntags, car_nodes, STR, inside, log, banchine=(), vie_nodo=Non
         fwd = side >= 0
         if r_['o'] and not fwd: cnt['saltata: a sinistra di una via a senso unico'] += 1; continue
         d = (ex, ez) if fwd else (-ex, -ez); nr = (-d[1], d[0])   # il verso del bus e la sua destra (verso il marciapiede)
-        # il centro: la pensilina dalla stessa parte, entro 15 m lungo la via, se c'e'
+        cands.append((nid, r_, refs, A, d, nr, fwd))
+    # fermate dalla stessa parte della stessa strada entro 30 m: una zona sola (OSM mappa spesso la stessa fermata due volte, il palo e la banchina;
+    # Carlo, 3/11, via Indipendenza)
+    gruppi_f = []
+    for c_ in cands:
+        for g_ in gruppi_f:
+            g0 = g_[0]
+            if c_[4][0] * g0[4][0] + c_[4][1] * g0[4][1] > 0.7 and math.dist(c_[3], g0[3]) < FB_UNISCI and abs((c_[3][0] - g0[3][0]) * g0[5][0] + (c_[3][1] - g0[3][1]) * g0[5][1]) < 6:
+                g_.append(c_); break
+        else: gruppi_f.append([c_])
+    for g_ in gruppi_f:
+        # la fermata che resta: quella con la pensilina (shelter=yes), se no la prima; le altre non hanno ne' zona ne' pensilina (tolte)
+        g_.sort(key=lambda c_: (ntags[c_[0]].get('shelter') != 'yes', c_[0]))
+        nid, r_, refs, A, d, nr, fwd = g_[0]
+        if len(g_) > 1:
+            cnt['fermate unite a un\'altra dalla stessa parte'] += len(g_) - 1
+            if tolte is not None: tolte.update(c_[0] for c_ in g_[1:])
+        # il centro: la pensilina di OSM disegnata a parte dalla stessa parte, entro 15 m lungo la via, se c'e'; se no la fermata (il gioco ci mette la pensilina)
         c_al = 0.0; q = []
         for pp, kk in pens:
             al = (pp[0] - A[0]) * d[0] + (pp[1] - A[1]) * d[1]; lat = (pp[0] - A[0]) * nr[0] + (pp[1] - A[1]) * nr[1]
@@ -389,8 +407,9 @@ def _sul_cerchio(C, u, c, r):
     t = -b + math.sqrt(q); return t if t > 0 else None
 
 
-def rotonde(nodes, car_nodes, anelli, STR, inside, log, misure=None, crossings=()):
-    """anelli: [[nodo]] le vie junction=roundabout/circular di OSM; misure: lista dove mettere le misure di prova"""
+def rotonde(nodes, vie_osm, anelli, STR, inside, log, misure=None, crossings=(), area=None, controllo=None):
+    """anelli: [[nodo]] le vie junction=roundabout/circular di OSM; vie_osm: le vie per auto di OSM ({refs, hw, o, mh, ms, rb}); misure: lista dove mettere
+    le misure di prova; area: dove si controlla (Meda e Seveso, la copertura del DBGT); controllo: lista dove mettere ogni ingresso dell'area, con o senza linea"""
     import shapely
     from shapely.geometry import Point, LineString, box
     from shapely.ops import unary_union
@@ -408,9 +427,12 @@ def rotonde(nodes, car_nodes, anelli, STR, inside, log, misure=None, crossings=(
     gruppi = collections.defaultdict(set)
     for nd in anelli:
         for n_ in nd: gruppi[fnd(n_)].add(n_)
-    vie = {}
-    for l_ in car_nodes.values():
-        for r_, _i in l_: vie[id(r_)] = r_
+    vie = {id(v): v for v in vie_osm}
+    at = collections.defaultdict(list)   # nodo -> [(via, indice)] delle vie che non sono anelli
+    for v in vie_osm:
+        if v['rb']: continue
+        for i_, n_ in enumerate(v['refs']): at[n_].append((v, i_))
+    tutti = []
 
     def emetti(lin, rm, cl, rl, clip):
         """una linea sul bordo (punti dal cordolo destro verso la mezzeria), il simbolo e il cartello"""
@@ -438,7 +460,7 @@ def rotonde(nodes, car_nodes, anelli, STR, inside, log, misure=None, crossings=(
             if okq.any(): cart = Qs[int(np.argmax(okq))]
         if cart is None: cnt['cartello: il posto lo cerca il gioco'] += 1; sg_ = [int(round(E[0] * 100)), int(round(E[1] * 100)), round(float(uin[0]), 3), round(float(uin[1]), 3), 1]
         else: sg_ = [int(round(cart[0] * 100)), int(round(cart[1] * 100)), round(float(uin[0]), 3), round(float(uin[1]), 3)]
-        out.append([[int(round(v * 100)) for q_ in lin for v in q_], c, simb, sg_]); cnt['ingressi con la linea'] += 1
+        out.append([[int(round(v * 100)) for q_ in lin for v in q_], c, simb, sg_]); cnt['ingressi con la linea'] += 1; rm['fatto'] = True
         return cart
 
     def solo_cartello(rm, motivo):
@@ -490,18 +512,16 @@ def rotonde(nodes, car_nodes, anelli, STR, inside, log, misure=None, crossings=(
         pts = np.array([nodes[n_] for n_ in sorted(g)]); C = pts.mean(0)   # in ordine: la stessa somma a ogni build
         if not inside(tuple(C), 0): continue
         r_ax = float(np.median(np.hypot(*(pts - C).T)))
-        rami = []   # i rami: vie per auto (non dell'anello) con un nodo sull'anello
-        for r_ in vie.values():
-            if all(n_ in g for n_ in r_['refs']): continue
-            for i, n_ in enumerate(r_['refs']):
-                if n_ not in g: continue
+        rami = []   # i rami: vie per auto di OSM (non dell'anello) con un nodo sull'anello
+        for n_ in sorted(g):
+            for r_, i in at.get(n_, ()):
                 for passo in (-1, 1):
                     if not (0 <= i + passo < len(r_['refs'])) or r_['refs'][i + passo] in g: continue
                     ent = (not r_['o']) or passo == -1; usc = (not r_['o']) or passo == 1
                     seq = [nodes[r_['refs'][j]] for j in (range(i, -1, -1) if passo == -1 else range(i, len(r_['refs'])))]
                     rami.append(dict(r=r_, ent=ent, usc=usc, seq=seq))
         if not rami: continue
-        cnt['rotonde'] += 1
+        cnt['rotonde'] += 1; tutti.extend((C, rm) for rm in rami)
         if U is None or not U.intersects(Point(*C).buffer(r_ax + 2)): con_osm(g, C, rami, 'rotonde fuori dal DBGT'); continue
         clip = U.intersection(box(C[0] - r_ax - 45, C[1] - r_ax - 45, C[0] + r_ax + 45, C[1] + r_ax + 45))
         if clip.is_empty: con_osm(g, C, rami, 'rotonde fuori dal DBGT'); continue
@@ -531,7 +551,11 @@ def rotonde(nodes, car_nodes, anelli, STR, inside, log, misure=None, crossings=(
         if W0 < 2.0 or W0 > 15 or ok0.sum() < 40: con_osm(g, C, rami, 'rotonde con l\'anello non trovato nel DBGT'); continue
         Pe = C + UU * np.where(fin, r_out, 0)[:, None]
         cg, rg, sg = _cerchio(Pe[ok0])
-        rc = np.array([_sul_cerchio(C, u, cg, rg) or 0 for u in UU])
+        # il bordo esterno di riferimento: il bordo interno piu' la larghezza dell'anello lì (mediana su 60 gradi): vale anche per un anello schiacciato
+        hw_ = int(30 / RB_PASSO); Wf = np.where(fin, W, np.nan)
+        Wloc = np.array([np.nanmedian(Wf[np.arange(k_ - hw_, k_ + hw_ + 1) % n]) for k_ in range(n)])
+        Wloc = np.where(np.isfinite(Wloc), Wloc, W0)
+        rc = r_in + Wloc
         gap = ~(fin & (r_out < rc + RB_APERTURA))
         if gap.all() or not gap.any(): con_osm(g, C, rami, 'rotonde con l\'anello non trovato nel DBGT'); continue
         # il raggio fermato da un'isola spartitraffico (MAN_TR)
@@ -545,20 +569,79 @@ def rotonde(nodes, car_nodes, anelli, STR, inside, log, misure=None, crossings=(
                 while k < n and gap[(k0 + k) % n]: k += 1
                 aperture.append([(k0 + j) % n for j in range(s, k)])
             else: k += 1
-        for rm in rami:   # dove ogni ramo passa il bordo (il cerchio)
-            seq = rm['seq']; ang = None
+        w3 = int(3 / RB_PASSO); libero = lambda k_: bool(fin[k_]) and not any(gap[(k_ + d2) % n] for d2 in range(-w3, w3 + 1))
+        kof = lambda a_: int(round(math.degrees(a_) % 360 / RB_PASSO)) % n
+
+        def bordo(kA, kB):
+            """il bordo esterno fra i raggi kA e kB (un'apertura, o un punto se kA == kB): dai punti veri del bordo da 3 a 15 gradi fuori dai due capi (con meno di
+            10 punti, quelli entro 50 gradi dal mezzo). Un cerchio (minimi quadrati) se ci sta bene, se no il raggio come parabola dell'angolo (un anello schiacciato).
+            Rende r(angolo) dal centro C e lo scarto dei punti veri"""
+            ks = [(kA - d_) % n for d_ in range(w3, 5 * w3 + 1) if libero((kA - d_) % n)] + [(kB + d_) % n for d_ in range(w3, 5 * w3 + 1) if libero((kB + d_) % n)]
+            km = (kA + ((kB - kA) % n) // 2) % n
+            if len(ks) < 10: ks = [(km + dk) % n for dk in range(-int(50 / RB_PASSO), int(50 / RB_PASSO) + 1) if libero((km + dk) % n)]
+            if len(ks) < 6: ks = [k_ for k_ in range(n) if fin[k_] and not gap[k_]]
+            P_ = Pe[ks]; cl, rl, sl = _cerchio(P_)
+            if len(ks) >= 12:   # una seconda volta senza i punti lontani dal primo cerchio (il raccordo di un altro ramo, un passo carraio)
+                res_ = np.abs(np.hypot(*(P_ - cl).T) - rl); ks = [k_ for k_, r_ in zip(ks, res_) if r_ <= max(0.15, 2.5 * sl)]
+                P_ = Pe[ks]; cl, rl, sl = _cerchio(P_)
+            dth = np.array([((th[k_] - th[km] + math.pi) % (2 * math.pi)) - math.pi for k_ in ks]); rr = r_out[ks]
+            cf = np.polyfit(dth, rr, 2 if len(ks) >= 6 else 0); sq = float(np.sqrt(np.mean((np.polyval(cf, dth) - rr) ** 2)))
+            if sl <= sq + 0.02 and abs(rl - rg) < 0.5 * rg:
+                return (lambda a_: _sul_cerchio(C, np.array([math.cos(a_), math.sin(a_)]), cl, rl) or float(np.polyval(cf, ((a_ - th[km] + math.pi) % (2 * math.pi)) - math.pi))), sl
+            return (lambda a_: float(np.polyval(cf, ((a_ - th[km] + math.pi) % (2 * math.pi)) - math.pi))), sq
+
+        def passa(seq, rfun):
+            """dove la via (dal nodo sull'anello verso fuori) passa il bordo r = rfun(angolo): il punto e l'angolo, o None"""
+            ev = lambda p_: math.dist(p_, C) - rfun(math.atan2(p_[1] - C[1], p_[0] - C[0]))
             for a_, b_ in zip(seq, seq[1:]):
-                ra, rb = math.dist(a_, cg), math.dist(b_, cg)
-                if ra <= rg <= rb:
-                    f = (rg - ra) / ((rb - ra) or 1); ang = math.atan2(a_[1] + (b_[1] - a_[1]) * f - C[1], a_[0] + (b_[0] - a_[0]) * f - C[0]); break
-            if ang is None and math.dist(seq[0], cg) > rg: ang = math.atan2(seq[0][1] - C[1], seq[0][0] - C[0])
-            rm['k'] = int(round(math.degrees(ang) % 360 / RB_PASSO)) % n if ang is not None else None
+                fa, fb_ = ev(a_), ev(b_)
+                if fa <= 0 <= fb_:
+                    f = -fa / ((fb_ - fa) or 1); P_ = (a_[0] + (b_[0] - a_[0]) * f, a_[1] + (b_[1] - a_[1]) * f); return P_, math.atan2(P_[1] - C[1], P_[0] - C[0])
+            return None
+
+        for rm in rami:   # dove ogni ramo passa il bordo
+            k_n = kof(math.atan2(rm['seq'][0][1] - C[1], rm['seq'][0][0] - C[0]))
+            rfun0, _s = bordo(k_n, k_n); ps = passa(rm['seq'], rfun0)
+            rm['k'] = kof(ps[1]) if ps is not None else None
+
+        def ripiego(rm):
+            """un ingresso che le aperture non hanno dato (corsia stretta, il ramo non cade in un'apertura, il bordo non tondo): la linea sul bordo dove il ramo
+            lo passa, larga quanto la carreggiata del ramo lì (dal DBGT, 3 m fuori dal bordo): dal cordolo destro all'asse (doppio senso) o all'altro cordolo"""
+            k_n = rm['k'] if rm['k'] is not None else kof(math.atan2(rm['seq'][0][1] - C[1], rm['seq'][0][0] - C[0]))
+            rfun, sl = bordo(k_n, k_n); ps = passa(rm['seq'], rfun)
+            if ps is None:
+                a_c = th[k_n]; Pc = C + np.array([math.cos(a_c), math.sin(a_c)]) * rfun(a_c)
+            else: Pc, a_c = np.array(ps[0]), ps[1]
+            uo = np.array([math.cos(a_c), math.sin(a_c)])   # fuori dall'anello
+            for a_, b_ in zip(rm['seq'], rm['seq'][1:]):   # il verso del ramo dove passa il bordo
+                if math.dist(b_, C) > math.dist(Pc, C) + 0.1: uo = np.array(b_) - np.array(a_); uo = uo / (np.hypot(*uo) or 1); break
+            din = -uo; nr_ = np.array([-din[1], din[0]])   # chi entra e la sua destra
+            Q = Pc + uo * 3.0; dr = dl = rm['r']['mh']
+            if clip.contains(Point(*Q)):
+                h1 = _bordo_vicino(clip, tuple(Q), tuple(nr_), 12.0); h2 = _bordo_vicino(clip, tuple(Q), tuple(-nr_), 12.0)
+                if h1: dr = h1[0]
+                if h2: dl = h2[0]
+            rr = rfun(a_c) or r_ax
+            # la destra di chi entra e' il lato degli angoli piu' piccoli
+            a0 = a_c - dr / rr; a1 = a_c if rm['usc'] else a_c + dl / rr
+            if a1 - a0 < 1.5 / rr: a1 = a0 + 1.5 / rr
+            lin = arco(C, rr, a0, a1, C, rfun)
+            emetti(lin, rm, C, rr, clip); cnt['linea di ripiego: ' + rm.get('motivo', 'il ramo non cade in un\'apertura')] += 1
+
         dk_ = lambda a, b: min(abs(a - b), n - abs(a - b))
-        for ap in aperture:
+        # ogni ramo nella sua apertura: la piu' vicina a dove passa il bordo, entro 8 gradi (l'asse di OSM puo' passare sul naso dell'isola)
+        ap_di = {}
+        for q_, rm in enumerate(rami):
+            if rm['k'] is None: continue
+            dd_ = [(min(dk_(rm['k'], k_) for k_ in ap), ia_) for ia_, ap in enumerate(aperture) if len(ap) >= 4]
+            if dd_ and min(dd_)[0] <= int(8 / RB_PASSO): ap_di[q_] = min(dd_)[1]
+        for ia_ap, ap in enumerate(aperture):
             if len(ap) < 4: continue
-            # dentro l'apertura i raggi fermati presto (un cordolo fra due rami) o da un'isola spartitraffico la dividono in passaggi
+            # dentro l'apertura i raggi fermati da un'isola spartitraffico (o presto, da un cordolo fra due rami) la dividono in passaggi; se cosi' non resta
+            # niente (un ramo di traverso: i raggi escono presto dai suoi lati) contano solo le isole, e senza isole l'apertura e' un passaggio solo
             ferm = [bool(fin[k_] and (r_out[k_] - rc[k_] < RB_FERMO or (isl_hit[k_] and r_out[k_] - rc[k_] < 20))) for k_ in ap]
-            if all(ferm): continue   # un'insenatura, non un ramo
+            if all(ferm): ferm = [bool(fin[k_] and isl_hit[k_] and r_out[k_] - rc[k_] < 20) for k_ in ap]
+            if all(ferm): ferm = [False] * len(ap)
             passaggi = []; j = 0
             while j < len(ap):
                 if not ferm[j]:
@@ -570,7 +653,7 @@ def rotonde(nodes, car_nodes, anelli, STR, inside, log, misure=None, crossings=(
             m_ = len(passaggi)
             pos_ = {}   # dove passa ogni ramo: nel passaggio i (2 i) o nel tratto fermato fra i e i + 1 (2 i + 1)
             for q_, rm in enumerate(rami):
-                if rm['k'] is None or min(dk_(rm['k'], k_) for k_ in ap) > 2: continue
+                if ap_di.get(q_) != ia_ap: continue
                 ia = min(range(len(ap)), key=lambda i_: dk_(ap[i_], rm['k'])); sl_ = 0
                 for pi_, (s, e) in enumerate(passaggi):
                     if s <= ia <= e: sl_ = 2 * pi_
@@ -594,36 +677,141 @@ def rotonde(nodes, car_nodes, anelli, STR, inside, log, misure=None, crossings=(
                 elif occ[sl_] == 1 and pi_ < m_ - 1 and occ[sl_ + 2] == 0: ingressi.setdefault(pi_, (rm, None, 'isola'))
                 else: ingressi.setdefault(pi_, (rm, ia, 'mezzeria'))
             for pi_, (rm, fino, fine) in sorted(ingressi.items()):
+                if rm.get('fatto'): continue
                 s, e = passaggi[pi_]
                 if fino is not None: e = int(min(max(fino, s + round((e - s) * 0.25)), s + round((e - s) * 0.75)))   # la mezzeria: fra un quarto e tre quarti del passaggio
-                if e - s < 2: solo_cartello(rm, 'ingressi senza linea: corsia stretta'); continue
-                cnt['ingressi'] += 1; cnt['linea fino a: ' + fine] += 1
-                # il bordo qui: il cerchio sui punti veri del bordo da 3 a 15 gradi fuori dai due capi dell'apertura (non in un'apertura ne' a 3 gradi da una): la
-                # linea continua il bordo che c'e' ai due lati; con meno di 10 punti, quelli entro 50 gradi. Un bordo che non sta su un cerchio (scarto oltre
-                # 0,3 m: un anello schiacciato) non ha la linea
-                w3 = int(3 / RB_PASSO); libero = lambda k_: fin[k_] and not any(gap[(k_ + d2) % n] for d2 in range(-w3, w3 + 1))
-                vic = [Pe[(ap[0] - d_) % n] for d_ in range(w3, 5 * w3 + 1) if libero((ap[0] - d_) % n)] + [Pe[(ap[-1] + d_) % n] for d_ in range(w3, 5 * w3 + 1) if libero((ap[-1] + d_) % n)]
-                if len(vic) < 10:
-                    kc = ap[(s + e) // 2]; vic = [Pe[(kc + dk) % n] for dk in range(-int(50 / RB_PASSO), int(50 / RB_PASSO) + 1) if libero((kc + dk) % n)]
-                cl, rl, sl = _cerchio(vic) if len(vic) >= 10 else (cg, rg, sg)
-                if len(vic) < 10 or abs(rl - rg) > 0.5 * rg: cl, rl, sl = cg, rg, sg
-                if sl > 0.3: solo_cartello(rm, 'ingressi senza linea: il bordo non sta su un cerchio'); continue
+                if e - s < 2: rm['motivo'] = 'corsia stretta'; continue
+                rfun, sl = bordo(ap[0], ap[-1])
                 a0 = th[ap[s]] - math.radians(RB_PASSO) / 2; a1 = th[ap[e]] + math.radians(RB_PASSO) / 2
                 if a1 < a0: a1 += 2 * math.pi
-                rfun = None
-                lin = arco(cl, rl, a0, a1, C, rfun)
-                if len(lin) < 3 or math.dist(lin[0], lin[-1]) < 1.5: solo_cartello(rm, 'ingressi senza linea: corsia stretta'); continue
+                rr = rfun((a0 + a1) / 2) or r_ax
+                lin = arco(C, rr, a0, a1, C, rfun)
+                if len(lin) < 3 or math.dist(lin[0], lin[-1]) < 1.5: rm['motivo'] = 'corsia stretta'; continue
                 inc = float(np.mean(shapely.contains_xy(clip, np.array(lin)[:, 0], np.array(lin)[:, 1])))
-                if inc < 0.95: solo_cartello(rm, 'ingressi senza linea: uscirebbe dalla carreggiata'); continue
+                if inc < 0.95: rm['motivo'] = 'la linea dell\'apertura usciva dalla carreggiata'; continue
+                cnt['ingressi'] += 1; cnt['linea fino a: ' + fine] += 1
                 if misure is not None:   # quanto la linea continua il bordo vero: i punti veri del bordo da 3 a 15 gradi fuori dall'apertura, dalla parte dove la linea arriva al capo
-                    rl_at = lambda k_: (rfun(th[k_]) if rfun is not None else (_sul_cerchio(C, UU[k_], cl, rl) or 0))
                     de = []
                     for k_ in ([(ap[0] - d_) % n for d_ in range(w3, 5 * w3)] if s == 0 else []) + ([(ap[-1] + d_) % n for d_ in range(w3, 5 * w3)] if e == len(ap) - 1 else []):
-                        if fin[k_] and not gap[k_]: de.append(abs(r_out[k_] - rl_at(k_)))
-                    a_lo, a_hi = a0 % (2 * math.pi), a1 % (2 * math.pi)
+                        if fin[k_] and not gap[k_]: de.append(abs(r_out[k_] - rfun(th[k_])))
                     sopra = [q2 for q2 in rami if q2['usc'] and not q2['ent'] and q2['k'] is not None and ((a0 < th[q2['k']] < a1) or (a0 < th[q2['k']] + 2 * math.pi < a1))]
-                    misure.append(dict(x=float(C[0]), z=float(C[1]), d_capi=de, scarto=sl, fine=fine, sopra_uscita=len(sopra), interp=rfun is not None,
-                                       in_carr=float(np.mean([clip.contains(Point(*q_)) for q_ in lin])), lin=[list(map(float, q_)) for q_ in lin]))
-                emetti(lin, rm, cl, rl, clip)
+                    misure.append(dict(x=float(C[0]), z=float(C[1]), d_capi=de, scarto=sl, fine=fine, sopra_uscita=len(sopra), interp=False,
+                                       in_carr=inc, lin=[list(map(float, q_)) for q_ in lin]))
+                emetti(lin, rm, C, rr, clip)
+        for rm in rami:   # ogni ingresso ha la sua linea (Carlo, 3/11): quelli che le aperture non hanno dato, sul bordo dove il ramo lo passa
+            if rm['ent'] and not rm.get('fatto'):
+                cnt['ingressi'] += 1; ripiego(rm)
+    if controllo is not None:   # il controllo di fine build: gli ingressi delle rotonde nell'area (Meda e Seveso) senza linea
+        for C_, rm in tutti:
+            if not rm['ent']: continue
+            P_ = rm['seq'][0]
+            if area is not None and not area.contains(Point(*P_)): continue
+            controllo.append(dict(x=round(P_[0], 1), z=round(P_[1], 1), ok=bool(rm.get('fatto')), motivo=rm.get('motivo', '')))
     log('rotonde', len(out), dict(cnt))
     return out
+
+
+# ---------------------------------------------------------------------------------------------------------------- dare precedenza e stop di OSM, controllo
+"""Ogni give_way e stop di OSM (nodi highway=give_way/stop, col loro direction) ha la sua linea (Carlo, 3/11), anche fuori dalle rotonde e dove la via di
+OSM non e' fra quelle del gioco: linee() la mette sul ramo dell'incrocio, rotonde() sul bordo dell'anello; qui si guarda che ogni nodo ne abbia una davanti
+(entro 30 m nel verso del traffico, parallela) e, se manca, la si mette sul nodo stesso, di traverso alla via, sulla carreggiata del DBGT."""
+
+
+def nodi_osm(nodes, ntags, vie_osm, la, lr, STR, inside, log, area=None, controllo=None):
+    """la: le righe [k, x, z, dx, dz, s0, s1, c] gia' fatte; lr: le righe delle rotonde. Rende le righe 'la' da aggiungere"""
+    from shapely.geometry import Point
+    cnt = collections.Counter(); nuove = []
+    U = getattr(STR, 'U_carr', None) if STR is not None else None
+    at = collections.defaultdict(list)
+    for v in vie_osm:
+        for i_, n_ in enumerate(v['refs']): at[n_].append((v, i_))
+    deg = lambda n_: sum(2 if 0 < i_ < len(v['refs']) - 1 else 1 for v, i_ in at.get(n_, ()))
+    RANGO = {'motorway': 0, 'trunk': 0, 'primary': 1, 'secondary': 2, 'tertiary': 3, 'unclassified': 4, 'residential': 4, 'living_street': 5, 'service': 6,
+             'motorway_link': 0, 'trunk_link': 0, 'primary_link': 1, 'secondary_link': 2, 'tertiary_link': 3, 'road': 4}
+    LA = [(np.array(r[1:3], float), np.array(r[3:5], float)) for r in la if r[0] in (0, 1)]
+    LR = []
+    for r in lr:
+        if not r[0]: continue
+        P_ = np.array(r[0], float).reshape(-1, 2) / 100; LR.append((P_, np.array(r[3][2:4], float)))
+
+    def coperto(P, d):
+        for R_, dr_ in LA:
+            q_ = R_ - P; al = q_ @ d; lat = abs(q_[0] * -d[1] + q_[1] * d[0])
+            if -6 <= al <= 30 and lat < 8 and dr_ @ d > 0.7: return 'linea all\'incrocio'
+        for L_, uin in LR:
+            q_ = L_ - P; al = q_ @ d; lat = np.abs(q_[:, 0] * -d[1] + q_[:, 1] * d[0])
+            if (((al >= -6) & (al <= 35) & (lat < 12)).any()) and uin @ d > 0.3: return 'linea della rotonda'
+        return None
+
+    def al_nodo(k, P, d, v):
+        """la linea sul nodo, di traverso alla via: dal bordo destro alla mezzeria (doppio senso) o all'altro bordo, sulla carreggiata del DBGT"""
+        nr_ = np.array([-d[1], d[0]])
+        if U is None: return None, 'senza DBGT'
+        if not U.contains(Point(*P)):
+            Pn = None
+            for t_ in np.arange(0.25, 8.01, 0.25):
+                for sg_ in (-1, 1):
+                    q_ = P + nr_ * t_ * sg_
+                    if U.contains(Point(*q_)): Pn = q_; break
+                if Pn is not None: break
+            if Pn is None: return None, 'il nodo non e\' su una carreggiata del DBGT'
+            P = Pn
+        h1 = _bordo_vicino(U, tuple(P), tuple(nr_), v['w'] / 2 + 3); h2 = _bordo_vicino(U, tuple(P), tuple(-nr_), v['w'] / 2 + 3)
+        dr = h1[0] if h1 else v['mh']; dl = h2[0] if h2 else v['mh']
+        s1 = dr; s0 = -dl if v['o'] else (dr - dl) / 2
+        if s1 - s0 < 1.5: return None, 'carreggiata stretta'
+        c = _tipo(v) | (4 if _grande(v) else 0); sm = (s0 + s1) / 2
+        ext = (STOP_D + STOP_L + 0.3) if k == 0 else (14.0 if _grande(v) else 5.5)
+        if (s1 - s0) >= (STOP_W + 0.2 if k == 0 else (2.0 if _grande(v) else 1.0) + 0.2) and all(U.contains(Point(*(P - d * uu + nr_ * ss))) for uu in (0, ext) for ss in (sm - 0.9, sm, sm + 0.9)): c |= 8
+        return [k, round(float(P[0]), 1), round(float(P[1]), 1), round(float(d[0]), 3), round(float(d[1]), 3), round(float(s0), 2), round(float(s1), 2), c], None
+
+    for nid, t in sorted(ntags.items()):
+        if t.get('highway') not in ('give_way', 'stop') or nid not in nodes or not inside(nodes[nid], 0): continue
+        p = np.array(nodes[nid], float)
+        if area is not None and not area.contains(Point(*p)): continue
+        k = 0 if t['highway'] == 'stop' else 1
+        rami = []   # (punto, verso del traffico, via)
+        if nid not in at: cnt['senza via per auto in OSM'] += 1; controllo is not None and controllo.append(dict(x=round(p[0], 1), z=round(p[1], 1), ok=False, motivo='il nodo non e\' su una via per auto')); continue
+        if deg(nid) >= 3:   # sull'incrocio: le vie minori che ci arrivano
+            peggio = max(RANGO.get(v['hw'], 6) for v, i_ in at[nid])
+            for v, i_ in at[nid]:
+                if RANGO.get(v['hw'], 6) != peggio: continue
+                for j in (i_ - 1, i_ + 1):
+                    if not (0 <= j < len(v['refs'])) or (v['o'] and j > i_): continue
+                    q = np.array(nodes[v['refs'][j]], float); L = float(np.hypot(*(p - q))) or 1.0; d = (p - q) / L
+                    rami.append((p - d * min(5, L * 0.6), d, v))
+        else:
+            v, i_ = at[nid][0]; refs = v['refs']; dirn = t.get('direction')
+            cands = []
+            for passo in (1, -1):
+                if v['o'] and passo == -1: continue
+                j = i_
+                while 0 <= j + passo < len(refs):
+                    j += passo
+                    if deg(refs[j]) >= 3: cands.append((passo, j)); break
+            if v['o']: cands = cands or [(1, len(refs) - 1)]
+            elif dirn in ('forward', 'backward'):
+                want = 1 if (dirn == 'forward') != v.get('dir', False) else -1
+                cands = [c_ for c_ in cands if c_[0] == want] or [(want, len(refs) - 1 if want == 1 else 0)]
+            else: cands.sort(key=lambda c_: math.dist(nodes[refs[c_[1]]], p))
+            if not cands: cnt['senza verso'] += 1; controllo is not None and controllo.append(dict(x=round(p[0], 1), z=round(p[1], 1), ok=False, motivo='verso ignoto (nessun incrocio sulla via)')); continue
+            passo, j = cands[0]; jn = i_ + passo if 0 <= i_ + passo < len(refs) else j
+            q = np.array(nodes[refs[jn]], float); L = float(np.hypot(*(q - p))) or 1.0
+            rami.append((p, (q - p) / L, v))
+        ok_tutti = True; motivi = []
+        for P, d, v in rami:
+            if coperto(P, d): cnt['gia\' con la linea'] += 1; continue
+            riga, perche = al_nodo(k, P, d, v)
+            if riga is None: ok_tutti = False; motivi.append(perche); cnt['senza linea: ' + perche] += 1; continue
+            nuove.append(riga); LA.append((np.array(riga[1:3], float), np.array(riga[3:5], float))); cnt['linea sul nodo'] += 1
+        if controllo is not None: controllo.append(dict(x=round(float(p[0]), 1), z=round(float(p[1]), 1), ok=ok_tutti, motivo=', '.join(motivi)))
+    log('dare precedenza e stop di OSM', len(nuove), 'linee aggiunte', dict(cnt))
+    return nuove
+
+
+def stampa_controllo(rot, nod, log, porta=8013):
+    """il controllo di fine build (Carlo, 3/11): nell'area, ingressi di rotonda senza linea = 0 e dare/stop di OSM senza linea = 0, se no l'elenco"""
+    for nome, L in (('ingressi di rotonda', rot), ('dare precedenza e stop di OSM', nod)):
+        no = [e for e in L if not e['ok']]
+        log('CONTROLLO segnaletica: %s nell\'area %d, senza linea %d' % (nome, len(L), len(no)))
+        for e in no: log('   senza linea: %s  http://127.0.0.1:%d/?x=%.1f&z=%.1f&piedi' % (e['motivo'] or '?', porta, e['x'], e['z']))

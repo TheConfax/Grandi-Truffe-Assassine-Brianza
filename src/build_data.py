@@ -1750,8 +1750,21 @@ for nd_, t_ in list(ways.values()) + [([r_], t) for r_, t in ntags.items()]:
     _pp = [nodes[n_] for n_ in nd_ if n_ in nodes]
     if _pp: _banchine.append(((sum(p_[0] for p_ in _pp) / len(_pp), sum(p_[1] for p_ in _pp) / len(_pp)), 'pensilina' if t_.get('amenity') == 'shelter' else 'banchina'))
 _vie_nodo = Counter(n_ for nd_, t_ in ways.values() if t_.get('highway') in ('motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'living_street', 'service', 'track', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link') for n_ in set(nd_))  # a junction or a driveway on the road: no bus stop zone over it
+# the OSM ways for cars as OSM has them (for src/segn_orizz.py: the arms of the roundabouts and the way of each give way / stop node): raw_roads leaves out
+# some (a way near a deck, via Cadorna x 120 z 20) and the DBGT axes renumber others. refs in the way of the traffic for oneway=-1; w as the streets above
+_vie_osm = []
+for _wid, (_nd, _t) in ways.items():
+    _hw = _t.get('highway')
+    if _hw not in DRIVE or _hw in ('pedestrian',) or _t.get('area') == 'yes' or len(_nd) < 2 or not all(n_ in nodes for n_ in _nd): continue
+    _w = num(_t.get('width'))
+    if not _w or _w > 30:
+        _ln = num(_t.get('lanes')); _w = DRIVE[_hw]
+        if _ln: _w = max(_w, min(_ln, 4) * 3.4)
+    _ms = num(_t.get('maxspeed')) if str(_t.get('maxspeed', '')).replace('.', '').isdigit() else None
+    _vie_osm.append({'id': _wid, 'refs': list(_nd[::-1]) if _t.get('oneway') == '-1' else list(_nd), 'hw': _hw, 'o': _t.get('oneway') in ('yes', '1', 'true', '-1') or _t.get('junction') in ('roundabout', 'circular') or _hw in ('motorway', 'motorway_link'),
+                     'rb': _t.get('junction') in ('roundabout', 'circular'), 'w': _w, 'mh': _w / 2, 'ms': _ms, 'dir': _t.get('oneway') == '-1'})
 if os.environ.get('GTA_DUMP_SEGN'):  # per rifare le linee e le fermate senza una build intera (prova di src/segn_orizz.py): si salva e si esce
-    import pickle; pickle.dump(dict(nodes=nodes, ntags=ntags, car_nodes=car_nodes, crossings=crossings, R=STR.R, CV=STR.CV, HW=HW, HH=HH, U_carr=STR.U_carr, isole=STR.isole, anelli=_anelli, banchine=_banchine), open(os.environ['GTA_DUMP_SEGN'], 'wb')); sys.exit(0)
+    import pickle; pickle.dump(dict(nodes=nodes, ntags=ntags, car_nodes=car_nodes, crossings=crossings, R=STR.R, CV=STR.CV, HW=HW, HH=HH, U_carr=STR.U_carr, isole=STR.isole, anelli=_anelli, banchine=_banchine, vie_osm=_vie_osm, vie_nodo=_vie_nodo, cover=STR.cover), open(os.environ['GTA_DUMP_SEGN'], 'wb')); sys.exit(0)
 for row in rows:
     for a, b in zip(row, row[1:]):
         L = math.dist(a, b)
@@ -2251,16 +2264,33 @@ for ri, r in enumerate(raw_roads):  # road pieces per tile (for markings and dec
 for x, z, dx, dz, w in crossings: push(tid(x, z), 'cr', [q(x), q(z), round(dx, 3), round(dz, 3), round(w, 1)])
 # stop lines, give way triangles and the lines at traffic lights (src/segn_orizz.py, DPR 495/1992 art. 144 and 148): tile key 'la'
 import segn_orizz
-for k_, x_, z_, dx_, dz_, s0_, s1_, c_ in segn_orizz.linee(nodes, ntags, car_nodes, json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8')), crossings, STR, inside, log):
-    push(tid(x_, z_), 'la', [k_, q(x_), q(z_), dx_, dz_, s0_, s1_, c_])
-for r_ in segn_orizz.fermate(nodes, ntags, car_nodes, STR, inside, log, _banchine, _vie_nodo, crossings=crossings): push(tid(r_[2][0] / 100, r_[2][1] / 100), 'fb', r_)
+_la = segn_orizz.linee(nodes, ntags, car_nodes, json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8')), crossings, STR, inside, log)
+_fermate_tolte = set()   # the same stop mapped twice on the same side: one zone, one shelter
+for r_ in segn_orizz.fermate(nodes, ntags, car_nodes, STR, inside, log, _banchine, _vie_nodo, crossings=crossings, tolte=_fermate_tolte): push(tid(r_[2][0] / 100, r_[2][1] / 100), 'fb', r_)
 # the give way at every entry of every roundabout, on the outer edge of the ring, with its sign (tile key lr, in the tile of the sign)
-for r_ in segn_orizz.rotonde(nodes, car_nodes, _anelli, STR, inside, log, crossings=crossings): push(tid(r_[3][0] / 100, r_[3][1] / 100), 'lr', r_)
+_ctl_rot, _ctl_nodi = [], []   # the check at the end (Carlo, 3/11): in Meda and Seveso (the DBGT) every roundabout entry and every OSM give way / stop has its line
+_lr = segn_orizz.rotonde(nodes, _vie_osm, _anelli, STR, inside, log, crossings=crossings, area=STR.cover if STR else None, controllo=_ctl_rot)
+for r_ in _lr: push(tid(r_[3][0] / 100, r_[3][1] / 100), 'lr', r_)
+# the OSM give way and stop nodes without a line in front of them: the line on the node itself
+_la += segn_orizz.nodi_osm(nodes, ntags, _vie_osm, _la, _lr, STR, inside, log, area=STR.cover if STR else None, controllo=_ctl_nodi)
+for k_, x_, z_, dx_, dz_, s0_, s1_, c_ in _la: push(tid(x_, z_), 'la', [k_, q(x_), q(z_), dx_, dz_, s0_, s1_, c_])
+segn_orizz.stampa_controllo(_ctl_rot, _ctl_nodi, log)
+# one sign for each roundabout entry (Carlo, 3/11): the signs of segnaletica.json that stand on its post (within 2 m) or say the same to the same drivers
+# (give way, stop or roundabout within 15 m, facing them) are not drawn (tile key sx: their index in SEGN, in their tile); Mapillary takes them as already there
+_segn_all = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8')); _n_sx = 0
+_lr_sg = [(r_[3][0] / 100, r_[3][1] / 100, r_[3][2], r_[3][3]) for r_ in _lr]
+for i_, sg_ in enumerate(_segn_all):
+    if sg_[0] == 'isola': continue
+    for x_, z_, dx_, dz_ in _lr_sg:
+        dd_ = math.hypot(sg_[1] - x_, sg_[2] - z_)
+        if dd_ < 2.0 or (sg_[0] in ('dare', 'stop', 'rotatoria') and dd_ < 15 and sg_[3] * dx_ + sg_[4] * dz_ > 0.5):
+            push(tid(sg_[1], sg_[2]), 'sx', i_); _n_sx += 1; break
+log('cartelli di segnaletica.json tolti come doppioni di quelli delle rotonde', _n_sx)
 # ---- Mapillary (src/mapillary_obj.py, docs/dati.md): the signs, lamps, traffic lights, poles and bins the photos saw, confirmed, snapped to the kerb
 # and without doubles with what OSM already gives; the same rules for every comune. Signs go to the tile as 'sm', the lamps join 'lp', the poles and
 # bins join 'og', the traffic lights add junction nodes to 'signals'
 import mapillary_obj
-_ctl_osm_segn = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8'))
+_ctl_osm_segn = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8')) + [['rotatoria', x_, z_, dx_, dz_, 'dare'] for x_, z_, dx_, dz_ in _lr_sg]  # the roundabout signs too: Mapillary adds no second one
 _ctl_incroci = [(r_, nodes[r_]) for r_, l_ in car_nodes.items() if r_ in node_index and r_ in nodes and sum(2 if 0 < i_ < len(r__['refs']) - 1 else 1 for r__, i_ in l_ if r__['c'] <= 5) >= 3]
 MAPI = mapillary_obj.elabora(DATA, proj, inside, _segs, _segtree, STR, [g_ for g_ in (P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9) if g_ is not None],
                              _ctl_osm_segn, lamps, ogg, OGG, [nodes[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and inside(nodes[r_], 0)],
@@ -2340,7 +2370,7 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'nodes': [c for n_ in NODES for c in n_], 'roads': out_roads, 'names': names, 'tiles': tiles,
        'trains': [{'p': enc(t['pts']), 'st': t['st'], 'stn': t['stn'], 'h': [q(coordH[key(p_)]) if key(p_) in coordH else -32768 for p_ in t['pts']]} for t in trains],
        'pois': pois, 'ng': negozi, 'gates': gate_out, 'doors': doors_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index] + signals_extra,
-       'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0)]}
+       'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0) and r_ not in _fermate_tolte]}
 if ROT: out.setdefault('report', {})['rotonde'] = ROT.rep
 if ED:  # the buildings of the DBGT: entrances, checks, report
     for x_, z_ in ED.acc:
