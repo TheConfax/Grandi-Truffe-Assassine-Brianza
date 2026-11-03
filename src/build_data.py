@@ -2067,7 +2067,7 @@ for r in raw_roads:
     if r.get('under'): rec['u'] = 1
     if r.get('pk'): rec['pk'] = r['pk']
     if r.get('pv'): rec['pv'] = 1  # over a yard of the DBGT (AC_VEI 0307): no AI traffic (src/dbgt_strade.py privati)
-    if r.get('sg'): rec['sg'] = 1  # its markings are in tiles[].sg (dbgt_righe.py): none on its axis
+    if r.get('sg'): rec['sg'] = 1 if r['sg'] is True else [int(v) for v in r['sg']]  # its markings are in tiles[].sg (dbgt_righe.py): none on its axis (a list: per segment, 0 where none of them runs there)
     if r.get('w_osm') is not None: rec['wd'] = 1  # w is the carriageway of the DBGT (AC_VEI): the markings go by it, mh is the lanes' room
     for k_ in ('lf', 'lb'):  # the AI lanes node by node: from the carriageway of the DBGT (dbgt_strade.py corsie_locali), away from the obstacles (corsie_ia.py)
         if r.get(k_) and len(r[k_]) == len(r['refs']): rec[k_] = r[k_]
@@ -2180,6 +2180,7 @@ _pst = _op.ponti_sopra(_Dop)   # what is of the road over a bridge does not lie 
 _sf, _isole_, bar_out = _op.senza_strada_di_sopra(_pst, dict(asph=asph, pedz=pedz, side=side, foot=foot), STR.md_dbgt if STR else None, bar_out, log)
 asph, pedz, side, foot = _sf['asph'], _sf['pedz'], _sf['side'], _sf['foot']
 if STR: STR.md_dbgt = _isole_
+_md_ponte = _op.senza_strada_di_sopra.sul_ponte   # the islands of the road over a bridge, for its deck
 if not median.is_empty: median = _op.senza_strada_di_sopra(_pst, {}, median, [], log)[1]
 area_geoms[:] = [(at, g.difference(_via) if g.intersects(_via) else g) for at, g in area_geoms]
 log('sottopassi', len(_sott), 'vernice tolta m2', round(_via.area))
@@ -2248,6 +2249,11 @@ import rotonde  # the aiuole of the roundabouts of Meda (src/rotonde.py, docs/ro
 ROT = rotonde.Rotonde(STR.isole, log) if STR else None
 if ROT: STR.md_dbgt = ROT.riempi(STR.md_dbgt); ROT.push_tiles(tid, polys_of, push, q)
 if STR: STR.togli_cortili(VERDE.cons, _cv_f.result()); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
+if _md_ponte is not None and not _md_ponte.is_empty:   # (dk: on the deck of the bridge, at its height: src/opere.py senza_strada_di_sopra, world3.js medianDeck)
+    for t in range(ntx * ntz):
+        bx = tbox(t)
+        if _md_ponte.intersects(bx):
+            for p_ in polys_of(_md_ponte.intersection(bx), 0.15, 0.5): p_.update({'g': 1, 'dk': 1, 'v': 1}); push(t, 'md', p_)   # (grass, as it was on the ground)
 if RIGHE: RIGHE = _op.righe_opere(_sott, RIGHE, log)   # the lines go on along the underpasses (src/opere.py)
 if RIGHE: dbgt_righe.push_tiles(RIGHE, ntx * ntz, tbox, push)  # the road markings (sg)
 if FER:  # the rail bed (sf)

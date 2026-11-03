@@ -30,6 +30,9 @@ from shapely.strtree import STRtree
 from scipy.ndimage import gaussian_filter1d, median_filter, minimum_filter1d, maximum_filter1d
 
 TRONCO = ('01', '0101', '0102', '0103', '0105')
+INCROCIO = '0205'   # the junction areas: the lines run through them along the carriageway, not across the streets that cross it (Carlo 3/11:
+                    # corso Isonzo at x 305 z 1988 and via Montecassino at both mouths of the trench lie in junction areas 30-50 m long, and had no line)
+TRONCO_R = TRONCO + (INCROCIO,)
 BORDO = 0.35        # edge lines this far inside the edge of the carriageway (centre of a 0.15 m line)
 PASSO = 1.0         # samples along a stroke
 RMAX = 20.0         # rays across the carriageway
@@ -166,7 +169,7 @@ def strokes(els):
 def righe(STR, raw_roads, nodes, log=print):
     R = STR.R; D = STR.D
     lev = lambda a: 1 if a.get('sed') in ('01', None) else 2
-    TRs = {1: R.draw([g for g, a in D['vei'] if a['zon'] in TRONCO and lev(a) == 1]), 2: R.draw([g for g, a in D['vei'] if a['zon'] in TRONCO and lev(a) == 2])}
+    TRs = {1: R.draw([g for g, a in D['vei'] if a['zon'] in TRONCO_R and lev(a) == 1]), 2: R.draw([g for g, a in D['vei'] if a['zon'] in TRONCO_R and lev(a) == 2])}
     TRs[3] = TRs[1] | TRs[2]
     # the edges exactly: the raster finds the edge within half a metre and leans outwards (edge lines 0.1-0.4 m past the edge), the
     # segments of the boundary of the same union give the distance along the ray
@@ -176,7 +179,7 @@ def righe(STR, raw_roads, nodes, log=print):
             for ring in [p.exterior] + list(p.interiors):
                 c = np.asarray(ring.coords); segs_.append(np.stack((c[:-1], c[1:]), 1))
         S_ = np.concatenate(segs_); return STRtree(shapely.linestrings(S_)), S_[:, 0], S_[:, 1]
-    TB = {1: bordi([g for g, a in D['vei'] if a['zon'] in TRONCO and lev(a) == 1]), 3: bordi([g for g, a in D['vei'] if a['zon'] in TRONCO])}
+    TB = {1: bordi([g for g, a in D['vei'] if a['zon'] in TRONCO_R and lev(a) == 1]), 3: bordi([g for g, a in D['vei'] if a['zon'] in TRONCO_R])}
     def esatto(tb, P, N, d0):
         tree, A, B = tb; d = d0.copy(); m = d0 < RMAX
         if not m.any(): return d
@@ -436,6 +439,29 @@ def righe(STR, raw_roads, nodes, log=print):
         p = np.array(l['p']); m = shapely.contains_xy(STR.U_carr, p[:, 0], p[:, 1]); nfuori += int((~m).sum())
         for i0, i1 in _runs(m, 3): kept.append(dict(l, p=l['p'][i0:i1]))
     lines = kept
+    # in a junction area a line stops where a street crosses it: the parts of a line in a junction area within the carriageway of a street that
+    # crosses it (its OSM axis, w/2 + 1 m, at more than 45 degrees to the line there) are left out
+    inc_ = [g for g, a in D['vei'] if a['zon'] == INCROCIO]
+    if inc_:
+        UI = unary_union(inc_); shapely.prepare(UI); vie_ = [(LineString([nodes[n_] for n_ in r['refs']]), r['w']) for r in raw_roads if r['c'] <= 5 and len(r['refs']) >= 2 and not r.get('bridge') and not r['tunnel']]
+        TV = STRtree([g for g, _ in vie_]); kept = []; ntag = 0
+        for l in lines:
+            p = np.array(l['p'], float)
+            if len(p) < 2: continue
+            m = shapely.contains_xy(UI, p[:, 0], p[:, 1])
+            if not m.any(): kept.append(l); continue
+            d = np.gradient(p, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]; via = np.zeros(len(p), bool)
+            for i in np.nonzero(m)[0]:
+                q = shapely.points(p[i])
+                for j in TV.query(q.buffer(12.0)):
+                    g, w = vie_[j]; dd = g.distance(q)
+                    if dd > w / 2 + 1.0: continue
+                    pr = g.project(q); a_ = np.asarray(g.interpolate(max(pr - 1, 0)).coords[0]); b_ = np.asarray(g.interpolate(min(pr + 1, g.length)).coords[0]); t_ = b_ - a_; t_ /= max(math.hypot(*t_), 1e-9)
+                    if abs(float(t_ @ d[i])) < 0.7: via[i] = True; break
+            if not via.any(): kept.append(l); continue
+            ntag += 1
+            for i0, i1 in _runs(~via, 3): kept.append(dict(l, p=l['p'][i0:i1]))
+        lines = kept; log('dbgt righe: righe tagliate dove una strada attraversa un incrocio %d' % ntag)
     # a line on a carriageway the DBGT has in gallery (AC_VEI SED=03) gets level 3: the game draws it on the floor of the underpass (src/opere.py),
     # not on the ground over it nor on a deck (the dashes of via Montecassino and of x -768 z 103 under the Milano-Meda)
     # (a line of the road over the gallery crosses the same area in plan: only a line running along the carriageway in gallery is its own. The
@@ -472,7 +498,23 @@ def righe(STR, raw_roads, nodes, log=print):
                pieghe_oltre_15=int((bends > 15).sum()), pieghe_oltre_5=int((bends > 5).sum()), piega_max=round(float(bends.max()), 1) if len(bends) else 0,
                pieghe_oltre_15_strade=int((bends_v > 15).sum()), piega_max_strade=round(float(bends_v.max()), 1) if len(bends_v) else 0,
                bordi_delle_rotatorie=nan, punti_doppi_tolti=ndup, punti_fuori_tolti=nfuori, campioni_fuori_carreggiata=out, campioni=tot, sezioni=nsez, sezioni_disegnate=nlead)
-    for ri in K: raw_roads[ri]['sg'] = True   # the game leaves out the old dashes on the axis of these (roads[].sg)
+    # the game leaves out the old dashes on the axis of these (roads[].sg), but only where the lines of the carriageway cover the street: a segment of it
+    # with no line of ours alongside keeps its dashes (Carlo 3/11: corso Isonzo at x 305 z 1988, via Montecassino past the trench, under the Milano-Meda
+    # at x -766 z 65 had no line at all). roads[].sg: 1 all covered, else one flag per segment
+    if lines:
+        LT = STRtree([LineString(l['p']) for l in lines if len(l['p']) >= 2]); LG = [LineString(l['p']) for l in lines if len(l['p']) >= 2]
+    nsc = 0
+    for ri in K:
+        r = raw_roads[ri]; xy = np.array([nodes[n_] for n_ in r['refs']], float); fl = []
+        for a_, b_ in zip(xy[:-1], xy[1:]):
+            m_ = (a_ + b_) / 2; d_ = b_ - a_; L_ = math.hypot(*d_)
+            if not lines or L_ < 0.05: fl.append(1 if lines else 0); continue
+            seg = LineString([a_, b_]); near = [LG[j] for j in LT.query(seg.buffer(r['w'] / 2 + 1.0))]
+            cov = sum(g.intersection(seg.buffer(r['w'] / 2 + 1.0)).length for g in near)
+            fl.append(1 if cov >= 0.6 * L_ else 0)
+        nsc += fl.count(0)
+        r['sg'] = True if all(fl) else fl
+    log('dbgt righe: tratti di strade con righe ma senza righe dalla carreggiata (tengono il tratteggio sull asse) %d' % nsc)
     log('dbgt righe: %s' % rep)
     return lines, rep
 
