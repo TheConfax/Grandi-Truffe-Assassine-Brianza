@@ -104,7 +104,8 @@ function segStopMat() { /* the STOP on the pavement, DPR 495/1992 fig. II.441/b:
 function buildSegnali(T, G) {
   const mk = FBuf(), lettering = FBuf(), WH = COL('#f2f0e8');
   if (T.d.sm && !T.d.smo) T.d.smo = T.d.sm.map((r, i) => { const s = r.slice(); s.i = i; s.place = { px: r[1], pz: r[2], dx: r[3], dz: r[4], hw: 0 }; return s; }); // the signs of Mapillary come with their place (src/mapillary_obj.py): on the kerb, facing the drivers
-  const LIST = SEGN.map((s, i) => [s, i]); for (const s of T.d.smo || []) LIST.push([s, 'm' + T.t + '_' + s.i]);
+  if (T.d.lr && !T.d.lro) T.d.lro = T.d.lr.map((r, i) => { const g = r[3], s = ['rotatoria', g[0] / 100, g[1] / 100, g[2], g[3], 'dare']; s.i = i; if (!g[4]) s.place = { px: s[1], pz: s[2], dx: g[2], dz: g[3], hw: 0 }; return s; }); /* every entry of a roundabout: give way over the roundabout sign, on the right kerb at the line (src/segn_orizz.py rotonde) */
+  const LIST = SEGN.map((s, i) => [s, i]).filter(([s]) => s[0] !== 'rotatoria'); for (const s of T.d.smo || []) LIST.push([s, 'm' + T.t + '_' + s.i]); for (const s of T.d.lro || []) LIST.push([s, 'r' + T.t + '_' + s.i]);
   LIST.forEach(([s, idx]) => {
     const [kind, x, z] = s; if (tileOf(x, z) !== T.t) return;
     let { px, pz, dx, dz, hw } = segPlace(s); const pf_ = s.skip || inBuilding(px, pz, 0.3) ? null : postFree(px, pz); if (pf_) { px = pf_[0]; pz = pf_[1]; } /* never in a wall (world3.js postFree) */

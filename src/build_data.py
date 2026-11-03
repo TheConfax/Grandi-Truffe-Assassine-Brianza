@@ -1741,8 +1741,17 @@ if STR:  # lamps out of the carriageway, crossings as wide as it is where they c
     lamps = [[round(v_, 1) for v_ in (STR.fuori(tuple(l_)) or l_)] for l_ in lamps]
     crossings = [(lambda a_: [a_[0], a_[1]] + c_[2:4] + [a_[2]])(STR.attraversamento(*c_)) for c_ in crossings]  # edge to edge of the carriageway there
 trees = [nodes[r_] for r_, t in ntags.items() if t.get('natural') == 'tree' and inside(nodes[r_], 0)]
+# for src/segn_orizz.py: the rings of the roundabouts (OSM junction=roundabout/circular: which ways they are, nothing more) and where the bus stops have their
+# shelter or platform drawn as a way (OSM amenity=shelter + shelter_type=public_transport, public_transport=platform)
+_anelli = [nd_ for nd_, t_ in ways.values() if t_.get('junction') in ('roundabout', 'circular') and t_.get('highway') and all(n_ in nodes for n_ in nd_)]
+_banchine = []
+for nd_, t_ in list(ways.values()) + [([r_], t) for r_, t in ntags.items()]:
+    if not ((t_.get('amenity') == 'shelter' and t_.get('shelter_type') == 'public_transport') or (t_.get('public_transport') == 'platform' and len(nd_) > 1)): continue
+    _pp = [nodes[n_] for n_ in nd_ if n_ in nodes]
+    if _pp: _banchine.append(((sum(p_[0] for p_ in _pp) / len(_pp), sum(p_[1] for p_ in _pp) / len(_pp)), 'pensilina' if t_.get('amenity') == 'shelter' else 'banchina'))
+_vie_nodo = Counter(n_ for nd_, t_ in ways.values() if t_.get('highway') in ('motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'living_street', 'service', 'track', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link') for n_ in set(nd_))  # a junction or a driveway on the road: no bus stop zone over it
 if os.environ.get('GTA_DUMP_SEGN'):  # per rifare le linee e le fermate senza una build intera (prova di src/segn_orizz.py): si salva e si esce
-    import pickle; pickle.dump(dict(nodes=nodes, ntags=ntags, car_nodes=car_nodes, crossings=crossings, R=STR.R, CV=STR.CV, HW=HW, HH=HH), open(os.environ['GTA_DUMP_SEGN'], 'wb')); sys.exit(0)
+    import pickle; pickle.dump(dict(nodes=nodes, ntags=ntags, car_nodes=car_nodes, crossings=crossings, R=STR.R, CV=STR.CV, HW=HW, HH=HH, U_carr=STR.U_carr, isole=STR.isole, anelli=_anelli, banchine=_banchine), open(os.environ['GTA_DUMP_SEGN'], 'wb')); sys.exit(0)
 for row in rows:
     for a, b in zip(row, row[1:]):
         L = math.dist(a, b)
@@ -2244,7 +2253,9 @@ for x, z, dx, dz, w in crossings: push(tid(x, z), 'cr', [q(x), q(z), round(dx, 3
 import segn_orizz
 for k_, x_, z_, dx_, dz_, s0_, s1_, c_ in segn_orizz.linee(nodes, ntags, car_nodes, json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8')), crossings, STR, inside, log):
     push(tid(x_, z_), 'la', [k_, q(x_), q(z_), dx_, dz_, s0_, s1_, c_])
-for r_ in segn_orizz.fermate(nodes, ntags, car_nodes, STR, inside, log): push(tid(r_[2][0] / 10, r_[2][1] / 10), 'fb', r_)
+for r_ in segn_orizz.fermate(nodes, ntags, car_nodes, STR, inside, log, _banchine, _vie_nodo, crossings=crossings): push(tid(r_[2][0] / 100, r_[2][1] / 100), 'fb', r_)
+# the give way at every entry of every roundabout, on the outer edge of the ring, with its sign (tile key lr, in the tile of the sign)
+for r_ in segn_orizz.rotonde(nodes, car_nodes, _anelli, STR, inside, log, crossings=crossings): push(tid(r_[3][0] / 100, r_[3][1] / 100), 'lr', r_)
 # ---- Mapillary (src/mapillary_obj.py, docs/dati.md): the signs, lamps, traffic lights, poles and bins the photos saw, confirmed, snapped to the kerb
 # and without doubles with what OSM already gives; the same rules for every comune. Signs go to the tile as 'sm', the lamps join 'lp', the poles and
 # bins join 'og', the traffic lights add junction nodes to 'signals'

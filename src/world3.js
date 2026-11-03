@@ -1455,20 +1455,40 @@ function* buildTileGen(T) {
         triUp(lett, i0, i0 + 1, i0 + 2); triUp(lett, i0, i0 + 2, i0 + 3);
       }
     }
-    /* bus stops (src/segn_orizz.py, tile key fb: [dash, kerb, [bx, bz, ux, uz]]; points in dm every 2 m). DPR 495/1992 art. 151: yellow strips 12 cm wide, the broken line 2.70 m from
-       the kerb with two continuous cross strips joining it to the kerb, the zone 12 + 14 + 12 m, BUS in yellow inside it (art. 148 c.4) read by the driver arriving.
+    /* bus stops (src/segn_orizz.py, tile key fb: [dash, kerb, [bx, bz, ux, uz]]; points in cm every metre). DPR 495/1992 art. 151: yellow strips 12 cm wide, the broken line 2.70 m from
+       the kerb (the edge of the DBGT carriageway) with two continuous cross strips joining it to the kerb, the zone 14 m (the 12 m before and after are only for the zig zag),
+       BUS in yellow in its middle (art. 148 c.4) read by the driver arriving.
        The dash module (1.0 m on, 1.5 m off) and the BUS size (2.40 x 1.60 m) are from Carlo's reference photo and fig. II.441/b (1.60 m letters), see segn_orizz.py; no zig zag (fig. II.447) */
     for (const [Dp, Kp, [bx, bz, ux, uz]] of d.fb || []) {
       const yel = COL('#e8b40c'), D = [], K = [], cum = [0];
-      for (let i = 0; i < Dp.length; i += 2) { D.push([Dp[i] / 10, Dp[i + 1] / 10]); K.push([Kp[i] / 10, Kp[i + 1] / 10]); }
+      for (let i = 0; i < Dp.length; i += 2) { D.push([Dp[i] / 100, Dp[i + 1] / 100]); K.push([Kp[i] / 100, Kp[i + 1] / 100]); }
       for (let i = 1; i < D.length; i++) cum.push(cum[i - 1] + hyp(D[i][0] - D[i - 1][0], D[i][1] - D[i - 1][1]));
       const at = s => { let i = 1; while (i < D.length - 1 && cum[i] < s) i++; const f = clamp((s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), 0, 1); return [lerp(D[i - 1][0], D[i][0], f), lerp(D[i - 1][1], D[i][1], f)]; };
       const L = cum[cum.length - 1];
       for (let s = 0; s < L - 0.3; s += 2.5) { const e = Math.min(L, s + 1.0), Q = [at(s)]; for (let i = 1; i < D.length - 1; i++) if (cum[i] > s && cum[i] < e) Q.push(D[i]); Q.push(at(e)); ribbon(mark, Q, -0.06, 0.06, 0.08 * fy, 1, 'along', yel); }
       ribbon(mark, [D[0], K[0]], -0.06, 0.06, 0.08 * fy, 1, 'along', yel); ribbon(mark, [D[D.length - 1], K[K.length - 1]], -0.06, 0.06, 0.08 * fy, 1, 'along', yel);
-      const x = bx / 10, z = bz / 10, nx = -uz, nz = ux, i0 = lettB.p.length / 3;
+      const x = bx / 100, z = bz / 100, nx = -uz, nz = ux, i0 = lettB.p.length / 3;
       for (const [uu, vv] of [[0, 1], [1, 1], [1, 0], [0, 0]]) vtx(lettB, x + nx * (2 * uu - 1) * 1.2 + ux * (2 * vv - 1) * 0.8, 0.09 * fy, z + nz * (2 * uu - 1) * 1.2 + uz * (2 * vv - 1) * 0.8, 0, 1, 0, uu, vv, white);
       triUp(lettB, i0, i0 + 1, i0 + 2); triUp(lettB, i0, i0 + 2, i0 + 3);
+    }
+    /* the give way at the entries of the roundabouts (src/segn_orizz.py rotonde, tile key lr: [line, c, symbol, sign]): the line in cm along the outer edge of the ring,
+       from the right kerb of the entry to the splitter island or the centre line, the driver entering on its left; the triangles (art. 144 c.4, fig. II.433) with their base
+       5 cm off the edge and the point at the driver; the symbol (art. 148 c.9, fig. II.442/a) [x, z, ux, uz]: the middle of its base and the way in, its base 2 m from the
+       points of the triangles. The sign is in segnali3.js */
+    for (const [Lp, c, sy] of d.lr || []) {
+      if (Lp.length < 6) continue;
+      const y = 0.085 * fy, Lq = [], cum = [0];
+      for (let i = 0; i < Lp.length; i += 2) Lq.push([Lp[i] / 100, Lp[i + 1] / 100]);
+      for (let i = 1; i < Lq.length; i++) cum.push(cum[i - 1] + hyp(Lq[i][0] - Lq[i - 1][0], Lq[i][1] - Lq[i - 1][1]));
+      const W = cum[cum.length - 1], at = (s, o) => { let i = 1; while (i < Lq.length - 1 && cum[i] < s) i++; const L_ = (cum[i] - cum[i - 1]) || 1, f = clamp((s - cum[i - 1]) / L_, 0, 1), tx = (Lq[i][0] - Lq[i - 1][0]) / L_, tz = (Lq[i][1] - Lq[i - 1][1]) / L_; return [lerp(Lq[i - 1][0], Lq[i][0], f) + tz * o, lerp(Lq[i - 1][1], Lq[i][1], f) - tx * o]; }; /* o: metres off the line towards the driver (its left) */
+      const [b, h] = [[0.6, 0.7], [0.5, 0.6], [0.4, 0.5]][c & 3], g = b / 2, n = Math.floor((W + g) / (b + g)), s00 = (W - (n * b + (n - 1) * g)) / 2;
+      for (let i = 0; i < n; i++) { const a = s00 + i * (b + g); try { polyFill(mark, [at(a, 0.05), at(a + b / 2, 0.05 + h), at(a + b, 0.05)], [], y, 4, white); } catch (e) { } }
+      if (sy) {
+        const big = !!(c & 4), SW = big ? 2 : 1, SH = big ? 6 : 2, ln = big ? 0.24 : 0.12, hyp_ = Math.hypot(SW / 2, SH), r = SW * SH / (SW + 2 * hyp_), kk = 1 - ln / r;
+        const bx = sy[0] / 100, bz = sy[1] / 100, ux = sy[2], uz = sy[3], P = (u, s) => [bx - ux * u - uz * s, bz - uz * u + ux * s]; /* u: metres back towards the driver from the base, s across */
+        const V = [[0, -SW / 2], [0, SW / 2], [SH, 0]], ic = [r, 0];
+        try { polyFill(mark, V.map(v => P(v[0], v[1])), [V.map(v => P(ic[0] + (v[0] - ic[0]) * kk, ic[1] + (v[1] - ic[1]) * kk))], y, 4, white); } catch (e) { }
+      }
     }
     // markings and elevated roads
     const deck = Buf(), dside = Buf(), emb = Buf(), grail = Buf(), dmark = Buf(), pil = Buf();
