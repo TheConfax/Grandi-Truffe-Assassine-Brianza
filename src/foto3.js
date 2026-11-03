@@ -3,11 +3,56 @@
 // (tex/*.jpg, made from the originals by the script in the commit): same palette, real asphalt cracks, blades of grass, paving joints.
 // The texture object stays the same, so every material using it follows; repeat turns the UV scale the surface was drawn with
 // (metres per repeat) into the size of the photo (metres)
-const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 1.8], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
+const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 2], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
 {
   const ld = new THREE.TextureLoader();
   for (const [t, f, r] of FOTO_TEX) ld.load('tex/' + f + '.jpg', img => { t.image = img.image; t.repeat.set(r, r); t.needsUpdate = true; });
 }
+// no repeating patterns (shaders only, no extra mesh). The photo of the pavement is a regular grid: 20 rows of 25.6 px (the first joint at 25 px), blocks 51.2 px wide in a
+// running bond, the row's phase in BLK_PH (fitted on the joints of tex/marciapiede.jpg, 512 px = 2 m). Every block takes the face of another
+// block of the photo, picked by a hash of the block in the world (its row, its column and the tile its centre lies in), sometimes turned 180
+// degrees: the sample goes to the donor block at the same offset from its centre, so the joints stay straight and aligned. On top of it a tone
+// per block (lighter or darker, towards pale pink or nearly brown), and a slow variation of 15-45 m in world coordinates (paler, dirtier, damp
+// zones). Far away, where a block is a few pixels, the plain photo takes over (no flicker). The asphalt is as in dev (its texture is chosen with
+// Carlo). Paint, kerbs and the rest are not touched
+const BLK_PH = [25.4, 0.2, 25.2, 0.4, 26.0, 0.6, 26.0, 0.2, 25.8, 0.6, 26.0, 0.6, 26.0, 0.6, 26.0, 0.4, 25.4, 50.6, 25.2, 0.0];
+const VAR_GLSL = `
+varying vec3 vWp;
+float h21(vec2 p) { vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
+float slowN(vec2 p, float k) { return vn(p / (17. * k) + 3.7) * .55 + vn(p / (29. * k) + 11.3) * .45; }
+`;
+const VAR_VERT = s => { s.vertexShader = 'varying vec3 vWp;\n' + s.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;'); };
+MAT.side.onBeforeCompile = s => {
+  VAR_VERT(s); s.uniforms.uPh = { value: BLK_PH };
+  s.fragmentShader = 'uniform float uPh[20];\n' + VAR_GLSL + s.fragmentShader.replace('#include <map_fragment>', `
+  vec4 texelColor = texture2D( map, vUv );
+  { vec2 dx = dFdx(vUv), dy = dFdy(vUv);
+    float fw = max(length(dx), length(dy)), amp = 1. - smoothstep(.012, .05, fw), a2 = 1. - smoothstep(.008, .03, fw); /* the blocks fade into the plain photo when they are a few pixels */
+    vec2 P = vec2(vUv.x, 1. - vUv.y) * 512.; /* pixels of the photo */
+    float r = floor(mod(P.y - 25., 512.) / 25.6), ph = uPh[int(r)], j = floor(mod(P.x - ph, 512.) / 51.2);
+    vec2 cen = vec2(ph + 51.2 * (j + .5), 25. + 25.6 * (r + .5)), rel = mod(P - cen + 256., 512.) - 256.;
+    vec2 cell = floor(vec2(vUv.x - rel.x / 512., vUv.y + rel.y / 512.)); /* the tile the block's centre lies in: one block, one id, also across the edge of the photo */
+    vec2 sd = vec2(r * 13. + j + 1., cell.x * 3.17 + cell.y * 5.31 + 1.7);
+    float hb = h21(sd), hc = h21(sd + 17.1), hd = h21(sd + 31.7), he = h21(sd + 47.3), hf = h21(sd + 63.9);
+    float rd = min(floor(hd * 20.), 19.), jd = min(floor(he * 10.), 9.), rot = hf > .5 ? -1. : 1.;
+    vec2 cen2 = vec2(uPh[int(rd)] + 51.2 * (jd + .5), 25. + 25.6 * (rd + .5)), P2 = cen2 + rel * rot, uv2 = vec2(P2.x, 512. - P2.y) / 512.;
+#if __VERSION__ >= 300
+    vec4 face = textureGrad( map, uv2, dx * rot, dy * rot );
+#else
+    vec4 face = texelColor;
+#endif
+    texelColor = mapTexelToLinear( mix(texelColor, face, a2) );
+    float lum = 1. + (hb - .5) * .60 * amp, tn = (hc - .5) * amp; /* tn > 0: pale pink, < 0: nearly brown */
+    texelColor.rgb *= lum * vec3(1. + .12 * tn, 1. + .38 * tn, 1. + .6 * tn);
+    float n = slowN(vWp.xz, 1.5), dirty = smoothstep(.5, .72, n), damp = smoothstep(.55, .75, slowN(vWp.xz + 40., 1.2));
+    float g = dot(texelColor.rgb, vec3(.3, .59, .11));
+    texelColor.rgb = mix(texelColor.rgb, vec3(g * 1.12), .22 * dirty);          /* faded, paler */
+    texelColor.rgb *= 1. - .10 * damp - .06 * dirty * (1. - damp);                 /* damp and dirty: darker */
+  }
+  diffuseColor *= texelColor;`);
+};
+MAT.side.customProgramCacheKey = () => 'marciapiede-var'; MAT.side.needsUpdate = true;
 // incolti: the grass photo dried out (half its green gone, towards straw), large soft patches a bit greener or paler, the ground photo
 // turned brown through irregular blotches (bare earth), a few dark tufts; composed once on a canvas when both photos are in, 16 m a repeat
 Promise.all(['prato', 'terreno'].map(f => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = 'tex/' + f + '.jpg'; }))).then(([pr, te]) => {
