@@ -109,7 +109,7 @@ function layMuri(T) {
   for (const B of d.b || []) {
     const outer = dec(B.p); if (outer.length < 3) continue;
     const holes = (B.k || []).map(dec).filter(h => h.length >= 3), bb = bbox(outer);
-    const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g, mm: B.mm, ti: T.t, bi: T.bld.length }; // g: 1 garages, 2 greenhouse, 3 stand, 4 water tower, 5 cabin; mm the model of a DBGT manufatto (paesaggio3.js)
+    const rec = { pts: outer, holes, h: B.h, t: B.t, bb, g: B.g, mm: B.mm, pt: B.pt, ti: T.t, bi: T.bld.length }; // g: 1 garages, 2 greenhouse, 3 stand, 4 water tower, 5 cabin; mm the model of a DBGT manufatto (paesaggio3.js)
     // a volume of the DBGT (src/dbgt_edifici.py): zt the top of its walls and zb its raised base (a portico, a passage, an overhang) above
     // terrain.base, e its building, rk/rf/rc its roof (planes over the top of the walls), wc/rcol the colours OSM gives, st its state in the
     // 2015 survey when OSM does not say otherwise (2 a ruin with no roof over it in the DSM: bare walls only; 3 a ruin with its roof; 1 under
@@ -137,7 +137,8 @@ function layMuri(T) {
     }
   }
   for (const q of T.feQ) T.fe.push(q); T.feQ = null; // fences follow the ground every 3 m (walls and collisions are built later)
-  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
+  const noTree = (d.ls || []).filter(q => q.s.startsWith('sport') || q.s.startsWith('pista')).map(q => { const P_ = dec(q.p); return { P: P_, b: bbox(P_) }; }); /* no tree on a pitch or a track (Carlo, 2/11, the bocce court of x 2345 z 18) */
+  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; if (noTree.some(q => x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.P))) { window.__ALBERI_TOLTI = (window.__ALBERI_TOLTI || 0) + 1; continue; } T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const [br, pts] of T.baQ) {
     const sp = BAR_PANEL[br.t], rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + br.h, yv: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
@@ -683,8 +684,26 @@ function aoGround(b, ring, E, i, innerA) {
   }
 }
 const _aoC = new THREE.Color(), SILL_COL = new THREE.Color('#e8e3d8');
-function addSill(b, x, y, z, ux, uz, nx, nz) { // a stone sill 1.16 m long sticking 10 cm out of the wall: top, front and underside only (6 triangles)
-  const W = 0.58, D = 0.1, H = 0.035, q = (s, d, dy) => [x + ux * s + nx * d, y + dy, z + uz * s + nz * d];
+// the windows of the facades (Carlo, 2/11: never cut by a corner, the eaves, a gable or the ground). Each wall (a run of sides turning less than 12
+// degrees, BEND) has a whole number of bays, centred on it and stretched a little (bay from 0.85 to 1.2 of the drawing; shorter than that, a bare wall);
+// the floors are the same all round the house, from F0, the highest ground along its walls (the base of a raised volume), each FMIN to FMAX high: the
+// height nearest to FL with which whole rows of windows fill the facade up to the eaves (Carlo, 2/11; the drawing is stretched like the bays).
+// Each bay draws its windows only in the floors kLo..kTop where they are whole: kLo the lowest whose plinth top
+// (ZH over the floor) is over the ground under the window, so where the ground falls by more than a floor the low bays get a whole floor more; kTop the
+// highest whose window top stays EM under the eaves (or the slope of a gable) across the whole window. Under the plinth's top the plaster is darker.
+// facD per vertex: kLo, kTop, plinth top, in v (floors); FAC_WALL (chained in foto3.js) draws bare plaster elsewhere, lit and mirroring panes included
+const FAC = { FL: 3.1, FMIN: 2.8, FMAX: 3.4, ZH: 0.3, EM: 0.2, MIN: 0.85, MAX: 1.2, BEND: 0.978, old: [0.9, 2.38, 0.2, 0.8], mod: [0.7, 2.48, 0.1, 0.9] }; // per kind: window bottom and top over the floor (m), its sides in the bay (with the shutters)
+const FAC_WALL = s => {
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 facD;\nvarying vec3 vFac;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFac = facD;');
+  const plaster = '0.25 * ( texture2D( map, vec2( 0.03, 0.86 ) ) + texture2D( map, vec2( 0.5, 0.95 ) ) + texture2D( map, vec2( 0.97, 0.9 ) ) + texture2D( map, vec2( 0.3, 0.99 ) ) )';
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFac;')
+    .replace('void main() {', 'void main() {\n  float facF = floor( vUv.y ), facW = step( vFac.x - 0.5, facF ) * step( facF, vFac.y + 0.5 ) * step( vFac.z, vUv.y );')
+    .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('texture2D( map, vUv )', `mix( ${plaster}, texture2D( map, vUv ), facW )`) + '\n  diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;')
+    .replace('#include <emissivemap_fragment>', THREE.ShaderChunk.emissivemap_fragment.replace('texture2D( emissiveMap, vUv )', '( texture2D( emissiveMap, vUv ) * facW )'))
+    .replace('texture2D( emissiveMap, vUv ).r', '( texture2D( emissiveMap, vUv ).r * facW )');
+};
+function addSill(b, x, y, z, ux, uz, nx, nz, W = 0.58) { // a stone sill 1.16 m long (W half of it) sticking 10 cm out of the wall: top, front and underside only (6 triangles)
+  const D = 0.1, H = 0.035, q = (s, d, dy) => [x + ux * s + nx * d, y + dy, z + uz * s + nz * d];
   for (const [n, vs] of [[[0, 1, 0], [q(-W, 0, H), q(W, 0, H), q(W, D, H), q(-W, D, H)]], [[nx, 0, nz], [q(-W, D, -H), q(W, D, -H), q(W, D, H), q(-W, D, H)]], [[0, -1, 0], [q(-W, 0, -H), q(W, 0, -H), q(W, D, -H), q(-W, D, -H)]]]) {
     const k = b.p.length / 3; for (const p of vs) vtx(b, p[0], p[1], p[2], n[0], n[1], n[2], 0, 0, SILL_COL);
     const e = [vs[1][0] - vs[0][0], vs[1][1] - vs[0][1], vs[1][2] - vs[0][2]], f = [vs[3][0] - vs[0][0], vs[3][1] - vs[0][1], vs[3][2] - vs[0][2]];
@@ -1689,36 +1708,76 @@ function* buildTileGen(T) {
       // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
       const planes = roofPlanes(B), flatDbgt = B.rk === 4;
       const pitched = planes ? true : !flatDbgt && !holes.length && outer.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(outer) || (t === 10 && outer.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && h >= 5;
-      if (!b.ao) b.ao = [];
-      for (const [ring, isHole] of [[outer, false], ...holes.map(hh => [hh, true])]) {
-        const A = sArea(ring), nr = ring.length; let acc = 0;
+      if (!b.ao) { b.ao = []; b.fac = []; }
+      // the facades (FAC): the bays along each wall and the ground under each window first, then the floors F0 + FL k the same all round the house.
+      // A wall is a run of sides that go on nearly straight (the DBGT draws a facade in many short sides): its bays run along all of it
+      const fw = FAC[kind], rings = [[outer, false], ...holes.map(hh => [hh, true])].map(([ring, isHole]) => {
+        const A = sArea(ring), nr = ring.length;
         const E = ring.map((a, i) => { const c = ring[(i + 1) % nr], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1e-6; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } return [dx, dz, L, nx, nz]; });
+        const st = []; for (let i = 0; i < nr; i++) { const p = E[(i - 1 + nr) % nr], e = E[i]; if ((p[0] * e[0] + p[1] * e[1]) / (p[2] * e[2]) < FAC.BEND) st.push(i); } if (!st.length) st.push(0);
+        const W = [];
+        const runs = st.map((i0, k) => {
+          const i1 = st[(k + 1) % st.length], ed = [], off = []; let j = i0, Lr = 0;
+          do { ed.push(j); off.push(Lr); W[j] = null; Lr += E[j][2]; j = (j + 1) % nr; } while (j !== i1);
+          const at = s => { let q = 0; while (q < ed.length - 1 && s > off[q] + E[ed[q]][2]) q++; const e = E[ed[q]], a = ring[ed[q]], f = clamp((s - off[q]) / e[2], 0, 1); return [a[0] + e[0] * f, a[1] + e[1] * f]; };
+          const rp = []; // the top of the wall along the run: straight between these (the roof's breaks over each side, src roofBreaks)
+          ed.forEach((i, q) => { const a = ring[i], c = ring[(i + 1) % nr], e = E[i]; for (const t of planes && !isHole ? roofBreaks(B, a, c) : [0, 1]) { const s = off[q] + t * e[2]; if (rp.length && Math.abs(rp[rp.length - 1][0] - s) < 1e-4) continue; rp.push([s, top + (planes ? roofAt(B, a[0] + e[0] * t, a[1] + e[1] * t) : 0)]); } });
+          const x = Lr / tile, gAt = s => { const p = at(s); return H.ground(p[0], p[1]); }, sp = []; let n = fw ? Math.round(x) : 0; if (n && x / n < FAC.MIN) n--;
+          const bw = n ? Math.min(x / n, FAC.MAX) * tile : Lr, pad = n ? (Lr - n * bw) / 2 : 0, span = (s0, s1, ss, bay) => { const g = ss.map(gAt); sp.push([s0, s1, Math.max(...g), Math.min(...g), bay]); };
+          if (!n) span(0, Lr, [0, Lr / 2, Lr], false);
+          else { if (pad > 0.01) span(0, pad, [0, pad], false); for (let j = 0; j < n; j++) { const s0 = pad + j * bw; span(s0, s0 + bw, [s0 + fw[2] * bw, s0 + bw / 2, s0 + fw[3] * bw], true); } if (pad > 0.01) span(Lr - pad, Lr, [Lr - pad, Lr], false); }
+          const R = { ed, off, Lr, at, rp, n, bw, pad, sp, uoff: Math.floor(hashRnd(Math.round(ring[i0][0] * 31 + ring[i0][1] * 17)) * 32) };
+          ed.forEach((i, q) => { W[i] = [R, off[q]]; }); return R;
+        });
+        return { ring, nr, E, W, runs };
+      });
+      let gHi = gmax, gLo = gmin; for (const r of rings) for (const R of r.runs) for (const p of R.sp) { gHi = Math.max(gHi, p[2]); gLo = Math.min(gLo, p[3]); }
+      // the height of a floor, from FAC.FMIN to FAC.FMAX (the drawing stretched like the bays): the whole windows fill the facade up to the eaves, nearest to FAC.FL
+      const F0 = raised ? bot : gHi, hRef = top - F0 - FAC.EM; let FL = FAC.FL;
+      if (fw) { const t1 = fw[1] / FAC.FL; let fb = null; for (let nf = 1; nf < 60; nf++) { const f = hRef / (nf - 1 + t1); if (f < FAC.FMIN) break; if (f <= FAC.FMAX && (fb === null || Math.abs(f - FAC.FL) < Math.abs(fb - FAC.FL))) fb = f; } FL = fb || (hRef > t1 * FAC.FMAX ? FAC.FMAX : FAC.FL); }
+      const sc = FL / FAC.FL, wLo = fw ? fw[0] * sc : 0.9, wHi = fw ? fw[1] * sc : 0, wbot = raised ? bot : Math.min(bot, gLo - 0.6), voff = Math.floor(hashRnd(Math.round(outer[0][0] * 3.7 + outer[0][1] * 11.3)) * 16), vOf = y => (y - F0) / FL + voff;
+      const kLoAt = g => { let k = -4; while (k < 60 && ((!raised && F0 + k * FL + FAC.ZH < g) || F0 + k * FL + wLo < wbot + 0.3)) k++; return k; }; // the plinth's top over the ground, the window over the base of a raised volume
+      for (const { ring, nr, E, W, runs } of rings) {
+        // each span's floors with windows (kLo..kTop, plus voff) and the plinth's top; a span the same as the one before makes one piece of wall with it
+        for (const R of runs) {
+          const { rp, bw, sp } = R, rlAt = s => { for (let k = 1; k < rp.length; k++) if (s <= rp[k][0] || k === rp.length - 1) { const [p0, y0] = rp[k - 1], [p1, y1] = rp[k]; return y0 + (y1 - y0) * clamp((s - p0) / ((p1 - p0) || 1), 0, 1); } return rp[0][1]; };
+          R.rlAt = rlAt; const grp = R.grp = [];
+          for (const [s0, s1, g, , bay] of sp) {
+            const kl = kLoAt(g); let f = [999, -999];
+            if (bay) { const w0 = s0 + fw[2] * bw, w1 = s0 + fw[3] * bw; let rl = Math.min(rlAt(w0), rlAt(w1)); for (const [p, y] of rp) if (p > w0 && p < w1) rl = Math.min(rl, y); const kt = Math.floor((rl - FAC.EM - wHi - F0) / FL + 1e-4); if (kt >= kl) f = [kl, kt]; }
+            f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : vOf(F0 + kl * FL + FAC.ZH)];
+            const last = grp[grp.length - 1];
+            if (last && last[2][0] === f[0] && last[2][1] === f[1] && Math.abs(last[2][2] - f[2]) < 1e-6) last[1] = s1; else grp.push([s0, s1, f]);
+            if (bay && kind === 'old' && f[0] < 900) { // stone sills under the painted windows (middle of the bay, 0.9-1 m up the floor), not on the lowest floor: the ground floor is shops
+              const sm = (s0 + s1) / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + E[R.ed[q]][2]) q++;
+              const e = E[R.ed[q]], ux = e[0] / e[2], uz = e[1] / e[2], [sx, sz] = R.at(sm);
+              for (let k = f[0] - voff + 1; k <= f[1] - voff; k++) addSill(sillB, sx, F0 + FL * k + 0.96 * sc, sz, ux, uz, e[3], e[4], 0.58 * bw / tile);
+            }
+          }
+        }
         const inner = i => { const p = E[(i - 1 + nr) % nr], e = E[i]; return p[3] * e[0] + p[4] * e[1] > 0.05 * e[2]; }; // the wall before turns towards this one: an inside corner
         for (let i = 0; i < nr; i++) {
-          const a = ring[i], c = ring[(i + 1) % nr], [dx, dz, L, nx, nz] = E[i]; if (L < 0.05) continue;
-          const ia = inner(i) ? 0 : 99, ic = inner((i + 1) % nr) ? 0 : 99, ts = planes && !isHole ? roofBreaks(B, a, c) : [0, 1], v0 = (bot - gmax) / 3.1;
-          for (let k = 1; k < ts.length; k++) { // the wall in pieces where the roof over it changes slope (a gable end), each piece straight on top
-            const s0 = ts[k - 1] * L, s1 = ts[k] * L, ax = a[0] + dx * ts[k - 1], az = a[1] + dz * ts[k - 1], cx = a[0] + dx * ts[k], cz = a[1] + dz * ts[k];
-            const ya = top + (planes ? roofAt(B, ax, az) : 0), yc = top + (planes ? roofAt(B, cx, cz) : 0), u0 = (acc + s0) / tile, u1 = (acc + s1) / tile, base = b.p.length / 3;
-            vtx(b, ax, bot, az, nx, 0, nz, u0, v0, wallCol); vtx(b, cx, bot, cz, nx, 0, nz, u1, v0, wallCol);
-            vtx(b, cx, yc, cz, nx, 0, nz, u1, (yc - gmax) / 3.1, wallCol); vtx(b, ax, ya, az, nx, 0, nz, u0, (ya - gmax) / 3.1, wallCol);
+          const a = ring[i], [dx, dz, L, nx, nz] = E[i], [R, o] = W[i]; if (L < 0.05) continue;
+          const ia = inner(i) ? 0 : 99, ic = inner((i + 1) % nr) ? 0 : 99, { grp, rp, rlAt, n, bw, pad, uoff } = R;
+          const uOf = s => uoff + (n ? (s - pad) / bw : s / tile); // s along the run
+          const cuts = [...new Set([o, o + L, ...grp.map(q => q[0]), ...rp.map(q => q[0])].filter(s => s >= o - 1e-4 && s <= o + L + 1e-4).map(s => Math.round(s * 1e4) / 1e4))].sort((p, q) => p - q);
+          for (let k = 1; k < cuts.length; k++) { // the side in pieces where the roof over it changes slope (a gable end) or the windows of a bay change, each piece straight on top
+            const s0 = cuts[k - 1], s1 = cuts[k]; if (s1 - s0 < 1e-3) continue;
+            const l0 = clamp(s0 - o, 0, L) / L, l1 = clamp(s1 - o, 0, L) / L, sm = (s0 + s1) / 2, f = (grp.find(q => sm >= q[0] && sm <= q[1]) || grp[grp.length - 1])[2];
+            const ax = a[0] + dx * l0, az = a[1] + dz * l0, cx = a[0] + dx * l1, cz = a[1] + dz * l1, ya = rlAt(s0), yc = rlAt(s1), u0 = uOf(s0), u1 = uOf(s1), v0 = vOf(wbot), base = b.p.length / 3, e0 = l0 * L, e1 = l1 * L;
+            vtx(b, ax, wbot, az, nx, 0, nz, u0, v0, wallCol); vtx(b, cx, wbot, cz, nx, 0, nz, u1, v0, wallCol);
+            vtx(b, cx, yc, cz, nx, 0, nz, u1, vOf(yc), wallCol); vtx(b, ax, ya, az, nx, 0, nz, u0, vOf(ya), wallCol);
             // occlusion: height over the ground, depth under the eaves, distance from the inside corners at either end (linear along the wall, so exact per pixel)
-            const ga = raised ? bot - 3 : H.ground(ax, az), gc = raised ? bot - 3 : H.ground(cx, cz);
-            b.ao.push(bot - ga, pitched ? ya - bot : 99, ia + s0, ic + L - s0, bot - gc, pitched ? yc - bot : 99, ia + s1, ic + L - s1, yc - gc, pitched ? 0 : 99, ia + s1, ic + L - s1, ya - ga, pitched ? 0 : 99, ia + s0, ic + L - s0);
+            const ga = raised ? wbot - 3 : H.ground(ax, az), gc = raised ? wbot - 3 : H.ground(cx, cz);
+            b.ao.push(wbot - ga, pitched ? ya - wbot : 99, ia + e0, ic + L - e0, wbot - gc, pitched ? yc - wbot : 99, ia + e1, ic + L - e1, yc - gc, pitched ? 0 : 99, ia + e1, ic + L - e1, ya - ga, pitched ? 0 : 99, ia + e0, ic + L - e0);
+            for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2]);
             if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
             if (B.st === 2) { // a ruin has no roof: the inside of its walls shows from above
               const bi = b.p.length / 3;
-              vtx(b, ax, bot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, bot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, (yc - gmax) / 3.1, wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, (ya - gmax) / 3.1, wallCol);
-              b.ao.push(bot - ga, 99, 99, 99, bot - gc, 99, 99, 99, yc - gc, 99, 99, 99, ya - ga, 99, 99, 99);
+              vtx(b, ax, wbot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, wbot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, vOf(yc), wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, vOf(ya), wallCol);
+              b.ao.push(wbot - ga, 99, 99, 99, wbot - gc, 99, 99, 99, yc - gc, 99, 99, 99, ya - ga, 99, 99, 99);
+              for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2]);
               if (nx * (-dz) + nz * dx > 0) b.i.push(bi, bi + 2, bi + 1, bi, bi + 3, bi + 2); else b.i.push(bi, bi + 1, bi + 2, bi, bi + 2, bi + 3);
-            }
-          }
-          const u0 = acc / tile; acc += L;
-          if (kind === 'old') { // stone sills under the painted windows (middle of each bay, 0.9-1 m up each 3.1 m floor), from the first floor: the ground floor is shops
-            const ux = dx / L, uz = dz / L, fl = raised ? bot - 3.1 : gmax;
-            for (let n = Math.ceil((u0 * tile + 0.7) / tile - 0.5); (n + 0.5) * tile - u0 * tile <= L - 0.7; n++) {
-              const s = (n + 0.5) * tile - u0 * tile, sx = a[0] + ux * s, sz = a[1] + uz * s;
-              for (let k = 1; fl + 3.1 * k + 2.5 <= top - 0.2; k++) if (fl + 3.1 * k > bot + 0.5) addSill(sillB, sx, fl + 3.1 * k + 0.96, sz, ux, uz, nx, nz);
             }
           }
         }
@@ -1752,7 +1811,7 @@ function* buildTileGen(T) {
       for (const [ss, yy] of [[-0.6, 0], [0.6, 0], [0.6, 2.3], [-0.6, 2.3]]) vtx(doorB, px + ux * ss + nx * o, gy + yy, pz + uz * ss + nz * o, nx, 0, nz, 0, 0, col);
       if (nx * (-uz) + nz * ux > 0) doorB.i.push(k0, k0 + 1, k0 + 2, k0, k0 + 2, k0 + 3); else doorB.i.push(k0, k0 + 2, k0 + 1, k0, k0 + 3, k0 + 2);
     }
-    for (const k of ['old', 'mod', 'plain']) if (wb[k].i.length) mkMesh(wb[k], MAT[k], 10, 'cast', G).geometry.setAttribute('aoD', new THREE.Float32BufferAttribute(wb[k].ao, 4));
+    for (const k of ['old', 'mod', 'plain']) if (wb[k].i.length) { const g = mkMesh(wb[k], MAT[k], 10, 'cast', G).geometry; g.setAttribute('aoD', new THREE.Float32BufferAttribute(wb[k].ao, 4)); g.setAttribute('facD', new THREE.Float32BufferAttribute(wb[k].fac, 3)); }
     if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast'); put(doorB, MAT.roof, 10);
@@ -2302,7 +2361,7 @@ function updFlags(st, t) {
 function updCaserme(dt) { for (const st of CASERME) if (st.root && st.root.parent && st.root.parent.visible && hyp(st.x - camera.position.x, st.z - camera.position.z) < 160) updFlags(st, now); }
 
 // ---------------------------------------------------------------- cemeteries: rows of graves, crosses and cypresses
-const CYP_G = (() => { const g = new THREE.ConeGeometry(0.9, 9, 7); g.translate(0, 5.2, 0); return g; })(), TOMB_G = new THREE.BoxGeometry(0.95, 0.28, 2.0), STONE_G = new THREE.BoxGeometry(0.8, 1.0, 0.14);
+const TOMB_G = new THREE.BoxGeometry(0.95, 0.28, 2.0), STONE_G = new THREE.BoxGeometry(0.8, 1.0, 0.14);
 function buildCemetery(T, G) {
   const tombs = [], cyps = [];
   for (const a of T.d.a || []) {
@@ -2319,11 +2378,27 @@ function buildCemetery(T, G) {
     for (let i = 0; i < outer.length; i++) { const p = outer[i], q = outer[(i + 1) % outer.length], L = hyp(q[0] - p[0], q[1] - p[1]); for (let s = 4; s < L - 2; s += 9) { const t = s / L, x = lerp(p[0], q[0], t), z = lerp(p[1], q[1], t), mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let nx = -(q[1] - p[1]) / L, nz = (q[0] - p[0]) / L; if (!inPoly(x + nx * 2, z + nz * 2, outer)) { nx = -nx; nz = -nz; } const X = x + nx * 2.2, Z = z + nz * 2.2; if (inside(X, Z, 1)) cyps.push([X, Z]); } }
   }
   if (!tombs.length && !cyps.length) return;
+  if (!T.cemDone) { /* graves are solid (Carlo, 2/11): two discs per slab, which you can walk up onto (28 cm), a disc for the headstone; a disc for each cypress */
+    T.cemDone = true; window.__COLL = window.__COLL || {}; window.__COLL.tombe = (window.__COLL.tombe || 0) + tombs.length;
+    for (const [x, z, a] of tombs) { const gy = H.ground(x, z), dx = -Math.sin(a), dz = Math.cos(a);
+      for (const o of [-0.5, 0.5]) { const px = x + dx * o, pz = z + dz * o; WALLS.add(px - 0.5, pz - 0.5, px + 0.5, pz + 0.5, { r: 0.5, x: px, z: pz, y0: gy - 3, y1: gy + 0.3, sali: { rs: 0.5, top: gy + 0.3 } }); }
+      const hx = x + dx * 0.95, hz = z + dz * 0.95; WALLS.add(hx - 0.42, hz - 0.42, hx + 0.42, hz + 0.42, { r: 0.42, x: hx, z: hz, y0: gy - 3, y1: gy + 1.0 }); }
+    for (const c of cyps) WALLS.add(c[0] - 0.35, c[1] - 0.35, c[0] + 0.35, c[1] + 0.35, { r: 0.35, x: c[0], z: c[1], y0: H.ground(c[0], c[1]) - 3, y1: H.ground(c[0], c[1]) + 8 });
+  }
   const m = new THREE.Matrix4(), qq = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), pp = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const mk = (geo, mat, list, f) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((t, i) => { f(t, pp); qq.setFromAxisAngle(up, -t[2] || 0); m.compose(pp, qq, sc); im.setMatrixAt(i, m); }); im.castShadow = true; G.add(im); };
   mk(TOMB_G, lam(0xb8b4ac), tombs, (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.14, t[1]));
   mk(STONE_G, lam(0x8e8a84), tombs.map(t => [t[0] - Math.sin(t[2]) * 0.95, t[1] + Math.cos(t[2]) * 0.95, t[2]]), (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.5, t[1])); // headstone at the head end
-  mk(CYP_G, lam(0x2f4a2a), cyps.map(c => [c[0], c[1], 0]), (t, p) => p.set(t[0], H.ground(t[0], t[1]), t[1]));
+  if (cyps.length) { // the cypresses are trees like the others: the plain stem and the crown of TREE_G (leaf tufts), stretched to a narrow column (height th, crown td across, as the narrow DSM trees above)
+    const trunks = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, cyps.length), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, cyps.length), sc2 = new THREE.Vector3(), e2 = new THREE.Euler();
+    cyps.forEach((c, i) => {
+      const x = c[0], z = c[1], gy = H.ground(x, z), h = trHash(x, z), th = 7.5 + 3 * h, td = 2.2 + 0.6 * trHash(z, x), yb = Math.min(th - 1.2, Math.max(0.5, Math.min(0.15 * th, th - 0.55 * td))), hc = th - yb;
+      const sx = td / 5.4, sy = hc / 4.5, yc = th - 2.5 * sy, tw = clamp(Math.min(Math.sqrt(th / 7), 0.4 * td), 0.5, 1.8);
+      qq.identity(); m.compose(pp.set(x, gy, z), qq, sc2.set(tw, yb + 0.5 * hc, tw)); trunks.setMatrixAt(i, m); /* the plain stem: the branches of the tall trunk come out of so narrow a crown */
+      qq.setFromEuler(e2.set(0, h * TAU * 7, 0)); m.compose(pp.set(x, gy + yc, z), qq, sc2.set(sx, sy, sx)); crowns.setMatrixAt(i, m); crowns.setColorAt(i, COL('#3d5a34'));
+    });
+    trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns);
+  }
 }
 
 // ---------------------------------------------------------------- traffic lights (semafori) and bus stops

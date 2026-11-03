@@ -690,7 +690,18 @@ function ngText(g, txt, cx, cy, maxW, maxH, font, col) {
   while (g.measureText(txt).width > maxW && fs > 6) { fs = Math.floor(fs * 0.92); g.font = f(fs); }
   g.fillStyle = col; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, cx, cy);
 }
+// the front is drawn on a straight line between the ends of the facade, but the real wall can bulge out of it (a facade that bends a little: via Salvo D'Acquisto, the
+// ice-cream shop's glass and sign were inside the wall): the plane moves out to where the wall is, over the width of the front (at most half a metre)
+function ngProtrusion(s) {
+  let pr = 0;
+  for (let f = -0.45; f <= 0.451; f += 0.15) {
+    const px = s.cx + s.ux * s.w * f, pz = s.cz + s.uz * s.w * f; if (!inBuilding(px - s.nx * 0.1, pz - s.nz * 0.1)) continue;
+    let k = 0; while (k < 0.5 && inBuilding(px + s.nx * k, pz + s.nz * k)) k += 0.04; pr = Math.max(pr, k);
+  }
+  return pr > 0.03 ? Math.min(pr, 0.5) : 0;
+}
 function ngFront(s, C) {
+  const pr0 = ngProtrusion(s); if (pr0 > 0) { s.cx += s.nx * (pr0 + 0.02); s.cz += s.nz * (pr0 + 0.02); }
   const m = s.m, cls = s.cls, W = s.w, hw = W / 2, gy = H.ground(s.cx + s.nx * 0.6, s.cz + s.nz * 0.6), top = s.b.gtop - gy;
   if (top < 2.7) return;
   const gl = Math.min(H.ground(s.cx - s.ux * hw, s.cz - s.uz * hw), H.ground(s.cx + s.ux * hw, s.cz + s.uz * hw)) - gy - 0.35;

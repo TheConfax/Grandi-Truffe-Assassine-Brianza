@@ -10,7 +10,7 @@ const OGG_MAT = new THREE.MeshLambertMaterial({ vertexColors: true }), WIRE_MAT 
 const OGG_SPEC = {
   traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8, sali: 0.5 },
   idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true, sali: 0.5 }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
-  panchina: { r: 0.8, h: 0.9, knock: true, sali: 0.4 }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: {},
+  panchina: { r: 0.8, h: 0.9, knock: true, sali: 0.4 }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: { r: 0.8, h: 2.3, parts: [[-1.6, 0, 0.7, 2.3], [1.6, 0, 0.7, 2.3], [3.4, 0, 0.7, 1.5], [3.4, -1.4, 0.7, 0.8], [0, 0, 0.9, 0.5]] }, /* swing frame, seats, slide: solid */
   telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true, sali: 0.35 }, rastrelliera: { r: 0.6, h: 0.8, knock: true }, cassetta: { r: 0.22, h: 1.2, knock: true },
   armadietti: { r: 1.0, h: 2.1, sali: 0.4 }, pannello: { r: 0.4, h: 2.3 }, picnic: { r: 0.9, h: 0.8, knock: true, sali: 0.6 }, fitness: { r: 0.8, h: 2.3 }, torre_acqua: { r: 3.2, h: 28, scale: 28 }, lavaggio: {},
 };
@@ -155,7 +155,9 @@ function buildOggetti(T, G) {
       if (S.knock) {
         if (!T.ogDone) addProp({ x, z, y: gy, r: S.r, h: S.h, inst: { meshes: [im], i, ry: a, base: gy }, ogTile: T, og: oi, sali: S.sali ? { rs: S.sali, dy: S.h * sy } : null });
         else for (const p of PROPS) if (p.ogTile === T && p.og === oi) { p.inst.meshes = [im]; if (p.broken) { o3.scale.set(0, 0, 0); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); } } // built again: what was knocked down stays down
+
       } else if (!T.ogDone) WALLS.add(x - S.r, z - S.r, x + S.r, z + S.r, { r: S.r, x, z, y0: gy - 3, y1: gy + S.h * sy, ...(S.sali ? { sali: { rs: S.sali, top: gy + S.h * sy } } : {}) });
+      if (S.parts && !S.knock && !T.ogDone) for (const [dx, dz, rr, hh] of S.parts) { const wx = x + dx * Math.cos(a) + dz * Math.sin(a), wz = z - dx * Math.sin(a) + dz * Math.cos(a); WALLS.add(wx - rr, wz - rr, wx + rr, wz + rr, { r: rr, x: wx, z: wz, y0: gy - 3, y1: gy + hh }); }
     });
     G.add(im);
   }
