@@ -3,10 +3,14 @@
 // (tex/*.jpg, made from the originals by the script in the commit): same palette, real asphalt cracks, blades of grass, paving joints.
 // The texture object stays the same, so every material using it follows; repeat turns the UV scale the surface was drawn with
 // (metres per repeat) into the size of the photo (metres)
+/* asfalto: three candidate photos (all CC0), chosen in the link with &asfalto=1|2|3 (default 1); metres a photo covers: 1 ambientCG Asphalt015 and 3 Asphalt031
+   (the site declares no size: 2 m assumed), 2 Poly Haven asphalt_04 (4.04 m declared). &asfsh=0 turns the asphalt details off (for the cost measure) */
+const ASF_N = (/[?&]asfalto=([123])/.exec(location.search) || [0, '1'])[1], ASF_FILE = 'asfalto_' + ASF_N, ASF_M = [0, 2, 4.04, 2][+ASF_N];
+const ASF_U = { value: /[?&]asfsh=0/.test(location.search) ? 0 : 1 }; window.__ASFU = ASF_U;
 const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 2], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
 {
   const ld = new THREE.TextureLoader();
-  for (const [t, f, r] of FOTO_TEX) ld.load('tex/' + f + '.jpg', img => { t.image = img.image; t.repeat.set(r, r); t.needsUpdate = true; });
+  for (const [t, f, r] of FOTO_TEX) ld.load('tex/' + (t === asphaltTex ? ASF_FILE : f) + '.jpg', img => { t.image = img.image; t.repeat.set(t === asphaltTex ? 9 / ASF_M : r, t === asphaltTex ? 9 / ASF_M : r); t.needsUpdate = true; });
 }
 // no repeating patterns (shaders only, no extra mesh). The photo of the pavement is a regular grid: 20 rows of 25.6 px (the first joint at 25 px), blocks 51.2 px wide in a
 // running bond, the row's phase in BLK_PH (fitted on the joints of tex/marciapiede.jpg, 512 px = 2 m). Every block takes the face of another
@@ -174,3 +178,66 @@ const FOTO_FACADE = (s, tile) => {
 for (const [k, m, tile] of [['old', MAT.old, 3.4], ['mod', MAT.mod, 4.2], ['plain', MAT.plain, 4]]) {
   const before = m.onBeforeCompile; m.onBeforeCompile = s => { before.call(m, s); AO_WALL(s); FOTO_FACADE(s, tile); if (k !== 'plain') FAC_WALL(s); }; m.customProgramCacheKey = () => 'foto-' + k; m.needsUpdate = true;
 }
+
+/* asphalt details (shader only, no extra mesh): stochastic tiling of the photo (4 samples with random offset and rotation per cell, blended, contrast kept), a slow
+   tone variation over 20-40 m, rare sealed cracks (edges of a Voronoi net, 12 m cells, only some edges kept, warped to wander, 2-4 cm wide), rare patches
+   (rectangles of 1-4 m, a little turned, darker and blacker, sharp edge). All in world coordinates. The wheel tracks are not done: the asphalt UVs do not know the road direction */
+const ASF_GLSL = `
+uniform float uAsf;
+vec2 h22(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); q += dot(q, q.yzx + 33.33); return fract((q.xx + q.yz) * q.zy); }
+`;
+const ASF_FRAG = `
+  vec4 texelColor;
+  { vec2 uv = vUv; vec2 dx = dFdx(uv), dy = dFdy(uv);
+    vec2 ci = floor(uv), cf = fract(uv); vec2 w2 = cf * cf * (3. - 2. * cf);
+    vec3 acc = vec3(0.); float ws = 0., wq = 0.; vec3 mean = vec3(.5);
+#if __VERSION__ >= 300
+    mean = textureLod(map, uv, 9.).rgb;
+#endif
+    for (int k = 0; k < 4; k++) {
+      vec2 o = vec2(float(k - k / 2 * 2), float(k / 2)), c = ci + o;
+      float w = (o.x > .5 ? w2.x : 1. - w2.x) * (o.y > .5 ? w2.y : 1. - w2.y);
+      vec2 r = h22(c + 7.3); float a = r.x * 6.2832, ca = cos(a), sa = sin(a);
+      mat2 R = mat2(ca, sa, -sa, ca);
+      vec2 u2 = R * (uv - c) + r.yx * 13.7;
+#if __VERSION__ >= 300
+      vec3 t = textureGrad(map, u2, R * dx, R * dy).rgb;
+#else
+      vec3 t = texture2D(map, u2).rgb;
+#endif
+      acc += t * w; ws += w; wq += w * w;
+    }
+    vec3 tc = mean + (acc - mean) / sqrt(wq); /* variance of the photo kept in the blended zones */
+    texelColor = vec4(tc, 1.);
+  }
+  texelColor = mapTexelToLinear(texelColor);
+  if (uAsf > .5) {
+    vec2 P = vWp.xz; float px = max(length(dFdx(P)), length(dFdy(P))) + 1e-4;
+    float far = 1. - smoothstep(.12, .4, px); /* cracks fade out when a pixel is wider than 12-40 cm */
+    texelColor.rgb *= 1. + .13 * (slowN(P + 91., 1.4) - .5) * 2.;    /* slow tone, 20-40 m */
+    /* sealed cracks */
+    { vec2 Q = P + vec2(vn(P / 3.1 + 5.), vn(P / 3.1 + 17.)) * 1.8 + vec2(vn(P / .45 + 3.), vn(P / .45 + 9.)) * .05;
+      vec2 ig = floor(Q / 12.), fg = Q / 12. - ig; float d1 = 9., d2 = 9.; vec2 id1 = vec2(0.), id2 = vec2(0.);
+      for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+        vec2 g = vec2(float(i), float(j)), cell = ig + g, pt = g + .15 + .7 * h22(cell + 3.1); float d = length(pt - fg);
+        if (d < d1) { d2 = d1; id2 = id1; d1 = d; id1 = cell; } else if (d < d2) { d2 = d; id2 = cell; } }
+      float keep = step(.7, h21(id1 + id2 + 11.)); /* a few edges only */
+      float wd = (.02 + .02 * vn(P / 2.7 + 40.)) * .5; /* half width in metres, 2-4 cm */
+      float dm = (d2 - d1) * .5 * 12.; /* about the metres to the edge */
+      float cr = (1. - smoothstep(wd - px, wd + px, dm)) * min(1., wd * 2. / px) * keep * far;
+      texelColor.rgb = mix(texelColor.rgb, texelColor.rgb * .22, cr * .9); }
+    /* patches */
+    { vec2 gc = floor(P / 16.), lp = P - gc * 16.; vec2 r1 = h22(gc + 21.), r2 = h22(gc + 33.), r3 = h22(gc + 45.);
+      if (r3.x < .22) {
+        vec2 cen = 4. + 8. * r1, hs = (.5 + 1.5 * r2) * vec2(1., .5 + r3.y); float a = (r2.x - .5) * .8 + 1.5708 * floor(r1.x * 2.), ca = cos(a), sa = sin(a);
+        vec2 d = lp - cen; vec2 e = abs(vec2(ca * d.x + sa * d.y, -sa * d.x + ca * d.y)) - hs;
+        float m = (1. - smoothstep(-px, px + .01, max(e.x, e.y))) * far;
+        float g = dot(texelColor.rgb, vec3(.3, .59, .11));
+        texelColor.rgb = mix(texelColor.rgb, vec3(g) * .5 * (.85 + .3 * r3.y), m * .9); } }
+  }
+  diffuseColor *= texelColor;`;
+const ASF_PATCH = s => {
+  VAR_VERT(s); s.uniforms.uAsf = ASF_U;
+  s.fragmentShader = ASF_GLSL + VAR_GLSL + s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
+};
+for (const k of ['asph', 'asphS', 'paved', 'pavedS', 'deck']) { MAT[k].onBeforeCompile = ASF_PATCH; MAT[k].customProgramCacheKey = () => 'asfalto-var'; MAT[k].needsUpdate = true; }
