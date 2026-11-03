@@ -23,6 +23,7 @@ Leggi questo, `CLAUDE.md` e solo le parti di `docs/motore.md` che servono al tuo
 - Nelle righe lunghe a più istruzioni usa `/* */`, mai `//` a metà riga.
 
 ## Prove (proporzionate al compito)
+- Quando un pezzo compare dove non deve stare, guarda se manca da dove dovrebbe stare (Carlo, 3/11: lo spartitraffico della strada sopra il cavalcavia di x 320 finiva sulla strada sotto; sono serviti tre giri e Carlo che sale sul ponte). Per ponti, gallerie e opere: foto sempre sopra e sotto, con lo stesso pezzo cercato in tutti e due.
 - Sempre: prova di avvio con Playwright (GPU: args `['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu']`, `http://127.0.0.1:<porta>/` non localhost): `window.__G` presente, nessun PAGEERR; `node --check` sullo script più lungo di `index.html` estratto in un `.mjs`.
 - Correzione piccola: una o due viste nel punto segnalato e un conteggio. Lavoro grosso (terreno, fisica, traffico): misure prima/dopo complete.
 - Il gioco accetta `?x=&z=`; espone `window.__G`. Script di prova da copiare: scratchpad della sessione, cartella `prove` (`h.mjs` e simili).
