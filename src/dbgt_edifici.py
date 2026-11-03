@@ -542,17 +542,10 @@ class Edifici:
                 a = rng.uniform(0, 2 * math.pi); d = rng.uniform(15, 120)
                 q = shapely.affinity.translate(g, d * math.cos(a), d * math.sin(a))
                 if not len(at.query(q, predicate='dwithin', distance=4.0)): neg.append(q); break
-        def feats(gs):
+        def feats(qs):
             F, keep = [], []
-            for k, g in enumerate(gs):
-                q = erode(g); f = None
-                if q is not None:
-                    kq = BC.chiave(q.wkb)   # the numbers of a plan depend only on the plan and the photo: from the cache when an earlier build had them
-                    if kq in tab: f = tab.get(kq)
-                    else:
-                        try: f = ef.caratteristiche(foto.pixel(q))
-                        except Exception as ex: f = None
-                        tab.put(kq, f)
+            for k, q in enumerate(qs):
+                f = tab.get(BC.chiave(q.wkb)) if q is not None else None
                 if f is not None: F.append(f); keep.append(k)
             return np.array(F), keep
         # the tiles first (resumable, in data/esri), then the numbers
@@ -562,7 +555,17 @@ class Edifici:
         for x, y in sorted(tl): ef.scarica(x, y)
         import build_cache as BC   # src/build_cache.py, table foto_esri: valid for the same code, the same tiles of the photo and the same frame (to_ll)
         tab = BC.Tabella('foto_esri', BC.sorgenti('esri_foto.py', 'dbgt_edifici.py') + BC.dati(os.path.join(ef.DATA, 'esri', str(ef.Z))) + BC.chiave(kx, kz, float(xa[0]), float(za[0])))
-        Xp, kp = feats([geo[i] for i in pos_s]); Xn, kn = feats(neg); Xc, kc = feats([geo[i] for i in cand]); tab.salva()
+        # the numbers of each plan (narrowed by 1 m): ef.caratteristiche(foto.pixel(q)), None where it fails. A plan an earlier build had comes
+        # from the cache; the others in processes of their own (src/processi.py, the same Foto with the same frame), in order
+        qss = [[erode(g) for g in gs] for gs in ([geo[i] for i in pos_s], neg, [geo[i] for i in cand])]
+        need = {}
+        for q in (q for qs in qss for q in qs if q is not None):
+            k = BC.chiave(q.wkb)
+            if k not in tab and k not in need: need[k] = q.wkb
+        if need:
+            import processi
+            for k, f in zip(need, processi.mappa('esri_foto', '_proc_numeri', list(need.values()), iniz=('_proc_init', kx, kz, float(xa[0]), float(za[0])))): tab.put(k, f)
+        (Xp, kp), (Xn, kn), (Xc, kc) = [feats(qs) for qs in qss]; tab.salva()
         if len(Xp) < 100 or len(Xn) < 100: log('dbgt edifici: demoliti, troppo pochi pixel per tarare (%d, %d): nessuno tolto' % (len(Xp), len(Xn))); return set()
         X = np.vstack((Xp, Xn)); y = np.r_[np.ones(len(Xp)), np.zeros(len(Xn))]
         fold = rng.integers(0, 5, len(y)); oof = np.zeros(len(y))

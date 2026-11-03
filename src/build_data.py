@@ -25,8 +25,9 @@ TILE = 250.0
 import time; _T0 = time.time()
 log = lambda *a: print('%4.0fs' % (time.time() - _T0), *a, flush=True)  # seconds since the start: where the build spends its time
 from vicini import PuntiVicini  # nearby points without a whole scan (src/vicini.py)
+from processi import differenze, intersezioni  # many differences or intersections against one big geometry in processes of their own (src/processi.py)
 import os; os.environ.setdefault('GTA_CACHE', os.path.join(os.path.dirname(os.path.abspath(dst)), 'cache_build'))  # the cache of the slow pure steps, next to the output (src/build_cache.py; GTA_NOCACHE=1 to do without)
-from presto import presto, in_parallelo  # the heavy GEOS calls on all the cores, each the same call as before (src/presto.py)
+from presto import presto, in_parallelo, subito  # the heavy GEOS calls on all the cores, each the same call as before (src/presto.py)
 
 # ------------------------------------------------------------------ parse
 nodes, ntags, ways, rels, wrefs = {}, {}, {}, [], {}
@@ -929,6 +930,8 @@ foot = _foot0_f.result().difference(side).difference(pedz).difference(bunion)  #
 median = _median.result(); del _median, _pedz_f, _side0_f, _foot0_f
 if STR: asph, pedz, side, foot, median = STR.superfici(raw_roads, asph, pedz, side, foot, median, bunion)  # inside the comuni with a DBGT: its areas
 log('surfaces done')
+# the surfaces are final (until the car parks join the asphalt, after the rivers): the unions the rivers use, on threads of their own from here
+_fiumi_u = [subito(unary_union, l_) for l_ in ([bunion, asph], [asph] + ([corridor] if not corridor.is_empty else []), [g for g in (asph, pedz, side, corridor) if g is not None and not g.is_empty])]
 # the building sites the DBGT green leaves out (VERDE.aree), the yards less those (STR.togli_cortili) and the rail bed drawn round everything
 # (FER.disegno), on threads from here (src/presto.py): the sites (area_geoms 7, final since FER.banchine), the surfaces, the platforms, the
 # buildings and the tracks are final. The tests on the prepared cover stay here
@@ -1011,7 +1014,7 @@ if dbt_walls:
     # barriers only in OSM (Carlo, 1/11): where the DBGT has no divider along an OSM hedge or wall, this one is drawn (the DBGT does not map every one)
     _dbt_z = unary_union([LineString(b_[0]).buffer(OSM_SOLO_D) for b_ in barriers[_dbt_i0:_dbt_i1] if len(b_[0]) >= 2]) if _dbt_i1 > _dbt_i0 else GeometryCollection()
     prepare(_dbt_z); _osm_solo = Counter(); _osm_solo_m = Counter(); _osm_all_m = 0.0
-    _osm_rest = in_parallelo(lambda pts_: LineString(pts_).difference(_dbt_z), [v_[0] for v_ in _osm_orig.values()])   # the same difference for each line, on all the cores (src/presto.py), used in order below
+    _osm_rest = differenze([LineString(v_[0]) for v_ in _osm_orig.values()], _dbt_z)   # the same difference for each line, in processes of their own (src/processi.py: shapely keeps the GIL in a difference), used in order below
     for (i_, (pts, k_, h_)), rest_ in zip(_osm_orig.items(), _osm_rest):
         L0_ = LineString(pts); _osm_all_m += L0_.length
         keep_ = [r_ for r_ in (list(rest_.geoms) if hasattr(rest_, 'geoms') else [rest_]) if isinstance(r_, LineString) and r_.length >= OSM_SOLO_MIN]
@@ -1028,6 +1031,7 @@ if dbt_walls:
 PC_D, PC_W = 6.0, 3.6
 # the barriers do not change until the cemetery walls: their union for those, on a thread from here (src/presto.py)
 _osm_bar_all_f = presto(lambda b_: unary_union([LineString(pts).buffer(1.5) for pts, k, h in b_ if len(pts) >= 2]) if b_ else GeometryCollection(), list(barriers))
+_have_f = subito(lambda f_, b_: unary_union([LineString(x_).buffer(12) for x_ in f_] + [LineString(p_).buffer(12) for p_, k_, h_ in b_ if len(p_) >= 2]), list(fences), list(barriers)) if railL else None   # the 12 m round every fence and barrier for the railway fill-in below (fences final since the railway fences), on a thread of its own from here
 pc_cuts, pc_gates = [], []
 _pcgV = PuntiVicini(pc_gates, lambda g_: ((g_[0][0] + g_[1][0]) / 2, (g_[0][1] + g_[1][1]) / 2))   # "a gate of these closer than r?" without going through the whole list (src/vicini.py)
 if dbt_pc:
@@ -1151,7 +1155,7 @@ _bc_parts_f = presto(lambda: ([r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5
 # railway fill-in: along every track, wherever no fence or wall stands within 12 m on that side, a fence 4.2 m out from the outer track; open at
 # level crossings, platforms, buildings and the ends of the line (the corridor fences above only exist where OSM maps the railway land)
 if railL:
-    _have = unary_union([LineString(f_).buffer(12) for f_ in fences] + [LineString(p_).buffer(12) for p_, k_, h_ in barriers if len(p_) >= 2])
+    _have = _have_f.result(); del _have_f   # = unary_union([LineString(f_).buffer(12) for f_ in fences] + [LineString(p_).buffer(12) for p_, k_, h_ in barriers if len(p_) >= 2])
     _xs, _tips = xpts, tips  # the same crossings and track ends as the corridor fences above
     _open = unary_union(_xs + [_plat06.result(), _bunb[0.3].result(), _have] + [Point(c_).buffer(9) for c_ in _tips]); del _plat06, _bunb[0.3], _openings_f
     _edge = _r42_f.pop().result().boundary.difference(_open).intersection(RECT.buffer(20))  # = unary_union([l.buffer(4.2, cap_style=2) for l in railL]).boundary...
@@ -1582,10 +1586,10 @@ for w_ in sorted(set(w for p, w in rivers)):
         if isinstance(l, LineString) and l.length > 1: riv_lines.append((l, w_))
 # the OSM line onto the bottom of the valley of the LiDAR (src/fiumi.py): at the Campaccio it ran halfway up the hillside, and so did the water
 import fiumi
-riv_lines, _fiumi_rep = fiumi.al_fondo(riv_lines, vietate=unary_union([bunion, asph]), log=log, strade=unary_union([asph] + ([corridor] if not corridor.is_empty else [])))
+riv_lines, _fiumi_rep = fiumi.al_fondo(riv_lines, vietate=_fiumi_u[0].result(), log=log, strade=_fiumi_u[1].result())   # = unary_union([bunion, asph]), unary_union([asph] + ([corridor] if not corridor.is_empty else []))
 # the drawn streets (inside the DBGT the carriageway AC_VEI, often wider than the OSM band) a river crossing them is cut against too: no
 # water or culvert mouth on the asphalt (via Varese at the Campaccio, x 563 z -1738: the water ran across the junction)
-_disegnate = unary_union([g for g in (asph, pedz, side, corridor) if g is not None and not g.is_empty]); prepare(_disegnate)
+_disegnate = _fiumi_u[2].result(); del _fiumi_u; prepare(_disegnate)   # = unary_union([g for g in (asph, pedz, side, corridor) if g is not None and not g.is_empty])
 cut_src = []
 for r in raw_roads:
     if flat(r) and r['line'].length > 0.1:
@@ -1952,7 +1956,7 @@ CL_MAXC = 1  # only main streets and through roads get them: between towns grown
 # CL_GAP m of the same name, and the side streets that meet it right at the boundary get none (no sign at every turning)
 CL_ALONG, CL_GAP = 40, 250
 _bu = unary_union([b_[0] for b_ in blines]).buffer(12) if blines else GeometryCollection()
-_along = [r for r, l_ in zip(_clr, in_parallelo(lambda r: r['line'].intersection(_bu).length, _clr)) if l_ > CL_ALONG] if blines else []  # the intersections on all the cores
+_along = [r for r, x_ in zip(_clr, intersezioni([r['line'] for r in _clr], _bu)) if x_.length > CL_ALONG] if blines else []  # the intersections in processes of their own (src/processi.py: shapely keeps the GIL in an intersection)
 _alt = STRtree([r['line'] for r in _along]) if _along else None
 _cl_by_name = defaultdict(list)
 if blines:
