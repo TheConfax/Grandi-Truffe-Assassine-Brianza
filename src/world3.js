@@ -750,6 +750,27 @@ function terrDrawnH(x, z) { // the terrain patch as drawn: visH on its tile's gr
 // ---- surfaces on the grid of S (docs/motore.md 3, phase 5): polyFill and mkMesh hand their draped polygons and triangles here
 // a polygon y over the ground, cut on the cells of S (H.clipPoly); false where no tile of S is under it, and polyFill drapes it the old way.
 // Its vertices are absolute (b.ab), mkMesh leaves them alone; a piece over a tile without .bin stays relative and drapes as before
+/* direction of the road, for the details of the asphalt (patches along the road): the axis of the edges of the asphalt polygons of the tile, each
+   weighted by its length over the squared distance to it (+ 8 m, so the notches of the bays and the little ends cancel and the long sides count).
+   Edges in a grid of 32 m; the answer is cos 2a and sin 2a (axis, doubled angle) as a colour, 0 = unknown: the shader of MAT.asph and MAT.asphS reads it and
+   does not multiply it in. The pieces on S (clipFill) and the whole cells of S (terrain of buildTileGen) ask the same field, so no seam between them */
+function asfGrid(T) {
+  if (T.asfG) return T.asfG; const B = 32, K = (i, j) => (i + 4096) * 8192 + (j + 4096), g = new Map(); T.asfG = g; g.B = B; g.K = K;
+  for (const q of T.d.as || []) for (const r of [dec(q.p), ...q.k.map(dec)]) for (let i = 0; i < r.length; i++) {
+    const a = r[i], c = r[(i + 1) % r.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5) continue; const e = [a[0], a[1], c[0], c[1], L, (c[0] - a[0]) / L, (c[1] - a[1]) / L], n = Math.ceil(L / 16);
+    let last = -1; for (let k = 0; k <= n; k++) { const key = K(Math.floor((a[0] + (c[0] - a[0]) * k / n) / B), Math.floor((a[1] + (c[1] - a[1]) * k / n) / B)); if (key === last) continue; last = key; let l = g.get(key); if (!l) g.set(key, l = []); if (l[l.length - 1] !== e) l.push(e); }
+  }
+  return g;
+}
+const ASF_NO = { r: 0, g: 0, b: 0 };
+function asfCol(g, x, z) {
+  const B = g.B, ix = Math.floor(x / B), iz = Math.floor(z / B); let sx = 0, sz = 0;
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const l = g.get(g.K(ix + i, iz + j)); if (!l) continue;
+    for (const [ax, az, bx, bz, L, dx, dz] of l) { const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L)), d = hyp(ax + (bx - ax) * t - x, az + (bz - az) * t - z), w = L / ((d + 8) * (d + 8)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
+  }
+  const l = hyp(sx, sz); return l > 1e-9 ? { r: 0.5 + 0.5 * sx / l, g: 0.5 + 0.5 * sz / l, b: 1 } : ASF_NO;
+}
 /* angle of the long side of the paving blocks to the kerb: 0 = along it, Math.PI / 2 = across it (from the kerb towards the wall); the one number to turn them */
 const PAVER_ROT = Math.PI / 2;
 function clipFill(b, outer, holes, y, vScale, col) {
@@ -767,7 +788,12 @@ function clipFill(b, outer, holes, y, vScale, col) {
       let sx = 0, sz = 0; for (const [x, z, L, dx, dz] of sg) { const d = hyp(x - mx, z - mz), w = L / ((d + 1) * (d + 1)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
       const th = Math.round(Math.atan2(sz, sx) / 2 / 0.0349) * 0.0349 + PAVER_ROT; co = Math.cos(th) / vScale; si = Math.sin(th) / vScale;
     }
-    for (let k = 0; k < P.length; k++) { const x = P[k][0], z = P[k][1]; let yy = y; if (fine) { yy += b.free ? H.overFree(x, z, P[k][2]) : P[k][2]; ab[i0 + k] = 1; } vtx(b, x, yy, z, 0, 1, 0, x * co + z * si, -x * si + z * co, col); }
+    for (let k = 0; k < P.length; k++) {
+      const x = P[k][0], z = P[k][1]; let yy = y, cc = col;
+      if (fine) { yy += b.free ? H.overFree(x, z, P[k][2]) : P[k][2]; ab[i0 + k] = 1; }
+      if (b.asf) cc = asfCol(b.asf, x, z); /* asphalt: the direction of the road in the colour (asfCol) */
+      vtx(b, x, yy, z, 0, 1, 0, x * co + z * si, -x * si + z * co, cc);
+    }
     for (let k = 1; k < P.length - 1; k++) triUp(b, i0, i0 + k, i0 + k + 1);
   }, b.rk, b.street);
 }
@@ -1242,7 +1268,8 @@ function* buildTileGen(T) {
       // triangle: built that way this slice took 40-60 ms in the town centre (a stutter while driving), now about as long as the bare terrain
       const sy = FT.sty[w]; let B = byStyle.get(sy); if (!B) byStyle.set(sy, B = { b: Buf(), sy, k: byStyle.size + 1 });
       if (tri & 1) { T.cellIdx[w] = B.b.i.length; T.cellMesh[w] = B.k; } const i0 = B.b.p.length / 3, vs = sy.vs;
-      vtx(B.b, ax, ay, az, 0, 1, 0, ax / vs, az / vs, sy.col); vtx(B.b, bx, by, bz, 0, 1, 0, bx / vs, bz / vs, sy.col); vtx(B.b, cx, cy, cz, 0, 1, 0, cx / vs, cz / vs, sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
+      const asf = sy.m === MAT.asphS ? asfGrid(T) : null; /* asphalt: the direction of the road at each corner (asfCol) in place of a colour */
+      vtx(B.b, ax, ay, az, 0, 1, 0, ax / vs, az / vs, asf ? asfCol(asf, ax, az) : sy.col); vtx(B.b, bx, by, bz, 0, 1, 0, bx / vs, bz / vs, asf ? asfCol(asf, bx, bz) : sy.col); vtx(B.b, cx, cy, cz, 0, 1, 0, cx / vs, cz / vs, asf ? asfCol(asf, cx, cz) : sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
     });
     { const s_ = srndT; yield 'terrain 2'; srndT = s_; } for (const { b, sy } of byStyle.values()) T.ownMeshes.push(mkMesh(b, sy.m, -2, false, G));
     { const s_ = srndT; yield 'terrain 3'; srndT = s_; }
@@ -1384,7 +1411,7 @@ function* buildTileGen(T) {
   yield 'streets';
   // street surfaces
   {
-    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
+    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; asp.angc = true; asp.asf = asfGrid(T); por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
     const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
     fill(d.as, asp, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fill(d.pz, por, 0.06 * fy, 4); fill(d.ft, foot, 0.045 * fy, 4);
