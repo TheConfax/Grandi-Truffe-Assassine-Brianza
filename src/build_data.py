@@ -1504,13 +1504,16 @@ for o, a, w in front_gates:
 # most of the points of a strip round it fall inside (fast: a point test against a prepared polygon, not an intersection with the whole network per gate)
 _carr_cl = _carr_cl_f.result(); del _carr_cl_f; prepare(_carr_cl)   # = unary_union([asph] + ([STR.U_carr] if STR else [])).buffer(1.0, quad_segs=2).buffer(-1.0, quad_segs=2), started with the gates
 _carr_ok = lambda x_, z_: _carr_cl.contains(Point(x_, z_))
+import shapely as _shp
 def _frac_carr(G_, w_=1.2):
-    """share of points on and beside the line G_ (w_ each side) that lie in the carriageway"""
-    n_ = max(2, int(G_.length / 1.0) + 1); hit_ = tot_ = 0
+    """share of points on and beside the line G_ (w_ each side) that lie in the carriageway (the points along the line and the test against
+    the prepared carriageway all at once: the same numbers as one G_.interpolate and one _carr_ok at a time)"""
+    n_ = max(2, int(G_.length / 1.0) + 1); ts_ = [i_ / n_ for i_ in range(n_ + 1)]
+    P_ = _shp.get_coordinates(_shp.line_interpolate_point(G_, ts_ + [min(1.0, t_ + 0.01) for t_ in ts_], normalized=True)).tolist(); xs_, zs_ = [], []
     for i_ in range(n_ + 1):
-        p_ = G_.interpolate(i_ / n_, normalized=True); q_ = G_.interpolate(min(1.0, i_ / n_ + 0.01), normalized=True); dx_, dz_ = q_.x - p_.x, q_.y - p_.y; l_ = math.hypot(dx_, dz_) or 1; nx_, nz_ = -dz_ / l_, dx_ / l_
-        for o_ in (-w_, 0.0, w_): tot_ += 1; hit_ += _carr_ok(p_.x + nx_ * o_, p_.y + nz_ * o_)
-    return hit_ / tot_
+        (px_, pz_), (qx_, qz_) = P_[i_], P_[n_ + 1 + i_]; dx_, dz_ = qx_ - px_, qz_ - pz_; l_ = math.hypot(dx_, dz_) or 1; nx_, nz_ = -dz_ / l_, dx_ / l_
+        for o_ in (-w_, 0.0, w_): xs_.append(px_ + nx_ * o_); zs_.append(pz_ + nz_ * o_)
+    return int(_shp.contains_xy(_carr_cl, xs_, zs_).sum()) / len(xs_)
 def _gate_in_strada(g_):
     G_ = LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)])
     if _asph_in.intersects(G_) and _asph_in.intersection(G_).length > 0.3: return True

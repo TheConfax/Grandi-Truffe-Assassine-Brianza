@@ -7,10 +7,10 @@ Windows starts the processes fresh (spawn): they run this file, never build_data
   differenze(geoms, Z)    = [g.difference(Z) for g in geoms]; on NP processes when there are many, otherwise here
   intersezioni(geoms, Z)  = [g.intersection(Z) for g in geoms], the same way
   mappa(modulo, fn, items, iniz)  = [modulo.fn(x) for x in items] after modulo.iniz[0](*iniz[1:]) (a pure fn of src/<modulo>.py, picklable items and results)"""
-import os, sys, pickle, subprocess, tempfile, shutil
+import os, sys, pickle, subprocess, tempfile, shutil, time
 import shapely
 
-NP = max(1, min(6, (os.cpu_count() or 4) // 2))   # six at most: each holds its own copy of Z (the build shares the machine)
+NP = max(1, min(8, (os.cpu_count() or 4) // 2))   # eight at most: each holds its own copy of Z (the build shares the machine)
 
 
 def differenze(geoms, Z, nproc=NP, minimo=200): return _molte('difference', geoms, Z, nproc, minimo)
@@ -24,10 +24,13 @@ def _molte(op, geoms, Z, nproc, minimo):
     if len(geoms) < minimo or nproc < 2 or os.environ.get('GTA_SENZA_PROCESSI'): return [getattr(g, op)(Z) for g in geoms]
     d = tempfile.mkdtemp(prefix='processi_'); fi, fo = os.path.join(d, 'in.pkl'), os.path.join(d, 'out.pkl')
     try:
-        with open(fi, 'wb') as f: pickle.dump((shapely.to_wkb(Z), [shapely.to_wkb(g) for g in geoms]), f, protocol=4)
+        t0 = time.time(); zb = shapely.to_wkb(Z)
+        with open(fi, 'wb') as f: pickle.dump((zb, [shapely.to_wkb(g) for g in geoms]), f, protocol=4)
         rc = subprocess.call([sys.executable, os.path.abspath(__file__), '--' + op, fi, fo, str(nproc)])
         if rc == 0 and os.path.exists(fo):
-            with open(fo, 'rb') as f: return [shapely.from_wkb(b) for b in pickle.load(f)]
+            with open(fo, 'rb') as f: out = [shapely.from_wkb(b) for b in pickle.load(f)]
+            print('processi: %d %s contro una geometria di %.0f MB (WKB) in %d processi, %.0f s' % (len(geoms), op, len(zb) / 1e6, nproc, time.time() - t0), flush=True)
+            return out
         print('processi: %s non riuscite (codice %s), le faccio qui' % (op, rc), flush=True)
         return [getattr(g, op)(Z) for g in geoms]
     finally: shutil.rmtree(d, ignore_errors=True)
