@@ -10,9 +10,8 @@ const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [g
 }
 // no repeating patterns (materials and shaders only, no extra mesh): the pavement gets a tone per block (the grid of the photo is read from
 // tex/marciapiede_blocchi.png, one flat value per block, R = random, G = 255 for the blocks the tile cuts at its edge) mixed with a hash of
-// the tile (so the 2 m of the photo never repeat as a whole), the asphalt is sampled on a hexagonal grid (three samples with a random
-// offset and rotation per vertex, blended: "stochastic tiling"), and both get a slow variation of 10-30 m in world coordinates
-// (paler, dirtier, damp zones; darker zones and faint patches). Paint, kerbs and the rest are not touched
+// the tile (so the 2 m of the photo never repeat as a whole), and a slow variation of 15-45 m in world coordinates (paler, dirtier, damp
+// zones). The asphalt is as in dev (its texture is chosen with Carlo). Paint, kerbs and the rest are not touched
 const VAR_GLSL = `
 varying vec3 vWp;
 float h21(vec2 p) { vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
@@ -30,9 +29,9 @@ MAT.side.onBeforeCompile = s => {
   { vec4 bk = texture2D( uBlk, vUv );
     float fw = max(length(dFdx(vUv)), length(dFdy(vUv))), amp = 1. - smoothstep(.012, .05, fw); /* the blocks fade into the mean when they are smaller than a pixel */
     float hb = mix(h21(floor(vUv) + bk.r * 255.), bk.r, step(.5, bk.g)), hc = h21(vec2(bk.r * 255., floor(vUv.x + 3. * floor(vUv.y)) + 7.));
-    float lum = 1. + (hb - .5) * .30 * amp, red = (hc - .5) * .16 * amp;
-    texelColor.rgb *= lum * vec3(1. + red, 1. - red * .25, 1. - red * 1.1);
-    float n = slowN(vWp.xz, 1.), dirty = smoothstep(.5, .72, n), damp = smoothstep(.55, .75, slowN(vWp.xz + 40., .8));
+    float lum = 1. + (hb - .5) * .60 * amp, tn = (hc - .5) * amp; /* tn > 0: pale pink, < 0: nearly brown */
+    texelColor.rgb *= lum * vec3(1. + .12 * tn, 1. + .38 * tn, 1. + .6 * tn);
+    float n = slowN(vWp.xz, 1.5), dirty = smoothstep(.5, .72, n), damp = smoothstep(.55, .75, slowN(vWp.xz + 40., 1.2));
     float g = dot(texelColor.rgb, vec3(.3, .59, .11));
     texelColor.rgb = mix(texelColor.rgb, vec3(g * 1.12), .22 * dirty);          /* faded, paler */
     texelColor.rgb *= 1. - .10 * damp - .06 * dirty * (1. - damp);                 /* damp and dirty: darker */
@@ -40,47 +39,6 @@ MAT.side.onBeforeCompile = s => {
   diffuseColor *= texelColor;`);
 };
 MAT.side.customProgramCacheKey = () => 'marciapiede-var'; MAT.side.needsUpdate = true;
-// asphalt: hexagonal stochastic tiling (Mikkelsen's hex-tiling, plain version)
-const ASPH_HEX = `
-vec3 hexAsph( sampler2D tx, vec2 uv, vec2 dx, vec2 dy ) {
-  vec2 st = uv * 3.4641 * .45; vec2 sk = mat2(1., 0., -.57735027, 1.15470054) * st, id = floor(sk); vec3 b = vec3(fract(sk), 0.); b.z = 1. - b.x - b.y;
-  vec2 v1, v2, v3; vec3 w;
-  if (b.z > 0.) { w = vec3(b.z, b.y, b.x); v1 = id; v2 = id + vec2(0, 1); v3 = id + vec2(1, 0); } else { w = vec3(-b.z, 1. - b.y, 1. - b.x); v1 = id + vec2(1, 1); v2 = id + vec2(1, 0); v3 = id + vec2(0, 1); }
-  w = pow(w, vec3(3.)); w /= w.x + w.y + w.z;
-  vec3 c = vec3(0.);
-  for (int k = 0; k < 3; k++) {
-    vec2 v = k == 0 ? v1 : k == 1 ? v2 : v3; float wk = k == 0 ? w.x : k == 1 ? w.y : w.z, an = 6.2831 * h21(v + 17.3); vec2 of = h22(v);
-    mat2 R = mat2(cos(an), -sin(an), sin(an), cos(an));
-#if __VERSION__ >= 300
-    c += wk * textureGrad( tx, R * uv + of, R * dx, R * dy ).rgb;
-#else
-    c += wk * texture2D( tx, R * uv + of ).rgb;
-#endif
-  }
-  return c;
-}
-`;
-const ASPH_MEAN = new THREE.Vector3(1, 1, 1);
-const asphPatch = s => {
-  VAR_VERT(s);
-  s.fragmentShader = VAR_GLSL + ASPH_HEX + s.fragmentShader.replace('#include <map_fragment>', `
-  vec4 texelColor = vec4( 1. );
-  { vec2 dx = dFdx(vUv), dy = dFdy(vUv);
-    vec3 c = hexAsph( map, vUv, dx, dy );
-#if __VERSION__ >= 300
-    vec3 mean = textureLod( map, vec2(.5), 9. ).rgb;
-#else
-    vec3 mean = texture2D( map, vUv ).rgb;
-#endif
-    c = mean + (c - mean) * 1.35; /* the blend of three loses contrast: put some back */
-    texelColor.rgb = max(c, 0.);
-    float n = slowN(vWp.xz + 90., 1.), dark = smoothstep(.45, .7, n), rattop = smoothstep(.62, .68, vn(vWp.xz / 6.5 + 5.)) * .6 * smoothstep(.4, .6, vn(vWp.xz / 40.));
-    texelColor.rgb *= 1. - .12 * dark - .07 * rattop;
-  }
-  texelColor = mapTexelToLinear( texelColor );
-  diffuseColor *= texelColor;`);
-};
-for (const k of ['asph', 'asphS', 'paved', 'pavedS', 'deck']) if (MAT[k]) { MAT[k].onBeforeCompile = asphPatch; MAT[k].customProgramCacheKey = () => 'asfalto-var'; MAT[k].needsUpdate = true; }
 // incolti: the grass photo dried out (half its green gone, towards straw), large soft patches a bit greener or paler, the ground photo
 // turned brown through irregular blotches (bare earth), a few dark tufts; composed once on a canvas when both photos are in, 16 m a repeat
 Promise.all(['prato', 'terreno'].map(f => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = 'tex/' + f + '.jpg'; }))).then(([pr, te]) => {
