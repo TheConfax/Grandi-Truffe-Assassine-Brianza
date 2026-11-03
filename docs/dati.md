@@ -4,6 +4,8 @@ La cartella `data/` non è in git (pesa circa 700 MB): qui c'è cosa contiene, d
 
 Per rigenerare `brianza.json`: `python src/build.py` (con il Python della `.venv`). Controlla che ci siano tutti i file qui sotto, dice quali mancano, poi lancia `src/build_data.py` con il riquadro della mappa (S 45.6345, N 45.6805, W 9.117, E 9.191). Dura circa 4 minuti per Meda (le grandi operazioni GEOS su più core, `src/presto.py`; il terreno, `python src/terreno_gioco.py --da DIR --rigenera`, meno di uno) e dà sempre gli stessi file. La cartella dei dati si può spostare con la variabile `GTA_DATA`.
 
+Velocità della build (3/11): sui fili (`src/presto.py`) vanno le unioni e i buffer, che lasciano il GIL; le differenze e le intersezioni di molte geometrie contro una grande vanno in processi loro (`src/processi.py`), perché shapely 2.2 tiene il GIL per tutta una `difference` o `intersection` e sui fili non vanno insieme. I passi lenti che dipendono solo dai loro ingressi (tetti dal DSM, numeri della foto Esri dei demoliti, ali dei volumi a L, T, U) hanno una cache su disco in `cache_build/` accanto all'`out.json` (`src/build_cache.py`; la chiave è l'ingresso più il sorgente e i dati che legge; `GTA_NOCACHE=1` per farne a meno). Il risultato è lo stesso byte per byte. Dove va il tempo riga per riga: `python src/campiona.py campioni.txt src/build_data.py <argomenti di build_data.py>`, poi `python src/campiona.py --leggi campioni.txt`.
+
 ## Usate dalla build
 
 | File | Fonte | Scaricato | Licenza | Script |
