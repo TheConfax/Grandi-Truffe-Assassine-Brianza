@@ -3,9 +3,9 @@
 // (tex/*.jpg, made from the originals by the script in the commit): same palette, real asphalt cracks, blades of grass, paving joints.
 // The texture object stays the same, so every material using it follows; repeat turns the UV scale the surface was drawn with
 // (metres per repeat) into the size of the photo (metres)
-/* asfalto: three candidate photos (all CC0), chosen in the link with &asfalto=1|2|3 (default 1); metres a photo covers: 1 ambientCG Asphalt015 and 3 Asphalt031
-   (the site declares no size: 2 m assumed), 2 Poly Haven asphalt_04 (4.04 m declared). &asfsh=0 turns the asphalt details off (for the cost measure) */
-const ASF_N = (/[?&]asfalto=([123])/.exec(location.search) || [0, '1'])[1], ASF_FILE = 'asfalto_' + ASF_N, ASF_M = [0, 2, 4.04, 2][+ASF_N];
+/* asfalto: Poly Haven asphalt_04 (CC0, 4.04 m declared), recoloured to the pale grey of the photo of via Yuri Gagarin and darkened by 0.65 (linear), baked in tex/asfalto.jpg.
+   &asftono=N multiplies the brightness on top (test only, default 1); &asfsh=0 turns the asphalt details off */
+const ASF_FILE = 'asfalto', ASF_M = 4.04;
 const ASF_U = { value: /[?&]asfsh=0/.test(location.search) ? 0 : 1 }; window.__ASFU = ASF_U;
 const ASF_T = { value: +((/[?&]asftono=([0-9.]+)/.exec(location.search) || [0, '1'])[1]) || 1 }; /* &asftono=N: multiplier of the asphalt brightness (default 1) */
 const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 2], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
@@ -212,6 +212,10 @@ const ASF_FRAG = `
     texelColor = vec4(tc, 1.);
   }
   texelColor = mapTexelToLinear(texelColor);
+  vec2 rd = vec2(1., 0.); float hasDir = 0.;
+#if defined( ASF_DIR ) && defined( USE_COLOR )
+  { vec2 q = vColor.rg * 2. - 1.; float lq = length(q); if (vColor.b > .5 && lq > .25) { float th = .5 * atan(q.y, q.x); rd = vec2(cos(th), sin(th)); hasDir = 1.; } }
+#endif
   if (uAsf > .5) {
     vec2 P = vWp.xz; float px = max(length(dFdx(P)), length(dFdy(P))) + 1e-4;
     float far = 1. - smoothstep(.12, .4, px); /* cracks fade out when a pixel is wider than 12-40 cm */
@@ -229,17 +233,21 @@ const ASF_FRAG = `
       texelColor.rgb = mix(texelColor.rgb, texelColor.rgb * .22, cr * .9); }
     /* patches */
     { vec2 gc = floor(P / 16.), lp = P - gc * 16.; vec2 r1 = h22(gc + 21.), r2 = h22(gc + 33.), r3 = h22(gc + 45.);
-      if (r3.x < .22) {
-        vec2 cen = 4. + 8. * r1, hs = (.5 + 1.5 * r2) * vec2(1., .5 + r3.y); float a = (r2.x - .5) * .8 + 1.5708 * floor(r1.x * 2.), ca = cos(a), sa = sin(a);
-        vec2 d = lp - cen; vec2 e = abs(vec2(ca * d.x + sa * d.y, -sa * d.x + ca * d.y)) - hs;
+      if (r3.x < .22 && hasDir > .5) {
+        vec2 cen = 4. + 8. * r1, hs = vec2(.75 + 1.25 * r2.x, .5 + .5 * r2.y); /* half sides: the long one (1.5-4 m) along the road, the short one (1-2 m) across */
+        vec2 d = lp - cen; vec2 e = abs(vec2(dot(d, rd), dot(d, vec2(-rd.y, rd.x)))) - hs;
         float m = (1. - smoothstep(-px, px + .01, max(e.x, e.y))) * far;
         float g = dot(texelColor.rgb, vec3(.3, .59, .11));
         texelColor.rgb = mix(texelColor.rgb, vec3(g) * .5 * (.85 + .3 * r3.y), m * .9); } }
   }
   texelColor.rgb *= uAsT;
   diffuseColor *= texelColor;`;
-const ASF_PATCH = s => {
+/* dir: the colour of the mesh is the direction of the road (cos 2a, sin 2a, 1; asp buffer of world3.js), not a tint: it is read, and not multiplied in */
+const ASF_PATCH = dir => s => {
   VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T;
-  s.fragmentShader = ASF_GLSL + VAR_GLSL + s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
+  let f = s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
+  if (dir) f = '#define ASF_DIR\n' + f.replace('#include <color_fragment>', '');
+  s.fragmentShader = ASF_GLSL + VAR_GLSL + f;
 };
-for (const k of ['asph', 'asphS', 'paved', 'pavedS', 'deck']) { MAT[k].onBeforeCompile = ASF_PATCH; MAT[k].customProgramCacheKey = () => 'asfalto-var'; MAT[k].needsUpdate = true; }
+MAT.asph.vertexColors = true; MAT.asphS.vertexColors = true;
+for (const k of ['asph', 'asphS', 'paved', 'pavedS', 'deck']) { MAT[k].onBeforeCompile = ASF_PATCH(k === 'asph' || k === 'asphS'); MAT[k].customProgramCacheKey = () => 'asfalto-var' + (k === 'asph' || k === 'asphS' ? '-dir' : ''); MAT[k].needsUpdate = true; }
