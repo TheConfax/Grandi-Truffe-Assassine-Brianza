@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo be34edc · assemblato 03/11 02:30 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo bf3fec2 · assemblato 03/11 02:39 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -9986,7 +9986,6 @@ for (const [k, m, tile] of [['old', MAT.old, 3.4], ['mod', MAT.mod, 4.2], ['plai
 const ASF_GLSL = `
 uniform float uAsf, uAsT;
 uniform sampler2D uPat;
-uniform vec3 uSun;
 vec2 h22(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); q += dot(q, q.yzx + 33.33); return fract((q.xx + q.yz) * q.zy); }
 `;
 const ASF_FRAG = `
@@ -10033,29 +10032,21 @@ const ASF_FRAG = `
       float dm = (d2 - d1) * .5 * 12.; /* about the metres to the edge */
       float cr = (1. - smoothstep(wd - px, wd + px, dm)) * min(1., wd * 2. / px) * keep * far;
       texelColor.rgb = mix(texelColor.rgb, texelColor.rgb * .22, cr * .9); }
-    /* patches of new asphalt: 6-25 m along the road (sometimes a whole lane wide), 1-3 m across, with the fine black photo of new asphalt (no cracks) and a slight
-       relief: the edge raised or lowered by a few cm, seen as light and shade on the sun side (Lambert lights per vertex, so the normal is tilted by hand) */
+    /* patches of new asphalt: 6-25 m along the road (sometimes a whole lane wide), 1-3 m across; the photo of new asphalt (darker, more even, finer grain, no cracks)
+       takes the place of the old one inside a sharp cut. No distance threshold: the cut is anti-aliased on the pixel and the photo is mip-mapped, so far away it is a flat darker tone */
     { vec2 gc = floor(P / 40.), lp = P - gc * 40.; vec2 r1 = h22(gc + 21.), r2 = h22(gc + 33.), r3 = h22(gc + 45.);
       if (r3.x < .7 && hasDir > .5) {
         vec2 cen = 15. + 10. * r1, hs = vec2(3. + 9.5 * r2.x, r3.y > .75 ? 1.75 : .5 + .9 * r2.y), nd = vec2(-rd.y, rd.x); /* half sides: long along the road, short across */
-        vec2 d = lp - cen; vec2 q = vec2(dot(d, rd), dot(d, nd)), e = abs(q) - hs; float sd = max(e.x, e.y);
-        float m = (1. - smoothstep(-px, px + .01, sd)) * far;
-        if (m > 0.) {
-          vec3 pt = pow(texture2D(uPat, P / 2.).rgb, vec3(2.2)); /* the photo of new asphalt, 2 m a repeat, in linear */
-          texelColor.rgb = mix(texelColor.rgb, pt * (.8 + .5 * r3.y), m);
-        }
-        float bw = .06, fade = 1. - smoothstep(.03, .1, px);
-        if (abs(sd) < bw && fade > 0.) { /* the edge: height h = rs * (1 - smoothstep(-bw, bw, sd)), rs +1 raised, -1 lowered; the slope is the gradient of h */
-          float rs = r3.y < .6 ? 1. : -1., t = clamp((sd + bw) / (2. * bw), 0., 1.), dh = -rs * 6. * t * (1. - t) / (2. * bw) * .05; /* slope in m per m, exaggerated */
-          vec2 gs = e.x > e.y ? sign(q.x) * rd : sign(q.y) * nd; vec2 sl = dh * gs, Lr = uSun.xz / max(uSun.y, .12);
-          texelColor.rgb *= mix(1., clamp(1. - dot(sl, Lr) * 3., .45, 1.7), fade); }
+        vec2 d = lp - cen; vec2 e = abs(vec2(dot(d, rd), dot(d, nd))) - hs; float sd = max(e.x, e.y);
+        float m = 1. - smoothstep(-px, px + .005, sd);
+        if (m > 0.) texelColor.rgb = mix(texelColor.rgb, pow(texture2D(uPat, P / 2.).rgb, vec3(2.2)) * (.9 + .2 * r3.y), m); /* the photo, 2 m a repeat, in linear */
       } }
   }
   texelColor.rgb *= uAsT;
   diffuseColor *= texelColor;`;
 /* dir: the colour of the mesh is the direction of the road (cos 2a, sin 2a, 1; asp buffer of world3.js), not a tint: it is read, and not multiplied in */
 const ASF_PATCH = dir => s => {
-  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T; s.uniforms.uPat = ASF_PAT; s.uniforms.uSun = { value: SUN_DIR };
+  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T; s.uniforms.uPat = ASF_PAT;
   let f = s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
   if (dir) f = '#define ASF_DIR\n' + f.replace('#include <color_fragment>', '');
   s.fragmentShader = ASF_GLSL + VAR_GLSL + f;
