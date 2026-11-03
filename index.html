@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 83598e0 · assemblato 03/11 02:29 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo be34edc · assemblato 03/11 02:30 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -328,7 +328,7 @@ function blocchiResi() { // the tile is finished: nothing reads its buffers any 
 }
 function passoTile(g) { BLOCCHI.on = true; try { const r = g.next(); if (r.done) blocchiResi(); return r; } finally { BLOCCHI.on = false; } } /* one slice of the building of a tile */
 
-function vtx(b, x, y, z, nx, ny, nz, u, v, col) { b.p.push(x, y, z); b.n.push(nx, ny, nz); b.uv.push(u, v); if (col) b.c.push(col.r, col.g, col.b); return b.p.length / 3 - 1; }
+function vtx(b, x, y, z, nx, ny, nz, u, v, col) { b.p.push(x, y, z); b.n.push(nx, ny, nz); b.uv.push(u, v); if (col) b.c.push(col.r, col.g, col.b); else if (b.angc) b.c.push(0, 0, 0); /* b.angc (asphalt): the colour carries the direction of the road, 0 = unknown */ return b.p.length / 3 - 1; }
 function triUp(b, i, j, k) {
   const P = b.p; const ax = P[i * 3], az = P[i * 3 + 2];
   const cy = (P[j * 3 + 2] - az) * (P[k * 3] - ax) - (P[j * 3] - ax) * (P[k * 3 + 2] - az);
@@ -2329,6 +2329,27 @@ function terrDrawnH(x, z) { // the terrain patch as drawn: visH on its tile's gr
 // ---- surfaces on the grid of S (docs/motore.md 3, phase 5): polyFill and mkMesh hand their draped polygons and triangles here
 // a polygon y over the ground, cut on the cells of S (H.clipPoly); false where no tile of S is under it, and polyFill drapes it the old way.
 // Its vertices are absolute (b.ab), mkMesh leaves them alone; a piece over a tile without .bin stays relative and drapes as before
+/* direction of the road, for the details of the asphalt (patches along the road): the axis of the edges of the asphalt polygons of the tile, each
+   weighted by its length over the squared distance to it (+ 8 m, so the notches of the bays and the little ends cancel and the long sides count).
+   Edges in a grid of 32 m; the answer is cos 2a and sin 2a (axis, doubled angle) as a colour, 0 = unknown: the shader of MAT.asph and MAT.asphS reads it and
+   does not multiply it in. The pieces on S (clipFill) and the whole cells of S (terrain of buildTileGen) ask the same field, so no seam between them */
+function asfGrid(T) {
+  if (T.asfG) return T.asfG; const B = 32, K = (i, j) => (i + 4096) * 8192 + (j + 4096), g = new Map(); T.asfG = g; g.B = B; g.K = K;
+  for (const q of T.d.as || []) for (const r of [dec(q.p), ...q.k.map(dec)]) for (let i = 0; i < r.length; i++) {
+    const a = r[i], c = r[(i + 1) % r.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5) continue; const e = [a[0], a[1], c[0], c[1], L, (c[0] - a[0]) / L, (c[1] - a[1]) / L], n = Math.ceil(L / 16);
+    let last = -1; for (let k = 0; k <= n; k++) { const key = K(Math.floor((a[0] + (c[0] - a[0]) * k / n) / B), Math.floor((a[1] + (c[1] - a[1]) * k / n) / B)); if (key === last) continue; last = key; let l = g.get(key); if (!l) g.set(key, l = []); if (l[l.length - 1] !== e) l.push(e); }
+  }
+  return g;
+}
+const ASF_NO = { r: 0, g: 0, b: 0 };
+function asfCol(g, x, z) {
+  const B = g.B, ix = Math.floor(x / B), iz = Math.floor(z / B); let sx = 0, sz = 0;
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const l = g.get(g.K(ix + i, iz + j)); if (!l) continue;
+    for (const [ax, az, bx, bz, L, dx, dz] of l) { const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L)), d = hyp(ax + (bx - ax) * t - x, az + (bz - az) * t - z), w = L / ((d + 8) * (d + 8)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
+  }
+  const l = hyp(sx, sz); return l > 1e-9 ? { r: 0.5 + 0.5 * sx / l, g: 0.5 + 0.5 * sz / l, b: 1 } : ASF_NO;
+}
 /* angle of the long side of the paving blocks to the kerb: 0 = along it, Math.PI / 2 = across it (from the kerb towards the wall); the one number to turn them */
 const PAVER_ROT = Math.PI / 2;
 function clipFill(b, outer, holes, y, vScale, col) {
@@ -2346,7 +2367,12 @@ function clipFill(b, outer, holes, y, vScale, col) {
       let sx = 0, sz = 0; for (const [x, z, L, dx, dz] of sg) { const d = hyp(x - mx, z - mz), w = L / ((d + 1) * (d + 1)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
       const th = Math.round(Math.atan2(sz, sx) / 2 / 0.0349) * 0.0349 + PAVER_ROT; co = Math.cos(th) / vScale; si = Math.sin(th) / vScale;
     }
-    for (let k = 0; k < P.length; k++) { const x = P[k][0], z = P[k][1]; let yy = y; if (fine) { yy += b.free ? H.overFree(x, z, P[k][2]) : P[k][2]; ab[i0 + k] = 1; } vtx(b, x, yy, z, 0, 1, 0, x * co + z * si, -x * si + z * co, col); }
+    for (let k = 0; k < P.length; k++) {
+      const x = P[k][0], z = P[k][1]; let yy = y, cc = col;
+      if (fine) { yy += b.free ? H.overFree(x, z, P[k][2]) : P[k][2]; ab[i0 + k] = 1; }
+      if (b.asf) cc = asfCol(b.asf, x, z); /* asphalt: the direction of the road in the colour (asfCol) */
+      vtx(b, x, yy, z, 0, 1, 0, x * co + z * si, -x * si + z * co, cc);
+    }
     for (let k = 1; k < P.length - 1; k++) triUp(b, i0, i0 + k, i0 + k + 1);
   }, b.rk, b.street);
 }
@@ -2821,7 +2847,8 @@ function* buildTileGen(T) {
       // triangle: built that way this slice took 40-60 ms in the town centre (a stutter while driving), now about as long as the bare terrain
       const sy = FT.sty[w]; let B = byStyle.get(sy); if (!B) byStyle.set(sy, B = { b: Buf(), sy, k: byStyle.size + 1 });
       if (tri & 1) { T.cellIdx[w] = B.b.i.length; T.cellMesh[w] = B.k; } const i0 = B.b.p.length / 3, vs = sy.vs;
-      vtx(B.b, ax, ay, az, 0, 1, 0, ax / vs, az / vs, sy.col); vtx(B.b, bx, by, bz, 0, 1, 0, bx / vs, bz / vs, sy.col); vtx(B.b, cx, cy, cz, 0, 1, 0, cx / vs, cz / vs, sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
+      const asf = sy.m === MAT.asphS ? asfGrid(T) : null; /* asphalt: the direction of the road at each corner (asfCol) in place of a colour */
+      vtx(B.b, ax, ay, az, 0, 1, 0, ax / vs, az / vs, asf ? asfCol(asf, ax, az) : sy.col); vtx(B.b, bx, by, bz, 0, 1, 0, bx / vs, bz / vs, asf ? asfCol(asf, bx, bz) : sy.col); vtx(B.b, cx, cy, cz, 0, 1, 0, cx / vs, cz / vs, asf ? asfCol(asf, cx, cz) : sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
     });
     { const s_ = srndT; yield 'terrain 2'; srndT = s_; } for (const { b, sy } of byStyle.values()) T.ownMeshes.push(mkMesh(b, sy.m, -2, false, G));
     { const s_ = srndT; yield 'terrain 3'; srndT = s_; }
@@ -2963,7 +2990,7 @@ function* buildTileGen(T) {
   yield 'streets';
   // street surfaces
   {
-    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
+    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; asp.angc = true; asp.asf = asfGrid(T); por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
     const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
     fill(d.as, asp, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fill(d.pz, por, 0.06 * fy, 4); fill(d.ft, foot, 0.045 * fy, 4);
@@ -9775,10 +9802,12 @@ window.__FX = { headSpot, CLOUDS, RAIN, STARS, CARGLOW, LAMPGLOW_MAT, LAMPPOOL_M
 // (tex/*.jpg, made from the originals by the script in the commit): same palette, real asphalt cracks, blades of grass, paving joints.
 // The texture object stays the same, so every material using it follows; repeat turns the UV scale the surface was drawn with
 // (metres per repeat) into the size of the photo (metres)
-/* asfalto: three candidate photos (all CC0), chosen in the link with &asfalto=1|2|3 (default 1); metres a photo covers: 1 ambientCG Asphalt015 and 3 Asphalt031
-   (the site declares no size: 2 m assumed), 2 Poly Haven asphalt_04 (4.04 m declared). &asfsh=0 turns the asphalt details off (for the cost measure) */
-const ASF_N = (/[?&]asfalto=([123])/.exec(location.search) || [0, '1'])[1], ASF_FILE = 'asfalto_' + ASF_N, ASF_M = [0, 2, 4.04, 2][+ASF_N];
+/* asfalto: Poly Haven asphalt_04 (CC0, 4.04 m declared), recoloured to the pale grey of the photo of via Yuri Gagarin and darkened by 0.65 (linear), baked in tex/asfalto.jpg.
+   &asftono=N multiplies the brightness on top (test only, default 1); &asfsh=0 turns the asphalt details off */
+const ASF_FILE = 'asfalto', ASF_M = 4.04;
+const ASF_PAT = { value: new THREE.TextureLoader().load('tex/asfalto_toppa.jpg', t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; }) }; /* new asphalt for the patches: ambientCG Asphalt020S (CC0), recoloured, 512 px */
 const ASF_U = { value: /[?&]asfsh=0/.test(location.search) ? 0 : 1 }; window.__ASFU = ASF_U;
+const ASF_T = { value: +((/[?&]asftono=([0-9.]+)/.exec(location.search) || [0, '1'])[1]) || 1 }; /* &asftono=N: multiplier of the asphalt brightness (default 1) */
 const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 2], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
 {
   const ld = new THREE.TextureLoader();
@@ -9955,7 +9984,9 @@ for (const [k, m, tile] of [['old', MAT.old, 3.4], ['mod', MAT.mod, 4.2], ['plai
    tone variation over 20-40 m, rare sealed cracks (edges of a Voronoi net, 12 m cells, only some edges kept, warped to wander, 2-4 cm wide), rare patches
    (rectangles of 1-4 m, a little turned, darker and blacker, sharp edge). All in world coordinates. The wheel tracks are not done: the asphalt UVs do not know the road direction */
 const ASF_GLSL = `
-uniform float uAsf;
+uniform float uAsf, uAsT;
+uniform sampler2D uPat;
+uniform vec3 uSun;
 vec2 h22(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); q += dot(q, q.yzx + 33.33); return fract((q.xx + q.yz) * q.zy); }
 `;
 const ASF_FRAG = `
@@ -9983,6 +10014,10 @@ const ASF_FRAG = `
     texelColor = vec4(tc, 1.);
   }
   texelColor = mapTexelToLinear(texelColor);
+  vec2 rd = vec2(1., 0.); float hasDir = 0.;
+#if defined( ASF_DIR ) && defined( USE_COLOR )
+  { vec2 q = vColor.rg * 2. - 1.; float lq = length(q); if (vColor.b > .5 && lq > .25) { float th = .5 * atan(q.y, q.x); rd = vec2(cos(th), sin(th)); hasDir = 1.; } }
+#endif
   if (uAsf > .5) {
     vec2 P = vWp.xz; float px = max(length(dFdx(P)), length(dFdy(P))) + 1e-4;
     float far = 1. - smoothstep(.12, .4, px); /* cracks fade out when a pixel is wider than 12-40 cm */
@@ -9998,21 +10033,35 @@ const ASF_FRAG = `
       float dm = (d2 - d1) * .5 * 12.; /* about the metres to the edge */
       float cr = (1. - smoothstep(wd - px, wd + px, dm)) * min(1., wd * 2. / px) * keep * far;
       texelColor.rgb = mix(texelColor.rgb, texelColor.rgb * .22, cr * .9); }
-    /* patches */
-    { vec2 gc = floor(P / 16.), lp = P - gc * 16.; vec2 r1 = h22(gc + 21.), r2 = h22(gc + 33.), r3 = h22(gc + 45.);
-      if (r3.x < .22) {
-        vec2 cen = 4. + 8. * r1, hs = (.5 + 1.5 * r2) * vec2(1., .5 + r3.y); float a = (r2.x - .5) * .8 + 1.5708 * floor(r1.x * 2.), ca = cos(a), sa = sin(a);
-        vec2 d = lp - cen; vec2 e = abs(vec2(ca * d.x + sa * d.y, -sa * d.x + ca * d.y)) - hs;
-        float m = (1. - smoothstep(-px, px + .01, max(e.x, e.y))) * far;
-        float g = dot(texelColor.rgb, vec3(.3, .59, .11));
-        texelColor.rgb = mix(texelColor.rgb, vec3(g) * .5 * (.85 + .3 * r3.y), m * .9); } }
+    /* patches of new asphalt: 6-25 m along the road (sometimes a whole lane wide), 1-3 m across, with the fine black photo of new asphalt (no cracks) and a slight
+       relief: the edge raised or lowered by a few cm, seen as light and shade on the sun side (Lambert lights per vertex, so the normal is tilted by hand) */
+    { vec2 gc = floor(P / 40.), lp = P - gc * 40.; vec2 r1 = h22(gc + 21.), r2 = h22(gc + 33.), r3 = h22(gc + 45.);
+      if (r3.x < .7 && hasDir > .5) {
+        vec2 cen = 15. + 10. * r1, hs = vec2(3. + 9.5 * r2.x, r3.y > .75 ? 1.75 : .5 + .9 * r2.y), nd = vec2(-rd.y, rd.x); /* half sides: long along the road, short across */
+        vec2 d = lp - cen; vec2 q = vec2(dot(d, rd), dot(d, nd)), e = abs(q) - hs; float sd = max(e.x, e.y);
+        float m = (1. - smoothstep(-px, px + .01, sd)) * far;
+        if (m > 0.) {
+          vec3 pt = pow(texture2D(uPat, P / 2.).rgb, vec3(2.2)); /* the photo of new asphalt, 2 m a repeat, in linear */
+          texelColor.rgb = mix(texelColor.rgb, pt * (.8 + .5 * r3.y), m);
+        }
+        float bw = .06, fade = 1. - smoothstep(.03, .1, px);
+        if (abs(sd) < bw && fade > 0.) { /* the edge: height h = rs * (1 - smoothstep(-bw, bw, sd)), rs +1 raised, -1 lowered; the slope is the gradient of h */
+          float rs = r3.y < .6 ? 1. : -1., t = clamp((sd + bw) / (2. * bw), 0., 1.), dh = -rs * 6. * t * (1. - t) / (2. * bw) * .05; /* slope in m per m, exaggerated */
+          vec2 gs = e.x > e.y ? sign(q.x) * rd : sign(q.y) * nd; vec2 sl = dh * gs, Lr = uSun.xz / max(uSun.y, .12);
+          texelColor.rgb *= mix(1., clamp(1. - dot(sl, Lr) * 3., .45, 1.7), fade); }
+      } }
   }
+  texelColor.rgb *= uAsT;
   diffuseColor *= texelColor;`;
-const ASF_PATCH = s => {
-  VAR_VERT(s); s.uniforms.uAsf = ASF_U;
-  s.fragmentShader = ASF_GLSL + VAR_GLSL + s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
+/* dir: the colour of the mesh is the direction of the road (cos 2a, sin 2a, 1; asp buffer of world3.js), not a tint: it is read, and not multiplied in */
+const ASF_PATCH = dir => s => {
+  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T; s.uniforms.uPat = ASF_PAT; s.uniforms.uSun = { value: SUN_DIR };
+  let f = s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
+  if (dir) f = '#define ASF_DIR\n' + f.replace('#include <color_fragment>', '');
+  s.fragmentShader = ASF_GLSL + VAR_GLSL + f;
 };
-for (const k of ['asph', 'asphS', 'paved', 'pavedS', 'deck']) { MAT[k].onBeforeCompile = ASF_PATCH; MAT[k].customProgramCacheKey = () => 'asfalto-var'; MAT[k].needsUpdate = true; }
+MAT.asph.vertexColors = true; MAT.asphS.vertexColors = true;
+for (const k of ['asph', 'asphS', 'paved', 'pavedS', 'deck']) { MAT[k].onBeforeCompile = ASF_PATCH(k === 'asph' || k === 'asphS'); MAT[k].customProgramCacheKey = () => 'asfalto-var' + (k === 'asph' || k === 'asphS' ? '-dir' : ''); MAT[k].needsUpdate = true; }
 
 function updVisuals(dt) {
   const cx = camera.position.x, cz = camera.position.z;
