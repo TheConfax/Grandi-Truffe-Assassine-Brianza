@@ -156,7 +156,7 @@ const FOTO_FACADE = (s, tile) => {
 #endif
   vec3 outgoingLight =`);
 };
-// ambient occlusion on the walls (AO_WALL in world3.js) and the facades, after the patch that lights the windows
+// ambient occlusion on the walls (AO_WALL in world3.js) and the facades, after the patch that lights the windows; then only whole windows (FAC_WALL)
 for (const [k, m, tile] of [['old', MAT.old, 3.4], ['mod', MAT.mod, 4.2], ['plain', MAT.plain, 4]]) {
-  const before = m.onBeforeCompile; m.onBeforeCompile = s => { before.call(m, s); AO_WALL(s); FOTO_FACADE(s, tile); }; m.customProgramCacheKey = () => 'foto-' + k; m.needsUpdate = true;
+  const before = m.onBeforeCompile; m.onBeforeCompile = s => { before.call(m, s); AO_WALL(s); FOTO_FACADE(s, tile); if (k !== 'plain') FAC_WALL(s); }; m.customProgramCacheKey = () => 'foto-' + k; m.needsUpdate = true;
 }
