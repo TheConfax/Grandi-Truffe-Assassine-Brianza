@@ -1,5 +1,13 @@
 # Da fare
 
+## Piano al ritorno di Carlo (deciso il 3/11 notte) — leggere per primo
+Stato: in `dev` c'è la build veloce (2e046e1). Unico agente acceso: terzo giro di `segnaletica-orizzontale` (8046); quando consegna, mi fermo e non lancio altro.
+1. **Verificare con Carlo la segnaletica** (8046): regola dei dare precedenza (ogni ingresso di rotonda + tutti i dare/stop OSM, controllo "ingressi senza linea = 0"), fermate doppie unite, cartello di troppo. Foto guardate da me prima di girarle. Unione in dev solo col suo sì.
+2. **Build veloce anche del terreno**: `terreno_gioco --rigenera` ~505 s, tempo soprattutto in 228k buffer piccoli di `superficie.raster` (80 s), fasi lunghe acqua 51 s, binari 45 s, lisciatore 44 s, sottoterra ~100 s. Stesso metodo della build: profilazione, risultato identico byte per byte.
+3. **Sottopassi, settimo giro** (ramo `sottopassi-cavalcavia`, 8e1271b, 8042, non unito): gradino di traverso ai due capi (images/30.png), bocca sud del sottopasso Milano-Meda "un disastro" (images/31-32.png), stazione da finire (images/34.png), raccordo dello spartitraffico, parapetti a scalini. Nuove regole: inquadrature scelte da noi (anche dall'alto inclinata) e foto controllate da un secondo agente nuovo che non sa cosa è stato cambiato.
+
+**In coda, tutto deciso oggi (3/11), dettagli più sotto in questo file:** lisciatore delle righe (dopo build veloce: fatta); superfici (piazza bianca dell'anfiteatro); anfiteatro di via Indipendenza come pezzo a mano; cave abbandonate x -968 z -1008 con molto dettaglio; cartelli di confine comunale (15 su 68); spartitraffico della Milano-Meda da rifare in generale; fisica a piedi e in auto sulle pendenze (scavalcare oggetti fino a un'altezza, niente salite su pareti ripide); righe vere dall'ortofoto (prova su 2-3 incroci); cancelli mancanti (via Angeli Custodi, via Papa Giovanni XXIII); macchina incastrata a corso Isonzo x 319 z 1981; pedoni solo nelle zone giuste (trincea di Montecassino); passerelle pedonali e capi di ponte senza spalla; gobba del parcheggio di Seveso; case più varie; prima persona in auto e modelli delle auto; sfondo della mappa grande coi colori; safehouse x 1683 z 173; acqua realistica. Fuori da Meda+Seveso non si cura niente ("residuo bellico").
+
 ## Scaletta (ottobre 2026)
 **Ordine di Carlo (31/10), vale sopra la lista qui sotto:** prima il gameplay di base (comandi, movimento, telecamera, fisica), poi i sistemi del gioco, solo dopo la storia.
 Regola per tutto: niente stili, scritte o dettagli inventati. Quello che non viene da OSM, da foto recenti o da chi gioca resta neutro.
