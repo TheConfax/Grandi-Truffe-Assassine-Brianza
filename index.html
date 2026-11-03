@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 43e6cbc · assemblato 03/11 01:03 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 35a43d5 · assemblato 03/11 01:26 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -9749,27 +9749,41 @@ const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [g
   const ld = new THREE.TextureLoader();
   for (const [t, f, r] of FOTO_TEX) ld.load('tex/' + f + '.jpg', img => { t.image = img.image; t.repeat.set(r, r); t.needsUpdate = true; });
 }
-// no repeating patterns (materials and shaders only, no extra mesh): the pavement gets a tone per block (the grid of the photo is read from
-// tex/marciapiede_blocchi.png, one flat value per block, R = random, G = 255 for the blocks the tile cuts at its edge) mixed with a hash of
-// the tile (so the 2 m of the photo never repeat as a whole), and a slow variation of 15-45 m in world coordinates (paler, dirtier, damp
-// zones). The asphalt is as in dev (its texture is chosen with Carlo). Paint, kerbs and the rest are not touched
+// no repeating patterns (shaders only, no extra mesh). The photo of the pavement is a regular grid: 20 rows of 25.6 px (the first joint at 25 px), blocks 51.2 px wide in a
+// running bond, the row's phase in BLK_PH (fitted on the joints of tex/marciapiede.jpg, 512 px = 2 m). Every block takes the face of another
+// block of the photo, picked by a hash of the block in the world (its row, its column and the tile its centre lies in), sometimes turned 180
+// degrees: the sample goes to the donor block at the same offset from its centre, so the joints stay straight and aligned. On top of it a tone
+// per block (lighter or darker, towards pale pink or nearly brown), and a slow variation of 15-45 m in world coordinates (paler, dirtier, damp
+// zones). Far away, where a block is a few pixels, the plain photo takes over (no flicker). The asphalt is as in dev (its texture is chosen with
+// Carlo). Paint, kerbs and the rest are not touched
+const BLK_PH = [25.4, 0.2, 25.2, 0.4, 26.0, 0.6, 26.0, 0.2, 25.8, 0.6, 26.0, 0.6, 26.0, 0.6, 26.0, 0.4, 25.4, 50.6, 25.2, 0.0];
 const VAR_GLSL = `
 varying vec3 vWp;
 float h21(vec2 p) { vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
-vec2 h22(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); q += dot(q, q.yzx + 33.33); return fract((q.xx + q.yz) * q.zy); }
 float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
 float slowN(vec2 p, float k) { return vn(p / (17. * k) + 3.7) * .55 + vn(p / (29. * k) + 11.3) * .45; }
 `;
 const VAR_VERT = s => { s.vertexShader = 'varying vec3 vWp;\n' + s.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;'); };
-const BLK_U = { value: null };
-new THREE.TextureLoader().load('tex/marciapiede_blocchi.png', t => { t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.LinearEncoding; t.needsUpdate = true; BLK_U.value = t; });
 MAT.side.onBeforeCompile = s => {
-  VAR_VERT(s); s.uniforms.uBlk = BLK_U;
-  s.fragmentShader = 'uniform sampler2D uBlk;\n' + VAR_GLSL + s.fragmentShader.replace('#include <map_fragment>', `
-  vec4 texelColor = mapTexelToLinear( texture2D( map, vUv ) );
-  { vec4 bk = texture2D( uBlk, vUv );
-    float fw = max(length(dFdx(vUv)), length(dFdy(vUv))), amp = 1. - smoothstep(.012, .05, fw); /* the blocks fade into the mean when they are smaller than a pixel */
-    float hb = mix(h21(floor(vUv) + bk.r * 255.), bk.r, step(.5, bk.g)), hc = h21(vec2(bk.r * 255., floor(vUv.x + 3. * floor(vUv.y)) + 7.));
+  VAR_VERT(s); s.uniforms.uPh = { value: BLK_PH };
+  s.fragmentShader = 'uniform float uPh[20];\n' + VAR_GLSL + s.fragmentShader.replace('#include <map_fragment>', `
+  vec4 texelColor = texture2D( map, vUv );
+  { vec2 dx = dFdx(vUv), dy = dFdy(vUv);
+    float fw = max(length(dx), length(dy)), amp = 1. - smoothstep(.012, .05, fw), a2 = 1. - smoothstep(.008, .03, fw); /* the blocks fade into the plain photo when they are a few pixels */
+    vec2 P = vec2(vUv.x, 1. - vUv.y) * 512.; /* pixels of the photo */
+    float r = floor(mod(P.y - 25., 512.) / 25.6), ph = uPh[int(r)], j = floor(mod(P.x - ph, 512.) / 51.2);
+    vec2 cen = vec2(ph + 51.2 * (j + .5), 25. + 25.6 * (r + .5)), rel = mod(P - cen + 256., 512.) - 256.;
+    vec2 cell = floor(vec2(vUv.x - rel.x / 512., vUv.y + rel.y / 512.)); /* the tile the block's centre lies in: one block, one id, also across the edge of the photo */
+    vec2 sd = vec2(r * 13. + j + 1., cell.x * 3.17 + cell.y * 5.31 + 1.7);
+    float hb = h21(sd), hc = h21(sd + 17.1), hd = h21(sd + 31.7), he = h21(sd + 47.3), hf = h21(sd + 63.9);
+    float rd = min(floor(hd * 20.), 19.), jd = min(floor(he * 10.), 9.), rot = hf > .5 ? -1. : 1.;
+    vec2 cen2 = vec2(uPh[int(rd)] + 51.2 * (jd + .5), 25. + 25.6 * (rd + .5)), P2 = cen2 + rel * rot, uv2 = vec2(P2.x, 512. - P2.y) / 512.;
+#if __VERSION__ >= 300
+    vec4 face = textureGrad( map, uv2, dx * rot, dy * rot );
+#else
+    vec4 face = texelColor;
+#endif
+    texelColor = mapTexelToLinear( mix(texelColor, face, a2) );
     float lum = 1. + (hb - .5) * .60 * amp, tn = (hc - .5) * amp; /* tn > 0: pale pink, < 0: nearly brown */
     texelColor.rgb *= lum * vec3(1. + .12 * tn, 1. + .38 * tn, 1. + .6 * tn);
     float n = slowN(vWp.xz, 1.5), dirty = smoothstep(.5, .72, n), damp = smoothstep(.55, .75, slowN(vWp.xz + 40., 1.2));
