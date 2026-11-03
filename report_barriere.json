@@ -10,27 +10,21 @@
    ],
    "pezzo_sciolto_m": 8.0
   },
-  "varchi_trovati": 106,
-  "chiusi": 42,
-  "metri_chiusi": 169.3,
-  "pezzi_sciolti_spostati": 1,
+  "varchi_trovati": 105,
+  "chiusi": 39,
+  "metri_chiusi": 161.1,
+  "pezzi_sciolti_spostati": 2,
   "aperti_per_motivo": {
-   "cancello": 9,
-   "una via che attraversa": 10,
+   "una via che attraversa": 12,
    "edificio": 20,
    "banchina": 6,
-   "passaggio a livello": 12,
+   "cancello": 11,
+   "passaggio a livello": 10,
    "carreggiata": 5,
    "sul binario": 2
   },
   "da_chiudere": 0,
   "elenco": [
-   {
-    "x": -1107.5,
-    "z": 443.1,
-    "m": 0.3,
-    "esito": "chiuso"
-   },
    {
     "x": 755.8,
     "z": -1189.6,
@@ -42,18 +36,6 @@
     "z": -1188.7,
     "m": 0.8,
     "esito": "chiuso"
-   },
-   {
-    "x": 891.9,
-    "z": -1530.2,
-    "m": 1.3,
-    "esito": "cancello"
-   },
-   {
-    "x": 746.6,
-    "z": -1129.1,
-    "m": 1.4,
-    "esito": "cancello"
    },
    {
     "x": 786.0,
@@ -188,12 +170,6 @@
     "esito": "chiuso"
    },
    {
-    "x": 863.8,
-    "z": -1470.6,
-    "m": 3.3,
-    "esito": "cancello"
-   },
-   {
     "x": 292.5,
     "z": -457.1,
     "m": 3.5,
@@ -260,6 +236,12 @@
     "esito": "cancello"
    },
    {
+    "x": 747.3,
+    "z": -1130.6,
+    "m": 4.5,
+    "esito": "cancello"
+   },
+   {
     "x": -630.6,
     "z": 221.2,
     "m": 4.9,
@@ -268,6 +250,12 @@
    {
     "x": -289.7,
     "z": -48.6,
+    "m": 5.0,
+    "esito": "chiuso"
+   },
+   {
+    "x": -1107.6,
+    "z": 440.8,
     "m": 5.0,
     "esito": "chiuso"
    },
@@ -281,7 +269,7 @@
     "x": -1105.9,
     "z": 660.5,
     "m": 5.4,
-    "esito": "chiuso"
+    "esito": "cancello"
    },
    {
     "x": -1108.1,
@@ -449,7 +437,7 @@
     "x": -142.0,
     "z": -155.0,
     "m": 11.0,
-    "esito": "passaggio a livello"
+    "esito": "una via che attraversa"
    },
    {
     "x": -539.2,
@@ -527,7 +515,7 @@
     "x": -145.7,
     "z": -159.8,
     "m": 14.0,
-    "esito": "passaggio a livello"
+    "esito": "una via che attraversa"
    },
    {
     "x": -1106.3,
@@ -569,7 +557,7 @@
     "x": -821.1,
     "z": 428.4,
     "m": 3.5,
-    "esito": "chiuso"
+    "esito": "cancello"
    },
    {
     "x": 432.3,
@@ -593,18 +581,18 @@
     "x": -1107.6,
     "z": 422.8,
     "m": 4.1,
-    "esito": "chiuso"
+    "esito": "cancello"
+   },
+   {
+    "x": 863.9,
+    "z": -1470.8,
+    "m": 4.6,
+    "esito": "cancello"
    },
    {
     "x": -1107.7,
     "z": 410.6,
     "m": 5.7,
-    "esito": "cancello"
-   },
-   {
-    "x": 128.9,
-    "z": -321.7,
-    "m": 5.8,
     "esito": "cancello"
    },
    {
@@ -636,6 +624,12 @@
     "z": -208.7,
     "m": 8.9,
     "esito": "edificio"
+   },
+   {
+    "x": 130.5,
+    "z": -322.7,
+    "m": 9.5,
+    "esito": "cancello"
    },
    {
     "x": -273.2,
