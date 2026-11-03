@@ -1411,7 +1411,7 @@ function* buildTileGen(T) {
   yield 'streets';
   // street surfaces
   {
-    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), white = COL('#f1efe6'); asp.rk = 5; asp.angc = true; asp.asf = asfGrid(T); por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
+    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), lett = FBuf(), lettB = FBuf(), white = COL('#f1efe6'); asp.rk = 5; asp.angc = true; asp.asf = asfGrid(T); por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = lett.street = lettB.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
     const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
     fill(d.as, asp, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fill(d.pz, por, 0.06 * fy, 4); fill(d.ft, foot, 0.045 * fy, 4);
@@ -1429,6 +1429,46 @@ function* buildTileGen(T) {
     for (const [X, Z, dx, dz, w] of d.cr || []) {
       const x = X / 10, z = Z / 10, nx = -dz, nz = dx;
       for (let s = -w / 2 + 0.5; s <= w / 2 - 0.4; s += 1.0) quad(mark, x + nx * s, z + nz * s, dx, dz, nx, nz, 3.2, 0.5, 0.085 * fy, white);
+    }
+    { const s_ = srndT; yield 'stop lines'; srndT = s_; }
+    /* stop lines, give way triangles and traffic light lines (src/segn_orizz.py, tile key la: [kind, x, z, dx, dz, s0, s1, c], kind 0 stop 1 give way 2 lights,
+       (dx, dz) the way the traffic goes, s0..s1 across it from the point to the right, c = road type 0 C/D 1 E 2 F + 4 big symbol + 8 room for the lettering/symbol).
+       DPR 495/1992: art. 144 c.1 the line is continuous, at least 50 cm wide, with stop and lights; art. 144 c.4 (fig. II.433) with the give way a row of white triangles
+       pointing at the driver, base x height 60x70 cm (type C, D) 50x60 (E) 40x50 (F), the gap half the base; art. 148 c.8 (figs. II.432/a, II.441/b) STOP on the pavement
+       2.09 x 1.60 m with its upper edge 2 m (1 to 3) before the line; art. 148 c.9 (fig. II.442/a) the triangle symbol 1.00 x 2.00 m with a 12 cm outline (local roads, towns) or
+       2.00 x 6.00 m with 24 cm (extraurban secondary roads), its upper edge (the base) 2 m from the vertices of the line's triangles */
+    for (const [k, X, Z, dx, dz, s0, s1, c] of d.la || []) {
+      const x = X / 10, z = Z / 10, nx = -dz, nz = dx, y = 0.085 * fy, W = s1 - s0, sm = (s0 + s1) / 2, P = (u, s) => [x - dx * u + nx * s, z - dz * u + nz * s]; /* u: metres upstream of the line's middle */
+      if (k !== 1) quad(mark, x + nx * sm, z + nz * sm, dx, dz, nx, nz, 0.5, W, y, white);
+      else {
+        const [b, h] = [[0.6, 0.7], [0.5, 0.6], [0.4, 0.5]][c & 3], g = b / 2, n = Math.floor((W + g) / (b + g)), s00 = s0 + (W - (n * b + (n - 1) * g)) / 2;
+        for (let i = 0; i < n; i++) { const a = s00 + i * (b + g); try { polyFill(mark, [P(-0.25, a), P(-0.25, a + b), P(h - 0.25, a + b / 2)], [], y, 4, white); } catch (e) { } }
+        if (c & 8) { /* the symbol, a triangle outline pointing at the driver */
+          const big = !!(c & 4), SW = big ? 2 : 1, SH = big ? 6 : 2, ln = big ? 0.24 : 0.12, ub = h - 0.25 + 2, hyp_ = Math.hypot(SW / 2, SH), r = SW * SH / (SW + 2 * hyp_), kk = 1 - ln / r;
+          const V = [[ub, sm - SW / 2], [ub, sm + SW / 2], [ub + SH, sm]], ic = [ub + r, sm];
+          try { polyFill(mark, V.map(v => P(v[0], v[1])), [V.map(v => P(ic[0] + (v[0] - ic[0]) * kk, ic[1] + (v[1] - ic[1]) * kk))], y, 4, white); } catch (e) { }
+        }
+      }
+      if (k === 0 && (c & 8)) { /* STOP: its top towards the line, read by the driver coming up to it */
+        const u0 = 0.25 + 2.0, u1 = u0 + 1.6, sl = sm - 1.045, sr = sm + 1.045, i0 = lett.p.length / 3;
+        for (const [u, s, uu, vv] of [[u0, sl, 0, 1], [u0, sr, 1, 1], [u1, sr, 1, 0], [u1, sl, 0, 0]]) { const p = P(u, s); vtx(lett, p[0], 0.09 * fy, p[1], 0, 1, 0, uu, vv, white); }
+        triUp(lett, i0, i0 + 1, i0 + 2); triUp(lett, i0, i0 + 2, i0 + 3);
+      }
+    }
+    /* bus stops (src/segn_orizz.py, tile key fb: [dash, kerb, [bx, bz, ux, uz]]; points in dm every 2 m). DPR 495/1992 art. 151: yellow strips 12 cm wide, the broken line 2.70 m from
+       the kerb with two continuous cross strips joining it to the kerb, the zone 12 + 14 + 12 m, BUS in yellow inside it (art. 148 c.4) read by the driver arriving.
+       The dash module (1.0 m on, 1.5 m off) and the BUS size (2.40 x 1.60 m) are from Carlo's reference photo and fig. II.441/b (1.60 m letters), see segn_orizz.py; no zig zag (fig. II.447) */
+    for (const [Dp, Kp, [bx, bz, ux, uz]] of d.fb || []) {
+      const yel = COL('#e8b40c'), D = [], K = [], cum = [0];
+      for (let i = 0; i < Dp.length; i += 2) { D.push([Dp[i] / 10, Dp[i + 1] / 10]); K.push([Kp[i] / 10, Kp[i + 1] / 10]); }
+      for (let i = 1; i < D.length; i++) cum.push(cum[i - 1] + hyp(D[i][0] - D[i - 1][0], D[i][1] - D[i - 1][1]));
+      const at = s => { let i = 1; while (i < D.length - 1 && cum[i] < s) i++; const f = clamp((s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), 0, 1); return [lerp(D[i - 1][0], D[i][0], f), lerp(D[i - 1][1], D[i][1], f)]; };
+      const L = cum[cum.length - 1];
+      for (let s = 0; s < L - 0.3; s += 2.5) { const e = Math.min(L, s + 1.0), Q = [at(s)]; for (let i = 1; i < D.length - 1; i++) if (cum[i] > s && cum[i] < e) Q.push(D[i]); Q.push(at(e)); ribbon(mark, Q, -0.06, 0.06, 0.08 * fy, 1, 'along', yel); }
+      ribbon(mark, [D[0], K[0]], -0.06, 0.06, 0.08 * fy, 1, 'along', yel); ribbon(mark, [D[D.length - 1], K[K.length - 1]], -0.06, 0.06, 0.08 * fy, 1, 'along', yel);
+      const x = bx / 10, z = bz / 10, nx = -uz, nz = ux, i0 = lettB.p.length / 3;
+      for (const [uu, vv] of [[0, 1], [1, 1], [1, 0], [0, 0]]) vtx(lettB, x + nx * (2 * uu - 1) * 1.2 + ux * (2 * vv - 1) * 0.8, 0.09 * fy, z + nz * (2 * uu - 1) * 1.2 + uz * (2 * vv - 1) * 0.8, 0, 1, 0, uu, vv, white);
+      triUp(lettB, i0, i0 + 1, i0 + 2); triUp(lettB, i0, i0 + 2, i0 + 3);
     }
     // markings and elevated roads
     const deck = Buf(), dside = Buf(), emb = Buf(), grail = Buf(), dmark = Buf(), pil = Buf();
@@ -1545,7 +1585,7 @@ function* buildTileGen(T) {
     }
     if (T.fine) drawDecks(T, deck, dside);
     { const s_ = srndT; yield 'streets put'; srndT = s_; } 
-    put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6);
+    put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
     put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9); put(kerbS, MAT.kerb, 9);
     put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10); put(dmark, MAT.deckMark, 10); put(pil, MAT.deckSide, 10, 'cast');
   }

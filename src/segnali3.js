@@ -92,14 +92,14 @@ function segPlace(s) { // the post on the right of the lane, the plate facing th
   }
   return (s.place = { px, pz, dx, dz, hw });
 }
-function segLine(s, kind, dx, dz, hw, mk, lettering, WH) { // the stop line (teeth for give way) and the STOP across the right half of the road
-  if ((kind === 'stop' || kind === 'dare' || (kind === 'rotatoria' && s[5] === 'dare')) && s.lane) { // across the right half of the road, where the sign is: the line (teeth for give way), STOP before it
-    const { cx, cz } = s.lane, rx = -dz, rz = dx, Q = (a, b, c, d, col, buf = mk, uv) => { const i = buf.p.length / 3; [a, b, c, d].forEach((p, k) => vtx(buf, p[0], 0.085, p[1], 0, 1, 0, uv ? uv[k][0] : 0, uv ? uv[k][1] : 0, col)); buf.i.push(i, i + 2, i + 1, i, i + 3, i + 2, i, i + 1, i + 2, i, i + 2, i + 3); };
-    const at = (along, side) => [cx + dx * along + rx * side, cz + dz * along + rz * side];
-    if (kind === 'stop') Q(at(-0.25, 0.1), at(0.25, 0.1), at(0.25, hw - 0.2), at(-0.25, hw - 0.2), WH);
-    else for (let t = 0.3; t < hw - 0.4; t += 0.8) Q(at(0, t), at(0, t + 0.5), at(-0.6, t + 0.25), at(-0.6, t + 0.25), WH); // the teeth point at the driver
-    if (kind === 'stop' && hw > 2.2) { const m = hw / 2 + 0.05, l = Math.min(2.2, hw - 0.6); Q(at(-4.6, m - l / 2), at(-4.6, m + l / 2), at(-2.0, m + l / 2), at(-2.0, m - l / 2), WH, lettering, [[0, 0], [1, 0], [1, 1], [0, 1]]); } // read by the driver coming up to it: the top of the letters towards the line
-  }
+function segLine() { /* the stop line, the give way triangles and STOP on the asphalt are no longer drawn here at the sign: they come from the OSM junctions with the DBGT carriageway (src/segn_orizz.py, tile key la, drawn in world3.js) */ }
+let SEG_BUS_MAT = null;
+function segBusMat() { /* BUS on the pavement, yellow (DPR 495/1992 art. 148 c.4, art. 151 c.4): 2.40 m wide, 1.60 m long */
+  return SEG_BUS_MAT || (SEG_BUS_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(384, 256, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#e8b40c'; g.font = 'bold 100px Arial, sans-serif'; g.textBaseline = 'alphabetic'; const mw = g.measureText('BUS').width; g.save(); g.translate(w * 0.015, h * 0.97); g.scale(w * 0.97 / mw, h * 0.94 / 72); g.fillText('BUS', 0, 0); g.restore(); }, false), transparent: true, depthWrite: false }));
+}
+let SEG_STOP_MAT = null;
+function segStopMat() { /* the STOP on the pavement, DPR 495/1992 fig. II.441/b: 2.09 m wide, 1.60 m long, white (the tall narrow letters of the figure: a bold face stretched to the box) */
+  return SEG_STOP_MAT || (SEG_STOP_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(418, 320, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#f2f0e8'; g.font = 'bold 100px Arial, sans-serif'; g.textBaseline = 'alphabetic'; const mw = g.measureText('STOP').width; g.save(); g.translate(w * 0.015, h * 0.97); g.scale(w * 0.97 / mw, h * 0.94 / 72); g.fillText('STOP', 0, 0); g.restore(); }, false), transparent: true, depthWrite: false }));
 }
 function buildSegnali(T, G) {
   const mk = FBuf(), lettering = FBuf(), WH = COL('#f2f0e8');

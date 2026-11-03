@@ -1741,6 +1741,8 @@ if STR:  # lamps out of the carriageway, crossings as wide as it is where they c
     lamps = [[round(v_, 1) for v_ in (STR.fuori(tuple(l_)) or l_)] for l_ in lamps]
     crossings = [(lambda a_: [a_[0], a_[1]] + c_[2:4] + [a_[2]])(STR.attraversamento(*c_)) for c_ in crossings]  # edge to edge of the carriageway there
 trees = [nodes[r_] for r_, t in ntags.items() if t.get('natural') == 'tree' and inside(nodes[r_], 0)]
+if os.environ.get('GTA_DUMP_SEGN'):  # per rifare le linee e le fermate senza una build intera (prova di src/segn_orizz.py): si salva e si esce
+    import pickle; pickle.dump(dict(nodes=nodes, ntags=ntags, car_nodes=car_nodes, crossings=crossings, R=STR.R, CV=STR.CV, HW=HW, HH=HH), open(os.environ['GTA_DUMP_SEGN'], 'wb')); sys.exit(0)
 for row in rows:
     for a, b in zip(row, row[1:]):
         L = math.dist(a, b)
@@ -2238,6 +2240,11 @@ for ri, r in enumerate(raw_roads):  # road pieces per tile (for markings and dec
     for t in set(tid(*p) for p in pts) | set(tid((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) for a, b in zip(pts, pts[1:])):
         push(t, 'rp', ri)
 for x, z, dx, dz, w in crossings: push(tid(x, z), 'cr', [q(x), q(z), round(dx, 3), round(dz, 3), round(w, 1)])
+# stop lines, give way triangles and the lines at traffic lights (src/segn_orizz.py, DPR 495/1992 art. 144 and 148): tile key 'la'
+import segn_orizz
+for k_, x_, z_, dx_, dz_, s0_, s1_, c_ in segn_orizz.linee(nodes, ntags, car_nodes, json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8')), crossings, STR, inside, log):
+    push(tid(x_, z_), 'la', [k_, q(x_), q(z_), dx_, dz_, s0_, s1_, c_])
+for r_ in segn_orizz.fermate(nodes, ntags, car_nodes, STR, inside, log): push(tid(r_[2][0] / 10, r_[2][1] / 10), 'fb', r_)
 # ---- Mapillary (src/mapillary_obj.py, docs/dati.md): the signs, lamps, traffic lights, poles and bins the photos saw, confirmed, snapped to the kerb
 # and without doubles with what OSM already gives; the same rules for every comune. Signs go to the tile as 'sm', the lamps join 'lp', the poles and
 # bins join 'og', the traffic lights add junction nodes to 'signals'
