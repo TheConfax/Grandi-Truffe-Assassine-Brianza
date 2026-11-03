@@ -232,7 +232,7 @@ scene.add(sun, sun.target);
 
 // ---------------------------------------------------------------- geometry buffers
 const Buf = () => ({ p: [], n: [], uv: [], c: [], i: [] });
-function vtx(b, x, y, z, nx, ny, nz, u, v, col) { b.p.push(x, y, z); b.n.push(nx, ny, nz); b.uv.push(u, v); if (col) b.c.push(col.r, col.g, col.b); return b.p.length / 3 - 1; }
+function vtx(b, x, y, z, nx, ny, nz, u, v, col) { b.p.push(x, y, z); b.n.push(nx, ny, nz); b.uv.push(u, v); if (col) b.c.push(col.r, col.g, col.b); else if (b.angc) b.c.push(0, 0, 0); /* b.angc (asphalt): the colour carries the direction of the road, 0 = unknown */ return b.p.length / 3 - 1; }
 function triUp(b, i, j, k) {
   const P = b.p; const ax = P[i * 3], az = P[i * 3 + 2];
   const cy = (P[j * 3 + 2] - az) * (P[k * 3] - ax) - (P[j * 3] - ax) * (P[k * 3 + 2] - az);

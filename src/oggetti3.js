@@ -123,6 +123,7 @@ function updOggetti(dt) { // a jolt in the car when you take a bump fast
 }
 
 const OGG_ON_ROAD_K = new Set(['dosso', 'rallentatore', 'piattaforma', 'traliccio', 'antenna', 'torre_acqua', 'lavaggio']); // as build_data.py OGG_ON_ROAD
+Object.assign(window.__POSTF = window.__POSTF || {}, { OGG_ON_ROAD_K, ogg: () => [OGG_KINDS, OGG_GEO] }); /* for the checks on the whole map (?tutto) */
 function buildOggetti(T, G) {
   const list = T.d.og || [], by = {};
   for (let i = 0; i < list.length; i++) { const o = list[i], k = OGG_KINDS[o[0]]; if (!k) continue; (by[k] = by[k] || []).push([o[1] / 10, o[2] / 10, o[3], o[4], i]); }
@@ -146,6 +147,7 @@ function buildOggetti(T, G) {
   for (const k in OGG_GEO) {
     let items = (by[k] || []).filter(([x, z]) => k === 'traliccio' || !inBuilding(x, z, 0));
     if (T.fine && !OGG_ON_ROAD_K.has(k)) items = items.map(it => { const q = offRoad(it[0], it[1]); return q ? [q[0], q[1], ...it.slice(2)] : null; }).filter(Boolean); // in a tile of S: off the asphalt of the ways the old engine had up in the air
+    if (!OGG_ON_ROAD_K.has(k)) items = items.map(it => { const q = postFree(it[0], it[1]); return q ? [q[0], q[1], ...it.slice(2)] : null; }).filter(Boolean); // never in a wall, a fence or a building (world3.js postFree)
     if (!items.length) continue;
     const S = OGG_SPEC[k], im = new THREE.InstancedMesh(OGG_GEO[k], OGG_MAT, items.length); im.castShadow = true; im.receiveShadow = true;
     items.forEach(([x, z, a, ex, oi], i) => {

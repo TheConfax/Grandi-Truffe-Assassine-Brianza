@@ -11,6 +11,7 @@ Leggi questo, `CLAUDE.md` e solo le parti di `docs/motore.md` che servono al tuo
 - Python: `C:/Users/theco/GitHub/GTA-Brianza/.venv/Scripts/python.exe` (pacchetti mancanti: installali nella venv).
 
 ## Regole
+- Stime realistiche (Carlo, 3/11): le stime degli agenti sono state 3-6 volte più lunghe del lavoro vero (GPS stimato 60-90 min, fatto in 10). Stima il tempo del lavoro, non il caso peggiore.
 - Se ti manca un'informazione, chiedi prima di indovinare (Carlo, 2/11): `SendMessage` con `to: "main"`, una domanda corta, poi continua con quello che non dipende dalla risposta. Vale anche per il compito se ti sembra sbagliato o inutile.
 - Ramo tuo da `origin/dev` in una worktree nella tua scratchpad. Mai nella cartella principale, mai `main`.
 - Build e terreno solo col gettone (vedi `CLAUDE.md`).

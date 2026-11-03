@@ -5,6 +5,7 @@
 // facing the drivers, on a post you can knock down; stop and give way get their line across the lane and STOP painted on the asphalt.
 const SEGN = /*__SEGN__*/[];
 const SEGN_DONE = new Set();
+Object.assign(window.__POSTF = window.__POSTF || {}, { segPlace: s => segPlace(s), SEGN }); /* for the checks on the whole map (?tutto) */
 const segTex = {}; const segTexIs = t => Object.values(segTex).some(p => p.some(m => m.map === t)); // shared across tiles: never freed
 // The real signs of the Italian Codice della Strada: tex/segnali.png, one atlas, rasterised from the SVG drawings of Wikimedia Commons (credits in docs/dati.md and in the credits line).
 // SEG_AT: name -> [x, y, w, h] in the atlas. A kind or a speed with no drawing there keeps the hand-drawn plate below.
@@ -106,7 +107,8 @@ function buildSegnali(T, G) {
   const LIST = SEGN.map((s, i) => [s, i]); for (const s of T.d.smo || []) LIST.push([s, 'm' + T.t + '_' + s.i]);
   LIST.forEach(([s, idx]) => {
     const [kind, x, z] = s; if (tileOf(x, z) !== T.t) return;
-    const { px, pz, dx, dz, hw } = segPlace(s); if (s.skip || inBuilding(px, pz, 0.3)) { segLine(s, kind, dx, dz, hw, mk, lettering, WH); return; } // a one-way lane through a courtyard: no post in the wall; no room for the post (the corner of a junction of the DBGT): the line and the STOP on the road all the same
+    let { px, pz, dx, dz, hw } = segPlace(s); const pf_ = s.skip || inBuilding(px, pz, 0.3) ? null : postFree(px, pz); if (pf_) { px = pf_[0]; pz = pf_[1]; } /* never in a wall (world3.js postFree) */
+    if (!pf_) { segLine(s, kind, dx, dz, hw, mk, lettering, WH); return; } // a one-way lane through a courtyard: no post in the wall; no room for the post (the corner of a junction of the DBGT): the line and the STOP on the road all the same
     const gy = H.ground(px, pz), wide = kind === 'paese' || kind === 'via' || kind === 'unico';
     const root = new THREE.Group(); root.position.set(px, gy, pz); root.rotation.y = Math.atan2(-dx, -dz); G.add(root);
     if (kind === 'isola') { // the splitter island at a roundabout: a low post with the no entry for the exit lane and, on its right, keep right
