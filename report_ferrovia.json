@@ -43,7 +43,7 @@
    "3": 68,
    "4": 26
   },
-  "tempo_s": 4.0
+  "tempo_s": 0.6
  },
  "banchine": {
   "tagliate": 4,
@@ -78,9 +78,9 @@
    "distanza_m": 1.6
   },
   "muri_e_divisori": {
-   "n": 11,
-   "metri_spostati": 91.7,
-   "metri_aperti": 6.3,
+   "n": 10,
+   "metri_spostati": 91.5,
+   "metri_aperti": 6.0,
    "distanza_m": 1.6
   }
  },
@@ -269,6 +269,6 @@
   "cartelli_di_paese": {
    "n": 15
   },
-  "tempo_s": 11.3
+  "tempo_s": 9.2
  }
 }

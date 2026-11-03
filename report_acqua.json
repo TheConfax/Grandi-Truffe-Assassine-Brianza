@@ -117,19 +117,26 @@
   "bordo_luoghi": 17
  },
  "A3": {
-  "celle_sotto_impalcati_con_strada_disegnata": 8,
+  "celle_sotto_impalcati_con_strada_disegnata": 87,
   "dipinte": 0,
   "m2": 0.0,
   "impalcati": [],
   "impalcati_prima_della_regola": [
+   4,
    6,
+   7,
+   8,
    11,
+   13,
    21,
+   25,
+   36,
+   40,
    44,
    47,
    48
   ],
-  "celle_segnate_sotto_impalcato": 1174,
+  "celle_segnate_sotto_impalcato": 1042,
   "luoghi": []
  },
  "A4": {
@@ -429,7 +436,7 @@
     "comune": "Meda",
     "x": -275.8,
     "z": -730.2,
-    "m": 8.0,
+    "m": 7.9,
     "strada": 223.97,
     "S_min": 224.0,
     "sfondato": false,
@@ -849,6 +856,6 @@
   "tombini_sotto_strade": 48,
   "tombini_sotto_strade_sfondati": 1,
   "prove_fisse_ok": "3 su 4",
-  "tempo_s": 91.2
+  "tempo_s": 75.4
  }
 }

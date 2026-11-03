@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 21.3,
+  "tempo_s": 3.6,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1151,7 +1151,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 55.6,
+  "tempo_s": 47.1,
   "cortili_nei_cantieri_m2": 16051
  },
  "barriere_solo_osm": {
@@ -1166,19 +1166,333 @@
   "metri_osm_nella_copertura": 92163
  },
  "cancelli_02": {
-  "cancelli": 1674,
-  "in_carreggiata": 1148,
+  "cancelli": 1752,
+  "in_carreggiata": 1212,
   "non_da_su_strada_o_cortile": 325,
-  "gia_passo_carraio": 188
+  "cancelli_lunghi_davanti_a_parcheggio_o_cortile": 78,
+  "gia_passo_carraio": 197,
+  "lunga_senza_parcheggio_o_cortile_dietro": 64,
+  "lunga_in_una_cancellata_a_pezzi": 54,
+  "lunga_non_da_su_strada": 26
+ },
+ "cancelli_cortile": {
+  "su_un_cortile": 7340,
+  "cortile_aperto_anche_altrove": 1696,
+  "non_da_su_strada": 3707,
+  "gia_cancello": 813,
+  "cancelli": 1107,
+  "una_strada_ci_passa": 17,
+  "dove": [
+   [
+    837.1,
+    -875.4,
+    5.9
+   ],
+   [
+    756.3,
+    577.3,
+    2.5
+   ],
+   [
+    1113.5,
+    -335.8,
+    5.8
+   ],
+   [
+    1109.7,
+    -427.5,
+    3.6
+   ],
+   [
+    813.6,
+    -1260.9,
+    2.6
+   ],
+   [
+    1587.6,
+    350.1,
+    7.4
+   ],
+   [
+    1708.7,
+    356.0,
+    3.9
+   ],
+   [
+    -603.3,
+    528.3,
+    4.3
+   ],
+   [
+    505.7,
+    -347.5,
+    7.8
+   ],
+   [
+    -311.1,
+    -888.6,
+    5.8
+   ],
+   [
+    1021.9,
+    231.5,
+    5.0
+   ],
+   [
+    1125.4,
+    738.8,
+    3.9
+   ],
+   [
+    -714.5,
+    -288.9,
+    3.5
+   ],
+   [
+    1581.5,
+    -724.1,
+    6.4
+   ],
+   [
+    1278.7,
+    654.7,
+    4.8
+   ],
+   [
+    -798.9,
+    -483.6,
+    7.0
+   ],
+   [
+    350.0,
+    818.1,
+    2.8
+   ],
+   [
+    -70.9,
+    -1773.8,
+    3.9
+   ],
+   [
+    124.9,
+    -319.3,
+    3.8
+   ],
+   [
+    151.7,
+    -1170.5,
+    5.4
+   ],
+   [
+    643.3,
+    -289.8,
+    4.5
+   ],
+   [
+    280.3,
+    -1189.4,
+    4.1
+   ],
+   [
+    -288.5,
+    -2077.5,
+    4.7
+   ],
+   [
+    857.6,
+    -986.1,
+    7.2
+   ],
+   [
+    1129.2,
+    -1102.7,
+    4.7
+   ],
+   [
+    545.5,
+    -1694.8,
+    4.4
+   ],
+   [
+    -851.0,
+    -561.5,
+    6.3
+   ],
+   [
+    1359.8,
+    -671.1,
+    4.8
+   ],
+   [
+    298.3,
+    363.4,
+    3.1
+   ],
+   [
+    1592.5,
+    -461.7,
+    4.7
+   ],
+   [
+    -227.5,
+    -406.7,
+    2.7
+   ],
+   [
+    -498.4,
+    -751.0,
+    3.5
+   ],
+   [
+    634.7,
+    725.7,
+    3.9
+   ],
+   [
+    1128.7,
+    -376.1,
+    6.1
+   ],
+   [
+    1046.4,
+    332.0,
+    3.8
+   ],
+   [
+    304.7,
+    579.8,
+    3.9
+   ],
+   [
+    617.4,
+    -1685.3,
+    3.4
+   ],
+   [
+    390.2,
+    -1361.1,
+    3.0
+   ],
+   [
+    224.5,
+    -1167.5,
+    3.1
+   ],
+   [
+    1775.6,
+    77.8,
+    6.7
+   ],
+   [
+    1044.5,
+    -313.3,
+    5.2
+   ],
+   [
+    857.3,
+    -1455.4,
+    3.9
+   ],
+   [
+    1482.0,
+    -1034.3,
+    4.6
+   ],
+   [
+    522.2,
+    677.6,
+    6.8
+   ],
+   [
+    -640.5,
+    -194.0,
+    4.2
+   ],
+   [
+    803.4,
+    -1248.4,
+    3.8
+   ],
+   [
+    -216.8,
+    -249.4,
+    2.8
+   ],
+   [
+    1540.0,
+    248.9,
+    3.7
+   ],
+   [
+    -1125.6,
+    -1031.3,
+    5.4
+   ],
+   [
+    786.0,
+    -1435.7,
+    3.3
+   ],
+   [
+    142.1,
+    346.8,
+    7.5
+   ],
+   [
+    -496.4,
+    -965.4,
+    2.9
+   ],
+   [
+    92.1,
+    -1049.9,
+    3.4
+   ],
+   [
+    1446.2,
+    -467.0,
+    4.8
+   ],
+   [
+    -436.2,
+    -230.5,
+    5.5
+   ],
+   [
+    -657.9,
+    -338.8,
+    4.2
+   ],
+   [
+    815.8,
+    -236.4,
+    5.9
+   ],
+   [
+    1625.2,
+    -3.7,
+    4.2
+   ],
+   [
+    624.7,
+    716.6,
+    3.9
+   ],
+   [
+    -373.4,
+    -676.8,
+    3.6
+   ]
+  ]
  },
  "muri_doppi_fusi": {
-  "linee": 1358,
-  "metri": 12917
+  "linee": 1191,
+  "metri": 12270
  },
  "muri_sul_confine": {
   "dbgt": 40203,
   "metri_dbgt": 503792,
-  "metri_tenuti": 461725,
+  "metri_tenuti": 456386,
   "spostati": 1441,
   "metri_spostati": 8019,
   "spostamento_m": {
@@ -1200,53 +1514,53 @@
  },
  "cancelli_passi_carrai": {
   "porte": {
-   "p": 2691
+   "p": 2683
   },
-  "nuovi": 3642,
-  "pedonali": 389,
-  "senza_strada": 5123,
-  "senza_chiusure": 4813,
-  "carreggiata_o_marciapiede": 2199,
-  "strada_osm": 715,
-  "troppo_stretti": 5445,
-  "gia_cancello": 15978,
+  "nuovi": 3369,
+  "pedonali": 358,
+  "senza_strada": 5084,
+  "senza_chiusure": 4893,
+  "carreggiata_o_marciapiede": 2329,
+  "strada_osm": 676,
+  "troppo_stretti": 5314,
+  "gia_cancello": 16950,
   "fuori": 21,
-  "doppione_recinzione": 175,
-  "capo_nel_vuoto": 989,
-  "troppo_larghi": 619,
+  "doppione_recinzione": 147,
+  "capo_nel_vuoto": 972,
+  "troppo_larghi": 615,
   "per_origine": {
-   "passo_carraio": 394,
+   "passo_carraio": 273,
    "rampa": 9,
    "vialetto": 0,
-   "varco": 1972,
-   "capo_recinzione": 1267
+   "varco": 1819,
+   "capo_recinzione": 1268
   }
  },
- "divisori_tagliati_da_cancelli": 794,
+ "divisori_tagliati_da_cancelli": 671,
  "monconi_in_carreggiata_tolti": 205,
- "cancelli_in_carreggiata_tolti": 797,
+ "cancelli_in_carreggiata_tolti": 922,
  "barriere_in_carreggiata": {
   "linee": 88,
   "metri": 1163
  },
  "corsie_ia": {
   "vie": 3015,
-  "corsie_spostate_nodi": 3846,
+  "corsie_spostate_nodi": 3849,
   "vie_con_corsie": 1027,
-  "tagli": 195,
-  "metri_tagliati": 1831,
-  "nodi_aggiunti": 205,
+  "tagli": 191,
+  "metri_tagliati": 1825,
+  "nodi_aggiunti": 201,
   "punti_per_motivo": {
    "fuori asfalto": 543,
-   "muro o edificio": 1921,
-   "stretta fra i muri": 308
+   "muro o edificio": 1888,
+   "stretta fra i muri": 309
   },
   "sensi_unici_tolti_metri": 952,
   "pezzi_isolati_tolti_metri": 383,
   "km_rete": 405.33,
-  "km_rete_ia": 402.16,
+  "km_rete_ia": 402.17,
   "dove": [
-   "?x=435&z=362 muro/stretta doppio senso 3.8 m 65 m",
+   "?x=435&z=362 muro/stretta doppio senso 3.8 m 64 m",
    "?x=1421&z=1183 stretta doppio senso 3.2 m 63 m",
    "?x=-506&z=-934 muro/stretta doppio senso 4.2 m 49 m",
    "?x=15&z=-2061 asfalto doppio senso 3.8 m 46 m",
@@ -1288,10 +1602,328 @@
    "?x=1426&z=-188 muro doppio senso 9.2 m 15 m"
   ]
  },
+ "oggetti_della_via_nei_muri": {
+  "conta": {
+   "lampioni_spostati": 16,
+   "oggetti_cassetta_spostati": 7,
+   "oggetti_distributore_spostati": 11,
+   "oggetti_fontanella_spostati": 1,
+   "oggetti_panchina_tolti": 1,
+   "oggetti_campana_spostati": 2,
+   "oggetti_cestino_spostati": 1,
+   "oggetti_campana_tolti": 1,
+   "oggetti_cassetta_tolti": 1,
+   "oggetti_distributore_tolti": 1,
+   "oggetti_armadietti_spostati": 1,
+   "oggetti_idrante_tolti": 1,
+   "oggetti_ricarica_spostati": 1,
+   "oggetti_fontanella_tolti": 1,
+   "oggetti_telecamera_tolti": 1,
+   "oggetti_pannello_spostati": 1,
+   "oggetti_rastrelliera_spostati": 1
+  },
+  "restano_dentro": 0,
+  "dove": [
+   [
+    "lampioni",
+    "spostato",
+    380.2,
+    2110.6
+   ],
+   [
+    "lampioni",
+    "spostato",
+    369.7,
+    2076.3
+   ],
+   [
+    "lampioni",
+    "spostato",
+    360.2,
+    2045.2
+   ],
+   [
+    "lampioni",
+    "spostato",
+    338.5,
+    1974.2
+   ],
+   [
+    "lampioni",
+    "spostato",
+    328.1,
+    1940.2
+   ],
+   [
+    "lampioni",
+    "spostato",
+    307.4,
+    1872.8
+   ],
+   [
+    "lampioni",
+    "spostato",
+    286.6,
+    1804.7
+   ],
+   [
+    "lampioni",
+    "spostato",
+    276.1,
+    1770.4
+   ],
+   [
+    "lampioni",
+    "spostato",
+    266.0,
+    1737.4
+   ],
+   [
+    "lampioni",
+    "spostato",
+    270.1,
+    1750.9
+   ],
+   [
+    "lampioni",
+    "spostato",
+    255.5,
+    1703.1
+   ],
+   [
+    "lampioni",
+    "spostato",
+    244.8,
+    1667.9
+   ],
+   [
+    "lampioni",
+    "spostato",
+    224.3,
+    1601.0
+   ],
+   [
+    "lampioni",
+    "spostato",
+    213.4,
+    1565.4
+   ],
+   [
+    "lampioni",
+    "spostato",
+    192.5,
+    1497.2
+   ],
+   [
+    "lampioni",
+    "spostato",
+    182.1,
+    1463.3
+   ],
+   [
+    "oggetti_cassetta",
+    "spostato",
+    -72.6,
+    -836.5
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    378.7,
+    -456.3
+   ],
+   [
+    "oggetti_fontanella",
+    "spostato",
+    104.3,
+    2130.2
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    1071.2,
+    -2012.9
+   ],
+   [
+    "oggetti_panchina",
+    "tolto",
+    3145.7,
+    461.8
+   ],
+   [
+    "oggetti_cassetta",
+    "spostato",
+    3585.9,
+    1181.5
+   ],
+   [
+    "oggetti_campana",
+    "spostato",
+    2483.3,
+    -1266.8
+   ],
+   [
+    "oggetti_cestino",
+    "spostato",
+    2145.4,
+    -462.7
+   ],
+   [
+    "oggetti_campana",
+    "tolto",
+    1058.2,
+    12.3
+   ],
+   [
+    "oggetti_cassetta",
+    "tolto",
+    424.5,
+    -928.0
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    298.2,
+    -639.6
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    638.1,
+    -503.5
+   ],
+   [
+    "oggetti_distributore",
+    "tolto",
+    68.0,
+    1890.3
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    375.0,
+    -535.3
+   ],
+   [
+    "oggetti_cassetta",
+    "spostato",
+    1271.7,
+    -1734.3
+   ],
+   [
+    "oggetti_cassetta",
+    "spostato",
+    3093.4,
+    2504.1
+   ],
+   [
+    "oggetti_armadietti",
+    "spostato",
+    1129.8,
+    -2044.6
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    3384.5,
+    1208.6
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    3384.6,
+    1210.0
+   ],
+   [
+    "oggetti_cassetta",
+    "spostato",
+    3099.0,
+    98.5
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    -334.8,
+    1608.3
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    -334.8,
+    1608.4
+   ],
+   [
+    "oggetti_idrante",
+    "tolto",
+    393.3,
+    -143.2
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    -1109.9,
+    1604.0
+   ],
+   [
+    "oggetti_ricarica",
+    "spostato",
+    -219.2,
+    1837.5
+   ],
+   [
+    "oggetti_cassetta",
+    "spostato",
+    -1795.3,
+    242.7
+   ],
+   [
+    "oggetti_campana",
+    "spostato",
+    -1795.5,
+    242.6
+   ],
+   [
+    "oggetti_cassetta",
+    "spostato",
+    1941.6,
+    276.8
+   ],
+   [
+    "oggetti_distributore",
+    "spostato",
+    1929.6,
+    274.2
+   ],
+   [
+    "oggetti_fontanella",
+    "tolto",
+    -1480.5,
+    1349.9
+   ],
+   [
+    "oggetti_telecamera",
+    "tolto",
+    1014.3,
+    2142.0
+   ],
+   [
+    "oggetti_pannello",
+    "spostato",
+    -518.1,
+    439.8
+   ],
+   [
+    "oggetti_rastrelliera",
+    "spostato",
+    -1033.6,
+    1023.4
+   ]
+  ]
+ },
  "controlli": {
   "oggetti_in_carreggiata": {
    "n": 9,
-   "di": 569,
+   "di": 562,
    "dove": [
     "?x=43&z=-846",
     "?x=-1180&z=1523",
@@ -1306,7 +1938,7 @@
   },
   "lampioni_in_carreggiata": {
    "n": 0,
-   "di": 255,
+   "di": 257,
    "dove": []
   },
   "alberi_in_carreggiata": {
@@ -1356,15 +1988,15 @@
    ]
   },
   "corsie_dentro_ac_vei": {
-   "campioni": 92749,
-   "fuori": 2650,
+   "campioni": 92745,
+   "fuori": 2656,
    "quota": 0.0286,
    "fuori_per_motivo": {
-    "altro": 1547,
-    "incrocio": 377,
-    "strettoia": 726
+    "altro": 1549,
+    "incrocio": 380,
+    "strettoia": 727
    },
-   "auto_fuori": 669,
+   "auto_fuori": 671,
    "nota_auto": "la linea della corsia a meno di 0,9 m (mezza auto) dal bordo o fuori",
    "margine_m": {
     "p1": -0.41,
@@ -1406,31 +2038,31 @@
   },
   "corsie_di_fronte": {
    "n": 218,
-   "campioni": 235582,
+   "campioni": 235590,
    "vie_diverse": 218,
    "stessa_via": 14077,
    "nota": "punti di corsia (1 m) con una corsia di verso opposto a meno di 1.8 m, lontano dagli incroci",
    "dove": [
-    "?x=863&z=58",
-    "?x=734&z=1488",
-    "?x=409&z=-412",
-    "?x=405&z=-415",
-    "?x=1332&z=657",
-    "?x=1332&z=658",
-    "?x=256&z=-1253",
-    "?x=1333&z=656",
-    "?x=-1177&z=1579",
-    "?x=255&z=-1254",
+    "?x=-765&z=2272",
+    "?x=256&z=-1254",
+    "?x=-373&z=-263",
+    "?x=250&z=-1257",
+    "?x=-1345&z=669",
+    "?x=-1280&z=1565",
+    "?x=-1283&z=1563",
+    "?x=863&z=55",
+    "?x=410&z=-411",
+    "?x=406&z=-414",
+    "?x=-1299&z=1555",
+    "?x=-2216&z=1774",
+    "?x=188&z=-1280",
+    "?x=188&z=-1280",
     "?x=248&z=-1258",
-    "?x=-501&z=-504",
-    "?x=-2216&z=1773",
-    "?x=-148&z=716",
-    "?x=748&z=1911",
+    "?x=-1338&z=673",
+    "?x=-294&z=-967",
     "?x=748&z=1910",
-    "?x=-153&z=714",
-    "?x=-153&z=714",
-    "?x=253&z=-1255",
-    "?x=-292&z=-967"
+    "?x=-148&z=716",
+    "?x=408&z=-413"
    ]
   },
   "traffico_nei_cortili": {
@@ -2095,6 +2727,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 7.9
+  "tempo_s": 7.1
  }
 }
