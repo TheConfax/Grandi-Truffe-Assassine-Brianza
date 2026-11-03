@@ -43,6 +43,33 @@ function offRoad(x, z) {
   }
   return onAnyRoad(x, z, 0.3) ? null : [x, z];
 }
+// an object of the street (lamp, sign, pole, bollard) never stands in a wall, a fence or a building (Carlo, 2/11, via San Martino x -58 z -860: offRoad
+// had pushed a bollard into the wall along the road). As build_data.py POST_*: the nearest free place within POST_MOVE m, off the asphalt and on the
+// street's side of the wall, else none. The walls and buildings of the tile and its neighbours are in WALLS before the furniture is built
+const POST_CLR = 0.3, POST_MOVE = 3, POST_N = window.__POST_N = { mossi: 0, tolti: 0 }; /* counted as the tiles are built: ?tutto gives the whole map */
+const postSolid = w => w.ax !== undefined && !w.pit && !w.off;
+function postIn(x, z) {
+  let f = false; WALLS.each(x - POST_CLR, z - POST_CLR, x + POST_CLR, z + POST_CLR, w => { if (!f && postSolid(w) && segDist(x, z, w.ax, w.az, w.bx, w.bz) < (w.two ? POST_CLR : 0.1)) f = true; });
+  return f || inBuilding(x, z, 0.1);
+}
+function postSide(x, z) { // nothing solid between the place and the nearest street axis
+  let best = null, bd = 20; ROADSEG.each(x - 20, z - 20, x + 20, z + 20, s => { const d = segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]); if (d < bd) { bd = d; best = s; } });
+  if (!best || bd < 0.05) return true;
+  const ex = best.b[0] - best.a[0], ez = best.b[1] - best.a[1], t = clamp(((x - best.a[0]) * ex + (z - best.a[1]) * ez) / (ex * ex + ez * ez || 1), 0, 1), cx = best.a[0] + ex * t, cz = best.a[1] + ez * t;
+  const cr = (ax, az, bx, bz, px, pz) => (bx - ax) * (pz - az) - (bz - az) * (px - ax);
+  let cut = false; WALLS.each(Math.min(x, cx), Math.min(z, cz), Math.max(x, cx), Math.max(z, cz), w => { if (cut || !postSolid(w)) return; if (cr(x, z, cx, cz, w.ax, w.az) * cr(x, z, cx, cz, w.bx, w.bz) < 0 && cr(w.ax, w.az, w.bx, w.bz, x, z) * cr(w.ax, w.az, w.bx, w.bz, cx, cz) < 0) cut = true; });
+  return !cut;
+}
+function postFree(x, z) {
+  if (!postIn(x, z)) return [x, z];
+  for (let d = 0.25; d <= POST_MOVE + 1e-6; d += 0.25) for (let k = 0; k < 24; k++) {
+    const a = k / 24 * TAU, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+    if (postIn(px, pz) || nearAsph(px, pz, 0.25) || onAnyRoad(px, pz, 0.3) || !postSide(px, pz)) continue;
+    POST_N.mossi++; return [px, pz];
+  }
+  POST_N.tolti++; return null;
+}
+Object.assign(window.__POSTF = window.__POSTF || {}, { postIn, postFree, offRoad }); /* for the checks on the whole map (?tutto) */
 // the asphalt as drawn (tiles[t].as; in a comune with a DBGT its carriageways and car parks AC_VEI, docs/motore.md 7) is a street for all that
 // keeps off the streets (lamps, posts, signs, benches, guardrails): where a carriageway is wider than its axis says (parking lanes, junction
 // corners) the band of the axis alone let them stand on it. A bit grid at 0.5 m per tile, made the first time a tile is asked
@@ -497,7 +524,7 @@ function edgePts(a, b, off, e) { // e: the edge, whose lane may change along it 
 }
 
 // ---------------------------------------------------------------- tile builder
-const CORTILE_COL = 0xb9b5ac; // the paving of yards and drives (tiles[t].cv): a plain light grey, the DBGT does not say what it is made of
+const CORTILE_COL = 0xb9b5ac; // a plain light grey (MAT.cortile); the yards and drives (tiles[t].cv) are drawn in the asphalt of the streets since 2/11
 const AREA_COL = { 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6', 17: '#b9b5ac' }; // 17: yards of the DBGT (AATT, dbgt_manufatti.py), a plain light grey paving (MAT.aatt)
 const PAL_OLD = ['#dfae62', '#e8c98a', '#dba08a', '#ece4d3', '#d99060', '#c7c9a6', '#e3b98f', '#f0dcb0'];
 const PAL_MOD = ['#dcd7cd', '#cbc4b7', '#bdb5a8', '#e6e0d5', '#c9b9a0', '#d5cbbb'];
@@ -852,7 +879,7 @@ function genLamps(T, d, osm) {
       let k = 1; while (k < r.cum.length - 1 && r.cum[k] < s) k++;
       const a = N[r.g[k - 1]], b = N[r.g[k]], L = r.cum[k] - r.cum[k - 1] || 1, f = (s - r.cum[k - 1]) / L, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
       const sd = wide ? (n % 2 ? 1 : -1) : side; let off = r.w / 2 + 0.9; for (let e = 0; e < 8 && nearAsph(a[0] + (b[0] - a[0]) * f - uz * off * sd, a[1] + (b[1] - a[1]) * f + ux * off * sd, 0.25); e++) off += 0.25; /* the pole past the edge of the drawn carriageway (the 0.5 m grid of onAsph left some 0.2 m in it) */ const x = a[0] + (b[0] - a[0]) * f - uz * off * sd, z = a[1] + (b[1] - a[1]) * f + ux * off * sd;
-      if (tileOf(x, z) !== T.t || nearAsph(x, z, 0.25) || onAnyRoad(x, z, 0.3) || inBuilding(x, z, 0.4) || nearRail(x, z, 4) || osm.some(o => hyp(o[0] - x, o[1] - z) < 14)) continue;
+      if (tileOf(x, z) !== T.t || nearAsph(x, z, 0.25) || onAnyRoad(x, z, 0.3) || inBuilding(x, z, 0.4) || postIn(x, z) || nearRail(x, z, 4) || osm.some(o => hyp(o[0] - x, o[1] - z) < 14)) continue;
       let town = 0; BLD.each(x - 30, z - 30, x + 30, z + 30, () => { town++; }); if (town < 2) continue; // only where there are houses
       out.push([x, z, Math.atan2(ux * sd, uz * sd)]); // arm towards the middle of the road
     }
@@ -1173,7 +1200,7 @@ function cellOwners(T, F) {
     else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
-  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('c', MAT.cortileS, 10), true); // yards and drives of the DBGT (AC_VEI 0307)
+  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('a', MAT.asphS, 9), true); // yards and drives of the DBGT (AC_VEI 0307): the asphalt of the carriageways and car parks (tiles[t].as), no lines (Carlo, 2/11)
   for (const q of d.sf || []) cover(dec(q.p), q.k.map(dec), 1.3, S('b', MAT.gravelS, 3)); // the rail bed of the DBGT (SD_FER a raso)
   for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, S('f', MAT.footS, 4), true);
   for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, S('a', MAT.asphS, 9), true);
@@ -1259,9 +1286,9 @@ function* buildTileGen(T) {
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
-    const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 10); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): their own paving, no traffic
+    const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 9); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): the asphalt of the carriageways and car parks, no lines, no traffic (Carlo, 2/11)
     const sB = FBuf(); sB.rk = 1.3; for (const q of d.sf || []) { try { polyFill(sB, dec(q.p), q.k.map(dec), 0.03 * fy, 3); } catch (e) { } } // the rail bed (DBGT SD_FER)
-    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.cortile, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.asph, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {
@@ -1798,7 +1825,7 @@ function* buildTileGen(T) {
     });
     for (const e of VM) if (e) { const [trunks, crowns] = e; /* VM is sparse (no plain trees in the tile: VM[0] empty) */ trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns); }
   }
-  const LPS = (d.lp || []).map(([X, Z]) => [X / 10, Z / 10, 0]); LPS.push(...genLamps(T, d, LPS)); // [x, z, arm direction]
+  const LPS = (d.lp || []).map(([X, Z]) => { const q = postFree(X / 10, Z / 10); return q ? [q[0], q[1], 0] : null; }).filter(Boolean); LPS.push(...genLamps(T, d, LPS)); // [x, z, arm direction]; never in a wall (postFree)
   if (LPS.length) { // one instance per lamp, so each can be knocked down on its own: pole and arm, head; the light pool and the glare go with it
     const pole = Buf(), head = Buf(); addBox(pole, 0, 3.6, 0, 0.14, 7.2, 0.14, null); addBox(pole, 0.6, 7.15, 0, 1.3, 0.1, 0.12, null); addBox(head, 1.15, 7.0, 0, 0.5, 0.14, 0.3, null);
     const geo = b => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setIndex(b.i); return g; };
