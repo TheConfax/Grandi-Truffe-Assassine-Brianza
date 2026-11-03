@@ -2040,6 +2040,11 @@ import opere as _op, impalcati as _imp, dbgt_quote as _dq   # the underpasses (s
 _lid = _dq.Lidar(); _Dop = _dq.load_dbgt_comuni(_dq.lista_comuni(None), _lid); _Dop.pop('_info', None)
 _sott = _op.da_indice(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json')); log('opere dal terreno', len(_sott))   # one outline: the one the terrain made (the terrain comes first)
 _opf = unary_union([g_ for l_ in _op.impronte(_sott) for g_ in l_])
+# no gate in the mouth of an underpass: a short railing of the DBGT on the side of the trench became a gate across the sidewalk (Carlo 3/11, x -774 z 120)
+if not _opf.is_empty:
+    _opfb = _opf.buffer(1.0); prepare(_opfb); _ng_ = len(gate_out)
+    gate_out[:] = [g_ for g_ in gate_out if not _opfb.intersects(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]))]
+    log('cancelli nelle bocche dei sottopassi, tolti', _ng_ - len(gate_out))
 def _fuori_opera(pl_):
     g_ = LineString(pl_) if len(pl_) >= 2 else None
     if g_ is None or not g_.intersects(_opf): return [pl_]
@@ -2181,6 +2186,20 @@ _sf, _isole_, bar_out = _op.senza_strada_di_sopra(_pst, dict(asph=asph, pedz=ped
 asph, pedz, side, foot = _sf['asph'], _sf['pedz'], _sf['side'], _sf['foot']
 if STR: STR.md_dbgt = _isole_
 _md_ponte = _op.senza_strada_di_sopra.sul_ponte   # the islands of the road over a bridge, for its deck
+# the deck of a PONTE goes on past it over the bank (impalcati.py): there the islands of the road over it (DBGT islands, OSM grass) lay on S under the deck top,
+# hidden, and the median stopped short of the bridge on both sides (Carlo 3/11, the Milano-Meda over corso Isonzo). They go on the deck too
+_mdp_ = _op.sotto_impalcato_sopra(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json'), _pst)
+if _mdp_ is not None and not _mdp_.is_empty:
+    _sp_ = []
+    if STR is not None and STR.md_dbgt is not None and not STR.md_dbgt.is_empty and STR.md_dbgt.intersects(_mdp_):
+        _q_ = STR.md_dbgt.intersection(_mdp_); _sp_.append(_q_); STR.md_dbgt = STR.md_dbgt.difference(_mdp_.buffer(0.05))
+    _ag_ = []
+    for at_, g_ in area_geoms:
+        if at_ in (1, 2) and g_.intersects(_mdp_): _sp_.append(g_.intersection(_mdp_)); g_ = g_.difference(_mdp_.buffer(0.05))
+        _ag_.append((at_, g_))
+    area_geoms[:] = [(a_, g_) for a_, g_ in _ag_ if not g_.is_empty]
+    _sp_ = [q_ for q_ in _sp_ if not q_.is_empty and q_.area > 0.3]
+    if _sp_: _md_ponte = unary_union(([_md_ponte] if _md_ponte is not None else []) + _sp_); log('isole della strada di sopra sotto la coda degli impalcati, sul ponte m2', round(sum(q_.area for q_ in _sp_), 1))
 if not median.is_empty: median = _op.senza_strada_di_sopra(_pst, {}, median, [], log)[1]
 area_geoms[:] = [(at, g.difference(_via) if g.intersects(_via) else g) for at, g in area_geoms]
 log('sottopassi', len(_sott), 'vernice tolta m2', round(_via.area))

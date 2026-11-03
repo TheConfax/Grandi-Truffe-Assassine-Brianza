@@ -1071,7 +1071,7 @@ class Superficie:
         S = s.L.copy(); band = ~FIX & ~BARR & np.isfinite(hi)
         lo_, hi_ = np.minimum(lo, hi), np.maximum(lo, hi)
         S[band] = s.L[band] + np.clip(0.0, lo_[band], hi_[band]); S[FIX] = s.ZF[FIX]
-        s.FIX = FIX; s.sotto_ponti(S, BARR); opere.opere_dbgt(s, S)   # (src/opere.py: dentro l'impronta di un ponte con muri o scarpate del DBGT il suolo e solo del DBGT)
+        s.FIX = FIX; s.sotto_ponti(S, BARR); opere.opere_dbgt(s, S); opere.galleria_piena(s, S)   # (src/opere.py: dentro l'impronta di un ponte con muri o scarpate del DBGT il suolo e solo del DBGT)
         zs = getattr(s, 'ZSOTTO', None)
         if zs is not None: k = np.isfinite(zs) & BARR; S[k] = zs[k]
         s.S = S

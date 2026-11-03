@@ -857,11 +857,21 @@ function kerbCap(b, px, pz, py, qx, qz, qy, nx, nz, u0, u1, pl, ql) {
   quad4([[px, t - C, pz], u0, .5], [[qx, r - C, qz], u1, .5], [[qx - nx * C, r, qz - nz * C], u1, .5], [[px - nx * C, t, pz - nz * C], u0, .5], [nx * s2, s2, nz * s2]);
   quad4([[px - nx * C, t, pz - nz * C], u0, .5], [[qx - nx * C, r, qz - nz * C], u1, .5], [[qx - nx * W, r, qz - nz * W], u1, .5], [[px - nx * W, t, pz - nz * W], u0, .5], [0, 1, 0]);
 }
+// an edge along a line between two tiles: where the build cut a surface on the tile, not a kerb (Carlo 3/11, corso Isonzo x 371 z 2003: the kerb of the sidewalk closed across it there)
+const sulBordoTile = (a, c) => { const on = (v, h) => { const f = (v + h) / TS; return Math.abs(f - Math.round(f)) * TS < 0.02; }; return (on(a[0], META.dati.hw) && on(c[0], META.dati.hw)) || (on(a[1], META.dati.hh) && on(c[1], META.dati.hh)); };
+// the runs of an edge not under a deck where S is no street (H.ud), in pieces of 1 m: a long edge whose middle was under the bridge lost its kerb all along (corso Isonzo, x 332..371)
+function kerbRuns(a, c) {
+  const L = hyp(c[0] - a[0], c[1] - a[1]), m = Math.max(1, Math.ceil(L)), out = []; let s = null;
+  for (let k = 0; k < m; k++) { const f = (k + 0.5) / m, u = H.ud(a[0] + (c[0] - a[0]) * f, a[1] + (c[1] - a[1]) * f); if (!u && s === null) s = k; if (u && s !== null) { out.push([s / m, k / m]); s = null; } }
+  if (s !== null) out.push([s / m, 1]);
+  return out.map(([f0, f1]) => [[a[0] + (c[0] - a[0]) * f0, a[1] + (c[1] - a[1]) * f0], [a[0] + (c[0] - a[0]) * f1, a[1] + (c[1] - a[1]) * f1]]);
+}
 function kerbRing(b, ring, h, yf, flip, top) {
   const A = sArea(ring);
   for (let i = 0; i < ring.length; i++) {
-    const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02) continue;
-    if (H.ud((a[0] + c[0]) / 2, (a[1] + c[1]) / 2)) continue; // under a deck where S is no street: no kerb there
+    const a0 = ring[i], c0 = ring[(i + 1) % ring.length]; if (hyp(c0[0] - a0[0], c0[1] - a0[1]) < 0.02 || sulBordoTile(a0, c0)) continue;
+    for (const [a, c] of kerbRuns(a0, c0)) { // under a deck where S is no street: no kerb there
+    const L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02) continue;
     let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; if (flip !== undefined && (A < 0) !== flip) { nx = -nx; nz = -nz; }
     const pts = H.cutLine(a[0], a[1], c[0], c[1], yf), keepP = [pts[0]];
     if (pts.length > 2) { // Douglas-Peucker on the profile, 1 cm
@@ -876,6 +886,7 @@ function kerbRing(b, ring, h, yf, flip, top) {
       if (top) { kerbCap(b, p[0], p[1], p[2] + h + up, q[0], q[1], q[2] + h + up, nx, nz, acc, acc + l, p[2] - lo, q[2] - lo); acc += l; continue; }
       vtx(b, p[0], p[2] - lo, p[1], nx, 0, nz, acc, 0); vtx(b, q[0], q[2] - lo, q[1], nx, 0, nz, acc + l, 0); vtx(b, q[0], q[2] + h + up, q[1], nx, 0, nz, acc + l, 1); vtx(b, p[0], p[2] + h + up, p[1], nx, 0, nz, acc, 1);
       b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); acc += l;
+    }
     }
   }
 }
@@ -962,6 +973,28 @@ function rampWalls(dk) {
   }
   return dk.rw;
 }
+// the abutments along the PONTE itself (Carlo 3/11, corso Isonzo under the Milano-Meda: under the bridge one saw grass slopes and pieces of the road
+// over it, not walls). Along each side of the footprint of the DBGT (nucleo) where the street under it lies low inside and the bank outside rises
+// to the deck, a concrete wall from the street up to the underside, its thickness towards the bank. The terrain keeps the bank behind the wall and
+// the street flat up to it (src/opere.py opere_dbgt). Pieces of 1 m: [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins]
+const SPALLA_LUCE = 2.0, SPALLA_BANCO = 1.5;
+function spalleNucleo(dk) {
+  if (dk.sn) return dk.sn; dk.sn = []; if (!dk.nucleo || dk.free || dk.tipo === 'copertura' || dk.nucleo.length < 3) return dk.sn;
+  const N = dk.nucleo, topAt = (x, z) => { for (const o of H.deckAt(x, z)) if (o.id === dk.id) return o.top; return null; };
+  for (let i = 0; i < N.length; i++) {
+    const a = N[i], c = N[(i + 1) % N.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.3) continue;
+    let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (inPoly(mx + nx * 0.2, mz + nz * 0.2, N)) { nx = -nx; nz = -nz; } // (n: outwards)
+    const m = Math.max(1, Math.round(L)), pts = [];
+    for (let k = 0; k <= m; k++) {
+      const x = a[0] + (c[0] - a[0]) * k / m, z = a[1] + (c[1] - a[1]) * k / m, t = topAt(x - nx * 0.3, z - nz * 0.3); if (t === null) { pts.push(null); continue; }
+      const bot = t - dk.sp, gin = Math.min(H.base(x - nx * 0.3, z - nz * 0.3), H.base(x - nx * 1.5, z - nz * 1.5)), gout = Math.max(H.base(x + nx * 3.5, z + nz * 3.5), H.base(x + nx * 4.5, z + nz * 4.5));
+      pts.push(bot - gin > SPALLA_LUCE && bot - gout < SPALLA_BANCO ? [x, z, gin - 0.3, bot] : null);
+    }
+    for (let k = 0; k < m; k++) { const p = pts[k], q = pts[k + 1]; if (!p || !q) continue; dk.sn.push([p[0], p[1], p[2], p[3], q[0], q[1], q[2], q[3], 0, nx, nz]); }
+  }
+  for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1] of dk.sn) { const L = hyp(bx - ax, bz - az) || 1; WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: Math.min(ya0, yb0) - 1, y1: Math.max(ya1, yb1), deckw: true }); }
+  return dk.sn;
+}
 function drawDecks(T, top, side) {
   for (const dk of H.DECKS) {
     if (dk.tipo === 'copertura') continue; // its top is S itself (the station underpass)
@@ -978,6 +1011,11 @@ function drawDecks(T, top, side) {
       const L = hyp(bx - ax, bz - az) || 1, nx = (bz - az) / L, nz = -(bx - ax) / L, b0 = side.p.length / 3;
       vtx(side, ax, ay - sp, az, nx, 0, nz, 0, 0); vtx(side, bx, by - sp, bz, nx, 0, nz, L / 2, 0); vtx(side, bx, by + 0.02, bz, nx, 0, nz, L / 2, 1); vtx(side, ax, ay + 0.02, az, nx, 0, nz, 0, 1);
       side.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3, b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); // both faces: the footprint has no fixed winding
+    }
+    for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1, , nx, nz] of spalleNucleo(dk)) { // the abutments along the PONTE: the face towards the street, the back towards the bank
+      if (tileOf((ax + bx) / 2, (az + bz) / 2) !== T.t) continue;
+      const ox = nx * SPALLA_SP, oz = nz * SPALLA_SP;
+      opQuad(side, [[ax, ya0, az], [bx, yb0, bz], [bx, yb1, bz], [ax, ya1, az]], -nx, 0, -nz); opQuad(side, [[ax + ox, ya0, az + oz], [bx + ox, yb0, bz + oz], [bx + ox, yb1, bz + oz], [ax + ox, ya1, az + oz]], nx, 0, nz);
     }
     for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins] of rampWalls(dk)) { // the walls of the approach ramps and the abutments (rampWalls): concrete with a thickness towards the fill, its ends closed
       if (tileOf((ax + bx) / 2, (az + bz) / 2) !== T.t) continue;
@@ -1277,11 +1315,12 @@ function buildPits(T, G) {
       const f = op_ ? opAnello(T, f0) : f0;
       for (let i = 0; i < f.length; i += 6) {
         const xs = [f[i], f[i + 2], f[i + 4]], zs = [f[i + 1], f[i + 3], f[i + 5]], cx = (xs[0] + xs[1] + xs[2]) / 3, cz = (zs[0] + zs[1] + zs[2]) / 3, sy = op_ ? opLook(T, cx, cz) : pitLook(T, cx, cz);
-        { const q_ = H.inPit(cx, cz); if (q_ && q_ !== p) continue; } // (inside another pit: its floor is there, not this pit's ground: the dark sheets over the stairs of the station, Carlo 3/11)
         let B = byLook.get(sy); if (!B) byLook.set(sy, B = Buf());
-        const ys = xs.map((x, q) => H.baseS(x, zs[q])), vs = sy ? sy.vs : 10, i0 = B.p.length / 3;
-        for (let q = 0; q < 3; q++) vtx(B, xs[q], ys[q], zs[q], 0, 1, 0, xs[q] / vs, zs[q] / vs, sy ? sy.col : null);
-        triUp(B, i0, i0 + 1, i0 + 2);
+        const vs = sy ? sy.vs : 10, put3 = (P3) => { const i0 = B.p.length / 3; for (const [x, z] of P3) vtx(B, x, H.baseS(x, z), z, 0, 1, 0, x / vs, z / vs, sy ? sy.col : null); triUp(B, i0, i0 + 1, i0 + 2); };
+        // inside another pit its floor is there, not this pit's ground: the triangle is cut on it in pieces, a whole triangle that only reached into it with a corner made the dark shards on the walls of the stairs of the station (Carlo 3/11)
+        const altra = (x, z) => { const q_ = H.inPit(x, z); return !!q_ && q_ !== p; }, tocca = P3 => { const mx = (P3[0][0] + P3[1][0] + P3[2][0]) / 3, mz = (P3[0][1] + P3[1][1] + P3[2][1]) / 3; return altra(mx, mz) || P3.some(([x, z]) => altra(mx + (x - mx) * 0.95, mz + (z - mz) * 0.95)); };
+        const parti = (P3, d) => { if (!tocca(P3)) { put3(P3); return; } if (d === 0) return; const [a, b, c] = P3, ab = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], bc = [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2], ca = [(c[0] + a[0]) / 2, (c[1] + a[1]) / 2]; for (const q of [[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]]) parti(q, d - 1); };
+        parti([[xs[0], zs[0]], [xs[1], zs[1]], [xs[2], zs[2]]], 4);
       }
     }
     for (const [sy, B] of byLook) { const M = mkMesh(B, op_ ? conProfondita(sy ? sy.m : MAT.terrainS) : (sy ? sy.m : MAT.terrainS), -2, false); scene.remove(M); G.add(M); M.userData.suolo = true; p.meshes.push(M); }
@@ -1529,7 +1568,7 @@ function* buildTileGen(T) {
       try { polyFill(sw, q.o, q.k, SIDE_H, 4); } catch (e) { } // the cover of the step: S + SIDE_H on the cells (clipFill)
       if (T.fine) { for (const ring of [q.o, ...q.k]) kerbRing(kerbS, ring, SIDE_H, streetY, undefined, true); continue; }
       for (const ring of [q.o, ...q.k]) for (let i = 0; i < ring.length; i++) {
-        const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02) continue;
+        const a = ring[i], c = ring[(i + 1) % ring.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02 || sulBordoTile(a, c)) continue;
         const nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L;
         kerbCap(kerb, a[0], a[1], SIDE_H, c[0], c[1], SIDE_H, nx, nz, 0, L, 0, 0);
       }
@@ -1701,13 +1740,18 @@ function* buildTileGen(T) {
         const lv = medianDeck(m);
         if (!lv) { try { if (m.v) polyFill(mdG, m.o, m.k, MED_H, 9, COL('#ffffff')); else polyFill(mdS, m.o, m.k, MED_H, 4); } catch (e) { } for (const ring of [m.o, ...m.k]) kerbRing(mdK, ring, MED_H, streetY); continue; } // in a tile of S: a step 0.15 over S (or a free deck), cover and kerbs on the cells; m.v: grass behind the kerb (DBGT islands)
         // on a deck that is not free (the ramps of an overpass): on its top, as before phase 5 (cut on S it lay under the bridge, a white strip on the slope)
-        try { const B_ = m.v ? mdD : md, base = B_.p.length / 3; polyFill(B_, densify(m.o, 4), m.k.map(h => densify(h, 4)), 0, 4); for (let i = base * 3; i < B_.p.length; i += 3) B_.p[i + 1] = lv(B_.p[i], B_.p[i + 2]) + 0.12; } catch (e) { } // (m.v: grass, the median of the road over a bridge)
+        if (m.v) { // the island of the road over a bridge (build: dk): grass 0.15 over the deck top, with its kerb all round. Its material writes the depth: the deck is drawn in the same order and, without, covered it (Carlo 3/11: the median of the Milano-Meda missing on the bridge of corso Isonzo)
+          try { const base = mdD.p.length / 3; polyFill(mdD, densify(m.o, 2), m.k.map(h => densify(h, 2)), 0, 4, COL('#ffffff')); for (let i = base * 3; i < mdD.p.length; i += 3) mdD.p[i + 1] = lv(mdD.p[i], mdD.p[i + 2]) + MED_H; } catch (e) { }
+          for (const ring of [m.o, ...m.k]) { const r = densify(ring, 2); for (let i = 0; i < r.length; i++) { const a = r[i], c = r[(i + 1) % r.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.02) continue; const nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L, ya = lv(a[0], a[1]), yc = lv(c[0], c[1]), b0 = mdK.p.length / 3; vtx(mdK, a[0], ya - 0.05, a[1], nx, 0, nz, 0, 0); vtx(mdK, c[0], yc - 0.05, c[1], nx, 0, nz, L, 0); vtx(mdK, c[0], yc + MED_H + 0.01, c[1], nx, 0, nz, L, 1); vtx(mdK, a[0], ya + MED_H + 0.01, a[1], nx, 0, nz, 0, 1); mdK.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); } } /* (the kerb material is double sided) */
+          continue;
+        }
+        try { const base = md.p.length / 3; polyFill(md, densify(m.o, 4), m.k.map(h => densify(h, 4)), 0, 4); for (let i = base * 3; i < md.p.length; i += 3) md.p[i + 1] = lv(md.p[i], md.p[i + 2]) + 0.12; } catch (e) { }
         continue;
       }
       const o = dec(q.p), k = q.k.map(dec), yAt = (x, z) => { let best = null, bd = 1e9; DECKG.each(x - 8, z - 8, x + 8, z + 8, s => { const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.ax) * ex + (z - s.az) * ez) / L2, 0, 1), dd = hyp(x - s.ax - ex * t, z - s.az - ez * t); if (dd < bd && dd < s.hw + 7) { bd = dd; best = lerp(s.ya, s.yb, t); } }); return best === null ? H.ground(x, z) : best; };
       try { const base = md.p.length / 3; polyFill(md, densify(o, 4), k.map(h => densify(h, 4)), 0, 4); for (let i = base * 3; i < md.p.length; i += 3) md.p[i + 1] = yAt(md.p[i], md.p[i + 2]) + 0.12; } catch (e) { }
     }
-    barTile(T, B, G); put(md, MAT.median, 9); put(mdS, MAT.median, 9); put(mdG, MAT.grass, 9); put(mdD, MAT.grass, 9); put(mdK, MAT.kerb, 9); // the barrier meshes and posts, every piece whole again
+    barTile(T, B, G); put(md, MAT.median, 9); put(mdS, MAT.median, 9); put(mdG, MAT.grass, 9); put(mdD, conProfondita(MAT.grass), 9); put(mdK, MAT.kerb, 9); // the barrier meshes and posts, every piece whole again
     rotondeTile(T, put, G); /* the aiuole of the roundabouts over their islands (rotonde3.js) */
   }
   yield 'railway';

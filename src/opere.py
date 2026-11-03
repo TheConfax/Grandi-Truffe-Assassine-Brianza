@@ -39,6 +39,8 @@ MARGINE_S = 1      # stazioni: il coperto comincia dove S e alta anche tante sta
 RAMO_MAX, RAMO_DZ, RAMO_LARGO, RAMO_SOTTO = 9.0, 0.6, 3.0, 0.2   # m: un altro asse del fondo entro tanto dall'asse, a tanto di quota, il margine che gli si lascia verso la parete, e quanto sta sotto il suolo (sopra e un'altra strada)
 ALLUNGA_MAX = 160.0  # m: per lato, oltre questo non e una trincea
 COPERTO_OSM = 6.0  # m: una stazione cosi vicina alla via tunnel di OSM e coperta
+GALLER_M = 1.0     # m: oltre il bordo della GALLER il coperto va ancora tanto, se sopra c'e la strada (il fronte col suo parapetto sta oltre il bordo della strada)
+PIENA_M = 1.5      # m: S sopra una galleria stradale e alla quota della strada di sopra fin tanto oltre la GALLER (galleria_piena)
 SOPRA_MIN = 0.7    # m: un vertice di un'area piu di tanto sopra il livello della strada sotto e del livello di sopra
 
 
@@ -319,8 +321,12 @@ def _stazioni(cat, assi, gr, gall, quota, D):
     # the mouth meets the street beyond it with no step (Carlo 3/11, via Montecassino: through the gap of 0.2-0.3 m between the end of the floor and the street
     # one saw the sky): the end station takes the ground 1 m past the end, on each side and in the middle, and the floor bends to it over 3 m
     T_ = np.gradient(C, axis=0); T_ /= np.maximum(np.hypot(*T_.T), 1e-9)[:, None]
-    oltre = lambda P_, k, sg: float(quota(*(P_[k] + sg * T_[k] * 1.0)))
-    yl = y + (oltre(Lft, 0, -1) - y[0]) * bl + (oltre(Lft, n - 1, 1) - y[-1]) * br; yr = y + (oltre(Rgt, 0, -1) - y[0]) * bl + (oltre(Rgt, n - 1, 1) - y[-1]) * br
+    # The street beyond the mouth on its middle line, for both sides (Carlo 3/11, via Montecassino x 830 z 2145 and x 680 z 2107: a jump in the car and grass
+    # in the gap). Its sides are higher than its middle (kerbs, the ground by the walls: 0.3-0.4 m at x 830); a floor end that took them stood that much over the
+    # street where the cars pass. The sides that stay lower than the ground are closed by a face (world3.js opSoglia)
+    oltre = lambda P_, k, sg: float(quota(*(P_[k] + sg * T_[k] * 0.3)))
+    e0, e1 = oltre(C, 0, -1), oltre(C, n - 1, 1)
+    yl = y + (e0 - y[0]) * bl + (e1 - y[-1]) * br; yr = yl.copy()
     # coperta: dentro la GALLER (senza GALLER vicino alla via tunnel). Una soletta sola: la quota viene dal tratto piu alto del coperto, e vale per tutto il coperto
     vie = [LineString(w['p']) for w in gr['vie'] if w['t'].get('tunnel') in ('yes', 'covered')]
     cop = np.array([dentro[k] or (not gs and any(v.distance(Point(C[k])) < COPERTO_OSM for v in vie)) for k in range(n)]); cop = ndimage.binary_closing(cop, np.ones(5, bool)) | cop
@@ -340,7 +346,11 @@ def _stazioni(cat, assi, gr, gall, quota, D):
         tr_ = shapely.STRtree(sopra_) if sopra_ else None
         strada_sopra = np.array([tr_ is not None and any(sopra_[j].contains(Point(q)) for q in (Lft[k], Rgt[k], C[k]) for j in tr_.query(Point(q))) for k in range(n)])
         alto_ = tp >= soff + SP_OPERA - PIANO * 0.5
-        idx = np.nonzero(coperto(cop, alto_) | (strada_sopra & alto_ & ndimage.binary_dilation(cop, np.ones(2 * OLTRE_STRADA + 1, bool))))[0]
+        # what the DBGT has in gallery (the GALLER, GALLER_M past its edge) is covered whatever S does there: the front stands at the edge of the road over it,
+        # with its parapet (Carlo 3/11, x -768 z 94 and 116: the front stood 2-4 m into the Milano-Meda, which lost its edge and its parapets; it was cut where S,
+        # one cell of 2 m, began to fall down the bank). S over it is made up to the road (galleria_piena)
+        dentro_b = np.array([any(g_.buffer(GALLER_M).contains(Point(q)) for g_ in gs) for q in C]) & strada_sopra if gs else np.zeros(n, bool)
+        idx = np.nonzero(coperto(cop, alto_) | (strada_sopra & alto_ & ndimage.binary_dilation(cop, np.ones(2 * OLTRE_STRADA + 1, bool))) | dentro_b)[0]
         cop[:] = False
         if len(idx):
             gal[idx[0]:idx[-1] + 1] = True; cop[idx[0]:idx[-1] + 1] = True
@@ -539,6 +549,7 @@ def cavalcavia(sup, log=lambda *a: None):
 VICINO_OPERA = 30.0  # m: muri di sostegno (MU_SOS) e scarpate (SCARPT) del DBGT entro tanto da un PONTE sono della sua opera
 ATTORNO = 12.0       # m: l'impronta dell'opera comprende il suolo attorno al PONTE entro tanto
 FILO_SCARPT = 0.75   # m: un nodo cosi vicino a una linea di scarpata ne prende la quota
+SPALLA_FUORI = 2.0   # m: oltre una spalla del PONTE il suolo scende ancora tanto (una cella di S): il gradino resta dietro il muro
 
 
 def pezzi_dbgt(sup):
@@ -588,7 +599,7 @@ def opere_dbgt(sup, S):
     from scipy import sparse
     from scipy.sparse.linalg import spsolve
     D = sup.D; P = D['PONTE']; sup.OPERA = np.zeros(S.shape, bool); rep = []
-    muri, linee = pezzi_dbgt(sup)
+    muri, linee = pezzi_dbgt(sup); ponti_s = ponti_sopra(D)
     tm = shapely.STRtree([g for g, _, _ in muri]) if muri else None; tl = shapely.STRtree([g for g, _, _ in linee]) if linee else None
     for i in range(len(P['off']) - 1):
         g = sf.poly(P, i)
@@ -636,7 +647,34 @@ def opere_dbgt(sup, S):
         sottoP = ponte_m & dentro & ~fx & np.isfinite(V); V[sottoP] = np.minimum(V[sottoP], bot - 0.3)   # under the deck never up to it (the grass came through the deck top, Carlo 3/11)
         nuovi = dentro & ~fx & np.isfinite(V); dz = V[nuovi] - W[nuovi]
         W[nuovi] = V[nuovi]; sup.OPERA[r0:r1, c0:c1] |= dentro
-        rep.append(dict(ponte=int(P['id'][i]), c=_c(g), muri=[muri[j][2] for j in mi], scarpate=[linee[j][2] for j in li], nodi=int(nuovi.sum()), rilevato=int(sopra.sum()),
+        # 5. a PONTE over a street: the street under it is flat up to the abutments, which stand on the sides of the PONTE across the road over it (the game draws
+        # them there as walls, world3.js spalleNucleo), and the bank begins behind them. Under the deck nothing stays of the road over it or of its bank (Carlo 3/11,
+        # corso Isonzo under the Milano-Meda: slopes of grass with pieces of the Milano-Meda's asphalt under the bridge, a hump of grass on the sidewalk, the
+        # sidewalk cut 2 m short of the abutment). The nodes within SPALLA_FUORI past an abutment go down too: the step of S (a cell of 2 m) then lies behind the wall
+        ps_ = [q for q in ponti_s if q[0].intersection(g).area > 0.5 * g.area]
+        if ps_:
+            _, v_, b_, c_ = ps_[0]; ring = np.asarray(g.exterior.coords); lati = []
+            for a_, e_ in zip(ring[:-1], ring[1:]):
+                d_ = e_ - a_; n_ = np.hypot(*d_)
+                if n_ > 1.0 and abs(d_ @ v_) / n_ < 0.5: lati.append(LineString([a_, e_]).buffer(SPALLA_FUORI, cap_style=2))
+            zona_g = shapely.union_all([g.buffer(0.05)] + lati); zona = shapely.contains(zona_g, pts) & dentro
+            strada_ = np.isin(sup.CLS[r0:r1, c0:c1], (sf.C_VEI, sf.C_VEIT, sf.C_PED, sf.C_AREA, sf.C_FER)) & sup.FIX[r0:r1, c0:c1]
+            base_ = strada_ & ponte_m & (W < bot - LUCE_MIN)   # the street under it, as made above
+            if zona.any() and base_.any():
+                idx = ndimage.distance_transform_edt(~base_, return_distances=False, return_indices=True); vb = W[idx[0], idx[1]]
+                giu = zona & ~base_ & (W > vb + 0.05); W[giu] = vb[giu]
+                in_c = shapely.contains(c_, pts) if not c_.is_empty else np.zeros(pts.shape, bool); in_b = shapely.contains(b_, pts) if not b_.is_empty else np.zeros(pts.shape, bool)
+                CL, FI = sup.CLS[r0:r1, c0:c1], sup.FIX[r0:r1, c0:c1]
+                k_ = zona & ~base_
+                CL[k_ & in_c] = sf.C_VEI; CL[k_ & in_b & ~in_c] = sf.C_PED; FI[k_ & in_b] = True
+                CL[k_ & ~in_b] = sf.C_NONE; FI[k_ & ~in_b] = False
+                for nm_ in ('SCARP', 'INT'):
+                    M_ = getattr(sup, nm_, None)
+                    if M_ is not None: M_[r0:r1, c0:c1][k_] = False
+                sup.OPERA[r0:r1, c0:c1] |= zona; rep_giu = int(giu.sum())
+            else: rep_giu = 0
+        else: rep_giu = 0
+        rep.append(dict(ponte=int(P['id'][i]), c=_c(g), muri=[muri[j][2] for j in mi], scarpate=[linee[j][2] for j in li], nodi=int(nuovi.sum()), rilevato=int(sopra.sum()), sotto_le_spalle=rep_giu,
                         dz_m=[round(float(v), 2) for v in np.percentile(dz, (5, 50, 95))] if len(dz) else None,
                         pezzi=[[[round(float(x), 2), round(float(z), 2)] for x, z in np.asarray(muri[j][0].representative_point().coords)] for j in mi] +
                               [[[round(float(x), 2), round(float(z), 2)] for x, z in np.asarray(linee[j][0].interpolate(0.5, normalized=True).coords)] for j in li]))
@@ -969,3 +1007,42 @@ def senza_strada_di_sopra(ponti, superfici, isole, barriere, log=lambda *a: None
     log('strada di sopra tolta da sotto i ponti (%d PONTE): superfici %.0f m2, spartitraffico %.0f m2, barriere %.0f m' % (len(ponti), m2['superfici'], m2['isole'], m2['barriere_m']))
     senza_strada_di_sopra.sul_ponte = unary_union(sul_ponte) if sul_ponte else None
     return out, isole, nb
+
+
+def sotto_impalcato_sopra(indice, ponti):
+    """dove l'impalcato di un PONTE che porta una strada sopra un'altra va oltre il PONTE, sul rilevato (impalcati.py lo allunga fin dove appoggia): la sua
+    impronta fuori dal PONTE. Li le isole della strada di sopra stanno sotto il piano dell'impalcato e non si vedono: vanno sull'impalcato (build_data)"""
+    import json, os
+    from shapely.ops import unary_union
+    if not ponti or not os.path.exists(indice): return None
+    out = []
+    for d in json.load(open(indice, encoding='utf-8')).get('decks', []):
+        if d.get('tipo') != 'strada' or not d.get('nucleo') or len(d['imp']) < 3: continue
+        nu = Polygon(d['nucleo']).buffer(0)
+        for g, v, b, c in ponti:
+            if nu.intersection(g).area < 0.5 * min(nu.area, g.area): continue
+            im = Polygon(d['imp']).buffer(0)
+            fuori = im.difference(g.buffer(0.3))
+            if not fuori.is_empty: out.append(fuori)
+    return unary_union(out) if out else None
+
+
+def galleria_piena(sup, S):
+    """in raccordi(), dopo opere_dbgt: sopra una galleria stradale (gallerie_stradali) S e piena fino al bordo della GALLER, PIENA_M oltre, alla quota della strada
+    di sopra (il nodo di strada alto piu vicino). Una cella di S (2 m) a cavallo del bordo del rilevato scendeva gia dentro la GALLER, e la strada di sopra
+    perdeva il suo bordo sopra il fronte (Carlo 3/11, x -768 z 90 e 117 sotto la Milano-Meda). Scrive i nodi in sup.OPERA (il lisciatore non li tocca)"""
+    import superficie as sf
+    D = sup.D; assi = [a for a in assi_dbgt(D) if a['sed'] == '03']; tot = 0
+    for P in gallerie_stradali(D):
+        w = sup.R.win(P.buffer(PIENA_M + 3.0).bounds, 0)
+        if w is None: continue
+        r0, r1, c0, c1 = w; X, Z = sup.R.xz(w); pts = shapely.points(X, Z); W = S[r0:r1, c0:c1]
+        zs = [np.median(a['z']) for a in assi if a['g'].intersects(P)]
+        if not zs: continue
+        basso = float(np.median(zs))
+        zona = shapely.contains(P.buffer(PIENA_M), pts)
+        strada = np.isin(sup.CLS[r0:r1, c0:c1], sf.ROADTYPE) & sup.FIX[r0:r1, c0:c1] & (W > basso + LUCE_MIN + 1.0) & shapely.contains(P.buffer(PIENA_M + 3.0), pts)
+        if not strada.any() or not zona.any(): continue
+        idx = ndimage.distance_transform_edt(~strada, return_distances=False, return_indices=True); vs = W[idx[0], idx[1]]
+        su = zona & ~strada & (W < vs - 0.05); W[su] = vs[su]; sup.OPERA[r0:r1, c0:c1] |= zona; tot += int(su.sum())
+    sup.log('gallerie stradali piene fino al bordo della GALLER: %d nodi alzati alla strada di sopra' % tot)
