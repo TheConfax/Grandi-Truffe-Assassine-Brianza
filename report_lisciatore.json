@@ -2570,13 +2570,13 @@
 },
 "spostamento": {
 "dente_m": {
-"n": 417282,
+"n": 417250,
 "p50": 0.09,
 "p90": 0.28,
-"p99": 1.03,
-"max": 3.26
+"p99": 1.02,
+"max": 2.44
 },
-"dente_su_m": 3.26,
+"dente_su_m": 2.44,
 "dente_giu_m": -1.5,
 "buche_m": {
 "n": 109164,
@@ -2585,12 +2585,12 @@
 "p99": 2.79,
 "max": 6.0
 },
-"nodi_mossi": 526446,
+"nodi_mossi": 526414,
 "nodi_griglia": 7880626,
 "limite_dente_m": 1.5
 },
 "invariati": {
-"nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 24,
+"nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 1,
 "nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 19,
 "carreggiate_cambiate": 5,
 "carreggiate_ai_passaggi_a_livello": 565,
@@ -2606,80 +2606,10 @@
 },
 "gradini_cresciuti": {
 "definizione": "coppie di nodi vicini (anche in diagonale), fuori dagli edifici e dalle buche riempite, con il salto cresciuto oltre la soglia",
-"oltre_0.3m": 13144,
-"oltre_0.5m": 2277,
-"oltre_1.0m": 147,
+"oltre_0.3m": 13075,
+"oltre_0.5m": 2218,
+"oltre_1.0m": 104,
 "peggiori": [
-{
-"x": 355.2,
-"z": -476.4,
-"cresce": 3.26
-},
-{
-"x": 353.2,
-"z": -474.4,
-"cresce": 3.2
-},
-{
-"x": 355.2,
-"z": -476.4,
-"cresce": 3.08
-},
-{
-"x": 353.2,
-"z": -474.4,
-"cresce": 2.94
-},
-{
-"x": 355.2,
-"z": -474.4,
-"cresce": 2.94
-},
-{
-"x": 355.2,
-"z": -478.4,
-"cresce": 2.86
-},
-{
-"x": 357.2,
-"z": -478.4,
-"cresce": 2.86
-},
-{
-"x": 355.2,
-"z": -478.4,
-"cresce": 2.86
-},
-{
-"x": 355.2,
-"z": -474.4,
-"cresce": 2.84
-},
-{
-"x": 357.2,
-"z": -474.4,
-"cresce": 2.67
-},
-{
-"x": 357.2,
-"z": -474.4,
-"cresce": 2.55
-},
-{
-"x": 357.2,
-"z": -476.4,
-"cresce": 2.54
-},
-{
-"x": 357.2,
-"z": -476.4,
-"cresce": 2.54
-},
-{
-"x": 359.2,
-"z": -476.4,
-"cresce": 2.5
-},
 {
 "x": 41.2,
 "z": -818.4,
@@ -2726,39 +2656,109 @@
 "cresce": 2.36
 },
 {
-"x": 359.2,
-"z": -474.4,
-"cresce": 2.3
-},
-{
-"x": 357.2,
-"z": -474.4,
-"cresce": 2.3
-},
-{
-"x": 357.2,
-"z": -478.4,
-"cresce": 2.12
-},
-{
 "x": 45.2,
 "z": -818.4,
 "cresce": 2.04
 },
 {
-"x": 359.2,
-"z": -474.4,
-"cresce": 2.01
+"x": 47.2,
+"z": -818.4,
+"cresce": 1.93
 },
 {
-"x": 359.2,
-"z": -476.4,
-"cresce": 1.97
+"x": 45.2,
+"z": -818.4,
+"cresce": 1.93
+},
+{
+"x": 41.2,
+"z": -824.4,
+"cresce": 1.91
 },
 {
 "x": 47.2,
 "z": -818.4,
-"cresce": 1.93
+"cresce": 1.87
+},
+{
+"x": 43.2,
+"z": -824.4,
+"cresce": 1.84
+},
+{
+"x": 45.2,
+"z": -822.4,
+"cresce": 1.81
+},
+{
+"x": 45.2,
+"z": -822.4,
+"cresce": 1.8
+},
+{
+"x": 43.2,
+"z": -822.4,
+"cresce": 1.78
+},
+{
+"x": 39.2,
+"z": -822.4,
+"cresce": 1.75
+},
+{
+"x": 43.2,
+"z": -822.4,
+"cresce": 1.69
+},
+{
+"x": -988.8,
+"z": 87.6,
+"cresce": 1.5
+},
+{
+"x": -1386.8,
+"z": 1233.6,
+"cresce": 1.5
+},
+{
+"x": -988.8,
+"z": 85.6,
+"cresce": 1.5
+},
+{
+"x": -988.8,
+"z": 87.6,
+"cresce": 1.5
+},
+{
+"x": -1598.8,
+"z": 1623.6,
+"cresce": 1.48
+},
+{
+"x": 47.2,
+"z": -820.4,
+"cresce": 1.46
+},
+{
+"x": 41.2,
+"z": -824.4,
+"cresce": 1.44
+},
+{
+"x": -986.8,
+"z": 83.6,
+"cresce": 1.42
+},
+{
+"x": 49.2,
+"z": -820.4,
+"cresce": 1.38
+},
+{
+"x": 47.2,
+"z": -818.4,
+"cresce": 1.33
 }
 ]
 },
@@ -2969,24 +2969,38 @@
 "controlli_pozzetti": {
 "definizione": "depressioni chiuse di S (piena dal minimo fino al punto di sfioro) profonde almeno 0.4 m con al massimo 3 nodi (12 m2), su tutta la mappa",
 "prima": {
-"totale": 3914,
+"totale": 3916,
 "senza_motivo": 3765,
-"oltre_1m": 484,
-"oltre_2m": 32
+"oltre_1m": 486,
+"oltre_2m": 34
 },
 "dopo": {
 "totale": 156,
-"senza_motivo": 3,
-"oltre_1m": 10,
-"oltre_2m": 0
+"senza_motivo": 1,
+"oltre_1m": 12,
+"oltre_2m": 2
 },
 "eccezioni_per_motivo": {
+"impalcato o ponte": 71,
 "a meno di 4 m da ponte, acqua o ferrovia": 21,
 "acqua o alveo": 52,
-"impalcato o ponte": 69,
 "rampa disegnata": 11
 },
 "eccezioni": [
+{
+"x": -2592.8,
+"z": 1479.6,
+"m2": 4,
+"prof": 2.25,
+"motivo": "impalcato o ponte"
+},
+{
+"x": -2588.8,
+"z": 1477.6,
+"m2": 4,
+"prof": 2.11,
+"motivo": "impalcato o ponte"
+},
 {
 "x": -1248.8,
 "z": 1095.6,
@@ -4066,20 +4080,6 @@
 "m2": 20,
 "prof": 1.3,
 "motivo": null
-},
-{
-"x": 367.2,
-"z": -470.4,
-"m2": 12,
-"prof": 0.87,
-"motivo": null
-},
-{
-"x": 359.2,
-"z": -468.4,
-"m2": 20,
-"prof": 0.54,
-"motivo": null
 }
 ],
 "riempiti_i_piu_profondi": [
@@ -4265,7 +4265,7 @@
 }
 ],
 "punte_verso_alto": {
-"totale": 1097,
+"totale": 1096,
 "fuori_dalle_cose_protette": 990,
 "peggiori": [
 {
