@@ -6,6 +6,7 @@
 /* asfalto: Poly Haven asphalt_04 (CC0, 4.04 m declared), recoloured to the pale grey of the photo of via Yuri Gagarin and darkened by 0.65 (linear), baked in tex/asfalto.jpg.
    &asftono=N multiplies the brightness on top (test only, default 1); &asfsh=0 turns the asphalt details off */
 const ASF_FILE = 'asfalto', ASF_M = 4.04;
+const ASF_PAT = { value: new THREE.TextureLoader().load('tex/asfalto_toppa.jpg', t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; }) }; /* new asphalt for the patches: ambientCG Asphalt020S (CC0), recoloured, 512 px */
 const ASF_U = { value: /[?&]asfsh=0/.test(location.search) ? 0 : 1 }; window.__ASFU = ASF_U;
 const ASF_T = { value: +((/[?&]asftono=([0-9.]+)/.exec(location.search) || [0, '1'])[1]) || 1 }; /* &asftono=N: multiplier of the asphalt brightness (default 1) */
 const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 2], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
@@ -185,6 +186,8 @@ for (const [k, m, tile] of [['old', MAT.old, 3.4], ['mod', MAT.mod, 4.2], ['plai
    (rectangles of 1-4 m, a little turned, darker and blacker, sharp edge). All in world coordinates. The wheel tracks are not done: the asphalt UVs do not know the road direction */
 const ASF_GLSL = `
 uniform float uAsf, uAsT;
+uniform sampler2D uPat;
+uniform vec3 uSun;
 vec2 h22(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); q += dot(q, q.yzx + 33.33); return fract((q.xx + q.yz) * q.zy); }
 `;
 const ASF_FRAG = `
@@ -231,20 +234,29 @@ const ASF_FRAG = `
       float dm = (d2 - d1) * .5 * 12.; /* about the metres to the edge */
       float cr = (1. - smoothstep(wd - px, wd + px, dm)) * min(1., wd * 2. / px) * keep * far;
       texelColor.rgb = mix(texelColor.rgb, texelColor.rgb * .22, cr * .9); }
-    /* patches */
-    { vec2 gc = floor(P / 16.), lp = P - gc * 16.; vec2 r1 = h22(gc + 21.), r2 = h22(gc + 33.), r3 = h22(gc + 45.);
-      if (r3.x < .22 && hasDir > .5) {
-        vec2 cen = 4. + 8. * r1, hs = vec2(.75 + 1.25 * r2.x, .5 + .5 * r2.y); /* half sides: the long one (1.5-4 m) along the road, the short one (1-2 m) across */
-        vec2 d = lp - cen; vec2 e = abs(vec2(dot(d, rd), dot(d, vec2(-rd.y, rd.x)))) - hs;
-        float m = (1. - smoothstep(-px, px + .01, max(e.x, e.y))) * far;
-        float g = dot(texelColor.rgb, vec3(.3, .59, .11));
-        texelColor.rgb = mix(texelColor.rgb, vec3(g) * .5 * (.85 + .3 * r3.y), m * .9); } }
+    /* patches of new asphalt: 6-25 m along the road (sometimes a whole lane wide), 1-3 m across, with the fine black photo of new asphalt (no cracks) and a slight
+       relief: the edge raised or lowered by a few cm, seen as light and shade on the sun side (Lambert lights per vertex, so the normal is tilted by hand) */
+    { vec2 gc = floor(P / 40.), lp = P - gc * 40.; vec2 r1 = h22(gc + 21.), r2 = h22(gc + 33.), r3 = h22(gc + 45.);
+      if (r3.x < .7 && hasDir > .5) {
+        vec2 cen = 15. + 10. * r1, hs = vec2(3. + 9.5 * r2.x, r3.y > .75 ? 1.75 : .5 + .9 * r2.y), nd = vec2(-rd.y, rd.x); /* half sides: long along the road, short across */
+        vec2 d = lp - cen; vec2 q = vec2(dot(d, rd), dot(d, nd)), e = abs(q) - hs; float sd = max(e.x, e.y);
+        float m = (1. - smoothstep(-px, px + .01, sd)) * far;
+        if (m > 0.) {
+          vec3 pt = pow(texture2D(uPat, P / 2.).rgb, vec3(2.2)); /* the photo of new asphalt, 2 m a repeat, in linear */
+          texelColor.rgb = mix(texelColor.rgb, pt * (.8 + .5 * r3.y), m);
+        }
+        float bw = .06, fade = 1. - smoothstep(.03, .1, px);
+        if (abs(sd) < bw && fade > 0.) { /* the edge: height h = rs * (1 - smoothstep(-bw, bw, sd)), rs +1 raised, -1 lowered; the slope is the gradient of h */
+          float rs = r3.y < .6 ? 1. : -1., t = clamp((sd + bw) / (2. * bw), 0., 1.), dh = -rs * 6. * t * (1. - t) / (2. * bw) * .05; /* slope in m per m, exaggerated */
+          vec2 gs = e.x > e.y ? sign(q.x) * rd : sign(q.y) * nd; vec2 sl = dh * gs, Lr = uSun.xz / max(uSun.y, .12);
+          texelColor.rgb *= mix(1., clamp(1. - dot(sl, Lr) * 3., .45, 1.7), fade); }
+      } }
   }
   texelColor.rgb *= uAsT;
   diffuseColor *= texelColor;`;
 /* dir: the colour of the mesh is the direction of the road (cos 2a, sin 2a, 1; asp buffer of world3.js), not a tint: it is read, and not multiplied in */
 const ASF_PATCH = dir => s => {
-  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T;
+  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T; s.uniforms.uPat = ASF_PAT; s.uniforms.uSun = { value: SUN_DIR };
   let f = s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
   if (dir) f = '#define ASF_DIR\n' + f.replace('#include <color_fragment>', '');
   s.fragmentShader = ASF_GLSL + VAR_GLSL + f;
