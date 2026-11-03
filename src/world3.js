@@ -1197,6 +1197,21 @@ function rampaPareti(Wb, p) {
   const B0 = H.B0, tops = L => { const g = L.map(v => H.baseS(v[0], v[1])), m = g.length - 1, gm = g.map((_, k) => { let x = -1e9; for (let d = -4; d <= 4; d++) x = Math.max(x, g[clamp(k + d, 0, m)]); return x; }); return L.map((v, k) => { let s_ = 0; for (let d = -4; d <= 4; d++) s_ += gm[clamp(k + d, 0, m)]; const gg = s_ / 9, dd = gg - v[2]; return (g[k] - v[2] < 0.25 ? v[2] : gg + Math.min(PIT_PAR, dd)) + B0; }); }; // (the top: the highest ground within 4 stations, averaged: never under the ground, no steps)
   opPareti(Wb, { sx: p.sx, dx: p.dx, src: { csx: tops(p.sx), cdx: tops(p.dx) }, id: p.id }, null);
 }
+// the open mouth of an underpass: where the street beyond stands over the end of the floor, a face from the floor up to the street along the end
+// line, looking into the trench (no gap to see the sky through: via Montecassino, Carlo 3/11). Not at the end that goes on into the covered part or another piece
+function opSoglia(Wb, p) {
+  const n = p.sx.length;
+  for (const [k, kin] of [[0, 1], [n - 1, n - 2]]) {
+    const a = p.sx[k], b = p.dx[k], mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, ix = (p.sx[kin][0] + p.dx[kin][0]) / 2 - mx, iz = (p.sx[kin][1] + p.dx[kin][1]) / 2 - mz, il = hyp(ix, iz) || 1, ox = mx - ix / il * 0.6, oz = mz - iz / il * 0.6;
+    if (H.gallAt(ox, oz)) continue; const q_ = H.inPit(ox, oz); if (q_ && q_ !== p) continue;
+    const L = hyp(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.ceil(L / 0.5));
+    for (let i = 0; i < m; i++) {
+      const f0 = i / m, f1 = (i + 1) / m, x0 = a[0] + (b[0] - a[0]) * f0, z0 = a[1] + (b[1] - a[1]) * f0, x1 = a[0] + (b[0] - a[0]) * f1, z1 = a[1] + (b[1] - a[1]) * f1, y0 = a[2] + (b[2] - a[2]) * f0, y1 = a[2] + (b[2] - a[2]) * f1, g0 = H.baseS(x0 - ix / il * 0.05, z0 - iz / il * 0.05), g1 = H.baseS(x1 - ix / il * 0.05, z1 - iz / il * 0.05);
+      if (g0 - y0 < 0.02 && g1 - y1 < 0.02) continue;
+      opQuad(Wb, [[x0, y0 - 0.05, z0], [x1, y1 - 0.05, z1], [x1, Math.max(y1, g1), z1], [x0, Math.max(y0, g0), z0]], ix / il, 0, iz / il);
+    }
+  }
+}
 function opSoffitto(C, p, roof) { for (let k = 1; k < p.sx.length; k++) { if (roof[k - 1] === null || roof[k] === null) continue; const a = p.sx[k - 1], b = p.sx[k], c = p.dx[k], d = p.dx[k - 1]; opQuad(C, [[a[0], roof[k - 1], a[1]], [b[0], roof[k], b[1]], [c[0], roof[k], c[1]], [d[0], roof[k - 1], d[1]]], 0, -1, 0); } }
 function opFronte(Wb, p, k, kin, soff) { // the front at station k, the covered part going towards station kin. Under a deck it goes up to the deck and runs along it as far as the ground stays under the deck; else up to the parapets at its two ends, with its own parapet on the ground over the tunnel
   const a = p.sx[k], b = p.dx[k], L = hyp(b[0] - a[0], b[1] - a[1]) || 1, ex = (b[0] - a[0]) / L, ez = (b[1] - a[1]) / L, B0 = H.B0, ya = p.src.csx[k] - B0, yb = p.src.cdx[k] - B0;
@@ -1220,7 +1235,7 @@ function buildGallerie(T, G) {
     for (let i = 0; i < tr.length; i += 9) { const a = F.p.length / 3; for (let q = 0; q < 3; q++) vtx(F, tr[i + q * 3], tr[i + q * 3 + 2], tr[i + q * 3 + 1], 0, 1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4); triUp(F, a, a + 1, a + 2); }
     opSoffitto(C, p, p.soffitto); opPareti(W_, p, p.soffitto);
     if (p.src.fronti[0]) opFronte(W_, p, 0, 1, p.soffitto[0]); if (p.src.fronti[1]) opFronte(W_, p, n - 1, n - 2, p.soffitto[n - 1]);
-    for (const [b, mt, r] of [[F, MAT.asph, -2], [C, MAT.pitWall, 0], [W_, MAT.pitWall, 0]]) if (b.i.length) { const M = mkMesh(b, mt, r, false); scene.remove(M); G.add(M); p.meshes.push(M); }
+    for (const [b, mt, r] of [[F, p.src.pedonale ? MAT.side : MAT.asph, -2], [C, MAT.pitWall, 0], [W_, MAT.pitWall, 0]]) if (b.i.length) { const M = mkMesh(b, mt, r, false); scene.remove(M); G.add(M); p.meshes.push(M); }
   }
 }
 function opLook(T, x, z) { let sy = pitLook(T, x, z); if (!sy) for (const [ox, oz] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) { sy = pitLook(T, x + ox, z + oz); if (sy) break; } /* (the paint stops a little short of the wall: the parapet covers that) */ return sy; }
@@ -1273,12 +1288,12 @@ function buildPits(T, G) {
       triUp(F, i0, i0 + 1, i0 + 2);
     }
     if (p.src && p.src.scala) { const SG = Buf(), RL = Buf(); scalaGradini(SG, RL, p); for (const [b, mt] of [[SG, MAT.pitFloor], [RL, MAT.rail]]) if (b.i.length) { const M = mkMesh(b, mt, 0, 'cast'); scene.remove(M); G.add(M); M.userData.suolo = b === SG; p.meshes.push(M); } }
-    else { const MF = mkMesh(F, p.src && p.src.sotto ? MAT.asph : MAT.pitFloor, -2, false); scene.remove(MF); G.add(MF); MF.userData.suolo = true; p.meshes.push(MF); }
+    else { const MF = mkMesh(F, p.src && p.src.sotto ? (p.src.pedonale ? MAT.side : MAT.asph) : MAT.pitFloor, -2, false); scene.remove(MF); G.add(MF); MF.userData.suolo = true; p.meshes.push(MF); }
     // walls and parapets along the two sides, the door at the end
     const Wb = Buf(), D = Buf(), quad = (b, a, c, ya0, ya1, yc0, yc1, u0, u1) => { const dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1, nx = dz / L, nz = -dx / L, i0 = b.p.length / 3; vtx(b, a[0], ya0, a[1], nx, 0, nz, u0, ya0 / 2); vtx(b, c[0], yc0, c[1], nx, 0, nz, u1, yc0 / 2); vtx(b, c[0], yc1, c[1], nx, 0, nz, u1, yc1 / 2); vtx(b, a[0], ya1, a[1], nx, 0, nz, u0, ya1 / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); };
     if (!op_) rampaPareti(Wb, p);
     if (op_) { // an underpass: no door
-      const q_ = p.src, n_ = p.sx.length, roof = q_.tetto ? q_.tetto.map(v => v === null ? null : v - H.B0) : null, C_ = Buf(); opPareti(Wb, p, roof);
+      const q_ = p.src, n_ = p.sx.length, roof = q_.tetto ? q_.tetto.map(v => v === null ? null : v - H.B0) : null, C_ = Buf(); opPareti(Wb, p, roof); opSoglia(Wb, p);
       if (roof) { opSoffitto(C_, p, roof); if (q_.fronti[0]) opFronte(Wb, p, 0, 1, roof[0]); if (q_.fronti[1]) opFronte(Wb, p, n_ - 1, n_ - 2, roof[n_ - 1]); }
       for (const [b, mt, cs] of [[Wb, MAT.pitWall, 'cast'], [C_, MAT.pitWall, false]]) if (b.i.length) { const M = mkMesh(b, mt, 0, cs); scene.remove(M); G.add(M); p.meshes.push(M); }
       continue;

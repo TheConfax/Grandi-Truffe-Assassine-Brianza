@@ -2176,6 +2176,11 @@ def _togli(g_):   # only the pieces it touches: the others stay as they are, in 
         out_ += [t_ for t_ in (list(q_.geoms) if hasattr(q_, 'geoms') else [q_]) if t_.geom_type == 'Polygon' and not t_.is_empty]
     return MultiPolygon(out_)
 asph, pedz, side, foot = _togli(asph), _togli(pedz), _togli(side), _togli(foot)
+_pst = _op.ponti_sopra(_Dop)   # what is of the road over a bridge does not lie on the ground under it (src/opere.py)
+_sf, _isole_, bar_out = _op.senza_strada_di_sopra(_pst, dict(asph=asph, pedz=pedz, side=side, foot=foot), STR.md_dbgt if STR else None, bar_out, log)
+asph, pedz, side, foot = _sf['asph'], _sf['pedz'], _sf['side'], _sf['foot']
+if STR: STR.md_dbgt = _isole_
+if not median.is_empty: median = _op.senza_strada_di_sopra(_pst, {}, median, [], log)[1]
 area_geoms[:] = [(at, g.difference(_via) if g.intersects(_via) else g) for at, g in area_geoms]
 log('sottopassi', len(_sott), 'vernice tolta m2', round(_via.area))
 SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}

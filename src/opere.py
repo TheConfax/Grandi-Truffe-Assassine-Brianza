@@ -315,8 +315,11 @@ def _stazioni(cat, assi, gr, gall, quota, D):
     tl, tr = np.array([float(quota(*q)) for q in Lft]), np.array([float(quota(*q)) for q in Rgt]); tp = np.minimum(np.minimum(tl, tr), np.array([float(quota(*q)) for q in C]))
     # alle bocche il fondo prende il suolo su ogni lato, in piano entro 3 m
     bl = np.clip(1 - np.arange(n) / 3.0, 0, 1); br = bl[::-1]
-    cl = lambda v: np.clip(v, -0.3, 0.3)   # (non oltre: se accanto il suolo sale, e la scarpata, non la strada)
-    yl = y + cl(tl[0] - y[0]) * bl + cl(tl[-1] - y[-1]) * br; yr = y + cl(tr[0] - y[0]) * bl + cl(tr[-1] - y[-1]) * br
+    # the mouth meets the street beyond it with no step (Carlo 3/11, via Montecassino: through the gap of 0.2-0.3 m between the end of the floor and the street
+    # one saw the sky): the end station takes the ground 1 m past the end, on each side and in the middle, and the floor bends to it over 3 m
+    T_ = np.gradient(C, axis=0); T_ /= np.maximum(np.hypot(*T_.T), 1e-9)[:, None]
+    oltre = lambda P_, k, sg: float(quota(*(P_[k] + sg * T_[k] * 1.0)))
+    yl = y + (oltre(Lft, 0, -1) - y[0]) * bl + (oltre(Lft, n - 1, 1) - y[-1]) * br; yr = y + (oltre(Rgt, 0, -1) - y[0]) * bl + (oltre(Rgt, n - 1, 1) - y[-1]) * br
     # coperta: dentro la GALLER (senza GALLER vicino alla via tunnel). Una soletta sola: la quota viene dal tratto piu alto del coperto, e vale per tutto il coperto
     vie = [LineString(w['p']) for w in gr['vie'] if w['t'].get('tunnel') in ('yes', 'covered')]
     cop = np.array([dentro[k] or (not gs and any(v.distance(Point(C[k])) < COPERTO_OSM for v in vie)) for k in range(n)]); cop = ndimage.binary_closing(cop, np.ones(5, bool)) | cop
@@ -401,6 +404,7 @@ def fosse_gioco(sotto, nodo=lambda x, z: None):
             sx, dx = r3(s['Lft'][a:b + 1], s['yl'][a:b + 1]), r3(s['Rgt'][a:b + 1], s['yr'][a:b + 1]); m = (a + b) // 2
             fr = [bool(cop[a] and (a == 0 or not cop[a - 1])), bool(cop[b] and (b == N - 1 or not cop[b + 1]))]
             e = dict(sottopasso=n, nome=s.get('nome'), sotto=True, c=[round(float(s['C'][m][0]), 1), round(float(s['C'][m][1]), 1)], sx=sx, dx=dx, lung=b - a, fonte_larghezza=s['fonte'], osm=s.get('vie'), csx=rr(s['csx'][a:b + 1]), cdx=rr(s['cdx'][a:b + 1]), fronti=fr)
+            if s.get('pedonale'): e['pedonale'] = True   # (a pedestrian underpass: paved floor, no road lines)
             if g:
                 e.update(tipo='galleria', soffitto=[round(float(s['soff']), 3)] * (b - a + 1), celle={}, anello=[])
             else:
@@ -476,7 +480,7 @@ def da_indice(percorso):
         L, R = np.array(L, float), np.array(R, float); C = (L[:, :2] + R[:, :2]) / 2
         T = np.gradient(C, axis=0); T /= np.maximum(np.hypot(*T.T), 1e-9)[:, None]; gal = np.array(gl)
         # (il primo tratto dopo una galleria: la stazione di confine appartiene al tratto dopo, come in tratti())
-        out.append(dict(C=C, y=(L[:, 2] + R[:, 2]) / 2, yl=L[:, 2], yr=R[:, 2], Lft=L[:, :2], Rgt=R[:, :2], N=np.column_stack((-T[:, 1], T[:, 0])), gal=gal, csx=np.array(cs), cdx=np.array(cd), nome=per[n][0].get('nome')))
+        out.append(dict(C=C, y=(L[:, 2] + R[:, 2]) / 2, yl=L[:, 2], yr=R[:, 2], Lft=L[:, :2], Rgt=R[:, :2], N=np.column_stack((-T[:, 1], T[:, 0])), gal=gal, csx=np.array(cs), cdx=np.array(cd), nome=per[n][0].get('nome'), pedonale=bool(per[n][0].get('pedonale') or per[n][0].get('fonte_larghezza') == 'GALLER pedonale')))
     return out
 
 
@@ -652,6 +656,13 @@ def righe_opere(sotto, lines, log=lambda *a: None):
     for s in sotto:
         C, N, L_, R_ = s['C'], s['N'], s['Lft'], s['Rgt']; n = len(C)
         if n < 3: continue
+        if s.get('pedonale'):   # a pedestrian underpass: no road lines on its floor, and none of the road over it either
+            fb = _sagoma(s, 0, n - 1).buffer(0.3); kept = []
+            for l in out:
+                p = np.asarray(l['p'], float); m = shapely.contains_xy(fb, p[:, 0], p[:, 1]) if len(p) else np.zeros(0, bool)
+                if l.get('lev') == 3 and m.any(): continue
+                kept.append(l)
+            out = kept; continue
         foot = _sagoma(s, 0, n - 1)
         if foot.is_empty: continue
         gal = np.asarray(s['gal'], bool); cov = _sagoma(s, int(np.argmax(gal)), int(n - 1 - np.argmax(gal[::-1]))) if gal.any() else Polygon()
@@ -692,19 +703,15 @@ def righe_opere(sotto, lines, log=lambda *a: None):
             for t, o, a in sorted(m, key=lambda x: x[2]):
                 if not any(t == t2 and abs(o - o2) < 0.8 for t2, o2 in r): r.append((t, o))
             return r
+        # 3. the lines of the work itself, as the edges and the middle of its floor (Carlo 3/11: the lines of the station underpass were the best
+        # model; the ones carried on from each mouth came out double and out of step): an edge line RIGHE_DAL_MURO from each wall, and the centre line
+        # in the middle of the floor, continuous if a continuous centre line comes to one of the mouths, else dashed (only on a floor wide enough for two lanes)
         A, B = bocca(0, 1), bocca(n - 1, -1)
-        coppie = []; usate = set()
-        for t, o in A:
-            best = min(((abs(o - o2), j) for j, (t2, o2) in enumerate(B) if t2 == t and j not in usate), default=None)
-            if best is not None and best[0] < 3.0: usate.add(best[1]); coppie.append((t, o, B[best[1]][1]))
-            else: coppie.append((t, o, o))
-        coppie += [(t, o, o) for j, (t, o) in enumerate(B) if j not in usate]
-        if not coppie:   # 3. nothing at either mouth: the edges and, on a wide carriageway, a dashed centre line
-            coppie = [(0, float(np.median(hl)) - RIGHE_DAL_MURO, float(np.median(hl)) - RIGHE_DAL_MURO), (0, -float(np.median(hr)) + RIGHE_DAL_MURO, -float(np.median(hr)) + RIGHE_DAL_MURO)]
-            if np.median(hl + hr) >= 5.5: coppie.append((2, 0.0, 0.0))
-        f = np.linspace(0, 1, n)
-        for t, oa, ob in coppie:
-            o = np.clip(oa + (ob - oa) * f, -hr + RIGHE_DAL_MURO, hl - RIGHE_DAL_MURO); q = C + N * o[:, None]
+        cen = 1 if any(t == 1 for t, _ in A + B) else 2
+        coppie = [(0, None, 'sx'), (0, None, 'dx')] + ([(cen, None, 'mezzo')] if np.median(hl + hr) >= 5.5 else [])
+        for t, _, dove in coppie:
+            o = (hl - RIGHE_DAL_MURO) if dove == 'sx' else (-(hr - RIGHE_DAL_MURO) if dove == 'dx' else (hl - hr) / 2)
+            q = C + N * ndimage.gaussian_filter1d(o, 3.0, mode='nearest')[:, None]
             out.append(dict(ri=-1, t=int(t), p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=3)); nuove += 1
     log('righe nelle opere: %d righe del DBGT tagliate, %d righe rifatte lungo le opere' % (tolte, nuove))
     return out
@@ -716,7 +723,7 @@ ALZATA = 0.16        # m: l'alzata di un gradino
 SCALA_INFOSSATA = 0.5  # m: una scala con il suolo accanto almeno tanto sopra la sua rampa e scavata nel suolo: una fossa con i muri
 
 
-def scale(osm, quota, sotto, log=lambda *a: None):
+def scale(osm, quota, sotto, log=lambda *a: None, sup=None):
     """le scale di OSM scavate nel suolo (la buca che il LiDAR vede alle teste dei sottopassi): una fossa lungo la via, il fondo una rampa dritta dalla
     quota della testa alta a quella della testa bassa (sul fondo dell'opera se la scala ci arriva), muri e parapetti come le opere, i gradini li disegna
     il gioco. Le scale a raso su un pendio restano sul suolo (il gioco disegna i gradini su S). Torna (scale come stazioni, rapporto)"""
@@ -747,10 +754,16 @@ def scale(osm, quota, sotto, log=lambda *a: None):
             za, zb = capo(C[0]), capo(C[-1])
             if muro: rep['contro_un_muro'] = rep.get('contro_un_muro', []) + [w['id']]; continue   # (via Montecassino: stairs to the cycle tunnel beside it, which is not drawn)
             if abs(za - zb) < 2 * ALZATA: rep['corte'] += 1; continue
+            if sup is not None:   # the stair fits the real hole: from where the ground drops to the bottom, as wide as the hole; the ground round it filled
+                f_ = _scala_nel_buco(sup, C, za, zb, quota, [f for f, _ in feet])
+                if f_ is None: rep['a_raso'] += 1; continue
+                C, za, zb, mz = f_; n = len(C); st = np.concatenate(([0], np.cumsum(np.hypot(*np.diff(C, axis=0).T)))); rep['buchi_riempiti_nodi'] = rep.get('buchi_riempiti_nodi', 0) + mz[2]
+            else: mz = (MEZZA_SCALA, MEZZA_SCALA, 0)
             y = za + (zb - za) * st / st[-1]
             T = np.gradient(C, axis=0); T /= np.maximum(np.hypot(*T.T), 1e-9)[:, None]; N = np.column_stack((-T[:, 1], T[:, 0]))
-            Lft, Rgt = C + N * MEZZA_SCALA, C - N * MEZZA_SCALA
+            Lft, Rgt = C + N * mz[0], C - N * mz[1]
             tl, tr = np.array([float(quota(*v)) for v in Lft]), np.array([float(quota(*v)) for v in Rgt])
+            if sup is not None: tl, tr = np.maximum(tl, za), np.maximum(tr, za)   # (the ground beside it is the street, the hole filled)
             if max((tl - y).max(), (tr - y).max()) < SCALA_INFOSSATA: rep['a_raso'] += 1; continue
             def cima(tq):
                 ts = ndimage.gaussian_filter1d(tq, 2.0, mode='nearest'); par = np.minimum(PARAPETTO, np.maximum(0.0, ts - y)); t = np.maximum(ts + par, tq + np.minimum(par, 0.3))
@@ -759,6 +772,48 @@ def scale(osm, quota, sotto, log=lambda *a: None):
             rep['infossate'] += 1
     log('scale: %s' % rep)
     return out, rep
+
+
+BUCO = 0.25   # m: il suolo piu di tanto sotto la strada attorno e la buca della scala
+
+
+def _scala_nel_buco(sup, C, za, zb, quota, feet):
+    """la scala adattata alla buca che il suolo ha attorno alla via OSM: dalla testa alta (la strada attorno, ztop) al punto in cui il suolo scende, fino
+    alla testa bassa; larga quanto la buca (mediana dei tagli trasversali). I nodi di S nella buca fuori dalla scala (entro 4 m) tornano alla quota della
+    strada: il pavimento attorno si taglia sul bordo della scala, non scende nella buca. Torna (C, ztop, zbasso, (mezza sx, mezza dx, nodi riempiti)) o None"""
+    import superficie as sf
+    if za < zb: C = C[::-1]; za, zb = zb, za
+    T0 = C[1] - C[0]; T0 = T0 / max(np.hypot(*T0), 1e-9)
+    ring = [C[0] + np.array([np.cos(a), np.sin(a)]) * r for a in np.linspace(0, 2 * np.pi, 16, endpoint=False) for r in (4.0, 5.5)]
+    ztop = float(np.percentile([quota(*q) for q in ring], 75))
+    if ztop - zb < 2 * ALZATA: return None
+    ext = np.array([C[0] - T0 * d for d in np.arange(4.0, 0, -0.5)])     # the hole can start before the OSM end
+    A = np.vstack((ext, C)); sv = np.concatenate(([0], np.cumsum(np.hypot(*np.diff(A, axis=0).T))))
+    zs = np.array([quota(*q) for q in A]); k0 = next((k for k in range(len(A)) if zs[k] < ztop - BUCO), None)
+    if k0 is None: return None
+    k0 = max(0, k0 - 1); s_ = np.arange(sv[k0], sv[-1] + 1e-9, 0.5)
+    P = np.column_stack((np.interp(s_, sv, A[:, 0]), np.interp(s_, sv, A[:, 1])))
+    if len(P) < 3: return None
+    T = np.gradient(P, axis=0); T /= np.maximum(np.hypot(*T.T), 1e-9)[:, None]; N = np.column_stack((-T[:, 1], T[:, 0]))
+    hs = {1: [], -1: []}; nb = 0
+    for k in range(1, len(P) - 1):
+        if quota(*P[k]) > ztop - BUCO: continue
+        nb += 1
+        for sg in (1, -1):
+            d = next((d for d in np.arange(0.5, 5.01, 0.25) if quota(*(P[k] + sg * N[k] * d)) >= ztop - BUCO), None)
+            if d is not None: hs[sg].append(d)
+    if not nb or max(len(hs[1]), len(hs[-1])) < 0.5 * nb: return None   # (the ground beside does not come back up on either side: a stair down a slope, not into a hole)
+    ml = float(np.clip(np.median(hs[1]), 0.8, 3.0)) if len(hs[1]) >= 0.5 * nb else None; mr = float(np.clip(np.median(hs[-1]), 0.8, 3.0)) if len(hs[-1]) >= 0.5 * nb else None
+    ml = ml if ml is not None else mr; mr = mr if mr is not None else ml   # (a side against a building or a wall: as wide as the other)
+    foot = Polygon(np.vstack((P + N * ml, (P - N * mr)[::-1]))).buffer(0)
+    zona = foot.buffer(4.0).difference(foot.buffer(0.3))
+    for f in feet: zona = zona.difference(f.buffer(0.5))
+    w = sup.R.win(zona.bounds, 2 * sf.SF); nz = 0
+    if w is not None:
+        r0, r1, c0, c1 = w; X, Z = sup.R.xz(w); shapely.prepare(zona); m = shapely.contains_xy(zona, X, Z)
+        G = sup.GF[r0:r1, c0:c1]; k = m & (G < ztop - BUCO)
+        if k.any(): G[k] = ztop; sup.HQ[r0:r1, c0:c1][k] = int(round(ztop * 100)); nz = int(k.sum())
+    return P, ztop, zb, (ml, mr, nz)
 
 
 def fosse_scale(scale_, primo):
@@ -788,3 +843,80 @@ def controllo_opere(comuni, fatte):
             pid, c = int(P['id'][i]), _c(g)
             if not any(abs(c[0] - c2[0]) < 1 and abs(c[1] - c2[1]) < 1 for _, c2 in fatti): out.append(dict(comune=com, ponte=pid, c=c))   # (by place: the ids of the PONTE of more comuni are renumbered when the layers are joined)
     return out
+
+
+# ---------- la strada di sopra non scende sotto il ponte ----------
+PARALLELO = 0.7   # coseno: un pezzo che corre lungo l'impalcato e della strada di sopra
+
+
+def ponti_sopra(D):
+    """i PONTE che portano una strada sopra un'altra (assi EL_STR di livello 01 sotto, l'impalcato almeno LUCE_MIN sopra): [(poligono, direzione
+    dell'impalcato, quel che sotto e della strada di sotto)]. La direzione: gli assi SED=02 dentro il PONTE; la strada di sotto: le aree del DBGT a raso
+    (AC_VEI, AC_PED, AC_CIC, AR_STR) che toccano il PONTE con la quota (mediana dei vertici) almeno LUCE_MIN sotto l'impalcato"""
+    import superficie as sf
+    P = D['PONTE']; assi = assi_dbgt(D); t02 = shapely.STRtree([a['g'] for a in assi]); out = []
+    aree = [(sf.poly(D[nm], i), float(np.nanmedian(D[nm]['z'][D[nm]['off'][i]:D[nm]['off'][i + 1]]))) for nm in ('AC_VEI', 'AC_PED', 'AC_CIC', 'AR_STR') if nm in D for i in range(len(D[nm]['off']) - 1) if sf.sed_ok(D[nm], i)]
+    ta = shapely.STRtree([g for g, _ in aree])
+    for i in range(len(P['off']) - 1):
+        g = sf.poly(P, i)
+        if not g.is_valid: g = g.buffer(0)
+        top = float(np.nanmedian(P['z'][P['off'][i]:P['off'][i + 1]]))
+        sopra = [assi[j] for j in t02.query(g) if assi[j]['sed'] == '02' and assi[j]['g'].intersection(g).length > 2]
+        sotto = [assi[j] for j in t02.query(g) if assi[j]['liv'] == '01' and np.median(assi[j]['z']) < top - LUCE_MIN]
+        if not sopra or not sotto: continue
+        v = np.zeros(2)
+        for a in sopra:
+            c = np.asarray(a['g'].intersection(g).coords if a['g'].intersection(g).geom_type == 'LineString' else a['g'].coords); d = c[-1] - c[0]
+            if v @ d < 0: d = -d
+            v += d
+        v /= max(np.hypot(*v), 1e-9)
+        basso = shapely.union_all([aree[j][0] for j in ta.query(g) if aree[j][1] < top - LUCE_MIN and aree[j][0].intersects(g)])
+        out.append((g, v, basso))
+    return out
+
+
+def _parallelo(geom, v):
+    """la direzione principale di un pezzo (il lato lungo del suo rettangolo minimo, o la corda di una linea) e parallela a v"""
+    if geom.is_empty: return False
+    if geom.geom_type in ('LineString', 'LinearRing'):
+        c = np.asarray(geom.coords); d = c[-1] - c[0]
+    else:
+        r = np.asarray(geom.minimum_rotated_rectangle.exterior.coords)[:3]; e1, e2 = r[1] - r[0], r[2] - r[1]; d = e1 if np.hypot(*e1) >= np.hypot(*e2) else e2
+    n = np.hypot(*d)
+    return n > 1e-6 and abs(d @ v) / n > PARALLELO
+
+
+def senza_strada_di_sopra(ponti, superfici, isole, barriere, log=lambda *a: None):
+    """sotto l'impronta di un PONTE resta solo la strada di sotto (Carlo, 3/11, il cavalcavia di x 320 z 1985: lo spartitraffico, le recinzioni e l'asfalto
+    della Milano-Meda erano disegnati sul suolo sotto il ponte). Toglie: dalle superfici (asfalto, marciapiedi, cortili, vialetti) quel che sta nel PONTE
+    fuori dalle aree della strada di sotto; dalle isole e dagli spartitraffico i pezzi nel PONTE che corrono lungo l'impalcato; dalle barriere i tratti nel
+    PONTE che corrono lungo l'impalcato. Sull'impalcato la strada di sopra la disegna il gioco (piano dell'impalcato, parapetti, righe di livello 2).
+    superfici: {nome: geometria}; isole: geometria; barriere: [(punti, tipo, altezza)]. Torna (superfici, isole, barriere)"""
+    from shapely.ops import unary_union
+    if not ponti: return superfici, isole, barriere
+    m2 = dict(superfici=0.0, isole=0.0, barriere_m=0.0)
+    togli = unary_union([g.buffer(0.3).difference(b) if not b.is_empty else g.buffer(0.3) for g, v, b in ponti])
+    out = {}
+    for k, s in superfici.items():
+        if s.is_empty or not s.intersects(togli): out[k] = s; continue
+        a0 = s.area; out[k] = s.difference(togli); m2['superfici'] += a0 - out[k].area
+    if isole is not None and not isole.is_empty:
+        for g, v, b in ponti:
+            gb = g.buffer(0.5)
+            if not isole.intersects(gb): continue
+            via = [p for p in getattr(isole.intersection(gb), 'geoms', [isole.intersection(gb)]) if p.area > 0.5 and _parallelo(p, v)]
+            if via: u = unary_union(via); m2['isole'] += u.area; isole = isole.difference(u.buffer(0.05))
+    nb = []
+    for pts, k_, h_ in barriere:
+        L = LineString(pts) if len(pts) >= 2 else None
+        hit = [(g, v) for g, v, b in ponti if L is not None and L.intersects(g.buffer(0.5))]
+        if not hit: nb.append((pts, k_, h_)); continue
+        rest = L
+        for g, v in hit:
+            dentro = rest.intersection(g.buffer(0.5))
+            via = [q for q in getattr(dentro, 'geoms', [dentro]) if q.geom_type == 'LineString' and _parallelo(q, v)]
+            if via: m2['barriere_m'] += sum(q.length for q in via); rest = rest.difference(unary_union([q.buffer(0.05) for q in via]))
+        for q in getattr(rest, 'geoms', [rest]):
+            if q.geom_type == 'LineString' and q.length > 0.5: nb.append((list(q.coords), k_, h_))
+    log('strada di sopra tolta da sotto i ponti (%d PONTE): superfici %.0f m2, spartitraffico %.0f m2, barriere %.0f m' % (len(ponti), m2['superfici'], m2['isole'], m2['barriere_m']))
+    return out, isole, nb

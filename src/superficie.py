@@ -1191,6 +1191,9 @@ class Superficie:
         else:
             cn = np.stack((nm[:-1, :-1], nm[:-1, 1:], nm[1:, :-1], nm[1:, 1:]))
             cnt = np.stack([(cn == v).sum(0) for v in range(1, 7)]); m = np.where(cnt.max(0) >= 2, cnt.argmax(0) + 1, 0).astype(np.uint8)
+            # a street is never a cliff: a street cell whose corners differ by more than a metre is the step of a bank (the abutment of a cavalcavia, x 349 z
+            # 2002: the Milano-Meda's asphalt hung down the step to corso Isonzo, Carlo 3/11). It takes the material of the slopes
+            hc = np.stack((hq[:-1, :-1], hq[:-1, 1:], hq[1:, :-1], hq[1:, 1:])); m[np.isin(m, (M_ASF, M_MARC)) & (hc.max(0) - hc.min(0) > 100)] = M_SCARP
         base = int(np.floor(hq.min() / 100.0)); q = hq - base * 100
         assert q.max() < 65535
         return int(st), float(base), q.astype(np.uint16), m
@@ -1528,7 +1531,7 @@ def main(argv=None):
     import impalcati as _im   # the underpasses (src/opere.py), on the S just made
     _G = s.HQ / 100.0; _q = lambda x, z: float(tri_interp(_G, s.R, np.atleast_1d(float(x)), np.atleast_1d(float(z)))[0])
     _ov = _im.osm_vie(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_vie.pkl'))
-    _sp, _sc = opere.trova(s.D, _q, _ov, log); _scl, _scr = opere.scale(_ov, _q, _sp, log)   # (and the stairs of OSM dug into the ground)
+    _sp, _sc = opere.trova(s.D, _q, _ov, log); _scl, _scr = opere.scale(_ov, _q, _sp, log, s)   # (and the stairs of OSM dug into the ground)
     json.dump(dict(fosse=opere.fosse_gioco(_sp) + opere.fosse_scale(_scl, len(_sp)), scartati=_sc, cavalcavia=opere.rapporto(s), scale=_scr), open(os.path.join(a.out, 'opere.json'), 'w', encoding='utf-8'), ensure_ascii=False, default=float)
     # the same steps as costruisci() with its defaults: impalcati.py, run after this in the same process (terreno_gioco.py --rigenera), takes
     # this surface instead of computing it all again (it was half the time of the terrain)
