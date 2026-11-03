@@ -470,6 +470,9 @@ class Impalcati:
             ea = ea.intersection(s._clip(pts).union(sq).union(core['g'] if core else Polygon()))
         es = shapely.union_all([s.cbox(rc) for rc in cells_sp]) if cells_sp else Polygon()
         g = shapely.union_all([x for x in (core['g'] if core else None, ea, es) if x is not None and not x.is_empty])
+        if core is not None:   # the ground that opere_dbgt took down behind the abutments of this PONTE: the deck covers it (it rests on the bank past it)
+            zs_ = [z_ for z_ in getattr(s.s, 'SPALLE_G', []) if z_.intersection(core['g']).area > 0.5 * core['g'].area]
+            if zs_: g = shapely.union_all([g] + zs_)
         g = pulito(g.union(g.buffer(1.5, join_style=2).buffer(-1.5, join_style=2)))   # gaps under 3 m inside the deck closed
         if g.is_empty: return
         ps = sorted(parts(g), key=lambda p: -(p.intersection(core['g']).area if core else p.area))

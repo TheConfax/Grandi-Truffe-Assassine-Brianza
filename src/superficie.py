@@ -1073,7 +1073,7 @@ class Superficie:
         S[band] = s.L[band] + np.clip(0.0, lo_[band], hi_[band]); S[FIX] = s.ZF[FIX]
         s.FIX = FIX; s.sotto_ponti(S, BARR); opere.opere_dbgt(s, S); opere.galleria_piena(s, S)   # (src/opere.py: dentro l'impronta di un ponte con muri o scarpate del DBGT il suolo e solo del DBGT)
         zs = getattr(s, 'ZSOTTO', None)
-        if zs is not None: k = np.isfinite(zs) & BARR; S[k] = zs[k]
+        if zs is not None: k = np.isfinite(zs) & BARR & ~getattr(s, 'SPALLE_N', np.zeros(BARR.shape, bool)); S[k] = zs[k]   # (not under the abutments of opere_dbgt: there the street under the bridge)
         s.S = S
         d = ndimage.distance_transform_edt(~FIX, sampling=SF); s.DFIX = d
         s.bordo_banda = int((band & (d > BAND - 2.5) & (np.abs(S - s.L) > 0.05)).sum())

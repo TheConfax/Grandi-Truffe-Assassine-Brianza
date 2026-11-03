@@ -700,7 +700,7 @@ AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.repla
 const AO_K = [[0, 0.2], [0.45, 0.5], [1.6, 1]]; // distance from the wall, shade (linear: multiplied on the screen, 0.2 darkens by half)
 function aoGround(b, ring, E, i, innerA) {
   const nr = ring.length, a = ring[i], [dx, dz, L, nx, nz] = E[i]; if (L < 0.05) return;
-  const put = (x, z, k) => { let y; if (H.fineAt(x, z)) y = H.base(x, z) + H.step(x, z) + 0.06; else { const s = H.surface(x, z); y = (onSide(x, z) ? s : Math.min(s, terrDrawnH(x, z))) + 0.03; } vtx(b, x, y, z, 0, 1, 0, 0, 0, _aoC.setScalar(k)); }; // in a tile of S the ground writes its depth: the strip (a shade, not cut on the cells: it would cost seven times the triangles) stands 6 cm over S
+  const put = (x, z, k) => { let y; if (H.fineAt(x, z)) y = H.base(x, z) + H.step(x, z) + 0.06; else { const s = H.surface(x, z); y = (onSide(x, z) ? s : Math.min(s, terrDrawnH(x, z))) + 0.03; } vtx(b, x, y, z, 0, 1, 0, 0, 0, _aoC.setScalar(H.inPit(x, z, 0.3) ? 1 : k)); }; /* over a pit no shade: the strip stands at the level of the street over the hole, and its dark patches lay across the walls of the stairs of the station (Carlo 3/11) */ // in a tile of S the ground writes its depth: the strip (a shade, not cut on the cells: it would cost seven times the triangles) stands 6 cm over S
   const n = Math.max(1, Math.ceil(L / 5)), w = AO_K.length;
   for (let s = 0; s <= n; s++) { const f = s / n, x = a[0] + dx * f, z = a[1] + dz * f; for (const [d, k] of AO_K) put(x + nx * (d + 0.02), z + nz * (d + 0.02), k); }
   const b0 = b.p.length / 3 - (n + 1) * w;

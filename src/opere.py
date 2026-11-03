@@ -549,6 +549,7 @@ def cavalcavia(sup, log=lambda *a: None):
 VICINO_OPERA = 30.0  # m: muri di sostegno (MU_SOS) e scarpate (SCARPT) del DBGT entro tanto da un PONTE sono della sua opera
 ATTORNO = 12.0       # m: l'impronta dell'opera comprende il suolo attorno al PONTE entro tanto
 FILO_SCARPT = 0.75   # m: un nodo cosi vicino a una linea di scarpata ne prende la quota
+SPALLA_COS = 0.8     # coseno fra un lato del PONTE e la strada di sopra: sotto tanto e una spalla (il ponte di corso Isonzo e storto: 0,54)
 SPALLA_FUORI = 2.0   # m: oltre una spalla del PONTE il suolo scende ancora tanto (una cella di S): il gradino resta dietro il muro
 
 
@@ -600,6 +601,7 @@ def opere_dbgt(sup, S):
     from scipy.sparse.linalg import spsolve
     D = sup.D; P = D['PONTE']; sup.OPERA = np.zeros(S.shape, bool); rep = []
     muri, linee = pezzi_dbgt(sup); ponti_s = ponti_sopra(D)
+    sup.SPALLE_N = np.zeros(S.shape, bool); sup.SPALLE_G = []   # (the ground under the abutments, point 5: no other pass puts it back up; the deck covers it, impalcati._deck)
     tm = shapely.STRtree([g for g, _, _ in muri]) if muri else None; tl = shapely.STRtree([g for g, _, _ in linee]) if linee else None
     for i in range(len(P['off']) - 1):
         g = sf.poly(P, i)
@@ -656,10 +658,18 @@ def opere_dbgt(sup, S):
             _, v_, b_, c_ = ps_[0]; ring = np.asarray(g.exterior.coords); lati = []
             for a_, e_ in zip(ring[:-1], ring[1:]):
                 d_ = e_ - a_; n_ = np.hypot(*d_)
-                if n_ > 1.0 and abs(d_ @ v_) / n_ < 0.5: lati.append(LineString([a_, e_]).buffer(SPALLA_FUORI, cap_style=2))
+                if n_ > 1.0 and abs(d_ @ v_) / n_ < SPALLA_COS: lati.append(LineString([a_, e_]).buffer(SPALLA_FUORI, cap_style=2))
             zona_g = shapely.union_all([g.buffer(0.05)] + lati); zona = shapely.contains(zona_g, pts) & dentro
             strada_ = np.isin(sup.CLS[r0:r1, c0:c1], (sf.C_VEI, sf.C_VEIT, sf.C_PED, sf.C_AREA, sf.C_FER)) & sup.FIX[r0:r1, c0:c1]
-            base_ = strada_ & ponte_m & (W < bot - LUCE_MIN)   # the street under it, as made above
+            # the street under it, as made above, at the height of its axes (within 0.6 m: the sidewalks): the island of the Milano-Meda over corso Isonzo
+            # (MAN_TR, 212.8 between 211.1 and 217) was burned on the street under the bridge, a hump of grass on the sidewalk and a spike up to the deck
+            from scipy.spatial import cKDTree
+            ax_ = [a for a in assi_dbgt(D) if a['liv'] == '01' and a['g'].distance(g) < 5 and np.median(a['z']) < bot - LUCE_MIN]
+            base_ = strada_ & ponte_m & (W < bot - LUCE_MIN)
+            if ax_:
+                sp_ = [(np.asarray(a['g'].interpolate(t).coords[0]), float(np.interp(t, np.concatenate(([0], np.cumsum(np.hypot(*np.diff(a['xy'], axis=0).T)))), a['z']))) for a in ax_ for t in np.arange(0, a['g'].length + 0.5, 1.0)]
+                kd = cKDTree(np.array([p for p, _ in sp_])); _, j_ = kd.query(np.column_stack((X.ravel(), Z.ravel()))); zax = np.array([z for _, z in sp_])[j_].reshape(W.shape)
+                base_ &= W < zax + 0.6
             if zona.any() and base_.any():
                 idx = ndimage.distance_transform_edt(~base_, return_distances=False, return_indices=True); vb = W[idx[0], idx[1]]
                 giu = zona & ~base_ & (W > vb + 0.05); W[giu] = vb[giu]
@@ -671,7 +681,7 @@ def opere_dbgt(sup, S):
                 for nm_ in ('SCARP', 'INT'):
                     M_ = getattr(sup, nm_, None)
                     if M_ is not None: M_[r0:r1, c0:c1][k_] = False
-                sup.OPERA[r0:r1, c0:c1] |= zona; rep_giu = int(giu.sum())
+                sup.OPERA[r0:r1, c0:c1] |= zona; sup.SPALLE_N[r0:r1, c0:c1] |= zona; sup.SPALLE_G.append(zona_g); rep_giu = int(giu.sum())
             else: rep_giu = 0
         else: rep_giu = 0
         rep.append(dict(ponte=int(P['id'][i]), c=_c(g), muri=[muri[j][2] for j in mi], scarpate=[linee[j][2] for j in li], nodi=int(nuovi.sum()), rilevato=int(sopra.sum()), sotto_le_spalle=rep_giu,
@@ -1040,7 +1050,9 @@ def galleria_piena(sup, S):
         zs = [np.median(a['z']) for a in assi if a['g'].intersects(P)]
         if not zs: continue
         basso = float(np.median(zs))
-        zona = shapely.contains(P.buffer(PIENA_M), pts)
+        # (past the GALLER, not the street under it: its mouth stays open. A node of it raised 1.5 m past the edge made a slope of asphalt into the mouth at z 120)
+        bassa = np.isin(sup.CLS[r0:r1, c0:c1], sf.ROADTYPE) & sup.FIX[r0:r1, c0:c1] & (W < basso + LUCE_MIN)
+        zona = shapely.contains(P.buffer(PIENA_M), pts) & ~(bassa & ~shapely.contains(P, pts))
         strada = np.isin(sup.CLS[r0:r1, c0:c1], sf.ROADTYPE) & sup.FIX[r0:r1, c0:c1] & (W > basso + LUCE_MIN + 1.0) & shapely.contains(P.buffer(PIENA_M + 3.0), pts)
         if not strada.any() or not zona.any(): continue
         idx = ndimage.distance_transform_edt(~strada, return_distances=False, return_indices=True); vs = W[idx[0], idx[1]]
