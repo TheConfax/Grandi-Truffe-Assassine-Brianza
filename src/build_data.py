@@ -2205,6 +2205,7 @@ import rotonde  # the aiuole of the roundabouts of Meda (src/rotonde.py, docs/ro
 ROT = rotonde.Rotonde(STR.isole, log) if STR else None
 if ROT: STR.md_dbgt = ROT.riempi(STR.md_dbgt); ROT.push_tiles(tid, polys_of, push, q)
 if STR: STR.togli_cortili(VERDE.cons, _cv_f.result()); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
+if RIGHE: RIGHE = _op.righe_opere(_sott, RIGHE, log)   # the lines go on along the underpasses (src/opere.py)
 if RIGHE: dbgt_righe.push_tiles(RIGHE, ntx * ntz, tbox, push)  # the road markings (sg)
 if FER:  # the rail bed (sf)
     FER.disegno(None, None, pronto=_fer_f.result())  # = FER.disegno(the tracks, unary_union([asph, pedz, side, foot, platforms, bunion] + [STR.cv])), on a thread since the surfaces

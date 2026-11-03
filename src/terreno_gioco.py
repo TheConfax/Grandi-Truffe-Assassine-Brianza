@@ -68,12 +68,21 @@ def main(argv=None):
     ff = os.path.join(a.da, 'fosse.json')   # the ramps of src/sottoterra.py (docs/sottoterra.md, tappa 1)
     if os.path.exists(ff): pits = pits + json.load(open(ff, encoding='utf-8'))['fosse']
     fo = os.path.join(a.da, 'opere.json')   # the underpasses of src/opere.py
-    if os.path.exists(fo): pits = pits + json.load(open(fo, encoding='utf-8'))['fosse']
+    opere_fatte = []
+    if os.path.exists(fo):
+        _oj = json.load(open(fo, encoding='utf-8')); pits = pits + _oj['fosse']; _cv = _oj.get('cavalcavia')
+        opere_fatte = _cv.get('opere_dbgt', []) if isinstance(_cv, dict) else []
     import dbgt_quote as dq
     ind = dict(ver=1, fase=4, comune='+'.join(dq.lista_comuni(a.comune)), nota='docs/motore.md fase 4: quote in m sul mare; il gioco toglie terrain.base di brianza.json',
                tiles=tiles, decks=decks, pits=pits, acqua=acqua)
     fb = os.path.join(a.da, 'binari.json')   # the height of the tracks (src/binari.py)
     if os.path.exists(fb): ind['binari'] = json.load(open(fb, encoding='utf-8'))['binari']
+    # the check of the works (todo.md 1/11, punto 7): every PONTE with retaining walls (MU_SOS) or banks (SCARPT) of the DBGT within 30 m must have been
+    # made from them (src/opere.py opere_dbgt). A missing one is an error, written big in the report and in the log
+    import opere as _op; _mancano = _op.controllo_opere(dq.lista_comuni(a.comune), opere_fatte)
+    ind['opere_dbgt'] = dict(fatte=[dict(ponte=o['ponte'], c=o['c'], muri=o['muri'], scarpate=o['scarpate'], nodi=o['nodi']) for o in opere_fatte], mancano=_mancano)
+    if _mancano: print('ERRORE OPERE: %d ponti con muri o scarpate del DBGT entro 30 m non fatti dai loro pezzi: %s' % (len(_mancano), _mancano))
+    else: print('opere dal DBGT: %d ponti con muri o scarpate, tutti fatti dai loro pezzi' % len(opere_fatte))
     open(os.path.join(a.out, 'indice.json'), 'w', encoding='utf-8').write(json.dumps(ind, ensure_ascii=False, separators=(',', ':')))
     import terreno_pacco; terreno_pacco.impacchetta(a.out)  # i .bin.gz in un file solo (avvio veloce)
     print('terreno: %d tile (%s), %.1f MB in gzip; impalcati %d, fosse %d, assi d acqua %d; indice %.0f KB; celle sotto un impalcato senza strada %d' % (

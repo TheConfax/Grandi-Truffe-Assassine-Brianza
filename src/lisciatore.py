@@ -69,6 +69,7 @@ def protetti(s):
     if getattr(s, 'BORDO_FER', None) is not None: fer = fer | s.BORDO_FER
     ponti = s.BR | s.AIR | s.BRP | s.ALTO
     if getattr(s, 'SOTTO', None) is not None: ponti = ponti | s.SOTTO
+    if getattr(s, 'OPERA', None) is not None: ponti = ponti | s.OPERA   # (the footprint of a cavalcavia made from the DBGT pieces, src/opere.py)
     rampe = [p['g'] for p in s.sotto.pits1 if p['esito'] == 'rampa']
     ram = _mask_geoms(R, rampe, 6.0) if rampe else np.zeros(sh, bool)
     P = ndimage.distance_transform_edt(~ponti, sampling=SF) <= 12.0

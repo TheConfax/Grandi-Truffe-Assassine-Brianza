@@ -12,9 +12,12 @@
 # Dove sopra la soletta c'e S abbastanza, S resta disegnata ('galleria': sotto c'e un livello in piu che legge solo H.surface(x, z, cy) con cy sotto il soffitto, src/altezze3.js);
 # altrove l'opera prende le celle di S (tipo 'rampa', sotto=True, con tetto dove e coperta: sopra c'e l'impalcato). Niente serranda, fondo d'asfalto.
 #
-# CAVALCAVIA (un PONTE con sotto assi EL_STR_LIV 01), in ordine: 1. la strada sotto, alla sua quota, comprese le aree con qualche vertice preso dal livello di sopra;
-# 2. l'impalcato (impalcati.py); 3-4. spalle e scarpate: il suolo libero attorno alla strada sotto non sta sopra la scarpata 1:K che parte dal bordo della strada, e sotto
-# l'impalcato mai oltre il suo intradosso; 5. recinzioni e scale seguono il suolo come prima. La vernice di strada non sale sulla scarpata (terreno_gioco.py, controlli_acqua.py).
+# CAVALCAVIA: ogni PONTE con muri di sostegno (MU_SOS) o scarpate (SCARPT) del DBGT entro 30 m e un'opera fatta dai suoi pezzi (opere_dbgt): dentro la sua
+# impronta il suolo e solo del DBGT, mai il LiDAR. In ordine: la strada di sotto alla quota dei suoi assi; i muri e le scarpate con la quota dei loro vertici;
+# sotto l'impalcato la strada di sotto piana fino alle spalle; il resto armonico fra questi. Le spalle (muri di cemento con spessore dove l'impalcato
+# appoggia) e l'impalcato li fa impalcati.py e li disegna il gioco. Prima qui c'era una scarpata 1:1,5 inventata sopra il LiDAR: tolta (Carlo, 3/11).
+# Le aree a raso con vertici presi dal livello di sopra stanno alla quota della strada (cavalcavia()). Le RIGHE dentro le opere si prolungano da quelle
+# alle bocche (righe_opere); le SCALE di OSM scavate nel suolo sono fosse con i gradini (scale).
 import os, sys, numpy as np, shapely
 from shapely.geometry import LineString, Polygon, box, Point
 from scipy import ndimage
@@ -35,8 +38,6 @@ MARGINE_S = 1      # stazioni: il coperto comincia dove S e alta anche tante sta
 RAMO_MAX, RAMO_DZ, RAMO_LARGO, RAMO_SOTTO = 9.0, 0.6, 3.0, 0.2   # m: un altro asse del fondo entro tanto dall'asse, a tanto di quota, il margine che gli si lascia verso la parete, e quanto sta sotto il suolo (sopra e un'altra strada)
 ALLUNGA_MAX = 160.0  # m: per lato, oltre questo non e una trincea
 COPERTO_OSM = 6.0  # m: una stazione cosi vicina alla via tunnel di OSM e coperta
-K_SCARPATA = 1.5   # come superficie.K
-RAGGIO_OPERA = 18.0  # m dall'impalcato: oltre, il vincolo della scarpata si allenta e il suolo torna quello di prima
 SOPRA_MIN = 0.7    # m: un vertice di un'area piu di tanto sopra il livello della strada sotto e del livello di sopra
 
 
@@ -465,7 +466,7 @@ def da_indice(percorso):
     import json
     per = {}
     for f in json.load(open(percorso, encoding='utf-8'))['pits']:
-        if f.get('sotto'): per.setdefault(f['sottopasso'], []).append(f)
+        if f.get('sotto') and not f.get('scala'): per.setdefault(f['sottopasso'], []).append(f)   # (the stairs are not works for the build)
     out = []
     for n in sorted(per):
         L, R, gl, cs, cd = [], [], [], [], []
@@ -522,24 +523,268 @@ def cavalcavia(sup, log=lambda *a: None):
     log('cavalcavia: %d PONTE con una strada sotto, %d nodi di strada riportati alla loro quota' % (len(opere), tot))
 
 
-def scarpate(sup, S):
-    """in raccordi(), sulla S libera: la scarpata che parte dal bordo della strada sotto. Dentro RAGGIO_OPERA dall'impalcato il suolo non sta sopra u + d / K; sotto l'impalcato
-    non oltre il suo intradosso. I nodi fissi (le strade, la ferrovia, il letto) non si muovono. Oltre il raggio il vincolo si allenta: nessun gradino al bordo."""
-    tot = 0; dz = []
-    for o in getattr(sup, 'OPERE', []):
-        w = sup.R.win(o['g'].buffer(RAGGIO_OPERA + 20).bounds, 0)
+VICINO_OPERA = 30.0  # m: muri di sostegno (MU_SOS) e scarpate (SCARPT) del DBGT entro tanto da un PONTE sono della sua opera
+ATTORNO = 12.0       # m: l'impronta dell'opera comprende il suolo attorno al PONTE entro tanto
+FILO_SCARPT = 0.75   # m: un nodo cosi vicino a una linea di scarpata ne prende la quota
+
+
+def pezzi_dbgt(sup):
+    """i muri di sostegno e le scarpate del DBGT dei comuni accesi, quota del DBGT (meno l'offset del comune): ([(Polygon, Tin, id)], [(LineString, z, id)])"""
+    import sqlite3, superficie as sf, dbgt_quote as dq
+    from pyproj import Transformer
+    tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True); muri, linee = [], []
+    info = getattr(sup, 'info', {}) or {}; off = (info.get('offset') or {}).get('per_comune') or {}
+    for com in sup.comuni:
+        o = float(off.get(com, (info.get('offset') or {}).get('valore', 0.0)) or 0.0); con = sqlite3.connect(dq.gpkg_di(com))
+        M = dq._read_layer(con, tr, 'MU_SOS_MSOS_SUP', 'area', {}); C = dq._read_layer(con, tr, 'SCARPT_SCARPT_SUP_L', 'linea', {}); con.close()
+        for L, out in ((M, muri), (C, linee)):
+            if L is None: continue
+            for i in range(len(L['off']) - 1):
+                a, b = L['off'][i], L['off'][i + 1]; xy, z = L['xy'][a:b], L['z0'][a:b] - o
+                ok = np.isfinite(z) & (z > 100)
+                if out is muri:
+                    if ok.sum() < 3: continue
+                    g = Polygon(xy).buffer(0)
+                    if g.is_empty or g.area < 1.0: continue
+                    xs, zs = _denso(xy[ok], z[ok], True); out.append((g, sf.Tin(xs, zs), '%s MU_SOS %d' % (com, L['id'][i])))
+                else:
+                    if ok.sum() < 2: continue
+                    xs, zs = _denso(xy[ok], z[ok], False)
+                    if len(xs) >= 2: out.append((LineString(xs), zs, '%s SCARPT %d' % (com, L['id'][i])))
+    return muri, linee
+
+
+def _denso(xy, z, chiuso, passo=1.0):
+    P = np.vstack((xy, xy[:1])) if chiuso else xy; Z = np.concatenate((z, z[:1])) if chiuso else z
+    d = np.concatenate(([0], np.cumsum(np.hypot(*np.diff(P, axis=0).T)))); keep = np.concatenate(([True], np.diff(d) > 1e-6)); P, Z, d = P[keep], Z[keep], d[keep]
+    if len(P) < 2: return P, Z
+    s = np.union1d(np.arange(0, d[-1] + 1e-9, passo), d)
+    return np.column_stack((np.interp(s, d, P[:, 0]), np.interp(s, d, P[:, 1]))), np.interp(s, d, Z)
+
+
+def opere_dbgt(sup, S):
+    """in raccordi(), sulla S appena fatta. Ogni PONTE con muri di sostegno (MU_SOS) o scarpate (SCARPT) del DBGT entro VICINO_OPERA e un'opera: dentro la sua
+    impronta (il PONTE e ATTORNO, i muri, le linee di scarpata) il suolo e solo quello del DBGT, mai il LiDAR (todo.md, punto 7: il cavalcavia di x 320 z 1985
+    era "tutto distrutto" da una pendenza inventata sopra il LiDAR). In ordine: 1. la strada di sotto e le strade di sopra come le ha fatte strade() (nodi
+    fissi); 2. i muri di sostegno e le scarpate con la quota dei loro vertici (la superficie del poligono MU_SOS fra testa e piede; le linee SCARPT sono
+    spigoli: i nodi su di loro ne prendono la quota); 3. sotto l'impalcato il suolo della strada di sotto, piano fino alle spalle (la quota del nodo
+    gia fatto piu vicino che sta sotto l'intradosso); 4. il resto dell'impronta e la superficie armonica fra questi (Laplace sui nodi liberi, il bordo
+    dell'impronta per continuita). Le spalle le disegna il gioco dove l'impalcato appoggia (world3.js rampWalls). Scrive sup.OPERA (i nodi dell'opera,
+    protetti dal lisciatore) e sup.opere_dbgt (il rapporto, e per ogni opera i pezzi del DBGT usati: il controllo della build li cerca nel gioco)."""
+    import superficie as sf
+    from scipy import sparse
+    from scipy.sparse.linalg import spsolve
+    D = sup.D; P = D['PONTE']; sup.OPERA = np.zeros(S.shape, bool); rep = []
+    muri, linee = pezzi_dbgt(sup)
+    tm = shapely.STRtree([g for g, _, _ in muri]) if muri else None; tl = shapely.STRtree([g for g, _, _ in linee]) if linee else None
+    for i in range(len(P['off']) - 1):
+        g = sf.poly(P, i)
+        if not g.is_valid: g = g.buffer(0)
+        mi = [j for j in (tm.query(g.buffer(VICINO_OPERA)) if tm is not None else []) if muri[j][0].distance(g) <= VICINO_OPERA]
+        li = [j for j in (tl.query(g.buffer(VICINO_OPERA)) if tl is not None else []) if linee[j][0].distance(g) <= VICINO_OPERA]
+        if not mi and not li: continue
+        top = float(np.nanmedian(P['z'][P['off'][i]:P['off'][i + 1]])); bot = top - SP_SOLETTA
+        O = shapely.union_all([g.buffer(ATTORNO)] + [muri[j][0] for j in mi] + [linee[j][0].buffer(FILO_SCARPT * 2) for j in li]).buffer(3.0).buffer(-3.0)
+        w = sup.R.win(O.bounds, 2 * sf.SF)
         if w is None: continue
-        r0, r1, c0, c1 = w; X, Z = sup.R.xz(w); pts = shapely.points(X, Z); shapely.prepare(o['corr'])
-        d = shapely.distance(o['corr'], pts); dp = shapely.distance(o['g'], pts)
-        tetto = o['u'] + d / K_SCARPATA + np.maximum(0.0, dp - RAGGIO_OPERA)
-        sotto = dp <= 0; tetto = np.where(sotto, np.minimum(tetto, o['bot'] - 0.2), tetto)
-        W = S[r0:r1, c0:c1]; lib = ~sup.FIX[r0:r1, c0:c1] | (sup.BR[r0:r1, c0:c1] & ~np.isin(sup.CLS[r0:r1, c0:c1], (1, 2, 3, 4, 5, 6, 7)))
-        k = lib & (W > tetto) & (d > 0)
-        if k.any():
-            dz.append((W[k] - tetto[k])); W[k] = tetto[k]; tot += int(k.sum()); o['nodi_scarpata'] = o.get('nodi_scarpata', 0) + int(k.sum())
-    sup.opere_scarpate = dict(nodi=tot, abbassati_m=[round(float(v), 2) for v in np.percentile(np.concatenate(dz), (50, 90, 100))] if dz else None)
-    sup.log('scarpate dei cavalcavia: %d nodi liberi abbassati, %s' % (tot, sup.opere_scarpate['abbassati_m']))
+        r0, r1, c0, c1 = w; X, Z = sup.R.xz(w); pts = shapely.points(X, Z); shapely.prepare(O)
+        dentro = shapely.contains(O, pts); W = S[r0:r1, c0:c1]
+        V = np.full(W.shape, np.nan)
+        # 1. the streets, rails and beds as strade() burned them. The street over it outside the PONTE is on its bank (the DBGT has the bank: MU_SOS, SCARPT),
+        # not a deck part where the DTM is low: its nodes go back to the ground at their DBGT height (the deck stops at the PONTE and rests there)
+        ponte_m = shapely.contains(g, pts); Ar = sup.AIR[r0:r1, c0:c1]; sopra = dentro & Ar & ~ponte_m & np.isfinite(sup.ZF[r0:r1, c0:c1])
+        if sopra.any():
+            W[sopra] = sup.ZF[r0:r1, c0:c1][sopra]; Ar[sopra] = False; sup.BR[r0:r1, c0:c1][sopra] = False; sup.FIX[r0:r1, c0:c1][sopra] = True; sup.RANK[r0:r1, c0:c1][sopra] = sf.R_VEI
+        fx = sup.FIX[r0:r1, c0:c1] & dentro & ~Ar; V[fx] = W[fx]
+        for j in mi:                                                                          # 2. the walls and banks: their own surface
+            mg, tn, _ = muri[j]; k = shapely.contains(mg, pts) & dentro & ~fx
+            if k.any(): V[k] = tn(X[k], Z[k])
+        for j in li:
+            lg, lz, _ = linee[j]; d = shapely.distance(lg, pts); k = (d <= FILO_SCARPT) & dentro & ~fx
+            if k.any():
+                cum = np.concatenate(([0], np.cumsum(np.hypot(*np.diff(np.asarray(lg.coords), axis=0).T))))
+                V[k] = np.interp(shapely.line_locate_point(lg, pts[k]), cum, lz)
+        sotto = ponte_m & dentro & np.isnan(V)                                # 3. under the deck: the street under it, flat to the abutments
+        strada = fx & np.isin(sup.CLS[r0:r1, c0:c1], (sf.C_VEI, sf.C_VEIT, sf.C_PED, sf.C_AREA, sf.C_FER))   # (a street, sidewalk or track under it: over a river bed the harmonic below)
+        basso = strada & (V < bot - LUCE_MIN * 0.5)
+        if sotto.any() and basso.any():
+            idx = ndimage.distance_transform_edt(~basso, return_distances=False, return_indices=True); V[sotto] = V[idx[0][sotto], idx[1][sotto]]
+        lib = dentro & np.isnan(V); n = int(lib.sum())                                       # 4. the rest: harmonic between them, the edge of the footprint as it is
+        if n:
+            Vb = np.where(dentro, V, W); idn = -np.ones(W.shape, np.int64); idn[lib] = np.arange(n); rr, cc = np.nonzero(lib)
+            rows, cols, vals = [], [], []; rhs = np.zeros(n); deg = np.zeros(n)
+            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                r2, c2 = rr + dr, cc + dc; ok = (r2 >= 0) & (r2 < W.shape[0]) & (c2 >= 0) & (c2 < W.shape[1]); me = idn[rr[ok], cc[ok]]; deg[me] += 1
+                nb = idn[r2[ok], c2[ok]]; free = nb >= 0
+                rows += list(me[free]); cols += list(nb[free]); vals += [-1.0] * int(free.sum())
+                np.add.at(rhs, me[~free], Vb[r2[ok][~free], c2[ok][~free]])
+            A = sparse.csr_matrix((np.array(vals + list(deg)), (np.array(rows + list(range(n))), np.array(cols + list(range(n))))), shape=(n, n))
+            V[lib] = spsolve(A, rhs)
+        nuovi = dentro & ~fx & np.isfinite(V); dz = V[nuovi] - W[nuovi]
+        W[nuovi] = V[nuovi]; sup.OPERA[r0:r1, c0:c1] |= dentro
+        rep.append(dict(ponte=int(P['id'][i]), c=_c(g), muri=[muri[j][2] for j in mi], scarpate=[linee[j][2] for j in li], nodi=int(nuovi.sum()), rilevato=int(sopra.sum()),
+                        dz_m=[round(float(v), 2) for v in np.percentile(dz, (5, 50, 95))] if len(dz) else None,
+                        pezzi=[[[round(float(x), 2), round(float(z), 2)] for x, z in np.asarray(muri[j][0].representative_point().coords)] for j in mi] +
+                              [[[round(float(x), 2), round(float(z), 2)] for x, z in np.asarray(linee[j][0].interpolate(0.5, normalized=True).coords)] for j in li]))
+    sup.opere_dbgt = rep
+    sup.log('opere dal DBGT: %d ponti con muri o scarpate, %d nodi fatti senza il LiDAR' % (len(rep), sum(r['nodi'] for r in rep)))
 
 
 def rapporto(sup):
-    return [dict(ponte=o['ponte'], c=_c(o['g']), quota_sotto=round(o['u'], 2), nodi_strada=o['nodi_strada'], nodi_scarpata=o.get('nodi_scarpata', 0)) for o in getattr(sup, 'OPERE', [])]
+    return dict(opere_dbgt=getattr(sup, 'opere_dbgt', []), cavalcavia=[dict(ponte=o['ponte'], c=_c(o['g']), quota_sotto=round(o['u'], 2), nodi_strada=o['nodi_strada'], nodi_scarpata=o.get('nodi_scarpata', 0)) for o in getattr(sup, 'OPERE', [])])
+
+
+# ---------- le righe dentro le opere ----------
+RIGHE_PRESA = 15.0   # m oltre la bocca: le righe che arrivano all'opera da fuori si cercano entro tanto
+RIGHE_COS = 0.85     # una riga che corre lungo l'opera (coseno con l'asse)
+RIGHE_DAL_MURO = 0.35  # m: una riga non sta piu vicino di tanto al muro
+
+
+def righe_opere(sotto, lines, log=lambda *a: None):
+    """le righe sempre anche dentro le opere (Carlo, regola fissa): dentro l'impronta di un'opera le righe del DBGT si tolgono (nella parte aperta tutte,
+    sotto il coperto quelle che corrono lungo l'opera: le altre sono della strada di sopra) e si rifanno prolungando quelle che arrivano alle due bocche:
+    ogni riga prima della bocca va avanti lungo l'asse dell'opera, alla sua distanza dall'asse, fino alla riga che la continua dopo l'altra bocca
+    (stesso tipo, distanza piu vicina; in mezzo la distanza passa dall'una all'altra), dritta e continua. Senza righe a nessuna delle due bocche: i
+    bordi a RIGHE_DAL_MURO dai muri e una mezzeria tratteggiata sull'asse (se la carreggiata e larga almeno 5,5 m). Livello 3: il gioco le disegna sul fondo"""
+    if not sotto or not lines: return lines
+    from shapely.geometry import MultiLineString
+    out = list(lines); nuove = tolte = 0
+    for s in sotto:
+        C, N, L_, R_ = s['C'], s['N'], s['Lft'], s['Rgt']; n = len(C)
+        if n < 3: continue
+        foot = _sagoma(s, 0, n - 1)
+        if foot.is_empty: continue
+        gal = np.asarray(s['gal'], bool); cov = _sagoma(s, int(np.argmax(gal)), int(n - 1 - np.argmax(gal[::-1]))) if gal.any() else Polygon()
+        T = np.gradient(C, axis=0); T /= np.maximum(np.hypot(*T.T), 1e-9)[:, None]
+        hl, hr = np.hypot(*(L_ - C).T), np.hypot(*(R_ - C).T)
+        fb = foot.buffer(0.3); shapely.prepare(fb)
+        kept = []
+        for l in out:   # 1. out with the lines on the floor of the work
+            p = np.asarray(l['p'], float)
+            if len(p) < 2 or not LineString(p).intersects(fb): kept.append(l); continue
+            d = np.gradient(p, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]
+            j = np.argmin(np.hypot(*(C[None, :, :] - p[:, None, :]).transpose(2, 0, 1)), axis=1); lungo = np.abs(np.sum(d * T[j], axis=1)) > 0.7
+            dentro = shapely.contains_xy(fb, p[:, 0], p[:, 1]); sopra = shapely.contains_xy(cov, p[:, 0], p[:, 1]) if not cov.is_empty else np.zeros(len(p), bool)
+            via = dentro & (~sopra | lungo)
+            if not via.any(): kept.append(l); continue
+            tolte += 1; i0 = 0
+            for i in range(1, len(p) + 1):
+                if i == len(p) or via[i] != via[i - 1]:
+                    if not via[i0] and i - i0 >= 2: kept.append(dict(l, p=l['p'][i0:i]))
+                    i0 = i
+        out = kept
+        # 2. the lines that come to each mouth from outside, along the work: their type and distance from the axis
+        def bocca(k, verso):
+            m = []
+            for l in out:
+                p = np.asarray(l['p'], float)
+                if len(p) < 2: continue
+                for e, e2 in ((0, 1), (len(p) - 1, len(p) - 2)):
+                    q = p[e]; dd = np.hypot(*(q - C[k]))
+                    if dd > RIGHE_PRESA: continue
+                    v = q - p[e2]; v /= max(np.hypot(*v), 1e-9)
+                    if abs(v @ T[k]) < RIGHE_COS: continue
+                    along = (q - C[k]) @ T[k] * verso   # <= 0: before the mouth, outside
+                    if along > 1.0: continue
+                    o = float((q - C[k]) @ N[k])
+                    if -hr[k] - 0.5 <= o <= hl[k] + 0.5: m.append((l['t'], float(np.clip(o, -hr[k] + RIGHE_DAL_MURO, hl[k] - RIGHE_DAL_MURO)), -along))
+            r = []   # one per type and place (the nearest end)
+            for t, o, a in sorted(m, key=lambda x: x[2]):
+                if not any(t == t2 and abs(o - o2) < 0.8 for t2, o2 in r): r.append((t, o))
+            return r
+        A, B = bocca(0, 1), bocca(n - 1, -1)
+        coppie = []; usate = set()
+        for t, o in A:
+            best = min(((abs(o - o2), j) for j, (t2, o2) in enumerate(B) if t2 == t and j not in usate), default=None)
+            if best is not None and best[0] < 3.0: usate.add(best[1]); coppie.append((t, o, B[best[1]][1]))
+            else: coppie.append((t, o, o))
+        coppie += [(t, o, o) for j, (t, o) in enumerate(B) if j not in usate]
+        if not coppie:   # 3. nothing at either mouth: the edges and, on a wide carriageway, a dashed centre line
+            coppie = [(0, float(np.median(hl)) - RIGHE_DAL_MURO, float(np.median(hl)) - RIGHE_DAL_MURO), (0, -float(np.median(hr)) + RIGHE_DAL_MURO, -float(np.median(hr)) + RIGHE_DAL_MURO)]
+            if np.median(hl + hr) >= 5.5: coppie.append((2, 0.0, 0.0))
+        f = np.linspace(0, 1, n)
+        for t, oa, ob in coppie:
+            o = np.clip(oa + (ob - oa) * f, -hr + RIGHE_DAL_MURO, hl - RIGHE_DAL_MURO); q = C + N * o[:, None]
+            out.append(dict(ri=-1, t=int(t), p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=3)); nuove += 1
+    log('righe nelle opere: %d righe del DBGT tagliate, %d righe rifatte lungo le opere' % (tolte, nuove))
+    return out
+
+
+# ---------- le scale (OSM highway=steps) ----------
+MEZZA_SCALA = 1.2    # m: mezza larghezza di una scala quando OSM non la dice (neutra)
+ALZATA = 0.16        # m: l'alzata di un gradino
+SCALA_INFOSSATA = 0.5  # m: una scala con il suolo accanto almeno tanto sopra la sua rampa e scavata nel suolo: una fossa con i muri
+
+
+def scale(osm, quota, sotto, log=lambda *a: None):
+    """le scale di OSM scavate nel suolo (la buca che il LiDAR vede alle teste dei sottopassi): una fossa lungo la via, il fondo una rampa dritta dalla
+    quota della testa alta a quella della testa bassa (sul fondo dell'opera se la scala ci arriva), muri e parapetti come le opere, i gradini li disegna
+    il gioco. Le scale a raso su un pendio restano sul suolo (il gioco disegna i gradini su S). Torna (scale come stazioni, rapporto)"""
+    feet = []
+    for s in sotto:
+        n = len(s['C'])
+        feet.append((_sagoma(s, 0, n - 1), s))
+    out, rep = [], dict(scale_osm=0, infossate=0, a_raso=0, corte=0)
+    for w in osm:
+        if w['t'].get('highway') != 'steps': continue
+        rep['scale_osm'] += 1
+        g = LineString(w['p'])
+        for f, _ in feet:   # the part outside the works (inside it is the floor of the work)
+            if g.intersects(f): g = g.difference(f.buffer(0.05))
+        parts = [q for q in getattr(g, 'geoms', [g]) if q.geom_type == 'LineString' and q.length >= 2.0]
+        if not parts: rep['corte'] += 1; continue
+        for q in parts:
+            P = np.asarray(q.coords, float); sv = np.concatenate(([0], np.cumsum(np.hypot(*np.diff(P, axis=0).T))))
+            st = np.linspace(0, sv[-1], max(3, int(np.ceil(sv[-1] / 0.5)) + 1)); C = np.column_stack((np.interp(st, sv, P[:, 0]), np.interp(st, sv, P[:, 1]))); n = len(C)
+            muro = []
+            def capo(pt):   # the height at an end: the floor of a work it touches, else the ground. Against the wall of the covered part of a road work there is no way in
+                for f, s in feet:
+                    if f.distance(Point(pt)) < 1.0:
+                        k = int(np.argmin(np.hypot(*(s['C'] - pt).T)))
+                        if bool(np.asarray(s['gal'])[k]) and not s.get('pedonale'): muro.append(k)
+                        return float((s['yl'][k] + s['yr'][k]) / 2)
+                return float(quota(*pt))
+            za, zb = capo(C[0]), capo(C[-1])
+            if muro: rep['contro_un_muro'] = rep.get('contro_un_muro', []) + [w['id']]; continue   # (via Montecassino: stairs to the cycle tunnel beside it, which is not drawn)
+            if abs(za - zb) < 2 * ALZATA: rep['corte'] += 1; continue
+            y = za + (zb - za) * st / st[-1]
+            T = np.gradient(C, axis=0); T /= np.maximum(np.hypot(*T.T), 1e-9)[:, None]; N = np.column_stack((-T[:, 1], T[:, 0]))
+            Lft, Rgt = C + N * MEZZA_SCALA, C - N * MEZZA_SCALA
+            tl, tr = np.array([float(quota(*v)) for v in Lft]), np.array([float(quota(*v)) for v in Rgt])
+            if max((tl - y).max(), (tr - y).max()) < SCALA_INFOSSATA: rep['a_raso'] += 1; continue
+            def cima(tq):
+                ts = ndimage.gaussian_filter1d(tq, 2.0, mode='nearest'); par = np.minimum(PARAPETTO, np.maximum(0.0, ts - y)); t = np.maximum(ts + par, tq + np.minimum(par, 0.3))
+                return ndimage.gaussian_filter1d(t, 1.0, mode='nearest')
+            out.append(dict(C=C, y=y, yl=y.copy(), yr=y.copy(), Lft=Lft, Rgt=Rgt, N=N, csx=cima(tl), cdx=cima(tr), osm=w['id'], gradini=int(round(abs(za - zb) / ALZATA))))
+            rep['infossate'] += 1
+    log('scale: %s' % rep)
+    return out, rep
+
+
+def fosse_scale(scale_, primo):
+    """le scale per terreno/indice.json: come le opere (tipo rampa, sotto: muri e parapetti di opPareti, niente porta), con scala=True e i gradini"""
+    r3 = lambda A, y: [[round(float(q[0]), 3), round(float(q[1]), 3), round(float(h), 3)] for q, h in zip(A, y)]; rr = lambda v: [round(float(q), 3) for q in v]; out = []
+    for i, s in enumerate(scale_):
+        n = len(s['C']); m = n // 2; ce, an = celle_anello(Polygon(np.vstack((s['Lft'], s['Rgt'][::-1]))).buffer(0))
+        out.append(dict(tipo='rampa', sotto=True, scala=True, sottopasso=primo + i, gradini=s['gradini'], osm=[s['osm']], c=[round(float(s['C'][m][0]), 1), round(float(s['C'][m][1]), 1)],
+                        sx=r3(s['Lft'], s['yl']), dx=r3(s['Rgt'], s['yr']), lung=n - 1, fonte_larghezza='neutra', csx=rr(s['csx']), cdx=rr(s['cdx']), fronti=[False, False],
+                        celle=ce, anello=an, porta_h=0))
+    return out
+
+
+def controllo_opere(comuni, fatte):
+    """i PONTE dei comuni con muri di sostegno o scarpate del DBGT entro VICINO_OPERA che opere_dbgt non ha fatto: [{comune, ponte, c}]"""
+    import sqlite3, dbgt_quote as dq
+    from pyproj import Transformer
+    tr = Transformer.from_crs('EPSG:7791', 'EPSG:4326', always_xy=True); fatti = {(o['ponte'], tuple(o['c'])) for o in fatte}; out = []
+    for com in comuni:
+        con = sqlite3.connect(dq.gpkg_di(com)); L = {t: dq._read_layer(con, tr, t, k, {}) for t, k in (('PONTE_PONTE_SEDE', 'area'), ('MU_SOS_MSOS_SUP', 'area'), ('SCARPT_SCARPT_SUP_L', 'linea'))}; con.close()
+        geo = lambda X, k: [(Polygon(X['xy'][X['off'][i]:X['off'][i + 1]]).buffer(0) if k == 'area' else LineString(X['xy'][X['off'][i]:X['off'][i + 1]])) for i in range(len(X['off']) - 1) if X['off'][i + 1] - X['off'][i] >= (3 if k == 'area' else 2)] if X is not None else []
+        P = L['PONTE_PONTE_SEDE']; pz = geo(P, 'area'); pezzi = geo(L['MU_SOS_MSOS_SUP'], 'area') + geo(L['SCARPT_SCARPT_SUP_L'], 'linea')
+        if not pezzi or P is None: continue
+        tree = shapely.STRtree(pezzi)
+        for i, g in enumerate(pz):
+            if not any(pezzi[j].distance(g) <= VICINO_OPERA for j in tree.query(g.buffer(VICINO_OPERA))): continue
+            pid, c = int(P['id'][i]), _c(g)
+            if not any(abs(c[0] - c2[0]) < 1 and abs(c[1] - c2[1]) < 1 for _, c2 in fatti): out.append(dict(comune=com, ponte=pid, c=c))   # (by place: the ids of the PONTE of more comuni are renumbered when the layers are joined)
+    return out

@@ -1071,7 +1071,7 @@ class Superficie:
         S = s.L.copy(); band = ~FIX & ~BARR & np.isfinite(hi)
         lo_, hi_ = np.minimum(lo, hi), np.maximum(lo, hi)
         S[band] = s.L[band] + np.clip(0.0, lo_[band], hi_[band]); S[FIX] = s.ZF[FIX]
-        s.FIX = FIX; s.sotto_ponti(S, BARR); opere.scarpate(s, S)   # (src/opere.py: il suolo attorno alla strada sotto un cavalcavia)
+        s.FIX = FIX; s.sotto_ponti(S, BARR); opere.opere_dbgt(s, S)   # (src/opere.py: dentro l'impronta di un ponte con muri o scarpate del DBGT il suolo e solo del DBGT)
         zs = getattr(s, 'ZSOTTO', None)
         if zs is not None: k = np.isfinite(zs) & BARR; S[k] = zs[k]
         s.S = S
@@ -1527,8 +1527,9 @@ def main(argv=None):
     s.tessere(osm); s.sotto.fosse(); s.sotto.scrivi(a.out)
     import impalcati as _im   # the underpasses (src/opere.py), on the S just made
     _G = s.HQ / 100.0; _q = lambda x, z: float(tri_interp(_G, s.R, np.atleast_1d(float(x)), np.atleast_1d(float(z)))[0])
-    _sp, _sc = opere.trova(s.D, _q, _im.osm_vie(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_vie.pkl')), log)
-    json.dump(dict(fosse=opere.fosse_gioco(_sp), scartati=_sc, cavalcavia=opere.rapporto(s), scarpate=s.opere_scarpate), open(os.path.join(a.out, 'opere.json'), 'w', encoding='utf-8'), ensure_ascii=False, default=float)
+    _ov = _im.osm_vie(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_vie.pkl'))
+    _sp, _sc = opere.trova(s.D, _q, _ov, log); _scl, _scr = opere.scale(_ov, _q, _sp, log)   # (and the stairs of OSM dug into the ground)
+    json.dump(dict(fosse=opere.fosse_gioco(_sp) + opere.fosse_scale(_scl, len(_sp)), scartati=_sc, cavalcavia=opere.rapporto(s), scale=_scr), open(os.path.join(a.out, 'opere.json'), 'w', encoding='utf-8'), ensure_ascii=False, default=float)
     # the same steps as costruisci() with its defaults: impalcati.py, run after this in the same process (terreno_gioco.py --rigenera), takes
     # this surface instead of computing it all again (it was half the time of the terrain)
     if a.margine == 250.0 and a.blend == BLEND and s.comune not in _S: _S[s.comune] = s
