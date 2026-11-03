@@ -154,3 +154,18 @@ class Modello:
 
     def _a(self, X): Z = (X - self.mu) / self.sd; return np.column_stack((np.ones(len(Z)), Z, Z ** 2))
     def p(self, X): return 1 / (1 + np.exp(-np.clip(self._a(X) @ self.w, -30, 30)))
+
+
+# ------------------------------------------------------------------ the same numbers in processes of their own (src/processi.py mappa)
+_FOTO = None
+def _proc_init(kx, kz, xa, za):
+    """the Foto of dbgt_edifici.demoliti, with the same frame: to_ll(x, z) = (9.16 + (x - xa) / kx, 45.66 + (z - za) / kz)"""
+    global _FOTO
+    _FOTO = Foto(lambda x, z: (9.16 + (x - xa) / kx, 45.66 + (z - za) / kz))
+
+
+def _proc_numeri(wkb):
+    """caratteristiche(Foto.pixel(plan)) of a plan given as WKB; None where demoliti gets None (no photo, too few pixels, an error)"""
+    from shapely import from_wkb
+    try: return caratteristiche(_FOTO.pixel(from_wkb(wkb)))
+    except Exception: return None
