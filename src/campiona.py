@@ -27,7 +27,8 @@ def via(path):
             for tid, f in fr.items():
                 if tid == me: continue
                 fo.write('%s|%s\n' % (nomi.get(tid, tid), _stack(f)))
-    th = threading.Thread(target=giro, name='campiona', daemon=True); th.start(); return th
+            fr = f = None   # (holding the frames until the next sample kept their objects alive: a file the build had just written stayed open, unflushed)
+    th =threading.Thread(target=giro, name='campiona', daemon=True); th.start(); return th
 
 
 def leggi(path, n=40):
