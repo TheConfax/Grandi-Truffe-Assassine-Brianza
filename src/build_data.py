@@ -7,7 +7,7 @@ from collections import defaultdict, Counter
 import xml.etree.ElementTree as ET
 import numpy as np, tifffile
 from pyproj import Transformer
-from shapely.geometry import LineString, Polygon, Point, box, GeometryCollection, MultiLineString
+from shapely.geometry import LineString, Polygon, Point, box, GeometryCollection, MultiLineString, MultiPolygon
 from shapely.ops import unary_union, linemerge
 from shapely.strtree import STRtree
 from shapely import prepare, segmentize as _segmentize
@@ -2077,11 +2077,27 @@ _cia_n = [0]
 def _cia_id(): _cia_n[0] += 1; return 'ia%d' % _cia_n[0]
 _cia_ost = [b_[0] for b_ in bar_out] + list(fences) + [[(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)] for g_ in gate_out]
 _cia_ost += [list(b_['p']) + [b_['p'][0]] for b_ in buildings if b_.get('t') != 9 and len(b_['p']) >= 3] + [list(h_) + [h_[0]] for b_ in buildings if b_.get('t') != 9 for h_ in b_.get('k', []) if len(h_) >= 3]
-_cia_asf = [asph, _cv_f.result()] if STR else None  # the asphalt drawn (AC_VEI, the OSM ways without it) and the paved yards
+import opere as _op, impalcati as _imp, dbgt_quote as _dq   # the underpasses (src/opere.py): their floor is asphalt for the lanes, what stands inside their outline is not in the way
+_lid = _dq.Lidar(); _Dop = _dq.load_dbgt_comuni(_dq.lista_comuni(None), _lid); _Dop.pop('_info', None)
+_sott = _op.da_indice(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json')); log('opere dal terreno', len(_sott))   # one outline: the one the terrain made (the terrain comes first)
+_opf = unary_union([g_ for l_ in _op.impronte(_sott) for g_ in l_])
+# no gate in the mouth of an underpass: a short railing of the DBGT on the side of the trench became a gate across the sidewalk (Carlo 3/11, x -774 z 120)
+if not _opf.is_empty:
+    _opfb = _opf.buffer(1.0); prepare(_opfb); _ng_ = len(gate_out)
+    gate_out[:] = [g_ for g_ in gate_out if not _opfb.intersects(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]))]
+    log('cancelli nelle bocche dei sottopassi, tolti', _ng_ - len(gate_out))
+def _fuori_opera(pl_):
+    g_ = LineString(pl_) if len(pl_) >= 2 else None
+    if g_ is None or not g_.intersects(_opf): return [pl_]
+    d_ = g_.difference(_opf)
+    return [list(q_.coords) for q_ in (d_.geoms if hasattr(d_, 'geoms') else [d_]) if not q_.is_empty and q_.geom_type == 'LineString']
+_cia_ost = [q_ for pl_ in _cia_ost for q_ in _fuori_opera(pl_)]
+_cia_asf = [unary_union([asph, _opf]), _cv_f.result()] if STR else None  # the asphalt drawn (AC_VEI, the OSM ways without it) and the paved yards
 if os.environ.get('GTA_DUMP_CORSIE'):  # development of src/corsie_ia.py: its inputs, to work on it without the whole build
     import pickle
     pickle.dump(dict(raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], nodes=nodes, deckH=deckH, ostacoli=_cia_ost, asfalto=_cia_asf, cover=dbt_cover if STR else None), open(os.environ['GTA_DUMP_CORSIE'], 'wb'))
 _cia_rep = corsie_ia.corsie(raw_roads, nodes, deckH, _cia_ost, _cia_asf, dbt_cover if STR else None, _cia_id, log)
+_op.corsie_opere(_sott, raw_roads, nodes, log)
 if STR: STR.rep['corsie_ia'] = _cia_rep
 del _cia_ost, _cia_asf
 # ------------------------------------------------------------------ graph & tiles
@@ -2097,7 +2113,7 @@ for r in raw_roads:
     if r.get('under'): rec['u'] = 1
     if r.get('pk'): rec['pk'] = r['pk']
     if r.get('pv'): rec['pv'] = 1  # over a yard of the DBGT (AC_VEI 0307): no AI traffic (src/dbgt_strade.py privati)
-    if r.get('sg'): rec['sg'] = 1  # its markings are in tiles[].sg (dbgt_righe.py): none on its axis
+    if r.get('sg'): rec['sg'] = 1 if r['sg'] is True else [int(v) for v in r['sg']]  # its markings are in tiles[].sg (dbgt_righe.py): none on its axis (a list: per segment, 0 where none of them runs there)
     if r.get('w_osm') is not None: rec['wd'] = 1  # w is the carriageway of the DBGT (AC_VEI): the markings go by it, mh is the lanes' room
     for k_ in ('lf', 'lb'):  # the AI lanes node by node: from the carriageway of the DBGT (dbgt_strade.py corsie_locali), away from the obstacles (corsie_ia.py)
         if r.get(k_) and len(r[k_]) == len(r['refs']): rec[k_] = r[k_]
@@ -2193,6 +2209,41 @@ if PARCHEGGI_ATTACCATI:
     asph, pedz, side, foot = unary_union([asph, _pa]), pedz.difference(_pa), side.difference(_pa), foot.difference(_pa)
     area_geoms[:] = [(at, g.difference(_pa) if (at in (1, 2, 3) and g.intersects(_pa)) else g) for at, g in area_geoms]
     log('parcheggi attaccati a mano', len(PARCHEGGI_ATTACCATI), 'm2', round(_pa.area))
+_ap, _co = _op.impronte(_sott, 0.2)   # no paint in the open part of an underpass (src/opere.py), nor over the covered part what the DBGT has in gallery; the floor is drawn by the game
+_top = unary_union([p for nm in ('AC_VEI', 'AR_STR') for p, q in zip(_op.poligoni(_Dop, nm), _Dop[nm]['attr']['sed']) if q == '03' and any(p.intersects(c_) for c_ in _co)])
+_raso = unary_union([p for p, q in zip(_op.poligoni(_Dop, 'AC_VEI'), _Dop['AC_VEI']['attr']['sed']) if q != '03' and p.intersects(_top)]) if not _top.is_empty else _top
+_via = unary_union(_ap + ([_top.intersection(unary_union(_co)).difference(_raso)] if not _top.is_empty else []))   # (only inside the work: what the DBGT has in gallery past its mouths is a street on the ground)
+def _togli(g_):   # only the pieces it touches: the others stay as they are, in the same order
+    ps_ = list(g_.geoms) if hasattr(g_, 'geoms') else [g_]
+    if not any(p_.intersects(_via) for p_ in ps_): return g_
+    out_ = []
+    for p_ in ps_:
+        q_ = p_.difference(_via) if p_.intersects(_via) else p_
+        out_ += [t_ for t_ in (list(q_.geoms) if hasattr(q_, 'geoms') else [q_]) if t_.geom_type == 'Polygon' and not t_.is_empty]
+    return MultiPolygon(out_)
+asph, pedz, side, foot = _togli(asph), _togli(pedz), _togli(side), _togli(foot)
+_pst = _op.ponti_sopra(_Dop)   # what is of the road over a bridge does not lie on the ground under it (src/opere.py)
+_sf, _isole_, bar_out = _op.senza_strada_di_sopra(_pst, dict(asph=asph, pedz=pedz, side=side, foot=foot), STR.md_dbgt if STR else None, bar_out, log)
+asph, pedz, side, foot = _sf['asph'], _sf['pedz'], _sf['side'], _sf['foot']
+if STR: STR.md_dbgt = _isole_
+_md_ponte = _op.senza_strada_di_sopra.sul_ponte   # the islands of the road over a bridge, for its deck
+# the deck of a PONTE goes on past it over the bank (impalcati.py): there the islands of the road over it (DBGT islands, OSM grass) lay on S under the deck top,
+# hidden, and the median stopped short of the bridge on both sides (Carlo 3/11, the Milano-Meda over corso Isonzo). They go on the deck too
+_mdp_ = _op.sotto_impalcato_sopra(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json'), _pst)
+if _mdp_ is not None and not _mdp_.is_empty:
+    _sp_ = []
+    if STR is not None and STR.md_dbgt is not None and not STR.md_dbgt.is_empty and STR.md_dbgt.intersects(_mdp_):
+        _q_ = STR.md_dbgt.intersection(_mdp_); _sp_.append(_q_); STR.md_dbgt = STR.md_dbgt.difference(_mdp_.buffer(0.05))
+    _ag_ = []
+    for at_, g_ in area_geoms:
+        if at_ in (1, 2) and g_.intersects(_mdp_): _sp_.append(g_.intersection(_mdp_)); g_ = g_.difference(_mdp_.buffer(0.05))
+        _ag_.append((at_, g_))
+    area_geoms[:] = [(a_, g_) for a_, g_ in _ag_ if not g_.is_empty]
+    _sp_ = [q_ for q_ in _sp_ if not q_.is_empty and q_.area > 0.3]
+    if _sp_: _md_ponte = unary_union(([_md_ponte] if _md_ponte is not None else []) + _sp_); log('isole della strada di sopra sotto la coda degli impalcati, sul ponte m2', round(sum(q_.area for q_ in _sp_), 1))
+if not median.is_empty: median = _op.senza_strada_di_sopra(_pst, {}, median, [], log)[1]
+area_geoms[:] = [(at, g.difference(_via) if g.intersects(_via) else g) for at, g in area_geoms]
+log('sottopassi', len(_sott), 'vernice tolta m2', round(_via.area))
 SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}
 parts_of = lambda g: [p for p in (list(g.geoms) if hasattr(g, 'geoms') else [g]) if not p.is_empty]
 SURFP = {k: parts_of(g) for k, g in SURF.items() if not g.is_empty}
@@ -2258,6 +2309,12 @@ import rotonde  # the aiuole of the roundabouts of Meda (src/rotonde.py, docs/ro
 ROT = rotonde.Rotonde(STR.isole, log) if STR else None
 if ROT: STR.md_dbgt = ROT.riempi(STR.md_dbgt); ROT.push_tiles(tid, polys_of, push, q)
 if STR: STR.togli_cortili(VERDE.cons, _cv_f.result()); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
+if _md_ponte is not None and not _md_ponte.is_empty:   # (dk: on the deck of the bridge, at its height: src/opere.py senza_strada_di_sopra, world3.js medianDeck)
+    for t in range(ntx * ntz):
+        bx = tbox(t)
+        if _md_ponte.intersects(bx):
+            for p_ in polys_of(_md_ponte.intersection(bx), 0.15, 0.5): p_.update({'g': 1, 'dk': 1, 'v': 1}); push(t, 'md', p_)   # (grass, as it was on the ground)
+if RIGHE: RIGHE = _op.righe_opere(_sott, RIGHE, log)   # the lines go on along the underpasses (src/opere.py)
 if RIGHE: dbgt_righe.push_tiles(RIGHE, ntx * ntz, tbox, push)  # the road markings (sg)
 if FER:  # the rail bed (sf)
     FER.disegno(None, None, pronto=_fer_f.result())  # = FER.disegno(the tracks, unary_union([asph, pedz, side, foot, platforms, bunion] + [STR.cv])), on a thread since the surfaces

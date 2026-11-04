@@ -18,6 +18,7 @@ sys.path.insert(0, HERE)
 import dbgt_quote as dq
 import riquadro as RQ
 from presto import in_parallelo, NT as NT_   # the TINs on all the cores (src/presto.py)
+import opere
 from dbgt_quote import DATA, KX, KZ, LAT0, LON0, FT_RAW, FT_NONE
 
 # map frame, as src/build.py and the game: tile i,j has its corner at (-META.hw + i*TILE, -META.hh + j*TILE)
@@ -727,12 +728,22 @@ class Superficie:
         s.DZ = np.where(FIX, s.ZF - s.L, np.nan)
         dbr = ndimage.distance_transform_edt(~s.BR, sampling=SF) if s.BR.any() else np.full(s.BR.shape, 1e9)
         st8 = np.ones((3, 3), bool); dz = np.nan_to_num(s.DZ)
+        # over a road gallery (src/opere.py gallerie_stradali: a GALLER with a SED=03 axis in it) the DBGT has solid ground, not a bridge: the roads
+        # over it keep their DBGT height on S, never a deck part nor the cap (the DTM sees through the underpass there). The work under them is opere.py's
+        GS = np.zeros(RT.shape, bool)
+        for P in opere.gallerie_stradali(s.D):
+            w, m = s.raster(P.buffer(1.0))
+            if w is not None: GS[w[0]:w[1], w[2]:w[3]] |= m
         s.AIR = ndimage.binary_propagation(RT & (dbr <= NEAR_BR) & (dz > DZ_CAP), structure=st8, mask=RT & (dz > DZ_WARN))
+        if GS.any():   # a patch of deck parts that reaches over a road gallery is all the gallery's ground (the DTM hole is wider than the GALLER)
+            lab, _ = ndimage.label(s.AIR, st8); hit = np.unique(lab[s.AIR & GS]); hit = hit[hit > 0]
+            if len(hit): GS = GS | (np.isin(lab, hit) & (ndimage.distance_transform_edt(~GS, sampling=SF) <= 15.0)); s.AIR &= ~GS   # (within 15 m: not a deck further along the same road)
+        s.GSTR = GS
         # a road under the LiDAR under a bridge or the gallery cover, or by them, keeps the DBGT: the DTM is filled across the deck and a few m
         # past its edges (via Busnelli under PONTE 12 is flat at 215.2 in the DBGT, the LiDAR rises to 219.7 and shut the road; the streets
         # over the station underpass took the stair holes of the LiDAR)
         s.UND = (dbr <= NEAR_UNDER) & (dz < 0)
-        s.CAP = ndimage.binary_propagation(RT & (np.abs(dz) > DZ_CAP) & ~s.AIR & ~s.UND, structure=st8, mask=RT & (np.abs(dz) > DZ_WARN) & ~s.AIR & ~s.UND)
+        s.CAP = ndimage.binary_propagation(RT & (np.abs(dz) > DZ_CAP) & ~s.AIR & ~s.UND & ~GS, structure=st8, mask=RT & (np.abs(dz) > DZ_WARN) & ~s.AIR & ~s.UND & ~GS)
         # a capped patch over the river is a culvert (tombino) the LiDAR sees through: the road keeps the DBGT
         s.TOMB = np.zeros(s.CAP.shape, bool); s.PNS = np.zeros(s.CAP.shape, bool)
         if s.CAP.any():
@@ -749,7 +760,7 @@ class Superficie:
         s.ZRAW = s.ZF.copy(); s.NEARCAP = np.zeros(s.CAP.shape, bool)
         if s.CAP.any():
             dc = ndimage.distance_transform_edt(~s.CAP, sampling=SF); wt = np.clip(dc / RAMP, 0, 1); s.NEARCAP = dc < RAMP
-            k = RT & ~s.AIR & ~s.UND; s.ZF[k] = s.L[k] + s.DZ[k] * wt[k]
+            k = RT & ~s.AIR & ~s.UND & ~GS; s.ZF[k] = s.L[k] + s.DZ[k] * wt[k]
         s.RANK[s.AIR] = 0; s.BR |= s.AIR
         # river bed more than DZ_CAP under the LiDAR (and not under a bridge): a covered stretch (the street over the Seveso in the centre,
         # x 260 z -525, is flat in the DTM 3.5 m over the DBGT bed) or the walls of the ravine in the north. The LiDAR is kept there, else
@@ -1106,9 +1117,9 @@ class Superficie:
         S = s.L.copy(); band = ~FIX & ~BARR & np.isfinite(hi)
         lo_, hi_ = np.minimum(lo, hi), np.maximum(lo, hi)
         S[band] = s.L[band] + np.clip(0.0, lo_[band], hi_[band]); S[FIX] = s.ZF[FIX]
-        s.FIX = FIX; s.sotto_ponti(S, BARR)
+        s.FIX = FIX; s.sotto_ponti(S, BARR); opere.opere_dbgt(s, S); opere.galleria_piena(s, S)   # (src/opere.py: dentro l'impronta di un ponte con muri o scarpate del DBGT il suolo e solo del DBGT)
         zs = getattr(s, 'ZSOTTO', None)
-        if zs is not None: k = np.isfinite(zs) & BARR; S[k] = zs[k]
+        if zs is not None: k = np.isfinite(zs) & BARR & ~getattr(s, 'SPALLE_N', np.zeros(BARR.shape, bool)); S[k] = zs[k]   # (not under the abutments of opere_dbgt: there the street under the bridge)
         s.S = S
         d = ndimage.distance_transform_edt(~FIX, sampling=SF); s.DFIX = d
         s.bordo_banda = int((band & (d > BAND - 2.5) & (np.abs(S - s.L) > 0.05)).sum())
@@ -1223,6 +1234,9 @@ class Superficie:
         else:
             cn = np.stack((nm[:-1, :-1], nm[:-1, 1:], nm[1:, :-1], nm[1:, 1:]))
             cnt = np.stack([(cn == v).sum(0) for v in range(1, 7)]); m = np.where(cnt.max(0) >= 2, cnt.argmax(0) + 1, 0).astype(np.uint8)
+            # a street is never a cliff: a street cell whose corners differ by more than a metre is the step of a bank (the abutment of a cavalcavia, x 349 z
+            # 2002: the Milano-Meda's asphalt hung down the step to corso Isonzo, Carlo 3/11). It takes the material of the slopes
+            hc = np.stack((hq[:-1, :-1], hq[:-1, 1:], hq[1:, :-1], hq[1:, 1:])); m[np.isin(m, (M_ASF, M_MARC)) & (hc.max(0) - hc.min(0) > 100)] = M_SCARP
         base = int(np.floor(hq.min() / 100.0)); q = hq - base * 100
         assert q.max() < 65535
         return int(st), float(base), q.astype(np.uint16), m
@@ -1242,7 +1256,7 @@ def costruisci(comune=None, margine=250.0, blend=BLEND, osm=True, cache_dir=None
     """The whole surface of the comuni + margine, all steps (about 40 s for Meda); cached per comuni."""
     comune = '+'.join(dq.lista_comuni(comune))
     if comune in _S: return _S[comune]
-    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
+    s = Superficie(comune, margine=margine, blend=blend); s.base(); s.dbgt(); s.strade(); s.sottoterra(cache_dir); opere.cavalcavia(s, s.log); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
     ob = None
     if osm:
         lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
@@ -1551,12 +1565,18 @@ def main(argv=None):
     AX_SIGMA = a.sigma
     s = Superficie(a.comune, margine=a.margine, blend=a.blend); osm_in_fondo(s, a.out)
     log('tessere da fare %d (tx %d..%d, tz %d..%d), griglia %dx%d' % (len(s.tiles), s.i0, s.i1, s.j0, s.j1, s.R.nx, s.R.nz))
-    s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
+    s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); opere.cavalcavia(s, log); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
     t0 = time.time()
     lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
     aspetta_osm(os.path.join(a.out, 'cache_osm_v2.pkl')); osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_v2.pkl'))
     s.t['osm'] = round(time.time() - t0, 1); log('osm: %d oggetti per decidere il passo' % len(osm))
     s.tessere(osm); s.sotto.fosse(); s.sotto.scrivi(a.out)
+    import impalcati as _im   # the underpasses (src/opere.py), on the S just made
+    _G = s.HQ / 100.0; _q = lambda x, z: float(tri_interp(_G, s.R, np.atleast_1d(float(x)), np.atleast_1d(float(z)))[0])
+    _ov = _im.osm_vie(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_vie.pkl'))
+    _sp, _sc = opere.trova(s.D, _q, _ov, log); _scl, _scr = opere.scale(_ov, _q, _sp, log, s)   # (and the stairs of OSM dug into the ground)
+    opere.bocche_coperte(_sp, s, log)   # (the ground over the cover reaches its front: the cells the trench takes in front of it)
+    json.dump(dict(fosse=opere.fosse_gioco(_sp) + opere.fosse_scale(_scl, len(_sp)), scartati=_sc, cavalcavia=opere.rapporto(s), scale=_scr), open(os.path.join(a.out, 'opere.json'), 'w', encoding='utf-8'), ensure_ascii=False, default=float)
     # the same steps as costruisci() with its defaults: impalcati.py, run after this in the same process (terreno_gioco.py --rigenera), takes
     # this surface instead of computing it all again (it was half the time of the terrain)
     if a.margine == 250.0 and a.blend == BLEND and s.comune not in _S: _S[s.comune] = s

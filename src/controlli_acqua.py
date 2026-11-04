@@ -24,6 +24,8 @@ sys.path.insert(0, HERE)
 
 TILE = 250.0
 SOTTO_DK = 1.0     # a cell is under a deck when the top stands this much over S there (A3, and the bit of terreno_gioco.py)
+VICINO_DK = 8.0    # m: a steep street cell this near a deck is the bank at its end
+SCARPA_DK = 0.25   # m per m: over this between the corners of a cell under a deck it is a bank, not a street (a street climbs 15% at most)
 STRADA_MAT = (1, 2)  # cell materials that are a road or a sidewalk at their own level (S burned there): the paint under a deck stays
 SFONDO = 1.0       # A2: a point of a carriageway this far under the road around it is a hole
 FONDO = 1.0        # A5: a point of an OSM stream this far over the bottom of the valley across it
@@ -73,7 +75,17 @@ def segna_sotto_impalcati(b, x0, z0, tri, tree):
     tp = cima_impalcati(tri, tree, x.ravel(), z.ravel()).reshape(c, c)
     if not np.isfinite(tp).any(): return b[:mo] + m.tobytes() + b[mo + c * c:], 0
     hc = (h[:-1, :-1] + h[1:, 1:]) / 2      # the middle of the cell: on the diagonal of its two triangles
-    k = np.isfinite(tp) & (tp > hc + SOTTO_DK) & ~np.isin(m, STRADA_MAT)
+    # a street cell under a deck is a street at its own level only if it lies like one: a cell whose corners differ by more than SCARPA_DK is the
+    # bank going up to the deck (the material is the street of the level above, burned there before it became a deck part): no paint on it
+    # (the cavalcavia of x 349 z 2002, todo.md 1/11 punto 7: the asphalt and a dash went up the banks to the deck)
+    hq = np.stack((h[:-1, :-1], h[:-1, 1:], h[1:, :-1], h[1:, 1:])); ripida = hq.max(0) - hq.min(0) > SCARPA_DK * st
+    k = np.isfinite(tp) & (tp > hc + SOTTO_DK) & (~np.isin(m, STRADA_MAT) | ripida)
+    # and the banks at the ends of a cavalcavia, just past the deck: the street of the level above is painted in plan over the bank that goes down to the
+    # street under it (x 349 z 2002: asphalt and a dash down the bank). A street cell that steep within VICINO_DK of a deck is the bank
+    if ripida.any():
+        X, Z = x.ravel(), z.ravel(); vic = np.zeros(X.shape, bool)
+        for dx_, dz_ in ((VICINO_DK, 0), (-VICINO_DK, 0), (0, VICINO_DK), (0, -VICINO_DK), (0, 0)): vic |= np.isfinite(cima_impalcati(tri, tree, X + dx_, Z + dz_))
+        k |= ripida & np.isin(m, STRADA_MAT) & vic.reshape(c, c)
     m[k] |= 128
     return b[:mo] + m.tobytes() + b[mo + c * c:], int(k.sum())
 

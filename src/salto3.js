@@ -55,7 +55,7 @@ function saltoAbove(v) { return v === P.onV || (P.climb && P.climb.v === v) || P
 // ---- is a body with its feet at this height free here? null if so, else what is in the way. tol: walls lower than that over the feet do not count, as for the walker
 function capsuleFree(x, z, feet, r = SALTO.r, tol = 0.02, head = SALTO.head) {
   if (x < ZONA[0] || x > ZONA[2] || z < ZONA[1] || z > ZONA[3]) return 'limite';
-  if (H.surface(x, z) > feet + Math.max(tol, 0.02) + 0.02) return 'suolo';
+  if (H.floorAt(x, z, feet) > feet + Math.max(tol, 0.02) + 0.02) return 'suolo';
   let hit = null;
   WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, s => {
     if (hit || s.off || (s.dyn && !s.on)) return;
@@ -211,7 +211,7 @@ function footVert(dt) {
     P.vy -= S.grav * dt; if (P.vy > 0 && ceilOver(P.x, P.z, P.y + P.vy * dt)) P.vy = 0;
     const fl = footFloor(P.x, P.z, P.y, 0.3, true), ny = P.y + P.vy * dt;
     if (ny <= fl && P.vy <= 0) { const hard = -P.vy > S.heavyV; P.y = fl; P.air = false; P.onV = saltoFV; P.land = S.landT; P.landK = hard ? 1 : Math.min(1, 0.4 + -P.vy / S.heavyV * 0.5); P.heavy = hard; P.vy = 0; P.speedAir = 0; }
-    else P.y = Math.max(ny, H.surface(P.x, P.z));
+    else P.y = Math.max(ny, H.floorAt(P.x, P.z, P.y));
   } else {
     if (P.land > 0) P.land = Math.max(0, P.land - dt);
     const fl = footFloor(P.x, P.z, P.y, S.stepUp, false);
@@ -264,7 +264,7 @@ function footCollide() { // the walls push him out, feet and head when he is off
 }
 const saltoLowBar = s => isBarrier(s) && s.y1 - (P.yg !== undefined ? P.yg : P.y) <= SALTO.maxBar + 0.8;
 function footGuard(x0, y0, z0, mx, mz) { // last word of the step. x0, y0, z0 where he was, mx, mz where his own step took him before any push
-  footVehBoxes(); footGuardXZ(x0, z0, mx, mz); const g = H.surface(P.x, P.z); if (P.y < g) P.y = g; // never under the ground he moved onto
+  footVehBoxes(); footGuardXZ(x0, z0, mx, mz); const g = H.floorAt(P.x, P.z, P.y); if (P.y < g) P.y = g; // never under the ground he moved onto
   // and never in a solid he was not in: squeezed in a gap (a car and a tree, two cars) the pushes can only go round. Back where he was free, at this height or at the last one
   const tol = P.air || P.knock > 0 ? 0.06 : 0.4, inS = (x, z, y) => { const q = capsuleFree(x, z, y, 0.25, tol); return q && q !== 'suolo' && (P.air || P.knock > 0 || (q !== 'soffitto' && q !== 'soletta')) && q !== 'limite'; };
   if (!inS(P.x, P.z, P.y)) return;

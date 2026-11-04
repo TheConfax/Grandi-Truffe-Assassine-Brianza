@@ -355,22 +355,46 @@ const H = (() => {
   // pits (docs/sottoterra.md, tappa 1): ramps of the underground garages, from src/sottoterra.py. Each takes the 2 m cells of S its outline
   // touches (F.pc, a flag per cell); inside its outline its floor triangles are the ground (H.base, H.ground, H.surface), outside it S. The
   // terrain mesh leaves those cells out, world3.js draws the floor, the ground of the cells around it (anello), the walls and the door
-  const PITS = [], PIT_ORD = new Map(), PG = new Grid(8), PCELL = new Map();
+  const PITS = [], PIT_ORD = new Map(), PG = new Grid(8), PCELL = new Map(), GALL = [], UG = new Grid(8); let TETTI = 0;
+  function gallAt(x, z) { // the covered part of an underpass at (x, z): { floor, soff }, or null
+    if (!GALL.length && !TETTI) return null; let u = null;
+    UG.each(x, z, x, z, ({ p, i }) => {
+      if (u) return; const T = p.tri, ax = T[i], az = T[i + 1], bx = T[i + 3], bz = T[i + 4], cx = T[i + 6], cz = T[i + 7], den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(den) < 1e-12) return;
+      const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / den, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / den, l3 = 1 - l1 - l2; if (l1 < -1e-7 || l2 < -1e-7 || l3 < -1e-7) return;
+      const j = i / 9 * 3; u = { floor: l1 * T[i + 2] + l2 * T[i + 5] + l3 * T[i + 8], soff: l1 * p.sof[j] + l2 * p.sof[j + 1] + l3 * p.sof[j + 2], p };
+    });
+    return u;
+  }
   function pitDentro(q) { // as deckDentro
     let o = PIT_ORD.get(q.ord); if (o) { o.refs++; return o; }
+    if (q.tipo === 'galleria') { // the covered part of an underpass (src/opere.py): S stays drawn over it, under it a level that only H.surface(x, z, cy) reads, with cy under the ceiling
+      const n = q.sx.length, tri = new Float64Array((n - 1) * 18), sof = new Float64Array((n - 1) * 6); let i = 0, j = 0;
+      for (let k = 0; k < n - 1; k++) for (const t of [[q.sx[k], q.sx[k + 1], q.dx[k + 1], k, k + 1, k + 1], [q.sx[k], q.dx[k + 1], q.dx[k], k, k + 1, k]]) { for (let w = 0; w < 3; w++) { tri[i++] = t[w][0]; tri[i++] = t[w][1]; tri[i++] = t[w][2] - B0; } sof[j++] = q.soffitto[t[3]] - B0; sof[j++] = q.soffitto[t[4]] - B0; sof[j++] = q.soffitto[t[5]] - B0; }
+      const imp = q.sx.map(v => [v[0], v[1]]).concat(q.dx.slice().reverse().map(v => [v[0], v[1]]));
+      o = { id: q.ord, ord: q.ord, refs: 1, reg: [], src: q, galleria: true, tri, sof, imp, sx: q.sx.map(([x, z, y]) => [x, z, y - B0]), dx: q.dx.map(([x, z, y]) => [x, z, y - B0]), soffitto: q.soffitto.map(v => v - B0), c: q.c };
+      GALL.push(o); PIT_ORD.set(q.ord, o); const rec0 = GRID_REC; GRID_REC = o.reg;
+      for (let t = 0; t < tri.length; t += 9) UG.add(Math.min(tri[t], tri[t + 3], tri[t + 6]), Math.min(tri[t + 1], tri[t + 4], tri[t + 7]), Math.max(tri[t], tri[t + 3], tri[t + 6]), Math.max(tri[t + 1], tri[t + 4], tri[t + 7]), { p: o, i: t });
+      GRID_REC = rec0; return o;
+    }
     if (q.tipo !== 'rampa') { PIT_ORD.set(q.ord, o = { refs: 1, vuota: true }); return o; }
-    const n = q.sx.length, tri = new Float64Array((n - 1) * 18), imp = q.sx.map(v => [v[0], v[1]]).concat(q.dx.slice().reverse().map(v => [v[0], v[1]])); // the strip between the two sides, as src/sottoterra.py
-    for (let k = 0, i = 0; k < n - 1; k++) for (const t of [[q.sx[k], q.sx[k + 1], q.dx[k + 1]], [q.sx[k], q.dx[k + 1], q.dx[k]]]) for (const v of t) { tri[i++] = v[0]; tri[i++] = v[1]; tri[i++] = v[2] - B0; }
+    // the strip between the two sides, as src/sottoterra.py; an underpass whose floor is not straight across (q.yc, src/opere.py: at its heads it takes the street beyond on each of its columns) in strips between its columns
+    const n = q.sx.length, KC = q.yc ? q.yc[0].length : 2, tri = new Float64Array((n - 1) * (KC - 1) * 18), imp = q.sx.map(v => [v[0], v[1]]).concat(q.dx.slice().reverse().map(v => [v[0], v[1]]));
+    const colP = (k, j) => { const a = q.sx[k], b = q.dx[k], f = j / (KC - 1); return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, q.yc ? q.yc[k][j] : a[2] + (b[2] - a[2]) * f]; };
+    for (let k = 0, i = 0; k < n - 1; k++) for (let j = 0; j < KC - 1; j++) for (const t of [[colP(k, j), colP(k + 1, j), colP(k + 1, j + 1)], [colP(k, j), colP(k + 1, j + 1), colP(k, j + 1)]]) for (const v of t) { tri[i++] = v[0]; tri[i++] = v[1]; tri[i++] = v[2] - B0; }
     o = { id: q.ord, ord: q.ord, refs: 1, reg: [], src: q, tri, imp, sx: q.sx.map(([x, z, y]) => [x, z, y - B0]), dx: q.dx.map(([x, z, y]) => [x, z, y - B0]), anello: q.anello, porta_h: q.porta_h || 2.4, c: q.c, bb: [Math.min(...imp.map(v => v[0])), Math.min(...imp.map(v => v[1])), Math.max(...imp.map(v => v[0])), Math.max(...imp.map(v => v[1]))] };
     PITS.push(o); PIT_ORD.set(q.ord, o);
     const rec0 = GRID_REC; GRID_REC = o.reg;
     for (let i = 0; i < tri.length; i += 9) PG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i });
+    if (q.tetto) { // the part of an underpass that takes the cells of S and is covered: its ceiling, as gallAt reads it
+      o.sof = new Float64Array(tri.length / 3); TETTI++; o.tetti = true;
+      for (let k = 0, j = 0; k < n - 1; k++) for (let c = 0; c < KC - 1; c++) for (const t of [[k, k + 1, k + 1], [k, k + 1, k]]) { const i = j * 3; if (q.tetto[k] !== null && q.tetto[k + 1] !== null) { for (let w = 0; w < 3; w++) o.sof[j + w] = q.tetto[t[w]] - B0; UG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i }); } j += 3; }
+    }
     GRID_REC = rec0;
     for (const k in q.celle) { let l = PCELL.get(k); if (!l) PCELL.set(k, l = []); for (const w of q.celle[k]) l.push(w); }
     return o;
   }
   function pitFuori(o) {
-    if (--o.refs > 0) return; PIT_ORD.delete(o.ord); if (o.vuota) return; PITS.splice(PITS.indexOf(o), 1); disfaGriglie(o.reg);
+    if (--o.refs > 0) return; PIT_ORD.delete(o.ord); if (o.vuota) return; if (o.galleria) { GALL.splice(GALL.indexOf(o), 1); disfaGriglie(o.reg); return; } PITS.splice(PITS.indexOf(o), 1); disfaGriglie(o.reg); if (o.tetti) TETTI--;
     for (const k in o.src.celle) { const l = PCELL.get(k); if (!l) continue; const a = new Set(o.src.celle[k]), m = l.filter(w => !a.has(w)); if (m.length) PCELL.set(k, m); else PCELL.delete(k); }
   }
   function deckFuori(o) { if (--o.refs > 0) return; DECK_ORD.delete(o.ord); DECKS.splice(DECKS.indexOf(o), 1); disfaGriglie(o.reg); }
@@ -386,7 +410,13 @@ const H = (() => {
     return y;
   }
   const pitIn = (F, x, z) => { if (!F.pc) return null; const c = F.n - 1, i = clamp(Math.floor((x - F.x0) / F.st), 0, c - 1), j = clamp(Math.floor((z - F.z0) / F.st), 0, c - 1); return F.pc[j * c + i] ? pitY(x, z) : null; };
-  const onG = (F, x, z) => { const p = pitIn(F, x, z); return p !== null ? p : onF(F, x, z); }; // S, or the floor of a ramp
+  // the ground over the cover of an underpass in the cells its open trench takes (src/opere.py): a cell of S is 2 m and the front of the cover crosses it, so its
+  // nodes in the trench are at the road under it and S over the cover, read in that cell, went down from the bank to the floor under the ceiling: a slanted sheet
+  // in the mouth (Carlo 3/11, the south mouth of the Milano-Meda x -769 z 118; the grey sheets over the station stairs x 325 z -500). Over the cover the ground
+  // is at least the top of the work (src/opere.py SP_OPERA over its ceiling)
+  const OP_CIMA = 1.25;
+  const sopraCoperto = (F, x, z, y) => { if (!F.pc || !GALL.length) return y; const c = F.n - 1, i = clamp(Math.floor((x - F.x0) / F.st), 0, c - 1), j = clamp(Math.floor((z - F.z0) / F.st), 0, c - 1); if (!F.pc[j * c + i]) return y; const u = gallAt(x, z); return u ? Math.max(y, u.soff + OP_CIMA) : y; };
+  const onG = (F, x, z) => { const p = pitIn(F, x, z); return p !== null ? p : sopraCoperto(F, x, z, onF(F, x, z)); }; // S, or the floor of a ramp
   // the step of the old engine (tiles without .bin): the sidewalks and platforms the tile draws raised; world3.js fills them in later
   const oldStep = (x, z) => { if (!H.gradini) return 0; try { return onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : 0; } catch (e) { return 0; } }; // (before world3.js has its grids: 0)
   // water level (docs/motore.md 1.3): zw along the DBGT river axes, every 2 m; elsewhere the lowest S across an OSM river + 0.3
@@ -406,9 +436,10 @@ const H = (() => {
     });
     return w;
   }
+  let NSOT = null; const nodeSotto = i => { if (!NSOT) { NSOT = new Set(); for (const r of D.roads) if (r.u) for (const n of r.g) NSOT.add(n); } return NSOT.has(i); }; // the nodes of the ways in gallery in OSM
   const KIND = [null, 'road', 'side', 'green', 'river', 'slope', 'rail'];
   const H = {
-    B0, DECKS, PITS, farH, deckAt, water, railY, railTop,
+    B0, DECKS, PITS, GALL, gallAt, farH, deckAt, water, railY, railTop,
     gradini: true, // false while a piece lays out what the build decided on the ground without the step layer (pezzi3.js)
     // a piece comes in (what H needs of it: S, decks, pits, water) and goes out; what goes in the grids is noted by the caller (GRID_REC)
     dentro(t, d, s) {
@@ -420,7 +451,11 @@ const H = (() => {
       FT[t] = null; NFADE.clear();
     },
     deck: ord => DECK_ORD.get(ord), nodeDeckCalc,
+    floorAt(x, z, y) { const u = gallAt(x, z); return u && y < u.soff ? u.floor : H.surface(x, z); }, // the ground (no decks) of someone at height y: the floor of a gallery if he is in it
+    camG(x, z, y) { const u = gallAt(x, z); return u && y < u.soff ? u.floor : H.ground(x, z); }, // the ground under the camera of someone at height y
+    camCap(x, z, gy, y) { const u = gallAt(x, z); return u && gy < u.soff ? Math.min(y, u.soff - 0.35) : y; }, // ... and the ceiling
     baseS(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); }, // S alone, without the ramps (their walls stand on it)
+    anello(x, z) { const F = fineAt(x, z); return F ? sopraCoperto(F, x, z, onF(F, x, z)) : oldG(x, z); }, // the ground round a ramp, in the cells it takes: S, over the cover of an underpass at least its top
     pitAt(x, z) { const F = fineAt(x, z); return F ? pitIn(F, x, z) : null; }, // the floor of a ramp here, or null
     inPit(x, z, m = 0) { for (const p of PITS) { if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) continue; if (inPoly(x, z, p.imp)) return p; if (m > 0) for (let k = 0; k < p.imp.length; k++) { const a = p.imp[k], b = p.imp[(k + 1) % p.imp.length]; if (segDist(x, z, a[0], a[1], b[0], b[1]) < m) return p; } } return null; }, // within m of a ramp: no tree, car or bench there
     fine: t => !!FT[t], tile: t => FT[t], has: t => STEP[t] > 0,
@@ -445,7 +480,8 @@ const H = (() => {
     addStep(kind, h, o, k) { if (o.length < 3) return; const s = { kind, h, o, k: k || [], bb: bbox(o) }; STG.add(s.bb[0], s.bb[1], s.bb[2], s.bb[3], s); },
     surface(x, z, cy) {
       const F = fineAt(x, z); if (!F) return H.oldSurface(x, z, cy);
-      const pf = pitIn(F, x, z); if (pf !== null) return pf; // down a ramp: its floor
+      const pf = pitIn(F, x, z); if (pf !== null) { if (cy === undefined) return pf; let yp = pf; for (const o of deckAt(x, z)) if (o.top > yp && o.top <= cy + 0.8) yp = o.top; return yp; } // down a ramp: its floor, or a deck over it
+      if (cy !== undefined && GALL.length) { const u = gallAt(x, z); if (u && cy < u.soff) return u.floor; } // in the covered part of an underpass
       const sh = step(x, z); let y = onF(F, x, z) + (sh || bumpAt(x, z)); // the step layer: the sidewalks, platforms and medians as drawn
       if (!sh && RAILT[F.t]) { const ry = railTop(x, z); if (ry !== null) y = ry; } // the ballast of a track: on its profile
       if (cy === undefined) return y;
@@ -460,7 +496,8 @@ const H = (() => {
       const [x, z] = N[i], F = fineAt(x, z), y0 = NHt[i];
       if (!F) return y0 === null ? oldG(x, z) : oldDeck(i, y0);
       const d = nodeDeck(i); if (d !== null) return d;
-      return y0 === null ? onF(F, x, z) : onDeck(F, x, z, y0);
+      if (GALL.length && nodeSotto(i)) { const u = gallAt(x, z); if (u) return u.floor; }
+      return y0 === null ? onG(F, x, z) : onDeck(F, x, z, y0);
     },
     nodeDeck: i => nodeDeck(i),
     kind(x, z) {

@@ -128,7 +128,7 @@ function parkCheck(T) {
 }
 function parkTile(T) {
   T.parked = []; srndT = 77 + T.seme * 131;
-  const add = (m, x, z, h, src) => { if (H.inPit(x, z, 1.5)) return false; const y = H.surface(x, z); if (!carFree(MODELS[m], x, z, h, y)) return false; const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.src = src; v.y = y; v.sync(); T.parked.push(v); return true; };
+  const add = (m, x, z, h, src) => { if (H.inPit(x, z, 1.5) || [0, 2.5, -2.5].some(d => H.gallAt(x + Math.sin(h) * d, z + Math.cos(h) * d))) return false; /* (nor in the covered part of an underpass: H.surface there is the ground over it, the car came out of the front wall, Carlo 3/11) */ const y = H.surface(x, z); if (!carFree(MODELS[m], x, z, h, y)) return false; const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.src = src; v.y = y; v.sync(); T.parked.push(v); return true; };
   // car parks with painted stalls: about half of them taken, a car in each and never in the yellow one; lots without stalls keep a few loose cars
   let inStalls = 0;
   for (const st of T.stalls || []) {
@@ -686,7 +686,7 @@ function camEase(dt, hb, k, minW, tau) { /* angular speed proportional to the er
 function updCamera(dt) {""")
 # up and down: on foot the camera orbits on a sphere round his chest; in the car the chase height changes (R3 behind stays)
 rep("want = new THREE.Vector3(cx, Math.max(gy, groundH(cx, cz)) + ht + lift, cz);",
-    "want = new THREE.Vector3(cx, Math.max(gy, H.ground(cx, cz)) + Math.max(0.6, ht + lift + (inCar ? camPitch * 6 : 0)), cz);")
+    "want = new THREE.Vector3(cx, H.camCap(cx, cz, gy, Math.max(gy, H.camG(cx, cz, gy)) + Math.max(0.6, ht + lift + (inCar ? camPitch * 6 : 0))), cz);")
 rep("const two = inCar && isTwo(P.car), dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2; let ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;",
     "const two = inCar && isTwo(P.car); let dist = inCar ? (two ? 6 : 8.8) + sp * 0.06 : 5.2, ht = inCar ? (two ? 2.7 : 3.6) + sp * 0.025 : 2.5;\n"
     "    if (!inCar && camPitch) { const ph_ = Math.atan2(1, 5.2) + camPitch; dist = 5.3 * Math.cos(ph_); ht = 1.5 + 5.3 * Math.sin(ph_); } /* sphere of radius 5.3 round his chest: camPitch 0 is the old view */")
@@ -776,7 +776,7 @@ rep("else { pm.inner.rotation.x = 0; pm.inner.position.y = 0; animPed(pm, P.phas
 rep("    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false;\n", "    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y);\n")
 rep("if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex;", "if (s.r || s.dyn || s.y0 > cy || s.off || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex;")
 rep("    const f = rayCam(px, pz, cx, cz, wy);", "    if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */\n    const f = rayCam(px, pz, cx, cz, wy);")
-rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = Math.max(fy, H.ground(cx, cz)) + ht;")
+rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = H.camCap(cx, cz, fy, Math.max(fy, H.camG(cx, cz, fy)) + ht);")
 rep("  camera.position.copy(camPos);\n  if (shake > 0)", "  if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */\n  camera.position.copy(camPos);\n  if (shake > 0)")
 rep("window.__G = { VIVI,", "window.__G = { FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
 # ---- a car off its wheels (Carlo, 1/11): fisica3.js. It steps with no grip, it turns round its waist, on its roof it is finished, he always gets out in a free place
