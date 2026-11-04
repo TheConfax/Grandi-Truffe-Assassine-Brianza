@@ -490,7 +490,9 @@ rep("CC BY 4.0.</p>", "CC BY 4.0. Edifici aggiuntivi e altezze: <a href=\"https:
 # ---- debug mode (code DEBUG in the pause menu, or ?debug in the URL): bug reports, coordinates HUD, export
 rep("async function reportSpot() {", """let DEBUG = false; try { const q = new URLSearchParams(location.search); if (q.has('debug')) localStorage.setItem('gtaDebug', q.get('debug') === '0' ? '0' : '1'); DEBUG = localStorage.getItem('gtaDebug') === '1'; } catch (e) { }
 function spotsLocal() { try { return JSON.parse(localStorage.getItem('gtaSpots') || '[]'); } catch (e) { return []; } }
-function setDebug(on) { DEBUG = on; try { localStorage.setItem('gtaDebug', on ? '1' : '0'); } catch (e) { } document.body.classList.toggle('debug', on); updDbgMenu(); toast(on ? '🛠 Modalità debug attiva' : '🛠 Modalità debug spenta'); }
+function setDebug(on) { DEBUG = on; try { localStorage.setItem('gtaDebug', on ? '1' : '0'); } catch (e) { } document.body.classList.toggle('debug', on); if (on) { W.offPrima = W.off; setPolizia(true, false); } else setPolizia(W.offPrima, false); updDbgMenu(); toast(on ? '🛠 Modalità debug attiva' : '🛠 Modalità debug spenta'); }
+function setPolizia(off, msg) { W.off = off; if (off) { W.heat = 0; W.stars = 0; W.unseen = 0; W.bustT = 0; } if (msg) toast(off ? '🚓 Polizia spenta' : '🚓 Polizia accesa'); }
+if (DEBUG) { W.offPrima = false; setPolizia(true, false); }
 function updDbgMenu() { const b = document.getElementById('dbgdl'); if (b) b.textContent = '⬇ Scarica segnalazioni (' + spotsLocal().length + ')'; }
 function exportSpots() {
   const a = spotsLocal(); if (!a.length) { toast('Nessuna segnalazione salvata'); return; }
@@ -628,7 +630,7 @@ rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
 rep("v -= 21 * dt * i.brk;", "v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
 rep("updGlow();", "updGlow(); updSkyFx(running && !paused ? dt : 0);")
-rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true) };")
+rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true) };")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')

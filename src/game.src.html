@@ -1179,9 +1179,10 @@ function spawnParked() {
 
 // ---------------------------------------------------------------- wanted level & police
 const HEAT_T = [0, 0.5, 2, 4, 7, 11];
-const W = { heat: 0, stars: 0, unseen: 0, seen: false, field: null, fieldT: 0, busted: 0 };
+const W = { heat: 0, stars: 0, unseen: 0, seen: false, field: null, fieldT: 0, busted: 0, off: false, offPrima: false };
 const starsOf = h => { let s = 0; for (let i = 1; i < HEAT_T.length; i++) if (h >= HEAT_T[i]) s = i; return s; };
 function crime(amount, msg) {
+  if (W.off) return; /* codice POLIZIA: polizia spenta, nessun reato conta */
   // after a crime the radio knows where you are: a negative clock gives the volanti time to arrive before the stars can fade
   const before = W.stars; W.heat = Math.min(16, W.heat + amount); W.stars = starsOf(W.heat); W.unseen = Math.min(W.unseen, -(10 + W.stars * 2));
   if (W.stars > before) { sfxBlip(520, 880, 0.3); if (msg) toast(msg); }
