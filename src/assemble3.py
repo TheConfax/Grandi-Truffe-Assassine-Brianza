@@ -128,7 +128,7 @@ function parkCheck(T) {
 }
 function parkTile(T) {
   T.parked = []; srndT = 77 + T.seme * 131;
-  const add = (m, x, z, h, src) => { if (H.inPit(x, z, 1.5)) return false; const y = H.surface(x, z); if (!carFree(MODELS[m], x, z, h, y)) return false; const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.src = src; v.y = y; v.sync(); T.parked.push(v); return true; };
+  const add = (m, x, z, h, src) => { if (H.inPit(x, z, 1.5) || [0, 2.5, -2.5].some(d => H.gallAt(x + Math.sin(h) * d, z + Math.cos(h) * d))) return false; /* (nor in the covered part of an underpass: H.surface there is the ground over it, the car came out of the front wall, Carlo 3/11) */ const y = H.surface(x, z); if (!carFree(MODELS[m], x, z, h, y)) return false; const v = new Vehicle(m, colorFor(m, tRnd), x, z, h); v.parkedTile = T; v.src = src; v.y = y; v.sync(); T.parked.push(v); return true; };
   // car parks with painted stalls: about half of them taken, a car in each and never in the yellow one; lots without stalls keep a few loose cars
   let inStalls = 0;
   for (const st of T.stalls || []) {

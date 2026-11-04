@@ -43,6 +43,8 @@ GALLER_M = 1.0     # m: oltre il bordo della GALLER il coperto va ancora tanto, 
 BOCCA_M = 7.0      # m: attorno all'asse di un sottopasso S non si alza fuori dalla GALLER (galleria_piena)
 PIENA_M = 1.5      # m: S sopra una galleria stradale e alla quota della strada di sopra fin tanto oltre la GALLER (galleria_piena)
 SOPRA_MIN = 0.7    # m: un vertice di un'area piu di tanto sopra il livello della strada sotto e del livello di sopra
+FONDO_K = 21       # colonne del fondo da parete a parete (il gioco lo disegna a strisce fra loro: altezze3.js pitDentro)
+RACC_BOCCA = 6.0   # m: dentro la bocca il profilo di traverso della strada di fuori torna al fondo in tanto
 
 
 def assi_dbgt(D):
@@ -202,6 +204,7 @@ def _pedonale(w, osm, gall, quota):
     def cima(tq, yq):
         ts = ndimage.gaussian_filter1d(tq, 3.0, mode='nearest'); par = np.minimum(PARAPETTO, np.maximum(0.0, ts - yq)); t = np.maximum(ts + par, tq + np.minimum(par, 0.3))
         return ndimage.gaussian_filter1d(t, 1.0, mode='nearest')
+    # (not the floor in columns: its heads are the bottom of the holes of the stairs, the ground beyond them is the stairs going up)
     return dict(C=C, y=y, yl=y.copy(), yr=y.copy(), Lft=Lft, Rgt=Rgt, N=Nn, tp=tp, hl=hl, hr=hr, cop=cop, gal=gal, soff=soff, csx=cima(tl, y), cdx=cima(tr, y), fonte='GALLER pedonale',
                 prof=float((tp - y).max()), lung=float(n - 1) * PASSO, pedonale=True)
 
@@ -357,10 +360,29 @@ def _stazioni(cat, assi, gr, gall, quota, D):
             gal[idx[0]:idx[-1] + 1] = True; cop[idx[0]:idx[-1] + 1] = True
             if idx[-1] + 1 < n: cop[idx[-1] + 1] = True     # (il tratto arriva alla stazione di confine)
         else: soff = None
+    # The floor across is FONDO_K columns, not a straight line from wall to wall (Carlo 3/11-4/11, via Montecassino x 680 z 2112 and x 830 z 2142: a step of
+    # 0.44 m across the road at both heads). The street beyond a head is not flat across (its camber, the kerb side 0.3-0.5 m higher than the middle): a floor
+    # end straight across, at the middle's height, stood under its high side. Each column takes the street just past the head on its own line, and the
+    # difference from the floor's middle fades into the trench over RACC_BOCCA: the road goes down into the underpass as a real road does, with no step
+    yc = _fondo_colonne(C, Lft, Rgt, yl, gal, quota); yl, yr = yc[:, 0].copy(), yc[:, -1].copy()
     def cima(tq, yq):   # la riga del parapetto: una linea continua sopra il suolo liscio, mai sotto il suolo vero
         ts = ndimage.gaussian_filter1d(tq, 3.0, mode='nearest'); par = np.minimum(PARAPETTO, np.maximum(0.0, ts - yq)); t = np.maximum(ts + par, tq + np.minimum(par, 0.3))
         return ndimage.gaussian_filter1d(t, 1.0, mode='nearest')
-    return dict(C=C, y=y, yl=yl, yr=yr, Lft=Lft, Rgt=Rgt, N=Nn, tp=tp, hl=hl, hr=hr, cop=cop, gal=gal, soff=soff, csx=cima(tl, yl), cdx=cima(tr, yr), fonte=fonte, prof=float((tp - y).max()), lung=float(n - 1) * PASSO)
+    return dict(C=C, y=y, yl=yl, yr=yr, yc=yc, Lft=Lft, Rgt=Rgt, N=Nn, tp=tp, hl=hl, hr=hr, cop=cop, gal=gal, soff=soff, csx=cima(tl, yl), cdx=cima(tr, yr), fonte=fonte, prof=float((tp - y).max()), lung=float(n - 1) * PASSO)
+
+
+def _fondo_colonne(C, Lft, Rgt, yl, gal, quota):
+    """il fondo in FONDO_K colonne da parete a parete: a ogni capo aperto ogni colonna prende la strada appena oltre sulla sua linea, e lo scarto dal fondo
+    torna a zero dentro la bocca in RACC_BOCCA (prima del coperto: il fondo di una galleria e dritto di traverso)"""
+    n = len(C); T_ = np.gradient(C, axis=0); T_ /= np.maximum(np.hypot(*T_.T), 1e-9)[:, None]
+    u_ = np.linspace(0.0, 1.0, FONDO_K); Pc = Lft[:, None, :] * (1 - u_)[None, :, None] + Rgt[:, None, :] * u_[None, :, None]
+    yc = np.repeat(np.asarray(yl, float)[:, None], FONDO_K, 1); dist = np.arange(n) * PASSO
+    gi = np.nonzero(gal)[0]; r0_ = min(RACC_BOCCA, gi[0] * PASSO) if len(gi) else RACC_BOCCA; r1_ = min(RACC_BOCCA, (n - 1 - gi[-1]) * PASSO) if len(gi) else RACC_BOCCA
+    for k0, sg, r_, d_ in ((0, -1, r0_, dist), (n - 1, 1, r1_, dist[::-1])):
+        if r_ < PASSO: continue
+        w_ = np.clip(1 - d_ / r_, 0, 1); prof = np.array([float(quota(*(Pc[k0, j] + sg * T_[k0] * 0.3))) for j in range(FONDO_K)])
+        if np.isfinite(prof).all(): yc += w_[:, None] * (prof - yl[k0])[None, :]
+    return yc
 
 
 def _su_catena(a_, catg):
@@ -429,6 +451,10 @@ def fosse_gioco(sotto, nodo=lambda x, z: None):
                 e.update(tipo='galleria', soffitto=[round(float(s['soff']), 3)] * (b - a + 1), celle={}, anello=[])
             else:
                 ce, an = celle_anello(_sagoma(s, a, b)); e.update(tipo='rampa', celle=ce, anello=an, porta_h=0)
+                yc = s.get('yc')
+                if yc is not None:   # the floor in columns across (altezze3.js pitDentro), where it is not straight from wall to wall
+                    yc = np.asarray(yc)[a:b + 1]; lin = yc[:, :1] + (yc[:, -1:] - yc[:, :1]) * np.linspace(0, 1, yc.shape[1])[None, :]
+                    if np.abs(yc - lin).max() > 0.01: e['yc'] = [[round(float(v), 3) for v in row] for row in yc]
                 te = [cop[k] and ((k > a and cop[k - 1]) or (k < b and cop[k + 1])) for k in range(a, b + 1)]
                 if any(te): e['tetto'] = [round(float(s['soff']), 3) if v else None for v in te]
             out.append(e)
@@ -437,12 +463,13 @@ def fosse_gioco(sotto, nodo=lambda x, z: None):
 
 def corsie_opere(sotto, raw_roads, nodes, log=lambda *a: None):
     """dopo corsie_ia: dentro l'opera le corsie stanno a meta fra l'asse e la parete, e la rete non si taglia; il nodo appena fuori non le manda contro la parete"""
-    tot = tolti = 0
+    tot = tolti = nsotto = 0
     for s in sotto:
         foot = _sagoma(s, 0, len(s['C']) - 1); bordo = foot.exterior; shapely.prepare(foot)
         lat = lambda p, u: min((np.hypot(*(np.asarray(q) - p)) for q in _tagli(LineString([p, p + u * 30]), bordo)), default=0.0)
         pareti = [LineString(L_[d_ >= 0.25]) for L_, d_ in ((s['Lft'], s['csx'] - s['yl']), (s['Rgt'], s['cdx'] - s['yr'])) if (d_ >= 0.25).sum() >= 2]
         libera = lambda a_, b_: not any(LineString([a_, b_]).intersects(w_) for w_ in pareti)
+        cop_ = [_sagoma(s, a_, b_) for g_, a_, b_ in tratti(s) if g_ and b_ > a_]   # the covered part
         for r in raw_roads:
             g = r.get('refs') or []
             if r.get('c', 9) > 3 or len(g) < 2 or r.get('deck') or r.get('x') or r.get('bridge'): continue     # (chi passa sopra l'opera non e nell'opera)
@@ -451,6 +478,10 @@ def corsie_opere(sotto, raw_roads, nodes, log=lambda *a: None):
                 dd = xy[-1] - xy[0]; j_ = int(np.argmin(np.hypot(*(s['C'] - xy[len(xy) // 2]).T))); t_ = s['C'][min(j_ + 2, len(s['C']) - 1)] - s['C'][max(j_ - 2, 0)]
                 if abs(dd @ t_) < 0.7 * max(np.hypot(*dd) * np.hypot(*t_), 1e-9): continue
             if not any(den): continue
+            # a road that runs in the covered part is under it even where OSM does not say tunnel (the underpass of the Milano-Meda, x -768 z 104): its nodes
+            # there stand on the floor of the gallery (altezze3.js H.node), not on the ground over it. A car born on them came out of the front wall at the
+            # height of the bank (Carlo 3/11, x -769 z 119)
+            if any(c_.contains(Point(q)) for c_ in cop_ for q in xy): r['under'] = True; nsotto += 1
             l0 = 0.0 if r.get('o') else min(r['w'] * 0.24, r['mh'] * 0.5)
             F = list(r.get('lf') or [int(round(l0 * 100))] * len(g)); B = (list(r.get('lb') or [int(round(l0 * 100))] * len(g))) if not r.get('o') else None
             Rg = []
@@ -476,7 +507,7 @@ def corsie_opere(sotto, raw_roads, nodes, log=lambda *a: None):
                 nn = [k for k in r['nt'] if not (den[k] or den[k - 1] or foot.contains(Point((xy[k] + xy[k - 1]) / 2)))]; tolti += len(r['nt']) - len(nn)
                 if nn: r['nt'] = nn
                 else: r.pop('nt')
-    log('corsie nelle opere: %d nodi, %d tratti rimessi nella rete del traffico' % (tot, tolti))
+    log('corsie nelle opere: %d nodi, %d tratti rimessi nella rete del traffico, %d vie sotto il coperto' % (tot, tolti, nsotto))
 
 
 def _tagli(linea, bordo):
@@ -830,6 +861,16 @@ def scale(osm, quota, sotto, log=lambda *a: None, sup=None):
             y = za + (zb - za) * st / st[-1]
             T = np.gradient(C, axis=0); T /= np.maximum(np.hypot(*T.T), 1e-9)[:, None]; N = np.column_stack((-T[:, 1], T[:, 0]))
             Lft, Rgt = C + N * mz[0], C - N * mz[1]
+            # an end on the open end of a work is that end: the same two corners. The stairs of the station (x 325 z -501) ended 0.7 m to the side of the
+            # underpass and 0.2 m short of it: a sliver with no floor and no wall between the two, the plane under the world seen through it (Carlo 3/11)
+            for e in (0, -1):
+                for f, s_ in feet:
+                    if f.distance(Point(C[e])) > 1.5: continue
+                    ns_ = len(s_['C']); k = int(np.argmin(np.hypot(*(s_['C'] - C[e]).T)))
+                    if k not in (0, ns_ - 1): continue
+                    A_, B_ = np.asarray(s_['Lft'][k], float), np.asarray(s_['Rgt'][k], float)
+                    if np.hypot(*(A_ - Lft[e])) + np.hypot(*(B_ - Rgt[e])) > np.hypot(*(B_ - Lft[e])) + np.hypot(*(A_ - Rgt[e])): A_, B_ = B_, A_
+                    Lft[e], Rgt[e] = A_, B_; break
             tl, tr = np.array([float(quota(*v)) for v in Lft]), np.array([float(quota(*v)) for v in Rgt])
             if sup is not None: tl, tr = np.maximum(tl, za), np.maximum(tr, za)   # (the ground beside it is the street, the hole filled)
             if max((tl - y).max(), (tr - y).max()) < SCALA_INFOSSATA: rep['a_raso'] += 1; continue
@@ -1063,3 +1104,21 @@ def galleria_piena(sup, S):
         idx = ndimage.distance_transform_edt(~strada, return_distances=False, return_indices=True); vs = W[idx[0], idx[1]]
         su = zona & ~strada & (W < vs - 0.05); W[su] = vs[su]; sup.OPERA[r0:r1, c0:c1] |= zona; tot += int(su.sum())
     sup.log('gallerie stradali piene fino al bordo della GALLER: %d nodi alzati alla strada di sopra' % tot)
+
+
+def bocche_coperte(sotto, sup, log=lambda *a: None):
+    """dopo trova(), prima di scrivere le tessere: dentro l'impronta del coperto S non resta mai sotto il soffitto. Dove scendeva (la scarpata obliqua della
+    Milano-Meda davanti alla bocca sud, x -772 z 116, Carlo 3/11) sale alla quota del suolo sopra il coperto. (Il pezzo delle celle prese dalla trincea che sta
+    sopra il coperto lo alza il gioco: altezze3.js sopraCoperto)"""
+    HQ = sup.HQ; R = sup.R; ns = 0
+    for s in sotto:
+        soff = s.get('soff'); gal = np.asarray(s['gal'])
+        if soff is None or not gal.any(): continue
+        top = int(round((soff + SP_OPERA) * 100))
+        for g, a, b in tratti(s):
+            if not g: continue
+            imp = _sagoma(s, a, b, 0.5); w = R.win(imp.bounds, 0)
+            if w is None: continue
+            X, Z = R.xz(w); m = shapely.contains_xy(imp, X, Z); H_ = HQ[w[0]:w[1], w[2]:w[3]]; k = m & (H_ < int(round((soff + 0.3) * 100)))
+            H_[k] = top; ns += int(k.sum())
+    log('bocche coperte: %d nodi di S sopra il coperto alzati sopra il soffitto' % ns)

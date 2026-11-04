@@ -377,15 +377,17 @@ const H = (() => {
       GRID_REC = rec0; return o;
     }
     if (q.tipo !== 'rampa') { PIT_ORD.set(q.ord, o = { refs: 1, vuota: true }); return o; }
-    const n = q.sx.length, tri = new Float64Array((n - 1) * 18), imp = q.sx.map(v => [v[0], v[1]]).concat(q.dx.slice().reverse().map(v => [v[0], v[1]])); // the strip between the two sides, as src/sottoterra.py
-    for (let k = 0, i = 0; k < n - 1; k++) for (const t of [[q.sx[k], q.sx[k + 1], q.dx[k + 1]], [q.sx[k], q.dx[k + 1], q.dx[k]]]) for (const v of t) { tri[i++] = v[0]; tri[i++] = v[1]; tri[i++] = v[2] - B0; }
+    // the strip between the two sides, as src/sottoterra.py; an underpass whose floor is not straight across (q.yc, src/opere.py: at its heads it takes the street beyond on each of its columns) in strips between its columns
+    const n = q.sx.length, KC = q.yc ? q.yc[0].length : 2, tri = new Float64Array((n - 1) * (KC - 1) * 18), imp = q.sx.map(v => [v[0], v[1]]).concat(q.dx.slice().reverse().map(v => [v[0], v[1]]));
+    const colP = (k, j) => { const a = q.sx[k], b = q.dx[k], f = j / (KC - 1); return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, q.yc ? q.yc[k][j] : a[2] + (b[2] - a[2]) * f]; };
+    for (let k = 0, i = 0; k < n - 1; k++) for (let j = 0; j < KC - 1; j++) for (const t of [[colP(k, j), colP(k + 1, j), colP(k + 1, j + 1)], [colP(k, j), colP(k + 1, j + 1), colP(k, j + 1)]]) for (const v of t) { tri[i++] = v[0]; tri[i++] = v[1]; tri[i++] = v[2] - B0; }
     o = { id: q.ord, ord: q.ord, refs: 1, reg: [], src: q, tri, imp, sx: q.sx.map(([x, z, y]) => [x, z, y - B0]), dx: q.dx.map(([x, z, y]) => [x, z, y - B0]), anello: q.anello, porta_h: q.porta_h || 2.4, c: q.c, bb: [Math.min(...imp.map(v => v[0])), Math.min(...imp.map(v => v[1])), Math.max(...imp.map(v => v[0])), Math.max(...imp.map(v => v[1]))] };
     PITS.push(o); PIT_ORD.set(q.ord, o);
     const rec0 = GRID_REC; GRID_REC = o.reg;
     for (let i = 0; i < tri.length; i += 9) PG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i });
     if (q.tetto) { // the part of an underpass that takes the cells of S and is covered: its ceiling, as gallAt reads it
       o.sof = new Float64Array(tri.length / 3); TETTI++; o.tetti = true;
-      for (let k = 0, j = 0; k < n - 1; k++) for (const t of [[k, k + 1, k + 1], [k, k + 1, k]]) { const i = j * 3; if (q.tetto[k] !== null && q.tetto[k + 1] !== null) { for (let w = 0; w < 3; w++) o.sof[j + w] = q.tetto[t[w]] - B0; UG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i }); } j += 3; }
+      for (let k = 0, j = 0; k < n - 1; k++) for (let c = 0; c < KC - 1; c++) for (const t of [[k, k + 1, k + 1], [k, k + 1, k]]) { const i = j * 3; if (q.tetto[k] !== null && q.tetto[k + 1] !== null) { for (let w = 0; w < 3; w++) o.sof[j + w] = q.tetto[t[w]] - B0; UG.add(Math.min(tri[i], tri[i + 3], tri[i + 6]), Math.min(tri[i + 1], tri[i + 4], tri[i + 7]), Math.max(tri[i], tri[i + 3], tri[i + 6]), Math.max(tri[i + 1], tri[i + 4], tri[i + 7]), { p: o, i }); } j += 3; }
     }
     GRID_REC = rec0;
     for (const k in q.celle) { let l = PCELL.get(k); if (!l) PCELL.set(k, l = []); for (const w of q.celle[k]) l.push(w); }
@@ -408,7 +410,13 @@ const H = (() => {
     return y;
   }
   const pitIn = (F, x, z) => { if (!F.pc) return null; const c = F.n - 1, i = clamp(Math.floor((x - F.x0) / F.st), 0, c - 1), j = clamp(Math.floor((z - F.z0) / F.st), 0, c - 1); return F.pc[j * c + i] ? pitY(x, z) : null; };
-  const onG = (F, x, z) => { const p = pitIn(F, x, z); return p !== null ? p : onF(F, x, z); }; // S, or the floor of a ramp
+  // the ground over the cover of an underpass in the cells its open trench takes (src/opere.py): a cell of S is 2 m and the front of the cover crosses it, so its
+  // nodes in the trench are at the road under it and S over the cover, read in that cell, went down from the bank to the floor under the ceiling: a slanted sheet
+  // in the mouth (Carlo 3/11, the south mouth of the Milano-Meda x -769 z 118; the grey sheets over the station stairs x 325 z -500). Over the cover the ground
+  // is at least the top of the work (src/opere.py SP_OPERA over its ceiling)
+  const OP_CIMA = 1.25;
+  const sopraCoperto = (F, x, z, y) => { if (!F.pc || !GALL.length) return y; const c = F.n - 1, i = clamp(Math.floor((x - F.x0) / F.st), 0, c - 1), j = clamp(Math.floor((z - F.z0) / F.st), 0, c - 1); if (!F.pc[j * c + i]) return y; const u = gallAt(x, z); return u ? Math.max(y, u.soff + OP_CIMA) : y; };
+  const onG = (F, x, z) => { const p = pitIn(F, x, z); return p !== null ? p : sopraCoperto(F, x, z, onF(F, x, z)); }; // S, or the floor of a ramp
   // the step of the old engine (tiles without .bin): the sidewalks and platforms the tile draws raised; world3.js fills them in later
   const oldStep = (x, z) => { if (!H.gradini) return 0; try { return onSide(x, z) ? SIDE_H : onPlatform(x, z) ? PLAT_H : 0; } catch (e) { return 0; } }; // (before world3.js has its grids: 0)
   // water level (docs/motore.md 1.3): zw along the DBGT river axes, every 2 m; elsewhere the lowest S across an OSM river + 0.3
@@ -447,6 +455,7 @@ const H = (() => {
     camG(x, z, y) { const u = gallAt(x, z); return u && y < u.soff ? u.floor : H.ground(x, z); }, // the ground under the camera of someone at height y
     camCap(x, z, gy, y) { const u = gallAt(x, z); return u && gy < u.soff ? Math.min(y, u.soff - 0.35) : y; }, // ... and the ceiling
     baseS(x, z) { const F = fineAt(x, z); return F ? onF(F, x, z) : oldG(x, z); }, // S alone, without the ramps (their walls stand on it)
+    anello(x, z) { const F = fineAt(x, z); return F ? sopraCoperto(F, x, z, onF(F, x, z)) : oldG(x, z); }, // the ground round a ramp, in the cells it takes: S, over the cover of an underpass at least its top
     pitAt(x, z) { const F = fineAt(x, z); return F ? pitIn(F, x, z) : null; }, // the floor of a ramp here, or null
     inPit(x, z, m = 0) { for (const p of PITS) { if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) continue; if (inPoly(x, z, p.imp)) return p; if (m > 0) for (let k = 0; k < p.imp.length; k++) { const a = p.imp[k], b = p.imp[(k + 1) % p.imp.length]; if (segDist(x, z, a[0], a[1], b[0], b[1]) < m) return p; } } return null; }, // within m of a ramp: no tree, car or bench there
     fine: t => !!FT[t], tile: t => FT[t], has: t => STEP[t] > 0,

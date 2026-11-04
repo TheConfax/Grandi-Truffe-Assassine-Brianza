@@ -2570,13 +2570,13 @@
 },
 "spostamento": {
 "dente_m": {
-"n": 417237,
+"n": 417239,
 "p50": 0.09,
 "p90": 0.28,
 "p99": 1.02,
-"max": 2.44
+"max": 6.36
 },
-"dente_su_m": 2.44,
+"dente_su_m": 6.36,
 "dente_giu_m": -1.5,
 "buche_m": {
 "n": 109167,
@@ -2585,14 +2585,14 @@
 "p99": 2.79,
 "max": 6.0
 },
-"nodi_mossi": 526404,
+"nodi_mossi": 526406,
 "nodi_griglia": 7880626,
 "limite_dente_m": 1.5
 },
 "invariati": {
-"nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 1,
+"nodi_nella_fascia_protetta_cambiati_fuori_dai_pozzetti": 3,
 "nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 20,
-"carreggiate_cambiate": 5,
+"carreggiate_cambiate": 7,
 "carreggiate_ai_passaggi_a_livello": 565,
 "bordo_carreggiate_alle_recinzioni": 149,
 "carreggiate_nei_pozzetti_riempiti": 284,
@@ -2606,10 +2606,45 @@
 },
 "gradini_cresciuti": {
 "definizione": "coppie di nodi vicini (anche in diagonale), fuori dagli edifici e dalle buche riempite, con il salto cresciuto oltre la soglia",
-"oltre_0.3m": 13075,
-"oltre_0.5m": 2218,
-"oltre_1.0m": 104,
+"oltre_0.3m": 13082,
+"oltre_0.5m": 2225,
+"oltre_1.0m": 111,
 "peggiori": [
+{
+"x": -772.8,
+"z": 117.6,
+"cresce": 6.36
+},
+{
+"x": -770.8,
+"z": 117.6,
+"cresce": 6.36
+},
+{
+"x": -772.8,
+"z": 117.6,
+"cresce": 6.36
+},
+{
+"x": -770.8,
+"z": 117.6,
+"cresce": 6.36
+},
+{
+"x": -774.8,
+"z": 117.6,
+"cresce": 6.36
+},
+{
+"x": -772.8,
+"z": 117.6,
+"cresce": 6.36
+},
+{
+"x": -774.8,
+"z": 117.6,
+"cresce": 2.74
+},
 {
 "x": 41.2,
 "z": -818.4,
@@ -2724,41 +2759,6 @@
 "x": -988.8,
 "z": 85.6,
 "cresce": 1.5
-},
-{
-"x": -988.8,
-"z": 87.6,
-"cresce": 1.5
-},
-{
-"x": -1598.8,
-"z": 1623.6,
-"cresce": 1.48
-},
-{
-"x": 47.2,
-"z": -820.4,
-"cresce": 1.46
-},
-{
-"x": 41.2,
-"z": -824.4,
-"cresce": 1.44
-},
-{
-"x": -986.8,
-"z": 83.6,
-"cresce": 1.42
-},
-{
-"x": 49.2,
-"z": -820.4,
-"cresce": 1.38
-},
-{
-"x": 47.2,
-"z": -818.4,
-"cresce": 1.33
 }
 ]
 },
@@ -4333,7 +4333,7 @@
 ],
 "nota": "contate, non corrette"
 },
-"oggetti_protetti_cambiati": 0,
+"oggetti_protetti_cambiati": 2,
 "ok": false
 }
 }

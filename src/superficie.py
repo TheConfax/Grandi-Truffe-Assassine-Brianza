@@ -1575,6 +1575,7 @@ def main(argv=None):
     _G = s.HQ / 100.0; _q = lambda x, z: float(tri_interp(_G, s.R, np.atleast_1d(float(x)), np.atleast_1d(float(z)))[0])
     _ov = _im.osm_vie(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_vie.pkl'))
     _sp, _sc = opere.trova(s.D, _q, _ov, log); _scl, _scr = opere.scale(_ov, _q, _sp, log, s)   # (and the stairs of OSM dug into the ground)
+    opere.bocche_coperte(_sp, s, log)   # (the ground over the cover reaches its front: the cells the trench takes in front of it)
     json.dump(dict(fosse=opere.fosse_gioco(_sp) + opere.fosse_scale(_scl, len(_sp)), scartati=_sc, cavalcavia=opere.rapporto(s), scale=_scr), open(os.path.join(a.out, 'opere.json'), 'w', encoding='utf-8'), ensure_ascii=False, default=float)
     # the same steps as costruisci() with its defaults: impalcati.py, run after this in the same process (terreno_gioco.py --rigenera), takes
     # this surface instead of computing it all again (it was half the time of the terrain)

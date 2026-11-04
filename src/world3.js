@@ -698,22 +698,32 @@ const AO_WALL = s => { // chained after the lit windows' patch of extras.js, in 
 const AO_GROUND_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
 AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n float fogF = smoothstep( fogNear, fogFar, fogDepth );\n gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 1.0 ), fogF );\n#endif'); }; // fades to nothing in the haze
 const AO_K = [[0, 0.2], [0.45, 0.5], [1.6, 1]]; // distance from the wall, shade (linear: multiplied on the screen, 0.2 darkens by half)
+// no shade over a pit (a ramp, an underpass, the stairs of the station): a triangle of the strip with a corner in it went down to its floor, one that crossed it
+// stood over the hole at the street's level. The dark bands across the floor and the walls of the station stairs, and the grey sheets over the hole (Carlo 3/11)
+function aoTri(b, i, j, k) {
+  const P = b.p, X = [P[i * 3], P[j * 3], P[k * 3]], Z = [P[i * 3 + 2], P[j * 3 + 2], P[k * 3 + 2]];
+  for (const [u, v, w] of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1 / 3, 1 / 3, 1 / 3], [0.5, 0.5, 0], [0, 0.5, 0.5], [0.5, 0, 0.5]]) if (H.inPit(u * X[0] + v * X[1] + w * X[2], u * Z[0] + v * Z[1] + w * Z[2], 0.3)) return;
+  triUp(b, i, j, k);
+}
 function aoGround(b, ring, E, i, innerA) {
   const nr = ring.length, a = ring[i], [dx, dz, L, nx, nz] = E[i]; if (L < 0.05) return;
   const put = (x, z, k) => { let y; if (H.fineAt(x, z)) y = H.base(x, z) + H.step(x, z) + 0.06; else { const s = H.surface(x, z); y = (onSide(x, z) ? s : Math.min(s, terrDrawnH(x, z))) + 0.03; } vtx(b, x, y, z, 0, 1, 0, 0, 0, _aoC.setScalar(H.inPit(x, z, 0.3) ? 1 : k)); }; /* over a pit no shade: the strip stands at the level of the street over the hole, and its dark patches lay across the walls of the stairs of the station (Carlo 3/11) */ // in a tile of S the ground writes its depth: the strip (a shade, not cut on the cells: it would cost seven times the triangles) stands 6 cm over S
   const n = Math.max(1, Math.ceil(L / 5)), w = AO_K.length;
   for (let s = 0; s <= n; s++) { const f = s / n, x = a[0] + dx * f, z = a[1] + dz * f; for (const [d, k] of AO_K) put(x + nx * (d + 0.02), z + nz * (d + 0.02), k); }
   const b0 = b.p.length / 3 - (n + 1) * w;
-  for (let s = 0; s < n; s++) for (let r = 0; r < w - 1; r++) { const q = b0 + s * w + r; triUp(b, q, q + w, q + w + 1); triUp(b, q, q + w + 1, q + 1); }
+  for (let s = 0; s < n; s++) for (let r = 0; r < w - 1; r++) { const q = b0 + s * w + r; aoTri(b, q, q + w, q + w + 1); aoTri(b, q, q + w + 1, q + 1); }
   if (!innerA) { // outside corner: a fan round it from the wall before to this one
     const p = E[(i - 1 + nr) % nr], a0 = Math.atan2(p[4], p[3]); let a1 = Math.atan2(nz, nx), da = a1 - a0; while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
     if (Math.abs(da) > 0.05) { const m = Math.max(1, Math.ceil(Math.abs(da) / 0.5)), c0 = b.p.length / 3; put(a[0], a[1], AO_K[0][1]);
       for (let s = 0; s <= m; s++) { const t = a0 + da * s / m; for (const [d, k] of AO_K.slice(1)) put(a[0] + Math.cos(t) * d, a[1] + Math.sin(t) * d, k); }
-      for (let s = 0; s < m; s++) { const q = c0 + 1 + s * 2; triUp(b, c0, q, q + 2); triUp(b, q, q + 2, q + 3); triUp(b, q, q + 3, q + 1); }
+      for (let s = 0; s < m; s++) { const q = c0 + 1 + s * 2; aoTri(b, c0, q, q + 2); aoTri(b, q, q + 2, q + 3); aoTri(b, q, q + 3, q + 1); }
     }
   }
 }
 const _aoC = new THREE.Color(), SILL_COL = new THREE.Color('#e8e3d8');
+// the ground a house stands on: never the floor of a pit beside it (a ramp, an underpass, the stairs of the station): its walls went down to the bottom of the
+// stairs of the station, 4 m under the street, a facade a few cm from the wall of the hole with its edge in it, the dark lines across its floor and walls (Carlo 3/11)
+const gCasa = (x, z) => H.pitAt(x, z) !== null ? H.anello(x, z) : H.ground(x, z);
 // the windows of the facades (Carlo, 2/11: never cut by a corner, the eaves, a gable or the ground). Each wall (a run of sides turning less than 12
 // degrees, BEND) has a whole number of bays, centred on it and stretched a little (bay from 0.85 to 1.2 of the drawing; shorter than that, a bare wall);
 // the floors are the same all round the house, from F0, the highest ground along its walls (the base of a raised volume), each FMIN to FMAX high: the
@@ -1245,7 +1255,8 @@ function opSoglia(Wb, p) {
     if (H.gallAt(ox, oz)) continue; const q_ = H.inPit(ox, oz); if (q_ && q_ !== p) continue;
     const L = hyp(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.ceil(L / 0.5));
     for (let i = 0; i < m; i++) {
-      const f0 = i / m, f1 = (i + 1) / m, x0 = a[0] + (b[0] - a[0]) * f0, z0 = a[1] + (b[1] - a[1]) * f0, x1 = a[0] + (b[0] - a[0]) * f1, z1 = a[1] + (b[1] - a[1]) * f1, y0 = a[2] + (b[2] - a[2]) * f0, y1 = a[2] + (b[2] - a[2]) * f1, g0 = H.baseS(x0 - ix / il * 0.05, z0 - iz / il * 0.05), g1 = H.baseS(x1 - ix / il * 0.05, z1 - iz / il * 0.05);
+      const yc = p.src && p.src.yc ? p.src.yc[k] : null, yAt = f => { if (!yc) return a[2] + (b[2] - a[2]) * f; const g = f * (yc.length - 1), j = Math.min(yc.length - 2, Math.floor(g)); return yc[j] + (yc[j + 1] - yc[j]) * (g - j) - H.B0; }; /* (the floor in columns across: src/opere.py yc) */
+      const f0 = i / m, f1 = (i + 1) / m, x0 = a[0] + (b[0] - a[0]) * f0, z0 = a[1] + (b[1] - a[1]) * f0, x1 = a[0] + (b[0] - a[0]) * f1, z1 = a[1] + (b[1] - a[1]) * f1, y0 = yAt(f0), y1 = yAt(f1), g0 = H.baseS(x0 - ix / il * 0.05, z0 - iz / il * 0.05), g1 = H.baseS(x1 - ix / il * 0.05, z1 - iz / il * 0.05);
       if (g0 - y0 < 0.02 && g1 - y1 < 0.02) continue;
       opQuad(Wb, [[x0, y0 - 0.05, z0], [x1, y1 - 0.05, z1], [x1, Math.max(y1, g1), z1], [x0, Math.max(y0, g0), z0]], ix / il, 0, iz / il);
     }
@@ -1260,11 +1271,11 @@ function opFronte(Wb, p, k, kin, soff) { // the front at station k, the covered 
   const s0 = lungo(0, -1), s1 = lungo(L, 1), S = [s0]; for (let s = Math.ceil(s0); s < 0; s++) if (s > s0) S.push(s); S.push(0); for (let s = 1; s < L; s++) S.push(s); S.push(L); for (let s = Math.ceil(L) + 1; s < s1; s++) S.push(s); if (s1 > L) S.push(s1);
   let wx = p.sx[kin][0] - a[0], wz = p.sx[kin][1] - a[1], wl = 1; { const d = wx * ex + wz * ez; wx -= ex * d; wz -= ez * d; wl = hyp(wx, wz) || 1; wx *= OP_SP / wl; wz *= OP_SP / wl; }
   // over the tunnel the front stands a parapet over the road behind it (Carlo 3/11, x -768 z 94 and 116 under the Milano-Meda: the road over it had no parapet at its edge)
-  const Ss = [...new Set(S)].sort((u, v) => u - v), nx = ez, nz = -ex, topAt = s => { const [x, z] = at(s), t = dk(x, z); if (t !== null) return t - 0.05; const lin = ya + (yb - ya) * clamp(s / L, 0, 1); return s >= 0 && s <= L ? Math.max(lin, H.baseS(x + wx / OP_SP * 1.5, z + wz / OP_SP * 1.5) + PARAPETTO_F) : lin; };
+  const Ss = [...new Set(S)].sort((u, v) => u - v), nx = ez, nz = -ex, topAt = s => { const [x, z] = at(s), t = dk(x, z); if (t !== null) return t - 0.05; const lin = ya + (yb - ya) * clamp(s / L, 0, 1); return s >= 0 && s <= L ? Math.max(lin, H.anello(x + wx / OP_SP * 1.5, z + wz / OP_SP * 1.5) + PARAPETTO_F) : lin; }; /* (the ground over the cover: H.anello, not S across the cells of the trench) */
   for (let i = 1; i < Ss.length; i++) {
     const u = Ss[i - 1], v = Ss[i], m = (u + v) / 2, [ux, uz] = at(u), [vx, vz] = at(v), tu = topAt(u), tv = topAt(v), dentro = m >= 0 && m <= L, bu = dentro ? soff : H.baseS(ux, uz) - 0.3, bv = dentro ? soff : H.baseS(vx, vz) - 0.3, deck = dk(ux + (vx - ux) / 2, uz + (vz - uz) / 2) !== null;
     opQuad(Wb, [[ux, bu, uz], [vx, bv, vz], [vx, tv, vz], [ux, tu, uz]], nx, 0, nz);
-    if (!deck) { opQuad(Wb, [[ux + wx, H.baseS(ux + wx, uz + wz) - 0.3, uz + wz], [vx + wx, H.baseS(vx + wx, vz + wz) - 0.3, vz + wz], [vx + wx, tv, vz + wz], [ux + wx, tu, uz + wz]], nx, 0, nz); opQuad(Wb, [[ux, tu, uz], [vx, tv, vz], [vx + wx, tv, vz + wz], [ux + wx, tu, uz + wz]], 0, 1, 0); }
+    if (!deck) { opQuad(Wb, [[ux + wx, H.anello(ux + wx, uz + wz) - 0.3, uz + wz], [vx + wx, H.anello(vx + wx, vz + wz) - 0.3, vz + wz], [vx + wx, tv, vz + wz], [ux + wx, tu, uz + wz]], nx, 0, nz); opQuad(Wb, [[ux, tu, uz], [vx, tv, vz], [vx + wx, tv, vz + wz], [ux + wx, tu, uz + wz]], 0, 1, 0); }
     WALLS.add(Math.min(ux, vx), Math.min(uz, vz), Math.max(ux, vx), Math.max(uz, vz), { ax: ux, az: uz, bx: vx, bz: vz, nx, nz, two: true, y0: dentro ? soff : Math.min(bu, bv) - 1, y1: Math.max(tu, tv) - (deck ? 0.3 : 0), pit: p.id });
   }
 }
@@ -1276,7 +1287,7 @@ function buildGallerie(T, G) {
     for (let i = 0; i < tr.length; i += 9) { const a = F.p.length / 3; for (let q = 0; q < 3; q++) vtx(F, tr[i + q * 3], tr[i + q * 3 + 2], tr[i + q * 3 + 1], 0, 1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4); triUp(F, a, a + 1, a + 2); }
     opSoffitto(C, p, p.soffitto); opPareti(W_, p, p.soffitto);
     if (p.src.fronti[0]) opFronte(W_, p, 0, 1, p.soffitto[0]); if (p.src.fronti[1]) opFronte(W_, p, n - 1, n - 2, p.soffitto[n - 1]);
-    for (const [b, mt, r] of [[F, conProfondita(p.src.pedonale ? MAT.side : MAT.asph), -2], [C, MAT.pitWall, 0], [W_, MAT.pitWall, 0]]) if (b.i.length) { const M = mkMesh(b, mt, r, false); scene.remove(M); G.add(M); p.meshes.push(M); }
+    for (const [b, mt, r] of [[F, conProfondita(p.src.pedonale ? MAT.side : MAT.asph), -2], [C, MAT.pitWall, 0], [W_, MAT.pitWall, 0]]) if (b.i.length) { const M = mkMesh(b, mt, r, b === C ? 'cast' : false); /* (the ceiling casts its shadow: under it the sun drew the shadows of what stands over the gallery, dark lines across the floor and the walls of the station underpass, Carlo 3/11) */ scene.remove(M); G.add(M); p.meshes.push(M); }
   }
 }
 function opLook(T, x, z) { let sy = pitLook(T, x, z); if (!sy) for (const [ox, oz] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) { sy = pitLook(T, x + ox, z + oz); if (sy) break; } /* (the paint stops a little short of the wall: the parapet covers that) */ return sy; }
@@ -1298,6 +1309,14 @@ function scalaGradini(F, R, p) {
     const a0 = at(sx, i / G), a1 = at(sx, (i + 1) / G), b0 = at(dx, i / G), b1 = at(dx, (i + 1) / G), h = hm(i);
     opQuad(F, [[a0[0], h, a0[1]], [a1[0], h, a1[1]], [b1[0], h, b1[1]], [b0[0], h, b0[1]]], 0, 1, 0);
     if (i + 1 < G) { const h2 = hm(i + 1), tx = a1[0] - a0[0], tz = a1[1] - a0[1], l = hyp(tx, tz) || 1, sg = h2 > h ? 1 : -1; opQuad(F, [[a1[0], Math.min(h, h2), a1[1]], [b1[0], Math.min(h, h2), b1[1]], [b1[0], Math.max(h, h2), b1[1]], [a1[0], Math.max(h, h2), a1[1]]], -sg * tx / l, 0, -sg * tz / l); }
+    // the two ends: a riser from the first tread up to the ground at the top and from the last one down to the floor at the bottom. Each tread stands at the height of
+    // its middle, half a riser off the ends: through the slit under the last one the plane under the world showed, a green strip on the edge of the hole (Carlo 3/11)
+    for (const [e, A, B, hp, hn] of [[0, a0, b0, null, h], [1, a1, b1, h, null]]) {
+      if ((e === 0 && i !== 0) || (e === 1 && i !== G - 1)) continue;
+      const ye = (A[2] + B[2]) / 2, y0 = hp === null ? ye : hp, y1 = hn === null ? ye : hn; if (Math.abs(y1 - y0) < 0.01) continue;
+      const tx = a1[0] - a0[0], tz = a1[1] - a0[1], l = hyp(tx, tz) || 1, sg = y1 > y0 ? 1 : -1;
+      opQuad(F, [[A[0], Math.min(y0, y1), A[1]], [B[0], Math.min(y0, y1), B[1]], [B[0], Math.max(y0, y1), B[1]], [A[0], Math.max(y0, y1), A[1]]], -sg * tx / l, 0, -sg * tz / l);
+    }
   }
   for (const [L, O] of [[sx, dx], [dx, sx]]) { // the handrail
     const pt = u => { const a = at(L, u), o = at(O, u), d = hyp(o[0] - a[0], o[1] - a[1]) || 1; return [a[0] + (o[0] - a[0]) / d * 0.15, a[2] + 0.9, a[1] + (o[1] - a[1]) / d * 0.15]; }, len = hyp(L[n - 1][0] - L[0][0], L[n - 1][1] - L[0][1]), m = Math.max(2, Math.ceil(len / 0.5));
@@ -1318,7 +1337,7 @@ function buildPits(T, G) {
       for (let i = 0; i < f.length; i += 6) {
         const xs = [f[i], f[i + 2], f[i + 4]], zs = [f[i + 1], f[i + 3], f[i + 5]], cx = (xs[0] + xs[1] + xs[2]) / 3, cz = (zs[0] + zs[1] + zs[2]) / 3, sy = op_ ? opLook(T, cx, cz) : pitLook(T, cx, cz);
         let B = byLook.get(sy); if (!B) byLook.set(sy, B = Buf());
-        const vs = sy ? sy.vs : 10, put3 = (P3) => { const i0 = B.p.length / 3; for (const [x, z] of P3) vtx(B, x, H.baseS(x, z), z, 0, 1, 0, x / vs, z / vs, sy ? sy.col : null); triUp(B, i0, i0 + 1, i0 + 2); };
+        const vs = sy ? sy.vs : 10, put3 = (P3) => { const i0 = B.p.length / 3; for (const [x, z] of P3) vtx(B, x, op_ ? H.anello(x, z) : H.baseS(x, z), z, 0, 1, 0, x / vs, z / vs, sy ? sy.col : null); triUp(B, i0, i0 + 1, i0 + 2); };
         // inside another pit its floor is there, not this pit's ground: the triangle is cut on it in pieces, a whole triangle that only reached into it with a corner made the dark shards on the walls of the stairs of the station (Carlo 3/11)
         const altra = (x, z) => { const q_ = H.inPit(x, z); return !!q_ && q_ !== p; }, tocca = P3 => { const mx = (P3[0][0] + P3[1][0] + P3[2][0]) / 3, mz = (P3[0][1] + P3[1][1] + P3[2][1]) / 3; return altra(mx, mz) || P3.some(([x, z]) => altra(mx + (x - mx) * 0.95, mz + (z - mz) * 0.95)); };
         const parti = (P3, d) => { if (!tocca(P3)) { put3(P3); return; } if (d === 0) return; const [a, b, c] = P3, ab = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], bc = [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2], ca = [(c[0] + a[0]) / 2, (c[1] + a[1]) / 2]; for (const q of [[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]]) parti(q, d - 1); };
@@ -1334,7 +1353,7 @@ function buildPits(T, G) {
       const i0 = F.p.length / 3; for (let q = 0; q < 3; q++) vtx(F, tr[i + q * 3], tr[i + q * 3 + 2], tr[i + q * 3 + 1], 0, 1, 0, tr[i + q * 3] / 4, tr[i + q * 3 + 1] / 4);
       triUp(F, i0, i0 + 1, i0 + 2);
     }
-    if (p.src && p.src.scala) { const SG = Buf(), RL = Buf(); scalaGradini(SG, RL, p); for (const [b, mt] of [[SG, MAT.pitFloor], [RL, MAT.rail]]) if (b.i.length) { const M = mkMesh(b, mt, 0, 'cast'); scene.remove(M); G.add(M); M.userData.suolo = b === SG; p.meshes.push(M); } }
+    if (p.src && p.src.scala) { const SG = Buf(), RL = Buf(); scalaGradini(SG, RL, p); for (const [b, mt] of [[SG, MAT.pitFloor], [RL, MAT.rail]]) if (b.i.length) { const M = mkMesh(b, mt, 0, b === SG ? 'cast' : false); /* (the handrail casts no shadow: 6 cm of rail made a dark band 10-20 cm wide across the floor and the walls of the station stairs at the resolution of the shadows, Carlo 3/11) */ scene.remove(M); G.add(M); M.userData.suolo = b === SG; p.meshes.push(M); } }
     else { const MF = mkMesh(F, p.src && p.src.sotto ? conProfondita(p.src.pedonale ? MAT.side : MAT.asph) : MAT.pitFloor, -2, false); scene.remove(MF); G.add(MF); MF.userData.suolo = true; p.meshes.push(MF); }
     // walls and parapets along the two sides, the door at the end
     const Wb = Buf(), D = Buf(), quad = (b, a, c, ya0, ya1, yc0, yc1, u0, u1) => { const dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1, nx = dz / L, nz = -dx / L, i0 = b.p.length / 3; vtx(b, a[0], ya0, a[1], nx, 0, nz, u0, ya0 / 2); vtx(b, c[0], yc0, c[1], nx, 0, nz, u1, yc0 / 2); vtx(b, c[0], yc1, c[1], nx, 0, nz, u1, yc1 / 2); vtx(b, a[0], ya1, a[1], nx, 0, nz, u0, ya1 / 2); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); };
@@ -1342,7 +1361,7 @@ function buildPits(T, G) {
     if (op_) { // an underpass: no door
       const q_ = p.src, n_ = p.sx.length, roof = q_.tetto ? q_.tetto.map(v => v === null ? null : v - H.B0) : null, C_ = Buf(); opPareti(Wb, p, roof); opSoglia(Wb, p);
       if (roof) { opSoffitto(C_, p, roof); if (q_.fronti[0]) opFronte(Wb, p, 0, 1, roof[0]); if (q_.fronti[1]) opFronte(Wb, p, n_ - 1, n_ - 2, roof[n_ - 1]); }
-      for (const [b, mt, cs] of [[Wb, MAT.pitWall, 'cast'], [C_, MAT.pitWall, false]]) if (b.i.length) { const M = mkMesh(b, mt, 0, cs); scene.remove(M); G.add(M); p.meshes.push(M); }
+      for (const [b, mt, cs] of [[Wb, MAT.pitWall, 'cast'], [C_, MAT.pitWall, 'cast']]) if (b.i.length) { const M = mkMesh(b, mt, 0, cs); scene.remove(M); G.add(M); p.meshes.push(M); }
       continue;
     }
     const [lx, lz, ly] = p.sx[p.sx.length - 1], [rx, rz, ry] = p.dx[p.dx.length - 1], dl = H.baseS(lx, lz), dr = H.baseS(rx, rz), ph = p.porta_h;
@@ -1853,7 +1872,7 @@ function* buildTileGen(T) {
       if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
       const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t, raised = B.zb !== undefined;
       // a DBGT volume: the top of its walls is its own (zt), never under the ground round it; a raised one starts at its base (zb)
-      const gys = outer.map(p => H.ground(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys);
+      const gys = outer.map(p => gCasa(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys);
       const top = B.zt !== undefined ? Math.max(B.zt, raised ? B.zb + 1 : gmax + Math.min(h, 2.2)) : gmax + h, bot = raised ? B.zb : gmin - 0.6;
       const R = B.e !== undefined ? (k => hashRnd(B.e * 7 + k)) : (() => tRnd()), pcB = (a, k = 0) => COL(a[Math.floor(R(k) * a.length)]);
       const colOr = (c, f) => { if (c) { try { return new THREE.Color(c); } catch (e) { } } return f(); };
@@ -1891,7 +1910,7 @@ function* buildTileGen(T) {
           const at = s => { let q = 0; while (q < ed.length - 1 && s > off[q] + E[ed[q]][2]) q++; const e = E[ed[q]], a = ring[ed[q]], f = clamp((s - off[q]) / e[2], 0, 1); return [a[0] + e[0] * f, a[1] + e[1] * f]; };
           const rp = []; // the top of the wall along the run: straight between these (the roof's breaks over each side, src roofBreaks)
           ed.forEach((i, q) => { const a = ring[i], c = ring[(i + 1) % nr], e = E[i]; for (const t of planes && !isHole ? roofBreaks(B, a, c) : [0, 1]) { const s = off[q] + t * e[2]; if (rp.length && Math.abs(rp[rp.length - 1][0] - s) < 1e-4) continue; rp.push([s, top + (planes ? roofAt(B, a[0] + e[0] * t, a[1] + e[1] * t) : 0)]); } });
-          const x = Lr / tile, gAt = s => { const p = at(s); return H.ground(p[0], p[1]); }, sp = []; let n = fw ? Math.round(x) : 0; if (n && x / n < FAC.MIN) n--;
+          const x = Lr / tile, gAt = s => { const p = at(s); return gCasa(p[0], p[1]); }, sp = []; let n = fw ? Math.round(x) : 0; if (n && x / n < FAC.MIN) n--;
           const bw = n ? Math.min(x / n, FAC.MAX) * tile : Lr, pad = n ? (Lr - n * bw) / 2 : 0, span = (s0, s1, ss, bay) => { const g = ss.map(gAt); sp.push([s0, s1, Math.max(...g), Math.min(...g), bay]); };
           if (!n) span(0, Lr, [0, Lr / 2, Lr], false);
           else { if (pad > 0.01) span(0, pad, [0, pad], false); for (let j = 0; j < n; j++) { const s0 = pad + j * bw; span(s0, s0 + bw, [s0 + fw[2] * bw, s0 + bw / 2, s0 + fw[3] * bw], true); } if (pad > 0.01) span(Lr - pad, Lr, [Lr - pad, Lr], false); }
