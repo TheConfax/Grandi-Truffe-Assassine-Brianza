@@ -98,12 +98,22 @@ function gpsDist(route, px, pz) { /* the distance from the player to the route (
   return best;
 }
 /* the part already driven goes away: the player is projected on the next stretches of the route (only the ones close to the last, so it never jumps onto a parallel bit or a loop), the line is cut from there on, and the dashed bit at the start goes once he is on the road */
-const GPS_TAGLIO = 40, GPS_SUSTRADA = 6;
+const GPS_TAGLIO = 40, GPS_SUSTRADA = 6, GPS_SALTO = 8, GPS_SUL = 5;
 function gpsTaglia(R, px, pz) {
   const m = R.main; let best = null;
   for (let k = 0; k < Math.min(GPS_TAGLIO, m.length - 1); k++) {
     const A = m[k], B = m[k + 1], ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((px - A[0]) * ex + (pz - A[1]) * ez) / L2)), qx = A[0] + ex * t, qz = A[1] + ez * t, d = Math.hypot(px - qx, pz - qz), sc = d + 0.3 * k;
     if (!best || sc < best.sc) best = { k, qx, qz, d, sc };
+  }
+  /* shortcut: if the player is off the near stretches but sits on the route further ahead (beyond the window), moving along it, he rejoined it: the skipped part goes away. Needs a clear gap (near > GPS_SALTO, far < GPS_SUL) and the heading along the stretch, so a parallel bit or the return of a loop does not catch him */
+  const mx = GPS.px === undefined ? 0 : px - GPS.px, mz = GPS.px === undefined ? 0 : pz - GPS.pz; GPS.px = px; GPS.pz = pz;
+  if ((!best || best.d > GPS_SALTO) && Math.hypot(mx, mz) > 0.03) {
+    let far = null;
+    for (let k = GPS_TAGLIO; k < m.length - 1; k++) {
+      const A = m[k], B = m[k + 1], ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((px - A[0]) * ex + (pz - A[1]) * ez) / L2)), qx = A[0] + ex * t, qz = A[1] + ez * t, d = Math.hypot(px - qx, pz - qz);
+      if (d < GPS_SUL && (!far || d < far.d) && (mx * ex + mz * ez) / (Math.hypot(mx, mz) * Math.sqrt(L2)) > 0.7) far = { k, qx, qz, d, sc: d };
+    }
+    if (far) best = far;
   }
   if (!best || best.d > GPS_FUORI) return;
   if (best.k > 0 || best.qx !== m[0][0] || best.qz !== m[0][1]) { R.main = [[best.qx, best.qz]].concat(m.slice(best.k + 1)); if (R.main.length < 2) R.main.push([best.qx, best.qz]); }
