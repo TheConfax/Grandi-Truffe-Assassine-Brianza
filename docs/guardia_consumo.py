@@ -1,5 +1,5 @@
 """Guardia del consumo: chiede get_usage al monitor di Carlo (MCP stdio) senza passare da Claude.
-Uso: python guardia_consumo.py [margine=2] [minuti=10] [--una]
+Uso: python guardia_consumo.py [margine=0] [minuti=10] [--una]  (Carlo: ci si ferma al punto esatto)
 Limite di Carlo (4/11): seven_day mai oltre il minore tra expected+15 e 90%.
 Esce (e stampa il motivo) quando used_percent >= limite - margine.
 """
@@ -38,7 +38,7 @@ def leggi():
 
 def main():
     argv = [a for a in sys.argv[1:] if not a.startswith("--")]
-    margine = float(argv[0]) if argv else 2
+    margine = float(argv[0]) if argv else 0
     minuti = float(argv[1]) if len(argv) > 1 else 10
     una = "--una" in sys.argv
     while True:
