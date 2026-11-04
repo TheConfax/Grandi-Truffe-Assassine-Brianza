@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 2d5163c · assemblato 04/11 04:45 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 1b60104 · assemblato 04/11 04:48 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -8085,9 +8085,10 @@ function parkTick() {
 
 // ---------------------------------------------------------------- wanted level & police
 const HEAT_T = [0, 0.5, 2, 4, 7, 11];
-const W = { heat: 0, stars: 0, unseen: 0, seen: false, field: null, fieldT: 0, busted: 0 };
+const W = { heat: 0, stars: 0, unseen: 0, seen: false, field: null, fieldT: 0, busted: 0, off: false, offPrima: false };
 const starsOf = h => { let s = 0; for (let i = 1; i < HEAT_T.length; i++) if (h >= HEAT_T[i]) s = i; return s; };
 function crime(amount, msg) {
+  if (W.off) return; /* codice POLIZIA: polizia spenta, nessun reato conta */
   // after a crime the radio knows where you are: a negative clock gives the volanti time to arrive before the stars can fade
   const before = W.stars; W.heat = Math.min(16, W.heat + amount); W.stars = starsOf(W.heat); W.unseen = Math.min(W.unseen, -(10 + W.stars * 2));
   if (W.stars > before) { sfxBlip(520, 880, 0.3); if (msg) toast(msg); }
@@ -9583,7 +9584,9 @@ function radioWheelCancel() { if (!RW.open) return; RW.open = false; if (RW.el) 
 let spotDb = null, spotN = 0; (async () => { try { spotDb = await window.claude?.use?.('db'); } catch (e) { spotDb = null; } })();
 let DEBUG = false; try { const q = new URLSearchParams(location.search); if (q.has('debug')) localStorage.setItem('gtaDebug', q.get('debug') === '0' ? '0' : '1'); DEBUG = localStorage.getItem('gtaDebug') === '1'; } catch (e) { }
 function spotsLocal() { try { return JSON.parse(localStorage.getItem('gtaSpots') || '[]'); } catch (e) { return []; } }
-function setDebug(on) { DEBUG = on; try { localStorage.setItem('gtaDebug', on ? '1' : '0'); } catch (e) { } document.body.classList.toggle('debug', on); updDbgMenu(); toast(on ? '🛠 Modalità debug attiva' : '🛠 Modalità debug spenta'); }
+function setDebug(on) { DEBUG = on; try { localStorage.setItem('gtaDebug', on ? '1' : '0'); } catch (e) { } document.body.classList.toggle('debug', on); if (on) { W.offPrima = W.off; setPolizia(true, false); } else setPolizia(W.offPrima, false); updDbgMenu(); toast(on ? '🛠 Modalità debug attiva' : '🛠 Modalità debug spenta'); }
+function setPolizia(off, msg) { W.off = off; if (off) { W.heat = 0; W.stars = 0; W.unseen = 0; W.bustT = 0; } if (msg) toast(off ? '🚓 Polizia spenta' : '🚓 Polizia accesa'); }
+if (DEBUG) { W.offPrima = false; setPolizia(true, false); }
 function updDbgMenu() { const b = document.getElementById('dbgdl'); if (b) b.textContent = '⬇ Scarica segnalazioni (' + spotsLocal().length + ')'; }
 function exportSpots() {
   const a = spotsLocal(); if (!a.length) { toast('Nessuna segnalazione salvata'); return; }
@@ -10402,7 +10405,7 @@ function cheatFerari() { // on foot: a Ferari right in front of you; driving: wh
   }
   toast('🏎 Ferari!');
 }
-const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true) };
+const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true) };
 let last = performance.now(), acc = 0;
 function frame(t) {
   requestAnimationFrame(frame);
