@@ -744,8 +744,8 @@ def scrivi_json(decks, pits, path, info):
             if d.get(k) is not None: e[k] = d[k]
         out.append(e)
     pz = [{k: v for k, v in p.items() if k != 'g'} for p in pits]
-    json.dump(dict(fase=3, formato='docs/motore.md 1.5: tri = triangoli del piano di sopra, 9 numeri per triangolo ((x, z, y) x 3), m; imp = impronta; spalle = lati [x1, z1, x2, z2] dove l impalcato appoggia su S; nucleo = impronta PONTE (i parapetti), il resto di imp sono rampe e appoggi sul reticolo; luce = min S sotto + 2.5; ra = indici di roads[] nel brianza.json di oggi; osm = id delle vie OSM sopra',
-                   info=info, decks=out, pits=pz), open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+    with open(path, 'w', encoding='utf-8') as fo: json.dump(dict(fase=3, formato='docs/motore.md 1.5: tri = triangoli del piano di sopra, 9 numeri per triangolo ((x, z, y) x 3), m; imp = impronta; spalle = lati [x1, z1, x2, z2] dove l impalcato appoggia su S; nucleo = impronta PONTE (i parapetti), il resto di imp sono rampe e appoggi sul reticolo; luce = min S sotto + 2.5; ra = indici di roads[] nel brianza.json di oggi; osm = id delle vie OSM sopra',
+                   info=info, decks=out, pits=pz), fo, ensure_ascii=False, separators=(',', ':'))   # (closed here: terreno_gioco.py reads it right after)
     return os.path.getsize(path)
 
 
@@ -777,6 +777,7 @@ def build_decks(comune=None, out=None):
     """docs/motore.md fase 3: (decks, pits, Impalcati) of the comune, on the surface of superficie.costruisci()"""
     s = sf.costruisci(comune, cache_dir=out); R = s.R
     lo_, la_ = dq.game_to_lonlat(np.array([R.x0 - 50, R.x0 + R.nx * SF + 50]), np.array([R.z0 + R.nz * SF + 50, R.z0 - 50]))
+    if out: sf.aspetta_osm(os.path.join(out, 'cache_osm_vie.pkl'))   # (read in a process of its own from the start: superficie.osm_in_fondo)
     osm = osm_vie(os.path.join(dq.DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(out, 'cache_osm_vie.pkl') if out else None)
     imp = Impalcati(s, osm); pits = build_pits(imp); decks = imp.build(pits); imp.copertura(pits)
     return imp.decks, pits, imp

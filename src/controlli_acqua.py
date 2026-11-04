@@ -120,11 +120,43 @@ def luoghi(P, r=4.0, val=None, n=12):
     return out[:n] if n else out
 
 
+_DATI = {}   # what Mondo reads of brianza.json (the drawn surfaces and their unions), made once a run: terreno_gioco.py asks twice (build veloce)
+
+
+def _disegno(dati):
+    st = os.stat(dati); k = (os.path.abspath(dati), st.st_size, st.st_mtime_ns)
+    if k in _DATI: return _DATI[k]
+    B = json.load(open(dati, encoding='utf-8'))
+    poly = {k_: [] for k_ in ('as', 'pz', 'sd', 'ft', 'cv', 'sf', 'b', 'acqua')}; rv, rl = [], []
+    for ti, T in enumerate(B['tiles']):
+        if not T: continue
+        for k_ in ('as', 'pz', 'sd', 'ft', 'cv', 'sf'):
+            for a in T.get(k_, []):
+                P = Polygon(dec(a['p']), [dec(h) for h in a.get('k', []) if len(h) >= 6])
+                poly[k_].append(P if P.is_valid else P.buffer(0))
+        for a in T.get('b', []):
+            o = dec(a['p'])
+            if len(o) >= 3: poly['b'].append(Polygon(o).buffer(0))
+        for a in T.get('a', []):
+            if a.get('t') == 6:
+                P = Polygon(dec(a['p']), [dec(h) for h in a.get('k', []) if len(h) >= 6]); poly['acqua'].append(P if P.is_valid else P.buffer(0))
+        for r in T.get('rv', []): rv.append(dict(p=dec(r['p']), w=float(r['w']), e=r.get('e', [0, 0]), t=ti))
+        for r in T.get('rl', []): rl.append(dec(r['p']))
+    from presto import in_parallelo   # (each union on its own, on the cores: GEOS lets the GIL go)
+    ks = list(poly); U = dict(zip(ks, in_parallelo(lambda k_: shapely.union_all(poly[k_]) if poly[k_] else Polygon(), ks)))
+    for g in U.values(): shapely.prepare(g)
+    rails = [LineString(p) for p in rl if len(p) >= 2]
+    U['rl'] = shapely.union_all([g.buffer(1.5, cap_style=2) for g in rails]) if rails else Polygon(); shapely.prepare(U['rl'])
+    strade = shapely.union_all([U['as'], U['pz'], U['sf'], U['rl']]); shapely.prepare(strade)   # what a car or a train runs on
+    _DATI.clear(); _DATI[k] = (B, poly, rv, rl, U, strade); return _DATI[k]
+
+
 class Mondo:
     """S, materials, under-deck cells, decks and water of terreno/, the drawn streets and rivers of brianza.json"""
     def __init__(s, terreno, dati, log=print):
         t0 = time.time(); s.log = log
-        s.B = B = json.load(open(dati, encoding='utf-8')); m = B['meta']; s.hw, s.hh, s.ntx = m['hw'], m['hh'], m['ntx']
+        B, s.poly, s.rv, s.rl, s.U, s.strade = _disegno(dati); s.U = dict(s.U)
+        s.B = B; m = B['meta']; s.hw, s.hh, s.ntx = m['hw'], m['hh'], m['ntx']
         s.ind = ind = json.load(open(os.path.join(terreno, 'indice.json'), encoding='utf-8'))
         pk = ind.get('pacco'); blob = open(os.path.join(terreno, pk['file']), 'rb').read() if pk else None
         tiles = {}
@@ -154,27 +186,7 @@ class Mondo:
         s.decks = [d for d in ind.get('decks', []) if d.get('tipo') != 'copertura']
         s._tri, s._ttree, s._did = triangoli_impalcati(s.decks)
         s._tri_nl, s._ttree_nl, _ = triangoli_impalcati(s.decks, liberi=False)   # the decks that do not carry the drawn streets (A3)
-        # the drawn surfaces (tiles of brianza.json)
-        s.poly = {k: [] for k in ('as', 'pz', 'sd', 'ft', 'cv', 'sf', 'b', 'acqua')}; s.rv, s.rl = [], []
-        for ti, T in enumerate(B['tiles']):
-            if not T: continue
-            for k in ('as', 'pz', 'sd', 'ft', 'cv', 'sf'):
-                for a in T.get(k, []):
-                    P = Polygon(dec(a['p']), [dec(h) for h in a.get('k', []) if len(h) >= 6])
-                    s.poly[k].append(P if P.is_valid else P.buffer(0))
-            for a in T.get('b', []):
-                o = dec(a['p'])
-                if len(o) >= 3: s.poly['b'].append(Polygon(o).buffer(0))
-            for a in T.get('a', []):
-                if a.get('t') == 6:
-                    P = Polygon(dec(a['p']), [dec(h) for h in a.get('k', []) if len(h) >= 6]); s.poly['acqua'].append(P if P.is_valid else P.buffer(0))
-            for r in T.get('rv', []): s.rv.append(dict(p=dec(r['p']), w=float(r['w']), e=r.get('e', [0, 0]), t=ti))
-            for r in T.get('rl', []): s.rl.append(dec(r['p']))
-        s.U = {k: (shapely.union_all(v) if v else Polygon()) for k, v in s.poly.items()}
-        for g in s.U.values(): shapely.prepare(g)
-        rails = [LineString(p) for p in s.rl if len(p) >= 2]
-        s.U['rl'] = shapely.union_all([g.buffer(1.5, cap_style=2) for g in rails]) if rails else Polygon(); shapely.prepare(s.U['rl'])
-        s.strade = shapely.union_all([s.U['as'], s.U['pz'], s.U['sf'], s.U['rl']]); shapely.prepare(s.strade)   # what a car or a train runs on
+        # the drawn surfaces (tiles of brianza.json): _disegno() above
         # the water level as the game reads it (altezze3.js water): the DBGT axes, else the lowest S across an OSM river + 0.3
         P, Z = [], []
         for a in ind.get('acqua', []):
@@ -236,9 +248,15 @@ def campioni(g, passo):
     """points every passo m inside the polygon g"""
     if g.is_empty: return np.zeros((0, 2))
     b = g.bounds; xs = np.arange(np.floor(b[0] / passo) * passo + passo / 2, b[2], passo); zs = np.arange(np.floor(b[1] / passo) * passo + passo / 2, b[3], passo)
-    out = []
-    for z0 in range(0, len(zs), 400):
-        X, Z = np.meshgrid(xs, zs[z0:z0 + 400]); X, Z = X.ravel(), Z.ravel(); k = shapely.contains_xy(g, X, Z); out.append(np.column_stack((X[k], Z[k])))
+    # (build veloce: the bands of 400 rows on the cores, each thread on its own copy of g, the same coordinates: a prepared geometry is not
+    # shared between threads; the points come back in the same order)
+    import threading
+    from presto import in_parallelo
+    wkb = shapely.to_wkb(g); loc = threading.local()
+    def banda(z0):
+        if not hasattr(loc, 'g'): loc.g = shapely.from_wkb(wkb); shapely.prepare(loc.g)
+        X, Z = np.meshgrid(xs, zs[z0:z0 + 400]); X, Z = X.ravel(), Z.ravel(); k = shapely.contains_xy(loc.g, X, Z); return np.column_stack((X[k], Z[k]))
+    out = in_parallelo(banda, range(0, len(zs), 400), nt=8)
     return np.vstack(out) if out else np.zeros((0, 2))
 
 
@@ -382,10 +400,10 @@ def a4_parapetti(m, gioco_ringhiere=False, lid=None):
     every OSM river (before this work); now none: the banks and walls are the DBGT's and OSM's barriers. Mouths: an end of an OSM river
     piece (e) where the ground over the culvert stands 0.6 m over the bed; 'lontane' those away from a street or a track (4 m plus a 2:3
     embankment down to the bed) or halfway up a slope (bed more than 1 m over the bottom of the valley)"""
-    near = shapely.union_all([m.strade.buffer(15.0), m.U['b'].buffer(15.0)]) if not m.strade.is_empty else Polygon(); shapely.prepare(near)
     lung, bosco = 0.0, 0.0
-    strade15 = m.strade.buffer(1.5); shapely.prepare(strade15)
-    if gioco_ringhiere:
+    if gioco_ringhiere:   # (the two big buffers only here, where they are used: they were a minute of the terrain for nothing, build veloce 4/11)
+        near = shapely.union_all([m.strade.buffer(15.0), m.U['b'].buffer(15.0)]) if not m.strade.is_empty else Polygon(); shapely.prepare(near)
+        strade15 = m.strade.buffer(1.5); shapely.prepare(strade15)
         for r in m.rv:
             p = r['p']
             for k in range(1, len(p)):
@@ -398,7 +416,6 @@ def a4_parapetti(m, gioco_ringhiere=False, lid=None):
                     lung += L
                     if not shapely.contains_xy(near, mx, mz): bosco += L
     bocche, lontane = 0, []
-    strade4 = m.strade.buffer(4.0); shapely.prepare(strade4)
     for r in m.rv:
         p = r['p']
         for ei in (0, 1):
