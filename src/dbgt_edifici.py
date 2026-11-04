@@ -542,13 +542,10 @@ class Edifici:
                 a = rng.uniform(0, 2 * math.pi); d = rng.uniform(15, 120)
                 q = shapely.affinity.translate(g, d * math.cos(a), d * math.sin(a))
                 if not len(at.query(q, predicate='dwithin', distance=4.0)): neg.append(q); break
-        def feats(gs):
+        def feats(qs):
             F, keep = [], []
-            for k, g in enumerate(gs):
-                q = erode(g); f = None
-                if q is not None:
-                    try: f = ef.caratteristiche(foto.pixel(q))
-                    except Exception as ex: f = None
+            for k, q in enumerate(qs):
+                f = tab.get(BC.chiave(q.wkb)) if q is not None else None
                 if f is not None: F.append(f); keep.append(k)
             return np.array(F), keep
         # the tiles first (resumable, in data/esri), then the numbers
@@ -556,7 +553,19 @@ class Edifici:
         for g in [geo[i] for i in cand + pos_s] + neg: tl.update(foto.tiles_per(g))
         log('dbgt edifici: demoliti, foto Esri: %d tile, %d da controllare, %d tetti sicuri, %d negativi' % (len(tl), len(cand), len(pos_s), len(neg)))
         for x, y in sorted(tl): ef.scarica(x, y)
-        Xp, kp = feats([geo[i] for i in pos_s]); Xn, kn = feats(neg); Xc, kc = feats([geo[i] for i in cand])
+        import build_cache as BC   # src/build_cache.py, table foto_esri: valid for the same code, the same tiles of the photo and the same frame (to_ll)
+        tab = BC.Tabella('foto_esri', BC.sorgenti('esri_foto.py', 'dbgt_edifici.py') + BC.dati(os.path.join(ef.DATA, 'esri', str(ef.Z))) + BC.chiave(kx, kz, float(xa[0]), float(za[0])))
+        # the numbers of each plan (narrowed by 1 m): ef.caratteristiche(foto.pixel(q)), None where it fails. A plan an earlier build had comes
+        # from the cache; the others in processes of their own (src/processi.py, the same Foto with the same frame), in order
+        qss = [[erode(g) for g in gs] for gs in ([geo[i] for i in pos_s], neg, [geo[i] for i in cand])]
+        need = {}
+        for q in (q for qs in qss for q in qs if q is not None):
+            k = BC.chiave(q.wkb)
+            if k not in tab and k not in need: need[k] = q.wkb
+        if need:
+            import processi
+            for k, f in zip(need, processi.mappa('esri_foto', '_proc_numeri', list(need.values()), iniz=('_proc_init', kx, kz, float(xa[0]), float(za[0])))): tab.put(k, f)
+        (Xp, kp), (Xn, kn), (Xc, kc) = [feats(qs) for qs in qss]; tab.salva()
         if len(Xp) < 100 or len(Xn) < 100: log('dbgt edifici: demoliti, troppo pochi pixel per tarare (%d, %d): nessuno tolto' % (len(Xp), len(Xn))); return set()
         X = np.vstack((Xp, Xn)); y = np.r_[np.ones(len(Xp)), np.zeros(len(Xn))]
         fold = rng.integers(0, 5, len(y)); oof = np.zeros(len(y))
@@ -582,8 +591,21 @@ class Edifici:
 
     # ---------------------------------------------------------------- roofs
     def _dsm(self, jobs):
-        """fit_tetto on the jobs in processes of their own: {id: result}"""
+        """fit_tetto on the jobs in processes of their own: {id: result}. A job already fitted by an earlier build with the same code and
+        the same DSM is taken from the cache (src/build_cache.py, table tetti_dsm): fit_tetto depends only on the job"""
         if not jobs or not os.path.isdir(self.dsm_dir): return {}
+        import build_cache as BC
+        if getattr(self, '_tab_tetti', None) is None: self._tab_tetti = BC.Tabella('tetti_dsm', BC.sorgenti('dbgt_edifici.py', 'dbgt_quote.py') + BC.dati(self.dsm_dir))
+        tab = self._tab_tetti; ks = [BC.chiave(j[1:]) for j in jobs]   # the id (j[0]) only goes through
+        out = {j[0]: tab.get(k) for j, k in zip(jobs, ks) if k in tab}
+        nuovi = [(j, k) for j, k in zip(jobs, ks) if k not in tab and j[0] not in out]
+        if nuovi:
+            res = self._dsm_calcola([j for j, k in nuovi])
+            for j, k in nuovi: tab.put(k, res[j[0]]); out[j[0]] = res[j[0]]
+        tab.salva()
+        return out
+
+    def _dsm_calcola(self, jobs):
         d = tempfile.mkdtemp(prefix='tetti_'); fi, fo = os.path.join(d, 'in.pkl'), os.path.join(d, 'out.pkl')
         pickle.dump(jobs, open(fi, 'wb'))
         for npr in sorted({TETTI_PROC, min(TETTI_PROC, 4), 1}, reverse=True):  # fewer processes when memory is short, never no roofs in silence
@@ -657,12 +679,18 @@ class Edifici:
         res = self._dsm([job(k, r, r['p']) for k, r in enumerate(recs) if r['bt'] not in ('roof',) and r.get('st') != 1])
         # the wings of the irregular volumes, in a second round
         wings, wj = {}, []
+        import build_cache as BC
+        tab_ali = BC.Tabella('ali', BC.sorgenti('dbgt_edifici.py'))   # the wings of a plan depend only on the plan (src/build_cache.py)
         def ali_di(k):  # the wings of volume k (None when it is not irregular): on all the cores (src/presto.py), used in order below
             r = recs[k]; f = res.get(k)
             if not f or f.get('m') != 'irregolare' or r.get('k') or r.get('st'): return None
             p = Polygon(r['p']).buffer(0)
-            return ali(p) if p.geom_type == 'Polygon' else None
-        for k, ps in enumerate(in_parallelo(ali_di, range(len(recs)))):
+            if p.geom_type != 'Polygon': return None
+            kp = BC.chiave(p.wkb)
+            if kp in tab_ali: return tab_ali.get(kp)
+            a = ali(p); tab_ali.put(kp, a); return a
+        _ali = in_parallelo(ali_di, range(len(recs))); tab_ali.salva()
+        for k, ps in enumerate(_ali):
             if ps is None or len(ps) < 2: continue
             r = recs[k]
             wings[k] = ps

@@ -933,7 +933,8 @@ class Strade:
             L = r['line'].intersection(C)
             if L.length < 0.5: continue
             cand.append((wi, L))
-        sole = [wi for (wi, L), ok in zip(cand, in_parallelo(lambda c_: c_[1].difference(tutto).length / c_[1].length > 0.5, cand)) if ok]
+        from processi import differenze   # the differences against the whole DBGT in processes of their own (src/processi.py: shapely keeps the GIL in a difference)
+        sole = [wi for (wi, L), d_ in zip(cand, differenze([c_[1] for c_ in cand], tutto)) if d_.length / L.length > 0.5]
         shapely.prepare(tutto)
         s.sole = sole
         buf = lambda cs: _u([raw_roads[wi]['line'].buffer(raw_roads[wi]['w'] / 2, quad_segs=5) for wi in sole if raw_roads[wi]['c'] in cs and not raw_roads[wi].get('deck') and not raw_roads[wi]['tunnel']])
