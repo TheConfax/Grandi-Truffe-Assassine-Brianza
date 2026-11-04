@@ -466,6 +466,26 @@ def rotonde(nodes, vie_osm, anelli, STR, inside, log, misure=None, crossings=(),
                 if 1.0 < lq - le < 10.0: return (le + lq) / 2
             return None
         sta = lambda L_: clip is None or shapely.contains_xy(clip, *(L_[0] + (L_[1] - L_[0]) * np.linspace(0.02, 0.98, 15)[:, None]).T).mean() >= 0.95   # i capi stanno sul bordo: un filo dentro
+        # con una isola spartitraffico a sinistra della corsia (Carlo, 4/11, via Manzoni): la linea sta alla punta dell'isola, la parte che guarda l'anello, e va dal
+        # cordolo destro alla punta; la corsia, come nelle rotonde vere, finisce dove finisce l'isola, anche se l'anello e' piu' avanti. L'isola e' una piccola
+        # (meno di 400 m2, non quella centrale) la cui punta sta a meno di 25 m dal bordo dell'anello, a sinistra della corsia, entro 14 m
+        if clip is not None and it is not None:
+            tring = float(Pm @ a) if Pc is not None else float((lin @ a).max()); lref = float(Pm @ t); best = None
+            c0 = a * tring + t * lref
+            for j_ in it.query(box(c0[0] - 35, c0[1] - 35, c0[0] + 35, c0[1] + 35)):
+                isl_ = isole[j_]
+                if isl_.geom_type != 'Polygon' or isl_.area > 400 or isl_.contains(Point(*cl)): continue
+                P_ = np.array(isl_.exterior.coords); k_ = int(np.argmax(P_ @ a)); tn = float(P_[k_] @ a); ln = float(P_[k_] @ t)
+                if tn > tring + 1.0 or tn < tring - 25.0 or not (lref - 2.0 <= ln <= lref + 14.0): continue
+                if best is None or ln - lref < best[0]: best = (ln - lref, tn, ln)
+            if best is not None:
+                _d, tn, ln = best; R0 = a * (tn - 0.3) + t * (ln - 1.5)
+                if clip.contains(Point(*R0)):
+                    h1 = _bordo_vicino(clip, tuple(R0), tuple(-t), 14.0)
+                    if h1 and h1[0] + 1.5 >= 1.5:
+                        L2 = np.array([a * tn + t * (ln - 1.5 - h1[0]), a * tn + t * ln])
+                        if sta(L2): cnt['linea dritta: alla punta dell isola'] += 1; return L2, a
+                cnt['linea dritta: la punta dell isola non va'] += 1
         if Pc is None:   # dall'arco
             ta, tl = lin @ a, lin @ t
             if tl[-1] < tl[0]: cnt['linea dritta: arco col verso contrario'] += 1
