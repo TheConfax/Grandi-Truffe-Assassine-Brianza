@@ -50,13 +50,10 @@ BORDO_BIN = 3.6     # m from a track: a node there does not go up (the rails and
 
 
 def _mask_geoms(R, geoms, buf=0.0):
-    m = np.zeros((R.nz, R.nx), bool)
-    for g in geoms:
-        if buf: g = g.buffer(buf, 2)
-        w = R.win(g.bounds, SF)
-        if w is None: continue
-        X, Z = R.xz(w); m[w[0]:w[1], w[2]:w[3]] |= shapely.contains_xy(g, X, Z)
-    return m
+    import superficie as sf   # (the same nodes as one geometry at a time on its window: superficie.maschera)
+    G = np.array(list(geoms), dtype=object)
+    if buf: G = shapely.buffer(G, buf, quad_segs=2)
+    return sf.maschera(R, G)
 
 
 def protetti(s):
@@ -77,12 +74,16 @@ def protetti(s):
     return P | ram, dict(ponti=ponti, bed=bed, fer=fer, ram=ram)
 
 
-def pozzi(S, prof=POZ_PROF, nodi=POZ_NODI):
+def base_pozzi(S):  # what pozzi() looks at first: the closing and the 3 x 3 minimum of S (the same for every depth on the same S: malta() makes it once a round)
+    return ndimage.grey_closing(S, size=(5, 5)), ndimage.minimum_filter(S, 3)
+
+
+def pozzi(S, prof=POZ_PROF, nodi=POZ_NODI, base=None):
     """the small closed depressions of the surface S. From each local minimum narrower than a closing of 5 x 5 nodes (a wider bowl is a shape of the land) a flood, lowest
     neighbour first. It stops at the way down, or when the deep part (more than `prof` under the water) passes `nodi` nodes or the whole pit POZ_TUTTI: the pit is then
     what lay under the last level that fitted (a deep hole in a shallow dimple counts by its hole: x 579 z -1179, two nodes 3 m down and a halo of a few cm).
     Returns [(rr, cc, depth, spill)]"""
-    sh = S.shape; ch = ndimage.grey_closing(S, size=(5, 5)); rr, cc = np.nonzero((S <= ndimage.minimum_filter(S, 3)) & (ch - S >= prof))
+    sh = S.shape; ch, mn = base if base is not None else base_pozzi(S); rr, cc = np.nonzero((S <= mn) & (ch - S >= prof))
     out, visti = [], set()
     for r0, c0 in zip(rr.tolist(), cc.tolist()):
         if (r0, c0) in visti: continue
@@ -107,6 +108,17 @@ def pozzi(S, prof=POZ_PROF, nodi=POZ_NODI):
     return out
 
 
+def pozzi_npy(H):   # pozzi(H) as arrays (for processi.dopo): the nodes of all the pits one after the other, where each starts, depth and spill
+    P = pozzi(H); n = np.array([len(q[0]) for q in P], np.int64)
+    cat = lambda k: np.concatenate([q[k] for q in P]).astype(np.int64) if P else np.zeros(0, np.int64)
+    return cat(0), cat(1), np.concatenate(([0], np.cumsum(n))).astype(np.int64), np.array([q[2] for q in P], float), np.array([q[3] for q in P], float)
+
+
+def da_npy(t):   # pozzi_npy back to the list pozzi() gives
+    rr, cc, off, prof, liv = t
+    return [(rr[off[k]:off[k + 1]], cc[off[k]:off[k + 1]], float(prof[k]), float(liv[k])) for k in range(len(prof))]
+
+
 def motivi_pozzi(s, PARTI, CARR):
     import superficie as sf
     tomb = s.TOMB | s.TOMBC | s.RIEMP
@@ -123,9 +135,9 @@ def malta(s, S, PARTI, CARR):
     for k in ('ponti', 'bed', 'fer'): marg |= ndimage.distance_transform_edt(~PARTI[k], sampling=SF) <= POZ_MARG
     for giro in range(16):
         # at several depths, the deepest first: a hole counts by its deep part
-        n = 0; pz = []; presi = np.zeros(S.shape, bool)
+        n = 0; pz = []; presi = np.zeros(S.shape, bool); bp = base_pozzi(S)
         for p_ in (2.0, 1.0, 0.6, POZ_PROF):
-            for q in pozzi(S, p_):
+            for q in pozzi(S, p_, base=bp):
                 if presi[q[0], q[1]].any(): continue
                 pz.append(q)
                 if not (marg[q[0], q[1]].any() or any(M[q[0], q[1]].any() for _, M in mot)): presi[q[0], q[1]] = True   # (a protected one does not hide a smaller pit that can be filled)
@@ -144,10 +156,11 @@ def malta(s, S, PARTI, CARR):
     return S, FILL, fatti, list(eccez.values())
 
 
-def buche(s, PROT, CARR, ROAD, CASE):
-    """closed depressions of S beside the streets, no ramp in the data: filled. S and L (the ground the raccordi start from) go up together"""
+def buche(s, PROT, CARR, ROAD, CASE, FD=None):
+    """closed depressions of S beside the streets, no ramp in the data: filled. S and L (the ground the raccordi start from) go up together
+    (FD: riempi(s.S), when it is ready)"""
     import sottoterra as stt
-    R = s.R; F, D = stt.riempi(s.S)
+    R = s.R; F, D = stt.riempi(s.S) if FD is None else FD
     lab, n = ndimage.label(D > B_REG, np.ones((3, 3), bool)); objs = ndimage.find_objects(lab)
     dst = ndimage.distance_transform_edt(~ROAD, sampling=SF)
     casi = []; FILL = np.zeros(D.shape, bool)
@@ -200,8 +213,11 @@ def distanza_vera(s, FISSI, band):
             if sf.sed_ok(L, i):
                 P = sf.poly(L, i)
                 if not P.is_empty: polys.append(P)
-    tree = shapely.STRtree(polys); rr, cc = np.nonzero(band); pts = shapely.points(R.x0 + cc * SF, R.z0 + rr * SF)
-    jn = tree.nearest(pts); dp = shapely.distance(np.array(polys, dtype=object)[jn], pts)
+    tree = shapely.STRtree(polys); rr, cc = np.nonzero(band); pts = shapely.points(R.x0 + cc * SF, R.z0 + rr * SF); PA = np.array(polys, dtype=object)
+    def vicino(k):   # (build veloce: the points in pieces on the cores; each point on its own, the distance to its nearest polygon is the same)
+        p = pts[k:k + 200_000]; return shapely.distance(PA[tree.nearest(p)], p)
+    if len(pts): tree.nearest(pts[:1])
+    dp = np.concatenate([np.zeros(0)] + sf.in_parallelo(vicino, range(0, len(pts), 200_000)))
     Fp = np.zeros(FISSI.shape, bool)   # the fixed nodes outside the polygons
     pfix = FISSI & (s.VIE if getattr(s, 'VIE', None) is not None else np.zeros(FISSI.shape, bool))
     de = ndimage.distance_transform_edt(~pfix, sampling=SF)[rr, cc] if pfix.any() else np.full(len(rr), 1e9)
@@ -267,13 +283,14 @@ def bordo_barriere(s, S, parti, CARR):
 def lisciatore(s, log=print):
     import superficie as sf
     t0 = time.time(); R = s.R; S0 = s.S.copy(); L0 = s.L; FIX = s.RANK > 0
+    import processi; fd = processi.dopo('sottoterra', 'riempi', S0)   # (the fill of buche() below, in a process of its own while the masks are made: build veloce)
     PROT, parti = protetti(s)
     CARR = FIX & np.isin(s.CLS, (sf.C_VEI, sf.C_VEIT))
     ROAD = FIX & np.isin(s.CLS, (sf.C_VEI, sf.C_VEIT, sf.C_PED, sf.C_AREA))
     CASE = _mask_geoms(R, s.case)
     rep = dict(limiti=dict(dente_m=LIM_DENTE, raccordo_minimo_m=RACC_W, gradino_pieno_m=STEP_PIENO, gradino_massimo_m=STEP_MAX, buca_prof_m=B_PROF, buca_m2=[B_AREA_MIN, B_AREA_MAX], buca_da_strada_m=B_STRADA))
     # ----- buche
-    Sb, FILLB, casi = buche(s, PROT, CARR, ROAD, CASE)
+    Sb, FILLB, casi = buche(s, PROT, CARR, ROAD, CASE, fd.result())
     Lb = np.where(FILLB, np.maximum(L0, Sb), L0)
     rep['buche'] = dict(conta={e: sum(c['esito'] == e for c in casi) for e in ('riempita', 'protetta', 'troppo_grande', 'strada_in_fondo', 'rampa_nei_dati')}, nodi=int(FILLB.sum()),
                         alzati_m=sf.pct((Sb - S0)[FILLB]), rimaste_oltre_soglia=[c for c in casi if c['esito'] != 'riempita'][:80], riempite=sorted([c for c in casi if c['esito'] == 'riempita'], key=lambda c: -c['prof'] * c['m2'])[:80])
@@ -355,21 +372,19 @@ DENTE_15_MAX_KM = 15.0   # km of edge sampled more than 15 cm off its own 4 m me
 
 def _bordi(s):
     import superficie as sf
-    out = []
-    for nm in LAYERS:
-        L = s.D[nm]
-        for i in range(len(L['off']) - 1):
-            if not sf.sed_ok(L, i): continue
-            P = sf.poly(L, i)
-            if P.is_empty: continue
-            for g in getattr(P, 'geoms', [P]):
-                for ring in [g.exterior] + list(g.interiors):
-                    ln = ring.length
-                    if ln < 4: continue
-                    d = np.arange(0, ln, 0.5); xy = shapely.get_coordinates(shapely.line_interpolate_point(ring, d)); xy2 = shapely.get_coordinates(shapely.line_interpolate_point(ring, np.minimum(d + 0.05, ln)))
-                    t = xy2 - xy; t /= np.maximum(np.hypot(*t.T), 1e-9)[:, None]; n = np.column_stack((-t[:, 1], t[:, 0]))
-                    out.append((nm, xy + n * 0.3)); out.append((nm, xy - n * 0.3))
-    return out
+    def uno(k):   # (each polygon on its own, on the cores: GEOS interpolates with the GIL let go; build veloce)
+        nm, i = k; P = sf.poly(s.D[nm], i); o = []
+        if P.is_empty: return o
+        for g in getattr(P, 'geoms', [P]):
+            for ring in [g.exterior] + list(g.interiors):
+                ln = ring.length
+                if ln < 4: continue
+                d = np.arange(0, ln, 0.5); xy = shapely.get_coordinates(shapely.line_interpolate_point(ring, d)); xy2 = shapely.get_coordinates(shapely.line_interpolate_point(ring, np.minimum(d + 0.05, ln)))
+                t = xy2 - xy; t /= np.maximum(np.hypot(*t.T), 1e-9)[:, None]; n = np.column_stack((-t[:, 1], t[:, 0]))
+                o.append((nm, xy + n * 0.3)); o.append((nm, xy - n * 0.3))
+        return o
+    ks = [(nm, i) for nm in LAYERS for i in range(len(s.D[nm]['off']) - 1) if sf.sed_ok(s.D[nm], i)]
+    return [e for o in sf.in_parallelo(uno, ks) for e in o]
 
 
 def misura_dente(G, R, bordi, PROT):
@@ -387,11 +402,11 @@ def misura_dente(G, R, bordi, PROT):
     return {nm: {k: round(v, 2) for k, v in e.items()} for nm, e in res.items()}, tot, (np.vstack(luoghi) if luoghi else np.zeros((0, 3)))
 
 
-def conta_buche(s, G, PROT, CARR, ROAD):
-    """the pits of the same definition as buche(), on the surface G"""
+def conta_buche(s, G, PROT, CARR, ROAD, D=None):
+    """the pits of the same definition as buche(), on the surface G (D: riempi(G)[1], when it is ready)"""
     import sottoterra as stt
     fos = [p for p in s.sotto.pits1 if p['esito'] in ('dubbio', 'altro') and 'g' in p]; ftree = shapely.STRtree([p['g'] for p in fos]) if fos else None
-    R = s.R; _, D = stt.riempi(G); lab, n = ndimage.label(D > B_REG, np.ones((3, 3), bool)); dst = ndimage.distance_transform_edt(~ROAD, sampling=SF); out = []
+    R = s.R; D = stt.riempi(G)[1] if D is None else D; lab, n = ndimage.label(D > B_REG, np.ones((3, 3), bool)); dst = ndimage.distance_transform_edt(~ROAD, sampling=SF); out = []
     for k, sl in enumerate(ndimage.find_objects(lab)):
         m = lab[sl] == k + 1; prof = float(D[sl][m].max()); a = m.sum() * SF * SF
         if prof < B_PROF + 0.03 or a < B_AREA_MIN: continue
@@ -406,11 +421,16 @@ def conta_buche(s, G, PROT, CARR, ROAD):
 def controlli(s, G, out_file=None, log=print):
     """G: S as the tiles give it (read back). Before and after on the whole map, and what must not have changed"""
     import superficie as sf
-    R = s.R; S0 = s.S0_lisc; PROT = s.LISC_PROT; FIX = s.RANK > 0; G0 = np.round(S0 * 100) / 100; bordi = _bordi(s)
-    IN = ~np.isnan(G); G = np.where(IN, G, G0)
+    R = s.R; S0 = s.S0_lisc; PROT = s.LISC_PROT; FIX = s.RANK > 0; G0 = np.round(S0 * 100) / 100
+    IN = ~np.isnan(G); G = np.where(IN, G, G0); G1 = np.where(IN, G, np.round(s.S * 100) / 100)
+    # (build veloce: the fills and the floods below, numpy and pure Python on the same surfaces, in processes of their own from now)
+    import processi
+    fut = dict(r0=processi.dopo('sottoterra', 'riempi', G0), r1=processi.dopo('sottoterra', 'riempi', G), p0=processi.dopo('lisciatore', 'pozzi_npy', G0),
+               p1=processi.dopo('lisciatore', 'pozzi_npy', G1), pm=processi.dopo('lisciatore', 'pozzi_npy', -G))
+    bordi = _bordi(s)
     CARR = FIX & np.isin(s.CLS, (sf.C_VEI, sf.C_VEIT)); ROAD = FIX & np.isin(s.CLS, (sf.C_VEI, sf.C_VEIT, sf.C_PED, sf.C_AREA))
     p0, t0_, _ = misura_dente(G0, R, bordi, PROT); p1, t1, luoghi = misura_dente(G, R, bordi, PROT)
-    b0 = conta_buche(s, G0, PROT, CARR, ROAD); b1 = conta_buche(s, G, PROT, CARR, ROAD)
+    b0 = conta_buche(s, G0, PROT, CARR, ROAD, fut['r0'].result()[1]); b1 = conta_buche(s, G, PROT, CARR, ROAD, fut['r1'].result()[1])
     dG = G - G0; mv = np.abs(dG) >= 0.015; B = s.LISC_BUCHE; parti = s.LISC_PARTI
     gr_ = {}; CS = s.CASE_LISC; g_lista = []
     for a_, b_ in (((slice(None), slice(0, -1)), (slice(None), slice(1, None))), ((slice(0, -1), slice(None)), (slice(1, None), slice(None))), ((slice(0, -1), slice(0, -1)), (slice(1, None), slice(1, None))), ((slice(0, -1), slice(1, None)), (slice(1, None), slice(0, -1)))):
@@ -429,20 +449,20 @@ def controlli(s, G, out_file=None, log=print):
     # the small pits, before and after, on what the tiles give; the exceptions with the reason. And the small spikes, only counted
     mot = motivi_pozzi(s, parti, CARR); marg = np.zeros(G.shape, bool)
     for k_ in ('ponti', 'bed', 'fer'): marg |= ndimage.distance_transform_edt(~parti[k_], sampling=SF) <= POZ_MARG
-    def conta_pozzi(H):
+    def conta_pozzi(H, P):
         tutti, ecc = 0, []
-        for rr, cc, prof, liv in pozzi(H):
+        for rr, cc, prof, liv in P:
             if not IN[rr, cc].all(): continue   # the lattice past the tiles: the game has no such node
             tutti += 1; j = np.argmin(H[rr, cc]); motivo = next((nm for nm, M in mot if M[rr, cc].any()), None)
             if motivo is None and marg[rr, cc].any(): motivo = 'a meno di %.0f m da ponte, acqua o ferrovia' % POZ_MARG
             e = dict(x=round(float(R.x0 + cc[j] * SF), 1), z=round(float(R.z0 + rr[j] * SF), 1), m2=int(len(rr) * SF * SF), prof=round(float(prof), 2), motivo=motivo)
             ecc.append(e)
         return tutti, ecc
-    n0, l0 = conta_pozzi(G0); G1 = np.where(IN, G, np.round(s.S * 100) / 100); n1, l1 = conta_pozzi(G1)
+    n0, l0 = conta_pozzi(G0, da_npy(fut['p0'].result())); n1, l1 = conta_pozzi(G1, da_npy(fut['p1'].result()))
     fuori = [e for e in l1 if e['motivo'] is None]; ecc1 = sorted([e for e in l1 if e['motivo'] is not None], key=lambda e: -e['prof'])
     per_mot = {}
     for e in ecc1: per_mot[e['motivo']] = per_mot.get(e['motivo'], 0) + 1
-    punte = sorted([dict(x=round(float(R.x0 + cc[np.argmax(G[rr, cc])] * SF), 1), z=round(float(R.z0 + rr[np.argmax(G[rr, cc])] * SF), 1), m2=int(len(rr) * SF * SF), alta=round(float(p_), 2)) for rr, cc, p_, _ in pozzi(-G) if IN[rr, cc].all()], key=lambda e: -e['alta'])
+    punte = sorted([dict(x=round(float(R.x0 + cc[np.argmax(G[rr, cc])] * SF), 1), z=round(float(R.z0 + rr[np.argmax(G[rr, cc])] * SF), 1), m2=int(len(rr) * SF * SF), alta=round(float(p_), 2)) for rr, cc, p_, _ in da_npy(fut['pm'].result()) if IN[rr, cc].all()], key=lambda e: -e['alta'])
     punte_fuori = [e for e in punte if not any(M[int(round((e['z'] - R.z0) / SF)), int(round((e['x'] - R.x0) / SF))] for _, M in mot) and not marg[int(round((e['z'] - R.z0) / SF)), int(round((e['x'] - R.x0) / SF))]]
     POZm = s.LISC_POZZ
     cambiati_oggetti = sum(int((np.abs(dG)[M & ~POZm & ~s.LISC_BARR & ~s.LISC_BIN] >= 0.015).sum()) for _, M in mot)

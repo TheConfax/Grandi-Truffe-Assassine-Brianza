@@ -17,7 +17,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import dbgt_quote as dq
 import riquadro as RQ
-from presto import in_parallelo   # the TINs on all the cores (src/presto.py)
+from presto import in_parallelo, NT as NT_   # the TINs on all the cores (src/presto.py)
 from dbgt_quote import DATA, KX, KZ, LAT0, LON0, FT_RAW, FT_NONE
 
 # map frame, as src/build.py and the game: tile i,j has its corner at (-META.hw + i*TILE, -META.hh + j*TILE)
@@ -86,6 +86,33 @@ class Reticolo:
 
     def xz(s, w):
         r0, r1, c0, c1 = w; return np.meshgrid(s.x0 + np.arange(c0, c1) * s.st, s.z0 + np.arange(r0, r1) * s.st)
+
+
+def maschera(R, geoms, M=None, blocco=1_000_000):
+    """M |= the nodes of R inside each geometry: the same nodes as the loop `w = R.win(g.bounds, SF); M[w] |= shapely.contains_xy(g, *R.xz(w))`
+    (build veloce, 4/11: 228k small rasters were 80 s of the terrain, mostly Python around tiny calls). Each geometry is tested on the same
+    nodes of its window (x0 + c * st, z0 + r * st, the same floats), all the pairs in a few big contains_xy calls on the cores (shapely lets the
+    GIL go there); OR does not care about order"""
+    if M is None: M = np.zeros((R.nz, R.nx), bool)
+    G = np.asarray(list(geoms) if not isinstance(geoms, np.ndarray) else geoms, dtype=object)
+    if not len(G): return M
+    G = G[~shapely.is_empty(G)]
+    if not len(G): return M
+    nuovi = G[~shapely.is_prepared(G)]; shapely.prepare(nuovi); b = shapely.bounds(G)   # (prepared here and let go at the end: the caller's geometries stay as they were)
+    c0 = np.maximum(0, np.floor((b[:, 0] - R.x0) / R.st)).astype(np.int64); c1 = np.minimum(R.nx, np.ceil((b[:, 2] - R.x0) / R.st) + 1).astype(np.int64)
+    r0 = np.maximum(0, np.floor((b[:, 1] - R.z0) / R.st)).astype(np.int64); r1 = np.minimum(R.nz, np.ceil((b[:, 3] - R.z0) / R.st) + 1).astype(np.int64)
+    nc, nr = np.maximum(c1 - c0, 0), np.maximum(r1 - r0, 0); n = nc * nr; ok = n > 0
+    G, c0, r0, nc, n = G[ok], c0[ok], r0[ok], nc[ok], n[ok]
+    cs = np.cumsum(n); i = 0; gr = []
+    while i < len(G):   # groups of geometries with at most `blocco` pairs (a single big one alone)
+        j = max(i + 1, int(np.searchsorted(cs, (cs[i - 1] if i else 0) + blocco, 'right'))); gr.append((i, j)); i = j
+    def uno(ij):
+        i, j = ij; gi = np.repeat(np.arange(i, j), n[i:j]); k = np.arange(len(gi)) - np.repeat(np.cumsum(n[i:j]) - n[i:j], n[i:j])
+        rr = r0[gi] + k // nc[gi]; cc = c0[gi] + k % nc[gi]
+        ins = shapely.contains_xy(G[gi], R.x0 + cc * R.st, R.z0 + rr * R.st); return rr[ins], cc[ins]
+    for rr, cc in in_parallelo(uno, gr, nt=min(8, NT_)): M[rr, cc] = True
+    shapely.destroy_prepared(nuovi)
+    return M
 
 
 def tri_interp(G, R, x, z):  # the game's formula (world3.js groundH): two triangles per cell, diagonal u >= v
@@ -294,6 +321,40 @@ def osm_ostacoli(path, lonlat, cache=None):
     return out
 
 
+_OSM = {}   # cache file -> the process writing it (osm_in_fondo)
+
+
+def osm_in_fondo(s, out):
+    """build veloce (4/11): the three readings of maplarge.osm the terrain makes (osm_ostacoli here, osm_sotto of sottoterra.py, osm_vie of
+    impalcati.py), each in a process of its own from the start, into the caches they already had in `out`. Each reader waits for its process
+    (aspetta_osm) and reads the cache: the same geometries (WKB, bit for bit) as reading the file. A cache already valid is left alone"""
+    import subprocess
+    path = os.path.join(DATA, 'osm', 'maplarge.osm'); os.makedirs(out, exist_ok=True)
+    lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50])); bb = (lo_[0], la_[0], lo_[1], la_[1])
+    for mod, fn, arg, nome in (('superficie', 'osm_ostacoli', bb, 'cache_osm_v2.pkl'), ('impalcati', 'osm_vie', bb, 'cache_osm_vie.pkl'),
+                               ('sottoterra', 'osm_sotto', shapely.to_wkb(s.conf.buffer(60)), 'cache_osm_sotto.pkl')):
+        c = os.path.abspath(os.path.join(out, nome))
+        if os.path.exists(c) and os.path.getmtime(c) > os.path.getmtime(path): continue
+        with open(c + '.args', 'wb') as fo: pickle.dump((mod, fn, path, arg, c), fo)
+        try: _OSM[c] = subprocess.Popen([sys.executable, os.path.abspath(__file__), '--osm-in-fondo', c + '.args'])
+        except OSError: pass
+
+
+def aspetta_osm(cache):
+    """the process of osm_in_fondo that writes this cache, if any, done; a cache it left unfinished is removed (the reader reads the file)"""
+    if not cache: return
+    p = _OSM.pop(os.path.abspath(cache), None)
+    if p is not None and p.wait() != 0 and os.path.exists(cache): os.remove(cache)
+    if p is not None and os.path.exists(cache + '.args'): os.remove(cache + '.args')
+
+
+def _osm_figlio(fa):
+    import importlib
+    mod, fn, path, arg, c = pickle.load(open(fa, 'rb'))
+    if mod == 'sottoterra': arg = shapely.from_wkb(arg)
+    getattr(importlib.import_module(mod), fn)(path, arg, c)
+
+
 # ---------- PNG ----------
 def png(path, rgb):
     rgb = np.clip(rgb, 0, 255).astype(np.uint8); h, w, _ = rgb.shape; raw = b''.join(b'\x00' + rgb[r].tobytes() for r in range(h))
@@ -414,23 +475,17 @@ class Superficie:
     # ----- 3. features
     def strade(s):
         t0 = time.time(); s._alloc(); D = s.D; AX = s.AX
+        import sottoterra as stt; stt.prepara(s)   # the 1 m LiDAR of sottoterra() and its fill, in a process of its own while the streets burn (build veloce)
         # bridges and gallery cover: never burned (phase 3 objects); the SED=01 features below them are
         for nm in ('PONTE', 'GALLER', 'AC_VEI', 'AC_PED', 'AC_CIC', 'AR_STR', 'SD_FER'):
-            L = D[nm]
-            for i in range(len(L['off']) - 1):
-                if nm not in ('PONTE', 'GALLER') and sed_ok(L, i): continue
-                w, m = s.raster(poly(L, i))
-                if w is not None:
-                    s.BR[w[0]:w[1], w[2]:w[3]] |= m
-                    if nm == 'PONTE': s.BRP[w[0]:w[1], w[2]:w[3]] |= m
+            L = D[nm]; m = maschera(s.R, [poly(L, i) for i in range(len(L['off']) - 1) if nm in ('PONTE', 'GALLER') or not sed_ok(L, i)])
+            s.BR |= m
+            if nm == 'PONTE': s.BRP |= m
         okz = lambda z, ft: ~np.isnan(z)
         # carriageways: own axes (blended), else an axis within 8 m (not for the inner areas ZON 0307), else the TIN of the vertices
         V = D['AC_VEI']; s.vei = {}; s.interne = []; nst = dict(asse=0, asse_vicino=0, tin=0, interne=0, scartati=0)
-        def poly_tin(i): tv = tin_di(V, i, okz); return poly(V, i), (Tin(*tv) if tv is not None else None)
-        ii = [i for i in range(len(V['off']) - 1) if sed_ok(V, i)]; pt = dict(zip(ii, in_parallelo(poly_tin, ii)))   # the TINs at the same time, used in order below
-        for i in range(len(V['off']) - 1):
-            if not sed_ok(V, i): continue
-            P, tin = pt.pop(i)
+        def poly_tin(i):   # the polygon, its TIN and its axes: each polygon on its own (build veloce: the axes too, they were 10 s of TIN queries)
+            tv = tin_di(V, i, okz); P = poly(V, i); tin = Tin(*tv) if tv is not None else None
             js = AX.cand(P.buffer(AX_OWN)); how = 'asse'
             if len(js) and tin is not None:
                 mx, mz = (AX.A[js] + AX.B[js]).T / 2; js = js[np.abs((AX.za[js] + AX.zb[js]) / 2 - tin(mx, mz)) < LEVEL]
@@ -438,6 +493,12 @@ class Superficie:
                 js = AX.cand(P.buffer(AX_NEAR)); how = 'asse_vicino'
                 if len(js) and tin is not None:
                     mx, mz = (AX.A[js] + AX.B[js]).T / 2; js = js[np.abs((AX.za[js] + AX.zb[js]) / 2 - tin(mx, mz)) < LEVEL]
+            return P, tin, js, how
+        AX.cand(box(0, 0, 1, 1))   # (the tree built before the threads read it)
+        ii = [i for i in range(len(V['off']) - 1) if sed_ok(V, i)]; pt =dict(zip(ii, in_parallelo(poly_tin, ii)))   # the TINs at the same time, used in order below
+        for i in range(len(V['off']) - 1):
+            if not sed_ok(V, i): continue
+            P, tin, js, how = pt.pop(i)
             if not len(js): js = None; how = 'tin'
             if js is None and V['attr']['zon'][i] == '0307':  # inner areas of the lots with no axis: their DBGT Z is off the LiDAR by
                 s.interne.append(P); nst['interne'] += 1; continue  # more than 0.5 m on 12 % of the nodes; the ground there is the LiDAR
@@ -520,10 +581,7 @@ class Superficie:
             for k, (P_, T_) in zip(ks, in_parallelo(ped_tin, ks)):
                 s.burn(P_, R_PED, cls, k[1], T_)
         s.alveo()
-        s.INT = np.zeros(s.RANK.shape, bool)
-        for P in s.interne:
-            w, m = s.raster(P)
-            if w is not None: s.INT[w[0]:w[1], w[2]:w[3]] |= m
+        s.INT = maschera(s.R, s.interne)
         s.t['strade'] = round(time.time() - t0, 1)
         s.log('strade: carreggiate %s, nodi fissi %d, sotto ponti %d, bordi agganciati %d (muri che il LiDAR non vede %d), punti di marciapiedi e aree al LiDAR %d' % (nst, int((s.RANK > 0).sum()), int(s.BR.sum()), s.nkerb, s.kerb_falsi, s.ped_lidar))
 
@@ -678,12 +736,7 @@ class Superficie:
         # a capped patch over the river is a culvert (tombino) the LiDAR sees through: the road keeps the DBGT
         s.TOMB = np.zeros(s.CAP.shape, bool); s.PNS = np.zeros(s.CAP.shape, bool)
         if s.CAP.any():
-            alv = np.zeros(s.CAP.shape, bool)
-            for nm in ('ALVEO', 'ALVEO_A'):
-                L = s.D[nm]
-                for i in range(len(L['off']) - 1):
-                    w, m = s.raster(poly(L, i).buffer(3.0))
-                    if w is not None: alv[w[0]:w[1], w[2]:w[3]] |= m
+            alv = maschera(s.R, shapely.buffer(np.array([poly(s.D[nm], i) for nm in ('ALVEO', 'ALVEO_A') for i in range(len(s.D[nm]['off']) - 1)], dtype=object), 3.0, quad_segs=16))
             lab, nl = ndimage.label(s.CAP, st8)
             if nl:
                 hit = np.unique(lab[s.CAP & alv]); hit = hit[hit > 0]
@@ -723,6 +776,22 @@ class Superficie:
     # own function: the blended axes, flat in section) and are fixed, so the section is flat over the whole drawn width and the slopes of
     # step 6 start past its edge. The height comes from the DBGT, the width from the drawn road. Not where the carriageway is capped to the
     # LiDAR or a deck part, and not more than VIA_DZ over or under the ground (another level: a road beside a ramp)
+    def disegnati(s, key):   # the polygons of brianza.json tiles[t][key] (as, sd, pz, ft, sf) of the tiles over the lattice, in order
+        B = s.B; m = B['meta']; ntx = m['ntx']; out = []
+        x0, x1, z0, z1 = s.R.x0, s.R.x0 + (s.R.nx - 1) * SF, s.R.z0, s.R.z0 + (s.R.nz - 1) * SF
+        dec = lambda a: np.cumsum(np.asarray(a, float).reshape(-1, 2), axis=0) / 10
+        for ti, T in enumerate(B['tiles']):
+            if not T or not T.get(key): continue
+            tx, tz = ti % ntx, ti // ntx; bx, bz = -m['hw'] + tx * TILE, -m['hh'] + tz * TILE
+            if bx > x1 or bx + TILE < x0 or bz > z1 or bz + TILE < z0: continue
+            for a in T[key]:
+                o = dec(a['p'])
+                if len(o) < 3: continue
+                P = Polygon(o, [dec(h) for h in a.get('k', []) if len(h) >= 6])
+                if not P.is_valid: P = P.buffer(0)
+                out.append(P)
+        return out
+
     def vie(s):
         s.nvie = dict(nodi=0, sotto_ponti=0); s.vie_dz = np.zeros(0); s.VIE = np.zeros(s.RANK.shape, bool); s.ZSOTTO = np.full(s.RANK.shape, np.nan)   # the ground under those deck parts: the drawn road
         bj = os.path.join(HERE, '..', 'brianza.json')
@@ -731,23 +800,11 @@ class Superficie:
         x0, x1, z0, z1 = s.R.x0, s.R.x0 + (s.R.nx - 1) * SF, s.R.z0, s.R.z0 + (s.R.nz - 1) * SF
         def dec(a):
             o = np.cumsum(np.asarray(a, float).reshape(-1, 2), axis=0) / 10; return o
-        ins = {}; ALL = np.zeros(s.RANK.shape, bool)
+        ins = {}; ALL = np.zeros(s.RANK.shape, bool); s.DISEGNO = {}   # (the polygons drawn, kept for acque())
         for key, cls in (('as', C_VEIT), ('sd', C_PED)):
-            M = np.zeros(s.RANK.shape, bool)
-            for ti, T in enumerate(B['tiles']):
-                if not T or not T.get(key): continue
-                tx, tz = ti % ntx, ti // ntx; bx, bz = -m['hw'] + tx * TILE, -m['hh'] + tz * TILE
-                if bx > x1 or bx + TILE < x0 or bz > z1 or bz + TILE < z0: continue
-                for a in T[key]:
-                    o = dec(a['p'])
-                    if len(o) < 3: continue
-                    P = Polygon(o, [dec(h) for h in a.get('k', []) if len(h) >= 6])
-                    if not P.is_valid: P = P.buffer(0)
-                    w, mk = s.raster(P)
-                    if w is not None: M[w[0]:w[1], w[2]:w[3]] |= mk
-                    w, mk = s.raster(P.buffer(VIA_BORDO, 4))   # every cell the drawn surface touches: all its corners flat
-                    if w is not None: ALL[w[0]:w[1], w[2]:w[3]] |= mk
-            ins[cls] = M
+            Ps = s.DISEGNO[key] = s.disegnati(key)
+            ins[cls] = maschera(s.R, Ps)
+            maschera(s.R, shapely.buffer(np.array(Ps, dtype=object), VIA_BORDO, quad_segs=4), ALL)   # every cell the drawn surface touches: all its corners flat
         # docs/motore.md 7: inside the DBGT the game draws its own areas (AC_VEI, AC_PED, MAN_TR: src/dbgt_strade.py), already burned here at
         # their height, so inside them nothing is left to do; what remains is the corners of the cells their edge crosses (VIA_BORDO, flat
         # at the height of the carriageway: else the edge of the asphalt climbs the slope in teeth, punto 1 under PONTE 14) and the ways
@@ -781,9 +838,8 @@ class Superficie:
         # the bridge, which then spans the drawn road) and the ground under them is filled like the rest under the bridges
         dp = ndimage.distance_transform_edt(~s.BRP, sampling=SF) if s.BRP.any() else np.full(s.BRP.shape, 1e9)
         alto = (s.RANK > 0) & np.isin(s.CLS, (C_FER, C_PED, C_AREA)) & (dp <= NEAR_UNDER) & (d <= VIA_MAX)
-        for P in case:
-            w, mk = s.raster(P.buffer(1.5, 2))
-            if w is not None: free[w[0]:w[1], w[2]:w[3]] &= ~mk; alto[w[0]:w[1], w[2]:w[3]] &= ~mk
+        s.CASE15 = maschera(s.R, shapely.buffer(np.array(case, dtype=object), 1.5, quad_segs=2))   # (acque() takes the same mask)
+        free &= ~s.CASE15; alto &= ~s.CASE15
         rr, cc = np.nonzero(ALL & (free | alto))
         if len(rr):
             sr, sc = ri[rr, cc], ci[rr, cc]; X, Z = s.R.x0 + cc * SF, s.R.z0 + rr * SF
@@ -858,39 +914,30 @@ class Superficie:
         m = B['meta']; ntx = m['ntx']; x0, x1, z0, z1 = s.R.x0, s.R.x0 + (s.R.nx - 1) * SF, s.R.z0, s.R.z0 + (s.R.nz - 1) * SF
         dec = lambda a: np.cumsum(np.asarray(a, float).reshape(-1, 2), axis=0) / 10
         KIND = {'as': C_VEIT, 'pz': C_AREA, 'sd': C_PED, 'ft': C_PED, 'sf': C_FER}
-        IN = {k: np.zeros(sh, bool) for k in KIND}; STB = np.zeros(sh, bool); SFB = np.zeros(sh, bool); SFW = np.zeros(sh, bool); rails, riv = [], []
+        # (the masks of the drawn surfaces: each polygon on the nodes of its window, all at once by maschera(); the same nodes as one by one)
+        R_ = s.R; dis = getattr(s, 'DISEGNO', {}); A_ = lambda L: np.array(L, dtype=object)
+        Ps = {k: dis[k] if k in dis else s.disegnati(k) for k in KIND}
+        IN = {k: maschera(R_, Ps[k]) for k in KIND}
+        SFW = maschera(R_, shapely.buffer(A_(Ps['sf']), VIA_BORDO, quad_segs=4)); STB = SFW.copy()
+        for k in KIND:
+            if k != 'sf': maschera(R_, shapely.buffer(A_(Ps[k]), VIA_BORDO, quad_segs=4), STB)
+        SFB = maschera(R_, [shapely.affinity.translate(P, -SF / 2, -SF / 2) for P in Ps['sf']])   # the cells whose middle is in the drawn rail bed (the node (r, c) is the corner of cell (r, c) nearest the origin)
+        rails, riv = [], []
         for ti, T in enumerate(B['tiles']):
             if not T: continue
             tx, tz = ti % ntx, ti // ntx; bx, bz = -m['hw'] + tx * TILE, -m['hh'] + tz * TILE
             if bx > x1 or bx + TILE < x0 or bz > z1 or bz + TILE < z0: continue
-            for k in KIND:
-                for a in T.get(k, []):
-                    o = dec(a['p'])
-                    if len(o) < 3: continue
-                    P = Polygon(o, [dec(h) for h in a.get('k', []) if len(h) >= 6])
-                    if not P.is_valid: P = P.buffer(0)
-                    w, mk = s.raster(P)
-                    if w is not None: IN[k][w[0]:w[1], w[2]:w[3]] |= mk
-                    w, mk = s.raster(P.buffer(VIA_BORDO, 4))
-                    if w is not None:
-                        STB[w[0]:w[1], w[2]:w[3]] |= mk
-                        if k == 'sf': SFW[w[0]:w[1], w[2]:w[3]] |= mk
-                    if k == 'sf':   # the cells whose middle is in the drawn rail bed (the node (r, c) is the corner of cell (r, c) nearest the origin)
-                        w, mk = s.raster(shapely.affinity.translate(P, -SF / 2, -SF / 2))
-                        if w is not None: SFB[w[0]:w[1], w[2]:w[3]] |= mk
             for r in T.get('rl', []):
                 p = dec(r['p'])
                 if len(p) >= 2: rails.append(LineString(p))
             for r in T.get('rv', []):
                 p = dec(r['p'])
                 if len(p) >= 2: riv.append((LineString(p), float(r['w'])))
-        for g in rails:
-            w, mk = s.raster(g.buffer(1.5, cap_style=2))
-            if w is not None: IN['sf'][w[0]:w[1], w[2]:w[3]] |= mk
-            w, mk = s.raster(g.buffer(1.5 + VIA_BORDO, cap_style=2))
-            if w is not None: STB[w[0]:w[1], w[2]:w[3]] |= mk; SFW[w[0]:w[1], w[2]:w[3]] |= mk
-            w, mk = s.raster(shapely.affinity.translate(g.buffer(1.5, cap_style=2), -SF / 2, -SF / 2))
-            if w is not None: SFB[w[0]:w[1], w[2]:w[3]] |= mk
+        if rails:
+            b15 = shapely.buffer(A_(rails), 1.5, quad_segs=16, cap_style=2)
+            maschera(R_, b15, IN['sf'])
+            b4 = maschera(R_, shapely.buffer(A_(rails), 1.5 + VIA_BORDO, quad_segs=16, cap_style=2)); STB |= b4; SFW |= b4
+            maschera(R_, [shapely.affinity.translate(g, -SF / 2, -SF / 2) for g in b15], SFB)
         ST = np.zeros(sh, bool)
         for k in KIND: ST |= IN[k]
         s.STRADE_DIS = ST; PB = s.BRP | s.BR | s.AIR; dp = ndimage.distance_transform_edt(~PB, sampling=SF) if PB.any() else np.full(sh, 1e9); ponte = dp <= 2.0   # under or by a bridge or a deck part: the bed stays open, the ground is the deck's business
@@ -906,11 +953,7 @@ class Superficie:
             ok = (ri >= 0) & (ri < sh[0]) & (ci >= 0) & (ci < sh[1]); ri, ci = ri[ok], ci[ok]; k = ST[ri, ci] & ~ponte[ri, ci]; sotto[ri[k], ci[k]] = True
         near_x = ndimage.distance_transform_edt(~sotto, sampling=SF) <= 4.0 if sotto.any() else np.zeros(sh, bool)
         cov_st = BED0 & ~ponte & (ST | (STB & near_x))
-        m03, m01 = np.zeros(sh, bool), np.zeros(sh, bool)
-        for gs, M_, r_ in ((ax03, m03, 4.0), (ax01, m01, 2.0)):
-            for g in gs:
-                w, mk = s.raster(g.buffer(r_))
-                if w is not None: M_[w[0]:w[1], w[2]:w[3]] |= mk
+        m03, m01 = maschera(R_, shapely.buffer(A_(ax03), 4.0, quad_segs=16)), maschera(R_, shapely.buffer(A_(ax01), 2.0, quad_segs=16))
         cov_03 = BED0 & m03 & ~m01 & ~ponte & ~cov_st
         strada = (s.RANK > 0) & np.isin(s.CLS, (C_VEI, C_VEIT, C_FER, C_PED, C_AREA)) & ~BED0
         d, (ri, ci) = ndimage.distance_transform_edt(~strada, sampling=SF, return_indices=True)
@@ -933,11 +976,8 @@ class Superficie:
         # not by a bridge whatever the drop (the bank of the channel stands at the edge of the rail bed, a wall in the next cell, as the
         # culvert's headwall). A free node raised against a fixed neighbour that is not a bed nor the rail bed itself steeper than 2:3 + 0.3 m
         # (another street at another level) goes back, and so on outwards
-        CASE0 = np.zeros(sh, bool)
-        for P in s.case:
-            w, mk = s.raster(P.buffer(1.5, 2))
-            if w is not None: CASE0[w[0]:w[1], w[2]:w[3]] |= mk
-        SFB = SFB | np.roll(SFB, 1, 0) | np.roll(SFB, 1, 1) | np.roll(np.roll(SFB, 1, 0), 1, 1)   # the four corners of those cells
+        CASE0 = s.CASE15   # the buildings + 1.5 m, as vie() made it
+        SFB =SFB | np.roll(SFB, 1, 0) | np.roll(SFB, 1, 1) | np.roll(np.roll(SFB, 1, 0), 1, 1)   # the four corners of those cells
         BEDN = np.isin(s.CLS, (C_ALV, C_ARG)) & (s.RANK > 0)
         FER = (s.RANK > 0) & (s.CLS == C_FER) & ~s.AIR & ~s.CAP
         if FER.any():
@@ -963,9 +1003,7 @@ class Superficie:
             s.nacque.update(bordo_ferrovia_nodi_liberi=int((RAI & libn).sum()), bordo_ferrovia_nodi_di_alveo=int((RAI & bedn).sum()), bordo_ferrovia_tolti_per_muro=tolti)
         # (b) holes of the drawn streets over a watercourse
         WZ = ndimage.binary_dilation(BED0, iterations=2)
-        for g, w_ in riv:
-            w, mk = s.raster(g.buffer(w_ + 3.0))
-            if w is not None: WZ[w[0]:w[1], w[2]:w[3]] |= mk
+        if riv: maschera(R_, shapely.buffer(A_([g for g, _ in riv]), np.array([w_ + 3.0 for _, w_ in riv]), quad_segs=16), WZ)
         H0 = np.where(s.RANK > 0, s.ZF, s.L)
         cand = ST & WZ & (s.RANK == 0) & ~ponte
         if cand.any():
@@ -984,21 +1022,19 @@ class Superficie:
         AUM = np.zeros(sh, bool)
         w, mk = s.raster(s.AU.buffer(2.0))
         if w is not None: AUM[w[0]:w[1], w[2]:w[3]] |= mk
-        CASE = np.zeros(sh, bool)
-        for P in s.case:
-            w, mk = s.raster(P.buffer(1.5, 2))
-            if w is not None: CASE[w[0]:w[1], w[2]:w[3]] |= mk
-        NO = STB | CASE | AUM | (s.RANK > 0) | s.AIR
+        CASE = s.CASE15
+        NO =STB | CASE | AUM | (s.RANK > 0) | s.AIR
         lines = []
         for w_ in sorted(set(w for _, w in riv)):
             ml = shapely.line_merge(shapely.union_all([g for g, w in riv if w == w_]))
             for g in getattr(ml, 'geoms', [ml]):
                 if g.geom_type == 'LineString' and g.length > 4: lines.append((g, w_))
-        nserie, scavati, fuori, dentro = 0, 0, 0, 0
+        nserie, scavati, fuori, dentro = 0, 0, 0, 0; AUb = {}; corse = []
         for g, w_ in lines:
             n = max(2, int(np.ceil(g.length / 2.0)) + 1); p = shapely.get_coordinates(shapely.line_interpolate_point(g, np.linspace(0, g.length, n)))
             ok = (p[:, 0] > x0 + 4) & (p[:, 0] < x1 - 4) & (p[:, 1] > z0 + 4) & (p[:, 1] < z1 - 4)
-            ok &= ~shapely.contains_xy(s.AU.buffer(w_ + 2.0), p[:, 0], p[:, 1])
+            if w_ not in AUb: AUb[w_] = s.AU.buffer(w_ + 2.0)   # (the same buffer for the streams of the same width: made once)
+            ok &= ~shapely.contains_xy(AUb[w_], p[:, 0], p[:, 1])
             if ok.sum() < 3: continue
             t = np.gradient(p, axis=0); t /= np.maximum(np.hypot(*t.T), 1e-9)[:, None]; nrm = np.column_stack((-t[:, 1], t[:, 0]))
             offs = np.linspace(-(w_ + 1), w_ + 1, 9); Q = p[:, None, :] + offs[None, :, None] * nrm[:, None, :]
@@ -1015,21 +1051,26 @@ class Superficie:
             idx = np.nonzero(ok)[0]; cut = np.nonzero(np.diff(idx) > 1)[0] + 1
             for run in np.split(idx, cut):
                 if len(run) < 3: continue
-                pr, zr = p[run], zw[run]; gl = LineString(pr); kd = cKDTree(pr)
-                win = s.R.win(gl.bounds, w_ + 3.0)
-                if win is None: continue
-                X, Z = s.R.xz(win); dd = shapely.distance(gl, shapely.points(X.ravel(), Z.ravel())).reshape(X.shape)
-                _, jn = kd.query(np.column_stack((X.ravel(), Z.ravel()))); zn = zr[jn].reshape(X.shape)
-                DEP = 0.3 * w_
-                zb = np.where(dd <= w_, zn - DEP * (1 - (dd / w_) ** 2), zn + 0.05 + (dd - w_))
-                r0, r1, c0, c1 = win; Lw = s.L[r0:r1, c0:c1]
-                sel = (dd <= w_ + 3.0) & ~NO[r0:r1, c0:c1] & (zb < Lw - 0.02)
-                if not sel.any(): continue
-                bed = sel & (dd <= w_)
-                s.ZF[r0:r1, c0:c1][sel] = zb[sel]; s.RANK[r0:r1, c0:c1][sel] = R_ALV; s.FID[r0:r1, c0:c1][sel] = -2
-                s.CLS[r0:r1, c0:c1][sel] = np.where(bed[sel], C_ALV, C_ARG); s.ZE[r0:r1, c0:c1][bed] = zn[bed] + 0.05; s.TORR[r0:r1, c0:c1] |= sel
-                scavati += int(sel.sum()); nserie += 1
-                s.ACQ_OSM.append(dict(p=np.round(pr, 1).tolist(), zw=np.round(zr, 2).tolist()))
+                corse.append((p[run], zw[run], w_))
+        def letto(c):   # the bed of a run: a function of the run, L and NO only (build veloce: on the cores, written below in the same order)
+            pr, zr, w_ = c; gl = LineString(pr); kd = cKDTree(pr)
+            win = s.R.win(gl.bounds, w_ + 3.0)
+            if win is None: return None
+            X, Z = s.R.xz(win); dd = shapely.distance(gl, shapely.points(X.ravel(), Z.ravel())).reshape(X.shape)
+            _, jn = kd.query(np.column_stack((X.ravel(), Z.ravel()))); zn = zr[jn].reshape(X.shape)
+            DEP = 0.3 * w_
+            zb = np.where(dd <= w_, zn - DEP * (1 - (dd / w_) ** 2), zn + 0.05 + (dd - w_))
+            r0, r1, c0, c1 = win; Lw = s.L[r0:r1, c0:c1]
+            sel = (dd <= w_ + 3.0) & ~NO[r0:r1, c0:c1] & (zb < Lw - 0.02)
+            if not sel.any(): return None
+            return win, sel, sel & (dd <= w_), zb, zn
+        for (pr, zr, w_), lt in zip(corse, in_parallelo(letto, corse)):
+            if lt is None: continue
+            (r0, r1, c0, c1), sel, bed, zb, zn = lt
+            s.ZF[r0:r1, c0:c1][sel] = zb[sel]; s.RANK[r0:r1, c0:c1][sel] = R_ALV; s.FID[r0:r1, c0:c1][sel] = -2
+            s.CLS[r0:r1, c0:c1][sel] = np.where(bed[sel], C_ALV, C_ARG); s.ZE[r0:r1, c0:c1][bed] = zn[bed] + 0.05; s.TORR[r0:r1, c0:c1] |= sel
+            scavati += int(sel.sum()); nserie += 1
+            s.ACQ_OSM.append(dict(p=np.round(pr, 1).tolist(), zw=np.round(zr, 2).tolist()))
         s.nacque.update(torrenti_osm=len(lines), serie_osm=nserie, nodi_scavati=scavati, punti_in_valle=dentro, punti_fuori_valle=fuori)
         s.t['acque'] = round(time.time() - t0, 1)
         s.log('acque: %s' % s.nacque)
@@ -1048,14 +1089,19 @@ class Superficie:
         if getattr(s, 'ZE', None) is not None: dz = np.where(np.isfinite(s.ZE) & (s.CLS == C_ALV), s.ZE - s.L, dz)   # the bed: from the water's edge
         sh = np.where(FIX, dz, np.inf).astype(np.float32); sl = np.where(FIX, dz, -np.inf).astype(np.float32)
         n = int(BAND / SF)
-        for dr in range(-n, n + 1):
-            for dc in range(-n, n + 1):
-                r = np.hypot(dr, dc) * SF
-                if r > BAND or r == 0: continue
-                c = np.float32(r / K)
-                a = (slice(max(0, dr), nz + min(0, dr)), slice(max(0, dc), nx + min(0, dc)))
-                b = (slice(max(0, -dr), nz + min(0, -dr)), slice(max(0, -dc), nx + min(0, -dc)))
-                np.minimum(hi[a], sh[b] + c, out=hi[a]); np.maximum(lo[a], sl[b] - c, out=lo[a])
+        def fascia(rb):   # the rows [r0, r1) of hi and lo, every offset (build veloce: bands of rows on the cores; min and max do not care about the order)
+            r0, r1 = rb
+            for dr in range(-n, n + 1):
+                a0, a1 = max(r0, max(0, dr)), min(r1, nz + min(0, dr))
+                if a0 >= a1: continue
+                for dc in range(-n, n + 1):
+                    r = np.hypot(dr, dc) * SF
+                    if r > BAND or r == 0: continue
+                    c = np.float32(r / K)
+                    a = (slice(a0, a1), slice(max(0, dc), nx + min(0, dc)))
+                    b = (slice(a0 - dr, a1 - dr), slice(max(0, -dc), nx + min(0, -dc)))
+                    np.minimum(hi[a], sh[b] + c, out=hi[a]); np.maximum(lo[a], sl[b] - c, out=lo[a])
+        nb = max(1, NT_); cut = np.linspace(0, nz, nb + 1).astype(int); in_parallelo(fascia, [(cut[k], cut[k + 1]) for k in range(nb) if cut[k] < cut[k + 1]])
         BARR = s.BR & ~FIX
         S = s.L.copy(); band = ~FIX & ~BARR & np.isfinite(hi)
         lo_, hi_ = np.minimum(lo, hi), np.maximum(lo, hi)
@@ -1144,10 +1190,7 @@ class Superficie:
     # ----- 7. tiles: 2 m or 10 m, seams, quantisation
     def tessere(s, osm=None):
         t0 = time.time()
-        NEED = s.FIX | s.BR
-        for P in s.edifici:
-            w, m = s.raster(P)
-            if w is not None: NEED[w[0]:w[1], w[2]:w[3]] |= m
+        NEED = maschera(s.R, s.edifici, s.FIX | s.BR)
         near = ndimage.distance_transform_edt(~NEED, sampling=SF) <= FINE_BUF
         tree = shapely.STRtree(osm) if osm else None
         s.passo = {}
@@ -1506,12 +1549,12 @@ def main(argv=None):
     ap.add_argument('--no-png', action='store_true'); ap.add_argument('--accetta', action='store_true')
     a = ap.parse_args(argv)
     AX_SIGMA = a.sigma
-    s = Superficie(a.comune, margine=a.margine, blend=a.blend)
+    s = Superficie(a.comune, margine=a.margine, blend=a.blend); osm_in_fondo(s, a.out)
     log('tessere da fare %d (tx %d..%d, tz %d..%d), griglia %dx%d' % (len(s.tiles), s.i0, s.i1, s.j0, s.j1, s.R.nx, s.R.nz))
     s.base(); s.dbgt(); s.strade(); s.sottoterra(a.out); s.tetto(); s.ritocchi(); s.vie(); s.acque(); s.raccordi(); s.liscia()
     t0 = time.time()
     lo_, la_ = dq.game_to_lonlat(np.array([s.R.x0 - 50, s.R.x0 + s.R.nx * SF + 50]), np.array([s.R.z0 + s.R.nz * SF + 50, s.R.z0 - 50]))
-    osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_v2.pkl'))
+    aspetta_osm(os.path.join(a.out, 'cache_osm_v2.pkl')); osm = osm_ostacoli(os.path.join(DATA, 'osm', 'maplarge.osm'), (lo_[0], la_[0], lo_[1], la_[1]), os.path.join(a.out, 'cache_osm_v2.pkl'))
     s.t['osm'] = round(time.time() - t0, 1); log('osm: %d oggetti per decidere il passo' % len(osm))
     s.tessere(osm); s.sotto.fosse(); s.sotto.scrivi(a.out)
     # the same steps as costruisci() with its defaults: impalcati.py, run after this in the same process (terreno_gioco.py --rigenera), takes
@@ -1548,5 +1591,6 @@ def main(argv=None):
     return 0 if ok or a.accetta else 2
 
 
-if __name__ == '__main__':
+if __name__ == '__main__' and len(sys.argv) == 3 and sys.argv[1] == '--osm-in-fondo': _osm_figlio(sys.argv[2])
+elif __name__ == '__main__':
     sys.exit(main())

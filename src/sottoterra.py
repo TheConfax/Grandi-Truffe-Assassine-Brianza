@@ -97,10 +97,17 @@ def riempi(A):  # depth of the closed depressions: the array filled up to its sp
     F = reconstruction(seed, B, method='erosion').astype(np.float32); return F, (F - B).astype(np.float32)
 
 
+_ALBERI = {}
+def _albero(geoms):  # the STRtree of a list, made once (build veloce: _forma asked it again for every pit, 2000 trees of all the buildings)
+    t = _ALBERI.get(id(geoms))
+    if t is None or t[0] is not geoms or t[1] != len(geoms): t = _ALBERI[id(geoms)] = (geoms, len(geoms), shapely.STRtree(geoms))
+    return t[2]
+
+
 def raster(geoms, X, Z):  # mask of the points inside any of the geometries
     m = np.zeros(X.shape, bool)
     if not geoms: return m
-    t = shapely.STRtree(geoms); b = box(X.min(), Z.min(), X.max(), Z.max())
+    t = _albero(geoms); b = box(X.min(), Z.min(), X.max(), Z.max())
     for j in t.query(b):
         g = geoms[j]; x0, z0, x1, z1 = g.bounds
         k = (X >= x0) & (X <= x1) & (Z >= z0) & (Z <= z1)
@@ -199,6 +206,14 @@ def spina(op, D, Z, head, pix, fondo=False):
 
 
 # ---------- the analysis ----------
+def prepara(sup):
+    """build veloce (4/11): the 1 m mosaic of fosse_1m() and the fill of the two lattices (riempi(): skimage keeps the GIL), started in
+    processes of their own while superficie.py burns the streets (L does not change before buche()); fosse_1m() and buche() take them"""
+    import processi
+    M = Mosaico(sup.conf.buffer(40).bounds, lid=sup.lid)
+    sup._sotto_pre = dict(M=M, R1=processi.dopo('sottoterra', 'riempi', M.dtm), L=sup.L, R2=processi.dopo('sottoterra', 'riempi', sup.L))
+
+
 class Sottoterra:
     def __init__(s, sup, log=log_):
         s.sup, s.log = sup, log; s.rep = {}
@@ -206,9 +221,11 @@ class Sottoterra:
     # ----- 1 m: the pits of the DTM, the ramp candidates and their sources
     def fosse_1m(s):
         t0 = time.time(); sup = s.sup; conf = sup.conf
-        b = conf.buffer(40).bounds; s.M = M = Mosaico(b, lid=sup.lid)
-        s.F1, s.D1 = riempi(M.dtm)
+        pre = getattr(sup, '_sotto_pre', None)
+        if pre: s.M = M = pre['M']; s.F1, s.D1 = pre['R1'].result()
+        else: b = conf.buffer(40).bounds; s.M = M = Mosaico(b, lid=sup.lid); s.F1, s.D1 = riempi(M.dtm)
         s.ex = dbgt_extra(sup.gpkgs)
+        import superficie as sf; sf.aspetta_osm(getattr(s, 'cache_osm', None))   # (read in a process of its own from the start: superficie.osm_in_fondo)
         s.osm = osm_sotto(os.path.join(DATA, 'osm', 'maplarge.osm'), conf.buffer(60), getattr(s, 'cache_osm', None))
         s.edifici = list(sup.edifici) + s.ex['emin'] + edifici_gioco(sup)   # what the game draws too (brianza.json): the ramp keeps off its walls
         s.vis = viste()
@@ -323,7 +340,8 @@ class Sottoterra:
     def buche(s):
         t0 = time.time(); sup = s.sup; R = sup.R; L = sup.L; RANK, CLS = sup.RANK, sup.CLS
         import superficie as sf
-        s.F2, s.D2 = riempi(L)
+        pre = getattr(sup, '_sotto_pre', None)
+        s.F2, s.D2 = pre['R2'].result() if pre is not None and pre['L'] is L else riempi(L)
         X, Z = np.meshgrid(R.xs(), R.zs())
         IN = shapely.contains_xy(sup.conf, X, Z)
         # what the DBGT says the ground is: the burned surfaces, and the inner yards (0307 with no axis, left to the LiDAR) by their ring TIN
@@ -332,19 +350,35 @@ class Sottoterra:
         viz = {}
         for i in range(len(V['off']) - 1):
             if V['attr']['zon'][i] == '0307' and sf.sed_ok(V, i): viz[tuple(np.round(sf.poly(V, i).representative_point().coords[0], 2))] = i
-        for P in sup.interne:
+        # (build veloce: each yard on its own on the cores, on the nodes it would take one after the other; that is the same set as long as
+        # no node is inside two yards, which is checked: else one after the other as before)
+        D0 = np.isnan(DREF)
+        def cortile(P):
             w = R.win(P.bounds, 2)
-            if w is None: continue
-            Xw, Zw = R.xz(w); sub = DREF[w[0]:w[1], w[2]:w[3]]; m = shapely.contains_xy(P, Xw, Zw) & np.isnan(sub)
-            if not m.any(): continue
+            if w is None: return None
+            Xw, Zw = R.xz(w); m = shapely.contains_xy(P, Xw, Zw) & D0[w[0]:w[1], w[2]:w[3]]
+            if not m.any(): return None
             i = viz.get(tuple(np.round(P.representative_point().coords[0], 2)))
             tv = sf.tin_di(V, i, okz) if i is not None else None
-            if tv is not None: sub[m] = sf.Tin(*tv)(Xw[m], Zw[m])
+            return (w, m, sf.Tin(*tv)(Xw[m], Zw[m]) if tv is not None else None)
+        cort = sf.in_parallelo(cortile, sup.interne); N = np.zeros(L.shape, np.int16)
+        for c in cort:
+            if c is not None: N[c[0][0]:c[0][1], c[0][2]:c[0][3]] += c[1]
+        if (N > 1).any():
+            for P in sup.interne:
+                w = R.win(P.bounds, 2)
+                if w is None: continue
+                Xw, Zw = R.xz(w); sub = DREF[w[0]:w[1], w[2]:w[3]]; m = shapely.contains_xy(P, Xw, Zw) & np.isnan(sub)
+                if not m.any(): continue
+                i = viz.get(tuple(np.round(P.representative_point().coords[0], 2)))
+                tv = sf.tin_di(V, i, okz) if i is not None else None
+                if tv is not None: sub[m] = sf.Tin(*tv)(Xw[m], Zw[m])
+        else:
+            for c in cort:
+                if c is not None and c[2] is not None: DREF[c[0][0]:c[0][1], c[0][2]:c[0][3]][c[1]] = c[2]
+        del cort, N
         s.DREF = DREF
-        ED = np.zeros(L.shape, bool)
-        for g in s.edifici:
-            w = R.win(g.bounds, 0)
-            if w is not None: Xw, Zw = R.xz(w); ED[w[0]:w[1], w[2]:w[3]] |= shapely.contains_xy(g, Xw, Zw)
+        ED = sf.maschera(R, s.edifici)
         far_alv = ndimage.distance_transform_edt(~np.isin(CLS, (sf.C_ALV, sf.C_ARG)), sampling=R.st) > B_FIUME
         far_br = ndimage.distance_transform_edt(~sup.BR, sampling=R.st) > B_PONTE
         far_fer = ndimage.distance_transform_edt(~((CLS == sf.C_FER) & (RANK > 0)), sampling=R.st) > 3.0
