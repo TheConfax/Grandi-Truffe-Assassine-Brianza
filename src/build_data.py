@@ -1207,7 +1207,7 @@ _bc_tree = STRtree(_bc_parts)
 _mv = STR.carreggiate(0, strade=True) if STR else []
 _mvt = STRtree(_mv) if _mv else None
 _fermi = STR.bordi_interni() if STR else None
-_vie = [(r['line'], r['w']) for r in raw_roads if r['c'] <= 6 and flat(r) and not r.get('under') and r['line'].length > 0.1]  # a short underpass (tunnel under 80 m) passes below the wall
+_vie = [(r['line'], r['w']) for r in raw_roads if r['c'] <= 6 and (flat(r) or not (r['bridge'] or r['tunnel'])) and not r.get('under') and r['line'].length > 0.1]  # a short underpass (tunnel under 80 m) passes below the wall; a way raised over the terrain but not on a bridge (an embankment, a ramp: the ground of the game is at its height there) opens the divider it crosses (Carlo 5/11, x 300 z 1901: a railing across the exit of the petrol station onto the Milano-Meda)
 _viet = STRtree([v_[0] for v_ in _vie]) if _vie else None
 _mrep = Counter()
 for bi_, (pts, kind, hgt) in enumerate(barriers):
@@ -2294,6 +2294,17 @@ _bvt = STRtree(btree_geoms) if btree_geoms else None
 # a low curb (kind 1) on a railway platform stands under it (the platform is a step of 0.55 m over the ground): nobody can see it, it does not go in the data. The walls and the fences stay
 _pf03 = platforms.buffer(0.3); prepare(_pf03); _nc = len(bar_out); bar_out = [b_ for b_ in bar_out if not (b_[1] == 1 and _pf03.contains(LineString(b_[0])))]
 log('cordoli sotto le banchine, tolti', _nc - len(bar_out))
+# guardrail e new jersey delle superstrade (src/guardrail.py): un passaggio dedicato, continuo; i divisori del DBGT che erano loro lasciano il posto
+GUARD = None
+if STR:
+    import guardrail as GRD
+    if os.environ.get('GTA_DUMP_GUARD'):
+        import pickle; pickle.dump(dict(D=STR.D, cover=STR.cover, U_carr=STR.U_carr, raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], nodes=nodes, zh=globals().get('zh', {}), bar_out=bar_out), open(os.environ['GTA_DUMP_GUARD'], 'wb'))
+    GUARD, _gr_fatte, STR.rep['guardrail'], _gr_x = GRD.guardrail(STR.D, STR.cover, STR.U_carr, raw_roads, nodes, globals().get('zh', {}), log)
+    bar_out, STR.rep['guardrail']['divisori_sostituiti'] = GRD.sostituisci_divisori(bar_out, GUARD, _gr_x[0], log)
+    for ri_ in _gr_fatte: out_roads[ri_]['gp'] = 1   # its guardrails are in tiles[].gr: the game makes none of its own along it
+    STR.md_nj = _gr_x[2]   # the medians with a new jersey: paved (STR.push_tiles)
+    GRD.push_tiles(GUARD, ntx * ntz, tbox, push)
 for pts, kind, hgt in bar_out:
     c = LineString(pts).centroid; v_ = None
     if _bvt is not None:

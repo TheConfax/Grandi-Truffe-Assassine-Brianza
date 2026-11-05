@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 24ad4a9 · assemblato 05/11 22:09 · porta ' + location.port;
+    const txt = 'locale · ramo milano-meda · dopo 697c199 · assemblato 06/11 00:10 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2745,7 +2745,7 @@ function* roadBarriers(T) {
   const res = { rails: [] }, nearJ = (x, z, r) => { let f = false; NODEG.each(x - r, z - r, x + r, z + r, ({ i }) => { if (!f && NODE_DEG[i] >= 3 && hyp(N[i][0] - x, N[i][1] - z) < r) f = true; }); return f; };
   let n = 0;
   for (const ri of T.d.rp || []) {
-    const r = D.roads[ri]; if (r.t || r.c > 5 || !(r.c <= 1 || r.x || ON_DECK.has(ri))) continue; if (++n % 12 === 0) yield 'barriers roads'; // main roads, ramps, and any road on a deck (off the PONTE core, where the parapets are)
+    const r = D.roads[ri]; if (r.t || r.c > 5 || r.gp || !(r.c <= 1 || r.x || ON_DECK.has(ri))) continue; if (++n % 12 === 0) yield 'barriers roads'; // r.gp: an expressway whose guardrails come from the build (guardRails, below) // main roads, ramps, and any road on a deck (off the PONTE core, where the parapets are)
     const hw = r.w / 2;
     for (let k = 1; k < r.g.length; k++) {
       const ia = r.g[k - 1], ib = r.g[k], A = N[ia], B = N[ib], L = hyp(B[0] - A[0], B[1] - A[1]); if (L < 1) continue;
@@ -2791,6 +2791,62 @@ function* roadBarriers(T) {
   }
   ROAD_BAR.set(T.t, res); return res;
 }
+// guardrails and new jersey of the expressways (src/guardrail.py, tiles[].gr): continuous lines from the build, [kind, roads, points]; kind 1 a
+// guardrail on posts, 2 a new jersey (the concrete barrier in the median of the Milano-Meda). Their height: the road they run by (H.node along
+// its axis, then its surface there), the surface at the line when it is within 0.6 m of it (else the road's: the edge of a drop, a bank higher
+// than the road). Worked out once per tile, with their collisions (two sided, as the guardrails of roadBarriers)
+const GUARD = new Map(), NJ_PROF = [[-0.3, 0], [-0.3, 0.08], [-0.2, 0.3], [-0.09, 0.82], [0.09, 0.82], [0.2, 0.3], [0.3, 0.08], [0.3, 0]];
+function guardRoadY(rs, x, z) {
+  let best = null, bd = 1e9, bx = 0, bz = 0;
+  for (const ri of rs) { const r = D.roads[ri]; if (!r) continue; for (let k = 1; k < r.g.length; k++) { const A = N[r.g[k - 1]], B = N[r.g[k]], ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - A[0]) * ex + (z - A[1]) * ez) / L2, 0, 1), d = hyp(x - A[0] - ex * t, z - A[1] - ez * t); if (d < bd) { bd = d; best = lerp(H.node(r.g[k - 1]), H.node(r.g[k]), t); bx = A[0] + ex * t; bz = A[1] + ez * t; } } }
+  return best === null ? null : [H.surface(bx, bz, best + 0.5), bx, bz];
+}
+function guardRails(T) {
+  if (GUARD.has(T.t)) return GUARD.get(T.t);
+  const out = [];
+  for (const [k, rs, o] of T.d.gr || []) {
+    const pts = []; let x = 0, z = 0; for (let i = 0; i < o.length; i += 2) { x += o[i]; z += o[i + 1]; pts.push([x / 100, z / 100]); }
+    if (pts.length < 2) continue;
+    // over a drop (the mouth of an underpass under the road, the edge of a bank) a point steps back towards the road, up to 1.5 m, to where the
+    // ground is at the road's level: the guardrail stands on the edge, never hanging in front of it
+    const y0 = pts.map(p => { const q = guardRoadY(rs, p[0], p[1]); if (q === null) return H.surface(p[0], p[1]); const [yr, bx, bz] = q; let yE = H.surface(p[0], p[1], yr + 0.3);
+      if (yE < yr - 0.6) { const dx = bx - p[0], dz = bz - p[1], L = hyp(dx, dz) || 1; for (let st = 0.1; st <= 1.5 + 1e-6; st += 0.1) { const x = p[0] + dx / L * st, z = p[1] + dz / L * st, y = H.surface(x, z, yr + 0.3); if (y >= yr - 0.3) { p[0] = x; p[1] = z; yE = y; break; } } }
+      return Math.abs(yE - yr) < 0.6 ? yE : yr; });
+    const ys = y0.map((v, i) => i && i < y0.length - 1 ? (y0[i - 1] + v + y0[i + 1]) / 3 : v); // no steps along it
+    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], c = pts[i], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(ys[i - 1], ys[i]) - 0.8, y1: Math.max(ys[i - 1], ys[i]) + 2.5, deckw: true }); }
+    out.push({ k, pts, ys });
+  }
+  GUARD.set(T.t, out); return out;
+}
+function drawGuard(T, grail, pil) {
+  for (const { k, pts, ys } of guardRails(T)) {
+    const n = pts.length, nm = pts.map((p, i) => { const a = pts[Math.max(0, i - 1)], c = pts[Math.min(n - 1, i + 1)], L = hyp(c[0] - a[0], c[1] - a[1]) || 1; return [(c[1] - a[1]) / L, -(c[0] - a[0]) / L]; }); // the normal at each point, between its two segments
+    if (k === 2) { // the new jersey: its profile along the line
+      for (let i = 1; i < n; i++) {
+        const a = pts[i - 1], c = pts[i];
+        for (let j = 1; j < NJ_PROF.length; j++) {
+          const [o0, h0] = NJ_PROF[j - 1], [o1, h1] = NJ_PROF[j], dl = hyp(o1 - o0, h1 - h0) || 1, sx = -(h1 - h0) / dl, sy = (o1 - o0) / dl, b0 = pil.p.length / 3; /* (sx, sy): the outward normal of this face of the profile */
+          vtx(pil, a[0] + nm[i - 1][0] * o0, ys[i - 1] + h0, a[1] + nm[i - 1][1] * o0, nm[i - 1][0] * sx, sy, nm[i - 1][1] * sx, 0, 0); vtx(pil, c[0] + nm[i][0] * o0, ys[i] + h0, c[1] + nm[i][1] * o0, nm[i][0] * sx, sy, nm[i][1] * sx, 0, 0);
+          vtx(pil, c[0] + nm[i][0] * o1, ys[i] + h1, c[1] + nm[i][1] * o1, nm[i][0] * sx, sy, nm[i][1] * sx, 0, 0); vtx(pil, a[0] + nm[i - 1][0] * o1, ys[i - 1] + h1, a[1] + nm[i - 1][1] * o1, nm[i - 1][0] * sx, sy, nm[i - 1][1] * sx, 0, 0);
+          pil.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
+        }
+      }
+      for (const [i, sg] of [[0, -1], [n - 1, 1]]) { const p = pts[i], b0 = pil.p.length / 3; for (const [o, h] of NJ_PROF) vtx(pil, p[0] + nm[i][0] * o, ys[i] + h, p[1] + nm[i][1] * o, -nm[i][1] * sg, 0, nm[i][0] * sg, 0, 0); for (let j = 1; j < NJ_PROF.length - 1; j++) pil.i.push(b0, b0 + j, b0 + j + 1); } // its two ends closed
+      continue;
+    }
+    // a guardrail: a steel band folded in two (0.45-0.8 m) on posts every 2 m down to the ground (at most 1.6 m: on the edge of a drop it ends there)
+    for (let i = 1; i < n; i++) {
+      const a = pts[i - 1], c = pts[i], ya = ys[i - 1], yc = ys[i];
+      for (const [h0, h1, o0, o1] of [[0.45, 0.625, 0, -0.05], [0.625, 0.8, -0.05, 0]]) { const b0 = grail.p.length / 3, na = nm[i - 1], nc = nm[i]; vtx(grail, a[0] + na[0] * o0, ya + h0, a[1] + na[1] * o0, na[0], 0, na[1], 0, 0); vtx(grail, c[0] + nc[0] * o0, yc + h0, c[1] + nc[1] * o0, nc[0], 0, nc[1], 0, 0); vtx(grail, c[0] + nc[0] * o1, yc + h1, c[1] + nc[1] * o1, nc[0], 0, nc[1], 0, 0); vtx(grail, a[0] + na[0] * o1, ya + h1, a[1] + na[1] * o1, na[0], 0, na[1], 0, 0); grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); }
+    }
+    let acc = 0, next = 1.0;
+    for (let i = 1; i < n; i++) {
+      const a = pts[i - 1], c = pts[i], L = hyp(c[0] - a[0], c[1] - a[1]);
+      while (next <= acc + L) { const f = (next - acc) / (L || 1), x = lerp(a[0], c[0], f), z = lerp(a[1], c[1], f), y = lerp(ys[i - 1], ys[i], f), g = Math.max(y - 1.6, Math.min(y, H.surface(x, z, y + 0.3))); addBox(grail, x, (g + y + 0.8) / 2 - 0.05, z, 0.1, y + 0.8 - g + 0.1, 0.1, null, Math.atan2(-(c[1] - a[1]), c[0] - a[0])); next += 2.0; }
+      acc += L;
+    }
+  }
+}
 // draw them: guardrail strips on posts, the parapets (a concrete kerb with a rail, a railing on the footbridges), the pillars
 function* drawBarriers(T, grail, pil) {
   const rail = (x0, z0, y0, x1, z1, y1, a, b) => { const L = hyp(x1 - x0, z1 - z0) || 1, nx = (z1 - z0) / L, nz = -(x1 - x0) / L, b0 = grail.p.length / 3; vtx(grail, x0, y0 + a, z0, nx, 0, nz, 0, 0); vtx(grail, x1, y1 + a, z1, nx, 0, nz, 0, 0); vtx(grail, x1, y1 + b, z1, nx, 0, nz, 0, 0); vtx(grail, x0, y0 + b, z0, nx, 0, nz, 0, 0); grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
@@ -2801,6 +2857,7 @@ function* drawBarriers(T, grail, pil) {
     addBox(pil, (x0 + x1) / 2, (y0 + y1) / 2 + 0.2, (z0 + z1) / 2, L + 0.02, 0.5, 0.3, null, ry); rail(x0, z0, y0, x1, z1, y1, 0.6, 0.95); // a concrete kerb and a rail
   }
   for (const dk of H.DECKS) if (dk.bar) for (const [x, z, g, bot] of dk.bar.pillars) if (tileOf(x, z) === T.t) addBox(pil, x, (g + bot) / 2 - 0.2, z, 0.9, bot - g + 0.4, 0.9, null);
+  drawGuard(T, grail, pil);
   const R = yield* roadBarriers(T);
   for (const [x0, z0, y0, x1, z1, y1] of R.rails) { rail(x0, z0, y0, x1, z1, y1, 0.45, 0.8); const L = hyp(x1 - x0, z1 - z0); for (let s = 0; s < L; s += 2) { const f = s / L, x = lerp(x0, x1, f), z = lerp(z0, z1, f), y = lerp(y0, y1, f), g = Math.min(y, H.surface(x, z, y + 0.3)); addBox(pil, x, (g + y + 0.75) / 2 - 0.1, z, 0.1, y + 0.75 - g + 0.2, 0.1, null); } } // posts every 2 m, down to the ground or the deck under them (not through it to the road below: deck 10, verifica fase 6)
 }
@@ -10663,5 +10720,5 @@ window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>
