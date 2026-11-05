@@ -478,7 +478,7 @@ def fondo_valle(lid, p, w, R=15.0):
 
 def a5_fondo_valle(m, lid):
     """OSM stream pieces in the tiles of S: points every 2 m whose LiDAR stands more than FONDO over the bottom of
-    the valley across (within 15 m) and that bottom more than the half width off the line"""
+    the valley across (within 15 m) and that bottom more than the half width off the line; only where the game draws water there (m.water over S)"""
     tot, lon, P, V = 0.0, 0.0, [], []
     for r in m.rv:
         p = r['p']
@@ -488,6 +488,7 @@ def a5_fondo_valle(m, lid):
         if ok.sum() < 2: continue
         lp, lb, off = fondo_valle(lid, q, r['w'])
         far = ok & (lp - lb > FONDO) & (np.abs(off) > r['w'])
+        zw = m.water(q[:, 0], q[:, 1]); far &= np.isfinite(zw) & (zw > m.H(q[:, 0], q[:, 1]))   # the game draws water only where H.water exists (not in a culvert, not off a valley: altezze3.js water) and stands over S (as A1): elsewhere nothing to see
         seg = Lg.length / (n - 1); tot += ok.sum() * seg; lon += far.sum() * seg
         P.append(q[far]); V.append((lp - lb)[far])
     P = np.vstack(P) if P else np.zeros((0, 2)); V = np.concatenate(V) if V else np.zeros(0)

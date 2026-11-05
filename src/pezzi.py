@@ -145,7 +145,8 @@ def main(argv=None):
     class Muto(http.server.SimpleHTTPRequestHandler):
         def __init__(s, *p, **k): super().__init__(*p, directory=a.root, **k)
         def log_message(s, *p): pass
-    srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Muto); threading.Thread(target=srv.serve_forever, daemon=True).start()
+    class Server(http.server.ThreadingHTTPServer): request_queue_size = 256   # the invisible browser opens 16 connections at once (5 fails on Windows)
+    srv = Server(('127.0.0.1', 0), Muto); threading.Thread(target=srv.serve_forever, daemon=True).start()
     c = os.path.join(a.root, 'mappa', 'cotta.json')
     rc = subprocess.call(['node', os.path.join(ROOT, 'src', 'cuoci.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], c, os.path.join(a.root, 'mappa', 'grande.webp')])
     srv.shutdown()
