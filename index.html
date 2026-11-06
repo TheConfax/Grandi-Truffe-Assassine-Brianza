@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 24ad4a9 · assemblato 05/11 22:09 · porta ' + location.port;
+    const txt = 'locale · ramo traffico-incastri · dopo 5fc4f3f · assemblato 06/11 23:46 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -8826,7 +8826,12 @@ function steerTo(v, tx, tz, cruise, avoid) {
 }
 function aiTraffic(v, dt) {
   const ai = v.ai; extendRoute(v);
-  if (!ai.q.length) { v.inp.thr = 0; v.inp.brk = 1; return; }
+  if (!ai.q.length) { /* the road ends here (a one-way carriageway cut at the edge of the data, a stub): the car leaves the map like real traffic leaves the area, out of sight or after 40 s; a patrol car picks another road */
+    v.inp.thr = 0; v.inp.brk = 1; ai.end = (ai.end || 0) + dt;
+    if (v.kind === 'police') { if (ai.end > 3) { ai.q = null; ai.end = 0; } } else if (ai.end > 40 || !onScreen(v.x, v.z)) v.remove();
+    return;
+  }
+  ai.end = 0;
   let [tx, tz, node] = ai.q[0];
   if (hyp(tx - v.x, tz - v.z) < 4.5) { ai.from = ai.q.shift(); if (node >= 0) { ai.prev = ai.cur; ai.cur = node; } extendRoute(v); if (!ai.q.length) return;[tx, tz] = ai.q[0]; }
   let cruise = ai.kind !== undefined ? Math.min(v.maxV * 0.85, (ai.q[0][3] || 10) * (ai.kind === 'ape' ? 0.55 : ai.kind === 'van' ? 0.9 : 1) * ai.mood) : ai.cruise;
@@ -8852,8 +8857,13 @@ function aiTraffic(v, dt) {
   const t = steerTo(v, tx, tz, cruise, true);
   passStep(v, cruise, dt);
   ai.ignore -= dt;
-  if (t < 0.5 && v.speed < 0.5) { ai.blocked += dt; if (ai.blocked > 4 && P.car && hyp(P.car.x - v.x, P.car.z - v.z) < 10) hornOther = 0.3; if (ai.blocked > 7) { ai.ignore = 2.5; ai.blocked = 0; } } else ai.blocked = 0;
+  if (t < 0.5 && v.speed < 0.5) { ai.blocked += dt; if (ai.blocked > 4 && P.car && hyp(P.car.x - v.x, P.car.z - v.z) < 10) hornOther = 0.3; if (ai.blocked > (ai.pat || (ai.pat = 4 + rnd() * 5))) { /* each driver has his own patience: of two cars face to face the one with less backs up, the other goes on; any other block is ignored for a moment (a lane line shared with a wall or a parked car) */
+      const b = ai.blocker; ai.pat = 4 + rnd() * 5; ai.blocked = 0; if (b && Math.cos(b.h - v.h) < -0.3) ai.reverse = 2.2; else ai.ignore = 2.5;
+    } } else ai.blocked = 0;
   unstick(v, dt);
+  /* stopped for 40 s (a queue that does not move, a wedge, a gridlock) and nobody looking: the car leaves the area, the traffic refills round the player; seen, it stays and keeps trying */
+  if (v.speed < 1) ai.still = (ai.still || 0) + dt; else if (v.speed > 2.5) ai.still = 0; /* creeping at under 1 m/s counts as standing */
+  if (ai.still > 40 && v.kind !== 'police' && (!onScreen(v.x, v.z) || hyp(v.x - P.x, v.z - P.z) > 90)) v.remove();
 }
 function passStep(v, cruise, dt) { // cars overtake slow scooters and bikes when the other lane is clear for 50 m
   const ai = v.ai, fx = Math.sin(v.h), fz = Math.cos(v.h), rel = o => { const ox = o.x - v.x, oz = o.z - v.z; return [ox * fx + oz * fz, ox * fz - oz * fx]; }; // [ahead, left]
@@ -8869,7 +8879,8 @@ function passStep(v, cruise, dt) { // cars overtake slow scooters and bikes when
 function unstick(v, dt) { // any AI car pressing the gas without moving (wedged on a wall or a kerb corner) backs off, steering the other way
   const ai = v.ai;
   if (ai.reverse > 0) { ai.reverse -= dt; v.inp.thr = 0; v.inp.brk = 1; v.inp.steer *= -1; return; }
-  if (v.inp.thr > 0 && v.speed < 0.4) { ai.wedged = (ai.wedged || 0) + dt; if (ai.wedged > 2.5) { ai.reverse = 1.3; ai.wedged = 0; } } else ai.wedged = 0;
+  if (v.speed > 2) ai.rc = 0;
+  if (v.inp.thr > 0 && v.speed < 0.4) { ai.wedged = (ai.wedged || 0) + dt; if (ai.wedged > 2.5) { ai.rc = (ai.rc || 0) + 1; ai.reverse = Math.min(4, 0.6 + 0.7 * ai.rc); ai.wedged = 0; } } else ai.wedged = 0; /* each failed try backs off longer (1.3 s, 2 s ... 4 s) */
 }
 function aiCop(v, dt) {
   const ai = v.ai, tx = P.mode === 'car' ? P.car.x : P.x, tz = P.mode === 'car' ? P.car.z : P.z, d = hyp(tx - v.x, tz - v.z);
