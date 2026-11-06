@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo milano-meda · dopo 9d270c9 · assemblato 06/11 20:08 · porta ' + location.port;
+    const txt = 'locale · ramo milano-meda · dopo 66e2ce9 · assemblato 06/11 21:34 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2795,6 +2795,7 @@ function* roadBarriers(T) {
 // guardrail on posts, 2 a new jersey (the concrete barrier in the median of the Milano-Meda). Their height: the road they run by (H.node along
 // its axis, then its surface there), the surface at the line when it is within 0.6 m of it (else the road's: the edge of a drop, a bank higher
 // than the road). Worked out once per tile, with their collisions (two sided, as the guardrails of roadBarriers)
+const GUARD_PALO = 1.5, GUARD_LUNGHI = window.__GR_PALI = { lunghi: 0, pali: 0 }; /* the longest post of a guardrail (m), and the check: posts that would be longer */
 const GUARD = new Map(), NJ_PROF = [[-0.3, 0], [-0.3, 0.08], [-0.2, 0.3], [-0.09, 0.82], [0.09, 0.82], [0.2, 0.3], [0.3, 0.08], [0.3, 0]];
 function guardRoadY(rs, x, z) {
   let best = null, bd = 1e9, bx = 0, bz = 0;
@@ -2805,16 +2806,22 @@ function guardRails(T) {
   if (GUARD.has(T.t)) return GUARD.get(T.t);
   const out = [];
   for (const [k, rs, o] of T.d.gr || []) {
-    const pts = []; let x = 0, z = 0; for (let i = 0; i < o.length; i += 2) { x += o[i]; z += o[i + 1]; pts.push([x / 100, z / 100]); }
-    if (pts.length < 2) continue;
+    const raw = []; let x = 0, z = 0; for (let i = 0; i < o.length; i += 2) { x += o[i]; z += o[i + 1]; raw.push([x / 100, z / 100]); }
+    if (raw.length < 2) continue;
+    const P = []; for (let i = 1; i < raw.length; i++) { const a = raw[i - 1], c = raw[i], n = Math.max(1, Math.ceil(hyp(c[0] - a[0], c[1] - a[1]))); for (let m = 0; m < n; m++) P.push([lerp(a[0], c[0], m / n), lerp(a[1], c[1], m / n)]); } P.push(raw[raw.length - 1].slice()); // every metre: a drop between two far vertices is seen too
     // over a drop (the mouth of an underpass under the road, the edge of a bank) a point steps back towards the road, up to 1.5 m, to where the
-    // ground is at the road's level: the guardrail stands on the edge, never hanging in front of it
-    const y0 = pts.map(p => { const q = guardRoadY(rs, p[0], p[1]); if (q === null) return H.surface(p[0], p[1]); const [yr, bx, bz] = q; let yE = H.surface(p[0], p[1], yr + 0.3);
+    // ground is at the road's level: the guardrail stands on the edge. Where it cannot, it stops there (Carlo 6/11, corso Isonzo: never on long
+    // posts over the road below, "non sa quando smettere"): a guardrail stands only at the road's level, on posts of normal height
+    const ok = [], y0 = P.map(p => { const q = guardRoadY(rs, p[0], p[1]); if (q === null) { ok.push(false); return H.surface(p[0], p[1]); } const [yr, bx, bz] = q; let yE = H.surface(p[0], p[1], yr + 0.3);
       if (yE < yr - 0.6) { const dx = bx - p[0], dz = bz - p[1], L = hyp(dx, dz) || 1; for (let st = 0.1; st <= 1.5 + 1e-6; st += 0.1) { const x = p[0] + dx / L * st, z = p[1] + dz / L * st, y = H.surface(x, z, yr + 0.3); if (y >= yr - 0.3) { p[0] = x; p[1] = z; yE = y; break; } } }
-      return Math.abs(yE - yr) < 0.6 ? yE : yr; });
-    const ys = y0.map((v, i) => i && i < y0.length - 1 ? (y0[i - 1] + v + y0[i + 1]) / 3 : v); // no steps along it
-    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], c = pts[i], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(ys[i - 1], ys[i]) - 0.8, y1: Math.max(ys[i - 1], ys[i]) + 2.5, deckw: true }); }
-    out.push({ k, pts, ys });
+      ok.push(yE >= yr - GUARD_PALO + 0.75); return Math.abs(yE - yr) < 0.6 ? yE : yr; });
+    for (let i = 0; i < P.length;) { // the runs it stands on, at least 4 m long
+      if (!ok[i]) { i++; continue; } let j = i; while (j < P.length && ok[j]) j++;
+      const pts = P.slice(i, j), ys0 = y0.slice(i, j); i = j; if (pts.length < 5) continue;
+      const ys = ys0.map((v, m) => m && m < ys0.length - 1 ? (ys0[m - 1] + v + ys0[m + 1]) / 3 : v); // no steps along it
+      for (let m = 1; m < pts.length; m++) { const a = pts[m - 1], c = pts[m], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(ys[m - 1], ys[m]) - 0.8, y1: Math.max(ys[m - 1], ys[m]) + 2.5, deckw: true }); }
+      out.push({ k, pts, ys });
+    }
   }
   GUARD.set(T.t, out); return out;
 }
@@ -2842,7 +2849,7 @@ function drawGuard(T, grail, pil) {
     let acc = 0, next = 1.0;
     for (let i = 1; i < n; i++) {
       const a = pts[i - 1], c = pts[i], L = hyp(c[0] - a[0], c[1] - a[1]);
-      while (next <= acc + L) { const f = (next - acc) / (L || 1), x = lerp(a[0], c[0], f), z = lerp(a[1], c[1], f), y = lerp(ys[i - 1], ys[i], f), g = Math.max(y - 1.6, Math.min(y, H.surface(x, z, y + 0.3))); addBox(grail, x, (g + y + 0.8) / 2 - 0.05, z, 0.1, y + 0.8 - g + 0.1, 0.1, null, Math.atan2(-(c[1] - a[1]), c[0] - a[0])); next += 2.0; }
+      while (next <= acc + L) { const f = (next - acc) / (L || 1), x = lerp(a[0], c[0], f), z = lerp(a[1], c[1], f), y = lerp(ys[i - 1], ys[i], f), g0 = Math.min(y, H.surface(x, z, y + 0.3)), g = Math.max(y - GUARD_PALO + 0.75, g0); GUARD_LUNGHI.pali++; if (g0 < g - 0.05) GUARD_LUNGHI.lunghi++; addBox(grail, x, (g + y + 0.8) / 2 - 0.05, z, 0.1, y + 0.8 - g + 0.1, 0.1, null, Math.atan2(-(c[1] - a[1]), c[0] - a[0])); next += 2.0; }
       acc += L;
     }
   }
