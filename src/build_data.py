@@ -2250,6 +2250,7 @@ SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}
 import fondi as _FO
 FONDI = _FO.Fondi(ways, nodes, lambda x_, z_: (lon0 + x_ / KX, lat0 - z_ / KZ), log)
 _ng = lambda L_: unary_union(L_) if L_ else Polygon()
+if STR: FONDI.allarga([g_ for g_, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)])   # a street's surface=* on its whole carriageway
 _vei02 = _ng([g_ for g_, a_ in STR.D['vei'] if a_.get('fon') == '02']) if STR else Polygon()   # AC_VEI_FON 02: "non pavimentato"
 _vms = _ng([g_ for g_, a_ in STR.D['avms']]) if STR else Polygon()                                # AR_VMS: carrarecce
 _pedcic = _ng([g_ for g_, a_ in STR.D['ped']] + [g_ for g_, a_ in STR.D['acic']]) if STR else Polygon()   # AC_PED, AC_CIC: FON 01 "pavimentato"

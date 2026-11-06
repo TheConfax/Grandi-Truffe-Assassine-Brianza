@@ -20,22 +20,22 @@ Aspetto visibile (lo strato più alto) metro per metro. "Prima" = build 5/11 di 
 
 | Superficie nel gioco | Fonte e regola | Aspetto | Prima m² | Dopo m² |
 |---|---|---|---:|---:|
-| Prato (area 1) | DBGT AR_VRD 01/02/04/07/95, PS_INC 01/05, CL_AGR 05 (`dbgt_verde.py:25-36`); OSM grass/meadow/village_green (`build_data.py:361`); WorldCover 30 fuori da OSM e DBGT (`build_data.py:102`) | `grassTex` (`world3.js` cellOwners `a.t <= 3`) | 3.570.498 | |
-| Bosco (11) | DBGT BOSCO, AR_VRD 03, CL_AGR 04; OSM forest/wood; WorldCover 10 | prato scuro `#7d9a6a` + alberi | 1.852.689 | |
-| Cortili e accessi AC_VEI 0307 (`cv`) | DBGT AC_VEI ZON 0307 (`dbgt_strade.py:33`, `:944`) | asfalto (Carlo 2/11) | 1.733.019 | |
-| Carreggiate (`as`) | DBGT AC_VEI (non 0307); OSM fuori dal DBGT (`dbgt_strade.py:943`) | asfalto | 1.693.597 | |
-| Incolti (18) | DBGT PS_INC 04 (`dbgt_verde.py:37`) | `incoltoTex` | 1.067.027 | |
-| Residenziale (16) | OSM landuse=residential dove sotto non c'è altro (`build_data.py:361`) | prato chiaro `#d2e2b2` | 915.112 | |
-| Campi (`ls` campo) | DBGT CL_AGR 06/07, OSM farmland (`build_data.py:402`) | solchi di `paesaggio3.js` | 557.852 | |
-| Terreno nudo | nessuno strato | `tex/terreno.jpg` (neutro) | 371.333 | |
-| Marciapiedi (`sd`) | DBGT AC_PED 01/03; OSM fuori dal DBGT | masselli (`tex/marciapiede.jpg`) con cordolo | 151.125 | |
-| Cantieri (7) | OSM landuse=construction | asfalto tinto `#a88f6c` | 112.123 | |
-| Cortili AATT (17) | DBGT AATT (`dbgt_manufatti.py:396`); il DBGT non dice il materiale | grigio liscio `#b9b5ac` senza texture (prima); vedi sotto (dopo) | 109.653 | |
-| Sport (`ls` sport:) | DBGT ATTR_SP + sport e fondo da OSM (`dbgt_verde.py:40`) | campi disegnati da `paesaggio3.js` | ~96.000 | |
-| Cespugli (12) | DBGT BOSCO 04, OSM scrub | `#c9d7a8` | 87.400 | |
-| Vialetti (`ft`) | DBGT AC_PED 06/07, AC_CIC, AR_VMS; OSM footway/path/cycleway fuori dal DBGT (`dbgt_strade.py:618`, `:925`) | beige liscio `#c8b89c` (prima) | 84.778 | |
-| Massicciata (`sf`) | DBGT SD_FER a raso | `gravelTex` | 80.998 | |
-| Piazze e aree pedonali (`pz`) | DBGT AC_PED 04/05/08/09/10/95; OSM pedestrian fuori dal DBGT (`dbgt_strade.py:617`, `:942`) | porfido (`tex/porfido.jpg`) | 44.837 | |
+| Prato (area 1) | DBGT AR_VRD 01/02/04/07/95, PS_INC 01/05, CL_AGR 05 (`dbgt_verde.py:25-36`); OSM grass/meadow/village_green (`build_data.py:361`); WorldCover 30 fuori da OSM e DBGT (`build_data.py:102`) | `grassTex` (`world3.js` cellOwners `a.t <= 3`) | 3.570.498 | 3.570.607 |
+| Bosco (11) | DBGT BOSCO, AR_VRD 03, CL_AGR 04; OSM forest/wood; WorldCover 10 | prato scuro `#7d9a6a` + alberi | 1.852.689 | 1.852.692 |
+| Cortili e accessi AC_VEI 0307 (`cv`) | DBGT AC_VEI ZON 0307 (`dbgt_strade.py:33`, `:944`) | asfalto (Carlo 2/11) | 1.733.019 | 1.671.875 asfalto, 55.257 ghiaia (FON 02), 4.312 pavimentato, 899 terra, 729 porfido e ciottoli (OSM) |
+| Carreggiate (`as`) | DBGT AC_VEI (non 0307); OSM fuori dal DBGT (`dbgt_strade.py:943`) | asfalto | 1.693.597 | 1.645.247 asfalto, 37.229 ghiaia, 4.942 terra, 2.270 porfido, 2.062 ciottoli, 985 masselli, 839 pavimentato |
+| Incolti (18) | DBGT PS_INC 04 (`dbgt_verde.py:37`) | `incoltoTex` | 1.067.027 | 1.067.011 |
+| Residenziale (16) | OSM landuse=residential dove sotto non c'è altro (`build_data.py:361`) | prato chiaro `#d2e2b2` | 915.112 | 915.099 |
+| Campi (`ls` campo) | DBGT CL_AGR 06/07, OSM farmland (`build_data.py:402`) | solchi di `paesaggio3.js` | 557.852 | 557.852 |
+| Terreno nudo | nessuno strato | `tex/terreno.jpg` (neutro) | 371.333 | 371.465 |
+| Marciapiedi (`sd`) | DBGT AC_PED 01/03; OSM fuori dal DBGT | masselli (`tex/marciapiede.jpg`) con cordolo | 151.125 | 151.125 |
+| Cantieri (7) | OSM landuse=construction | asfalto tinto `#a88f6c` | 112.123 | 112.126 |
+| Cortili AATT (17) | DBGT AATT (`dbgt_manufatti.py:396`); il DBGT non dice il materiale | grigio liscio `#b9b5ac` senza texture (prima); pavimentato neutro e materiale dalla foto (dopo) | 109.653 | 75.407 pavimentato (foto), 19.921 prato (foto), 11.095 terra (foto), 3.236 neutro senza foto |
+| Sport (`ls` sport:) | DBGT ATTR_SP + sport e fondo da OSM (`dbgt_verde.py:40`) | campi disegnati da `paesaggio3.js` | ~96.000 | ~96.000 |
+| Cespugli (12) | DBGT BOSCO 04, OSM scrub | `#c9d7a8` | 87.400 | 87.400 |
+| Vialetti (`ft`) | DBGT AC_PED 06/07, AC_CIC, AR_VMS; OSM footway/path/cycleway fuori dal DBGT (`dbgt_strade.py:618`, `:925`) | beige liscio `#c8b89c` (prima); materiale o pavimentato neutro (dopo) | 84.778 | 28.479 ghiaia (AR_VMS, OSM), 17.818 pavimentato (AC_PED, AC_CIC, foto), 15.502 terra (OSM, foto), 7.996 asfalto (OSM), 1.000 altri, 14.035 neutro |
+| Massicciata (`sf`) | DBGT SD_FER a raso | `gravelTex` | 80.998 | 80.999 |
+| Piazze e aree pedonali (`pz`) | DBGT AC_PED 04/05/08/09/10/95; OSM pedestrian fuori dal DBGT (`dbgt_strade.py:617`, `:942`) | porfido (`tex/porfido.jpg`) | 44.837 | 43.352 porfido, 1.458 da OSM (ghiaia, pavimentato, asfalto, ciottoli) |
 | Scuole (15) | OSM amenity=school/kindergarten | prato `#d6e2b4` | 38.497 | |
 | Isole e spartitraffico (`md`) | DBGT MAN_TR 01-03 (verde da 12 m²) | prato / pavimentate | 20.957 | |
 | Zone industriali e commerciali OSM (8, 9) | OSM landuse=industrial/retail/commercial | asfalto tinto | 21.168 | |
@@ -76,6 +76,19 @@ Il materiale di un pezzo, in quest'ordine, senza coordinate scritte a mano:
 I materiali nel gioco (`world3.js fondoLook`): asfalto e porfido, masselli, ciottoli, prato con le foto di prima; tre foto nuove Poly Haven CC0:
 `tex/ghiaia.jpg` (gravel_floor_02, ×0,88), `tex/terra.jpg` (brown_mud_dry), `tex/pavimento.jpg` (concrete_floor_02 portato a grigio chiaro,
 il pavimentato di materiale ignoto). Crediti nel gioco (riga dei crediti, `assemble3.py`).
+
+## Il neutro, prima e dopo (Meda+Seveso)
+
+| | Prima m² | Dopo m² |
+|---|---:|---:|
+| Terreno nudo dentro il riquadro dei dati (fiumi, strisce, cava) | 106.000 | 106.000 |
+| Cortili AATT grigio liscio (nessun materiale) | 109.653 | 3.236 |
+| Vialetti beige liscio (nessun materiale) | 84.778 | 14.035 |
+| Cortili e carreggiate AC_VEI FON 02 disegnati in asfalto | ~92.000 | 0 |
+| **Totale senza un materiale dai dati** | **~300.000** | **~123.000** |
+
+Il pavimentato neutro da foto (75.407 m² di cortili AATT) conta come "pavimentato, materiale ignoto": la foto dice che è pavimentato, non di che
+cosa. Il terreno nudo fuori dal riquadro (265.000 m² a nord) non cambia: lì non ci sono dati.
 
 ## Domande aperte per Carlo
 - Le piazze (AC_PED 09 e simili) restano in porfido? Il DBGT non lo dice; OSM lo dice per 2 piazze su 35 a Meda+Seveso.

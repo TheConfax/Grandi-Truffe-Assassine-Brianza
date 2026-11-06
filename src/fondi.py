@@ -56,6 +56,19 @@ class Fondi:
             s.foto = ef.Foto(to_ll, scarica=False)   # solo le tile gia' in data/esri (le scarica dbgt_edifici.py): senza foto si resta neutri
         s.rep = {}
 
+    def allarga(s, celle, quota=0.5):
+        """la superficie di una via per auto vale per tutta la carreggiata su cui corre: una cella (AC_VEI) che la sua sede copre almeno per quota
+        la prende intera (una sede di 6 m sull'asse di una carreggiata di 8 lasciava una striscia d'asfalto di lato: via Antona Traversi, via Monte
+        Rosa). L'asfalto no: e' gia' il materiale delle carreggiate"""
+        if not celle or s.T is None: return
+        T = STRtree(celle); out = []; n = 0
+        for z, m, k in s.Z:
+            if k == 'auto' and m != 'a':
+                cs = [celle[i] for i in T.query(z, predicate='intersects') if celle[i].intersection(z).area >= quota * celle[i].area]
+                if cs: z = unary_union(cs + [z]); n += 1
+            out.append((z, m, k))
+        s.Z = out; s.T = STRtree([q[0] for q in s.Z]); s.rep['vie_allargate_alla_carreggiata'] = n
+
     def da_osm(s, g, generi=('area',)):
         """il materiale delle zone OSM (di quei generi) che coprono g per almeno COPRE (quello che copre di piu'), o None"""
         if s.T is None or g.is_empty: return None
@@ -96,31 +109,45 @@ class Fondi:
     def dividi(s, geom, regole, generi, foto=None, base=None):
         """geom (l'unione di una superficie) in pezzi per materiale: prima le zone OSM dei generi dati, poi regole [(geometria, materiale)] in
         ordine (la prima vince), poi foto(pezzo) per quel che resta, pezzo per pezzo. base: il materiale che la superficie ha gia' (va con
-        None). -> {materiale o None: geometria}"""
-        out = {}; resto = geom
+        None). -> {materiale o None: geometria}. Lavora sui pezzi di geom che ogni zona tocca, mai sull'unione intera (le carreggiate di tutta
+        la mappa: tagliate intere la build durava 17 minuti di piu')"""
+        out = {}; parts = _pz(geom)
         def add(m, g):
             m = None if m == base else m
             out[m] = unary_union([out[m], g]) if m in out else g
-        # OSM prima: la via con surface=* sopra un pezzo del DBGT e' piu' precisa del tipo del DBGT
-        if s.T is not None and not resto.is_empty:
+        def take(Z, m):
+            nonlocal parts
+            if Z is None or Z.is_empty or not parts: return
+            hit = set(STRtree(parts).query(Z, predicate='intersects').tolist()); got, new = [], []
+            for i, p in enumerate(parts):
+                c = p.intersection(Z) if i in hit else None
+                if c is not None and not c.is_empty and c.area >= 0.5: got.append(c); new += _pz(p.difference(Z))
+                else: new.append(p)
+            if got: add(m, unary_union(got)); parts = new
+        R = unary_union([g for g, m in regole]) if regole else None
+        # OSM prima: la via con surface=* sopra un pezzo del DBGT e' piu' precisa del tipo del DBGT. Il materiale che la superficie ha gia'
+        # conta solo dove una regola direbbe altro
+        if s.T is not None and parts:
             for m in sorted(set(z[1] for z in s.Z)):
-                zs = [s.Z[i][0] for i in s.T.query(resto, predicate='intersects') if s.Z[i][1] == m and s.Z[i][2] in generi]
+                if m == base and R is None: continue
+                zs = [z for z, m_, k in s.Z if m_ == m and k in generi]
+                if m == base: zs = (lambda zz: [zz[i] for i in STRtree(zz).query(R, predicate='intersects')])(zs) if zs else []
                 if not zs: continue
-                c = resto.intersection(unary_union(zs))
-                if c.is_empty or c.area < 0.5: continue
-                add(m, c); resto = resto.difference(c)
-        for g, m in regole:
-            if resto.is_empty: break
-            c = resto.intersection(g)
-            if c.is_empty or c.area < 0.5: continue
-            add(m, c); resto = resto.difference(c)
-        if foto is not None and not resto.is_empty:
+                Z = unary_union(zs)
+                take(Z.intersection(R) if m == base else Z, m)
+        for g, m in regole: take(g, m)
+        if foto is not None:
             altri = []
-            for p in (list(resto.geoms) if hasattr(resto, 'geoms') else [resto]):
-                if p.is_empty: continue
+            for p in parts:
                 m = foto(p) if p.area >= 4 else None
                 if m: add(m, p)
                 else: altri.append(p)
-            resto = unary_union(altri) if altri else Polygon()
-        if not resto.is_empty: add(None, resto)
+            parts = altri
+        if parts: add(None, unary_union(parts))
         return out
+
+
+def _pz(g):
+    """i poligoni di g (non vuoti, da 0,01 m2)"""
+    if g is None or g.is_empty: return []
+    return [p for p in (list(g.geoms) if hasattr(g, 'geoms') else [g]) if p.geom_type == 'Polygon' and p.area > 0.01] +         [q for p in (list(g.geoms) if hasattr(g, 'geoms') else []) if p.geom_type == 'MultiPolygon' for q in p.geoms if q.area > 0.01]
