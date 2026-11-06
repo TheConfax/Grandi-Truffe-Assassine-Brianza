@@ -1389,7 +1389,7 @@ function cellOwners(T, F) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
     if (a.t === 18) cover(outer, holes, 1, S('i', MAT.incoltoS, 12)); // incolti (DBGT PS_INC 04): dry grass and bare earth
     else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
-    else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
+    else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) cover(outer, holes, 2, S('w', MAT.waterS, 9)); } /* a lake is dug and drawn by acqua3.js */
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
     else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
@@ -1476,7 +1476,7 @@ function* buildTileGen(T) {
       try {
         if (a.t === 18) polyFill(iB, outer, holes, 0.02 * fy, 12);
         else if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
-        else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
+        else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) polyFill(wB, outer, holes, 0.03 * fy, 9); }
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
         else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
@@ -1495,7 +1495,7 @@ function* buildTileGen(T) {
         if (T.fine) { // new engine: the bed and the banks are in S, the water is drawn below at its level zw; the railing follows the bank
           const bedNear = [[0, 0], [0.5, 0], [-0.5, 0], [0, 1]].some(([f, g]) => { const x = (a[0] + c[0]) / 2 + nx * r.w * f + (c[0] - a[0]) * g / 2, z = (a[1] + c[1]) / 2 + nz * r.w * f + (c[1] - a[1]) * g / 2; return H.mat(x, z) === 4; });
           if (!bedNear && !onAnyRoad((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, r.w)) { const wa = H.water(a[0], a[1]), wc = H.water(c[0], c[1]); // an OSM river with no bed in S (where src/superficie.py could not dig one): the strip between its banks at H.water, as in phase 4; never on a street
-            if (wa !== null && wc !== null) { const i0 = rv.p.length / 3; vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0); triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3); } }
+            if (wa !== null && wc !== null) { const i0 = rv.p.length / 3; vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0.5, Math.atan2(c[1] - a[1], c[0] - a[0])); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0.5, Math.atan2(c[1] - a[1], c[0] - a[0])); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0.5, Math.atan2(c[1] - a[1], c[0] - a[0])); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0.5, Math.atan2(c[1] - a[1], c[0] - a[0])); triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3); } }
           if (RIVER_RAIL) for (const sd of [1, -1]) {
             const ax = a[0] + nx * r.w * sd, az = a[1] + nz * r.w * sd, cx = c[0] + nx * r.w * sd, cz = c[1] + nz * r.w * sd, ya = H.ground(ax, az), yc = H.ground(cx, cz);
             if (!onAnyRoad((ax + cx) / 2, (az + cz) / 2, 1.5) && !inWater((ax + cx) / 2, (az + cz) / 2, (ya + yc) / 2)) { const r0 = rail.p.length / 3; vtx(rail, ax, ya + 0.75, az, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 0.75, cz, nx, 0, nz, 0, 0); vtx(rail, cx, yc + 1.05, cz, nx, 0, nz, 0, 0); vtx(rail, ax, ya + 1.05, az, nx, 0, nz, 0, 0); rail.i.push(r0, r0 + 1, r0 + 2, r0, r0 + 2, r0 + 3); }
@@ -1504,7 +1504,7 @@ function* buildTileGen(T) {
         }
         const ga = H.ground(a[0], a[1]), gc = H.ground(c[0], c[1]), wa = ga - RIV_D * (1 - H.fadeW(a[0], a[1])) + 0.5, wc = gc - RIV_D * (1 - H.fadeW(c[0], c[1])) + 0.5; // near S the cut fades out (H.rivCut)
         const i0 = rv.p.length / 3; // water
-        vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0, 0); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0, 0); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0, 0);
+        vtx(rv, a[0] - nx * r.w, wa, a[1] - nz * r.w, 0, 1, 0, 0.5, Math.atan2(c[1] - a[1], c[0] - a[0])); vtx(rv, a[0] + nx * r.w, wa, a[1] + nz * r.w, 0, 1, 0, 0.5, Math.atan2(c[1] - a[1], c[0] - a[0])); vtx(rv, c[0] + nx * r.w, wc, c[1] + nz * r.w, 0, 1, 0, 0.5, Math.atan2(c[1] - a[1], c[0] - a[0])); vtx(rv, c[0] - nx * r.w, wc, c[1] - nz * r.w, 0, 1, 0, 0.5, Math.atan2(c[1] - a[1], c[0] - a[0]));
         triUp(rv, i0, i0 + 1, i0 + 2); triUp(rv, i0, i0 + 2, i0 + 3);
         for (const sd of [1, -1]) {
           const ax = a[0] + nx * r.w * sd, az = a[1] + nz * r.w * sd, cx = c[0] + nx * r.w * sd, cz = c[1] + nz * r.w * sd, b0 = wallsR.p.length / 3;
@@ -1514,6 +1514,7 @@ function* buildTileGen(T) {
         }
       }
     }
+    const RSEG = []; for (const r of d.rv || []) { const q = dec(r.p); for (let k = 1; k < q.length; k++) RSEG.push([q[k - 1][0], q[k - 1][1], q[k][0], q[k][1]]); } /* the axes of the OSM rivers: the current of the water sheet follows them */
     if (T.fine) { // the water level (docs/motore.md 3): a sheet at zw, cut on each cell triangle where zw - S changes sign, so its edge is the
       // line where the water meets the banks of S. It starts from the cells of the bed (material 4: an OSM river outside the DBGT keeps its strip above) and spreads to the cells
       // next to them as long as the water reaches one of their corners (at most 12 m out): it fills the bed up its banks and never a
@@ -1532,7 +1533,7 @@ function* buildTileGen(T) {
         for (const tri of [[k, k + 1, k + n + 1], [k, k + n + 1, k + n]]) {
           const V = tri.map(q => [F.x0 + (q % n) * st, F.z0 + Math.floor(q / n) * st, W(q), W(q) - Y[q]]); if (V.some(v => isNaN(v[2])) || V.every(v => v[3] <= 0)) continue;
           const o = []; for (let e = 0; e < 3; e++) { const p = V[e], q = V[(e + 1) % 3]; if (p[3] > 0) o.push(p); if ((p[3] > 0) !== (q[3] > 0)) { const t = p[3] / (p[3] - q[3]); o.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t, 0]); } }
-          if (o.length < 3) continue; const i0 = rv.p.length / 3; for (const p of o) vtx(rv, p[0], p[2], p[1], 0, 1, 0, 0, 0); for (let e = 1; e < o.length - 1; e++) triUp(rv, i0, i0 + e, i0 + e + 1);
+          if (o.length < 3) continue; const i0 = rv.p.length / 3; for (const p of o) vtx(rv, p[0], p[2], p[1], 0, 1, 0, Math.max(0.02, p[3]), riverFlow(RSEG, p[0], p[1])); for (let e = 1; e < o.length - 1; e++) triUp(rv, i0, i0 + e, i0 + e + 1);
         }
       }
     }
@@ -1575,7 +1576,7 @@ function* buildTileGen(T) {
       }
     }
     put(head, lam(0x8f8a80, { side: THREE.DoubleSide }), 10, 'cast'); put(mouth, lam(0x0c0d0e, { side: THREE.DoubleSide }), 11); put(apron, lam(0x9a958b), 4);
-    put(rv, MAT.water, 2); put(wallsR, MAT.deckSide, 10, 'cast'); put(rail, MAT.rail, 10);
+    if (rv.i.length) { const M = mkMesh(rv, ACQ_RIVER, 12, false, G); M.receiveShadow = false; acquaDraw(M); } put(wallsR, MAT.deckSide, 10, 'cast'); put(rail, MAT.rail, 10);
   }
   yield 'streets';
   // street surfaces
@@ -2129,7 +2130,7 @@ function* buildTileGen(T) {
 // tiles far behind are taken apart (their geometry and their sign textures freed) and built again if you come back
 const GEO_VUOTA = new THREE.BufferGeometry();
 function freeTile(T) {
-  const G = T.group; if (!G) return; scene.remove(G);
+  const G = T.group; if (!G) return; scene.remove(G); poolsFree(T);
   const own = t => t && t.id > T.tex0 && !segTexIs(t);
   G.traverse(m => { if (m.geometry) m.geometry.dispose(); const mt = m.material; if (!mt || Array.isArray(mt)) return;
     if (own(mt.map) || own(mt.emissiveMap)) { const k = SIGN_MATS.indexOf(mt); if (k >= 0) SIGN_MATS.splice(k, 1); for (const t of [mt.map, mt.emissiveMap]) if (own(t)) t.dispose(); mt.dispose(); } });
