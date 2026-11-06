@@ -15,11 +15,20 @@ void main() { vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz; vU = uv;
 }`;
 const ACQ_FS = `uniform float uTime, uAbs, uRip, uFlow, uLit, uMin; uniform vec3 uSky, uHor, uSunC, uSunD, uTint; varying vec3 vW; varying vec2 vU;
 #include <fog_pars_fragment>
-vec2 wave(vec2 q, vec2 d, float f, float sp, float a) { return d * f * a * cos(dot(q, d) * f + uTime * sp); }
+vec2 wave(vec2 q, vec2 d, float f, float sp, float a, float ph) { return d * f * a * cos(dot(q, d) * f + ph + uTime * sp); }
+/* no lattice of glints (Carlo, 6/11): six waves of unrelated length and direction on a coordinate warped by a slow noise, the strength of the ripples changes from place to place (calm and busy patches, 5-20 m), the short waves fade with the distance */
+float wh21(vec2 p) { vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+float wvn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(wh21(i), wh21(i + vec2(1, 0)), f.x), mix(wh21(i + vec2(0, 1)), wh21(i + vec2(1, 1)), f.x), f.y); }
 void main() {
   float flowing = step(vU.y, 10.0); vec2 fl = vec2(cos(vU.y), sin(vU.y)) * uFlow * flowing;
   vec2 q = vW.xz - fl * uTime;
-  vec2 g = wave(q, normalize(vec2(1.0, 0.45)), 2.3, 1.1, 0.05) + wave(q, normalize(vec2(-0.6, 1.0)), 3.7, 1.6, 0.035) + wave(q, normalize(vec2(0.8, -0.9)), 6.1, 2.1, 0.02) + wave(q, normalize(vec2(-1.0, -0.3)), 9.3, 2.9, 0.012);
+  float dist = length(cameraPosition - vW); float hf = 1.0 - smoothstep(25.0, 110.0, dist);
+  vec2 qw = q + (vec2(wvn(q / 9.0 + uTime * 0.03), wvn(q / 9.0 + 17.0 - uTime * 0.02)) - 0.5) * 6.0;
+  float am = 0.25 + 1.5 * smoothstep(0.25, 0.75, wvn(qw / 7.0 + 3.1 + uTime * 0.04)); am *= 0.6 + 0.8 * wvn(qw / 21.0 + 9.7);
+  vec2 g = wave(qw, normalize(vec2(1.0, 0.45)), 1.9, 0.9, 0.06, 0.0) + wave(qw, normalize(vec2(-0.62, 1.0)), 2.9, 1.3, 0.045, 1.7) + wave(qw, normalize(vec2(0.83, -0.91)), 4.3, 1.7, 0.03, 4.1)
+    + hf * (wave(qw, normalize(vec2(-1.0, -0.27)), 6.7, 2.2, 0.017, 2.3) + wave(qw, normalize(vec2(0.31, 1.0)), 9.7, 2.8, 0.011, 5.2) + wave(qw, normalize(vec2(-0.9, 0.7)), 14.1, 3.4, 0.0065, 0.9));
+  g *= am;
+  g += (vec2(wvn(qw * 1.3 + 40.0 + uTime * 0.2) - wvn(qw * 1.3 + 40.4 + uTime * 0.2), wvn(qw * 1.3 + 71.0 - uTime * 0.2) - wvn(qw * 1.3 + 71.4 - uTime * 0.2))) * 0.55 * hf;
   vec3 N = normalize(vec3(-g.x * uRip, 1.0, -g.y * uRip));
   vec3 V = normalize(cameraPosition - vW); float ndv = max(dot(N, V), 0.0);
   float fres = 0.025 + 0.975 * pow(1.0 - ndv, 5.0);
