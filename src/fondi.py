@@ -56,18 +56,41 @@ class Fondi:
             s.foto = ef.Foto(to_ll, scarica=False)   # solo le tile gia' in data/esri (le scarica dbgt_edifici.py): senza foto si resta neutri
         s.rep = {}
 
-    def allarga(s, celle, quota=0.5):
-        """la superficie di una via per auto vale per tutta la carreggiata su cui corre: una cella (AC_VEI) che la sua sede copre almeno per quota
-        la prende intera (una sede di 6 m sull'asse di una carreggiata di 8 lasciava una striscia d'asfalto di lato: via Antona Traversi, via Monte
-        Rosa). L'asfalto no: e' gia' il materiale delle carreggiate"""
-        if not celle or s.T is None: return
-        T = STRtree(celle); out = []; n = 0
-        for z, m, k in s.Z:
-            if k == 'auto' and m != 'a':
-                cs = [celle[i] for i in T.query(z, predicate='intersects') if celle[i].intersection(z).area >= quota * celle[i].area]
-                if cs: z = unary_union(cs + [z]); n += 1
-            out.append((z, m, k))
-        s.Z = out; s.T = STRtree([q[0] for q in s.Z]); s.rep['vie_allargate_alla_carreggiata'] = n
+    def strade(s, ways, nodes, raggio=20.0, passo=2.0):
+        """la superficie di una strada vale per la carreggiata fino a dove comincia un'altra strada (Carlo 6/11: la sede sull'asse lasciava
+        una striscia di ciottoli in mezzo all'asfalto, piazza Vittorio Veneto; le celle AC_VEI del DBGT sono lunghe e prendono piu' strade).
+        Ogni punto della carreggiata entro raggio da una via con surface=* va alla via per auto piu' vicina (Voronoi dei punti degli assi ogni
+        passo m): il confine e' a meta' fra due assi, dove cambia la strada. Zone di genere 'strada' (per le carreggiate)"""
+        import shapely
+        from shapely.geometry import MultiPoint
+        assi = []
+        for wid, (refs, t) in ways.items():
+            h = t.get('highway')
+            if not h or h in PIEDI or t.get('area') == 'yes' or h in ('proposed', 'construction', 'platform', 'bus_stop'): continue
+            pts = [nodes[r] for r in refs if r in nodes]
+            if len(pts) >= 2: assi.append((LineString(pts), OSM_M.get(t.get('surface')) or 'a'))
+        sur = [(L, m) for L, m in assi if m != 'a']
+        if not sur: return
+        zona = unary_union([L.buffer(raggio) for L, m in sur]); vicino = zona.buffer(raggio); shapely.prepare(vicino)
+        P, M = [], []
+        for L, m in assi:
+            if not vicino.intersects(L): continue
+            Lv = L.intersection(vicino)
+            for part in (list(Lv.geoms) if hasattr(Lv, 'geoms') else [Lv]):
+                if part.geom_type != 'LineString' or part.length <= 0: continue
+                n = max(1, int(part.length // passo))
+                for k in range(n + 1): q = part.interpolate(k / n, normalized=True); P.append((q.x, q.y)); M.append(m)
+        import numpy as np
+        P = np.round(np.array(P), 2); P, ui = np.unique(P, axis=0, return_index=True); M = [M[i] for i in ui]
+        V = shapely.voronoi_polygons(MultiPoint(P), extend_to=vicino, ordered=True)
+        per = {}
+        for g, m in zip(V.geoms, M):
+            if m != 'a': per.setdefault(m, []).append(g)
+        n = 0
+        for m, gs in per.items():
+            z = unary_union(gs).intersection(zona)
+            if not z.is_empty: s.Z.append((z, m, 'strada')); n += 1
+        s.T = STRtree([q[0] for q in s.Z]); s.rep['strade_voronoi'] = dict(assi=len(assi), punti=len(P), materiali=sorted(per))
 
     def da_osm(s, g, generi=('area',)):
         """il materiale delle zone OSM (di quei generi) che coprono g per almeno COPRE (quello che copre di piu'), o None"""
@@ -106,15 +129,12 @@ class Fondi:
         f = s.da_foto(g)
         return {'verde': 'p', 'terra': 't', 'pav': 'n'}.get(f), ('foto' if f else None)
 
-    def dividi(s, geom, regole, generi, foto=None, base=None):
+    def dividi(s, geom, regole, generi, foto=None, base=None, vicini=False):
         """geom (l'unione di una superficie) in pezzi per materiale: prima le zone OSM dei generi dati, poi regole [(geometria, materiale)] in
         ordine (la prima vince), poi foto(pezzo) per quel che resta, pezzo per pezzo. base: il materiale che la superficie ha gia' (va con
         None). -> {materiale o None: geometria}. Lavora sui pezzi di geom che ogni zona tocca, mai sull'unione intera (le carreggiate di tutta
         la mappa: tagliate intere la build durava 17 minuti di piu')"""
-        out = {}; parts = _pz(geom)
-        def add(m, g):
-            m = None if m == base else m
-            out[m] = unary_union([out[m], g]) if m in out else g
+        parts = _pz(geom); kn = []   # kn: [pezzo, materiale] dei pezzi che sanno il loro materiale; parts: quelli che non lo sanno
         def take(Z, m):
             nonlocal parts
             if Z is None or Z.is_empty or not parts: return
@@ -123,7 +143,7 @@ class Fondi:
                 c = p.intersection(Z) if i in hit else None
                 if c is not None and not c.is_empty and c.area >= 0.5: got.append(c); new += _pz(p.difference(Z))
                 else: new.append(p)
-            if got: add(m, unary_union(got)); parts = new
+            if got: parts = new; kn.extend([q, m] for c in got for q in _pz(c))
         R = unary_union([g for g, m in regole]) if regole else None
         # OSM prima: la via con surface=* sopra un pezzo del DBGT e' piu' precisa del tipo del DBGT. Il materiale che la superficie ha gia'
         # conta solo dove una regola direbbe altro
@@ -136,15 +156,54 @@ class Fondi:
                 Z = unary_union(zs)
                 take(Z.intersection(R) if m == base else Z, m)
         for g, m in regole: take(g, m)
+        # i pezzi attaccati della stessa superficie (nessun bordo fra loro: sono un pezzo solo dell'unione) senza materiale prendono quello del
+        # vicino che lo conosce, con cui hanno piu' confine (Carlo 6/11: macchie chiare sull'asfalto del vialetto lungo la Milano-Meda). Il
+        # neutro resta solo a una superficie intera di cui nessun pezzo sa niente. 'n' (pavimentato, materiale ignoto: AC_PED, AC_CIC, la foto)
+        # sa poco: un pezzo 'n' attaccato a un materiale vero per almeno un quarto del suo contorno prende quello (le strisce chiare ai lati del
+        # vialetto d'asfalto); un materiale vero non ne scaccia mai un altro
+        def confini(p, T):
+            pb = p.buffer(0.05); best = {}
+            for i in T.query(pb, predicate='intersects'):
+                g, m = kn[i]
+                if g is p: continue
+                L = g.boundary.intersection(pb).length
+                if L > 0: best[m] = best.get(m, 0) + L
+            return best
+        def propaga():
+            nonlocal parts
+            for _ in range(8):
+                cambi = 0
+                if parts and kn:
+                    T = STRtree([g for g, m in kn]); rest, nuovi = [], []
+                    for p in parts:
+                        best = confini(p, T)
+                        if best:
+                            spec = {m: L * (0.5 if m == 'n' else 1) for m, L in best.items()}; m = max(spec, key=spec.get)
+                            if best[m] >= 0.5: nuovi.append([p, m]); continue
+                        rest.append(p)
+                    parts = rest; kn.extend(nuovi); cambi += len(nuovi)
+                if kn:
+                    T = STRtree([g for g, m in kn])
+                    for e in kn:
+                        if e[1] != 'n': continue
+                        best = {m: L for m, L in confini(e[0], T).items() if m != 'n'}
+                        if best:
+                            m = max(best, key=best.get)
+                            if best[m] >= max(0.5, 0.25 * e[0].length): e[1] = m; cambi += 1
+                if not cambi: return
+        if vicini: propaga()
         if foto is not None:
             altri = []
             for p in parts:
                 m = foto(p) if p.area >= 4 else None
-                if m: add(m, p)
+                if m: kn.append([p, m])
                 else: altri.append(p)
             parts = altri
-        if parts: add(None, unary_union(parts))
-        return out
+            if vicini: propaga()
+        per = {}
+        for g, m in kn: per.setdefault(None if m == base else m, []).append(g)
+        if parts: per.setdefault(None, []).extend(parts)
+        return {m: unary_union(gs) for m, gs in per.items()}
 
 
 def _pz(g):

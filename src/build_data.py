@@ -48,6 +48,15 @@ for ev, el in ET.iterparse(src):
         rels.append(([(m.get('type'), m.get('ref'), m.get('role')) for m in el.findall('member')], {x.get('k'): x.get('v') for x in el.findall('tag')}))
         el.clear()
 log('parsed', len(nodes), 'nodes', len(ways), 'ways')
+# local corrections of OSM tags (src/correzioni_osm.json, docs/superfici.md): errors seen on the spot, before any rule; OSM online is not touched
+_corr_n = 0
+for _c in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'correzioni_osm.json'), encoding='utf-8')).get('correzioni', []):
+    if _c['way'] in ways:
+        for _k, _v in _c['tag'].items():
+            if _v is None: ways[_c['way']][1].pop(_k, None)
+            else: ways[_c['way']][1][_k] = _v
+        _corr_n += 1
+log('correzioni OSM locali', _corr_n)
 
 def h01(s): return int(hashlib.md5(str(s).encode()).hexdigest()[:8], 16) / 0xffffffff
 def num(v):
@@ -2250,7 +2259,7 @@ SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}
 import fondi as _FO
 FONDI = _FO.Fondi(ways, nodes, lambda x_, z_: (lon0 + x_ / KX, lat0 - z_ / KZ), log)
 _ng = lambda L_: unary_union(L_) if L_ else Polygon()
-if STR: FONDI.allarga([g_ for g_, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)])   # a street's surface=* on its whole carriageway
+FONDI.strade(ways, nodes)   # a street's surface=* on its carriageway up to where the next street begins (nearest axis)
 _vei02 = _ng([g_ for g_, a_ in STR.D['vei'] if a_.get('fon') == '02']) if STR else Polygon()   # AC_VEI_FON 02: "non pavimentato"
 _vms = _ng([g_ for g_, a_ in STR.D['avms']]) if STR else Polygon()                                # AR_VMS: carrarecce
 _pedcic = _ng([g_ for g_, a_ in STR.D['ped']] + [g_ for g_, a_ in STR.D['acic']]) if STR else Polygon()   # AC_PED, AC_CIC: FON 01 "pavimentato"
@@ -2258,8 +2267,8 @@ _ffoto = lambda p_: {'terra': 't', 'pav': 'n'}.get(FONDI.da_foto(p_))
 SURFM = {}
 for k_, g_ in SURF.items():
     if g_.is_empty: continue
-    SURFM[k_] = (FONDI.dividi(g_, [(_vei02, 'g')], ('auto',), base='a') if k_ == 'as' else FONDI.dividi(g_, [], ('piedi', 'area')) if k_ == 'pz' else
-                 FONDI.dividi(g_, [(_vms, 'g'), (_pedcic, 'n')], ('piedi',), foto=_ffoto) if k_ == 'ft' else {None: g_})
+    SURFM[k_] = (FONDI.dividi(g_, [(_vei02, 'g')], ('strada',), base='a') if k_ == 'as' else FONDI.dividi(g_, [], ('piedi', 'area'), vicini=True) if k_ == 'pz' else
+                 FONDI.dividi(g_, [(_vms, 'g'), (_pedcic, 'n')], ('piedi',), foto=_ffoto, vicini=True) if k_ == 'ft' else {None: g_})
 FONDI.rep['superfici'] = {k_: {str(m_): round(g_.area) for m_, g_ in d_.items()} for k_, d_ in SURFM.items()}
 log('fondi', FONDI.rep['superfici'])
 parts_of = lambda g: [p for p in (list(g.geoms) if hasattr(g, 'geoms') else [g]) if not p.is_empty]

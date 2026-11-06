@@ -61,8 +61,15 @@ Note sul "prima":
 ## Le regole del 6/11 (`src/fondi.py`)
 
 Il materiale di un pezzo, in quest'ordine, senza coordinate scritte a mano:
-1. **OSM `surface=*`** della via o dell'area che sta sopra il pezzo (una via vale per la larghezza della sua sede, `width=` o la classe).
-   Solo vie del genere giusto: le carreggiate prendono le vie per auto, i vialetti le pedonali e ciclabili, le piazze le pedonali e le aree.
+0. **Correzioni locali di OSM** (`src/correzioni_osm.json`): tag di una via sbagliati dal vero (way, tag giusto, motivo, fonte), applicati da
+   `build_data.py` subito dopo la lettura del file OSM, prima di ogni regola. OSM online non si tocca. Oggi una: via Monte Rosa (way 96763937)
+   surface=sett → asphalt (Carlo 6/11, visto dal vero).
+1. **OSM `surface=*`** della via o dell'area che sta sopra il pezzo. Solo vie del genere giusto: le carreggiate prendono le vie per auto, i
+   vialetti le pedonali e ciclabili, le piazze le pedonali e le aree. Per le **carreggiate** (dal 6/11 sera) ogni punto va alla via per auto
+   più vicina (Voronoi dei punti degli assi ogni 2 m, entro 20 m da una via con surface=*): il confine è a metà fra due assi, dove cambia la
+   strada, così una piazza in ciottoli è tutta in ciottoli e la via d'asfalto che la attraversa resta d'asfalto (prima: la sede di 6 m sull'asse,
+   una striscia di ciottoli fra chiazze d'asfalto in piazza Vittorio Veneto). Per vialetti, piazze e cortili la via vale per la sua sede
+   (`width=` o la classe).
    asphalt → asfalto; paved, concrete → pavimentato; paving_stones → masselli; sett → porfido; cobblestone → ciottoli; gravel, fine_gravel,
    compacted, unpaved → ghiaia; ground, dirt, earth, sand → terra; grass, grass_paver → prato.
 2. **DBGT**: AC_VEI_FON 02 (carreggiate e cortili) → ghiaia/sterrato; AR_VMS (carrarecce) → ghiaia/sterrato; AC_PED e AC_CIC (FON 01) →
@@ -71,7 +78,17 @@ Il materiale di un pezzo, in quest'ordine, senza coordinate scritte a mano:
    non dicono il materiale: i cortili AATT interi e i vialetti che vengono solo da OSM. La mediana dei pixel dentro il pezzo (ristretto di 0,5 m,
    senza le ombre): verde → prato; rosso sul blu da +15 con luce sotto 95 → terra; luce da 80 in su → pavimentato. Tarata sulle superfici
    note (`fondi.py da_foto`): la foto di luglio è calda, il pavimentato si separa dalla terra per la luce, non per il colore.
+3b. **I pezzi attaccati della stessa superficie** (vialetti e piazze: pezzi di un'unica area, senza un cordolo in mezzo) che restano senza
+   materiale prendono quello del vicino che lo conosce, con cui hanno più confine; prima e dopo la foto. Un materiale non ne scaccia mai un
+   altro. Il pavimentato di materiale ignoto (AC_PED e AC_CIC del DBGT, la foto) sa poco: un pezzo così attaccato a un materiale vero per
+   almeno un quarto del suo contorno prende quello. Prima: le strisce chiare di pavimentato neutro ai lati del vialetto d'asfalto lungo la
+   Milano-Meda (x 92-120 z 50-196).
 4. Altrimenti **neutro**: nessun `m`. Un cortile AATT o un vialetto neutro si disegna col pavimentato neutro (non più il grigio liscio o il beige).
+   Il neutro resta solo a una superficie intera di cui nessun pezzo sa il materiale.
+
+**Strisce** (`world3.js senzaStrisce`, Carlo 6/11: in Italia sui ciottoli, sul porfido, sui masselli, sulla ghiaia e sulla terra non si dipinge):
+righe di bordo e di mezzeria, tratteggi, strisce pedonali, linee di arresto, triangoli, fermate del bus e scritte si tolgono dove la carreggiata, il
+cortile o la piazza sotto non sono d'asfalto (le piazze senza materiale sono in porfido). Un triangolo a cavallo del confine si taglia fino a 0,4 m.
 
 I materiali nel gioco (`world3.js fondoLook`): asfalto e porfido, masselli, ciottoli, prato con le foto di prima; tre foto nuove Poly Haven CC0:
 `tex/ghiaia.jpg` (gravel_floor_02, ×0,88), `tex/terra.jpg` (brown_mud_dry), `tex/pavimento.jpg` (concrete_floor_02 portato a grigio chiaro,
