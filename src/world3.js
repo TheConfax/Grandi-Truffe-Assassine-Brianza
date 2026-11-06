@@ -101,7 +101,7 @@ function hardAt(x, z) {
   const k = H.kind(x, z); if (k === 'road' || k === 'side' || k === 'plat') return true;
   const T = TILES[tileOf(x, z)]; if (!T) return false;
   if (!T.hardP) { const d = T.d, mk = q => { const o = dec(q.p); return { o, k: (q.k || []).map(dec), b: bbox(o) }; };
-    T.hardP = [...(d.a || []).filter(a => a.t !== 5 && a.t !== 6 && a.t !== 18 && !(a.t <= 3 || a.t >= 11 && a.t !== 17)), ...(d.cv || []), ...(d.pz || []), ...(d.ft || []), ...(d.as || [])].filter(q => q.p).map(mk); }
+    T.hardP = [...(d.a || []).filter(a => a.t !== 5 && a.t !== 6 && a.t !== 18 && !(a.t <= 3 || a.t >= 11 && a.t !== 17)), ...(d.cv || []), ...(d.pz || []), ...(d.ft || []), ...(d.as || [])].filter(q => q.p && q.m !== 'p').map(mk); } /* (a yard of grass, src/fondi.py, is no hard standing) */
   for (const q of T.hardP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
   return false;
 }
@@ -615,6 +615,20 @@ Object.assign(MAT, { aattS: new THREE.MeshLambertMaterial({ color: 0xb9b5ac }), 
 // the rail bed of the DBGT (SD_FER, tiles[t].sf): the gravel of the ballast without the sleepers, which each track draws over it
 const gravelTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#7e766b'; g.fillRect(0, 0, w, h); noise(g, w, h, 900, 0.5, ['#5d564d', '#9c9487', '#4a443d']); });
 Object.assign(MAT, { gravel: flatMat({ map: gravelTex }), gravelS: new THREE.MeshLambertMaterial({ map: gravelTex }) });
+/* what a surface is made of (src/fondi.py: the key m of the polygons of as, pz, ft, cv and of the yards AATT in a; docs/superfici.md): g gravel and unpaved, t earth, n paved of no
+   known material (the neutral paving: also the AATT yards and the paths the data say nothing of), b paving blocks, f porphyry setts, c cobbles, p grass, a asphalt.
+   S: the look on the whole cells of S (cellOwners), F: the drape (polyFill), vs: metres per repeat of the photo. New photos, Poly Haven CC0: tex/ghiaia.jpg gravel_floor_02
+   (x0.88), tex/terra.jpg brown_mud_dry, tex/pavimento.jpg concrete_floor_02 turned to a light grey. Built at the first use: ciottoliTex is in rotonde3.js */
+let FONDO_ = null;
+function fondoLook(m) {
+  if (!FONDO_) {
+    const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t; };
+    const mk = (map, vs) => ({ S: new THREE.MeshLambertMaterial({ map }), F: flatMat({ map }), vs });
+    FONDO_ = { g: mk(ld('ghiaia'), 2.5), t: mk(ld('terra'), 2.6), n: mk(ld('pavimento'), 3), b: { S: MAT.side, F: flatMat({ map: sidewalkTex }), vs: 4 }, f: { S: MAT.piazzaS, F: MAT.piazza, vs: 4 },
+      c: mk(ciottoliTex, 4), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
+  }
+  return FONDO_[m] || null;
+}
 Object.assign(MAT.water, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }); // the water level of a tile of S meets the banks of S, which write their depth
 // the kinds of divider the DBGT adds (build_data.py): plastered low walls, railings with vertical bars, green wire mesh, railway panels, wood
 const barsTex = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#26292c'; for (let x = 4; x < w; x += 10) g.fillRect(x, 0, 3, h); g.fillRect(0, 0, w, 5); g.fillRect(0, h - 6, w, 6); });
@@ -1383,6 +1397,7 @@ function cellOwners(T, F) {
   const c = F.n - 1, own = F.own = new Float32Array(c * c), sty = F.sty = new Array(c * c).fill(null), d = T.d, uf = new Int8Array(c * c);
   const underFree = w => { if (!uf[w]) { const i = w % c, j = (w - i) / c; let f = false; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x = F.x0 + (i + a) * F.st, z = F.z0 + (j + b) * F.st; if (H.overFree(x, z, H.base(x, z)) > H.base(x, z) + 0.01) f = true; } uf[w] = f ? 1 : 2; } return uf[w] === 1; };
   const S = (k, m, vs, col) => { const key = k + (col ? col.getHexString() : ''); return STY[key] || (STY[key] = { m, vs, col: col || null }); };
+  const SF = m => { const f = fondoLook(m); return S('m' + m, f.S, f.vs, f.col); }; // a material of src/fondi.py
   const lay = T.layers = []; // [outer, holes, rank, look]: the look of a cell a ramp takes (pitLook)
   const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && (underFree(w) || (F.ud2 && F.ud2[w])))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
@@ -1391,14 +1406,14 @@ function cellOwners(T, F) {
     else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
     else if (a.t === 6) cover(outer, holes, 2, S('w', MAT.waterS, 9));
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
-    else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
+    else if (a.t === 17) cover(outer, holes, 1.1, SF(a.m || 'n')); // yards of the DBGT (AATT): their material (src/fondi.py), or the neutral paving
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
-  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('a', MAT.asphS, 9), true); // yards and drives of the DBGT (AC_VEI 0307): the asphalt of the carriageways and car parks (tiles[t].as), no lines (Carlo, 2/11)
+  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, q.m ? SF(q.m) : S('a', MAT.asphS, 9), true); // yards and drives of the DBGT (AC_VEI 0307): the asphalt of the carriageways and car parks (tiles[t].as), no lines (Carlo, 2/11)
   for (const q of d.sf || []) cover(dec(q.p), q.k.map(dec), 1.3, S('b', MAT.gravelS, 3)); // the rail bed of the DBGT (SD_FER a raso)
-  for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, S('f', MAT.footS, 4), true);
-  for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, S('a', MAT.asphS, 9), true);
-  for (const q of d.pz || []) cover(dec(q.p), q.k.map(dec), 5.1, S('z', MAT.piazzaS, 4), true);
+  for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, SF(q.m || 'n'), true); // paths: their material, or the neutral paving
+  for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, q.m ? SF(q.m) : S('a', MAT.asphS, 9), true);
+  for (const q of d.pz || []) cover(dec(q.p), q.k.map(dec), 5.1, q.m ? SF(q.m) : S('z', MAT.piazzaS, 4), true);
   // under a deck that carries a street or a railway (F.ud, terreno_gioco.py) no grass grows and the DBGT and OSM green areas, drawn from the
   // air, are the deck's top seen from above: bare earth there (29/10, via Maroncelli: a lawn under the cavalcavia), the rail bed, the
   // water and the streets at their own level stay
@@ -1421,6 +1436,7 @@ function* buildTileGen(T) {
   const G = new THREE.Group(); G.visible = false; scene.add(G); T.group = G;
   const put = (b, mat, ro, shadow) => { if (b.i.length) mkMesh(b, mat, ro, shadow, G); };
   const pc = a => COL(a[Math.floor(tRnd() * a.length)]), d = T.d, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
+  const FB = new Map(), fbuf = (m, rk, street, V) => { const k = m + '|' + rk; let b = FB.get(k); if (!b) { b = V ? VBuf() : FBuf(); b.rk = rk; if (street) b.street = true; b.fm = m; FB.set(k, b); } return b; }; /* the drapes of the materials of src/fondi.py, one buffer per material and rank */
   // terrain patch
   const FT = H.tile(T.t); T.fine = !!FT;
   if (FT) { // new engine: the nodes of S as they are, the triangles of H.onTri (docs/motore.md 3: H.base is this mesh, H.check)
@@ -1478,13 +1494,13 @@ function* buildTileGen(T) {
         else if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 6) polyFill(wB, outer, holes, 0.03 * fy, 9);
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
-        else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
+        else if (a.t === 17) { const m = a.m || 'n'; polyFill(fbuf(m, 1.1, false, true), outer, holes, 0.025 * fy, fondoLook(m).vs, fondoLook(m).col); }
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
-    const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 9); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): the asphalt of the carriageways and car parks, no lines, no traffic (Carlo, 2/11)
+    const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { if (q.m) polyFill(fbuf(q.m, 1.2, true), dec(q.p), q.k.map(dec), 0.03 * fy, fondoLook(q.m).vs, fondoLook(q.m).col); else polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 9); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): the asphalt of the carriageways and car parks, no lines, no traffic (Carlo, 2/11)
     const sB = FBuf(); sB.rk = 1.3; for (const q of d.sf || []) { try { polyFill(sB, dec(q.p), q.k.map(dec), 0.03 * fy, 3); } catch (e) { } } // the rail bed (DBGT SD_FER)
-    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.asph, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.asph, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2); for (const b of FB.values()) put(b, fondoLook(b.fm).F, 1); FB.clear();
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {
@@ -1583,7 +1599,8 @@ function* buildTileGen(T) {
     const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), lett = FBuf(), lettB = FBuf(), white = COL('#f1efe6'); asp.rk = 5; asp.angc = true; asp.asf = asfGrid(T); por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = lett.street = lettB.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
     const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
-    fill(d.as, asp, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fill(d.pz, por, 0.06 * fy, 4); fill(d.ft, foot, 0.045 * fy, 4);
+    const fillM = (list, b, rk, y, sc) => { for (const q of list || []) { const m = q.m || (b ? null : 'n'); try { if (m) polyFill(fbuf(m, rk, true), dec(q.p), q.k.map(dec), y, fondoLook(m).vs, fondoLook(m).col); else polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } }; /* a polygon with its material (src/fondi.py) in the buffer of that material */
+    fillM(d.as, asp, 5, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fillM(d.pz, por, 5.1, 0.06 * fy, 4); fillM(d.ft, null, 3, 0.045 * fy, 4);
     { const s_ = srndT; yield 'sidewalks'; srndT = s_; } /* a tile of S cuts its surfaces on the cells: in slices, so building it never stops the game for long */
     for (const q of T.sd) {
       try { polyFill(sw, q.o, q.k, SIDE_H, 4); } catch (e) { } // the cover of the step: S + SIDE_H on the cells (clipFill)
@@ -1787,7 +1804,7 @@ function* buildTileGen(T) {
     }
     if (T.fine) drawDecks(T, deck, dside);
     { const s_ = srndT; yield 'streets put'; srndT = s_; } 
-    put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
+    put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); for (const b of FB.values()) put(b, fondoLook(b.fm).F, b.rk >= 5 ? 5 : 3); FB.clear(); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
     put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9); put(kerbS, MAT.kerb, 9);
     put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10); put(dmark, MAT.deckMark, 10); put(pil, MAT.deckSide, 10, 'cast');
   }

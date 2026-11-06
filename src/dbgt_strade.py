@@ -1002,7 +1002,10 @@ class Strade:
         on bridges (ap, only for what keeps off the carriageway) in the tiles.
         Grass or paved: MAN_TR_VRD is empty at Meda; on the Mapillary photos of 10 islands and medians (strade/mly_man) 8 are grass or a hedge
         behind a kerb, the small ones paved: grass from ISOLA_VERDE m2 up"""
-        P1 = _parts(s.cv); P2 = [p for p in _parts(s.md_dbgt) if p.area >= ISOLA_VERDE]; P3 = [p for p in _parts(s.md_dbgt) if p.area < ISOLA_VERDE]
+        CVM = [(m, _parts(g)) for m, g in (getattr(s, 'cv_m', None) or {None: s.cv}).items()]   # the yards by material (src/fondi.py, build_data.py)
+        P1 = []; M1 = []
+        for m, ps in CVM: P1 += ps; M1 += [m] * len(ps)
+        P2 = [p for p in _parts(s.md_dbgt) if p.area >= ISOLA_VERDE]; P3 = [p for p in _parts(s.md_dbgt) if p.area < ISOLA_VERDE]
         # ap: the carriageways on the bridges (AC_VEI SED 02; the deck draws its own top): the guardrails of the ramps keep out of them (verifica
         # 24/10: 20 pieces in them on the decks of the Milano-Meda junction)
         P4 = _parts(_u([g for g, a in s.D['vei'] if a.get('sed') not in ('01', None) and a['zon'] not in NON_CARR]).intersection(s.cover))
@@ -1013,8 +1016,12 @@ class Strade:
                 if T_ is None: continue
                 idx = T_.query(bx)
                 if not len(idx): continue
-                c = unary_union([P_[i].intersection(bx) for i in idx])
-                for p_ in polys_of(c, 0.15, 0.5): p_.update(extra); push(t, key, p_)
+                for m in (sorted(set(M1[i] for i in idx), key=str) if key == 'cv' else [None]):
+                    c = unary_union([P_[i].intersection(bx) for i in idx if key != 'cv' or M1[i] == m])
+                    for p_ in polys_of(c, 0.15, 0.5):
+                        p_.update(extra)
+                        if m: p_['m'] = m
+                        push(t, key, p_)
 
     # ---- 4. checks (docs/motore.md 7, last paragraph)
     def controlli(s, raw_roads, nodes, oggetti=(), lampioni=(), cartelli=(), barriere=(), edifici=(), alberi=(), attraversamenti=()):

@@ -1,0 +1,89 @@
+# Le superfici del suolo: censimento e regole (6/11/2026)
+
+Carlo (3/11): "dobbiamo cercare tutte le superfici e come cazzo sono assegnate". Qui c'è ogni tipo di suolo che entra nella build, da dove viene,
+che aspetto prende nel gioco, con quale regola e quanto copre in Meda+Seveso. I numeri si rifanno con gli script descritti in fondo.
+
+## Come arriva il suolo al gioco
+
+1. `src/build_data.py` mette in ogni tile poligoni con una chiave: `a` (aree, col tipo `t`), `as` (carreggiate), `pz` (piazze e aree pedonali),
+   `sd` (marciapiedi), `ft` (vialetti), `cv` (cortili e accessi AC_VEI 0307), `sf` (massicciata), `md` (isole), `ls` (terreni vestiti da
+   `paesaggio3.js`). Dal 6/11 `as`, `pz`, `ft`, `cv` e le aree `a` di tipo 17 possono avere `m`, il materiale (`src/fondi.py`).
+2. `src/world3.js` `cellOwners` (le celle intere di S) e i drappi `polyFill` (il resto) disegnano ogni poligono con l'aspetto della sua chiave;
+   vince il rango più alto: aree 1-2, cortili AATT 1.1, cortili AC_VEI 1.2, massicciata 1.3, piazze OSM 4, vialetti 3, carreggiate 5, piazze 5.1,
+   poi marciapiedi (gradino) e terreni di `paesaggio3.js`.
+3. Dove nessun poligono copre il suolo resta il **terreno nudo** (`MAT.terrainS`, la foto `tex/terreno.jpg`, prato e terra): questo è il colore
+   neutro vero, il suolo di cui i dati non dicono niente.
+
+## Censimento: Meda+Seveso, 12,68 km² di suolo (edifici esclusi)
+
+Aspetto visibile (lo strato più alto) metro per metro. "Prima" = build 5/11 di `dev`; "dopo" = ramo `superfici`.
+
+| Superficie nel gioco | Fonte e regola | Aspetto | Prima m² | Dopo m² |
+|---|---|---|---:|---:|
+| Prato (area 1) | DBGT AR_VRD 01/02/04/07/95, PS_INC 01/05, CL_AGR 05 (`dbgt_verde.py:25-36`); OSM grass/meadow/village_green (`build_data.py:361`); WorldCover 30 fuori da OSM e DBGT (`build_data.py:102`) | `grassTex` (`world3.js` cellOwners `a.t <= 3`) | 3.570.498 | |
+| Bosco (11) | DBGT BOSCO, AR_VRD 03, CL_AGR 04; OSM forest/wood; WorldCover 10 | prato scuro `#7d9a6a` + alberi | 1.852.689 | |
+| Cortili e accessi AC_VEI 0307 (`cv`) | DBGT AC_VEI ZON 0307 (`dbgt_strade.py:33`, `:944`) | asfalto (Carlo 2/11) | 1.733.019 | |
+| Carreggiate (`as`) | DBGT AC_VEI (non 0307); OSM fuori dal DBGT (`dbgt_strade.py:943`) | asfalto | 1.693.597 | |
+| Incolti (18) | DBGT PS_INC 04 (`dbgt_verde.py:37`) | `incoltoTex` | 1.067.027 | |
+| Residenziale (16) | OSM landuse=residential dove sotto non c'è altro (`build_data.py:361`) | prato chiaro `#d2e2b2` | 915.112 | |
+| Campi (`ls` campo) | DBGT CL_AGR 06/07, OSM farmland (`build_data.py:402`) | solchi di `paesaggio3.js` | 557.852 | |
+| Terreno nudo | nessuno strato | `tex/terreno.jpg` (neutro) | 371.333 | |
+| Marciapiedi (`sd`) | DBGT AC_PED 01/03; OSM fuori dal DBGT | masselli (`tex/marciapiede.jpg`) con cordolo | 151.125 | |
+| Cantieri (7) | OSM landuse=construction | asfalto tinto `#a88f6c` | 112.123 | |
+| Cortili AATT (17) | DBGT AATT (`dbgt_manufatti.py:396`); il DBGT non dice il materiale | grigio liscio `#b9b5ac` senza texture (prima); vedi sotto (dopo) | 109.653 | |
+| Sport (`ls` sport:) | DBGT ATTR_SP + sport e fondo da OSM (`dbgt_verde.py:40`) | campi disegnati da `paesaggio3.js` | ~96.000 | |
+| Cespugli (12) | DBGT BOSCO 04, OSM scrub | `#c9d7a8` | 87.400 | |
+| Vialetti (`ft`) | DBGT AC_PED 06/07, AC_CIC, AR_VMS; OSM footway/path/cycleway fuori dal DBGT (`dbgt_strade.py:618`, `:925`) | beige liscio `#c8b89c` (prima) | 84.778 | |
+| Massicciata (`sf`) | DBGT SD_FER a raso | `gravelTex` | 80.998 | |
+| Piazze e aree pedonali (`pz`) | DBGT AC_PED 04/05/08/09/10/95; OSM pedestrian fuori dal DBGT (`dbgt_strade.py:617`, `:942`) | porfido (`tex/porfido.jpg`) | 44.837 | |
+| Scuole (15) | OSM amenity=school/kindergarten | prato `#d6e2b4` | 38.497 | |
+| Isole e spartitraffico (`md`) | DBGT MAN_TR 01-03 (verde da 12 m²) | prato / pavimentate | 20.957 | |
+| Zone industriali e commerciali OSM (8, 9) | OSM landuse=industrial/retail/commercial | asfalto tinto | 21.168 | |
+| Cimiteri (14) | OSM | prato `#c3cdb6` | 18.221 | |
+| Parcheggi OSM (4) | OSM amenity=parking | asfalto tinto `#7b7c7a` | 16.983 | |
+| Piste, frutteti, vivai, orti, piscine, prato `ls` | OSM e DBGT (`build_data.py:402-412`) | `paesaggio3.js` | ~27.500 | |
+| Parchi (2), acqua (6), coltivi (13), campi (3) | OSM, DBGT | prato chiaro, acqua | ~6.900 | |
+
+Note sul "prima":
+- **Terreno nudo**: 265.000 m² stanno a nord fuori dal riquadro dei dati (non ci sono tile); 106.000 m² dentro, in 12.830 pezzi: soprattutto i letti
+  di Seveso, Certesa e Tarò (la riga rossa lungo i fiumi in `censo_prima_neutro.png`), le strisce fra due strati e la cava di x -1119 z -778
+  (OSM landuse=quarry, che nessuna regola riconosce).
+- **Cortili AATT**: il grigio liscio è il neutro che si vedeva bianco (la piazza di via Indipendenza x 369 z -456: AATT 95 "altro" con sopra
+  i vialetti beige delle footway OSM). Il DBGT dice solo "cortile, corte, spazio interno, altro".
+- **Vialetti**: il beige liscio era un colore scelto, non un materiale: AR_VMS sono carrarecce (sterrato), AC_PED e AC_CIC hanno FON 01
+  "pavimentato".
+- **AC_VEI_FON 02** "non pavimentato" (Meda 175 pezzi, Seveso 51: cortili e qualche carreggiata) era disegnato in asfalto.
+- **Residenziale OSM**: è una zona, non un suolo, ma la foto aerea gli dà lo stesso colore dei prati (luce mediana 56 contro 57, verde sul
+  rosso +10 contro +11): lì il prato chiaro va bene e resta.
+- **Piazze in porfido**: il DBGT non dice il materiale (AC_PED_FON è sempre 01, "pavimentato"); il porfido è una scelta del gioco. Resta finché
+  OSM non dice altro (domanda per Carlo in fondo).
+
+## Le regole del 6/11 (`src/fondi.py`)
+
+Il materiale di un pezzo, in quest'ordine, senza coordinate scritte a mano:
+1. **OSM `surface=*`** della via o dell'area che sta sopra il pezzo (una via vale per la larghezza della sua sede, `width=` o la classe).
+   Solo vie del genere giusto: le carreggiate prendono le vie per auto, i vialetti le pedonali e ciclabili, le piazze le pedonali e le aree.
+   asphalt → asfalto; paved, concrete → pavimentato; paving_stones → masselli; sett → porfido; cobblestone → ciottoli; gravel, fine_gravel,
+   compacted, unpaved → ghiaia; ground, dirt, earth, sand → terra; grass, grass_paver → prato.
+2. **DBGT**: AC_VEI_FON 02 (carreggiate e cortili) → ghiaia/sterrato; AR_VMS (carrarecce) → ghiaia/sterrato; AC_PED e AC_CIC (FON 01) →
+   pavimentato.
+3. **Foto aerea Esri** (luglio 2025, solo riferimento interno della build come in `dbgt_edifici.py`; mai nel gioco) per i pezzi di cui i dati
+   non dicono il materiale: i cortili AATT interi e i vialetti che vengono solo da OSM. La mediana dei pixel dentro il pezzo (ristretto di 0,5 m,
+   senza le ombre): verde → prato; rosso sul blu da +15 con luce sotto 95 → terra; luce da 80 in su → pavimentato. Tarata sulle superfici
+   note (`fondi.py da_foto`): la foto di luglio è calda, il pavimentato si separa dalla terra per la luce, non per il colore.
+4. Altrimenti **neutro**: nessun `m`. Un cortile AATT o un vialetto neutro si disegna col pavimentato neutro (non più il grigio liscio o il beige).
+
+I materiali nel gioco (`world3.js fondoLook`): asfalto e porfido, masselli, ciottoli, prato con le foto di prima; tre foto nuove Poly Haven CC0:
+`tex/ghiaia.jpg` (gravel_floor_02, ×0,88), `tex/terra.jpg` (brown_mud_dry), `tex/pavimento.jpg` (concrete_floor_02 portato a grigio chiaro,
+il pavimentato di materiale ignoto). Crediti nel gioco (riga dei crediti, `assemble3.py`).
+
+## Domande aperte per Carlo
+- Le piazze (AC_PED 09 e simili) restano in porfido? Il DBGT non lo dice; OSM lo dice per 2 piazze su 35 a Meda+Seveso.
+- I cortili AC_VEI 0307 FON 01 restano asfalto (deciso il 2/11); la foto dice che molti sono più chiari (masselli o cemento), ma il DBGT dice
+  "pavimentato" e basta.
+- La cava di x -1119 z -778 (OSM landuse=quarry) è terreno nudo: serve un tipo "cava" (terra)?
+
+## Rifare i numeri
+`python src/censo_superfici.py brianza.json confine_dbgt.json
+<uscita>` rasterizza a 1 m gli strati dei tile nell'ordine dei ranghi dentro Meda+Seveso e conta i m² per aspetto; la build scrive anche
+`report.fondi` in `brianza.json` (m² per materiale di ogni superficie).
