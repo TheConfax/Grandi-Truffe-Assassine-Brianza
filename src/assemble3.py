@@ -828,5 +828,5 @@ rep("propHits(v); barHits(v); v.collide();", "propHits(v); barHits(v); v.collide
 rep("      else { P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; P.x += P.vx * dt;", "      else { P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; footSlope(dt); P.x += P.vx * dt;")
 rep("    P.air = false; P.climb = null; P.onV = null; P.land = 0; P.jumpReq = 0;\n", "    P.air = false; P.climb = null; P.onV = null; P.land = 0; P.jumpReq = 0; P.slx = P.slz = 0;\n")
 rep("v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y);", "v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y); if (v.speed > FARI.minV) v.fariFino = now + FARI.dopo; /* the lights stay on a little (extras.js FARI) */")
-rep("window.__G = { GPS,", "window.__G = { FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, GPS,")
+rep("window.__G = { acquaIn,", "window.__G = { FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn,")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
