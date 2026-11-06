@@ -1167,6 +1167,9 @@ function busyGround(dk, x, z) {
   if (dk.tipo !== 'ferro') RAILG.each(x - 4, z - 4, x + 4, z + 4, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < 3.5) f = true; }); // (on a railway deck its own rails run over the point)
   const w = H.water(x, z); return f || (w !== null && w > H.base(x, z));
 }
+// how high the guardrails, the new jersey and the parapets are for the walker: as drawn (drawGuard, drawBarriers), so he goes over them as over any barrier of
+// that height (salto3.js). A car meets them ALTO_VERO.auto over the road: it does not fly over a guardrail (Carlo, 6/11)
+const ALTO_VERO = { guardrail: 0.8, newJersey: 0.82, parapetto: 0.95, passerella: 1.1, auto: 2.5 };
 // what a deck adds to the world, once, when all the tiles under it are here (pezzi3.js): its parapets, pillars, ramp walls. They go with it
 function deckInit(dk) { if (dk.pronto) return; dk.pronto = true; dk.bar = { rails: [], pillars: [] }; const r0 = GRID_REC; GRID_REC = dk.reg; try { deckInit2(dk); } finally { GRID_REC = r0; } }
 function deckInit2(dk) {
@@ -1185,7 +1188,7 @@ function deckInit2(dk) {
       if (top - H.base(qx, qz) < 0.8) continue; // it rests on the ground there (a spalla)
       const seg = { ax: ax + (bx - ax) * k / n, az: az + (bz - az) * k / n, bx: ax + (bx - ax) * (k + 1) / n, bz: az + (bz - az) * (k + 1) / n };
       dk.bar.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, dk.tipo === 'pedonale' ? 2 : 1, nx, nz]);
-      WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + 2.5, deckw: true });
+      WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + (dk.tipo === 'pedonale' ? ALTO_VERO.passerella : ALTO_VERO.parapetto), yv: Math.max(y0, y1) + ALTO_VERO.auto, deckw: true });
     }
   }
   // pillars: on the long axis of the footprint (two lines on a wide deck), every PIL_STEP m, where the deck stands more than 2.5 m over
@@ -1233,7 +1236,7 @@ function* roadBarriers(T) {
   const res = { rails: [] }, nearJ = (x, z, r) => { let f = false; NODEG.each(x - r, z - r, x + r, z + r, ({ i }) => { if (!f && NODE_DEG[i] >= 3 && hyp(N[i][0] - x, N[i][1] - z) < r) f = true; }); return f; };
   let n = 0;
   for (const ri of T.d.rp || []) {
-    const r = D.roads[ri]; if (r.t || r.c > 5 || !(r.c <= 1 || r.x || ON_DECK.has(ri))) continue; if (++n % 12 === 0) yield 'barriers roads'; // main roads, ramps, and any road on a deck (off the PONTE core, where the parapets are)
+    const r = D.roads[ri]; if (r.t || r.c > 5 || r.gp || !(r.c <= 1 || r.x || ON_DECK.has(ri))) continue; if (++n % 12 === 0) yield 'barriers roads'; // r.gp: an expressway whose guardrails come from the build (guardRails, below) // main roads, ramps, and any road on a deck (off the PONTE core, where the parapets are)
     const hw = r.w / 2;
     for (let k = 1; k < r.g.length; k++) {
       const ia = r.g[k - 1], ib = r.g[k], A = N[ia], B = N[ib], L = hyp(B[0] - A[0], B[1] - A[1]); if (L < 1) continue;
@@ -1272,12 +1275,68 @@ function* roadBarriers(T) {
           if (b - a + 1 < 3 && !(a === 0 && b === ns - 1 && L < 6)) continue;
           const t0 = q / ns, t1 = (q + 1) / ns, off = offS, x0 = A[0] + (B[0] - A[0]) * t0 + ex * off, z0 = A[1] + (B[1] - A[1]) * t0 + ez * off, x1 = A[0] + (B[0] - A[0]) * t1 + ex * off, z1 = A[1] + (B[1] - A[1]) * t1 + ez * off;
           const y0 = q > a ? (flag[q - 1] + flag[q]) / 2 : flag[q], y1 = q < b ? (flag[q + 1] + flag[q]) / 2 : flag[q];
-          res.rails.push([x0, z0, y0, x1, z1, y1]); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ex, nz: -ez, two: true, y0: Math.min(y0, y1) - 0.8, y1: Math.max(y0, y1) + 2.5, deckw: true });
+          res.rails.push([x0, z0, y0, x1, z1, y1]); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ex, nz: -ez, two: true, y0: Math.min(y0, y1) - 0.8, y1: Math.max(y0, y1) + ALTO_VERO.guardrail, yv: Math.max(y0, y1) + ALTO_VERO.auto, deckw: true });
         }
       }
     }
   }
   ROAD_BAR.set(T.t, res); return res;
+}
+// guardrails and new jersey of the expressways (src/guardrail.py, tiles[].gr): continuous lines from the build, [kind, roads, points]; kind 1 a
+// guardrail on posts, 2 a new jersey (the concrete barrier in the median of the Milano-Meda). Their height: the road they run by (H.node along
+// its axis, then its surface there), the surface at the line when it is within 0.6 m of it (else the road's: the edge of a drop, a bank higher
+// than the road). Worked out once per tile, with their collisions (two sided, as the guardrails of roadBarriers)
+const GUARD = new Map(), NJ_PROF = [[-0.3, 0], [-0.3, 0.08], [-0.2, 0.3], [-0.09, 0.82], [0.09, 0.82], [0.2, 0.3], [0.3, 0.08], [0.3, 0]];
+function guardRoadY(rs, x, z) {
+  let best = null, bd = 1e9, bx = 0, bz = 0;
+  for (const ri of rs) { const r = D.roads[ri]; if (!r) continue; for (let k = 1; k < r.g.length; k++) { const A = N[r.g[k - 1]], B = N[r.g[k]], ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - A[0]) * ex + (z - A[1]) * ez) / L2, 0, 1), d = hyp(x - A[0] - ex * t, z - A[1] - ez * t); if (d < bd) { bd = d; best = lerp(H.node(r.g[k - 1]), H.node(r.g[k]), t); bx = A[0] + ex * t; bz = A[1] + ez * t; } } }
+  return best === null ? null : [H.surface(bx, bz, best + 0.5), bx, bz];
+}
+function guardRails(T) {
+  if (GUARD.has(T.t)) return GUARD.get(T.t);
+  const out = [];
+  for (const [k, rs, o] of T.d.gr || []) {
+    const pts = []; let x = 0, z = 0; for (let i = 0; i < o.length; i += 2) { x += o[i]; z += o[i + 1]; pts.push([x / 100, z / 100]); }
+    if (pts.length < 2) continue;
+    // over a drop (the mouth of an underpass under the road, the edge of a bank) a point steps back towards the road, up to 1.5 m, to where the
+    // ground is at the road's level: the guardrail stands on the edge, never hanging in front of it
+    const y0 = pts.map(p => { const q = guardRoadY(rs, p[0], p[1]); if (q === null) return H.surface(p[0], p[1]); const [yr, bx, bz] = q; let yE = H.surface(p[0], p[1], yr + 0.3);
+      if (yE < yr - 0.6) { const dx = bx - p[0], dz = bz - p[1], L = hyp(dx, dz) || 1; for (let st = 0.1; st <= 1.5 + 1e-6; st += 0.1) { const x = p[0] + dx / L * st, z = p[1] + dz / L * st, y = H.surface(x, z, yr + 0.3); if (y >= yr - 0.3) { p[0] = x; p[1] = z; yE = y; break; } } }
+      return Math.abs(yE - yr) < 0.6 ? yE : yr; });
+    const ys = y0.map((v, i) => i && i < y0.length - 1 ? (y0[i - 1] + v + y0[i + 1]) / 3 : v); // no steps along it
+    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], c = pts[i], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(ys[i - 1], ys[i]) - 0.8, y1: Math.max(ys[i - 1], ys[i]) + (k === 2 ? ALTO_VERO.newJersey : ALTO_VERO.guardrail), yv: Math.max(ys[i - 1], ys[i]) + ALTO_VERO.auto, deckw: true }); }
+    out.push({ k, pts, ys });
+  }
+  GUARD.set(T.t, out); return out;
+}
+function drawGuard(T, grail, pil) {
+  for (const { k, pts, ys } of guardRails(T)) {
+    const n = pts.length, nm = pts.map((p, i) => { const a = pts[Math.max(0, i - 1)], c = pts[Math.min(n - 1, i + 1)], L = hyp(c[0] - a[0], c[1] - a[1]) || 1; return [(c[1] - a[1]) / L, -(c[0] - a[0]) / L]; }); // the normal at each point, between its two segments
+    if (k === 2) { // the new jersey: its profile along the line
+      for (let i = 1; i < n; i++) {
+        const a = pts[i - 1], c = pts[i];
+        for (let j = 1; j < NJ_PROF.length; j++) {
+          const [o0, h0] = NJ_PROF[j - 1], [o1, h1] = NJ_PROF[j], dl = hyp(o1 - o0, h1 - h0) || 1, sx = -(h1 - h0) / dl, sy = (o1 - o0) / dl, b0 = pil.p.length / 3; /* (sx, sy): the outward normal of this face of the profile */
+          vtx(pil, a[0] + nm[i - 1][0] * o0, ys[i - 1] + h0, a[1] + nm[i - 1][1] * o0, nm[i - 1][0] * sx, sy, nm[i - 1][1] * sx, 0, 0); vtx(pil, c[0] + nm[i][0] * o0, ys[i] + h0, c[1] + nm[i][1] * o0, nm[i][0] * sx, sy, nm[i][1] * sx, 0, 0);
+          vtx(pil, c[0] + nm[i][0] * o1, ys[i] + h1, c[1] + nm[i][1] * o1, nm[i][0] * sx, sy, nm[i][1] * sx, 0, 0); vtx(pil, a[0] + nm[i - 1][0] * o1, ys[i - 1] + h1, a[1] + nm[i - 1][1] * o1, nm[i - 1][0] * sx, sy, nm[i - 1][1] * sx, 0, 0);
+          pil.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
+        }
+      }
+      for (const [i, sg] of [[0, -1], [n - 1, 1]]) { const p = pts[i], b0 = pil.p.length / 3; for (const [o, h] of NJ_PROF) vtx(pil, p[0] + nm[i][0] * o, ys[i] + h, p[1] + nm[i][1] * o, -nm[i][1] * sg, 0, nm[i][0] * sg, 0, 0); for (let j = 1; j < NJ_PROF.length - 1; j++) pil.i.push(b0, b0 + j, b0 + j + 1); } // its two ends closed
+      continue;
+    }
+    // a guardrail: a steel band folded in two (0.45-0.8 m) on posts every 2 m down to the ground (at most 1.6 m: on the edge of a drop it ends there)
+    for (let i = 1; i < n; i++) {
+      const a = pts[i - 1], c = pts[i], ya = ys[i - 1], yc = ys[i];
+      for (const [h0, h1, o0, o1] of [[0.45, 0.625, 0, -0.05], [0.625, 0.8, -0.05, 0]]) { const b0 = grail.p.length / 3, na = nm[i - 1], nc = nm[i]; vtx(grail, a[0] + na[0] * o0, ya + h0, a[1] + na[1] * o0, na[0], 0, na[1], 0, 0); vtx(grail, c[0] + nc[0] * o0, yc + h0, c[1] + nc[1] * o0, nc[0], 0, nc[1], 0, 0); vtx(grail, c[0] + nc[0] * o1, yc + h1, c[1] + nc[1] * o1, nc[0], 0, nc[1], 0, 0); vtx(grail, a[0] + na[0] * o1, ya + h1, a[1] + na[1] * o1, na[0], 0, na[1], 0, 0); grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); }
+    }
+    let acc = 0, next = 1.0;
+    for (let i = 1; i < n; i++) {
+      const a = pts[i - 1], c = pts[i], L = hyp(c[0] - a[0], c[1] - a[1]);
+      while (next <= acc + L) { const f = (next - acc) / (L || 1), x = lerp(a[0], c[0], f), z = lerp(a[1], c[1], f), y = lerp(ys[i - 1], ys[i], f), g = Math.max(y - 1.6, Math.min(y, H.surface(x, z, y + 0.3))); addBox(grail, x, (g + y + 0.8) / 2 - 0.05, z, 0.1, y + 0.8 - g + 0.1, 0.1, null, Math.atan2(-(c[1] - a[1]), c[0] - a[0])); next += 2.0; }
+      acc += L;
+    }
+  }
 }
 // draw them: guardrail strips on posts, the parapets (a concrete kerb with a rail, a railing on the footbridges), the pillars
 function* drawBarriers(T, grail, pil) {
@@ -1289,6 +1348,7 @@ function* drawBarriers(T, grail, pil) {
     addBox(pil, (x0 + x1) / 2, (y0 + y1) / 2 + 0.2, (z0 + z1) / 2, L + 0.02, 0.5, 0.3, null, ry); rail(x0, z0, y0, x1, z1, y1, 0.6, 0.95); // a concrete kerb and a rail
   }
   for (const dk of H.DECKS) if (dk.bar) for (const [x, z, g, bot] of dk.bar.pillars) if (tileOf(x, z) === T.t) addBox(pil, x, (g + bot) / 2 - 0.2, z, 0.9, bot - g + 0.4, 0.9, null);
+  drawGuard(T, grail, pil);
   const R = yield* roadBarriers(T);
   for (const [x0, z0, y0, x1, z1, y1] of R.rails) { rail(x0, z0, y0, x1, z1, y1, 0.45, 0.8); const L = hyp(x1 - x0, z1 - z0); for (let s = 0; s < L; s += 2) { const f = s / L, x = lerp(x0, x1, f), z = lerp(z0, z1, f), y = lerp(y0, y1, f), g = Math.min(y, H.surface(x, z, y + 0.3)); addBox(pil, x, (g + y + 0.75) / 2 - 0.1, z, 0.1, y + 0.75 - g + 0.2, 0.1, null); } } // posts every 2 m, down to the ground or the deck under them (not through it to the road below: deck 10, verifica fase 6)
 }
@@ -2738,15 +2798,13 @@ function buildCemetery(T, G) {
   if (!tombs.length && !cyps.length) return;
   if (!T.cemDone) { /* graves are solid (Carlo, 2/11): two discs per slab, which you can walk up onto (28 cm), a disc for the headstone; a disc for each cypress */
     T.cemDone = true; window.__COLL = window.__COLL || {}; window.__COLL.tombe = (window.__COLL.tombe || 0) + tombs.length;
-    for (const [x, z, a] of tombs) { const gy = H.ground(x, z), dx = -Math.sin(a), dz = Math.cos(a);
-      for (const o of [-0.5, 0.5]) { const px = x + dx * o, pz = z + dz * o; WALLS.add(px - 0.5, pz - 0.5, px + 0.5, pz + 0.5, { r: 0.5, x: px, z: pz, y0: gy - 3, y1: gy + 0.3, sali: { rs: 0.5, top: gy + 0.3 } }); }
-      const hx = x + dx * 0.95, hz = z + dz * 0.95; WALLS.add(hx - 0.42, hz - 0.42, hx + 0.42, hz + 0.42, { r: 0.42, x: hx, z: hz, y0: gy - 3, y1: gy + 1.0 }); }
+    T.tombe = tombs.map(([x, z, a], i) => tombaSolida(T, x, z, a, i)); /* a car breaks them (sfondabili3.js) */
     for (const c of cyps) WALLS.add(c[0] - 0.35, c[1] - 0.35, c[0] + 0.35, c[1] + 0.35, { r: 0.35, x: c[0], z: c[1], y0: H.ground(c[0], c[1]) - 3, y1: H.ground(c[0], c[1]) + 8 });
   }
   const m = new THREE.Matrix4(), qq = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), pp = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  const mk = (geo, mat, list, f) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((t, i) => { f(t, pp); qq.setFromAxisAngle(up, -t[2] || 0); m.compose(pp, qq, sc); im.setMatrixAt(i, m); }); im.castShadow = true; G.add(im); };
-  mk(TOMB_G, lam(0xb8b4ac), tombs, (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.14, t[1]));
-  mk(STONE_G, lam(0x8e8a84), tombs.map(t => [t[0] - Math.sin(t[2]) * 0.95, t[1] + Math.cos(t[2]) * 0.95, t[2]]), (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.5, t[1])); // headstone at the head end
+  const mk = (geo, mat, list, f) => { if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((t, i) => { f(t, pp); qq.setFromAxisAngle(up, -t[2] || 0); m.compose(pp, qq, sc); im.setMatrixAt(i, m); }); im.castShadow = true; G.add(im); return im; };
+  const slabs_ = mk(TOMB_G, lam(0xb8b4ac), tombs, (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.14, t[1]));
+  T.tombeM = [slabs_, mk(STONE_G, lam(0x8e8a84), tombs.map(t => [t[0] - Math.sin(t[2]) * 0.95, t[1] + Math.cos(t[2]) * 0.95, t[2]]), (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.5, t[1]))]; tombeNascoste(T); // headstone at the head end; the broken ones stay broken
   if (cyps.length) { // the cypresses are trees like the others: the plain stem and the crown of TREE_G (leaf tufts), stretched to a narrow column (height th, crown td across, as the narrow DSM trees above)
     const trunks = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, cyps.length), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, cyps.length), sc2 = new THREE.Vector3(), e2 = new THREE.Euler();
     cyps.forEach((c, i) => {
