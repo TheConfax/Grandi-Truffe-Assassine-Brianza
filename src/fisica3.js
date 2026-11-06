@@ -105,6 +105,7 @@ function fisVert(v, cf, cb, yf, yb, ty) { // once a step from Vehicle.collide, a
     }
     v.vy += dv; v.wr += dr; v.wp += dp; v.y += dy; v.ar += da; v.ap += db;
   }
+  if (!v.spec.two) fisScocca(v); /* the body never in the ground */
   // the wheels as drawn: on the ground, at most the full droop below the body
   for (let i = 0; i < n; i++) { const x = F.gf[i] - (v.y + F.sx[i] * Math.sin(v.ar) - F.sz[i] * Math.sin(v.ap)); F.x[i] = x; F.off[i] = lerp(F.off[i], clamp(x, -Math.min(F.droop, 0.2), T.up), 0.5); }
   // on the wheels or in the air
@@ -264,8 +265,10 @@ function pendioPresa(v) { // the share of grip the wheels have on this slope, 1 
 function pendioMuro(v, x0, z0) { // the ground as a wall, on the car's way (x0, z0: where it was before the step). Takes the move into it back; the outward normal, or null
   const dx = v.x - x0, dz = v.z - z0, d = hyp(dx, dz); if (!(d > 1e-4) || d > 8) return null;
   const ux = dx / d, uz = dz / d, p = PENDIO.passo, tg = Math.tan(PENDIO.muro * Math.PI / 180) * p, cy = v.y + 0.5; let out = null;
-  for (const c of v.circles()) {
-    const lx = c[0] + ux * v.rad, lz = c[1] + uz * v.rad, g0 = H.surface(lx, lz, cy), g1 = H.surface(lx + ux * p, lz + uz * p, cy);
+  const fx = Math.sin(v.h), fz = Math.cos(v.h), sd = fx * ux + fz * uz >= 0 ? 1 : -1, hl = v.spec.L / 2 * sd, hw = v.spec.W / 2, lead = v.circles().map(c => [c[0] + ux * v.rad, c[1] + uz * v.rad]);
+  for (const k of [-1, 1]) lead.push([v.x + fx * hl + fz * hw * k, v.z + fz * hl - fx * hw * k]); /* and the two corners in front, the way it goes */
+  for (const [lx, lz] of lead) {
+    const g0 = H.surface(lx, lz, cy), g1 = H.surface(lx + ux * p, lz + uz * p, cy);
     if (g1 - g0 < tg || g1 < v.y + PENDIO.gradino) continue;
     const e = 0.2, mx = lx + ux * p / 2, mz = lz + uz * p / 2, gx = H.surface(mx + e, mz, cy) - H.surface(mx - e, mz, cy), gz = H.surface(mx, mz + e, cy) - H.surface(mx, mz - e, cy), gl = hyp(gx, gz) || 1;
     let nx = -gx / gl, nz = -gz / gl; if (nx * ux + nz * uz > -0.2) { nx = -ux; nz = -uz; } /* the face looks back at the car */
@@ -290,4 +293,24 @@ function vehAppoggio(v) {
   }
   v.appoggi = skip; v.lev = skip ? lev : null; // fisGround: the wheels of an axle over it stand on it
   return { skip, lev };
+}
+
+// the body never goes into the ground (Carlo, 6/11: on a steep bank the car went into it): the four corners of its underside, at the bumpers,
+// are stops of their own. A corner under the ground lifts the body there at once, all of it, and takes the speed into the ground away: the
+// car rests on its bumper or its floor and turns about it, as the springs do on a wheel at the end of its travel
+const SCOCCA = { largo: 0.95, gioco: 0.01, giri: 2 }; // share of the width the corners are at; m a corner may be in the ground; rounds
+function fisScocca(v) {
+  const F = v.F, S = v.spec, belly = S.wr * 0.9, hw = S.W / 2 * SCOCCA.largo, hl = S.L / 2, sh = Math.sin(v.h), ch = Math.cos(v.h);
+  for (let it = 0; it < SCOCCA.giri; it++) {
+    let any = false;
+    for (const sx of [-hw, hw]) for (const sz of [-hl, hl]) {
+      const sr = Math.sin(v.ar), cr = Math.cos(v.ar), sp = Math.sin(v.ap), cp = Math.cos(v.ap), X = sx * cr - belly * sr, Y1 = sx * sr + belly * cr, Z = Y1 * sp + sz * cp; /* the corner as drawn (yaw, nose, roll: YXZ) */
+      const x = v.x + ch * X + sh * Z, z = v.z - sh * X + ch * Z, py = v.y + Y1 * cp - sz * sp, over = H.surface(x, z, py + 0.5) - py;
+      if (over <= SCOCCA.gioco) continue; any = true;
+      const w = 1 + sx * sx / F.Ir + sz * sz / F.Ip, rel = -(v.vy + sx * v.wr - sz * v.wp);
+      if (rel > 0) { const j = rel / w; v.vy += j; v.wr += j * sx / F.Ir; v.wp -= j * sz / F.Ip; }
+      const q = over / w; v.y += q; v.ar += q * sx / F.Ir; v.ap -= q * sz / F.Ip;
+    }
+    if (!any) break;
+  }
 }

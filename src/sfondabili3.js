@@ -326,9 +326,16 @@ function bushHits(v, cs, R) {
   });
 }
 
-// ---- the graves of the cemeteries (world3.js buildCemetery) break as the street furniture does (props3.js SFONDA, Carlo 6/11): a car that touches
-// one at SFONDA.v m/s or more, or comes down on it that fast, smashes slab and headstone; it loses what it loses on a lamp post. Broken for good (TOMBE.rotte)
-const TOMBE = { G: new Grid(8), rotte: new Set(), bit: 0x9a968e, nBit: 8, alto: 1.0 }; // alto: the headstone
+// ---- the graves of the cemeteries (world3.js buildCemetery) break, but they are stone (Carlo 6/11: "di base dovrebbero rallentarti, non e che puoi
+// fartele tutte"): a car that touches one at TOMBE.v m/s or more, or comes down on it that fast, smashes slab and headstone and keeps only TOMBE.frena
+// of its speed; slower, the grave stops it as a wall. Broken for good (TOMBE.rotte)
+const TOMBE = {
+  v: 6,        // m/s to break one (a lamp post: SFONDA.v)
+  frena: 0.5,  // share of the speed the car keeps after breaking one (a lamp post: SFONDA.slow)
+  danno: 5,    // health the car loses on one
+  macerie: 0.35, // what is left of one: share of the speed lost per m driven over it (with the gas held a car does not go on smashing row after row)
+  G: new Grid(8), rotte: new Set(), bit: 0x9a968e, nBit: 8, alto: 1.0, // alto: the headstone
+};
 function tombaSolida(T, x, z, a, i) { // the collisions of a grave: two discs for the slab, which he can walk up onto (28 cm), one for the headstone
   const gy = H.ground(x, z), dx = -Math.sin(a), dz = Math.cos(a), key = Math.round(x * 10) + '_' + Math.round(z * 10), on = !TOMBE.rotte.has(key), t = { x, z, gy, key, i, T, ws: [], broken: !on };
   for (const o of [-0.5, 0.5]) { const px = x + dx * o, pz = z + dz * o, w = { r: 0.5, x: px, z: pz, y0: gy - 3, y1: gy + 0.3, sali: { rs: 0.5, top: gy + 0.3 }, dyn: true, on }; WALLS.add(px - 0.5, pz - 0.5, px + 0.5, pz + 0.5, w); t.ws.push(w); }
@@ -338,17 +345,20 @@ function tombaSolida(T, x, z, a, i) { // the collisions of a grave: two discs fo
 function tombaVia(t) { const M = t.T.tombeM; if (!M) return; const z0 = new THREE.Matrix4().makeScale(0, 0, 0); for (const m of M) if (m && t.i < m.count) { m.setMatrixAt(t.i, z0); m.instanceMatrix.needsUpdate = true; } }
 function tombeNascoste(T) { for (const t of T.tombe || []) if (t.broken) tombaVia(t); }
 function tombHits(v) {
-  const sp = v.speed, down = -(v.vy || 0); if (sp < SFONDA.v && down < SFONDA.v) return;
-  const cs = v.circles(), top = v.y + vehMaxTop(v);
+  const sp = v.speed, down = -(v.vy || 0); if (sp < 0.5 && down < TOMBE.v) return;
+  const cs = v.circles(), top = v.y + vehMaxTop(v); let rub = false;
   TOMBE.G.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, t => {
-    if (t.broken || v.y > t.gy + TOMBE.alto + 0.15 || top < t.gy) return; // (over it, or on a bridge under which it lies)
+    if (v.y > t.gy + TOMBE.alto + 0.15 || top < t.gy) return; // (over it, or on a bridge under which it lies)
+    if (t.broken) { if (!rub && !v.air) for (const c of cs) for (const w of t.ws) if (w.r === 0.5 && hyp(c[0] - w.x, c[1] - w.z) < w.r + 0.3) rub = true; return; }
+    if (sp < TOMBE.v && down < TOMBE.v) return;
     for (const c of cs) for (const w of t.ws) if (hyp(c[0] - w.x, c[1] - w.z) < v.rad + w.r + 0.15) { tombaRotta(t, v); return; }
   });
+  if (rub) { const k = Math.exp(-TOMBE.macerie * sp / 60); v.vx *= k; v.vz *= k; } /* over the rubble (a step of the game is 1/60 s) */
 }
 function tombaRotta(t, v) {
   t.broken = true; TOMBE.rotte.add(t.key); for (const w of t.ws) w.on = false; tombaVia(t);
   barBits(t.x, t.gy + 0.4, t.z, v, TOMBE.bit, TOMBE.nBit);
-  const sp = v.speed; v.vx *= SFONDA.slow; v.vz *= SFONDA.slow; v.health = Math.max(0, v.health - SFONDA.dmg);
+  const sp = v.speed; v.vx *= TOMBE.frena; v.vz *= TOMBE.frena; if (v.vy < 0) v.vy *= TOMBE.frena; v.health = Math.max(0, v.health - TOMBE.danno);
   if (v === P.car) { sfxCrash(Math.min(10, Math.max(sp, -(v.vy || 0)))); shake = Math.max(shake, 0.25); }
   TOMBE.n = (TOMBE.n || 0) + 1;
 }

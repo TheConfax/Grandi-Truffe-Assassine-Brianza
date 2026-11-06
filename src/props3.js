@@ -8,7 +8,7 @@ function addProp(p) { // { x, z, r, obj | inst: { meshes, i, ry, base }, onBreak
   WALLS.add(p.x - p.r - 0.2, p.z - p.r - 0.2, p.x + p.r + 0.2, p.z + p.r + 0.2, p.wall);
   PROPS.push(p); PROPG.add(p.x - 2, p.z - 2, p.x + 2, p.z + 2, p); return p;
 }
-const SFONDA = { v: 3.5, slow: 0.86, dmg: 2 }; // a car breaks a thing it hits at v m/s or more, and loses slow of its speed and dmg of its health (the graves too, sfondabili3.js)
+const SFONDA = { v: 3.5, slow: 0.86, dmg: 2 }; // a car breaks a thing it hits at v m/s or more, and loses slow of its speed and dmg of its health (the graves have their own, sfondabili3.js TOMBE)
 function breakProp(p, v) {
   if (p.broken) return; p.broken = true; p.wall.on = false;
   let dx = v ? v.vx : 1, dz = v ? v.vz : 0; const l = hyp(dx, dz) || 1; dx /= l; dz /= l;

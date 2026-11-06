@@ -7,6 +7,16 @@
 // the drop, against all that stops the walker, at the height the feet will have there. So nothing has to be excepted: a barrier is passed because
 // the feet are above it. If no path is free the press is a plain jump.
 // Every number of the jump and of the climb is here.
+// the vault over a low barrier (up to SALTO.lowH, Carlo 6/11: "deve sembrare uno scavalco vero"): a hop with the hands put on the top, the legs
+// swing over to one side while the weight goes onto the hands, the far side comes down without a stop. Times in s, angles in rad, lengths in m
+const SCAVALCO = {
+  hop: 0.2, hopK: 0.1,  // the hop up to the top: hop + hopK a m of rise
+  over: 0.42,           // the swing over the top (at least: never faster than SALTO.vOver)
+  arco: 0.14,           // how much the hips go over the top in the middle of the swing
+  gambe: 1.25, lato: 0.55, // legs forward (as sitting) and out to the side during the swing
+  busto: 0.32, peso: 0.1, // torso leaning away from the legs, and shifted over the hands
+  dolce: 12,            // 1/s: how fast roll and side swing follow (the rest follows at 24)
+};
 const SALTO = {
   grav: 14, jumpH: 1.05, carry: 0.92, airAcc: 7, buffer: 0.14, // m/s2 (22 was the knock-down, 9.81 looks slow in a game), apex in m, speed kept at take-off, control in the air, how long a press waits for the ground
   stepUp: 0.45, dropOff: 0.35, // on foot: what is walked up onto a perch at once; a drop over this is a fall, under it the feet follow the ground
@@ -174,9 +184,9 @@ function tryClimb() {
 function saltoStartClimb(p, sp) {
   const S = SALTO, h = p.y - Math.min(P.y, p.y), fast = sp > 3 ? S.fastK : 1, low = p.top - P.y <= S.lowH;
   p.run = hyp(p.sx - P.x, p.sz - P.z) / Math.max(sp, 3.5);
-  if (low) { p.tRise = (S.tHopMin + S.tHopK * h) * fast; p.tHold = 0; p.tPull = 0; p.yHang = null; }
+  if (low) { p.tRise = (SCAVALCO.hop + SCAVALCO.hopK * h) * fast; p.tHold = 0; p.tPull = 0; p.yHang = null; p.side = P.climbN % 2 ? 1 : -1; }
   else { p.tRise = S.tJump * fast; p.tHold = S.tHold * fast; p.yHang = Math.max(P.y, p.y - S.hoist); p.tPull = S.tPullK * Math.max(0.4, p.y - p.yHang) * fast; }
-  p.tOver = Math.max((p.stand ? S.tStand : S.tOver) * fast, hyp(p.ex - p.sx, p.ez - p.sz) / S.vOver); p.t = 0; p.sp = sp; p.x0 = P.x; p.z0 = P.z; p.y0 = P.y; p.h0 = P.h; p.low = low;
+  p.tOver = Math.max((p.stand ? S.tStand : low ? SCAVALCO.over : S.tOver) * fast, hyp(p.ex - p.sx, p.ez - p.sz) / S.vOver); p.t = 0; p.sp = sp; p.x0 = P.x; p.z0 = P.z; p.y0 = P.y; p.h0 = P.h; p.low = low;
   if (p.v) { p.lv = vehLocal(p.v, p.ex, p.ez); }
   P.climb = p; P.air = false; P.vy = 0; P.onV = null; P.land = 0; P.jumpReq = 0; P.vx = P.vz = 0; P.speedNow = 0; P.climbN = (P.climbN || 0) + 1;
 }
@@ -190,13 +200,13 @@ function climbStep(dt) {
   if (t < c.run) { const k = t / c.run; P.x = c.x0 + (c.sx - c.x0) * k; P.z = c.z0 + (c.sz - c.z0) * k; if (c.y0 < H.surface(P.x, P.z, c.y0) + 0.4) P.y = H.surface(P.x, P.z, P.y); c.y0r = P.y; P.phase += c.sp * dt * 3; c.ph = 0; return; }
   if (c.y0r === undefined) c.y0r = P.y; t -= c.run; P.x = c.sx; P.z = c.sz;
   const y0 = c.y0r, T1 = c.tRise, T2 = T1 + c.tHold, T3 = T2 + c.tPull, T4 = T3 + c.tOver;
-  if (t < T1) { c.ph = 1; P.y = y0 + ((c.yHang !== null ? c.yHang : c.y) - y0) * smooth01(t / T1); return; }
+  if (t < T1) { c.ph = 1; const q = t / T1; P.y = y0 + ((c.yHang !== null ? c.yHang : c.y) - y0) * (c.low ? 1 - (1 - q) * (1 - q) : smooth01(q)); return; }
   if (t < T2) { c.ph = 2; P.y = c.yHang; return; }
   if (t < T3) { c.ph = 3; P.y = c.yHang + (c.y - c.yHang) * smooth01((t - T2) / c.tPull); return; }
-  if (t < T4) { c.ph = 4; const k = smooth01((t - T3) / c.tOver); P.x = c.sx + (c.ex - c.sx) * k; P.z = c.sz + (c.ez - c.sz) * k; P.y = c.y + (c.stand ? (c.endY - c.y) * k : 0); return; }
+  if (t < T4) { c.ph = 4; const u = (t - T3) / c.tOver, k = c.low && !c.stand ? u * u * (2 - u) : smooth01(u); c.u = u; P.x = c.sx + (c.ex - c.sx) * k; P.z = c.sz + (c.ez - c.sz) * k; P.y = c.y + (c.stand ? (c.endY - c.y) * k : c.low ? SCAVALCO.arco * Math.sin(Math.PI * u) : 0); return; } /* a low one: off the hop, the swing keeps its way and ends going down, into the fall */
   P.x = c.ex; P.z = c.ez; P.climb = null;
   if (c.stand) { P.y = c.endY; P.air = false; P.onV = c.v; P.land = S.landT * 0.6; P.landK = 0.6; P.vx = P.vz = 0; }
-  else { const sp = Math.max(S.exitV, c.sp * S.exitK); P.air = true; P.vy = 0; P.vx = c.nx * sp; P.vz = c.nz * sp; }
+  else { const L = hyp(c.ex - c.sx, c.ez - c.sz), sp = c.low ? Math.max(L / c.tOver, c.sp * S.exitK) : Math.max(S.exitV, c.sp * S.exitK); P.air = true; P.vy = c.low ? -SCAVALCO.arco * Math.PI / c.tOver : 0; P.vx = c.nx * sp; P.vz = c.nz * sp; }
 }
 
 // ---- the walker's vertical: called before he moves
@@ -294,8 +304,14 @@ function barTopOnRay(ax, az, bx, bz) {
 
 // ---- the gesture, with the model there is: hands on the top, a push, the legs over; a bend at landing
 function saltoPose(m, dt, walkAmp) {
-  const k = 1 - Math.exp(-24 * dt), c = P.climb, S = SALTO; let L = 0, R = 0, AL = 0, AR = 0, tilt = 0, dip = 0, spread = 0;
-  if (c) {
+  const k = 1 - Math.exp(-24 * dt), ks = 1 - Math.exp(-SCAVALCO.dolce * dt), c = P.climb, S = SALTO, V = SCAVALCO; let L = 0, R = 0, AL = 0, AR = 0, tilt = 0, dip = 0, spread = 0, roll = 0, side = 0, lz = 0, sh = 0;
+  if (c && c.low && !c.stand && c.ph >= 1) { // the vault: hands on the top, legs over to one side, the weight on the hands
+    const sd = c.side || 1, fx = Math.sin(P.h), fz = Math.cos(P.h), dz = (c.gx - P.x) * fx + (c.gz - P.z) * fz, pin = -Math.atan2(dz, -(c.top - (P.y + 1.44)));
+    if (c.ph === 1) { const q = clamp(c.t / Math.max(0.01, c.run + c.tRise) , 0, 1); L = -0.95; R = -0.35; AL = AR = pin; spread = 0.2; tilt = 0.4; dip = 0.12 * (1 - q); roll = -sd * V.busto * 0.4; sh = sd * V.peso * 0.5; }
+    else { const u = c.u || 0, w = Math.sin(Math.PI * Math.min(1, u * 1.15)); // up and out to the side, then down to land
+      L = -V.gambe * w - 0.2 * (1 - w); R = -(V.gambe - 0.25) * w + 0.15 * (1 - w); lz = sd * V.lato * w; roll = -sd * V.busto * w; sh = sd * V.peso * w; tilt = 0.18 - 0.3 * w;
+      AL = sd > 0 ? pin : -0.4 * w; AR = sd > 0 ? -0.4 * w : pin; spread = 0.2 + 0.4 * w; if (u > 0.75) { AL = AR = -0.5; } } /* one hand stays on the top, the other lets go for the balance */
+  } else if (c) {
     if (c.ph === 0 && c.t < c.run) { const s = Math.sin(P.phase) * walkAmp; L = s; R = -s; AL = -s * 0.8; AR = s * 0.8; }
     else {
       const fx = Math.sin(P.h), fz = Math.cos(P.h), dz = (c.gx - P.x) * fx + (c.gz - P.z) * fz, dy = c.top - (P.y + 1.44), pin = -Math.atan2(dz, -dy); // the arm from the shoulder to the top, as long as he is at it
@@ -307,7 +323,7 @@ function saltoPose(m, dt, walkAmp) {
     }
   } else if (P.air) {
     if (P.vy > 0.5) { L = -0.9; R = 0.35; AL = -0.4; AR = 0.5; tilt = 0.08; }
-    else { L = -0.3; R = 0.25; AL = -1.3; AR = -1.3; spread = 0.5; tilt = 0.02; }
+    else { L = -0.35; R = 0.2; AL = -0.55; AR = -0.55; spread = 0.75; tilt = 0.06; } /* coming down: the arms out for the balance, the legs ready to land */
   } else if (P.land > 0) {
     const q = Math.sin(Math.PI * Math.min(1, 1 - P.land / S.landT + 0.15)) * (P.landK || 0.6);
     dip = S.landDip * q; L = -0.75 * q; R = 0.45 * q; AL = AR = -0.5 * q; tilt = 0.3 * q;
@@ -316,6 +332,7 @@ function saltoPose(m, dt, walkAmp) {
   m.L.rotation.x += (L - m.L.rotation.x) * k; m.R.rotation.x += (R - m.R.rotation.x) * k; m.AL.rotation.x += (AL - m.AL.rotation.x) * k; m.AR.rotation.x += (AR - m.AR.rotation.x) * k;
   m.AL.rotation.z += (-spread - m.AL.rotation.z) * k; m.AR.rotation.z += (spread - m.AR.rotation.z) * k;
   m.inner.rotation.x += (tilt - m.inner.rotation.x) * k; m.inner.position.y += (-dip - m.inner.position.y) * k;
+  m.inner.rotation.z += (roll - m.inner.rotation.z) * ks; m.inner.position.x += (sh - m.inner.position.x) * ks; m.L.rotation.z += (lz - m.L.rotation.z) * ks; m.R.rotation.z += (lz - m.R.rotation.z) * ks;
 }
 
 // ---- slopes on foot (Carlo, 6/11): up to SALITA.piano degrees he walks as on the flat, from there to SALITA.max slower and slower, past it he
