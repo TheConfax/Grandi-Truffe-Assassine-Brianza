@@ -15,9 +15,9 @@
   "metri_chiusi": 164.8,
   "pezzi_sciolti_spostati": 1,
   "aperti_per_motivo": {
-   "una via che attraversa": 12,
-   "edificio": 21,
-   "banchina": 4,
+   "una via che attraversa": 11,
+   "edificio": 20,
+   "banchina": 6,
    "cancello": 12,
    "passaggio a livello": 11,
    "carreggiata": 5,
@@ -359,7 +359,7 @@
     "x": 844.6,
     "z": -1403.3,
     "m": 8.9,
-    "esito": "passaggio a livello"
+    "esito": "una via che attraversa"
    },
    {
     "x": 754.8,
@@ -383,7 +383,7 @@
     "x": 586.4,
     "z": -763.4,
     "m": 9.5,
-    "esito": "una via che attraversa"
+    "esito": "passaggio a livello"
    },
    {
     "x": 827.1,
@@ -425,7 +425,7 @@
     "x": 1128.1,
     "z": -2017.0,
     "m": 10.9,
-    "esito": "una via che attraversa"
+    "esito": "banchina"
    },
    {
     "x": -192.5,
@@ -545,7 +545,7 @@
     "x": 368.0,
     "z": -538.2,
     "m": 1.5,
-    "esito": "edificio"
+    "esito": "banchina"
    },
    {
     "x": 884.6,
