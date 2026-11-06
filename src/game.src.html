@@ -1131,18 +1131,11 @@ function extendRoute(v) {
     ai.q.push([p0[0], p0[1], -1], [p1[0], p1[1], e.to]);
   }
 }
-function spawnPed(near) {
-  // people are where the houses are: around you, preferring walkable nodes with a building within 14 m
-  let a = near ? null : pick(WALK_NODES);
-  if (near) for (let k = 0; k < 4; k++) { const i = nodeInRing(WALK_NODES, P.x, P.z, 25, 140, true); if (i == null) break; a = i; if (inBuilding(N[i][0], N[i][1], 14)) break; }
-  const e = pick(WALK[a]); if (!e) return; const side = rnd() < 0.5 ? 1 : -1, [p0, p1] = edgePts(a, e.to, e.off * side);
+function spawnPed(near) { /* where they may stand and walk: pedPick, pedNext (world3.js) */
+  const w = pedPick(near); if (!w) return;
   const m = newPedModel(false);
-  const p = { x: p0[0], z: p0[1], h: 0, y: 0, vx: 0, vz: 0, vy: 0, side, prev: a, cur: e.to, q: [p1], m, state: 'walk', t: 0, phase: rnd() * 6, spd: 1.1 + rnd() * 0.5 };
+  const p = { x: w.x, z: w.z, h: 0, y: 0, vx: 0, vz: 0, vy: 0, side: w.s || 1, prev: w.e ? w.a : -1, cur: w.e ? w.e.to : -1, q: w.e ? [w.p1] : [], zona: w.zona || null, m, state: 'walk', t: 0, phase: rnd() * 6, spd: 1.1 + rnd() * 0.5 };
   PEDS.push(p); return p;
-}
-function pedNext(p) {
-  let opts = WALK[p.cur].filter(e => e.to !== p.prev); if (!opts.length) opts = WALK[p.cur]; if (!opts.length) return;
-  const e = pick(opts), [p0, p1] = edgePts(p.cur, e.to, e.off * p.side); p.q.push(p0, p1); p.prev = p.cur; p.cur = e.to;
 }
 function removePed(p) { scene.remove(p.m.g); PEDS.splice(PEDS.indexOf(p), 1); }
 let pedTgt = 30, pedTgtT = 0;
@@ -1718,11 +1711,11 @@ function step(dt) {
       continue;
     }
     let spd = 0;
-    if (p.state === 'flee') { p.t -= dt; spd = 5; const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35); p.x = pp.x; p.z = pp.z; p.h = Math.atan2(p.fx, p.fz); if (p.t <= 0) { p.state = 'walk'; p.q = []; const n = nearestNode(WALK_NODES, p.x, p.z); p.prev = -1; p.cur = n; p.q.push(N[n]); } }
+    if (p.state === 'flee') { p.t -= dt; spd = 5; const pp = { x: p.x + p.fx * spd * dt, z: p.z + p.fz * spd * dt }; collideStatic(pp, 0.35); p.x = pp.x; p.z = pp.z; p.h = Math.atan2(p.fx, p.fz); if (p.t <= 0) { p.state = 'walk'; p.q = []; const n = nearestNode(WALK_NODES, p.x, p.z); p.prev = -1; p.cur = n; p.free = true; if (p.zona) p.q.length = 0; } }
     else {
-      if (p.q.length < 2) pedNext(p);
-      const [tx, tz] = p.q[0], dx = tx - p.x, dz = tz - p.z, d = hyp(dx, dz);
-      if (d < 0.6) p.q.shift(); else { spd = p.spd; p.x += dx / d * spd * dt; p.z += dz / d * spd * dt; p.h = lerp(p.h, p.h + wrapA(Math.atan2(dx, dz) - p.h), 0.15); }
+      if (p.pause > 0) p.pause -= dt; else if (p.q.length < 2) { pedNext(p); if (p.kill) { removePed(p); continue; } }
+      const [tx, tz] = p.q[0] || [p.x, p.z], dx = tx - p.x, dz = tz - p.z, d = hyp(dx, dz);
+      if (p.pause > 0) { /* stands still */ } else if (d < 0.6) p.q.shift(); else { spd = p.spd; p.x += dx / d * spd * dt; p.z += dz / d * spd * dt; p.h = lerp(p.h, p.h + wrapA(Math.atan2(dx, dz) - p.h), 0.15); }
       // dodge the player's car
       if (pc && pc.speed > 9) { const ox = p.x - pc.x, oz = p.z - pc.z, fx = pc.vx / pc.speed, fz = pc.vz / pc.speed, ahead = ox * fx + oz * fz, side = ox * fz - oz * fx; if (ahead > 0 && ahead < 14 && Math.abs(side) < 2.4 && rnd() < 0.05) { p.state = 'flee'; p.t = 1.2; const s = side >= 0 ? 1 : -1; p.fx = fz * s; p.fz = -fx * s; } }
     }

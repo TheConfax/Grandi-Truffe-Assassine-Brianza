@@ -69,7 +69,7 @@ function postFree(x, z) {
   }
   POST_N.tolti++; return null;
 }
-Object.assign(window.__POSTF = window.__POSTF || {}, { postIn, postFree, offRoad }); /* for the checks on the whole map (?tutto) */
+Object.assign(window.__POSTF = window.__POSTF || {}, { postIn, postFree, offRoad, onAsph, nearAsph, hardAt, tileOf }); /* for the checks on the whole map (?tutto) */
 // the asphalt as drawn (tiles[t].as; in a comune with a DBGT its carriageways and car parks AC_VEI, docs/motore.md 7) is a street for all that
 // keeps off the streets (lamps, posts, signs, benches, guardrails): where a carriageway is wider than its axis says (parking lanes, junction
 // corners) the band of the axis alone let them stand on it. A bit grid at 0.5 m per tile, made the first time a tile is asked
@@ -480,7 +480,7 @@ for (let ri = 0; ri < D.roads.length; ri++) {
   for (let k = 1; k < r.g.length; k++) {
     const a = r.g[k - 1], b = r.g[k], L = hyp(N[b][0] - N[a][0], N[b][1] - N[a][1]);
     const ok = inLim(N[a][0], N[a][1], 2) && inLim(N[b][0], N[b][1], 2), open = r.d || !(COT && COT.nb[ri] && COT.nb[ri].includes(k)); /* COT.nb: the segments inside a building, the bake sees them all */
-    if (r.c <= 6 && ok && !r.x) { WALK[a].push({ to: b, L, off: r.walk }); WALK[b].push({ to: a, L, off: r.walk }); }
+    if (r.c <= 6 && ok && !r.x) { WALK[a].push({ to: b, L, off: r.walk, r }); WALK[b].push({ to: a, L, off: r.walk, r }); }
     if (r.c <= 5 && ok && open) { DRIVE[a].push({ to: b, L }); DRIVE[b].push({ to: a, L }); }
     // r.lf / r.lb: the lane right of the axis at each node, forward and backward, in cm (src/dbgt_strade.py corsie_locali: from the carriageway AC_VEI, not the axis); d2 the change along the edge (edgePts)
     const fa = r.lf ? r.lf[k - 1] / 100 : r.lane, fb = r.lf ? r.lf[k] / 100 : r.lane, ba = r.lb ? r.lb[k] / 100 : r.lane, bb = r.lb ? r.lb[k - 1] / 100 : r.lane;
@@ -514,6 +514,111 @@ function nodeInRing(list, x, z, r0, r1, notVisible) {
   NODEG.each(x - r1, z - r1, x + r1, z + r1, ({ i }) => { if (adj ? !adj[i].length : !set.has(i)) return; const d = hyp(N[i][0] - x, N[i][1] - z); if (d > r0 && d < r1 && inLim(N[i][0], N[i][1], 20)) c.push(i); });
   for (let k = 0; k < 14 && c.length; k++) { const i = pick(c); if (!notVisible || !onScreen(N[i][0], N[i][1])) return i; }
   return c.length ? pick(c) : null;
+}
+// ---------------------------------------------------------------- where the people walk (Carlo, 6/11)
+// A walker uses an edge of WALK only along a line (pedLine) that is not on the carriageway of a road, not in a building, and not in a trench, ramp or road underpass
+// (a pedestrian underpass is fine). The line is the sidewalk offset of the edge, pushed outwards until it is clear of the asphalt (the verge, on a road with no pavement);
+// a small street may be shared (the line stays where it is). A walker goes from one line to the next across asphalt only as far as a small street is wide, or at a zebra crossing.
+// Squares, paved paths and parks of the tiles (pz, ft, areas 2 and 10) are walked in too (pedZonaNext). Checked on the whole map by the walkers' test (src/controlli_pedoni.mjs)
+const PED_STEP = 2.5, PED_SHARED_W = 6.5, PED_CROSS_FREE = 7.5, PED_EXTRA = [0, 0.5, 1, 1.6, 2.4, 3.2, 4.5, 6];
+const PED_FREE_R = { c: 9, d: false }, pedReady = (x, z) => { const T = TILES[tileOf(x, z)]; return !!T && T.l0; };
+function pedBadAt(x, z, r, asph) { // may a walker not stand here (road r)?
+  if (asph && onAsph(x, z, r.d ? 'ap' : 'as')) return true;
+  if (inBuilding(x, z, 0.15)) return true;
+  if (!r.d) {
+    const p = H.inPit(x, z, 0.3); if (p && !(p.src && p.src.pedonale)) return true;
+    const u = H.gallAt(x, z); if (u && !(u.p && u.p.src && u.p.src.pedonale)) return true;
+  }
+  return false;
+}
+// the walking line of the edge e out of node a on a side (+1/-1): { o: the offset for edgePts }, or null if no one walks there, or undefined if the map is not there yet
+function pedLine(a, e, side) {
+  const c = e.pl || (e.pl = [undefined, undefined]), i = side > 0 ? 0 : 1; if (c[i] !== undefined) return c[i];
+  const r = e.r; if (!r) return (c[i] = { o: e.off * side });
+  const [ax, az] = N[a], [bx, bz] = N[e.to], L = hyp(bx - ax, bz - az) || 1, n = Math.max(1, Math.ceil(L / PED_STEP)), rx = -(bz - az) / L, rz = (bx - ax) / L;
+  for (let k = 0; k <= n; k++) if (!pedReady(ax + (bx - ax) * k / n, az + (bz - az) * k / n)) return undefined;
+  const free = (o, asph) => { /* every metre; asphalt only in short runs (the mouth of a side street) and a quarter of the line at most */
+    let run = 0, tot = 0; const m = Math.ceil(L), st = L / m;
+    for (let k = 0; k <= m; k++) {
+      const x = ax + (bx - ax) * k / m + rx * o, z = az + (bz - az) * k / m + rz * o;
+      if (pedBadAt(x, z, r, false)) return false;
+      if (asph && onAsph(x, z, r.d ? 'ap' : 'as')) { run++; tot++; if (run * st > PED_CROSS_FREE) return false; } else run = 0;
+    }
+    return !asph || tot <= 0.25 * (m + 1);
+  };
+  for (const ex of (r.c <= 3 ? PED_EXTRA : [0])) { const o = (e.off + ex) * side; if (free(o, r.c <= 3)) return (c[i] = { o }); }
+  /* no clear line: a small street, a lane or a yard is shared with the cars; a big road is not walked on this side */
+  if (r.c >= 3 || (r.c === 2 && r.w <= PED_SHARED_W)) { const o = e.off * side; if (free(o, false)) return (c[i] = { o, shared: true }); }
+  return (c[i] = null);
+}
+function zebraNear(x, z, rad) {
+  for (const T of new Set([tileOf(x, z), tileOf(x + rad, z + rad), tileOf(x - rad, z - rad), tileOf(x + rad, z - rad), tileOf(x - rad, z + rad)].map(t => TILES[t]))) {
+    if (!T || !T.d || T.d === NOD) continue;
+    for (const [X, Z, dx, dz, w] of T.d.cr || []) { const cx = X / 10, cz = Z / 10, nx = -dz * w / 2, nz = dx * w / 2; if (segDist(x, z, cx - nx, cz - nz, cx + nx, cz + nz) < rad) return true; }
+  }
+  return false;
+}
+// may a walker go straight from one point to the other? Over asphalt only as far as a small street is wide, or at a zebra crossing
+function pedCross(x0, z0, x1, z1) {
+  const L = hyp(x1 - x0, z1 - z0); if (L < 0.5) return true; if (L > 40) return false; /* a hop between two lines is never longer */
+  const n = Math.ceil(L); let asph = 0; for (let k = 0; k <= n; k++) { const x = x0 + (x1 - x0) * k / n, z = z0 + (z1 - z0) * k / n; if (onAsph(x, z)) asph += L / n; if (pedBadAt(x, z, PED_FREE_R, false)) return false; }
+  return asph <= PED_CROSS_FREE || zebraNear((x0 + x1) / 2, (z0 + z1) / 2, 5);
+}
+// squares, paved paths and parks of a tile: [{ o, k, b, A }]
+function pedZones(T) {
+  if (T.zonaP) return T.zonaP; if (!T.l0) return [];
+  const d = T.d; if (d === NOD) return (T.zonaP = []);
+  return (T.zonaP = [...(d.pz || []), ...(d.ft || []), ...(d.a || []).filter(a => a.t === 2 || a.t === 10)].filter(q => q.p).map(q => { const o = dec(q.p), b = bbox(o); return { o, k: (q.k || []).map(dec), b, A: Math.min(6000, (b[2] - b[0]) * (b[3] - b[1])) }; }).filter(z => z.b[2] - z.b[0] > 2.5 && z.b[3] - z.b[1] > 2.5));
+}
+const inZona = (Z, x, z) => x >= Z.b[0] && x <= Z.b[2] && z >= Z.b[1] && z <= Z.b[3] && inPoly(x, z, Z.o) && !Z.k.some(h => inPoly(x, z, h));
+const zonaOk = (Z, x, z) => inZona(Z, x, z) && !onAsph(x, z) && !inBuilding(x, z, 0.4) && !H.inPit(x, z, 0.3) && !H.gallAt(x, z);
+// a spawn point in a zone 25 to 140 m round (cx, cz), by area; null if none
+function pedPickZona(cx, cz, r0 = 25, r1 = 140, hidden = true) {
+  const Ts = new Set(); for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) Ts.add(tileOf(cx + i * TS, cz + j * TS));
+  const zs = []; let tot = 0; for (const t of Ts) for (const Z of pedZones(TILES[t])) { const d = hyp((Z.b[0] + Z.b[2]) / 2 - cx, (Z.b[1] + Z.b[3]) / 2 - cz); if (d < r1 + 60) { zs.push(Z); tot += Z.A; } }
+  for (let t = 0; t < 8 && tot > 0; t++) {
+    let u = rnd() * tot, Z = zs[0]; for (const q of zs) { u -= q.A; if (u <= 0) { Z = q; break; } }
+    for (let k = 0; k < 6; k++) {
+      const x = Z.b[0] + rnd() * (Z.b[2] - Z.b[0]), z = Z.b[1] + rnd() * (Z.b[3] - Z.b[1]), d = hyp(x - cx, z - cz);
+      if (d > r0 && d < r1 && zonaOk(Z, x, z) && !(hidden && onScreen(x, z)) && inLim(x, z, 20)) return { x, z, zona: Z };
+    }
+  }
+  return null;
+}
+function pedZonaNext(p) { // a new spot in the zone, 6 to 24 m away, the straight way to it inside the zone
+  const Z = p.zona;
+  for (let t = 0; t < 10; t++) {
+    const a = rnd() * TAU, d = 6 + rnd() * 18, x = p.x + Math.sin(a) * d, z = p.z + Math.cos(a) * d;
+    let ok = true; for (let k = 1, n = Math.ceil(d); k <= n && ok; k++) ok = zonaOk(Z, p.x + (x - p.x) * k / n, p.z + (z - p.z) * k / n);
+    if (ok) { p.q.push([x, z], [x, z]); return; }
+  }
+  p.pause = 1 + rnd() * 2; p.q.push([p.x, p.z], [p.x, p.z]);
+}
+// the next two points of a walker at node p.cur: an edge and a side with a line, reached by a crossing that is allowed. p.kill if there is none
+function pedNext(p) {
+  if (p.zona) return pedZonaNext(p);
+  const lx = p.q.length ? p.q[p.q.length - 1][0] : p.x, lz = p.q.length ? p.q[p.q.length - 1][1] : p.z, cand = []; let tot = 0;
+  for (const e of WALK[p.cur]) for (const s of [p.side, -p.side]) {
+    const pl = pedLine(p.cur, e, s); if (!pl) continue;
+    const [p0, p1] = edgePts(p.cur, e.to, pl.o); if (!p.free && !pedCross(lx, lz, p0[0], p0[1])) continue;
+    const w = (e.to === p.prev ? 0.05 : 1) * (s === p.side ? 4 : 1); cand.push({ e, s, p0, p1, w }); tot += w;
+  }
+  p.free = false;
+  if (!cand.length) { p.kill = true; return; }
+  let u = rnd() * tot, c = cand[0]; for (const q of cand) { u -= q.w; if (u <= 0) { c = q; break; } }
+  p.q.push(c.p0, c.p1); p.side = c.s; p.prev = p.cur; p.cur = c.e.to;
+}
+// where a new walker stands: { x, z, a, e, s, p1 } on an edge, or { x, z, zona }; near: round the player, out of sight
+function pedPick(near, cx = P.x, cz = P.z) {
+  if (near && rnd() < 0.3) { const z = pedPickZona(cx, cz); if (z) return z; }
+  for (let t = 0; t < 10; t++) {
+    let a = near ? null : pick(WALK_NODES);
+    if (near) for (let k = 0; k < 4; k++) { const i = nodeInRing(WALK_NODES, cx, cz, 25, 140, true); if (i == null) break; a = i; if (inBuilding(N[i][0], N[i][1], 14)) break; }
+    if (a == null) return null;
+    const e = pick(WALK[a]); if (!e) continue; const s = rnd() < 0.5 ? 1 : -1, pl = pedLine(a, e, s); if (!pl) continue;
+    const [p0, p1] = edgePts(a, e.to, pl.o); return { x: p0[0], z: p0[1], a, e, s, p1 };
+  }
+  return null;
 }
 const _v3 = new THREE.Vector3();
 function onScreen(x, z) { // only within drawing distance: something 2 km ahead of the camera is not "on screen" (it pinned peds and cars there forever)
