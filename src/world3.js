@@ -1838,6 +1838,10 @@ function* buildTileGen(T) {
     // points in cm delta-encoded]; type 0 edge line, 1 continuous centre line, 2 dashed (3 m every 7.5 m, the phase from s0, the length of the
     // line before this tile in dm); level 2 on a bridge: on the top of its deck. The streets that have them (roads[].sg) draw nothing on their axis
     const top = (x, z) => { let y = null; for (const o of H.deckAt(x, z)) if (o.tipo !== 'copertura' && (y === null || o.top > y)) y = o.top; return y; }; // the highest deck over (x, z)
+    // a line at grade (level 1) on a road deck that no street passes under, or at the ground's level (within 2.5 m: no street passes under it
+    // there): the deck is the road there (the DBGT has the carriageway at grade where the deck of the terrain stands, at the ends of a bridge
+    // or on a small one over a stream), the line goes on it; under a deck with a street under it, at its height, the line stays on S
+    const topS = (x, z) => { let y = null; for (const o of H.deckAt(x, z)) if (o.tipo === 'strada' && (o.d.free || o.top - H.ground(x, z) < 2.5) && (y === null || o.top > y)) y = o.top; return y; };
     for (const [ty, lev, s0, E] of d.sg || []) {
       const P = []; let px = 0, pz = 0; for (let i = 0; i < E.length; i += 2) { px += E[i]; pz += E[i + 1]; P.push([px / 100, pz / 100]); }
       if (P.length < 2) continue;
@@ -1850,14 +1854,15 @@ function* buildTileGen(T) {
       const runs = []; if (ty !== 2) runs.push([0, cum[cum.length - 1]]);
       else { const S0 = s0 / 10, L = cum[cum.length - 1]; for (let k = Math.floor(S0 / 7.5); k * 7.5 - S0 < L; k++) { const a = Math.max(0, k * 7.5 - S0), b = Math.min(L, k * 7.5 + 3 - S0); if (b - a > 0.2) runs.push([a, b]); } }
       const drawQ = Q => {
-        if (lev === 2 && T.fine) { // on the bridge: on the top of the deck where there is one (absolute heights, a vertex every 2 m at most), on S past its ends
+        const tq = !T.fine || !H.DECKS.length ? null : lev === 2 ? top : lev === 1 ? topS : null;
+        if (tq && (lev === 2 || Q.some(q => tq(q[0], q[1]) !== null))) { // on the bridge: on the top of the deck where there is one (absolute heights, a vertex every 2 m at most), on S past its ends
           const Q2 = [Q[0]]; for (let i = 1; i < Q.length; i++) { const p = Q[i - 1], q = Q[i], n = Math.max(1, Math.ceil(hyp(q[0] - p[0], q[1] - p[1]) / 2)); for (let k = 1; k <= n; k++) Q2.push([lerp(p[0], q[0], k / n), lerp(p[1], q[1], k / n)]); }
-          const on = Q2.map(q => top(q[0], q[1]) !== null);
+          const on = Q2.map(q => tq(q[0], q[1]) !== null);
           for (let i = 0; i < Q2.length;) {
             let j = i; while (j + 1 < Q2.length && on[j + 1] === on[i]) j++;
             const R2 = Q2.slice(i, Math.min(Q2.length, j + 2)); // a run and the first vertex of the next one: no gap between them
             if (R2.length >= 2) {
-              if (on[i]) { const i0 = dmark.p.length / 3; ribbon(dmark, R2, -0.075, 0.075, 0, 1, 'along', white); for (let v = i0; v < dmark.p.length / 3; v++) { const y = top(dmark.p[v * 3], dmark.p[v * 3 + 2]); dmark.p[v * 3 + 1] = (y === null ? H.ground(dmark.p[v * 3], dmark.p[v * 3 + 2]) : y) + 0.09; } }
+              if (on[i]) { const i0 = dmark.p.length / 3; ribbon(dmark, R2, -0.075, 0.075, 0, 1, 'along', white); for (let v = i0; v < dmark.p.length / 3; v++) { const y = tq(dmark.p[v * 3], dmark.p[v * 3 + 2]); dmark.p[v * 3 + 1] = (y === null ? H.ground(dmark.p[v * 3], dmark.p[v * 3 + 2]) : y) + 0.09; } }
               else ribbon(mark, R2, -0.075, 0.075, 0.08 * fy, 1, 'along', white);
             }
             i = j + 1;
