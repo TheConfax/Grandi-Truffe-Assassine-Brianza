@@ -180,8 +180,17 @@ def righe(STR, raw_roads, nodes, log=print):
                 c = np.asarray(ring.coords); segs_.append(np.stack((c[:-1], c[1:]), 1))
         S_ = np.concatenate(segs_); return STRtree(shapely.linestrings(S_)), S_[:, 0], S_[:, 1]
     TB = {1: bordi([g for g, a in D['vei'] if a['zon'] in TRONCO_R and lev(a) == 1]), 3: bordi([g for g, a in D['vei'] if a['zon'] in TRONCO_R])}
-    def esatto(tb, P, N, d0):
-        tree, A, B = tb; d = d0.copy(); m = d0 < RMAX
+    if TRs[2].any():   # the edges of the decks (SED 02) without the joints with the street at grade before and after them (a side with the
+        # carriageway at grade 0.5 m outside and none 0.5 m inside: the end of an oblique deck is not an edge of the street)
+        P2 = [g for g, a in D['vei'] if a['zon'] in TRONCO_R and lev(a) == 2]; U2 = unary_union(P2)
+        U1 = unary_union([g for g, a in D['vei'] if a['zon'] in TRONCO_R and lev(a) == 1]); _, A2, B2 = bordi(P2)
+        e2 = B2 - A2; n2 = np.column_stack((-e2[:, 1], e2[:, 0])) / np.maximum(np.hypot(*e2.T), 1e-9)[:, None]; M2 = (A2 + B2) / 2
+        s1 = shapely.contains_xy(U2, *(M2 + n2 * 0.3).T); fuori = np.where(s1[:, None], M2 - n2 * 0.5, M2 + n2 * 0.5); dentro = np.where(s1[:, None], M2 + n2 * 0.5, M2 - n2 * 0.5)
+        k2 = ~(shapely.contains_xy(U1, *fuori.T) & ~shapely.contains_xy(U1, *dentro.T))
+        TB[2] = (STRtree(shapely.linestrings(np.stack((A2[k2], B2[k2]), 1))), A2[k2], B2[k2])
+    def esatto(tb, P, N, d0, libero=False):
+        """libero: the ray to RMAX on the segments alone (the decks: the raster stops at the joints)"""
+        tree, A, B = tb; d = d0.copy(); m = (d0 < RMAX) | libero
         if not m.any(): return d
         idx = np.where(m)[0]; E = P[idx] + N[idx] * (d0[idx] + 1.0)[:, None]
         qi, qj = tree.query(shapely.linestrings(np.stack((P[idx], E), 1)), predicate='intersects')
@@ -190,7 +199,7 @@ def righe(STR, raw_roads, nodes, log=print):
         den = n_[:, 0] * e[:, 1] - n_[:, 1] * e[:, 0]; ok = np.abs(den) > 1e-9
         w = a - p; t = (w[:, 0] * e[:, 1] - w[:, 1] * e[:, 0]) / np.where(ok, den, 1)
         ok &= t > 0.02; best = np.full(len(idx), np.inf); np.minimum.at(best, qi[ok], t[ok])
-        g = np.isfinite(best) & (np.abs(best - d0[idx]) < 1.0); d[idx[g]] = best[g]
+        g = np.isfinite(best) & ((np.abs(best - d0[idx]) < 1.0) | (libero & (best < RMAX))); d[idx[g]] = best[g]
         return d
     cover = STR.cover
     K = set(ri for ri, r in enumerate(raw_roads) if r['c'] <= 2 and r.get('dbgt') == 'str' and not r.get('pv') and not r['tunnel'] and len(r['refs']) >= 2)
@@ -246,12 +255,18 @@ def righe(STR, raw_roads, nodes, log=print):
         def across(P, N, up, up2=None):
             # a street on a bridge runs on the bridge's carriageway (SED 02) and on its own at grade before and after it, as one: its rays
             # cross from one to the other (the edge of the bridge at the abutment is not an edge of the street); one at grade only on its own
-            lv = np.where(up & R.at(TRs[2], P[:, 0], P[:, 1]) & (up2 if up2 is not None else up), 2, 1)
+            # (on a bridge: its axis EL_STR on the bridge (SED 02), or its carriageway on the bridge with none at grade there: the DBGT has the
+            # axis of the Milano-Meda at grade on the bridge of x 415 z 2228)
+            lv = np.where(up & R.at(TRs[2], P[:, 0], P[:, 1]) & ((up2 if up2 is not None else up) | ~R.at(TRs[1], P[:, 0], P[:, 1])), 2, 1)
+            # on the deck itself only the deck's carriageway: the street under the bridge is in the union too, and a ray across the deck
+            # ran along it to RMAX (no edge, no edge line on the bridges: Carlo 6/11, via Vignazzola over the Milano-Meda at x -15 z 767). On the
+            # deck the rays go on the edges of the deck alone (TB[2], without the joints)
             dr = np.full(len(P), RMAX); dl = np.full(len(P), RMAX); inm = np.zeros(len(P), bool)
-            for u_, M in ((True, TRs[3]), (False, TRs[1])):
-                m = up == u_
-                if not m.any(): continue
-                inm[m] = R.at(M, P[m, 0], P[m, 1]); tb = TB[3 if u_ else 1]
+            for g_, M in ((2, TRs[2]), (3, TRs[3]), (1, TRs[1])):
+                m = (lv == 2) if g_ == 2 else (up & (lv != 2)) if g_ == 3 else ~up
+                if not m.any() or g_ not in TB: continue
+                inm[m] = R.at(M, P[m, 0], P[m, 1]); tb = TB[g_]
+                if g_ == 2: d0 = np.full(int(m.sum()), RMAX); dr[m] = esatto(tb, P[m], N[m], d0, True); dl[m] = esatto(tb, P[m], -N[m], d0, True); continue
                 dr[m] = esatto(tb, P[m], N[m], R.ray(M, P[m], N[m], RMAX)); dl[m] = esatto(tb, P[m], -N[m], R.ray(M, P[m], -N[m], RMAX))
             return dl, dr, inm, lv
         def edges(P, N, up, inc, up2=None):
@@ -347,8 +362,10 @@ def righe(STR, raw_roads, nodes, log=print):
                 lvs = lvq[idx]; cut = [0] + [m for m in range(1, len(idx)) if lvs[m] != lvs[m - 1]] + [len(idx)]
                 for a_, b_ in zip(cut[:-1], cut[1:]):
                     if b_ - a_ < 3: continue
+                    lv_ = int(lvs[a_])
+                    if lv_ == 2: a_, b_ = max(0, a_ - 1), min(len(idx), b_ + 1)   # the piece on the bridge reaches the samples at grade either side: no gap at the abutment
                     q = _morbida(pts[a_:b_])
-                    lines.append(dict(ri=int(ri_), t=t, p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=int(lvs[a_])))
+                    lines.append(dict(ri=int(ri_), t=t, p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=lv_))
             # edges: where the edge runs on and the section has them
             has = np.array([x is not None and x[2] for x in sig])
             for nm, v, sgn in (('l', vl, -1), ('r', vr, 1)):
@@ -419,19 +436,20 @@ def righe(STR, raw_roads, nodes, log=print):
                     lines.append(dict(ri=-1, t=0, p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=lev(a))); nan += 1
     # no line twice: a piece of a line within 1 m of a line drawn before it (by a longer carriageway: a ramp that drew a section the main
     # one draws too, from a reference of its own) is left out
+    # (on its own level: the lines of the street under a bridge cut the lines on the deck into 3 m pieces)
     kept = []; grid = defaultdict(list)
-    def near(p):
+    def near(p, lv):
         gx, gz = int(p[0] // 4), int(p[1] // 4)
         for a in (gx - 1, gx, gx + 1):
             for b in (gz - 1, gz, gz + 1):
-                for q in grid.get((a, b), ()):
+                for q in grid.get((a, b, lv), ()):
                     if (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 < 1.0: return True
         return False
     ndup = 0
     for l in lines:
-        m = np.array([not near(p) for p in l['p']]); ndup += int((~m).sum())
+        m = np.array([not near(p, l['lev']) for p in l['p']]); ndup += int((~m).sum())
         for i0, i1 in _runs(m, 4): kept.append(dict(l, p=l['p'][i0:i1]))
-        for p in l['p']: grid[(int(p[0] // 4), int(p[1] // 4))].append(p)
+        for p in l['p']: grid[(int(p[0] // 4), int(p[1] // 4), l['lev'])].append(p)
     lines = kept
     # and no line off the carriageway: a piece whose points fall outside AC_VEI (a line that cut the corner of a notch) is left out
     kept = []; nfuori = 0
@@ -448,6 +466,7 @@ def righe(STR, raw_roads, nodes, log=print):
         for l in lines:
             p = np.array(l['p'], float)
             if len(p) < 2: continue
+            if l['lev'] == 2: kept.append(l); continue   # a line on a bridge: the streets that cross under it do not cut it
             m = shapely.contains_xy(UI, p[:, 0], p[:, 1])
             if not m.any(): kept.append(l); continue
             d = np.gradient(p, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]; via = np.zeros(len(p), bool)
@@ -475,7 +494,7 @@ def righe(STR, raw_roads, nodes, log=print):
         tr3 = STRtree([g for g, _ in p3]); kept = []; n3 = 0
         for l in lines:
             p = np.array(l['p'], float)
-            if len(p) < 2: kept.append(l); continue
+            if len(p) < 2 or l['lev'] == 2: kept.append(l); continue   # (a line on a bridge stays on its deck)
             d = np.gradient(p, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]; m = np.zeros(len(p), bool)
             for i, q in enumerate(p):
                 for j in tr3.query(shapely.points(q)):
