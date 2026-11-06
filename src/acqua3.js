@@ -25,7 +25,7 @@ void main() {
   float fres = 0.025 + 0.975 * pow(1.0 - ndv, 5.0);
   vec3 R = reflect(-V, N); R.y = abs(R.y);
   vec3 sky = mix(uHor, uSky, pow(clamp(R.y, 0.0, 1.0), 0.45));
-  float spec = pow(max(dot(R, normalize(uSunD)), 0.0), 220.0) * 2.2;
+  float spec = pow(max(dot(R, normalize(uSunD)), 0.0), 320.0) * 1.3;
   float dep = max(vU.x, 0.0); float a = 1.0 - exp(-dep * uAbs); a = max(a, uMin) * smoothstep(0.0, 0.06, dep + 0.02);
   vec3 body = uTint * uLit;
   vec3 col = mix(body, sky * (0.55 + 0.45 * uLit), fres) + uSunC * spec * uLit;
@@ -41,7 +41,7 @@ function acquaMat(tint, abs, rip, flow, minA) {
 // the uniforms are shared (merge clones them): the shared object is the one we write, the materials copy it at each frame
 const ACQ_MATS = [];
 function acquaMatReg(...a) { const m = acquaMat(...a); ACQ_MATS.push(m); return m; }
-const ACQ_POOL = acquaMatReg('#46c1de', 0.34, 0.35, 0, 0.06), ACQ_RIVER = acquaMatReg('#3f7d8f', 2.4, 0.7, 0.45, 0.3), ACQ_LAKE = acquaMatReg('#4f9a98', 0.8, 0.45, 0, 0.25);
+const ACQ_POOL = acquaMatReg('#35a9cf', 0.85, 0.3, 0, 0.26), ACQ_RIVER = acquaMatReg('#3f7d8f', 2.4, 0.7, 0.45, 0.3), ACQ_LAKE = acquaMatReg('#4f9a98', 0.8, 0.45, 0, 0.25);
 function acquaAgg(frame, day) { // each frame, from the first water that is drawn: the sky, the sun and the time
   if (ACQ.frame === frame) return; ACQ.frame = frame; const t = performance.now() / 1000;
   const sky = ACQ.U.uSky.value, hor = ACQ.U.uHor.value; hor.copy(scene.fog.color); sky.copy(hemi.color).multiplyScalar(0.8);
@@ -63,12 +63,30 @@ const ACQ_SKIP = new Set(['crown', 'trunk', 'net', 'railing', 'hedge', 'lamp', '
 function acquaMascheraSuolo() { for (const k in MAT) if (!ACQ_SKIP.has(k) && MAT[k] && MAT[k].isMaterial) acquaSuoloMasch(MAT[k]); }
 acquaMascheraSuolo();
 
-// ---- tile of the basin: a light blue ceramic, 1 m a repeat (4 x 4 tiles)
-const ACQ_TILE_TEX = canvasTex(128, 128, (g, w, h) => {
-  g.fillStyle = '#d4ecf1'; g.fillRect(0, 0, w, h);
-  for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { const v = 0.94 + ((i * 7 + j * 13) % 5) * 0.015; g.fillStyle = `rgb(${Math.round(150 * v)},${Math.round(212 * v)},${Math.round(228 * v)})`; g.fillRect(i * 32 + 2, j * 32 + 2, 28, 28); }
+// ---- tile of the basin: a ceramic mosaic, 2 m a repeat (16 x 16 tiles of 12.5 cm, each its own tone, a few darker or chipped, the grout a little dirty, uneven shade in soft patches)
+// the depth shade and the slow variation along the walls come from the vertex colours (piscina)
+const ACQ_TILE_TEX = canvasTex(512, 512, (g, w, h) => {
+  let sd = 4177; const R = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = '#a9c9cf'; g.fillRect(0, 0, w, h);
+  for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) {
+    const v = 0.86 + R() * 0.26, hu = (R() - 0.5) * 14, chip = R() < 0.04;
+    g.fillStyle = `rgb(${Math.round((138 + hu * 0.6) * v)},${Math.round((204 + hu) * v)},${Math.round((226 - hu * 0.4) * v)})`; g.fillRect(i * 32 + 1.5, j * 32 + 1.5, 29, 29);
+    g.fillStyle = 'rgba(255,255,255,0.16)'; g.fillRect(i * 32 + 1.5, j * 32 + 1.5, 29, 3); g.fillStyle = 'rgba(0,40,70,0.14)'; g.fillRect(i * 32 + 1.5, j * 32 + 27.5, 29, 3);
+    if (chip) { g.fillStyle = 'rgba(30,70,90,0.35)'; g.fillRect(i * 32 + 2 + R() * 14, j * 32 + 2 + R() * 14, 6 + R() * 10, 5 + R() * 9); }
+  }
+  for (let k = 0; k < 26; k++) { const x = R() * w, y = R() * h, r = 30 + R() * 90, gr = g.createRadialGradient(x, y, 0, x, y, r); const lt = R() < 0.5; gr.addColorStop(0, lt ? 'rgba(255,255,255,0.10)' : 'rgba(0,50,80,0.13)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
 });
-const ACQ_TILE = new THREE.MeshLambertMaterial({ map: ACQ_TILE_TEX, side: THREE.DoubleSide }), ACQ_COPING = new THREE.MeshLambertMaterial({ color: 0xe9e4d6, side: THREE.DoubleSide });
+ACQ_TILE_TEX.repeat.set(0.5, 0.5);
+// the coping: stone slabs of 60 cm with their joints and each its own tone; the texture is 1.2 m (two slabs) by the width of the strip
+const ACQ_COPING_TEX = canvasTex(256, 64, (g, w, h) => {
+  let sd = 911; const R = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < 2; k++) {
+    const v = 0.93 + R() * 0.1; g.fillStyle = `rgb(${Math.round(233 * v)},${Math.round(228 * v)},${Math.round(214 * v)})`; g.fillRect(k * 128, 0, 128, h);
+    for (let q = 0; q < 160; q++) { g.fillStyle = R() < 0.5 ? 'rgba(120,110,95,0.10)' : 'rgba(255,255,250,0.12)'; g.fillRect(k * 128 + R() * 128, R() * h, 1 + R() * 2, 1 + R() * 2); }
+    g.fillStyle = 'rgba(95,88,76,0.55)'; g.fillRect(k * 128, 0, 2, h);
+  }
+});
+const ACQ_TILE = new THREE.MeshLambertMaterial({ map: ACQ_TILE_TEX, vertexColors: true, side: THREE.DoubleSide }), ACQ_COPING = new THREE.MeshLambertMaterial({ map: ACQ_COPING_TEX, color: 0xffffff, side: THREE.DoubleSide });
 const ACQ_LINE = new THREE.MeshLambertMaterial({ color: 0x1f5f8a, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 
 // ---- the registry of the basins, for what walks and drives
@@ -132,23 +150,45 @@ function piscina(P, A, T, TL, solid) {
   const dAt = (x, z) => { const s = ((x - A.cx) * A.ux + (z - A.cz) * A.uz - A.s0) / (L || 1); const t = Math.min(1, Math.max(0, dir > 0 ? s : 1 - s)); return dMin + (dMax - dMin) * t; }; /* depth under the coping */
   const floor = (x, z) => rim - dAt(x, z), bb = [1e9, 1e9, -1e9, -1e9]; for (const q of O) { bb[0] = Math.min(bb[0], q[0]); bb[1] = Math.min(bb[1], q[1]); bb[2] = Math.max(bb[2], q[0]); bb[3] = Math.max(bb[3], q[1]); }
   // ladders: steps going down into the water, at the middle of an edge (two on a rectangle, on the opposite long sides); the steps are what you walk up
-  const stairs = [], np = P.length, pick = rect ? [0, 2] : [0];
-  for (const e of pick) {
-    const a = P[e % np], c = P[(e + 1) % np], L1 = hyp(c[0] - a[0], c[1] - a[1]); if (L1 < 1.6) continue; const ux = (c[0] - a[0]) / L1, uz = (c[1] - a[1]) / L1, sg = sArea(P) < 0 ? -1 : 1, nx = -uz * sg, nz = ux * sg; /* nx, nz: inwards */
+  // every pool has at least one: the longest edge that has room, and on a rectangle the one opposite it too
+  const stairs = [], np = P.length, sgP = sArea(P) < 0 ? -1 : 1;
+  const mkStair = (e, hwMax) => {
+    const a = P[e % np], c = P[(e + 1) % np], L1 = hyp(c[0] - a[0], c[1] - a[1]); if (L1 < 1.1) return null; const ux = (c[0] - a[0]) / L1, uz = (c[1] - a[1]) / L1, nx = -uz * sgP, nz = ux * sgP; /* nx, nz: inwards */
     const mx = (a[0] + c[0]) / 2 + nx * 0.3, mz = (a[1] + c[1]) / 2 + nz * 0.3, dd = dAt(mx, mz), rise = 0.38, k = Math.max(2, Math.min(6, Math.ceil((dd - 0.72) / rise) + 1)); /* the last step is at most 42 cm over the floor: what a walker climbs (SALTO.stepUp 0.45) */
-    if (!inPoly(mx + nx * 0.4, mz + nz * 0.4, W)) continue; stairs.push({ x: mx, z: mz, ux, uz, nx, nz, hw: 0.5, n: k, td: 0.3, rise });
+    const hw = Math.min(hwMax, L1 / 2 - 0.25); if (hw < 0.3) return null;
+    for (const t of [0.4, 1.0]) for (const sd of [-hw, hw]) if (!inPoly(mx + ux * sd + nx * t, mz + uz * sd + nz * t, W)) return null; /* the steps and their sides inside the water */
+    return { x: mx, z: mz, ux, uz, nx, nz, hw, n: k, td: 0.3, rise, e };
+  };
+  {
+    const len = i => hyp(P[(i + 1) % np][0] - P[i][0], P[(i + 1) % np][1] - P[i][1]), order = P.map((_, i) => i).sort((p, q) => len(q) - len(p));
+    for (const e of order) { const st = mkStair(e, 0.5); if (st) { stairs.push(st); if (rect) { const o = mkStair((e + 2) % np, 0.5); if (o) stairs.push(o); } break; } }
+    if (!stairs.length) for (const e of order) { const st = mkStair(e, 0.3); if (st) { stairs.push(st); break; } } /* a narrow one on a small pool */
   }
   const pool = { W, O, bb, rim, water, floor, stairs };
   const key = A.cx.toFixed(1) + ',' + A.cz.toFixed(1); (T.poolKeys || (T.poolKeys = [])).push(key); poolAdd(key, pool); TL.n++;
   // the mask of the ground, laid first
   aqPoly(TL.hole, W, () => rim, () => [0, 0], [0, 1, 0]);
-  // the coping: a ring 75 cm wide, flat, 10 cm over the highest ground, and its outer wall down to the ground
-  { const b = TL.cop; for (let i = 0; i < n; i++) { const j = (i + 1) % n, wi = W[i], wj = W[j], oi = O[i], oj = O[j]; aqQuad(b, [wi[0], rim, wi[1]], [wj[0], rim, wj[1]], [oj[0], rim, oj[1]], [oi[0], rim, oi[1]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-    const yi = Math.min(gr(oi[0], oi[1]), rim - 0.05) - 0.12, yj = Math.min(gr(oj[0], oj[1]), rim - 0.05) - 0.12, l = hyp(oj[0] - oi[0], oj[1] - oi[1]) || 1, ox = (oj[1] - oi[1]) / l, oz = -(oj[0] - oi[0]) / l, os = sArea(O) < 0 ? -1 : 1;
-    aqQuad(b, [oi[0], yi, oi[1]], [oj[0], yj, oj[1]], [oj[0], rim, oj[1]], [oi[0], rim, oi[1]], [ox * os, 0, oz * os], [[0, 0], [1, 0], [1, 1], [0, 1]]); } }
+  // the coping: slabs all round, 75 cm wide with a profile: a lip over the water (a vertical face of 7 cm), a first row at the rim, a step of 3.5 cm up to the outer row,
+  // and the outer wall down to the ground (the rim is 10 cm over the highest ground)
+  {
+    const b = TL.cop, os = sArea(O) < 0 ? -1 : 1, ws = sArea(W) < 0 ? -1 : 1, Mi = W.map((w, i) => [w[0] + (O[i][0] - w[0]) * 0.38, w[1] + (O[i][1] - w[1]) * 0.38]), r2 = rim + 0.035, Q = (p, y) => [p[0], y, p[1]];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n, wi = W[i], wj = W[j], mi = Mi[i], mj = Mi[j], oi = O[i], oj = O[j], l = hyp(wj[0] - wi[0], wj[1] - wi[1]) || 1, u0 = LS_HASH(wi[0], wi[1], 'cp') * 1.2, u1 = u0 + l / 0.6 * 0.5, nx = -(wj[1] - wi[1]) / l * ws, nz = (wj[0] - wi[0]) / l * ws;
+      aqQuad(b, Q(wi, rim), Q(wj, rim), Q(mj, rim), Q(mi, rim), [0, 1, 0], [[u0, 0], [u1, 0], [u1, 1], [u0, 1]]); /* first row */
+      aqQuad(b, Q(wi, rim - 0.07), Q(wj, rim - 0.07), Q(wj, rim), Q(wi, rim), [nx, 0, nz], [[u0, 0], [u1, 0], [u1, 0.2], [u0, 0.2]]); /* the lip over the water */
+      aqQuad(b, Q(mi, rim), Q(mj, rim), Q(mj, r2), Q(mi, r2), [-nx, 0, -nz], [[u0, 0], [u1, 0], [u1, 0.1], [u0, 0.1]]); /* the step */
+      aqQuad(b, Q(mi, r2), Q(mj, r2), Q(oj, r2), Q(oi, r2), [0, 1, 0], [[u0 + 0.3, 0], [u1 + 0.3, 0], [u1 + 0.3, 1], [u0 + 0.3, 1]]); /* outer row, its joints not in line with the first */
+      const yi = Math.min(gr(oi[0], oi[1]), rim - 0.05) - 0.12, yj = Math.min(gr(oj[0], oj[1]), rim - 0.05) - 0.12, lo = hyp(oj[0] - oi[0], oj[1] - oi[1]) || 1, ox = (oj[1] - oi[1]) / lo, oz = -(oj[0] - oi[0]) / lo;
+      aqQuad(b, [oi[0], yi, oi[1]], [oj[0], yj, oj[1]], [oj[0], r2, oj[1]], [oi[0], r2, oi[1]], [ox * os, 0, oz * os], [[0, 0], [1, 0], [1, 0.3], [0, 0.3]]);
+    }
+  }
   // the walls of the basin, tiled, the lines of the tiles go round; the floor
-  { const b = TL.floor; let acc = 0, ws = sArea(W) < 0 ? -1 : 1; for (let i = 0; i < n; i++) { const j = (i + 1) % n, wi = W[i], wj = W[j], l = hyp(wj[0] - wi[0], wj[1] - wi[1]) || 1, nx = -(wj[1] - wi[1]) / l * ws, nz = (wj[0] - wi[0]) / l * ws, yi = floor(wi[0], wi[1]), yj = floor(wj[0], wj[1]);
-      aqQuad(b, [wi[0], yi, wi[1]], [wj[0], yj, wj[1]], [wj[0], rim, wj[1]], [wi[0], rim, wi[1]], [nx, 0, nz], [[acc, -(rim - yi)], [acc + l, -(rim - yj)], [acc + l, 0], [acc, 0]]); acc += l; }
+  const fl0 = TL.floor.p.length / 3;
+  { const b = TL.floor; let acc = LS_HASH(W[0][0], W[0][1], 'tl') * 2, ws = sArea(W) < 0 ? -1 : 1; for (let i = 0; i < n; i++) { const j = (i + 1) % n, wi = W[i], wj = W[j], l = hyp(wj[0] - wi[0], wj[1] - wi[1]) || 1, nx = -(wj[1] - wi[1]) / l * ws, nz = (wj[0] - wi[0]) / l * ws, yi = floor(wi[0], wi[1]), yj = floor(wj[0], wj[1]);
+      aqQuad(b, [wi[0], yi, wi[1]], [wj[0], yj, wj[1]], [wj[0], rim, wj[1]], [wi[0], rim, wi[1]], [nx, 0, nz], [[acc, -(rim - yi)], [acc + l, -(rim - yj)], [acc + l, 0], [acc, 0]]);
+      /* the darker band of tiles at the water line (as on a real pool: 20 cm, the water is 18 cm under the coping) */
+      { const q = (p, y) => [p[0] + nx * 0.006, y, p[1] + nz * 0.006]; aqQuad(TL.lane, q(wi, rim - 0.27), q(wj, rim - 0.27), q(wj, rim - 0.07), q(wi, rim - 0.07), [nx, 0, nz], [[0, 0], [0, 0], [0, 0], [0, 0]]); }
+      acc += l + 0.37; }
     aqPoly(b, W, floor, (x, z) => [x, z], [0, 1, 0]);
     // the lane lines on the floor of a long straight pool: dark blue, 12 cm wide
     if (rect && L >= 18 && A.v1 - A.v0 >= 7) { const lanes = Math.floor((A.v1 - A.v0 - 1.2) / 2.2); for (let k = 1; k < lanes; k++) { const v = A.v0 + 0.6 + (A.v1 - A.v0 - 1.2) * k / lanes, p0 = A.at(A.s0 + 0.9, v), p1 = A.at(A.s1 - 0.9, v);
@@ -158,9 +198,18 @@ function piscina(P, A, T, TL, solid) {
       const bot = rim - dMax - 0.1; aqQuad(b, P4(-s.hw, b0, top), P4(s.hw, b0, top), P4(s.hw, b1, top), P4(-s.hw, b1, top), [0, 1, 0], [[0, 0], [1, 0], [1, 0.3], [0, 0.3]]);
       aqQuad(b, P4(-s.hw, b1, bot), P4(s.hw, b1, bot), P4(s.hw, b1, top), P4(-s.hw, b1, top), [s.nx, 0, s.nz], [[0, 0], [1, 0], [1, 1], [0, 1]]);
       for (const sd of [-1, 1]) aqQuad(b, P4(sd * s.hw, b0, bot), P4(sd * s.hw, b1, bot), P4(sd * s.hw, b1, top), P4(sd * s.hw, b0, top), [s.ux * sd, 0, s.uz * sd], [[0, 0], [1, 0], [1, 1], [0, 1]]); }
-    // the handrails of the ladder: two steel tubes, up from the coping, over and down into the water
-    for (const s of stairs) for (const sd of [-0.42, 0.42]) { const P3 = (bb2, y) => [s.x + s.ux * sd + s.nx * bb2, y, s.z + s.uz * sd + s.nz * bb2]; lsRod(solid, P3(-0.4, rim), P3(-0.4, rim + 0.9), 0.022, '#d9dcde', 6); lsRod(solid, P3(-0.4, rim + 0.9), P3(0.35, rim + 0.9), 0.022, '#d9dcde', 6); lsRod(solid, P3(0.35, rim + 0.9), P3(0.35, rim - 0.9), 0.022, '#d9dcde', 6); }
+    // the handrails of the ladder: a steel hoop each side, up from a flange on the coping, bent over the water and down into it to 90 cm under the rim
+    for (const s of stairs) for (const sd of [-s.hw + 0.08, s.hw - 0.08]) {
+      const P3 = (bb2, y) => [s.x + s.ux * sd + s.nx * bb2, y, s.z + s.uz * sd + s.nz * bb2], pts = [[-0.45, rim + 0.035], [-0.45, rim + 0.72]];
+      for (let k = 1; k <= 4; k++) { const a = k / 4 * Math.PI / 2; pts.push([-0.45 + 0.18 - 0.18 * Math.cos(a), rim + 0.72 + 0.18 * Math.sin(a)]); } /* the bend over */
+      pts.push([0.3 - 0.18, rim + 0.9]);
+      for (let k = 1; k <= 4; k++) { const a = k / 4 * Math.PI / 2; pts.push([0.3 - 0.18 + 0.18 * Math.sin(a), rim + 0.72 + 0.18 * Math.cos(a)]); } /* and down */
+      pts.push([0.3, rim - 0.9]);
+      for (let k = 1; k < pts.length; k++) lsRod(solid, P3(pts[k - 1][0], pts[k - 1][1]), P3(pts[k][0], pts[k][1]), 0.026, '#d9dcde', 8);
+      lsRod(solid, P3(-0.45, rim + 0.035), P3(-0.45, rim + 0.06), 0.06, '#c4c8cb', 10); /* the flange */
+    }
   }
+  { const b = TL.floor, K = b.p.length / 3; for (let k = fl0; k < K; k++) { const x = b.p[k * 3], y = b.p[k * 3 + 1], z = b.p[k * 3 + 2], d = Math.min(1, (rim - y) / (dMax + 0.1)), sh = (1 - 0.3 * d) * (0.95 + 0.05 * Math.sin(x * 0.9 + z * 1.3) * Math.cos(z * 0.7 - x * 0.5)); b.c.push(sh, sh, sh); } } /* the tiles darker with the depth, a little uneven */
   // the water: 18 cm under the coping; the depth under each vertex goes to the shader
   { const b = TL.water; const base = b.p.length / 3; const faces = THREE.ShapeUtils.triangulateShape(W.map(v => new THREE.Vector2(v[0], v[1])), []);
     for (const v of W) { b.p.push(v[0], water, v[1]); b.n.push(0, 1, 0); b.uv.push(Math.max(0.05, water - floor(v[0], v[1])), 99); } for (const f of faces) b.i.push(base + f[0], base + f[1], base + f[2]); }

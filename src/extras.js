@@ -121,7 +121,7 @@ const CHAR = new THREE.Color(0x1d1b19);
 function dentCar(v, sev, nx, nz) {
   const m = v.m; if (!m.bm || sev <= 0) return;
   if (!m.own) { // own paint so that only this car gets scorched
-    const pm = m.paint.clone(); m.body.traverse(o => { if (o.material === m.paint) o.material = pm; }); m.paint = pm; m.own = true; m.base = pm.color.clone();
+    const pm = rifClone(m.paint); m.body.traverse(o => { if (o.material === m.paint) o.material = pm; }); m.paint = pm; m.own = true; m.base = pm.color.clone();
   }
   // contact point in the car's frame: opposite to the push normal
   const c = Math.cos(v.h), s = Math.sin(v.h), lx = -nx * c + nz * s, lz = -nx * s - nz * c; // world -> local (x right, z forward)
