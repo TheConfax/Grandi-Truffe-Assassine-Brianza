@@ -2438,6 +2438,7 @@ log('CONTROLLO oggetti della via dentro un muro, una recinzione o un edificio (d
 if STR: STR.rep['oggetti_della_via_nei_muri'] = {'conta': dict(_ps_n), 'restano_dentro': _ps_resto, 'dove': _ps_dove[:60]}
 signals_extra = [node_index[r_] for r_ in MAPI['sf']]
 for s_ in MAPI['sm']: push(tid(s_[1], s_[2]), 'sm', s_)
+if GUARD: lamps, STR.rep['guardrail']['lampioni'] = GRD.lampioni(lamps, GUARD, _gr_x[3], log)   # the lamps of the expressway: on the new jersey, one per source (src/guardrail.py)
 for x, z in lamps: push(tid(x, z), 'lp', [q(x), q(z)])
 for o in ogg: push(tid(o[1] / 10, o[2] / 10), 'og', o)
 for s_ in pspaces: push(tid(s_[0] / 10, s_[1] / 10), 'ps', s_)

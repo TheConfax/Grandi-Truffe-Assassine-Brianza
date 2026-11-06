@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 8.7,
+  "tempo_s": 19.5,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 55.8,
+  "tempo_s": 64.9,
   "cortili_nei_cantieri_m2": 16051
  },
  "barriere_solo_osm": {
@@ -1633,28 +1633,38 @@
   ]
  },
  "guardrail": {
-  "carreggiate_ad_altra_quota": 5,
-  "carreggiata_superstrada_m2": 87295,
-  "pezzi_superstrada": 69,
+  "carreggiate_ad_altra_quota": 10,
+  "carreggiata_superstrada_m2": 86272,
+  "pezzi_superstrada": 65,
   "spartitraffico_larghi": 2,
   "spartitraffico_stretti": 20,
-  "tratti_di_vie_ad_altra_quota": 11,
-  "pezzi_corti_tolti": 2,
-  "guardrail_km": 11.61,
-  "guardrail_pezzi": 42,
-  "new_jersey_km": 2.62,
-  "new_jersey_pezzi": 5,
+  "tratti_di_vie_ad_altra_quota": 9,
+  "innesti": 57,
+  "pezzi_corti_tolti": 7,
+  "fessure_con_new_jersey": 3,
+  "controllo_guardrail_lontani": 0,
+  "controllo_lontani_dove": [],
+  "controllo_attraversa_carreggiata": 0,
+  "controllo_attraversa_dove": [],
+  "guardrail_km": 11.22,
+  "guardrail_pezzi": 40,
+  "new_jersey_km": 2.9,
+  "new_jersey_pezzi": 8,
   "vie_fatte": 90,
   "controllo_punti_in_carreggiata": 0,
   "controllo_dove": [],
   "divisori_sostituiti": {
-   "divisori_toccati": 81,
-   "metri_sostituiti": 4602
+   "divisori_toccati": 79,
+   "metri_sostituiti": 4819
+  },
+  "lampioni": {
+   "sul_new_jersey": 80,
+   "fusi": 33,
+   "doppi_tolti": 3
   }
  },
  "oggetti_della_via_nei_muri": {
   "conta": {
-   "lampioni_spostati": 3,
    "oggetti_cassetta_spostati": 7,
    "oggetti_distributore_spostati": 11,
    "oggetti_fontanella_spostati": 1,
@@ -1674,24 +1684,6 @@
   },
   "restano_dentro": 0,
   "dove": [
-   [
-    "lampioni",
-    "spostato",
-    380.2,
-    2110.6
-   ],
-   [
-    "lampioni",
-    "spostato",
-    369.7,
-    2076.3
-   ],
-   [
-    "lampioni",
-    "spostato",
-    360.2,
-    2045.2
-   ],
    [
     "oggetti_cassetta",
     "spostato",
@@ -1910,7 +1902,7 @@
   },
   "lampioni_in_carreggiata": {
    "n": 0,
-   "di": 262,
+   "di": 226,
    "dove": []
   },
   "alberi_in_carreggiata": {
@@ -2699,6 +2691,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 27.4
+  "tempo_s": 21.2
  }
 }
