@@ -31,7 +31,8 @@ RAMPA_MAX = 40.0  # an end with no ground at its level at all comes down to the 
 RAMPA_PEND = {'strada': 0.10, 'ferro': 0.04, 'pedonale': 0.12}   # the steepest an approach ramp comes down (m per m)
 DENTRO_BUF, DENTRO_FRAC, DENTRO_DZ = 1.5, 0.6, 1.5   # a deck with this share of its footprint within DENTRO_BUF m of bigger ones, its top within DENTRO_DZ m of theirs, is a piece of them
 EDIFICIO_CAPO = 3.0   # m: an end with a building this near beyond it ends at the building (no ramp)
-WIN = max(EXT_MAX, RAMPA_MAX) + 2 * SF   # m: the window round a PONTE where its ends are looked for
+WIN = max(EXT_MAX, RAMPA_MAX) + 2 * SF
+SENTIERI = {'footway', 'path', 'cycleway', 'track', 'bridleway', 'steps', 'pedestrian'}   # the ways that make a bridge a footbridge when they are all it links   # m: the window round a PONTE where its ends are looked for
 def tol(tipo, ped=False): return LEVEL_PED if (tipo == 'pedonale' or ped) else LEVEL_TOL
 RC = 10.0         # the pull of the deck top onto the ground at its spalle fades over about this distance
 NEAR_V = 2.9      # lattice nodes this close to the footprint carry the deck values
@@ -285,6 +286,19 @@ class Impalcati:
 
     def Sat(s, x, z): return np.atleast_1d(tri_interp(s.SQ, s.R, np.atleast_1d(x), np.atleast_1d(z)))
 
+    def solo_sentieri(s, ob, g):
+        """Carlo 6/11 (the abandoned overpass of Seveso, x 145 z 1440: as wide as a road, it links two paths): a bridge is of the kind of the ways it links.
+        True when the OSM ways that meet the bridge ways on g at their ends, past g, are all paths, footways, cycleways or tracks"""
+        ends = [np.asarray(w['p'][k], float) for w in ob for k in (0, -1) if not g.buffer(1.0).contains(Point(w['p'][k]))]
+        if not ends: return False
+        ids = {w['id'] for w in ob}; tipi = []
+        for e in ends:
+            for w in s.osm:
+                if w['id'] in ids: continue
+                P = np.asarray(w['p'], float)
+                if len(P) and np.hypot(*(P - e).T).min() < 1.0: tipi.append(w['t'].get('highway'))
+        return bool(tipi) and all(h in SENTIERI for h in tipi)
+
     def under_dirs(s, g):
         return [u for u in (direzione(segs_line(a['g'].intersection(g.buffer(2.0)))) for a in s.ax_under if a['g'].intersects(g)) if u is not None]
 
@@ -328,6 +342,7 @@ class Impalcati:
                 if ud: u = direzione([((0, 0), tuple(v)) for v in ud]); dv = np.array([-u[1], u[0]])
             z0 = P['z0'][P['off'][i]:P['off'][i + 1]]
             ped = not (on & {'EL_STR', 'AC_VEI', 'AR_STR', 'EL_FER', 'SD_FER'})   # nothing for cars or trains on it in the DBGT
+            if tipo == 'strada' and ob and s.solo_sentieri(ob, g): tipo, ped = 'pedonale', True   # (Carlo 6/11: a bridge is of the kind of the ways it links)
             s.cores.append(dict(k=len(s.cores), pid=int(P['id'][i]), g=g, top=top, tipo=tipo, ped=ped, dir=dv if dv is not None else dir_rect(g), ob=ob,
                                 assi=sorted({(a['nm'], a['id']) for _, _, a in lines}), aree=sorted({(a['nm'], a['id']) for a in ars}),
                                 z_dbgt=[round(float(np.nanmin(z0)), 2), round(float(np.nanmax(z0)), 2)]))
@@ -422,7 +437,7 @@ class Impalcati:
             lat |= {(r0 + r, c0 + c) for r, c in zip(*np.nonzero(m & sub))}
         lat -= ext
         if lat: s.info.setdefault('allargati_sulla_via_osm', []).append(dict(ponte=core['pid'], celle=len(lat)))
-        core['ext'] = ext | lat
+        core['ext'] = ext | lat; core['lat'] = lat
         return {(r0 + r, c0 + c) for r, c in zip(*np.nonzero(hit))} | ext | lat
 
     # ----- the approach ramp (ramo ponti-spalle, 6/11: "ogni ponte deve appoggiare su una spalla a ogni capo"). An end of a PONTE with no ground
@@ -444,6 +459,19 @@ class Impalcati:
         if not E: E = [e for e in getattr(s.s, 'edifici', []) if e is not None and not e.is_empty]
         s.case = shapely.STRtree(E)
 
+    def striscia(s, core):   # the strip of the PONTE past its ends: between its two long sides carried on straight (each the line of its longest side along dir), WIN m past each end
+        dv = np.asarray(core['dir'], float); nv = np.array([-dv[1], dv[0]]); P = np.asarray(core['g'].exterior.coords)
+        u, v = P @ dv, P @ nv; u0, u1 = u.min() - WIN, u.max() + WIN; vc = (v.min() + v.max()) / 2; lati = {}
+        for a, b in zip(P[:-1], P[1:]):
+            e = b - a; L = np.hypot(*e)
+            if L < 1.0 or abs(e @ dv) / L < 0.9: continue
+            k = int(((a + b) / 2) @ nv > vc)
+            if k not in lati or L > lati[k][2]: lati[k] = (a, e / L, L)
+        if len(lati) < 2: return Polygon([dv * a + nv * b for a, b in ((u0, v.min()), (u1, v.min()), (u1, v.max()), (u0, v.max()))])
+        def su(k, uu): a, e, _ = lati[k]; return a + e * (uu - a @ dv) / (e @ dv)   # the point of side k at the distance uu along dir
+        q = Polygon([su(0, u0), su(0, u1), su(1, u1), su(1, u0)])
+        return q if q.is_valid and q.area > 0 else q.buffer(0)
+
     def davanti_casa(s, pe, dv, sg):   # a building within EDIFICIO_CAPO past the end points pe (direction dv, side sg)
         s.carica_case()
         pe = np.asarray(pe, float).reshape(-1, 2)
@@ -464,7 +492,8 @@ class Impalcati:
         # what the ramp may not cover: a street, a railway or water at a lower level, another bridge (BR: under or on one)
         cs = s.case.query(box(X.min(), Z.min(), X.max(), Z.max()), predicate='intersects')
         casa = shapely.contains_xy(shapely.union_all([s.case.geometries[j] for j in cs]).buffer(1.0), X, Z) if len(cs) else np.zeros(X.shape, bool)
-        busy = casa | ~s.LAND[r0:r1, c0:c1] | (s.s.FIX[r0:r1, c0:c1] & np.isin(s.s.CLS[r0:r1, c0:c1], (C_VEI, C_VEIT, C_FER, C_ALV)) & (Sw < ye - dy - 1.0))   # (a river bank, C_ARG, carries the ramp: the end of the bridge over it)
+        vicino = shapely.distance(core['g'], shapely.points(X, Z)) < 3.0   # (the nodes by the PONTE end are BR, as they are under its edge: not another bridge)
+        busy = casa | (~s.LAND[r0:r1, c0:c1] & ~vicino) | (s.s.FIX[r0:r1, c0:c1] & np.isin(s.s.CLS[r0:r1, c0:c1], (C_VEI, C_VEIT, C_FER, C_ALV)) & (Sw < ye - dy - 1.0))   # (a river bank, C_ARG, carries the ramp: the end of the bridge over it)
         bc = busy[:-1, :-1] | busy[:-1, 1:] | busy[1:, :-1] | busy[1:, 1:]
         al = sg * (uc - end); cand = band & beyond & (n >= 2) & (dcore <= RAMPA_MAX)
         if not cand.any(): return None
@@ -538,7 +567,11 @@ class Impalcati:
             sq = shapely.union_all(shapely.box(s.R.x0 + s.air_cc[air_idx] * SF - 1, s.R.z0 + s.air_rr[air_idx] * SF - 1, s.R.x0 + s.air_cc[air_idx] * SF + 1, s.R.z0 + s.air_rr[air_idx] * SF + 1))
             pts = shapely.points(s.R.x0 + s.air_cc[air_idx] * SF, s.R.z0 + s.air_rr[air_idx] * SF)
             ea = ea.intersection(s._clip(pts).union(sq).union(core['g'] if core else Polygon()))
-        es = shapely.union_all([s.cbox(rc) for rc in cells_sp]) if cells_sp else Polygon()
+        es = shapely.union_all([s.cbox(rc) for rc in cells_sp if rc not in core.get('lat', ())]) if cells_sp else Polygon()
+        if core is not None and not es.is_empty:   # (Carlo 6/11, "ti sembra dritto?") the cells past the ends of the PONTE stay inside its width: the sides of the deck, and its
+            es = es.intersection(s.striscia(core))   # parapets, go on straight from those of the PONTE instead of stepping on the lattice cells
+        la_ = [rc for rc in cells_sp if core is not None and rc in core.get('lat', ())]
+        if la_: es = shapely.union_all([es, shapely.union_all([s.cbox(rc) for rc in la_])])
         g = shapely.union_all([x for x in (core['g'] if core else None, ea, es) if x is not None and not x.is_empty])
         if core is not None:   # the ground that opere_dbgt took down behind the abutments of this PONTE: the deck covers it (it rests on the bank past it)
             zs_ = [z_ for z_ in getattr(s.s, 'SPALLE_G', []) if z_.intersection(core['g']).area > 0.5 * core['g'].area]
@@ -880,16 +913,15 @@ def main(argv=None):
         if u is not None and d['tipo'] != 'copertura' and np.median(u['hv'] - u['sn']) < -UNDER_MIN:
             scart.append(dict(fonte=d['fonte'], motivo='sotto il terreno di %.1f m (mediana)' % -np.median(u['hv'] - u['sn']), x=round(d['imp'].centroid.x, 1), z=round(d['imp'].centroid.y, 1), dbgt=d['dbgt'], link=link(d['imp'].centroid.x, d['imp'].centroid.y)))
             d['scartato'] = True
-    # a footbridge that rests nowhere (no landing node, no approach of its own), whose ends meet no building, but with a building along it is a terrace or a
-    # balcony of that building the DBGT files as PONTE (Seveso x -79 z 1920: a slab 6.5 m over the courtyard, its parapets and a wall down to the ground). The house carries it
+    # a footbridge that rests nowhere (no landing node, no approach of its own), with no way on it (no road of the game, no OSM way) and a building within
+    # EDIFICIO_CAPO: a walkway between the buildings of a complex or a balcony the DBGT files as PONTE (Seveso x -82 z 1919, Carlo 6/11: three slabs with
+    # railings 4-6 m over a yard, one stuck half way up a house; the orthophoto has no footbridge over any way there). It is part of the buildings: not drawn
+    imp.carica_case()
     for d in decks:
-        if d.get('scartato') or d['tipo'] != 'pedonale' or d['F'] is None or d['F'].land.any() or (d['F'].valid & ~d['F'].land).any(): continue
-        P_ = np.asarray(d['imp'].exterior.coords); dv_ = np.asarray(d['dir'], float); ue_ = P_ @ dv_
-        if any(imp.davanti_casa(P_[np.abs(ue_ - e_) < SF], dv_, sg_) for sg_, e_ in ((-1, ue_.min()), (1, ue_.max()))): continue
-        imp.carica_case()
-        if not len(imp.case.query(d['imp'].buffer(1.0), predicate='intersects')): continue
+        if d.get('scartato') or d['tipo'] != 'pedonale' or d['F'] is None or d['F'].land.any() or (d['F'].valid & ~d['F'].land).any() or d.get('ra') or d.get('osm'): continue
+        if not len(imp.case.query(d['imp'].buffer(EDIFICIO_CAPO), predicate='intersects')): continue
         d['scartato'] = True
-        scart.append(dict(fonte=d['fonte'], motivo='terrazzo di un edificio: non appoggia da nessuna parte e non arriva a un edificio ai capi', x=round(d['imp'].centroid.x, 1), z=round(d['imp'].centroid.y, 1), dbgt=d['dbgt'], link=link(d['imp'].centroid.x, d['imp'].centroid.y)))
+        scart.append(dict(fonte=d['fonte'], motivo='passerella fra edifici: non appoggia da nessuna parte, nessuna via sopra, un edificio a meno di %.0f m' % EDIFICIO_CAPO, x=round(d['imp'].centroid.x, 1), z=round(d['imp'].centroid.y, 1), dbgt=d['dbgt'], link=link(d['imp'].centroid.x, d['imp'].centroid.y)))
     # a deck that lies inside a bigger one at about its height is a piece of the same bridge (ramo ponti-spalle, 6/11): the PONTE on the border of two comuni
     # given by both DBGT (via Vignazzola, PONTE 20 and the Seveso one, 72 % one over the other: two slabs and two rows of parapets), the strips of sidewalk
     # along the Milano-Meda over the railway at Seveso, 1 m under its top, each with its parapets and its ends 6 m over the tracks. The bigger one carries it

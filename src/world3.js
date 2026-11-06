@@ -998,7 +998,8 @@ function spalleNucleo(dk) {
     for (let k = 0; k <= m; k++) {
       const x = a[0] + (c[0] - a[0]) * k / m, z = a[1] + (c[1] - a[1]) * k / m, t = topAt(x - nx * 0.3, z - nz * 0.3); if (t === null) { pts.push(null); continue; }
       const bot = t - dk.sp, gin = Math.min(H.base(x - nx * 0.3, z - nz * 0.3), H.base(x - nx * 1.5, z - nz * 1.5)), gout = Math.max(H.base(x + nx * 3.5, z + nz * 3.5), H.base(x + nx * 4.5, z + nz * 4.5));
-      pts.push(bot - gin > SPALLA_LUCE && bot - gout < SPALLA_BANCO ? [x, z, gin - 0.3, bot] : null);
+      const strada = q => H.mat(x + nx * q, z + nz * q) === 1 && Math.abs(H.base(x + nx * q, z + nz * q) - gin) < 0.6; // (the carriageway under it on both sides of the line: a wall there would stand in the street, Carlo 6/11 corso Isonzo)
+      pts.push(bot - gin > SPALLA_LUCE && bot - gout < SPALLA_BANCO && !(strada(0.8) && strada(-0.8)) ? [x, z, gin - 0.3, bot] : null);
     }
     for (let k = 0; k < m; k++) { const p = pts[k], q = pts[k + 1]; if (!p || !q) continue; dk.sn.push([p[0], p[1], p[2], p[3], q[0], q[1], q[2], q[3], 0, nx, nz]); }
   }
@@ -1010,6 +1011,7 @@ function spalleNucleo(dk) {
 // slot under the end of a bridge shows the sky. Up to SPALLA_CAPO_MAX (src/controlli_ponti.py counts the gap closed up to there). Pieces of the
 // spalle edges: [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins]
 const SPALLA_CAPO_MAX = 6.0;
+window.__PONTI = { rampWalls: d => rampWalls(d), spalleNucleo: d => spalleNucleo(d), spalleCapi: d => spalleCapi(d) }; // (src/controlli_ponti.mjs measures them)
 function spalleCapi(dk) {
   if (dk.cw) return dk.cw; dk.cw = []; if (dk.tipo === 'copertura' || !dk.spalle.length) return dk.cw;
   const T = dk.tri, sp = dk.sp, key = (ax, az, bx, bz) => { const a = ax.toFixed(2) + ',' + az.toFixed(2), b = bx.toFixed(2) + ',' + bz.toFixed(2); return a < b ? a + ' ' + b : b + ' ' + a; };

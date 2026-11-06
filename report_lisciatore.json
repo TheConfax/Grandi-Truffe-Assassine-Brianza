@@ -748,8 +748,8 @@
 {
 "x": -264.8,
 "z": 675.6,
-"m2": 6096,
-"prof": 4.4,
+"m2": 4624,
+"prof": 3.27,
 "sotto_edificio": 0.0,
 "era": "altro",
 "fonti": [
@@ -2969,19 +2969,19 @@
 "controlli_pozzetti": {
 "definizione": "depressioni chiuse di S (piena dal minimo fino al punto di sfioro) profonde almeno 0.4 m con al massimo 3 nodi (12 m2), su tutta la mappa",
 "prima": {
-"totale": 3916,
+"totale": 3915,
 "senza_motivo": 3765,
-"oltre_1m": 486,
+"oltre_1m": 485,
 "oltre_2m": 34
 },
 "dopo": {
-"totale": 156,
+"totale": 155,
 "senza_motivo": 1,
-"oltre_1m": 12,
+"oltre_1m": 11,
 "oltre_2m": 2
 },
 "eccezioni_per_motivo": {
-"impalcato o ponte": 71,
+"impalcato o ponte": 70,
 "a meno di 4 m da ponte, acqua o ferrovia": 21,
 "acqua o alveo": 52,
 "rampa disegnata": 11
@@ -3048,13 +3048,6 @@
 "z": 457.6,
 "m2": 8,
 "prof": 1.13,
-"motivo": "impalcato o ponte"
-},
-{
-"x": -262.8,
-"z": 693.6,
-"m2": 4,
-"prof": 1.06,
 "motivo": "impalcato o ponte"
 },
 {
@@ -3387,13 +3380,6 @@
 "motivo": "impalcato o ponte"
 },
 {
-"x": -36.8,
-"z": 785.6,
-"m2": 40,
-"prof": 0.54,
-"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
-},
-{
 "x": -3242.8,
 "z": 1777.6,
 "m2": 28,
@@ -3432,6 +3418,13 @@
 "x": -912.8,
 "z": 493.6,
 "m2": 44,
+"prof": 0.53,
+"motivo": "a meno di 4 m da ponte, acqua o ferrovia"
+},
+{
+"x": -36.8,
+"z": 785.6,
+"m2": 40,
 "prof": 0.53,
 "motivo": "a meno di 4 m da ponte, acqua o ferrovia"
 },
@@ -4265,7 +4258,7 @@
 }
 ],
 "punte_verso_alto": {
-"totale": 1093,
+"totale": 1095,
 "fuori_dalle_cose_protette": 990,
 "peggiori": [
 {
@@ -4301,10 +4294,10 @@
 ],
 "peggiori_tutte": [
 {
-"x": 407.2,
-"z": 2247.6,
-"m2": 4,
-"alta": 6.53
+"x": 409.2,
+"z": 2259.6,
+"m2": 12,
+"alta": 3.84
 },
 {
 "x": 15.2,

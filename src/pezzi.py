@@ -153,6 +153,10 @@ def main(argv=None):
     if rc: sys.exit('cottura fallita')
     print('cotti', scrivi(a.root, B, IND, PK, g, json.load(open(c, encoding='utf-8')), dem))
     os.remove(c)
+    # the check of the parapets and walls of the bridges, in the game just written (src/controlli_ponti.mjs, key barriere of report_ponti.json)
+    srv = Server(('127.0.0.1', 0), Muto); threading.Thread(target=srv.serve_forever, daemon=True).start()
+    subprocess.call(['node', os.path.join(ROOT, 'src', 'controlli_ponti.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], os.path.join(a.root, 'report_ponti.json')])
+    srv.shutdown()
 
 
 if __name__ == '__main__': main()
