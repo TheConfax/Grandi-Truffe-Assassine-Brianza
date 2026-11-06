@@ -180,8 +180,17 @@ def righe(STR, raw_roads, nodes, log=print):
                 c = np.asarray(ring.coords); segs_.append(np.stack((c[:-1], c[1:]), 1))
         S_ = np.concatenate(segs_); return STRtree(shapely.linestrings(S_)), S_[:, 0], S_[:, 1]
     TB = {1: bordi([g for g, a in D['vei'] if a['zon'] in TRONCO_R and lev(a) == 1]), 3: bordi([g for g, a in D['vei'] if a['zon'] in TRONCO_R])}
-    def esatto(tb, P, N, d0):
-        tree, A, B = tb; d = d0.copy(); m = d0 < RMAX
+    if TRs[2].any():   # the edges of the decks (SED 02) without the joints with the street at grade before and after them (a side with the
+        # carriageway at grade 0.5 m outside and none 0.5 m inside: the end of an oblique deck is not an edge of the street)
+        P2 = [g for g, a in D['vei'] if a['zon'] in TRONCO_R and lev(a) == 2]; U2 = unary_union(P2)
+        U1 = unary_union([g for g, a in D['vei'] if a['zon'] in TRONCO_R and lev(a) == 1]); _, A2, B2 = bordi(P2)
+        e2 = B2 - A2; n2 = np.column_stack((-e2[:, 1], e2[:, 0])) / np.maximum(np.hypot(*e2.T), 1e-9)[:, None]; M2 = (A2 + B2) / 2
+        s1 = shapely.contains_xy(U2, *(M2 + n2 * 0.3).T); fuori = np.where(s1[:, None], M2 - n2 * 0.5, M2 + n2 * 0.5); dentro = np.where(s1[:, None], M2 + n2 * 0.5, M2 - n2 * 0.5)
+        k2 = ~(shapely.contains_xy(U1, *fuori.T) & ~shapely.contains_xy(U1, *dentro.T))
+        TB[2] = (STRtree(shapely.linestrings(np.stack((A2[k2], B2[k2]), 1))), A2[k2], B2[k2])
+    def esatto(tb, P, N, d0, libero=False):
+        """libero: the ray to RMAX on the segments alone (the decks: the raster stops at the joints)"""
+        tree, A, B = tb; d = d0.copy(); m = (d0 < RMAX) | libero
         if not m.any(): return d
         idx = np.where(m)[0]; E = P[idx] + N[idx] * (d0[idx] + 1.0)[:, None]
         qi, qj = tree.query(shapely.linestrings(np.stack((P[idx], E), 1)), predicate='intersects')
@@ -190,7 +199,7 @@ def righe(STR, raw_roads, nodes, log=print):
         den = n_[:, 0] * e[:, 1] - n_[:, 1] * e[:, 0]; ok = np.abs(den) > 1e-9
         w = a - p; t = (w[:, 0] * e[:, 1] - w[:, 1] * e[:, 0]) / np.where(ok, den, 1)
         ok &= t > 0.02; best = np.full(len(idx), np.inf); np.minimum.at(best, qi[ok], t[ok])
-        g = np.isfinite(best) & (np.abs(best - d0[idx]) < 1.0); d[idx[g]] = best[g]
+        g = np.isfinite(best) & ((np.abs(best - d0[idx]) < 1.0) | (libero & (best < RMAX))); d[idx[g]] = best[g]
         return d
     cover = STR.cover
     K = set(ri for ri, r in enumerate(raw_roads) if r['c'] <= 2 and r.get('dbgt') == 'str' and not r.get('pv') and not r['tunnel'] and len(r['refs']) >= 2)
@@ -246,12 +255,18 @@ def righe(STR, raw_roads, nodes, log=print):
         def across(P, N, up, up2=None):
             # a street on a bridge runs on the bridge's carriageway (SED 02) and on its own at grade before and after it, as one: its rays
             # cross from one to the other (the edge of the bridge at the abutment is not an edge of the street); one at grade only on its own
-            lv = np.where(up & R.at(TRs[2], P[:, 0], P[:, 1]) & (up2 if up2 is not None else up), 2, 1)
+            # (on a bridge: its axis EL_STR on the bridge (SED 02), or its carriageway on the bridge with none at grade there: the DBGT has the
+            # axis of the Milano-Meda at grade on the bridge of x 415 z 2228)
+            lv = np.where(up & R.at(TRs[2], P[:, 0], P[:, 1]) & ((up2 if up2 is not None else up) | ~R.at(TRs[1], P[:, 0], P[:, 1])), 2, 1)
+            # on the deck itself only the deck's carriageway: the street under the bridge is in the union too, and a ray across the deck
+            # ran along it to RMAX (no edge, no edge line on the bridges: Carlo 6/11, via Vignazzola over the Milano-Meda at x -15 z 767). On the
+            # deck the rays go on the edges of the deck alone (TB[2], without the joints)
             dr = np.full(len(P), RMAX); dl = np.full(len(P), RMAX); inm = np.zeros(len(P), bool)
-            for u_, M in ((True, TRs[3]), (False, TRs[1])):
-                m = up == u_
-                if not m.any(): continue
-                inm[m] = R.at(M, P[m, 0], P[m, 1]); tb = TB[3 if u_ else 1]
+            for g_, M in ((2, TRs[2]), (3, TRs[3]), (1, TRs[1])):
+                m = (lv == 2) if g_ == 2 else (up & (lv != 2)) if g_ == 3 else ~up
+                if not m.any() or g_ not in TB: continue
+                inm[m] = R.at(M, P[m, 0], P[m, 1]); tb = TB[g_]
+                if g_ == 2: d0 = np.full(int(m.sum()), RMAX); dr[m] = esatto(tb, P[m], N[m], d0, True); dl[m] = esatto(tb, P[m], -N[m], d0, True); continue
                 dr[m] = esatto(tb, P[m], N[m], R.ray(M, P[m], N[m], RMAX)); dl[m] = esatto(tb, P[m], -N[m], R.ray(M, P[m], -N[m], RMAX))
             return dl, dr, inm, lv
         def edges(P, N, up, inc, up2=None):
@@ -347,8 +362,10 @@ def righe(STR, raw_roads, nodes, log=print):
                 lvs = lvq[idx]; cut = [0] + [m for m in range(1, len(idx)) if lvs[m] != lvs[m - 1]] + [len(idx)]
                 for a_, b_ in zip(cut[:-1], cut[1:]):
                     if b_ - a_ < 3: continue
+                    lv_ = int(lvs[a_])
+                    if lv_ == 2: a_, b_ = max(0, a_ - 1), min(len(idx), b_ + 1)   # the piece on the bridge reaches the samples at grade either side: no gap at the abutment
                     q = _morbida(pts[a_:b_])
-                    lines.append(dict(ri=int(ri_), t=t, p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=int(lvs[a_])))
+                    lines.append(dict(ri=int(ri_), t=t, p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=lv_))
             # edges: where the edge runs on and the section has them
             has = np.array([x is not None and x[2] for x in sig])
             for nm, v, sgn in (('l', vl, -1), ('r', vr, 1)):
@@ -419,19 +436,20 @@ def righe(STR, raw_roads, nodes, log=print):
                     lines.append(dict(ri=-1, t=0, p=[(round(float(x), 2), round(float(z), 2)) for x, z in q], lev=lev(a))); nan += 1
     # no line twice: a piece of a line within 1 m of a line drawn before it (by a longer carriageway: a ramp that drew a section the main
     # one draws too, from a reference of its own) is left out
+    # (on its own level: the lines of the street under a bridge cut the lines on the deck into 3 m pieces)
     kept = []; grid = defaultdict(list)
-    def near(p):
+    def near(p, lv):
         gx, gz = int(p[0] // 4), int(p[1] // 4)
         for a in (gx - 1, gx, gx + 1):
             for b in (gz - 1, gz, gz + 1):
-                for q in grid.get((a, b), ()):
+                for q in grid.get((a, b, lv), ()):
                     if (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 < 1.0: return True
         return False
     ndup = 0
     for l in lines:
-        m = np.array([not near(p) for p in l['p']]); ndup += int((~m).sum())
+        m = np.array([not near(p, l['lev']) for p in l['p']]); ndup += int((~m).sum())
         for i0, i1 in _runs(m, 4): kept.append(dict(l, p=l['p'][i0:i1]))
-        for p in l['p']: grid[(int(p[0] // 4), int(p[1] // 4))].append(p)
+        for p in l['p']: grid[(int(p[0] // 4), int(p[1] // 4), l['lev'])].append(p)
     lines = kept
     # and no line off the carriageway: a piece whose points fall outside AC_VEI (a line that cut the corner of a notch) is left out
     kept = []; nfuori = 0
@@ -448,6 +466,7 @@ def righe(STR, raw_roads, nodes, log=print):
         for l in lines:
             p = np.array(l['p'], float)
             if len(p) < 2: continue
+            if l['lev'] == 2: kept.append(l); continue   # a line on a bridge: the streets that cross under it do not cut it
             m = shapely.contains_xy(UI, p[:, 0], p[:, 1])
             if not m.any(): kept.append(l); continue
             d = np.gradient(p, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]; via = np.zeros(len(p), bool)
@@ -475,7 +494,7 @@ def righe(STR, raw_roads, nodes, log=print):
         tr3 = STRtree([g for g, _ in p3]); kept = []; n3 = 0
         for l in lines:
             p = np.array(l['p'], float)
-            if len(p) < 2: kept.append(l); continue
+            if len(p) < 2 or l['lev'] == 2: kept.append(l); continue   # (a line on a bridge stays on its deck)
             d = np.gradient(p, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]; m = np.zeros(len(p), bool)
             for i, q in enumerate(p):
                 for j in tr3.query(shapely.points(q)):
@@ -487,6 +506,11 @@ def righe(STR, raw_roads, nodes, log=print):
                 a0, b0 = max(0, a_ - (1 if m[a_] else 0)), min(len(m), b_ + (1 if m[a_] else 0))   # (the run in gallery takes the point before and after: no gap at the edge)
                 if b0 - a0 >= 2: kept.append(dict(l, p=l['p'][a0:b0], lev=3 if m[a_] else l['lev'])); n3 += int(m[a_])
         lines = kept; log('dbgt righe: pezzi in galleria (livello 3) %d' % n3)
+    # il lisciatore delle righe: solo forme ragionevoli (regole() sotto); il controllo conta le righe fuori regola prima e dopo
+    ctl_prima = controllo(lines, STR.U_carr, raw_roads)
+    lines, nlisc = lisciatore(lines, STR.U_carr, raw_roads)
+    ctl_dopo = controllo(lines, STR.U_carr, raw_roads)
+    log('dbgt righe: lisciatore %s; fuori regola prima %s, dopo %s' % (nlisc, ctl_prima, ctl_dopo))
     # the report: bends and lines off the carriageway
     bends = np.concatenate([_bends(l['p']) for l in lines]) if lines else np.zeros(0)
     out = 0; tot = 0; U = STR.U_carr
@@ -497,7 +521,8 @@ def righe(STR, raw_roads, nodes, log=print):
                per_tipo=dict(Counter(['bordo', 'mezzeria', 'tratteggio'][l['t']] for l in lines)), su_ponte=sum(1 for l in lines if l['lev'] == 2),
                pieghe_oltre_15=int((bends > 15).sum()), pieghe_oltre_5=int((bends > 5).sum()), piega_max=round(float(bends.max()), 1) if len(bends) else 0,
                pieghe_oltre_15_strade=int((bends_v > 15).sum()), piega_max_strade=round(float(bends_v.max()), 1) if len(bends_v) else 0,
-               bordi_delle_rotatorie=nan, punti_doppi_tolti=ndup, punti_fuori_tolti=nfuori, campioni_fuori_carreggiata=out, campioni=tot, sezioni=nsez, sezioni_disegnate=nlead)
+               bordi_delle_rotatorie=nan, punti_doppi_tolti=ndup, punti_fuori_tolti=nfuori, campioni_fuori_carreggiata=out, campioni=tot, sezioni=nsez, sezioni_disegnate=nlead,
+               lisciatore=nlisc, fuori_regola_prima=ctl_prima, fuori_regola=ctl_dopo)
     # the game leaves out the old dashes on the axis of these (roads[].sg), but only where the lines of the carriageway cover the street: a segment of it
     # with no line of ours alongside keeps its dashes (Carlo 3/11: corso Isonzo at x 305 z 1988, via Montecassino past the trench, under the Milano-Meda
     # at x -766 z 65 had no line at all). roads[].sg: 1 all covered, else one flag per segment
@@ -517,6 +542,157 @@ def righe(STR, raw_roads, nodes, log=print):
     log('dbgt righe: tratti di strade con righe ma senza righe dalla carreggiata (tengono il tratteggio sull asse) %d' % nsc)
     log('dbgt righe: %s' % rep)
     return lines, rep
+
+
+# ---- il lisciatore delle righe (Carlo 5/11, la Milano-Meda: "fatte molto male"). Una riga vera ha una forma che si può dipingere: una curva non
+# più stretta di quella che la strada permette, la stessa distanza dal bordo (spartitraffico compreso), niente punte, pieghe o pezzetti. Dove i
+# dati chiedono una forma che non va, la riga va dritta fra i punti buoni prima e dopo; se così uscirebbe dalla carreggiata, lì non c'è.
+# Regole per classe di strada (raggio minimo della riga, m): superstrade e autostrade (c 0 con x) 120, rampe (c 1 con x) 20, strade principali
+# (c 0) 30, terziarie e rampe (c 1) 15, c 2 10, le altre e i bordi delle rotatorie 5
+R_MIN = dict(sup=120.0, rampa=20.0, c0=30.0, c1=15.0, c2=10.0, altro=5.0)
+CURVA_W = 3          # la curvatura si misura fra i punti a 3 m prima e dopo (m): una riga ricampionata a 1 m
+PIEGA = 15.0         # una svolta di più fra due metri consecutivi è una piega (gradi)
+BORDO_TOL = 0.25     # una riga di bordo sta a BORDO dal bordo della carreggiata, più o meno questo (m)
+ONDA = 0.12          # una riga ondeggia dove, su ONDA_S m, gira avanti e indietro (la somma delle svolte meno la svolta netta) più di
+ONDA_S = 8           # tanto (radianti; svolte misurate ogni 2 m): una curva vera gira da una parte sola
+BORDO_LONTANO = 1.5  # una riga di bordo più lontana di così dal bordo attraversa una bocca: lì non si giudica
+CORTA = {0: 6.0, 1: 6.0, 2: 4.5}   # le righe più corte di così sono pezzetti (bordo, mezzeria, tratteggio)
+ALLARGA_B = 2        # un tratto fuori regola si allarga di tanti metri per parte: la riga dritta parte da punti sicuri
+SPOSTA_MAX = 0.6     # arrotondando una curva la riga si sposta al più di tanto (m): di più, lì la riga non c'è
+
+
+def _classe(l, raw_roads):
+    if l['ri'] < 0: return 'altro'
+    r = raw_roads[l['ri']]
+    if r.get('x'): return 'sup' if r['c'] == 0 else 'rampa'
+    return {0: 'c0', 1: 'c1', 2: 'c2'}.get(r['c'], 'altro')
+
+
+def _bordo(U):
+    """i segmenti del bordo della carreggiata (tutte le carreggiate AC_VEI): un STRtree per la distanza dal bordo"""
+    segs = []
+    for p in _parts(U):
+        for ring in [p.exterior] + list(p.interiors):
+            c = np.asarray(ring.coords)
+            if len(c) >= 2: segs.append(shapely.linestrings(np.stack((c[:-1], c[1:]), 1)))
+    G = np.concatenate(segs) if segs else np.zeros(0, object)
+    return STRtree(G)
+
+
+def _difetti(l, raw_roads, tree):
+    """la riga ricampionata a 1 m e, campione per campione, cosa non va: curva (più stretta del raggio minimo), piega, bordo (una riga di
+    bordo non a BORDO dal bordo dove il bordo è vicino), onda (gira avanti e indietro); la lunghezza"""
+    p = np.asarray(l['p'], float)
+    L = float(np.hypot(*np.diff(p, axis=0).T).sum()) if len(p) >= 2 else 0.0
+    if L < 1.0: return p, dict(), L
+    q, _ = _resample(p, PASSO); n = len(q)
+    bad = {}
+    if n >= 2 * CURVA_W + 1:
+        k = np.zeros(n); w = CURVA_W
+        a = q[w:-w] - q[:-2 * w]; b = q[2 * w:] - q[w:-w]
+        ang = np.abs((np.arctan2(b[:, 1], b[:, 0]) - np.arctan2(a[:, 1], a[:, 0]) + np.pi) % (2 * np.pi) - np.pi)
+        k[w:-w] = ang / w   # radianti per metro: 1 / raggio
+        bad['curva'] = k > 1.0 / R_MIN[_classe(l, raw_roads)] * 1.25 + 0.002
+    if n >= 3:
+        t = np.zeros(n); t[1:-1] = _bends(q); bad['piega'] = t > PIEGA
+    if n >= 2 * ONDA_S // 2 + 3:
+        q2, _ = _resample(p, 2.0)
+        if len(q2) >= ONDA_S // 2 + 2:
+            dd = np.diff(q2, axis=0); a = np.arctan2(dd[:, 1], dd[:, 0]); t = (np.diff(a) + np.pi) % (2 * np.pi) - np.pi
+            w = ONDA_S // 2; cs = np.r_[0, np.cumsum(t)]; ca = np.r_[0, np.cumsum(np.abs(t))]
+            zig = np.zeros(len(t))
+            for i in range(len(t)):
+                i0, i1 = max(0, i - w // 2), min(len(t), i - w // 2 + w)
+                zig[i] = (ca[i1] - ca[i0]) - abs(cs[i1] - cs[i0])
+            z2 = np.zeros(len(q2)); z2[1:-1] = zig
+            bad['onda'] = np.interp(np.linspace(0, 1, n), np.linspace(0, 1, len(q2)), z2) > ONDA
+    if l['t'] == 0 and len(tree.geometries):
+        _, d = tree.query_nearest(shapely.points(q), return_distance=True, all_matches=False)
+        d = np.asarray(d, float)
+        if len(d) == n:   # troppo vicina (o fuori); troppo lontana solo dove la riga segue il bordo che si allontana (non dove va dritta: lì è giusto)
+            gira = np.zeros(n); gira[CURVA_W:-CURVA_W] = k[CURVA_W:-CURVA_W] * CURVA_W if n >= 2 * CURVA_W + 1 else 0
+            bad['bordo'] = (d < BORDO - BORDO_TOL) | ((d > BORDO + BORDO_TOL) & (d < BORDO_LONTANO) & (gira > math.radians(2)))
+    return q, bad, L
+
+
+def controllo(lines, U, raw_roads):
+    """in tutta la mappa: quante righe sono fuori regola, e per quale regola (una riga conta una volta per regola)"""
+    tree = _bordo(U); c = Counter(); n_ = 0
+    for l in lines:
+        q, bad, L = _difetti(l, raw_roads, tree)
+        f = False
+        if L < CORTA.get(l['t'], 4.5): c['corta'] += 1; f = True
+        for k, m in bad.items():
+            if m.sum() >= 2: c[k] += 1; f = True
+        n_ += f
+    return dict(righe=len(lines), km=round(sum(LineString(l['p']).length for l in lines if len(l['p']) >= 2) / 1000, 1), fuori_regola=n_, **{k: c[k] for k in ('curva', 'piega', 'bordo', 'onda', 'corta')})
+
+
+def lisciatore(lines, U, raw_roads):
+    """ogni riga fuori regola: i tratti che non vanno (allargati di ALLARGA_B m) diventano dritti fra i punti buoni prima e dopo; un tratto in
+    fondo alla riga si toglie; un tratto dritto che uscirebbe dalla carreggiata si toglie; i pezzetti si tolgono"""
+    tree = _bordo(U); shapely.prepare(U); c = Counter()
+    for giro in range(3):   # una riga dritta fra due punti buoni può piegare dove si attacca: un altro giro su quelle
+        lines, nc = _lisciatore1(lines, U, raw_roads, tree, c)
+        if not nc: break
+    return lines, {k: int(v) for k, v in c.items()}
+
+
+def _curva(r, lim):
+    """i campioni di r (a 1 m) in una curva più stretta del raggio minimo (lim: 1 / raggio, con la tolleranza) o in una piega"""
+    n = len(r); bad = np.zeros(n, bool)
+    if n >= 2 * CURVA_W + 1:
+        w = CURVA_W; a = r[w:-w] - r[:-2 * w]; b = r[2 * w:] - r[w:-w]
+        ang = np.abs((np.arctan2(b[:, 1], b[:, 0]) - np.arctan2(a[:, 1], a[:, 0]) + np.pi) % (2 * np.pi) - np.pi)
+        bad[w:-w] = ang / w > lim
+    if n >= 3: t = np.zeros(n); t[1:-1] = _bends(r); bad |= t > PIEGA
+    return bad
+
+
+def _lisciatore1(lines, U, raw_roads, tree, c):
+    """un giro: (a) dove la riga ondeggia o non sta alla sua distanza dal bordo va dritta fra i punti buoni prima e dopo (allargati di
+    ALLARGA_B m); (b) le curve troppo strette e le pieghe (anche quelle dove il tratto dritto si attacca) si arrotondano, lisciando solo lì,
+    finché la curva va o la riga si sposterebbe più di SPOSTA_MAX m; (c) dove non va ancora, o la riga uscirebbe dalla carreggiata, lì non c'è"""
+    out = []; nc = 0
+    for l in lines:
+        q, bad, L = _difetti(l, raw_roads, tree)
+        if L < CORTA.get(l['t'], 4.5): c['corte_tolte'] += 1; continue
+        m = np.zeros(len(q), bool)
+        for k, b in bad.items():
+            if b.sum() >= 2 or (k == 'piega' and b.any()): m |= b
+        if not m.any(): out.append(l); continue
+        c['righe_corrette'] += 1; nc += 1
+        keep = np.ones(len(q), bool); r = q.copy(); n = len(q)
+        ml = np.zeros(n, bool)
+        for k in ('onda', 'bordo'):
+            if k in bad and bad[k].sum() >= 2: ml |= bad[k]
+        m0 = ml; ml = maximum_filter1d(ml.astype(np.uint8), 2 * ALLARGA_B + 1, mode='nearest').astype(bool)
+        for i0, i1 in _runs(ml):
+            if i0 == 0 or i1 == n:   # in fondo alla riga: via solo i punti che non vanno, fino al primo buono
+                e = np.where(m0[i0:i1])[0]
+                if not len(e): continue
+                a_, b_ = (i0, i0 + e[-1] + 1) if i0 == 0 else (i0 + e[0], i1)
+                keep[a_:b_] = False; c['punte_in_fondo_tolte_m'] += b_ - a_; continue
+            a, b = q[i0 - 1], q[i1]; t = (np.arange(i0, i1) - (i0 - 1)) / (i1 - (i0 - 1))
+            r[i0:i1] = a + (b - a) * t[:, None]; c['metri_dritti'] += i1 - i0
+        lim = 1.0 / R_MIN[_classe(l, raw_roads)] * 1.25 + 0.002
+        r0 = r.copy()
+        for it in range(20):
+            bd = _curva(r, lim) & keep
+            if not bd.any(): break
+            w = maximum_filter1d(bd.astype(np.uint8), 2 * CURVA_W + 3, mode='nearest').astype(bool); w[0] = w[-1] = False
+            sm = gaussian_filter1d(r, 1.5, axis=0, mode='nearest'); r[w] = sm[w]
+        c['metri_arrotondati'] += int((np.hypot(*(r - r0).T) > 0.02).sum())
+        bd = _curva(r, lim); sp = np.hypot(*(r - q).T) > SPOSTA_MAX
+        out_ = ~shapely.contains_xy(U, r[:, 0], r[:, 1])
+        c['metri_tolti_curva'] += int((bd & keep).sum()); c['metri_tolti_spostati'] += int((sp & keep & ~bd).sum()); c['metri_tolti_fuori'] += int((out_ & keep & ~bd & ~sp).sum())
+        keep &= ~bd & ~sp & ~out_
+        for i0, i1 in _runs(keep, 2):
+            seg = r[i0:i1]
+            Ls = float(np.hypot(*np.diff(seg, axis=0).T).sum()) if len(seg) >= 2 else 0.0
+            if Ls < CORTA.get(l['t'], 4.5): c['corte_tolte'] += 1; continue
+            out.append(dict(l, p=[(round(float(x), 2), round(float(z), 2)) for x, z in seg]))
+    return out, nc
 
 
 def push_tiles(lines, ntiles, tbox, push):

@@ -84,7 +84,7 @@ const LS_PANEL_M = new THREE.MeshLambertMaterial({ vertexColors: true }), LS_PAN
 const LS_POT_G = (() => { const g = new THREE.IcosahedronGeometry(0.32, 0); g.translate(0, 0.45, 0); return g; })();
 
 function* buildPaesaggio(T, G) {
-  const d = T.d, solid = Buf(), drape = Object.assign(VBuf(), { noclip: !!H.tile(T.t) }), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), film = Buf(), F0 = lmFrame(new THREE.Matrix4());
+  const d = T.d, TL = acquaTile(), solid = Buf(), drape = Object.assign(VBuf(), { noclip: !!H.tile(T.t) }), lines = VBuf(), doors = Buf(), glass = Buf(), net = Buf(), film = Buf(), F0 = lmFrame(new THREE.Matrix4());
   const box = (w, h, dd, x, y, z, col, ry = 0) => F0.geo(solid, lmBox(w, h, dd, x, y, z, ry), null, COL(col));
   const cyl = (r, h, x, y, z, col, seg = 10) => F0.geo(solid, new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z), null, COL(col));
   const solids = [], bales = [], pots = [], panels = [], ftrees = [], potPlants = [], crops = [], stakes = [], fruitG = [];
@@ -210,7 +210,7 @@ function* buildPaesaggio(T, G) {
         }
       }
       void ry;
-    } else if (kind === 'piscina') lsPool(P, A, drape, lines, solid);
+    } else if (kind === 'piscina') lsPool(P, A, drape, lines, solid, T, TL);
     else if (kind === 'cani') { // a dog run: a mesh fence with a way in on the side nearest a street, a bench and a bin inside
       let gate = 0, gd = 1e9; P.forEach((p, i) => { const q = P[(i + 1) % P.length], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let d = 1e9; ROADSEG.each(mx - 30, mz - 30, mx + 30, mz + 30, s => { d = Math.min(d, segDist(mx, mz, s.a[0], s.a[1], s.b[0], s.b[1])); }); if (d < gd && hyp(q[0] - p[0], q[1] - p[1]) > 3) { gd = d; gate = i; } });
       lsFence(net, solid, P, 1.2, gate, '#3e4a42');
@@ -320,6 +320,8 @@ function* buildPaesaggio(T, G) {
   if (net.i.length) mkMesh(net, MAT.net, 10, false, G);
   yield 'terreni reti';
   if (drape.i.length) mkMesh(drape, MAT.mark, 2, false, G);
+  for (const a of d.a || []) { const P = lagoDi(a, T); if (P) lago(P, T, TL); }
+  acquaMesh(TL, G);
   yield 'terreni fondo';
   if (lines.i.length) mkMesh(lines, MAT.mark, 3, false, G);
   yield 'terreni linee';
@@ -472,7 +474,8 @@ function lsInset(P, d) {
   return Math.abs(sArea(R)) > 0.1 * Math.abs(sArea(P)) && R.filter(([x, z]) => !inPoly(x, z, P)).length <= 0.03 * R.length ? R : null;
 }
 // a swimming pool: stone coping all round, the water in three bands going darker towards the middle, lane lines when it is long and straight, steel ladders
-function lsPool(P, A, drape, lines, solid) {
+function lsPool(P, A, drape, lines, solid, T, TL) {
+  if (piscina(P, A, T, TL, solid)) return; /* a real basin (acqua3.js); the flat picture below is what is left where the ground is too steep for one */
   const F0 = lmFrame(new THREE.Matrix4()), area = Math.abs(sArea(P)), STONE = COL('#e9e4d6'); if (area < 4) return;
   const o0 = P.length <= 6 ? P : lsResample(P, 1.2), i0 = lsInset(P, 0.5); if (!i0) { try { polyFill(drape, P, [], 0.06, 10, COL('#4aa9cc')); } catch (e) { } return; }
   const ring = (R1, R2, col, y) => { const n = Math.min(R1.length, R2.length); for (let i = 0; i < n; i++) { const j = (i + 1) % n, q = drape.p.length / 3; for (const p of [R1[i], R1[j], R2[j], R2[i]]) vtx(drape, p[0], y, p[1], 0, 1, 0, 0, 0, col); drape.i.push(q, q + 1, q + 2, q, q + 2, q + 3, q, q + 2, q + 1, q, q + 3, q + 2); } };

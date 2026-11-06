@@ -52,23 +52,23 @@ const flatMat""", """  parent.add(m); return m;
 const flatMat""")
 
 # ---- world: replace everything from "the world" to "audio" with the tiled world + level-aware collisions
-world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'rotonde3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'pezzi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'gps3.js'), encoding='utf-8').read()
+world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'rotonde3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'acqua3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'pezzi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'gps3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
-function collideStatic(p, r, y, veh) {
-  let nx = 0, nz = 0, hit = false;
+function collideStatic(p, r, y, veh, skip) { /* skip: what a car rests on (fisica3.js vehAppoggio) */
+  let nx = 0, nz = 0, hit = false, fx = 0, fz = 0, pinch = false; const one = (x, z) => { if (!hit) { fx = x; fz = z; } else if (x * fx + z * fz < -0.2) pinch = true; }; /* pinch: pushed from two opposite sides (between two posts narrower than it) */
   WALLS.each(p.x - r - 1, p.z - r - 1, p.x + r + 1, p.z + r + 1, s => {
-    if (s.off || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh && s.yv !== undefined ? s.yv : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
+    if (s.off || (skip && skip.has(s)) || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh && s.yv !== undefined ? s.yv : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
     if (s.dyn && !s.on) return;
-    if (s.r) { const dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz), R = r + s.r; if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; hit = true; } return; }
+    if (s.r) { const dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz), R = r + s.r; if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; one(dx / d, dz / d); hit = true; } return; }
     if (s.dyn && !s.on) return;
     const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez; if (L2 < 1e-6) return;
     let t = ((p.x - s.ax) * ex + (p.z - s.az) * ez) / L2, cl = false; if (t < 0) { t = 0; cl = true; } else if (t > 1) { t = 1; cl = true; }
     const cx = s.ax + ex * t, cz = s.az + ez * t, dx = p.x - cx, dz = p.z - cz, d = hyp(dx, dz);
-    if (s.two || dx * s.nx + dz * s.nz >= 0 || cl) { if (d < r && d > 1e-6) { const k = (r - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; hit = true; } }
-    else if (d < r) { p.x += s.nx * (r + d); p.z += s.nz * (r + d); nx += s.nx; nz += s.nz; hit = true; }
+    if (s.two || dx * s.nx + dz * s.nz >= 0 || cl) { if (d < r && d > 1e-6) { const k = (r - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; one(dx / d, dz / d); hit = true; } }
+    else if (d < r) { p.x += s.nx * (r + d); p.z += s.nz * (r + d); nx += s.nx; nz += s.nz; one(s.nx, s.nz); hit = true; }
   });
-  if (!hit) return null; const l = hyp(nx, nz) || 1; return [nx / l, nz / l];
+  if (!hit) return null; const l = hyp(nx, nz) || 1, out = [nx / l, nz / l]; out.pinch = pinch; return out;
 }
 function rayWalls(ax, az, bx, bz, solidOnly) {
   let best = 1; const dx = bx - ax, dz = bz - az;
@@ -105,7 +105,6 @@ rep("v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to]], cr
     "v.driver = 'ai'; v.ai = { prev: a, cur: e.to, q: [[q1[0], q1[1], e.to, e.sp]], cruise: Math.min(v.maxV * 0.8, base * mood), mood, kind, blocked: 0, ignore: 0 }; v.sleep = false; v.y = H.node(a); v.sync();")
 rep("ai.q.push([p0[0], p0[1], -1], [p1[0], p1[1], e.to]);", "ai.q.push([p0[0], p0[1], -1, e.sp], [p1[0], p1[1], e.to, e.sp]);")
 rep("  let cruise = ai.cruise;\n", "  let cruise = ai.kind !== undefined ? Math.min(v.maxV * 0.85, (ai.q[0][3] || 10) * (ai.kind === 'ape' ? 0.55 : ai.kind === 'van' ? 0.9 : 1) * ai.mood) : ai.cruise;\n")
-rep("const p = { x: p0[0], z: p0[1], h: 0, y: 0,", "const p = { x: p0[0], z: p0[1], h: 0, y: H.node(a),")
 # police field limited radius
 rep("while (heap.length) { const [d, u] = pop(); if (d > dist[u]) continue;", "while (heap.length) { const [d, u] = pop(); if (d > dist[u] || d > 2500) continue;")
 
@@ -260,8 +259,8 @@ rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z
 rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   updVisuals(running && !paused ? dt : 0);""")
 rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); vetrinaShader(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
-rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { VIVI, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };")
+rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { VIVI, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -293,7 +292,6 @@ rep("  updTrain(dt); updCrossings(dt);", "  updTrain(dt); updCrossings(dt); updS
 rep("    v.step(dt); v.collide();", "    v.step(dt); gateHits(v); fuelHits(v); propHits(v); barHits(v); v.collide();")
 # no spawning on top of the player; tougher cars
 rep("  const e = pick(TRAF[a]); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off, e);", "  if (a == null || VEH.some(o => hyp(o.x - N[a][0], o.z - N[a][1]) < 9)) return null;\n  const e = pick(outward(a, TRAF[a])); if (!e) return null; const [p0, p1] = edgePts(a, e.to, e.off, e);")
-rep("  const e = pick(WALK[a]); if (!e) return; const side", "  if (a == null) return; const e = pick(WALK[a]); if (!e) return; const side")
 rep("    if (v > 4) { this.health = Math.max(0, this.health - (v - 4) * 2.2); }", "    if (v > 7) { this.health = Math.max(0, this.health - (v - 7) * 1.1); }")
 rep("      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;", "      if (!inPoly(x, z, o) || inBuilding(x, z, 2.6) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 5)) continue;")
 rep("      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;", "      if (!inLim(x, z, 10) || inBuilding(x, z, 2.6) || nearJunction(x, z, 12) || hyp(P.x - x, P.z - z) < 45 || VEH.some(v => hyp(v.x - x, v.z - z) < 6)) continue;")
@@ -463,9 +461,10 @@ async function reportSpot() {
   const v = P.mode === 'car' ? P.car : null, x = v ? v.x : P.x, z = v ? v.z : P.z, y = v ? v.y : P.y;
   const lat = META.lat0 - z / 110540, lon = META.lon0 + x / (111320 * Math.cos(META.lat0 * Math.PI / 180));
   const rec = { x: +x.toFixed(1), z: +z.toFixed(1), y: +y.toFixed(1), suolo: +H.ground(x, z).toFixed(1), lat: +lat.toFixed(6), lon: +lon.toFixed(6), via: streetAt(x, z) || '', zona: placeAt(x, z) || '', direzione: Math.round(((v ? v.h : P.h) * 180 / Math.PI + 360) % 360), modo: P.mode, velocita: v ? Math.round(v.speed * 3.6) : 0, cam: camMode, ora: $('clock') ? $('clock').textContent : '', quando: new Date().toISOString(), versione: 'v16' };
+  let foto = ''; try { renderer.render(scene, camera); foto = canvas.toDataURL('image/jpeg', 0.85); } catch (e) { } /* photo of what Carlo sees, taken before the toast and in the same task as the render (no preserveDrawingBuffer) */
   spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }
   let saved = false; if (spotDb) { try { await spotDb.collection('segnalazioni').add(rec); saved = true; } catch (e) { saved = false; } }
-  if (!saved && /^(localhost|127\\.0\\.0\\.1)$/.test(location.hostname)) { try { const r = await fetch('/segnala', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) }); saved = r.ok; } catch (e) { } } /* local game: straight to the dev server, Claude reads it live */
+  if (!saved && /^(localhost|127\\.0\\.0\\.1)$/.test(location.hostname)) { try { const r = await fetch('/segnala', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(foto ? Object.assign({}, rec, { fotob64: foto }) : rec) }); saved = r.ok; } catch (e) { } } /* local game: straight to the dev server, Claude reads it live */
   if (!saved) { try { const a = JSON.parse(localStorage.getItem('gtaSpots') || '[]'); a.push(rec); localStorage.setItem('gtaSpots', JSON.stringify(a)); } catch (e) { } }
   toast('📍 Punto ' + spotN + ' segnalato' + (rec.via ? ': ' + rec.via : '') + (saved ? '' : ' (solo in locale)'));
 }
@@ -623,7 +622,7 @@ rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'
 
 # ---- weather: clouds, rain, thunderstorms and fog; codes SOLE, NUVOLE, PIOGGIA, TEMPORALE, NEBBIA
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'weather3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
-rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("// ---------------------------------------------------------------- renderer\n", open(os.path.join(HERE, 'foto3_colori.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- renderer\n")
 rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>')  # the sky of foto3.js
 rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
@@ -783,11 +782,11 @@ rep("window.__G = { VIVI,", "window.__G = { FIS, VIVI, step, updVisuals, BAR_ROT
 rep("    if (this.air) { this.stepAir(dt); return; }\n", "    if (this.air || (this.F && this.F.rig)) { this.stepAir(dt); return; }\n")
 rep("    const i = this.inp, k = 1 - 0.0004 * this.speed * dt;\n", "    const i = this.ko ? KO_INP : this.inp, k = 1 - 0.0004 * this.speed * dt;\n")
 rep("class Vehicle {\n", "const KO_INP = { thr: 0, brk: 0, steer: 0, hand: 0, lean: 0 }; /* a car finished on its roof: the controls do nothing */\nclass Vehicle {\n")
-rep("m.g.rotation.z = this.F ? this.ar : 0;\n", "m.g.rotation.z = this.F ? this.ar : 0;\n    if (this.F) { const ca_ = Math.cos(this.ar), cp_ = Math.cos(this.ap), up_ = ca_ * cp_; if (up_ < FIS.pivHi) { const k_ = fisPivot(this.F, up_), lx_ = k_ * Math.sin(this.ar), lz_ = -k_ * ca_ * Math.sin(this.ap), sh_ = Math.sin(this.h), ch_ = Math.cos(this.h); m.g.position.x += lx_ * ch_ + lz_ * sh_; m.g.position.z += lz_ * ch_ - lx_ * sh_; m.g.position.y += k_ * (1 - up_); } } /* a body well over turns round its waist */\n")
+rep("m.g.rotation.z = this.F ? this.ar : 0;\n", "m.g.rotation.z = this.F ? this.ar : 0;\n    if (this.F && this.F.rig) { const ca_ = Math.cos(this.ar), cp_ = Math.cos(this.ap), up_ = ca_ * cp_; if (up_ < FIS.pivHi) { const k_ = fisPivot(this.F, up_), lx_ = k_ * Math.sin(this.ar), lz_ = -k_ * ca_ * Math.sin(this.ap), sh_ = Math.sin(this.h), ch_ = Math.cos(this.h); m.g.position.x += lx_ * ch_ + lz_ * sh_; m.g.position.z += lz_ * ch_ - lx_ * sh_; m.g.position.y += k_ * (1 - up_); } } /* a body well over turns round its waist; on its wheels (a steep bank, a jump) round the point under them, as fisVert turns it (Carlo 6/11: the car went into the bank) */\n")
 rep("let x = v.x + fz * 1.6, z = v.z - fx * 1.6; if (inBuilding(x, z, 0.4)) { x = v.x - fz * 1.6; z = v.z + fx * 1.6; }", "const [x, z] = exitSpot(v);")
 rep("    toast(`${best.stolen ? (isTwo(best)", "    if (!best.ko) toast(`${best.stolen ? (isTwo(best)")
 rep("v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;", "v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal && !v.ko;")
-rep("const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen,", "const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen && !v.ko,")
+rep("const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen,", "const live = (!!v.driver || v.fariFino > now) && v.health > 0 && !v.exploded && !v.fallen && !v.ko,") # (FARI: a little after he gets out)
 rep("  const v = P.mode === 'car' ? P.car : null;\n  if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2,", "  const v = P.mode === 'car' && !P.car.ko ? P.car : null; /* finished on its roof: no engine to hear */\n  if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2,")
 # ---- less garbage per frame: Math.hypot boxes its arguments on every call, and it is called everywhere (same numbers to the last bits or so). The train against the traffic: a look at the distance first, no two circles of every car for every coach, every step
 rep("const hyp = Math.hypot;", "function hyp(a, b, c) { return c === undefined ? Math.sqrt(a * a + b * b) : Math.hypot(a, b, c); }")
@@ -810,9 +809,25 @@ rep("  renderer.render(scene, camera);\n  if (ipol) interpEnd(ipol);\n}", "  if 
 rep("if (!DEBUG) { el.hidden = true; return; }", "if (!DEBUG) { el.hidden = true; if (MIS.el && !MIS.el.hidden) dbgOff(); return; }")
 rep("  spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }", "  rec.misure = MIS.txt; spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }")
 rep("  if (e.code === 'KeyB') reportSpot();", "  if (e.code === 'KeyB') reportSpot();\n  if (e.code === 'KeyK' && DEBUG) dbgCopy();")
-rep("window.__G = { FIS, VIVI,", "window.__G = { GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI,")
+rep("window.__G = { FIS, VIVI,", "window.__G = { acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI,")
 # ---- GPS (gps3.js): the route follows the waypoint, drawn above the roads on the big map too
 rep("  // places and landmarks\n", "  gpsDraw(g, px_(6)); /* the GPS route: above the roads, under the icons */\n  // places and landmarks\n")
 rep("toast(had ? 'Segnaposto tolto' : 'Segnaposto messo'); drawBig();", "toast(had ? 'Segnaposto tolto' : 'Segnaposto messo'); gpsTick(0); drawBig();")
 rep("  drawMinimap();\n  hudT -= dt;", "  if (P.mode !== 'car' && camMode === 2) camMode = 0; /* no first person on foot (Carlo, 3/11) */\n  gpsTick(dt); drawMinimap();\n  hudT -= dt;")
+# ---- slopes, ground walls and floors (Carlo, 6/11): fisica3.js PENDIO (cars), salto3.js SALITA (on foot). The same rules for every vehicle and every place
+rep("    if (thr > 0) { if (v < -0.5) v += 24 * dt; else v += thr * acc * Math.max(", "    const tk_ = pendioPresa(this); /* the grip the slope leaves the wheels: engine, brakes, steering, grip across */\n    if (thr > 0) { if (v < -0.5) v += 24 * tk_ * dt; else v += thr * acc * tk_ * Math.max(")
+rep("if (i.brk > 0) { if (v > 0.5) v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk; else if (!dead) v = Math.max(-11, v - 7 * dt * i.brk); }", "if (i.brk > 0) { if (v > 0.5) v -= 21 * (1 - 0.25 * WX.wet) * tk_ * dt * i.brk; else if (!dead && v > -11) v = Math.max(-11, v - 7 * tk_ * dt * i.brk); }")
+rep("    v += 9.81 * Math.sin(this.slope) * 0.6 * dt; // gravity on hills\n    const drag = (0.15 + (thr ? 0 : 1.6 + 0.0004 * v * v)) * dt + (i.hand ? 7 * dt : 0);",
+    "    v += PENDIO.g * Math.sin(this.slope) * dt; // gravity on hills, whole\n    const drag = (0.15 + (thr ? 0 : 1.6 * tk_ + 0.0004 * v * v)) * dt + (i.hand ? 7 * tk_ * dt : 0);")
+rep("    this.h = wrapA(this.h + yaw * dt);\n    lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);",
+    "    this.h = wrapA(this.h + yaw * tk_ * dt);\n    lat += this.pendLat * dt; lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * tk_ * dt);")
+rep("  collide() {\n    let hitN = null;\n    for (const c of this.circles()) {\n      const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad, this.y + 0.4, true);\n      if (n) { this.x += p.x - c[0]; this.z += p.z - c[1]; hitN = n; }\n    }\n",
+    "  collide(x0, z0) {\n    let hitN = null, pinch_ = false; const ap_ = this.F && !this.F.rig ? vehAppoggio(this) : null; /* what it comes down on is a floor, not a push (fisica3.js) */\n    for (const c of this.circles()) {\n      const p = { x: c[0], z: c[1] }; const n = collideStatic(p, this.rad, this.y + 0.4, true, ap_ && ap_.skip);\n      if (n) { this.x += p.x - c[0]; this.z += p.z - c[1]; hitN = n; if (n.pinch) pinch_ = true; }\n    }\n    if (pinch_ && x0 !== undefined) { const dx_ = this.x - x0, dz_ = this.z - z0, d_ = hyp(dx_, dz_); this.x = x0; this.z = z0; if (d_ > 1e-6) hitN = [-dx_ / d_, -dz_ / d_]; } /* squeezed between two things narrower than it: it does not go in, it stays where it was (no shaking from one to the other) */\n    if (x0 !== undefined) { const m_ = pendioMuro(this, x0, z0); if (m_) hitN = m_; } /* the ground steeper than a wall */\n")
+rep("const [cf, cb] = this.circles(), yf = H.surface(cf[0], cf[1], this.y), yb = H.surface(cb[0], cb[1], this.y), ty = (yf + yb) / 2;",
+    "const [cf, cb] = this.circles(), yf = Math.max(H.surface(cf[0], cf[1], this.y), ap_ ? ap_.lev[0] : -Infinity), yb = Math.max(H.surface(cb[0], cb[1], this.y), ap_ ? ap_.lev[1] : -Infinity), ty = (yf + yb) / 2;")
+rep("propHits(v); barHits(v); v.collide();", "propHits(v); barHits(v); v.collide(x0_, z0_);")
+rep("      else { P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; P.x += P.vx * dt;", "      else { P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; footSlope(dt); P.x += P.vx * dt;")
+rep("    P.air = false; P.climb = null; P.onV = null; P.land = 0; P.jumpReq = 0;\n", "    P.air = false; P.climb = null; P.onV = null; P.land = 0; P.jumpReq = 0; P.slx = P.slz = 0;\n")
+rep("v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y);", "v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y); if (v.speed > FARI.minV) v.fariFino = now + FARI.dopo; /* the lights stay on a little (extras.js FARI) */")
+rep("window.__G = { acquaIn,", "window.__G = { FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn,")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)

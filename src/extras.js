@@ -39,6 +39,8 @@ const skySprite = (tex, size, extra) => { const s = new THREE.Sprite(new THREE.S
 const MOON = skySprite(canvasTex(64, 64, (g) => { g.fillStyle = '#000'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#eef0f4'; g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill(); g.fillStyle = '#b4bac6'; for (const [x, y, r] of [[22, 24, 7], [38, 20, 5], [40, 38, 9], [24, 42, 4], [30, 30, 3]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } }, false), 150, { blending: THREE.AdditiveBlending });
 const MOONHALO = skySprite(haloTex, 900, { blending: THREE.AdditiveBlending, color: 0x8ea4d8 });
 const SUNGLOW = skySprite(haloTex, 1800, { blending: THREE.AdditiveBlending });
+// getting out of a moving car the lights stay on dopo seconds more, while it rolls on alone, then go off (Carlo, 6/11); minV: m/s it must be doing
+const FARI = { dopo: 4, minV: 1 };
 const LIGHTS = { on: 0 }, _gv = new THREE.Vector3(), M_BRAKE = M_TAIL.clone();
 function skyAt(s, x, y, z) { s.position.set(camera.position.x + x * SKY_R * 0.97, camera.position.y + y * SKY_R * 0.97, camera.position.z + z * SKY_R * 0.97); }
 function updGlow() {
@@ -121,7 +123,7 @@ const CHAR = new THREE.Color(0x1d1b19);
 function dentCar(v, sev, nx, nz) {
   const m = v.m; if (!m.bm || sev <= 0) return;
   if (!m.own) { // own paint so that only this car gets scorched
-    const pm = m.paint.clone(); m.body.traverse(o => { if (o.material === m.paint) o.material = pm; }); m.paint = pm; m.own = true; m.base = pm.color.clone();
+    const pm = rifClone(m.paint); m.body.traverse(o => { if (o.material === m.paint) o.material = pm; }); m.paint = pm; m.own = true; m.base = pm.color.clone();
   }
   // contact point in the car's frame: opposite to the push normal
   const c = Math.cos(v.h), s = Math.sin(v.h), lx = -nx * c + nz * s, lz = -nx * s - nz * c; // world -> local (x right, z forward)

@@ -1002,7 +1002,9 @@ class Strade:
         on bridges (ap, only for what keeps off the carriageway) in the tiles.
         Grass or paved: MAN_TR_VRD is empty at Meda; on the Mapillary photos of 10 islands and medians (strade/mly_man) 8 are grass or a hedge
         behind a kerb, the small ones paved: grass from ISOLA_VERDE m2 up"""
-        P1 = _parts(s.cv); P2 = [p for p in _parts(s.md_dbgt) if p.area >= ISOLA_VERDE]; P3 = [p for p in _parts(s.md_dbgt) if p.area < ISOLA_VERDE]
+        # the narrow medians of an expressway with a new jersey on them (src/guardrail.py, s.md_nj): paved, as the Milano-Meda (Mapillary 2023)
+        nj = getattr(s, 'md_nj', None); paved = (lambda p: nj is not None and p.intersection(nj).area > 0.5 * p.area)
+        P1 = _parts(s.cv); P2 = [p for p in _parts(s.md_dbgt) if p.area >= ISOLA_VERDE and not paved(p)]; P3 = [p for p in _parts(s.md_dbgt) if p.area < ISOLA_VERDE or paved(p)]
         # ap: the carriageways on the bridges (AC_VEI SED 02; the deck draws its own top): the guardrails of the ramps keep out of them (verifica
         # 24/10: 20 pieces in them on the decks of the Milano-Meda junction)
         P4 = _parts(_u([g for g, a in s.D['vei'] if a.get('sed') not in ('01', None) and a['zon'] not in NON_CARR]).intersection(s.cover))

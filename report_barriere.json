@@ -16,8 +16,8 @@
   "pezzi_sciolti_spostati": 1,
   "aperti_per_motivo": {
    "una via che attraversa": 12,
-   "edificio": 20,
-   "banchina": 5,
+   "edificio": 21,
+   "banchina": 4,
    "cancello": 12,
    "passaggio a livello": 11,
    "carreggiata": 5,
@@ -545,7 +545,7 @@
     "x": 368.0,
     "z": -538.2,
     "m": 1.5,
-    "esito": "banchina"
+    "esito": "edificio"
    },
    {
     "x": 884.6,

@@ -29,6 +29,7 @@ const FIS = {
   rigPitch: 3.2, rigRoll: 3.6, rigAcc: 16, saveK: 2, saveMax: 5.5, // the player's stick on a hull off its wheels, touching the ground or in a hop: rad/s of nose and of roll, rad/s2 to get there; touching crooked with the stick pushed: a hop of saveK of the speed, at most saveMax, for the time to finish the turn. Free of the stick nothing of this happens
   nudge: 6, nudgeV: 6, // rad/s2 on a body slower than nudgeV on its side or its nose, growing with the time it takes: it does not stay in the balance
   koUp: -0.8, koV: 0.5, koT: 0.4, stuckT: 5, // on the roof (up under koUp), slower than koV for koT s: finished (v.ko), for good. Nothing lies crooked longer than stuckT s
+  tipNear: 0.5,     // m under the full droop: a body this near the ground under its wheels is over or not as the ground is, not as the world (Carlo, 6/11: a car standing on a bank of 50 degrees is not over)
   hitShake: 14, hitSfx: 2.5, // landing speed m/s for the full shake, speed from which it is heard
   // f: Hz of the body on its springs, z: damping (0.7: one soft overshoot, no bouncing), up: m of travel to the bump stop, rollG / pitchG: rad of body per g of side / brake or gas
   tipi: {
@@ -58,6 +59,7 @@ function fisGround(v, mv, first, yf, yb) { // the ground under each wheel: F.gf 
   let kerb = 0;
   for (let i = 0; i < F.n; i++) {
     let g = H.surface(v.x + s * F.sz[i] + c * F.sx[i], v.z + c * F.sz[i] - s * F.sx[i], v.y);
+    if (v.lev) g = Math.max(g, v.lev[F.sz[i] > 0 ? 0 : 1]); /* resting on a thing it came down on (vehAppoggio) */
     if (yf !== undefined) { const ga = lerp(yb, yf, clamp(0.5 + F.sz[i] / (2 * v.co), 0, 1)), lm = FIS.bankMax * Math.abs(F.sx[i]) + 0.02; g = clamp(g, ga - lm, ga + lm); } /* the axle's own ground is the mean of the two ways the wheels may lie */
     if (first) { F.g[i] = F.gf[i] = g; F.dg[i] = 0; continue; }
     const d = g - F.g[i], st = mv < 0.02 || Math.abs(d) > lim; F.g[i] = g; if (st && d > kerb) kerb = d;
@@ -103,6 +105,7 @@ function fisVert(v, cf, cb, yf, yb, ty) { // once a step from Vehicle.collide, a
     }
     v.vy += dv; v.wr += dr; v.wp += dp; v.y += dy; v.ar += da; v.ap += db;
   }
+  if (!v.spec.two) fisScocca(v); /* the body never in the ground */
   // the wheels as drawn: on the ground, at most the full droop below the body
   for (let i = 0; i < n; i++) { const x = F.gf[i] - (v.y + F.sx[i] * Math.sin(v.ar) - F.sz[i] * Math.sin(v.ap)); F.x[i] = x; F.off[i] = lerp(F.off[i], clamp(x, -Math.min(F.droop, 0.2), T.up), 0.5); }
   // on the wheels or in the air
@@ -120,7 +123,7 @@ function fisVert(v, cf, cb, yf, yb, ty) { // once a step from Vehicle.collide, a
     }
   }
   v.fpBusy = Math.abs(v.vy) > 0.05 || Math.abs(v.wp) > 0.02 || Math.abs(v.wr) > 0.02 || !!v.air || (!!v.fallen && Math.abs(v.ar) + Math.abs(v.ap - gs) > 0.02);
-  if (!v.spec.two && Math.cos(v.ar) * Math.cos(v.ap) < FIS.tipIn) fisRigIn(v);
+  if (!v.spec.two && (on || F.x.some(x => x > -F.droop - FIS.tipNear) ? Math.cos(v.ar - Math.atan(pendioTan(v)[1])) * Math.cos(v.ap - gs) : Math.cos(v.ar) * Math.cos(v.ap)) < FIS.tipIn) fisRigIn(v); /* on its wheels, over as the ground under it is: on a steep bank a car standing on it is not over */
 }
 function fisLevel(d) { const a = Math.abs(d), L = FIS.airLim; return a <= L ? d : Math.sign(d) * L * (Math.PI - a) / (Math.PI - L); } // the stick-free pull back level, for an angle within 180 degrees
 function fisPivot(F, up) { const t = clamp((FIS.pivHi - up) / (FIS.pivHi - FIS.pivLo), 0, 1); return F.mid * t * t * (3 - 2 * t); } // height over the point under the wheels the body turns round
@@ -172,6 +175,7 @@ function fisRig(v, yf, yb, ty, fs) {
       const al = clamp(F.al[q] - (la + jxr * v.wr) / (1 + jxr * jxr / Ir), -lim, lim), dl = al - F.al[q]; F.al[q] = al; la += dl; v.wr += dl * jxr / Ir;
     }
     v.vx = fw * sh + la * ch; v.vz = fw * ch - la * sh;
+    { const e = 1, gx = (H.surface(v.x + e, v.z, v.y + 1) - H.surface(v.x - e, v.z, v.y + 1)) / (2 * e), gz = (H.surface(v.x, v.z + e, v.y + 1) - H.surface(v.x, v.z - e, v.y + 1)) / (2 * e), gl = hyp(gx, gz), th = Math.atan(gl), a = PENDIO.g * (Math.sin(th) - FIS.rigMu * Math.cos(th)) * Math.cos(th); if (a > 0) { v.vx -= gx / gl * a * dt; v.vz -= gz / gl * a * dt; } } /* the ground pushes the hull up only: on a slope steeper than its rub it slides down (Carlo, 6/11) */
     v.y += deep > 0.4 ? deep : Math.max(0, deep - 0.01) * 0.5; const dm = 1 - FIS.rigDamp * dt; v.wr *= dm; v.wp *= dm;
     F.off0 = 0;
     if (v.air) { // down
@@ -196,6 +200,7 @@ function fisRig(v, yf, yb, ty, fs) {
       if (F.restT > FIS.stuckT && slow) { if (up < 0) { fisKo(v); return; } fisRigOut(v, yf, yb); v.fpBusy = true; return; }
     } else F.restT = 0;
     if (!v.ko && up > FIS.tipLand && Math.abs(v.wr) < 3 && Math.abs(v.wp) < 3) { fisRigOut(v, yf, yb); v.fpBusy = true; return; } /* on the wheels */
+    if (!v.ko && ca * Math.cos(v.ap - Math.atan2(yb - yf, v.co * 2)) > FIS.tipLand && Math.abs(v.wr) < 3 && Math.abs(v.wp) < 3) { fisRigOut(v, yf, yb); v.fpBusy = true; return; } /* on the wheels, on a steep bank */
   } else {
     F.off0 += dt;
     if (!v.air && F.off0 > FIS.airT) { v.air = true; v.airT = F.off0; v.airTop = 0; v.air0 = [v.x, v.z]; }
@@ -227,4 +232,85 @@ function vehSweep(v, x0, z0) {
     for (const c of v.circles()) if (collideStatic({ x: c[0], z: c[1] }, v.rad, v.y + 0.4, true)) return; /* stops here: Vehicle.collide takes it from this point */
   }
   v.x = xe; v.z = ze;
+}
+
+// ---------------------------------------------------------------- slopes and walls of the ground, and what a car comes down on (Carlo, 6/11)
+// The same for every vehicle and every place. Gravity pulls along the slope whole. Up to PENDIO.presa degrees the wheels hold (engine, brakes,
+// steering, grip across); from there to presa + sfuma they lose it, and past that the car is a sled: no engine, no brakes, it slides down the
+// way the ground falls. Ground rising steeper than PENDIO.muro in front of the car, over its floor, is a wall: it stops it as the walls do.
+// A thing the car comes down on from above (its underside was over its top) is a floor: the car rests on it, it does not push it sideways; the
+// barriers whose wall for cars is higher than drawn (yv: guardrails, the low fences) are never a floor, they push it off.
+const PENDIO = {
+  g: 9.81,         // m/s2 of gravity along the slope (it was 0.6 of it)
+  presa: 35, sfuma: 5, // degrees: the wheels hold up to presa, none past presa + sfuma
+  muro: 60,        // degrees: steeper ground ahead is a wall...
+  passo: 0.3,      // ...read over this many m in front of the car's outline
+  gradino: 0.3,    // m: and only where it rises over the car's floor by this (a kerb is climbed, as ever)
+  appoggio: 0.6,   // a thing is a floor under a circle of the car when it is within this share of its radius from the centre (else it pushes it off)
+};
+function pendioTan(v) { // rise over run of the ground under the car: [along it, front up = +; across it, its right side up = +]. The player's vehicle reads it under each wheel
+  const F = v.F; let tp = -Math.tan(v.slope || 0), tr = 0;
+  if (F && !F.rig && F.n >= 4) {
+    let gf = 0, nf = 0, gb = 0, nb = 0, zf = 0, zb = 0, gr = 0, nr = 0, gl = 0, nl = 0, xr = 0, xl = 0;
+    for (let i = 0; i < F.n; i++) { const g = F.g[i]; if (F.sz[i] > 0) { gf += g; zf += F.sz[i]; nf++; } else { gb += g; zb += F.sz[i]; nb++; } if (F.sx[i] > 0) { gr += g; xr += F.sx[i]; nr++; } else { gl += g; xl += F.sx[i]; nl++; } }
+    if (nf && nb && zf / nf - zb / nb > 0.3) tp = (gf / nf - gb / nb) / (zf / nf - zb / nb);
+    if (nr && nl && xr / nr - xl / nl > 0.3) tr = (gr / nr - gl / nl) / (xr / nr - xl / nl);
+  }
+  return [tp, tr];
+}
+function pendioPresa(v) { // the share of grip the wheels have on this slope, 1 to 0; v.pendLat: the pull of gravity across the car that the wheels no longer hold (m/s2, to its right +)
+  const [tp, tr] = pendioTan(v), deg = Math.atan(Math.hypot(tp, tr)) * 180 / Math.PI, t = clamp((deg - PENDIO.presa) / PENDIO.sfuma, 0, 1), k = 1 - t * t * (3 - 2 * t);
+  v.pendLat = -PENDIO.g * Math.sin(Math.atan(tr)) * (1 - k); v.presa = k; return k;
+}
+function pendioMuro(v, x0, z0) { // the ground as a wall, on the car's way (x0, z0: where it was before the step). Takes the move into it back; the outward normal, or null
+  const dx = v.x - x0, dz = v.z - z0, d = hyp(dx, dz); if (!(d > 1e-4) || d > 8) return null;
+  const ux = dx / d, uz = dz / d, p = PENDIO.passo, tg = Math.tan(PENDIO.muro * Math.PI / 180) * p, cy = v.y + 0.5; let out = null;
+  const fx = Math.sin(v.h), fz = Math.cos(v.h), sd = fx * ux + fz * uz >= 0 ? 1 : -1, hl = v.spec.L / 2 * sd, hw = v.spec.W / 2, lead = v.circles().map(c => [c[0] + ux * v.rad, c[1] + uz * v.rad]);
+  for (const k of [-1, 1]) lead.push([v.x + fx * hl + fz * hw * k, v.z + fz * hl - fx * hw * k]); /* and the two corners in front, the way it goes */
+  for (const [lx, lz] of lead) {
+    const g0 = H.surface(lx, lz, cy), g1 = H.surface(lx + ux * p, lz + uz * p, cy);
+    if (g1 - g0 < tg || g1 < v.y + PENDIO.gradino) continue;
+    const e = 0.2, mx = lx + ux * p / 2, mz = lz + uz * p / 2, gx = H.surface(mx + e, mz, cy) - H.surface(mx - e, mz, cy), gz = H.surface(mx, mz + e, cy) - H.surface(mx, mz - e, cy), gl = hyp(gx, gz) || 1;
+    let nx = -gx / gl, nz = -gz / gl; if (nx * ux + nz * uz > -0.2) { nx = -ux; nz = -uz; } /* the face looks back at the car */
+    const into = (v.x - x0) * nx + (v.z - z0) * nz; if (into < 0) { v.x -= nx * into; v.z -= nz * into; }
+    out = [nx, nz];
+  }
+  if (out) v.muri = (v.muri || 0) + 1;
+  return out;
+}
+// what the car comes down on: the colliders under its circles that its underside was over. They are left out of the push (skip) and their tops
+// raise the ground of the axle over them (lev[0] front, lev[1] back), so the springs take the car on them as on a step of the ground
+function vehAppoggio(v) {
+  const belly = v.spec.wr * 0.9, under = v.y + belly, cs = v.circles(), lev = [-Infinity, -Infinity], was = v.appoggi; let skip = null;
+  for (let k = 0; k < 2; k++) {
+    const [x, z] = cs[k], R = v.rad;
+    WALLS.each(x - R - 1, z - R - 1, x + R + 1, z + R + 1, s => {
+      if (s.off || (s.dyn && !s.on) || s.y1 === undefined || s.yv !== undefined) return;
+      if ((under < s.y1 - 0.05 && !(was && was.has(s))) || v.y + vehMaxTop(v) < s.y0) return; // (it was not over it, nor resting on it)
+      const d = s.r ? hyp(x - s.x, z - s.z) - s.r : segDist(x, z, s.ax, s.az, s.bx, s.bz); if (d >= R) return;
+      if (d < R * PENDIO.appoggio) { lev[k] = Math.max(lev[k], s.y1 - belly); (skip || (skip = new Set())).add(s); }
+    });
+  }
+  v.appoggi = skip; v.lev = skip ? lev : null; // fisGround: the wheels of an axle over it stand on it
+  return { skip, lev };
+}
+
+// the body never goes into the ground (Carlo, 6/11: on a steep bank the car went into it): the four corners of its underside, at the bumpers,
+// are stops of their own. A corner under the ground lifts the body there at once, all of it, and takes the speed into the ground away: the
+// car rests on its bumper or its floor and turns about it, as the springs do on a wheel at the end of its travel
+const SCOCCA = { largo: 0.95, gioco: 0.01, giri: 2 }; // share of the width the corners are at; m a corner may be in the ground; rounds
+function fisScocca(v) {
+  const F = v.F, S = v.spec, belly = S.wr * 0.9, hw = S.W / 2 * SCOCCA.largo, hl = S.L / 2, sh = Math.sin(v.h), ch = Math.cos(v.h);
+  for (let it = 0; it < SCOCCA.giri; it++) {
+    let any = false;
+    for (const sx of [-hw, hw]) for (const sz of [-hl, hl]) {
+      const sr = Math.sin(v.ar), cr = Math.cos(v.ar), sp = Math.sin(v.ap), cp = Math.cos(v.ap), X = sx * cr - belly * sr, Y1 = sx * sr + belly * cr, Z = Y1 * sp + sz * cp; /* the corner as drawn (yaw, nose, roll: YXZ) */
+      const x = v.x + ch * X + sh * Z, z = v.z - sh * X + ch * Z, py = v.y + Y1 * cp - sz * sp, over = H.surface(x, z, py + 0.5) - py;
+      if (over <= SCOCCA.gioco) continue; any = true;
+      const w = 1 + sx * sx / F.Ir + sz * sz / F.Ip, rel = -(v.vy + sx * v.wr - sz * v.wp);
+      if (rel > 0) { const j = rel / w; v.vy += j; v.wr += j * sx / F.Ir; v.wp -= j * sz / F.Ip; }
+      const q = over / w; v.y += q; v.ar += q * sx / F.Ir; v.ap -= q * sz / F.Ip;
+    }
+    if (!any) break;
+  }
 }

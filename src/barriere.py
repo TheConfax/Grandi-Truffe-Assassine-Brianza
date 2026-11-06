@@ -110,15 +110,16 @@ FORZA = {1: 0, 4: 0, 6: 1, 5: 2, 2: 3, 7: 4, 3: 5}   # the lower, the stronger
 FUSI = {'coppie': 0, 'metri_tolti': 0.0, 'linee_toccate': 0}
 
 
-def fondi_doppi(items, dist_strada):
-    """items: [(pts, kind, height)]; dist_strada(LineString) -> distance of the line from the nearest carriageway. Returns the new list"""
+def fondi_doppi(items, dist_strada, prio=None):
+    """items: [(pts, kind, height)]; dist_strada(LineString) -> distance of the line from the nearest carriageway; prio: the source of each item, 0 OSM before 1 DBGT before 2 derived,
+    which decides first who stays (Carlo, 6/11: OSM is the more recent). Returns the new list"""
     from shapely.strtree import STRtree
     n = len(items)
     L = [LineString(p) if len(p) >= 2 else None for p, k, h in items]
     key = []
     for i in range(n):
-        if L[i] is None: key.append((9, 0, i)); continue
-        key.append((FORZA.get(items[i][1], 3), -round(dist_strada(L[i]), 1), -L[i].length, i))
+        if L[i] is None: key.append((9, 0, 0, 0, i)); continue
+        key.append((prio[i] if prio is not None else 0, FORZA.get(items[i][1], 3), -round(dist_strada(L[i]), 1), -L[i].length, i))
     order = sorted((i for i in range(n) if L[i] is not None), key=lambda i: key[i])
     rank = {i: r for r, i in enumerate(order)}
     tree = STRtree([L[i] for i in order]); surv = {}
