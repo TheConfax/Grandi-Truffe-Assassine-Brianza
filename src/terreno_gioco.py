@@ -7,7 +7,8 @@
 #   python src/terreno_gioco.py --da DIR            pack the outputs of superficie.py / impalcati.py found in DIR
 #   python src/terreno_gioco.py --da DIR --rigenera run superficie.py and impalcati.py into DIR first (under 1 min for Meda: impalcati.py reuses the surface superficie.py just made)
 # The cells under a deck where S is not a street get bit 7 of their material (the game paints no street there), and at the end the checks
-# of the water and the bridges (src/controlli_acqua.py) write report_acqua.json next to the terreno folder (--no-controlli skips them)
+# of the water and the bridges (src/controlli_acqua.py) write report_acqua.json next to the terreno folder, and those of the ends of the
+# decks (src/controlli_ponti.py) report_ponti.json (--no-controlli skips them)
 import os, sys, json, gzip, glob, re, argparse, struct, io
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -47,6 +48,7 @@ def main(argv=None):
         if d.get('nucleo'): e['nucleo'] = [[r2(x), r2(z)] for x, z in d['nucleo']]
         if d.get('fondo') is not None: e['fondo'] = r2(d['fondo'])
         if d.get('tn'): e['tn'] = d['tn']
+        if d.get('dir'): e['dir'] = d['dir']   # the direction of the deck (src/controlli_ponti.py: its two ends)
         decks.append(e)
     # the cells under a deck where S is not a street at its own level: bit 7 of the material (the game paints no street there; fiumi-ponti, 28/10)
     tri, tree, _ = ca.triangoli_impalcati(decks, liberi=False); sotto = 0
@@ -93,6 +95,8 @@ def main(argv=None):
     giu = ca.acqua_giu_dalle_strade(a.out, os.path.join(ROOT, 'brianza.json'))   # on the S the game reads: the water comes down where it would stand on a street
     if not a.no_controlli:   # the checks of the water and the bridges on what the game reads (src/controlli_acqua.py)
         ca.controlla(a.out, os.path.join(ROOT, 'brianza.json'), os.path.join(os.path.dirname(os.path.abspath(a.out)), 'report_acqua.json'), acqua_giu=giu)
+        import controlli_ponti   # the ends of the decks: each rests on the ground, no step and no gap under its end (report_ponti.json)
+        controlli_ponti.controlla(a.out, os.path.join(ROOT, 'brianza.json'), os.path.join(os.path.dirname(os.path.abspath(a.out)), 'report_ponti.json'))
 
 
 if __name__ == '__main__':

@@ -117,27 +117,26 @@
   "bordo_luoghi": 17
  },
  "A3": {
-  "celle_sotto_impalcati_con_strada_disegnata": 198,
+  "celle_sotto_impalcati_con_strada_disegnata": 199,
   "dipinte": 0,
   "m2": 0.0,
   "impalcati": [],
   "impalcati_prima_della_regola": [
-   4,
+   3,
+   5,
    6,
    7,
-   8,
-   11,
-   13,
-   21,
-   25,
-   36,
-   40,
-   44,
-   46,
-   47,
-   48
+   10,
+   12,
+   20,
+   31,
+   35,
+   39,
+   41,
+   42,
+   43
   ],
-  "celle_segnate_sotto_impalcato": 1143,
+  "celle_segnate_sotto_impalcato": 1138,
   "luoghi": []
  },
  "A4": {
@@ -200,22 +199,15 @@
  },
  "A5": {
   "metri_controllati": 19374,
-  "metri_lontani_dal_fondo": 416,
+  "metri_lontani_dal_fondo": 265,
   "sopra_il_fondo": {
-   "n": 206,
-   "p50": 1.332,
-   "p90": 2.315,
-   "p99": 2.723,
+   "n": 132,
+   "p50": 1.256,
+   "p90": 1.861,
+   "p99": 2.429,
    "max": 3.029
   },
   "luoghi": [
-   {
-    "punti": 35,
-    "x": -2354.0,
-    "z": 1486.1,
-    "v": 2.72,
-    "link": "?x=-2354.0&z=1486.1"
-   },
    {
     "punti": 15,
     "x": -3292.6,
@@ -224,18 +216,18 @@
     "link": "?x=-3292.6&z=980.0"
    },
    {
-    "punti": 15,
-    "x": -3191.4,
-    "z": 2087.5,
-    "v": 2.35,
-    "link": "?x=-3191.4&z=2087.5"
-   },
-   {
     "punti": 12,
     "x": -3266.1,
     "z": 1874.9,
     "v": 1.32,
     "link": "?x=-3266.1&z=1874.9"
+   },
+   {
+    "punti": 10,
+    "x": -3191.4,
+    "z": 2087.5,
+    "v": 2.35,
+    "link": "?x=-3191.4&z=2087.5"
    },
    {
     "punti": 8,
@@ -280,21 +272,28 @@
     "link": "?x=201.9&z=-2190.8"
    },
    {
-    "punti": 6,
-    "x": 3.6,
-    "z": -1889.9,
-    "v": 2.89,
-    "link": "?x=3.6&z=-1889.9"
-   },
-   {
     "punti": 5,
     "x": -51.7,
     "z": -2373.3,
     "v": 1.23,
     "link": "?x=-51.7&z=-2373.3"
+   },
+   {
+    "punti": 5,
+    "x": -5.9,
+    "z": -2276.8,
+    "v": 1.63,
+    "link": "?x=-5.9&z=-2276.8"
+   },
+   {
+    "punti": 4,
+    "x": 266.7,
+    "z": -2477.3,
+    "v": 1.26,
+    "link": "?x=266.7&z=-2477.3"
    }
   ],
-  "n_luoghi": 48
+  "n_luoghi": 38
  },
  "A6": {
   "incroci": 48,
@@ -828,10 +827,10 @@
    "nome": "Campaccio, torrente a mezza costa",
    "attese": "il torrente OSM entro 1 m dal fondo della valle del LiDAR; nessuna ringhiera; nessuna bocca di tombino lontana dalla strada",
    "link": "?x=25.0&z=-1860.0",
-   "punti_lontani_dal_fondo": 6,
+   "punti_lontani_dal_fondo": 0,
    "bocche_lontane": 0,
    "ringhiere_m": 0,
-   "ok": false
+   "ok": true
   },
   {
    "nome": "via Varese al Campaccio, acqua sopra l incrocio",
@@ -852,11 +851,11 @@
   "ringhiere_m": 0,
   "ringhiere_in_bosco_m": 0,
   "bocche_lontane_da_strade": 10,
-  "acqua_lontana_dal_fondo_m": 416,
-  "acqua_lontana_dal_fondo_luoghi": 48,
+  "acqua_lontana_dal_fondo_m": 265,
+  "acqua_lontana_dal_fondo_luoghi": 38,
   "tombini_sotto_strade": 48,
   "tombini_sotto_strade_sfondati": 1,
-  "prove_fisse_ok": "3 su 4",
-  "tempo_s": 43.4
+  "prove_fisse_ok": "4 su 4",
+  "tempo_s": 61.3
  }
 }

@@ -1005,6 +1005,28 @@ function spalleNucleo(dk) {
   for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1] of dk.sn) { const L = hyp(bx - ax, bz - az) || 1; WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: Math.min(ya0, yb0) - 1, y1: Math.max(ya1, yb1), deckw: true }); }
   return dk.sn;
 }
+// the abutment at the end of a deck (ramo ponti-spalle, 6/11): where the deck rests on S (its spalle edges) and the ground just inside the end
+// falls away under the slab (the bank under the deck end), a concrete wall from that ground up to the underside, its thickness outwards, so no
+// slot under the end of a bridge shows the sky. Up to SPALLA_CAPO_MAX (src/controlli_ponti.py counts the gap closed up to there). Pieces of the
+// spalle edges: [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins]
+const SPALLA_CAPO_MAX = 6.0;
+function spalleCapi(dk) {
+  if (dk.cw) return dk.cw; dk.cw = []; if (dk.tipo === 'copertura' || !dk.spalle.length) return dk.cw;
+  const T = dk.tri, sp = dk.sp, key = (ax, az, bx, bz) => { const a = ax.toFixed(2) + ',' + az.toFixed(2), b = bx.toFixed(2) + ',' + bz.toFixed(2); return a < b ? a + ' ' + b : b + ' ' + a; };
+  const spk = new Set(dk.spalle.map(e => key(e[0], e[1], e[2], e[3])));
+  for (let i = 0; i < T.length; i += 9) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) {
+    const ax = T[i + a], az = T[i + a + 1], ay = T[i + a + 2], bx = T[i + b], bz = T[i + b + 1], by = T[i + b + 2];
+    if (!spk.has(key(ax, az, bx, bz))) continue;
+    const cx = (T[i] + T[i + 3] + T[i + 6]) / 3, cz = (T[i + 1] + T[i + 4] + T[i + 7]) / 3, L = hyp(bx - ax, bz - az) || 1;
+    let nx = (bz - az) / L, nz = -(bx - ax) / L; if (nx * (cx - ax) + nz * (cz - az) < 0) { nx = -nx; nz = -nz; } // (n: into the deck)
+    const gin = (x, z) => Math.min(H.base(x + nx * 0.5, z + nz * 0.5), H.base(x + nx * 1.0, z + nz * 1.0));
+    const ga = gin(ax, az), gb = gin(bx, bz), da = ay - sp - ga, db = by - sp - gb;
+    if (Math.max(da, db) < 0.05 || Math.max(da, db) > SPALLA_CAPO_MAX || H.inPit((ax + bx) / 2, (az + bz) / 2, 0.3)) continue;
+    const g = Math.min(ga, gb); dk.cw.push([ax, az, g - 0.3, ay - sp, bx, bz, g - 0.3, by - sp, (nx * (bz - az) - nz * (bx - ax)) > 0 ? -1 : 1]);
+    WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: g - 1, y1: Math.max(ay, by) - sp, deckw: true });
+  }
+  return dk.cw;
+}
 function drawDecks(T, top, side) {
   for (const dk of H.DECKS) {
     if (dk.tipo === 'copertura') continue; // its top is S itself (the station underpass)
@@ -1027,7 +1049,7 @@ function drawDecks(T, top, side) {
       const ox = nx * SPALLA_SP, oz = nz * SPALLA_SP;
       opQuad(side, [[ax, ya0, az], [bx, yb0, bz], [bx, yb1, bz], [ax, ya1, az]], -nx, 0, -nz); opQuad(side, [[ax + ox, ya0, az + oz], [bx + ox, yb0, bz + oz], [bx + ox, yb1, bz + oz], [ax + ox, ya1, az + oz]], nx, 0, nz);
     }
-    for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins] of rampWalls(dk)) { // the walls of the approach ramps and the abutments (rampWalls): concrete with a thickness towards the fill, its ends closed
+    for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins] of rampWalls(dk).concat(spalleCapi(dk))) { // the walls of the approach ramps and the abutments (rampWalls, spalleCapi): concrete with a thickness towards the fill, its ends closed
       if (tileOf((ax + bx) / 2, (az + bz) / 2) !== T.t) continue;
       const L = hyp(bx - ax, bz - az) || 1, nx = (bz - az) / L * (ins || 1), nz = -(bx - ax) / L * (ins || 1), ox = nx * SPALLA_SP, oz = nz * SPALLA_SP, ta = Math.max(ya0, ya1), tb = Math.max(yb0, yb1);
       opQuad(side, [[ax, ya0, az], [bx, yb0, bz], [bx, tb, bz], [ax, ta, az]], -nx, 0, -nz); opQuad(side, [[ax + ox, ya0, az + oz], [bx + ox, yb0, bz + oz], [bx + ox, tb, bz + oz], [ax + ox, ta, az + oz]], nx, 0, nz);
@@ -1066,7 +1088,7 @@ function busyGround(dk, x, z) {
 function deckInit(dk) { if (dk.pronto) return; dk.pronto = true; dk.bar = { rails: [], pillars: [] }; const r0 = GRID_REC; GRID_REC = dk.reg; try { deckInit2(dk); } finally { GRID_REC = r0; } }
 function deckInit2(dk) {
   if (dk.tipo === 'copertura') return;
-  const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null; rampWalls(dk); // the walls of its approach ramps and their collisions, once
+  const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null; rampWalls(dk); spalleCapi(dk); // the walls of its approach ramps and their collisions, once
   for (const [ax, az, bx, bz, core] of deckOutline(dk)) {
     const L = hyp(bx - ax, bz - az); if (L < 0.05) continue;
     let nx = (bz - az) / L, nz = -(bx - ax) / L; const mx = (ax + bx) / 2, mz = (az + bz) / 2;
