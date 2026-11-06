@@ -15,7 +15,7 @@ Fatto solo con ricerca web e qualche richiesta di conteggio ai servizi (niente d
 - `data/mapillary_grande/` (17 168 oggetti, 67 078 foto): scaricato, non letto da nessuna build. Quello di Meda invece lo legge `src/mapillary_obj.py` (la voce 3 di `todo.md` è da aggiornare).
 - DBGT di 30 comuni attorno a Meda: 8 scaricati prima più 22 nuovi, zip non estratti. La build legge solo `dbgt.gpkg`.
 - `overture/edifici_mappa_grande.geojson` e `osm/mappa_grande.osm`: pronti, non letti dalla build di Meda.
-- LiDAR: 54 tessere su 170 per la mappa grande. Le altre 116 non si scaricano perché il portale del Ministero ha la manutenzione fino al 6/11.
+- LiDAR: 54 tessere su 170 per la mappa grande. Le altre 116 non si scaricano perché il portale del Ministero è in manutenzione: il 6/11 l'avviso è stato prorogato a martedì 10/11 e il portale rispondeva con errore 500. Riprovare dall'11/11.
 - Il DBGT ha 106 tabelle e la build non le legge tutte. Non sono solo tre: il codice ne cita molte di più (fra cui `AC_VEI`, `AC_PED`, `AR_STR`, `EL_STR`, `EL_FER`, `EL_IDR`, `PONTE`, `GALLER`, `MAN_TR`, `PS_INC`, `FIL_AL`, `EL_DIV`, `UN_VOL`). L'elenco di quelle non usate è da fare. Da controllare anche se `FIL_AL` e le siepi `EL_DIV` tipo 19 coprono già lo strato "Filari e siepi" di DUSAF, che qui sopra è detto mancante nel DBGT.
 
 ## Tabella
@@ -39,7 +39,7 @@ Legenda "Build": SI = la build la usa oggi; no = non la usa.
 | [Meta/WRI Canopy Height 1 m](https://registry.opendata.aws/dataforgood-fb-forests/) | Altezza degli alberi da satellite | CC BY 4.0 (registro AWS) | Parti del mondo; Europa e Meda: non verificato | No | no | **Bassa**: il LiDAR (DSM First - DTM) ha già l'altezza vera degli alberi |
 | [Copernicus DEM GLO-30](https://dataspace.copernicus.eu/) | Quote a 30 m | Libero con attribuzione | Mondiale | No | no | Scartata (vedi sotto) |
 | [TINITALY 1.1](https://tinitaly.pi.ingv.it/) | Quote a 10 m | CC BY 4.0. SI | Nord Italia | Si | SI | Resta come ripiego fuori dal LiDAR |
-| [LiDAR PST-A, Ministero (DTM e DSM 1 m)](https://sim.mase.gov.it/portalediaccesso/mappe/#/viewer/new) | Quote vere del terreno e altezze di alberi e tetti | CC BY 4.0. SI | Meda 54 tessere su 54. Mappa grande: 116 mancano (portale in manutenzione fino al 6/11, non verificato) | Parziale | SI | Già in uso; completare per la mappa grande |
+| [LiDAR PST-A, Ministero (DTM e DSM 1 m)](https://sim.mase.gov.it/portalediaccesso/mappe/#/viewer/new) | Quote vere del terreno e altezze di alberi e tetti | CC BY 4.0. SI | Meda 54 tessere su 54. Mappa grande: 116 mancano (portale in manutenzione prorogata al 10/11: il 6/11 rispondeva con errore 500) | Parziale | SI | Già in uso; completare per la mappa grande |
 | [DTM 5 m Regione Lombardia 2015](https://www.geoportale.regione.lombardia.it/) | Quote a 5 m | CC BY 4.0. SI | Lombardia | No | no | **Bassa**: il LiDAR a 1 m è meglio; serve solo come ripiego se le 116 tessere non arrivano |
 | DBGT Regione Lombardia (Meda 2015 e altri 29 comuni) | Forme e quote di strade, edifici, muri, ferrovia, acqua | CC BY 4.0. SI | Meda estratto; 29 comuni scaricati e non estratti | Si | SI (solo Meda) | **Alta**: vedi "abbiamo e non usiamo" |
 | [Servizi Regione `LOM_WMS3_Trasporti` e `ReticoloIdrografico_RIRU`](https://www.cartografia.servizirl.it/arcgis1/rest/services/territorio) | Rete stradale e ferroviaria regionale, reticolo idrico regionale con nomi | Licenza non verificata. ? | Lombardia | No | no | **Bassa**: strade e ferrovia sono già in DBGT e OSM; il reticolo RIRU serve solo a controllare i nomi dei torrenti |
@@ -77,4 +77,4 @@ Legenda "Build": SI = la build la usa oggi; no = non la usa.
 - Se in Panoramax o altri servizi aperti esiste qualcosa vicino a Meda oltre ai conteggi fatti.
 - Open-Meteo e Copernicus HRL alla fonte; Meta Canopy Height su Meda.
 - Il Catasto: il testo della licenza e il formato per Meda; la fonte è un comunicato di stampa AdE del 2020 e notizie del 2025.
-- Il portale del Ministero per il LiDAR: se la manutenzione finisce davvero il 6/11.
+- Il portale del Ministero per il LiDAR: il 6/11 la manutenzione è stata prorogata a martedì 10/11; riprovare dall'11/11.
