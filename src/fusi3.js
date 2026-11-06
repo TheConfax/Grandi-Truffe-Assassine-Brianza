@@ -2,7 +2,7 @@
 // Every frame, after the matrices and before the renderer walks the scene, the parts of what the camera or the sun can see go into one instanced mesh per kind of geometry and material. A part fused leaves the renderer's sight by its layer: its matrix is still worked out, and nothing else changes.
 // Boxes share one unit box scaled to size. The plain lit materials share one material, their colour read each frame per part (a car that scorches, a new paint); a lit one (lamps, brake lights, sirens) has its own batch with its own material, so what the game does to it shows. Not fused, and drawn as ever: what is see-through or has a map (the cab of the police, the pool of the headlights) and a dented body, whose geometry is its own (geo.fFuori).
 const FUSI = { n: 0, sf: new THREE.Sphere(new THREE.Vector3(), 9), gu: {}, lista: [], opaca: new THREE.MeshLambertMaterial({ color: 0xffffff }), slot: new Map(), mask: 1 << 20, ogg: new THREE.Matrix4() };
-FUSI.slot.set(FUSI.opaca, 0); const FUSI_MAT = [FUSI.opaca];
+FUSI.slot.set(FUSI.opaca, 0); const FUSI_MAT = [FUSI.opaca], FUSI_COL = [true], FUSI_RIF = {}; /* FUSI_COL[s]: the batch reads the colour of each part; FUSI_RIF: one white material per kind of reflection (riflessi3.js), the colour per part as for the plain one */
 // The matrices: what is hidden needs none (it has them the frame it shows again), and a parked car that has not moved has the ones it had, some twenty parts each, every frame
 const _fusiUMW = THREE.Object3D.prototype.updateMatrixWorld;
 function fusiMatrici(force) {
@@ -13,16 +13,17 @@ function fusiMatrici(force) {
 function fusiSlot(M) { // 0: the shared plain material; n: a batch with M itself; -1: drawn as ever
   let s = FUSI.slot.get(M); if (s !== undefined) return s;
   if (!M.isMeshLambertMaterial || M.transparent || M.map || M.alphaMap || M.emissiveMap || M.vertexColors || M.side !== THREE.FrontSide || M.alphaTest || M.polygonOffset || M.opacity !== 1 || !M.fog || !M.depthWrite || !M.depthTest || !M.colorWrite) s = -1;
+  else if (M.userData.rif) { const k = M.userData.rif; s = FUSI_RIF[k]; if (s === undefined) { s = FUSI_RIF[k] = FUSI_MAT.length; FUSI_MAT.push(rifMat(new THREE.MeshLambertMaterial({ color: 0xffffff }), k)); FUSI_COL[s] = true; } }
   else if (M.emissive.r || M.emissive.g || M.emissive.b) { s = FUSI_MAT.length; FUSI_MAT.push(M); } else s = 0;
   FUSI.slot.set(M, s); return s;
 }
 function fusiLotto(g, s, c) { // the batch of a geometry, a material, cast or not
-  const k = s * 2 + (c ? 1 : 0); return (g.fL || (g.fL = []))[k] || (g.fL[k] = fusiNuovo(g, s, c, s ? 64 : 512));
+  const k = s * 2 + (c ? 1 : 0); return (g.fL || (g.fL = []))[k] || (g.fL[k] = fusiNuovo(g, s, c, FUSI_COL[s] ? 512 : 64));
 }
 function fusiNuovo(g, s, c, cap) {
   const m = new THREE.InstancedMesh(g, FUSI_MAT[s], cap); m.castShadow = c; m.receiveShadow = false; m.frustumCulled = false; m.matrixAutoUpdate = false; m.visible = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const l = { m, n: 0, cap, mt: m.instanceMatrix.array, col: null, g, s, c };
-  if (!s) { m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage); l.col = m.instanceColor.array; }
+  if (FUSI_COL[s]) { m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage); l.col = m.instanceColor.array; }
   scene.add(m); FUSI.lista.push(l); FUSI.n++; return l;
 }
 function fusiCresci(l) { // a batch too small: the next size up; what is in it stays

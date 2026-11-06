@@ -829,7 +829,7 @@ const _geo = {};
 const boxG = (w, h, l) => { const k = w + ',' + h + ',' + l; return _geo[k] || (_geo[k] = new THREE.BoxGeometry(w, h, l)); };
 const wheelG = r => { const k = 'w' + r; return _geo[k] || (_geo[k] = new THREE.CylinderGeometry(r, r, 0.26, 12).rotateZ(Math.PI / 2)); };
 function makeCar(model, color) {
-  const S = MODELS[model], g = new THREE.Group(), body = new THREE.Group(), hl = S.L / 2, paint = lam(color); g.add(body); g.rotation.order = 'YXZ';
+  const S = MODELS[model], g = new THREE.Group(), body = new THREE.Group(), hl = S.L / 2, paint = rifPaint(color); g.add(body); g.rotation.order = 'YXZ';
   const add = (geo, mat, x, y, z, shadow = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; body.add(m); return m; };
   let wheelPos, lightY, lightZ = hl + 0.01, rider = null, crew = null;
   if (S.two) { // scooter, moto, bici: frame, seat, bars, two thin wheels and a seated rider (shown when an AI rides it)

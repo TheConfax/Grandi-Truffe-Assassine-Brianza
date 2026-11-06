@@ -204,6 +204,8 @@ function vetrinaShader() {
     oggetti.push(q); VETRINA_TIENI.push(m);
   }
   for (const k of ['old', 'mod', 'plain']) if (MAT[k]) oggetti.push(new THREE.Mesh(geo, MAT[k]));
+  for (const [m, ins] of RIF.pre) oggetti.push(ins ? new THREE.InstancedMesh(geo, m, 1) : new THREE.Mesh(geo, m)); /* the reflections of riflessi3.js: their shaders too, and those of the fused cars (fusi3.js: the paint and the panes read the colour of each part) */
+  for (const m of [M_GLASS, rifPaint('#ffffff')]) { const s = fusiSlot(m); if (s > 0 && FUSI_COL[s]) { const q = new THREE.InstancedMesh(geo, FUSI_MAT[s], 1); q.setColorAt(0, new THREE.Color()); oggetti.push(q); } }
   const g = new THREE.Group(); g.visible = false; g.add(...oggetti); scene.add(g); renderer.compile(scene, camera); scene.remove(g);
 }
 
