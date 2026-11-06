@@ -2,7 +2,7 @@
 // The square button jumps; near something low enough it goes over it or up on it instead, never without the press. What can be climbed comes from
 // what the world already knows (WALLS, VEH), with no places written anywhere: a two-sided barrier up to SALTO.maxBar over the ground the walker
 // stands on, a stopped car, and the street objects tagged in their spec (sali: stand on it; scav: go over it). Everything else stays a wall:
-// buildings, doors, bridge parapets, ramps, and walls higher than maxBar (the data have no holds on walls, so those are not climbed).
+// buildings, doors, and walls higher than maxBar over the ground he stands on (a guardrail or a bridge parapet is a barrier like any other, as high as drawn: Carlo 6/11) (the data have no holds on walls, so those are not climbed).
 // A climb is planned before it starts and only if its whole path is free: capsuleFree is asked at every step of the rise, of the way across and of
 // the drop, against all that stops the walker, at the height the feet will have there. So nothing has to be excepted: a barrier is passed because
 // the feet are above it. If no path is free the press is a plain jump.
@@ -20,7 +20,7 @@ const SALTO = {
   lowH: 1.35, hoist: 2.0, // up to lowH a hop with the hands on top; over it a jump to hang from the top by the hands (feet hoist m under it), then a pull up
   tHopMin: 0.16, tHopK: 0.11, tJump: 0.2, tHold: 0.1, tPullK: 0.3, tOver: 0.22, tStand: 0.16, vOver: 5.5, fastK: 0.8, exitV: 1.5, exitK: 0.6, // seconds; with a run-up everything takes fastK of the time; speed off the far side
 };
-function isBarrier(s) { return s.ax !== undefined && s.two && !s.off && !s.deckw && !s.door && !s.mf && s.pit === undefined && (!s.dyn || s.on); }
+function isBarrier(s) { return s.ax !== undefined && s.two && !s.off && !s.door && !s.mf && s.pit === undefined && (!s.dyn || s.on); }
 
 // ---- cars as solids and floors: the boxes makeCar draws. Heights over v.y
 function vehLocal(v, x, z) { const dx = x - v.x, dz = z - v.z, s = Math.sin(v.h), c = Math.cos(v.h); return [dx * c - dz * s, dx * s + dz * c]; } // [side, along]
@@ -316,4 +316,31 @@ function saltoPose(m, dt, walkAmp) {
   m.L.rotation.x += (L - m.L.rotation.x) * k; m.R.rotation.x += (R - m.R.rotation.x) * k; m.AL.rotation.x += (AL - m.AL.rotation.x) * k; m.AR.rotation.x += (AR - m.AR.rotation.x) * k;
   m.AL.rotation.z += (-spread - m.AL.rotation.z) * k; m.AR.rotation.z += (spread - m.AR.rotation.z) * k;
   m.inner.rotation.x += (tilt - m.inner.rotation.x) * k; m.inner.position.y += (-dip - m.inner.position.y) * k;
+}
+
+// ---- slopes on foot (Carlo, 6/11): up to SALITA.piano degrees he walks as on the flat, from there to SALITA.max slower and slower, past it he
+// does not go up and, standing on it, he slides down. Downhill nothing holds him back. The slope is the ground's (decks and ramps included), read
+// in two pieces of SALITA.passo m one after the other: only where both rise is it a slope, so a kerb, a step or the edge of a drop is not one
+const SALITA = {
+  piano: 15, max: 40, // degrees
+  passo: 0.5,         // m of each of the two pieces the slope is read on
+  attrito: 0.84,      // tan of the angle he stops sliding at (40 degrees): on steeper ground he slides with g (sin - attrito cos)
+  frena: 6,           // m/s2: the slide dies out on ground he can stand on
+  maxV: 9,            // m/s, the fastest slide
+};
+const salitaMin = (a, b) => a > 0 && b > 0 ? Math.min(a, b) : a < 0 && b < 0 ? Math.max(a, b) : 0; // the smaller of two rises of the same sign, else 0
+function salitaG(x, z, y) { return H.surface(x, z, y + 0.6); }
+function footSlope(dt) { // on the ground, before the step: P.vx, P.vz are the walk he wants; this bends them to the slope and adds the slide
+  const S = SALITA, p = S.passo, y = P.y, g0 = salitaG(P.x, P.z, y), sp = hyp(P.vx, P.vz), R = Math.PI / 180;
+  if (sp > 0.05) { // up the way he walks
+    const ux = P.vx / sp, uz = P.vz / sp, rise = salitaMin(salitaG(P.x + ux * p, P.z + uz * p, y) - g0, salitaG(P.x + ux * 2 * p, P.z + uz * 2 * p, y) - salitaG(P.x + ux * p, P.z + uz * p, y)) / p;
+    const a = Math.atan(rise) / R; P.salita = a;
+    if (a > S.piano) { const k = clamp((S.max - a) / (S.max - S.piano), 0, 1); P.vx *= k; P.vz *= k; }
+  } else P.salita = 0;
+  // the ground he stands on: its fall, the same way
+  const gx = salitaMin(salitaG(P.x + p, P.z, y) - g0, g0 - salitaG(P.x - p, P.z, y)) / p, gz = salitaMin(salitaG(P.x, P.z + p, y) - g0, g0 - salitaG(P.x, P.z - p, y)) / p, gl = hyp(gx, gz), th = Math.atan(gl);
+  let sx = P.slx || 0, sz = P.slz || 0;
+  if (th > S.max * R) { const a = 9.81 * (Math.sin(th) - S.attrito * Math.cos(th)); sx -= gx / gl * a * dt; sz -= gz / gl * a * dt; const v = hyp(sx, sz); if (v > S.maxV) { sx *= S.maxV / v; sz *= S.maxV / v; } }
+  else { const v = hyp(sx, sz), d = S.frena * dt; if (v <= d) sx = sz = 0; else { sx -= sx / v * d; sz -= sz / v * d; } }
+  P.slx = sx; P.slz = sz; P.vx += sx; P.vz += sz;
 }

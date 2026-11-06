@@ -8,6 +8,7 @@ function addProp(p) { // { x, z, r, obj | inst: { meshes, i, ry, base }, onBreak
   WALLS.add(p.x - p.r - 0.2, p.z - p.r - 0.2, p.x + p.r + 0.2, p.z + p.r + 0.2, p.wall);
   PROPS.push(p); PROPG.add(p.x - 2, p.z - 2, p.x + 2, p.z + 2, p); return p;
 }
+const SFONDA = { v: 3.5, slow: 0.86, dmg: 2 }; // a car breaks a thing it hits at v m/s or more, and loses slow of its speed and dmg of its health (the graves too, sfondabili3.js)
 function breakProp(p, v) {
   if (p.broken) return; p.broken = true; p.wall.on = false;
   let dx = v ? v.vx : 1, dz = v ? v.vz : 0; const l = hyp(dx, dz) || 1; dx /= l; dz /= l;
@@ -16,10 +17,11 @@ function breakProp(p, v) {
   if (!o && p.inst) { o = new THREE.Object3D(); o.position.set(p.x, p.inst.base, p.z); o.rotation.y = p.inst.ry; if (p.inst.sx) o.scale.set(p.inst.sx, 1, 1); o.updateMatrix(); } // sx: a panel stretched to its length
   if (o) PROP_FALL.push({ o, p, axis, a: 0, w: 0.6 + (v ? Math.min(2.5, v.speed * 0.08) : 0), max: 1.42 + Math.random() * 0.12 });
   if (p.onBreak) p.onBreak();
-  if (v) { const sp = v.speed; v.vx *= 0.86; v.vz *= 0.86; v.health = Math.max(0, v.health - 2); if (v === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
+  if (v) { const sp = v.speed; v.vx *= SFONDA.slow; v.vz *= SFONDA.slow; v.health = Math.max(0, v.health - SFONDA.dmg); if (v === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
 }
 function propHits(v) {
-  if (v.speed < 3.5) return;
+  tombHits(v);
+  if (v.speed < SFONDA.v) return;
   PROPG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, p => {
     if (p.broken || Math.abs(v.y - p.y) > 3) return;
     for (const c of v.circles()) if (hyp(c[0] - p.x, c[1] - p.z) < v.rad + p.r + 0.15) { breakProp(p, v); return; }

@@ -1062,6 +1062,9 @@ function busyGround(dk, x, z) {
   if (dk.tipo !== 'ferro') RAILG.each(x - 4, z - 4, x + 4, z + 4, s => { if (!f && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < 3.5) f = true; }); // (on a railway deck its own rails run over the point)
   const w = H.water(x, z); return f || (w !== null && w > H.base(x, z));
 }
+// how high the guardrails, the new jersey and the parapets are for the walker: as drawn (drawGuard, drawBarriers), so he goes over them as over any barrier of
+// that height (salto3.js). A car meets them ALTO_VERO.auto over the road: it does not fly over a guardrail (Carlo, 6/11)
+const ALTO_VERO = { guardrail: 0.8, newJersey: 0.82, parapetto: 0.95, passerella: 1.1, auto: 2.5 };
 // what a deck adds to the world, once, when all the tiles under it are here (pezzi3.js): its parapets, pillars, ramp walls. They go with it
 function deckInit(dk) { if (dk.pronto) return; dk.pronto = true; dk.bar = { rails: [], pillars: [] }; const r0 = GRID_REC; GRID_REC = dk.reg; try { deckInit2(dk); } finally { GRID_REC = r0; } }
 function deckInit2(dk) {
@@ -1080,7 +1083,7 @@ function deckInit2(dk) {
       if (top - H.base(qx, qz) < 0.8) continue; // it rests on the ground there (a spalla)
       const seg = { ax: ax + (bx - ax) * k / n, az: az + (bz - az) * k / n, bx: ax + (bx - ax) * (k + 1) / n, bz: az + (bz - az) * (k + 1) / n };
       dk.bar.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, dk.tipo === 'pedonale' ? 2 : 1, nx, nz]);
-      WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + 2.5, deckw: true });
+      WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + (dk.tipo === 'pedonale' ? ALTO_VERO.passerella : ALTO_VERO.parapetto), yv: Math.max(y0, y1) + ALTO_VERO.auto, deckw: true });
     }
   }
   // pillars: on the long axis of the footprint (two lines on a wide deck), every PIL_STEP m, where the deck stands more than 2.5 m over
@@ -1167,7 +1170,7 @@ function* roadBarriers(T) {
           if (b - a + 1 < 3 && !(a === 0 && b === ns - 1 && L < 6)) continue;
           const t0 = q / ns, t1 = (q + 1) / ns, off = offS, x0 = A[0] + (B[0] - A[0]) * t0 + ex * off, z0 = A[1] + (B[1] - A[1]) * t0 + ez * off, x1 = A[0] + (B[0] - A[0]) * t1 + ex * off, z1 = A[1] + (B[1] - A[1]) * t1 + ez * off;
           const y0 = q > a ? (flag[q - 1] + flag[q]) / 2 : flag[q], y1 = q < b ? (flag[q + 1] + flag[q]) / 2 : flag[q];
-          res.rails.push([x0, z0, y0, x1, z1, y1]); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ex, nz: -ez, two: true, y0: Math.min(y0, y1) - 0.8, y1: Math.max(y0, y1) + 2.5, deckw: true });
+          res.rails.push([x0, z0, y0, x1, z1, y1]); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ex, nz: -ez, two: true, y0: Math.min(y0, y1) - 0.8, y1: Math.max(y0, y1) + ALTO_VERO.guardrail, yv: Math.max(y0, y1) + ALTO_VERO.auto, deckw: true });
         }
       }
     }
@@ -1196,7 +1199,7 @@ function guardRails(T) {
       if (yE < yr - 0.6) { const dx = bx - p[0], dz = bz - p[1], L = hyp(dx, dz) || 1; for (let st = 0.1; st <= 1.5 + 1e-6; st += 0.1) { const x = p[0] + dx / L * st, z = p[1] + dz / L * st, y = H.surface(x, z, yr + 0.3); if (y >= yr - 0.3) { p[0] = x; p[1] = z; yE = y; break; } } }
       return Math.abs(yE - yr) < 0.6 ? yE : yr; });
     const ys = y0.map((v, i) => i && i < y0.length - 1 ? (y0[i - 1] + v + y0[i + 1]) / 3 : v); // no steps along it
-    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], c = pts[i], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(ys[i - 1], ys[i]) - 0.8, y1: Math.max(ys[i - 1], ys[i]) + 2.5, deckw: true }); }
+    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], c = pts[i], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(ys[i - 1], ys[i]) - 0.8, y1: Math.max(ys[i - 1], ys[i]) + (k === 2 ? ALTO_VERO.newJersey : ALTO_VERO.guardrail), yv: Math.max(ys[i - 1], ys[i]) + ALTO_VERO.auto, deckw: true }); }
     out.push({ k, pts, ys });
   }
   GUARD.set(T.t, out); return out;
@@ -2689,15 +2692,13 @@ function buildCemetery(T, G) {
   if (!tombs.length && !cyps.length) return;
   if (!T.cemDone) { /* graves are solid (Carlo, 2/11): two discs per slab, which you can walk up onto (28 cm), a disc for the headstone; a disc for each cypress */
     T.cemDone = true; window.__COLL = window.__COLL || {}; window.__COLL.tombe = (window.__COLL.tombe || 0) + tombs.length;
-    for (const [x, z, a] of tombs) { const gy = H.ground(x, z), dx = -Math.sin(a), dz = Math.cos(a);
-      for (const o of [-0.5, 0.5]) { const px = x + dx * o, pz = z + dz * o; WALLS.add(px - 0.5, pz - 0.5, px + 0.5, pz + 0.5, { r: 0.5, x: px, z: pz, y0: gy - 3, y1: gy + 0.3, sali: { rs: 0.5, top: gy + 0.3 } }); }
-      const hx = x + dx * 0.95, hz = z + dz * 0.95; WALLS.add(hx - 0.42, hz - 0.42, hx + 0.42, hz + 0.42, { r: 0.42, x: hx, z: hz, y0: gy - 3, y1: gy + 1.0 }); }
+    T.tombe = tombs.map(([x, z, a], i) => tombaSolida(T, x, z, a, i)); /* a car breaks them (sfondabili3.js) */
     for (const c of cyps) WALLS.add(c[0] - 0.35, c[1] - 0.35, c[0] + 0.35, c[1] + 0.35, { r: 0.35, x: c[0], z: c[1], y0: H.ground(c[0], c[1]) - 3, y1: H.ground(c[0], c[1]) + 8 });
   }
   const m = new THREE.Matrix4(), qq = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), pp = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  const mk = (geo, mat, list, f) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((t, i) => { f(t, pp); qq.setFromAxisAngle(up, -t[2] || 0); m.compose(pp, qq, sc); im.setMatrixAt(i, m); }); im.castShadow = true; G.add(im); };
-  mk(TOMB_G, lam(0xb8b4ac), tombs, (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.14, t[1]));
-  mk(STONE_G, lam(0x8e8a84), tombs.map(t => [t[0] - Math.sin(t[2]) * 0.95, t[1] + Math.cos(t[2]) * 0.95, t[2]]), (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.5, t[1])); // headstone at the head end
+  const mk = (geo, mat, list, f) => { if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((t, i) => { f(t, pp); qq.setFromAxisAngle(up, -t[2] || 0); m.compose(pp, qq, sc); im.setMatrixAt(i, m); }); im.castShadow = true; G.add(im); return im; };
+  const slabs_ = mk(TOMB_G, lam(0xb8b4ac), tombs, (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.14, t[1]));
+  T.tombeM = [slabs_, mk(STONE_G, lam(0x8e8a84), tombs.map(t => [t[0] - Math.sin(t[2]) * 0.95, t[1] + Math.cos(t[2]) * 0.95, t[2]]), (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.5, t[1]))]; tombeNascoste(T); // headstone at the head end; the broken ones stay broken
   if (cyps.length) { // the cypresses are trees like the others: the plain stem and the crown of TREE_G (leaf tufts), stretched to a narrow column (height th, crown td across, as the narrow DSM trees above)
     const trunks = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, cyps.length), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, cyps.length), sc2 = new THREE.Vector3(), e2 = new THREE.Euler();
     cyps.forEach((c, i) => {
