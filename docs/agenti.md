@@ -15,7 +15,7 @@ Leggi questo, `CLAUDE.md` e solo le parti di `docs/motore.md` che servono al tuo
 - Se ti manca un'informazione, chiedi prima di indovinare (Carlo, 2/11): `SendMessage` con `to: "main"`, una domanda corta, poi continua con quello che non dipende dalla risposta. Vale anche per il compito se ti sembra sbagliato o inutile.
 - Ramo tuo da `origin/dev` in una worktree nella tua scratchpad. Mai nella cartella principale, mai `main`.
 - Build e terreno solo col gettone (vedi `CLAUDE.md`).
-- Build (Carlo, 7/11): al massimo due insieme in tutto il PC. Prima di una build prendi un posto con `mkdir /c/Users/theco/GitHub/GTA-Brianza-posto-1` (o `posto-2`; se sono presi entrambi aspetta) e toglilo alla fine con `trap`. **Una sola build completa per giro**, alla fine, e su quella fai girare i controlli su tutta la mappa per vedere che la regola non rompa altro. I tentativi prima li fai con la build attorno al punto (solo i pezzi vicini al caso; quando c'è, vedi `todo.md`); se la build completa trova un problema altrove, torni alla build locale su quel punto.
+- Build (Carlo, 7/11): al massimo due insieme in tutto il PC. Prima di una build prendi un posto con `mkdir /c/Users/theco/GitHub/GTA-Brianza-posto-1` (o `posto-2`; se sono presi entrambi aspetta) e toglilo alla fine con `trap`.
 - Niente dati inventati: forme e quote dal DBGT, nomi e attributi da OSM, aspetto da ortofoto o foto; dove non si sa, neutro. Niente regole o coordinate scritte per un comune: regole generali.
 - Un muro non sparisce mai: se va tolto da un posto si sposta sul confine.
 - Niente di attraversabile (Carlo, 25/10): ogni oggetto solido che metti nel mondo o si sfascia quando lo prendi o ti ferma. Mai un oggetto che l'auto o il pedone passa come un fantasma.
