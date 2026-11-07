@@ -10,7 +10,7 @@ const HELI = {
   /* the numbers of a real light twin, the Airbus H135 of the air ambulances (Carlo 7/11: "un po' lento per essere un elicottero"): fast cruise 254 km/h = 70.5 m/s
      at full weight, climb 7.6 m/s (1500 ft/min) (airbus.com, H135 technical information; LPR, the Polish air ambulance). The sink is not in the data sheets: 6 m/s */
   tilt: 0.45, tiltK: 3.2,            /* most tilt from the stick (rad, 26 degrees: g tan = 4.7 m/s2 at the start), how fast the body follows it (1/s) */
-  hold: 0.06, holdMax: 0.45,         /* stick let go: tilt against the drift (rad per m/s) and its cap */
+  hold: 0.06, holdMax: 0.52,         /* stick let go: tilt against the drift (rad per m/s) and its cap: 30 degrees nose up, a quick stop (Carlo 7/11: it slid on for far too long) */
   drag1: 0.015, drag2: 0.00074,      /* air drag, linear and quadratic: full stick ends at 70.5 m/s, the H135's fast cruise */
   climb: 7.6, sink: 6, vyK: 1.8,     /* climb and sink speed at full R2/L2 (m/s), how fast the vertical speed follows (1/s) */
   yawRate: 1.4, yawK: 4,             /* turn on the spot with L1/R1 (rad/s) and its ease (1/s) */
@@ -19,6 +19,10 @@ const HELI = {
   rotorR: 4.8, rotorY: 2.35,         /* rotor radius, height of the rotor over the skids */
   flat: 0.55,                        /* highest minus lowest point under the skids (m) past which it slides off */
   maxAlt: 600,                       /* ceiling over terrain.base 0 */
+  camK: 10, camS: 30, camPitchK: 0.8, /* camera: how fast it follows (1/s), the pace it goes back behind after the right stick (as a car at camS m/s), how fast the tilt from the right stick goes back (1/s) */
+  camRoll: 0.3, camZen: 1.52,        /* the share of the bank the view leans with, the highest view (rad over the horizon: 87 degrees, straight over it) */
+  camW0: 2, camW1: 10,               /* the view turns from the nose to the way it goes between these speeds (m/s) */
+  fogAlt: 50,                        /* the fog's reach grows by one time its own every fogAlt metres of the view over the ground (past the first 15) */
   home: [[562.7, -428, 0]],          /* where the helicopters stand at the start: the round paved yard in the park among the blocks at Meda (Carlo, 7/11) */
 };
 const HELI_ZERO = { col: 0, yaw: 0, fwd: 0, side: 0 };
@@ -241,3 +245,11 @@ function heliSound(v, t, m) {
   AU.eng.o1.frequency.setTargetAtTime(24 + r * 30 + (v.inp.col || 0) * 4, t, 0.1); AU.eng.o2.frequency.setTargetAtTime(24 + r * 30, t, 0.1);
   AU.eng.lp.frequency.setTargetAtTime(220 + r * 380, t, 0.1); AU.eng.eg.gain.setTargetAtTime(m * (v.health > 0 ? (0.05 + 0.13 * r) * beat : 0), t, 0.012);
 }
+/* where the camera looks from behind the helicopter: the nose when still, the way it goes when it moves (the stick held diagonally: diagonally); going backwards it stays behind the nose */
+function heliCamDir(e) {
+  const sp = hyp(e.vx, e.vz); if (sp < 0.3) return e.h;
+  const d = wrapA(Math.atan2(e.vx, e.vz) - e.h), w = clamp((sp - HELI.camW0) / (HELI.camW1 - HELI.camW0), 0, 1) * clamp((Math.cos(d) + 0.35) / 0.7, 0, 1);
+  return wrapA(e.h + d * w);
+}
+/* the fog thins out with the height of the view over the ground: from up high one sees far, as the lights do */
+function nebbiaQuota() { const c = camera.position, a = c.y - H.ground(c.x, c.z) - 15; return a > 0 ? 1 + a / HELI.fogAlt : 1; }
