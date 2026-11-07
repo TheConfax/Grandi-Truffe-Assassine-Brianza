@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo porte · dopo fd77f32 · assemblato 07/11 19:45 · porta ' + location.port;
+    const txt = 'locale · ramo porte · dopo 14c5cf0 · assemblato 07/11 23:32 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3867,7 +3867,7 @@ function* buildTileGen(T) {
   yield 'buildings';
   // buildings
   {
-    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf(), doorB = Buf();
+    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf();
     let nb = 0;
     for (const B of T.bld) {
       if (B.skipDraw) continue; /* under a fuel station's own canopy */
@@ -4015,22 +4015,10 @@ function* buildTileGen(T) {
         }
       } else { try { polyFill(roofB, outer, holes, top, 10, B.st === 1 ? COL('#a9a6a0') : colOr(B.rcol, () => pcB(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT, 1))); } catch (e) { } }
     }
-    // the entrances of the DBGT (ACC_INT, the middle of the opening): a door on the nearest wall within 1.5 m
-    for (const [X, Z] of d.ai || []) {
-      const x = X / 10, z = Z / 10; let best = null;
-      BLD.each(x - 2, z - 2, x + 2, z + 2, Bb => { if (Bb.lm || Bb.big || Bb.t === 9 || Bb.zb !== undefined || Bb.st === 2) return; const P = Bb.pts; for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1.4) continue; const dd = segDist(x, z, a[0], a[1], c[0], c[1]); if (dd < 1.5 && (!best || dd < best.d)) best = { d: dd, a, c, L, B: Bb }; } });
-      if (!best) continue;
-      const { a, c, L } = best, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L; let nx = uz, nz = -ux; const s = clamp((x - a[0]) * ux + (z - a[1]) * uz, 0.7, L - 0.7), px = a[0] + ux * s, pz = a[1] + uz * s;
-      if (inPoly(px + nx * 0.2, pz + nz * 0.2, best.B.pts)) { nx = -nx; nz = -nz; }
-      if (inBuilding(px + nx * 0.6, pz + nz * 0.6)) continue; // a party wall
-      const gy = H.ground(px, pz), o = 0.04, k0 = doorB.p.length / 3, col = COL('#4b3a2c');
-      for (const [ss, yy] of [[-0.6, 0], [0.6, 0], [0.6, 2.3], [-0.6, 2.3]]) vtx(doorB, px + ux * ss + nx * o, gy + yy, pz + uz * ss + nz * o, nx, 0, nz, 0, 0, col);
-      if (nx * (-uz) + nz * ux > 0) doorB.i.push(k0, k0 + 1, k0 + 2, k0, k0 + 2, k0 + 3); else doorB.i.push(k0, k0 + 2, k0 + 1, k0, k0 + 3, k0 + 2);
-    }
     for (const k of ['old', 'mod', 'plain']) if (wb[k].i.length) { const g = mkMesh(wb[k], MAT[k], 10, 'cast', G).geometry; g.setAttribute('aoD', new THREE.Float32BufferAttribute(wb[k].ao, 4)); g.setAttribute('facD', new THREE.Float32BufferAttribute(wb[k].fac, 3)); }
     if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
-    put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast'); put(doorB, MAT.roof, 10);
+    put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   for (const f of [confineMesh, buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
@@ -4130,7 +4118,22 @@ function layPorte(T) { T.doors = []; for (const [X0, Z0, X1, Z1, k, h] of T.d.dr
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
   T.doors.push({ ax, az, bx, bz, ux, uz, W, k, h, gy });
   WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, door: true, y0: gy - 2, y1: gy + h });
-} }
+}
+  /* the entrances of the DBGT (ACC_INT, the middle of the opening, Carlo 7/11): the same door as the others (T.doors), on the nearest wall within 1.5 m. It goes through the same bay check as the others (centre of the free bay, no window under it). Kept out if a door already stands within 2 m on that wall, or if the wall is a party wall */
+  const PC = window.PORTE_CNT || (window.PORTE_CNT = { porte: 0, sopra_prima: 0, sopra_dopo: 0, spostate: 0 }); PC.dbgt = PC.dbgt || 0; PC.dbgt_doppie = PC.dbgt_doppie || 0;
+  for (const [X, Z] of T.d.ai || []) {
+    const x = X / 10, z = Z / 10; let best = null;
+    BLD.each(x - 2, z - 2, x + 2, z + 2, Bb => { if (Bb.lm || Bb.big || Bb.t === 9 || Bb.zb !== undefined || Bb.st === 2) return; const P = Bb.pts; for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1.4) continue; const dd = segDist(x, z, a[0], a[1], c[0], c[1]); if (dd < 1.5 && (!best || dd < best.d)) best = { d: dd, a, c, L, B: Bb }; } });
+    if (!best) continue;
+    const { a, c, L } = best, wx = (c[0] - a[0]) / L, wz = (c[1] - a[1]) / L; let nx = wz, nz = -wx; const s = clamp((x - a[0]) * wx + (z - a[1]) * wz, 0.7, L - 0.7), px = a[0] + wx * s, pz = a[1] + wz * s;
+    if (inPoly(px + nx * 0.2, pz + nz * 0.2, best.B.pts)) { nx = -nx; nz = -nz; }
+    if (inBuilding(px + nx * 0.6, pz + nz * 0.6)) continue; /* a party wall */
+    if (T.doors.some(q => hyp((q.ax + q.bx) / 2 - px, (q.az + q.bz) / 2 - pz) < 2 && Math.abs(q.ux * wx + q.uz * wz) > 0.8)) { PC.dbgt_doppie++; continue; }
+    const W = 1.1, h = 2.2, ux = nz, uz = -nx, ax = px - ux * W / 2, az = pz - uz * W / 2, bx = px + ux * W / 2, bz = pz + uz * W / 2, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
+    T.doors.push({ ax, az, bx, bz, ux, uz, W, k: 'p', h, gy, dbgt: 1 }); PC.dbgt++;
+    WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, door: true, y0: gy - 2, y1: gy + h });
+  }
+}
 const DOOR_COL = { p: 0x5b3a26, n: 0x4a3426, b: 0x8f9296 };
 // What stands still in a tile by the thousand (posts, doors, closed gates) goes in one mesh per material: a tile has hundreds of them and each one cost an object or three in every pass of the renderer.
 // addGeo copies a geometry through a matrix, in the buffers of mkMesh; the normals go through the same matrix (rotations only, no scale)
