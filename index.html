@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo c0359bd · assemblato 07/11 23:36 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 5bd4eea · assemblato 07/11 23:38 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -3919,7 +3919,7 @@ function* buildTileGen(T) {
   yield 'buildings';
   // buildings
   {
-    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf(), doorB = Buf();
+    const wb = { old: Buf(), mod: Buf(), plain: Buf() }, roofB = Buf(), canopyB = Buf(), postB = Buf(), aoB = Buf(), sillB = Buf();
     let nb = 0;
     for (const B of T.bld) {
       if (B.skipDraw) continue; /* under a fuel station's own canopy */
@@ -3974,6 +3974,25 @@ function* buildTileGen(T) {
         });
         return { ring, nr, E, W, runs };
       });
+      /* the doors on this house (Carlo 7/11, via Adua): a door takes the place of the ground-floor window of a bay, never sits over a window. It goes to the centre of the nearest free bay of its wall, flush on the wall, facing out; that bay draws no window on its lowest floor (R.noG). Where the wall has no bays the door stays where it is, put on the wall. PORTE_CNT counts the doors over a ground-floor window before and after (debug) */
+      for (const d of T.doors || []) {
+        if (d.fit) continue; const mx = (d.ax + d.bx) / 2, mz = (d.az + d.bz) / 2; let best = null;
+        for (const rg of rings) for (let i = 0; i < rg.nr; i++) {
+          const w = rg.W[i]; if (!w) continue; const a = rg.ring[i], [dx, dz, L] = rg.E[i], t = clamp(((mx - a[0]) * dx + (mz - a[1]) * dz) / (L * L), 0, 1), dd = hyp(mx - a[0] - dx * t, mz - a[1] - dz * t);
+          if (dd < 1.0 && (!best || dd < best.dd)) best = { dd, rg, i, R: w[0], s: w[1] + t * L };
+        }
+        if (!best) continue; d.fit = true; const { R, rg } = best, e = rg.E[best.i], PC = window.PORTE_CNT || (window.PORTE_CNT = { porte: 0, sopra_prima: 0, sopra_dopo: 0, spostate: 0 });
+        const win = j => { const s0 = R.pad + j * R.bw; return [s0 + fw[2] * R.bw, s0 + fw[3] * R.bw]; }, ov = (j, s) => { const [w0, w1] = win(j); return s + d.W / 2 > w0 && s - d.W / 2 < w1; };
+        const noG = R.noG || (R.noG = new Set()); let sc = best.s; PC.porte++;
+        if (R.n && fw) {
+          const O = R.ovl || (R.ovl = new Set()); for (let j = 0; j < R.n; j++) if (ov(j, best.s)) O.add(j);
+          const c = j => R.pad + (j + 0.5) * R.bw; let bj = -1;
+          for (let j = 0; j < R.n; j++) if (!noG.has(j) && Math.abs(c(j) - best.s) < 2 * R.bw && (bj < 0 || Math.abs(c(j) - best.s) < Math.abs(c(bj) - best.s))) bj = j;
+          if (bj >= 0) { sc = c(bj); noG.add(bj); PC.spostate++; } else for (let j = 0; j < R.n; j++) if (ov(j, best.s)) noG.add(j);
+        }
+        (R.dr || (R.dr = [])).push([sc, d.W]); const mid = R.at(sc), ux = e[4], uz = -e[3]; /* e: [dx, dz, L, nx, nz]; the door faces along the outward normal (-uz, ux) = (nx, nz) */
+        d.ax = mid[0] - ux * d.W / 2; d.az = mid[1] - uz * d.W / 2; d.bx = mid[0] + ux * d.W / 2; d.bz = mid[1] + uz * d.W / 2; d.ux = ux; d.uz = uz; d.gy = Math.min(H.ground(d.ax, d.az), H.ground(d.bx, d.bz));
+      }
       let gHi = gmax, gLo = gmin; for (const r of rings) for (const R of r.runs) for (const p of R.sp) { gHi = Math.max(gHi, p[2]); gLo = Math.min(gLo, p[3]); }
       // the height of a floor, from FAC.FMIN to FAC.FMAX (the drawing stretched like the bays): the whole windows fill the facade up to the eaves, nearest to FAC.FL
       const F0 = raised ? bot : gHi, hRef = top - F0 - FAC.EM; let FL = FAC.FL;
@@ -3988,13 +4007,19 @@ function* buildTileGen(T) {
           for (const [s0, s1, g, , bay] of sp) {
             const kl = kLoAt(g); let f = [999, -999];
             if (bay) { const w0 = s0 + fw[2] * bw, w1 = s0 + fw[3] * bw; let rl = Math.min(rlAt(w0), rlAt(w1)); for (const [p, y] of rp) if (p > w0 && p < w1) rl = Math.min(rl, y); const kt = Math.floor((rl - FAC.EM - wHi - F0) / FL + 1e-4); if (kt >= kl) f = [kl, kt]; }
+            let dropped = 0;
+            if (bay && f[0] < 900 && R.dr) { /* a door in this bay: no window on the lowest floor (PORTE_CNT: the bays a door was over before, and the ones with a window under a door after) */
+              const j = Math.round((s0 - R.pad) / bw), PC = window.PORTE_CNT, w0 = s0 + fw[2] * bw, w1 = s0 + fw[3] * bw;
+              if (R.ovl && R.ovl.has(j)) PC.sopra_prima++;
+              if (R.noG && R.noG.has(j)) { dropped = 1; f = f[0] + 1 <= f[1] ? [f[0] + 1, f[1]] : [999, -999]; } else if (R.dr.some(([c, W]) => c + W / 2 > w0 && c - W / 2 < w1)) PC.sopra_dopo++;
+            }
             f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : vOf(F0 + kl * FL + FAC.ZH)];
             const last = grp[grp.length - 1];
             if (last && last[2][0] === f[0] && last[2][1] === f[1] && Math.abs(last[2][2] - f[2]) < 1e-6) last[1] = s1; else grp.push([s0, s1, f]);
             if (bay && kind === 'old' && f[0] < 900) { // stone sills under the painted windows (middle of the bay, 0.9-1 m up the floor), not on the lowest floor: the ground floor is shops
               const sm = (s0 + s1) / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + E[R.ed[q]][2]) q++;
               const e = E[R.ed[q]], ux = e[0] / e[2], uz = e[1] / e[2], [sx, sz] = R.at(sm);
-              for (let k = f[0] - voff + 1; k <= f[1] - voff; k++) addSill(sillB, sx, F0 + FL * k + 0.96 * sc, sz, ux, uz, e[3], e[4], 0.58 * bw / tile);
+              for (let k = f[0] - voff + 1 - dropped; k <= f[1] - voff; k++) addSill(sillB, sx, F0 + FL * k + 0.96 * sc, sz, ux, uz, e[3], e[4], 0.58 * bw / tile);
             }
           }
         }
@@ -4042,22 +4067,10 @@ function* buildTileGen(T) {
         }
       } else { try { polyFill(roofB, outer, holes, top, 10, B.st === 1 ? COL('#a9a6a0') : colOr(B.rcol, () => pcB(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT, 1))); } catch (e) { } }
     }
-    // the entrances of the DBGT (ACC_INT, the middle of the opening): a door on the nearest wall within 1.5 m
-    for (const [X, Z] of d.ai || []) {
-      const x = X / 10, z = Z / 10; let best = null;
-      BLD.each(x - 2, z - 2, x + 2, z + 2, Bb => { if (Bb.lm || Bb.big || Bb.t === 9 || Bb.zb !== undefined || Bb.st === 2) return; const P = Bb.pts; for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1.4) continue; const dd = segDist(x, z, a[0], a[1], c[0], c[1]); if (dd < 1.5 && (!best || dd < best.d)) best = { d: dd, a, c, L, B: Bb }; } });
-      if (!best) continue;
-      const { a, c, L } = best, ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L; let nx = uz, nz = -ux; const s = clamp((x - a[0]) * ux + (z - a[1]) * uz, 0.7, L - 0.7), px = a[0] + ux * s, pz = a[1] + uz * s;
-      if (inPoly(px + nx * 0.2, pz + nz * 0.2, best.B.pts)) { nx = -nx; nz = -nz; }
-      if (inBuilding(px + nx * 0.6, pz + nz * 0.6)) continue; // a party wall
-      const gy = H.ground(px, pz), o = 0.04, k0 = doorB.p.length / 3, col = COL('#4b3a2c');
-      for (const [ss, yy] of [[-0.6, 0], [0.6, 0], [0.6, 2.3], [-0.6, 2.3]]) vtx(doorB, px + ux * ss + nx * o, gy + yy, pz + uz * ss + nz * o, nx, 0, nz, 0, 0, col);
-      if (nx * (-uz) + nz * ux > 0) doorB.i.push(k0, k0 + 1, k0 + 2, k0, k0 + 2, k0 + 3); else doorB.i.push(k0, k0 + 2, k0 + 1, k0, k0 + 3, k0 + 2);
-    }
     for (const k of ['old', 'mod', 'plain']) if (wb[k].i.length) { const g = mkMesh(wb[k], MAT[k], 10, 'cast', G).geometry; g.setAttribute('aoD', new THREE.Float32BufferAttribute(wb[k].ao, 4)); g.setAttribute('facD', new THREE.Float32BufferAttribute(wb[k].fac, 3)); }
     if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
     if (sillB.i.length) T.sill = mkMesh(sillB, MAT.roof, 10, 'cast', G); // shown near the player only (foto3.js)
-    put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast'); put(doorB, MAT.roof, 10);
+    put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
   for (const f of [confineMesh, buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCaserme, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
@@ -4157,7 +4170,22 @@ function layPorte(T) { T.doors = []; for (const [X0, Z0, X1, Z1, k, h] of T.d.dr
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
   T.doors.push({ ax, az, bx, bz, ux, uz, W, k, h, gy });
   WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, door: true, y0: gy - 2, y1: gy + h });
-} }
+}
+  /* the entrances of the DBGT (ACC_INT, the middle of the opening, Carlo 7/11): the same door as the others (T.doors), on the nearest wall within 1.5 m. It goes through the same bay check as the others (centre of the free bay, no window under it). Kept out if a door already stands within 2 m on that wall, or if the wall is a party wall */
+  const PC = window.PORTE_CNT || (window.PORTE_CNT = { porte: 0, sopra_prima: 0, sopra_dopo: 0, spostate: 0 }); PC.dbgt = PC.dbgt || 0; PC.dbgt_doppie = PC.dbgt_doppie || 0;
+  for (const [X, Z] of T.d.ai || []) {
+    const x = X / 10, z = Z / 10; let best = null;
+    BLD.each(x - 2, z - 2, x + 2, z + 2, Bb => { if (Bb.lm || Bb.big || Bb.t === 9 || Bb.zb !== undefined || Bb.st === 2) return; const P = Bb.pts; for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1.4) continue; const dd = segDist(x, z, a[0], a[1], c[0], c[1]); if (dd < 1.5 && (!best || dd < best.d)) best = { d: dd, a, c, L, B: Bb }; } });
+    if (!best) continue;
+    const { a, c, L } = best, wx = (c[0] - a[0]) / L, wz = (c[1] - a[1]) / L; let nx = wz, nz = -wx; const s = clamp((x - a[0]) * wx + (z - a[1]) * wz, 0.7, L - 0.7), px = a[0] + wx * s, pz = a[1] + wz * s;
+    if (inPoly(px + nx * 0.2, pz + nz * 0.2, best.B.pts)) { nx = -nx; nz = -nz; }
+    if (inBuilding(px + nx * 0.6, pz + nz * 0.6)) continue; /* a party wall */
+    if (T.doors.some(q => hyp((q.ax + q.bx) / 2 - px, (q.az + q.bz) / 2 - pz) < 2 && Math.abs(q.ux * wx + q.uz * wz) > 0.8)) { PC.dbgt_doppie++; continue; }
+    const W = 1.1, h = 2.2, ux = nz, uz = -nx, ax = px - ux * W / 2, az = pz - uz * W / 2, bx = px + ux * W / 2, bz = pz + uz * W / 2, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
+    T.doors.push({ ax, az, bx, bz, ux, uz, W, k: 'p', h, gy, dbgt: 1 }); PC.dbgt++;
+    WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -uz, nz: ux, two: true, door: true, y0: gy - 2, y1: gy + h });
+  }
+}
 const DOOR_COL = { p: 0x5b3a26, n: 0x4a3426, b: 0x8f9296 };
 // What stands still in a tile by the thousand (posts, doors, closed gates) goes in one mesh per material: a tile has hundreds of them and each one cost an object or three in every pass of the renderer.
 // addGeo copies a geometry through a matrix, in the buffers of mkMesh; the normals go through the same matrix (rotations only, no scale)
