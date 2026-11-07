@@ -404,7 +404,7 @@ rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2)
     "        P.h = wrapA(P.h + tn_); sp = clamp(m_ / 0.9, 0, 1) * (4.2 + GP.sprint) * (0.45 + 0.55 * Math.max(0, Math.cos(dh_)));\n"
     "      }")
 rep("((K.horn && P.mode === 'car') ? 0.12", "(((K.horn || GP.horn > 0.5) && P.mode === 'car') ? 0.12")
-rep("  if (running && !paused) { acc += dt;", "  pollPad();\n  if (running && !paused) { acc += dt;")
+rep("  if (running && !paused && !TELE) { acc += dt;", "  pollPad();\n  if (running && !paused && !TELE) { acc += dt;")
 rep("<p>Premi <kbd>P</kbd> per riprendere</p>", "<p id=\"padline\" hidden></p><p>Premi <kbd>P</kbd> per riprendere</p>")
 # get out at any speed: you tumble out and the car rolls on
 rep("    const v = P.car; if (v.speed > 5) { toast('Frena prima di scendere'); return; }", "    const v = P.car, fast = v.speed > 6;")
@@ -576,7 +576,7 @@ rep("near.kind === 'police' ? 'ruba l\\'auto della Polizia' :", "near.kind === '
 rep("${near.driver === 'ai' ? (", "${near.caserma && !near.taken && near.driver !== 'ai' ? 'ruba ' + (near.caserma.cc ? 'la gazzella dei Carabinieri' : 'l\\'auto della Polizia Locale') : near.driver === 'ai' ? (")
 rep("}${best.spec.name} · fino a", "}${best.color === CC_COL ? 'Gazzella dei Carabinieri' : best.spec.name} · fino a")
 # busted: you walk out of the door of the caserma
-rep("const n = nearestNode(WALK_NODES, spot.x, spot.z); P.x = N[n][0]; P.z = N[n][1];", "const n = nearestNode(WALK_NODES, spot.x, spot.z); P.x = N[n][0]; P.z = N[n][1]; const cz = kind === 'busted' && CASERME.find(c => c.p === spot); if (cz) { [P.x, P.z] = cz.at(0, 2.4); P.h = Math.atan2(cz.nx, cz.nz); cz.force = true; }")
+rep("P.x = N[n][0]; P.z = N[n][1];", "P.x = N[n][0]; P.z = N[n][1]; const cz = kind === 'busted' && CASERME.find(c => c.p === spot); if (cz) { [P.x, P.z] = cz.at(0, 2.4); P.h = Math.atan2(cz.nx, cz.nz); cz.force = true; }")
 
 # ---- cheat codes in the pause menu: RESPAWN back to the start in Meda with the Ferari, FERARI spawns one
 rep("""function setupWorld(saved) {""", """function startSpot() { // the parking on via Yuri Gagarin in Meda, facing the fountain
@@ -597,11 +597,10 @@ function ferari(x, z, h) { // a red Ferari at (x,z), clearing whatever is parked
   const v = new Vehicle('sport', '#d0141a', x, z, h); v.moved = true; v.y = H.surface(x, z); v.sync(); return v;
 }
 async function cheatRespawn() { // back to the start: via Yuri Gagarin, on foot next to the Ferari, no stars
-  if (P.car) { P.car.driver = null; P.car.boost = false; P.car.inp = { thr: 0, brk: 0, steer: 0, hand: 1 }; P.car = null; }
-  const [sx, sz, h] = startSpot(); await mondoPronto(sx, sz, 420); tileTick(sx, sz, 0, 420);
+  const [sx, sz, h] = startSpot(); await teletrasporto(sx, sz, 420);
   const mine = ferari(sx, sz, h);
   P.x = mine.x + Math.cos(h) * 2.4; P.z = mine.z - Math.sin(h) * 2.4; if (inBuilding(P.x, P.z, 0.5)) { P.x = mine.x - Math.cos(h) * 2.4; P.z = mine.z + Math.sin(h) * 2.4; }
-  P.h = h; P.y = H.surface(P.x, P.z); P.mode = 'foot'; P.model.g.visible = true; P.hp = 100; P.knock = 0; P.vx = P.vz = P.vy = 0;
+  P.h = h; P.y = H.surface(P.x, P.z); P.hp = 100; P.knock = 0; P.vx = P.vz = P.vy = 0;
   W.heat = 0; W.stars = 0; W.busted = 0; W.bustT = 0;
   camInit = false; banner(META.partenza.via, META.partenza.comune);
 }
@@ -778,7 +777,7 @@ rep("if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - 
 rep("    const f = rayCam(px, pz, cx, cz, wy);", "    if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */\n    const f = rayCam(px, pz, cx, cz, wy);")
 rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = H.camCap(cx, cz, fy, Math.max(fy, H.camG(cx, cz, fy)) + ht);")
 rep("  camera.position.copy(camPos);\n  if (shake > 0)", "  if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */\n  camera.position.copy(camPos);\n  if (shake > 0)")
-rep("window.__G = { VIVI,", "window.__G = { FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
+rep("window.__G = { VIVI,", "window.__G = { FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
 # ---- a car off its wheels (Carlo, 1/11): fisica3.js. It steps with no grip, it turns round its waist, on its roof it is finished, he always gets out in a free place
 rep("    if (this.air) { this.stepAir(dt); return; }\n", "    if (this.air || (this.F && this.F.rig)) { this.stepAir(dt); return; }\n")
 rep("    const i = this.inp, k = 1 - 0.0004 * this.speed * dt;\n", "    const i = this.ko ? KO_INP : this.inp, k = 1 - 0.0004 * this.speed * dt;\n")

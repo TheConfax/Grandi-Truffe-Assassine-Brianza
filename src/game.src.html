@@ -1790,16 +1790,29 @@ function step(dt) {
   missionStep(dt);
 }
 
+// a jump across the map (RESPAWN, the hospital, the caserma): the player goes there at once, on foot, and nothing moves until the world round
+// where he lands is laid out. The tiles follow the player: while he stayed far away the frames threw out what mondoPronto had just loaded round the
+// arrival and mondoPronto threw out what was under his feet, without end; and he stood on the old ground of tiles coming and going
+let TELE = null;
+async function teletrasporto(x, z, R) {
+  const io = TELE = {};
+  if (P.car && P.car.heli) { heliExit(); P.air = false; P.land = 0; P.onV = null; } /* out of the helicopter by its own exit, then the jump */
+  if (P.car) { P.car.driver = null; P.car.boost = false; P.car.inp = { thr: 0, brk: 0, steer: 0, hand: 1 }; P.car = null; }
+  P.mode = 'foot'; P.model.g.visible = true; P.x = x; P.z = z; P.y = H.surface(x, z); P.vx = P.vz = P.vy = 0;
+  PZ.lx = null; PZ.vx = PZ.vz = 0; /* the jump is no speed: the tiles are not asked for ahead of it */
+  try { await mondoPronto(x, z, R); tileTick(x, z, 0, R); } finally { if (TELE === io) TELE = null; }
+}
 function endRun(kind) {
   W.busted = kind; const lost = kind === 'busted' ? Math.min(P.money, 100 + W.stars * 60) : Math.min(P.money, 120);
   P.money -= lost; MS.state = 'none'; MS.cool = 6; MS.streak = 0; clearMarker();
   $('fxt').innerHTML = kind === 'busted' ? `ARRESTATO<small>Multa e sequestro: −€ ${lost}</small>` : `AL PRONTO SOCCORSO<small>Spese mediche: −€ ${lost}</small>`;
   $('fx').classList.add('on'); sfxBlip(kind === 'busted' ? 500 : 300, 120, 1.0);
-  setTimeout(() => {
-    $('fx').classList.remove('on');
+  setTimeout(async () => {
     const spot = D.pois.find(p => p.k === (kind === 'busted' ? 'polizia' : 'stazione')) || { x: 0, z: 0 };
-    if (P.car) { P.car.driver = null; P.car.inp = { thr: 0, brk: 0, steer: 0, hand: 1 }; P.car = null; }
-    const n = nearestNode(WALK_NODES, spot.x, spot.z); P.x = N[n][0]; P.z = N[n][1]; P.mode = 'foot'; P.model.g.visible = true; P.hp = 100; P.knock = 0; P.y = 0;
+    const n = nearestNode(WALK_NODES, spot.x, spot.z); await teletrasporto(N[n][0], N[n][1], 260);
+    $('fx').classList.remove('on');
+    P.x = N[n][0]; P.z = N[n][1];
+    P.hp = 100; P.knock = 0; P.vx = P.vz = P.vy = 0; P.y = H.surface(P.x, P.z, H.node(n)); camInit = false;
     W.heat = 0; W.stars = 0; W.busted = 0; W.bustT = 0;
     banner(kind === 'busted' ? 'Polizia Locale' : 'Stazione di Meda', 'DI NUOVO IN STRADA');
   }, 3200);
@@ -1962,7 +1975,7 @@ let last = performance.now(), acc = 0;
 function frame(t) {
   requestAnimationFrame(frame);
   let dt = Math.min(0.1, (t - last) / 1000); last = t;
-  if (running && !paused) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
+  if (running && !paused && !TELE) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { step(1 / 60); acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
   else if (!running) { now += dt; P.h += dt * 0.08; } // slow orbit behind the title
   updVisuals(running && !paused ? dt : 0);
   updCamera(running ? dt : dt * 0.4);

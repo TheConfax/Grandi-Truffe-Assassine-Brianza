@@ -130,7 +130,8 @@ function tileTick(px, pz, budgetMs, force, soloDati) {
     const t1 = performance.now(); tileLay(T); PZ.usa.stesura += performance.now() - t1; k++;
   }
   if (soloDati) return;
-  if (force) { for (const T of cand) { if (T.dist > force) break; buildTile(T); } if (tileTick.cur) { buildTile(tileTick.cur); tileTick.cur = null; } return; }
+  /* the tile left half built by the frames first: a tile finished gives back all the blocks in use (blocchi3.js), those of the half built one too, which then went on writing into blocks no longer its own */
+  if (force) { if (tileTick.cur) { buildTile(tileTick.cur); tileTick.cur = null; } for (const T of cand) { if (T.dist > force) break; buildTile(T); } return; }
   // the meshes: a slice at a time within the budget, the nearest tile first
   const t2 = performance.now();
   while (performance.now() - t0 < bud) {
