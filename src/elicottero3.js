@@ -121,8 +121,6 @@ function heliHurt(e, d) { if (d <= 0 || e.health <= 0) return; e.health = Math.m
 function heliInput(e) { e.inp.col = clamp((GP.thr || 0) - (GP.brk || 0), -1, 1); e.inp.yaw = clamp(GP.yaw || 0, -1, 1); e.inp.fwd = clamp(GP.fwd || 0, -1, 1); e.inp.side = clamp(GP.steer || 0, -1, 1); }
 function heliStep(dt) {
   for (const e of HELIS) heliStep1(e, dt);
-  /* jumped out up in the air: the fall hurts when he reaches the ground */
-  if (P.cadutaEli !== undefined && (P.mode !== 'foot' || P.y <= H.surface(P.x, P.z, P.y) + 0.05)) { const dr = P.cadutaEli - P.y; P.cadutaEli = undefined; if (P.mode === 'foot' && dr > 3) { P.hp -= (dr - 3) * 7; shake = Math.max(shake, 0.6); sfxCrash(Math.min(10, dr)); } }
 }
 function heliStep1(e, dt) {
   if (e.driver === 'player' && P.car !== e) e.driver = null; /* wasted, busted, the cheats: he is no longer in it */
@@ -222,7 +220,7 @@ function heliEnter() {
 function heliExit() {
   const e = P.car, [x, z, ey] = exitSpot(e), alto = e.alto; /* ey: the feet there, a roof as well as the ground */
   P.x = x; P.z = z; P.h = e.h; P.mode = 'foot'; P.model.g.visible = true; e.driver = null; P.car = null; P.vx = P.vz = P.vy = 0;
-  if (alto > 1.5) { P.y = e.y + 0.3; P.knock = Math.sqrt(2 * (alto + 0.3) / 22) + 0.8; P.vx = e.vx * 0.8; P.vz = e.vz * 0.8; P.cadutaEli = P.y; } /* out in the air: he falls */
+  if (alto > 1.5) { P.y = e.y + 0.3; P.air = true; P.onV = null; P.land = 0; P.vx = e.vx; P.vz = e.vz; P.vy = e.vy; } /* out in the air: he falls as any walker falls (salto3.js footVert); what a fall does to him is the walker's physics, not the helicopter's (Carlo 7/11) */
   else P.y = ey;
 }
 /* drawn each frame between the physics steps: the body, the rotors turning, the blur of the rotor, the smoke of a damaged one */
