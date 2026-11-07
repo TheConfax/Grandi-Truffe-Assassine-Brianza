@@ -69,22 +69,24 @@ function capsuleFree(x, z, feet, r = SALTO.r, tol = 0.02, head = SALTO.head) {
   let hit = null;
   WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, s => {
     if (hit || s.off || (s.dyn && !s.on)) return;
-    if (s.y0 !== undefined && (feet + tol >= s.y1 || feet + head <= s.y0)) return;
+    if (s.y0 !== undefined && (feet + tol >= (s.yp ? s.yp.max : s.y1) || feet + head <= s.y0)) return;
     if (s.r) { if (hyp(x - s.x, z - s.z) < r + s.r) hit = s; return; }
-    if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < r) hit = s;
+    if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < r && (!s.yp || feet + tol < wallTopP(s, saltoT(s, x, z)))) hit = s; // a building's wall: up to its roof there
   });
   if (hit) return hit;
-  if (inBuilding(x, z, 0)) return 'edificio';
+  if (inBuildingAt(x, z, feet, 0, Math.max(tol, 0.02) + 0.02)) return 'edificio'; // under a roof; on it he is free
   if (ceilAbove(x, z, feet - 0.1) < feet + head) return 'soffitto';
   for (const o of H.deckAt(x, z)) if (o.top > feet + Math.max(tol, 0.3) && (o.bot !== undefined ? o.bot : o.top - 0.6) < feet + head) return 'soletta';
   for (const v of VEH) if (Math.abs(v.x - x) < 6 && Math.abs(v.z - z) < 6 && feet + head > v.y && vehBox(v, x, z, feet + tol, r)) return v;
   return null;
 }
 
-// ---- the floor under the feet: the ground and the decks (H.surface), a car, a street object with a top. reach: how far above the feet a top is taken
+const saltoT = (s, x, z) => { const ex = s.bx - s.ax, ez = s.bz - s.az; return clamp(((x - s.ax) * ex + (z - s.az) * ez) / (ex * ex + ez * ez || 1), 0, 1); }; // where along a wall a point is nearest
+
+// ---- the floor under the feet: the ground and the decks (H.surface), a roof (world3.js bldFloorAt), a car, a street object with a top. reach: how far above the feet a top is taken
 let saltoFV = null;
 function footFloor(x, z, feet, reach, inAir) {
-  let y = H.surface(x, z, inAir ? feet - 0.5 : feet); saltoFV = null;
+  let y = Math.max(H.surface(x, z, inAir ? feet - 0.5 : feet), bldFloorAt(x, z, feet + reach)); saltoFV = null;
   WALLS.each(x - 1.5, z - 1.5, x + 1.5, z + 1.5, s => { const q = s.sali; if (q && !s.off && (!s.dyn || s.on) && q.top <= feet + reach && q.top > y && hyp(x - s.x, z - s.z) < q.rs) y = q.top; });
   for (const v of VEH) {
     if (Math.abs(v.x - x) > 4 || Math.abs(v.z - z) > 4 || !vehCan(v)) continue;
@@ -113,7 +115,7 @@ function saltoStart(c) {
   const d = hyp(c.sx - P.x, c.sz - P.z); if (d < 0.02) return true; if (P.air && d > 0.9) return false;
   return !saltoAcrossTol(P.x, P.z, c.sx, c.sz, P.y);
 }
-function saltoAcrossTol(ax, az, bx, bz, y) { const L = hyp(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.15)); for (let i = 0; i <= n; i++) { const qx = ax + (bx - ax) * i / n, qz = az + (bz - az) * i / n; if (capsuleFree(qx, qz, Math.max(y, H.surface(qx, qz, y)), SALTO.r, 0.4)) return true; } return false; }
+function saltoAcrossTol(ax, az, bx, bz, y) { const L = hyp(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.15)); for (let i = 0; i <= n; i++) { const qx = ax + (bx - ax) * i / n, qz = az + (bz - az) * i / n; if (capsuleFree(qx, qz, Math.max(y, walkGround(qx, qz, y)), SALTO.r, 0.4)) return true; } return false; }
 
 function planOver(c, g) { // over something and down the far side. c: sx, sz the start, nx, nz the way across, span how far from the start to the far edge, top
   const Sx = c.sx, Sz = c.sz; let top = c.top;
@@ -125,7 +127,7 @@ function planOver(c, g) { // over something and down the far side. c: sx, sz the
       const q = saltoRise(Sx, Sz, Math.min(P.y, y), y, SALTO.r) || saltoAcross(Sx, Sz, ex, ez, y, SALTO.r);
       if (!q) {
         const fl = footFloor(ex, ez, y, 0.02, true), drop = saltoRise(ex, ez, fl, y, SALTO.rLand);
-        if (drop || inWater(ex, ez, fl) || inBuilding(ex, ez, SALTO.rLand)) break;
+        if (drop || inWater(ex, ez, fl) || inBuildingAt(ex, ez, fl, SALTO.rLand, 0.05)) break;
         return { sx: Sx, sz: Sz, ex, ez, y, stand: false, gx: c.gx, gz: c.gz, top, h: Math.atan2(c.nx, c.nz), nx: c.nx, nz: c.nz, v: null };
       }
       if (q.ax !== undefined && isBarrier(q) && q.y1 > top && q.y1 - g <= SALTO.maxBar) { top = q.y1; continue; } // the next piece of the same barrier, a little higher
@@ -144,7 +146,7 @@ function planOn(c, g) { // up onto something and stay there. c: sx, sz, ex, ez, 
 }
 // what is ahead and could be taken, best first
 function tryClimb() {
-  const S = SALTO, stick = Math.hypot(GP.steer, GP.fwd) > 0.15 && padLat, dh = stick ? padTgt : P.h, dx = Math.sin(dh), dz = Math.cos(dh), sp = hyp(P.vx, P.vz), reach = S.reach + sp * S.reachV, g = H.surface(P.x, P.z, P.y), cs = [], seen = new Set();
+  const S = SALTO, stick = Math.hypot(GP.steer, GP.fwd) > 0.15 && padLat, dh = stick ? padTgt : P.h, dx = Math.sin(dh), dz = Math.cos(dh), sp = hyp(P.vx, P.vz), reach = S.reach + sp * S.reachV, g = walkGround(P.x, P.z, P.y), cs = [], seen = new Set();
   const ahead = (qx, qz, d) => d < 0.15 ? 1 : ((qx - P.x) * dx + (qz - P.z) * dz) / d;
   WALLS.each(P.x - reach - 1, P.z - reach - 1, P.x + reach + 1, P.z + reach + 1, s => {
     if (seen.has(s)) return; seen.add(s);
@@ -154,6 +156,14 @@ function tryClimb() {
       const dot = ahead(s.x, s.z, d0); if (dot < S.cone) return;
       const nx = (s.x - P.x) / d0, nz = (s.z - P.z) / d0, st = Math.min(d0, s.r + S.gap), sx = s.x - nx * st, sz = s.z - nz * st;
       cs.push({ d, dot, top, sx, sz, gx: s.x - nx * s.r * 0.6, gz: s.z - nz * s.r * 0.6, ...(s.sali ? { on: true, ex: s.x - nx * s.sali.rs * 0.4, ez: s.z - nz * s.sali.rs * 0.4, endY: top } : { nx, nz, span: st + s.r }) });
+      return;
+    }
+    if (s.yp && !s.two && !s.off) { // a building's wall (Carlo, 7/11): one no higher than a barrier he climbs (a box, a garage) he climbs the same way, up onto its roof
+      const t = saltoT(s, P.x, P.z), cx = s.ax + (s.bx - s.ax) * t, cz = s.az + (s.bz - s.az) * t, d = hyp(cx - P.x, cz - P.z), top = wallTopP(s, t);
+      if ((P.x - cx) * s.nx + (P.z - cz) * s.nz < -0.05 || s.y0 > g + 0.5 || d > reach || top - g > S.maxBar || top <= P.y + 0.1) return; // from outside, under its top
+      const dot = ahead(cx, cz, d); if (dot < S.cone) return;
+      const st = Math.min(d, S.gap), sx = d < S.gap ? P.x : cx + s.nx * st, sz = d < S.gap ? P.z : cz + s.nz * st;
+      for (const k of [0.7, 1.1]) { const qx = cx - s.nx * k, qz = cz - s.nz * k, f = bldFloorAt(qx, qz, top + 1); if (f < top - 1) continue; cs.push({ d, dot, on: true, top: Math.max(top, f), sx, sz, ex: qx, ez: qz, endY: f, gx: cx, gz: cz }); break; }
       return;
     }
     if (!isBarrier(s)) return;
@@ -197,7 +207,7 @@ function climbStep(dt) {
   if (c.v) { const [ex, ez] = vehWorld(c.v, c.lv[0], c.lv[1]); c.ex = ex; c.ez = ez; }
   c.t += dt; P.h = wrapA(P.h + wrapA(c.h - P.h) * (1 - Math.exp(-14 * dt)));
   let t = c.t;
-  if (t < c.run) { const k = t / c.run; P.x = c.x0 + (c.sx - c.x0) * k; P.z = c.z0 + (c.sz - c.z0) * k; if (c.y0 < H.surface(P.x, P.z, c.y0) + 0.4) P.y = H.surface(P.x, P.z, P.y); c.y0r = P.y; P.phase += c.sp * dt * 3; c.ph = 0; return; }
+  if (t < c.run) { const k = t / c.run; P.x = c.x0 + (c.sx - c.x0) * k; P.z = c.z0 + (c.sz - c.z0) * k; if (c.y0 < walkGround(P.x, P.z, c.y0) + 0.4) P.y = walkGround(P.x, P.z, P.y); c.y0r = P.y; P.phase += c.sp * dt * 3; c.ph = 0; return; }
   if (c.y0r === undefined) c.y0r = P.y; t -= c.run; P.x = c.sx; P.z = c.sz;
   const y0 = c.y0r, T1 = c.tRise, T2 = T1 + c.tHold, T3 = T2 + c.tPull, T4 = T3 + c.tOver;
   if (t < T1) { c.ph = 1; const q = t / T1; P.y = y0 + ((c.yHang !== null ? c.yHang : c.y) - y0) * (c.low ? 1 - (1 - q) * (1 - q) : smooth01(q)); return; }
@@ -239,7 +249,7 @@ function footRide() {
 function footThrow(v) { // too fast to stay on: down on the nearest free ground at the side of the car, falling from where he stood (no fall damage is done in the game)
   const [lx, lz] = vehLocal(v, P.x, P.z), S = v.spec, sd = Math.sign(lx || 1), al = clamp(lz, -S.L / 2, S.L / 2);
   for (let d = S.W / 2 + SALTO.rLand + 0.15; d < S.W / 2 + 3.5; d += 0.35) for (const q of [sd, -sd]) {
-    const [x, z] = vehWorld(v, q * d, al), g = H.surface(x, z, P.y); if (g > P.y + 0.2 || inWater(x, z, g) || inBuilding(x, z, SALTO.rLand) || capsuleFree(x, z, g, SALTO.rLand, 0.05)) continue;
+    const [x, z] = vehWorld(v, q * d, al), g = walkGround(x, z, P.y); if (g > P.y + 0.2 || inWater(x, z, g) || inBuildingAt(x, z, g, SALTO.rLand, 0.05) || capsuleFree(x, z, g, SALTO.rLand, 0.05)) continue;
     P.x = x; P.z = z; P.air = true; P.vy = 0; P.vx = P.vz = 0; P.onV = null; P.onL = null; P.land = 0; P.thrown = (P.thrown || 0) + 1; return true;
   }
   return false;
@@ -260,10 +270,10 @@ function saltoCrosses(ax, az, bx, bz, y0, y1) {
   let hit = false; const dx = bx - ax, dz = bz - az; if (Math.abs(dx) + Math.abs(dz) < 1e-6) return false;
   WALLS.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => {
     if (hit || s.r || s.off || (s.dyn && !s.on)) return;
-    if (s.y0 !== undefined && (y1 < s.y0 || y0 > s.y1)) return;
+    if (s.y0 !== undefined && (y1 < s.y0 || y0 > (s.yp ? s.yp.max : s.y1))) return;
     const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
     const t = ((s.ax - ax) * ez - (s.az - az) * ex) / den, u = ((s.ax - ax) * dz - (s.az - az) * dx) / den;
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) hit = true;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && (!s.yp || y0 <= wallTopP(s, u))) hit = true;
   });
   return hit;
 }
@@ -284,7 +294,7 @@ function footGuard(x0, y0, z0, mx, mz) { // last word of the step. x0, y0, z0 wh
 function footGuardXZ(x0, z0, mx, mz) {
   const air = P.air || P.knock > 0, y0 = air ? P.y + 0.05 : P.y + 0.4, y1 = air ? P.y + 1.7 : y0, dd = hyp(P.x - mx, P.z - mz);
   if (air && dd > SALTO.airPush) { const k = SALTO.airPush / dd; P.x = mx + (P.x - mx) * k; P.z = mz + (P.z - mz) * k; } // in the air a push is a slide, not a pop
-  const bad = (x, z) => saltoCrosses(x0, z0, x, z, y0, y1) || (inBuilding(x, z, 0) && !inBuilding(x0, z0, 0)) || (air && ceilOver(x, z, P.y) && !ceilOver(x0, z0, P.y)); // in the air also the edge of a deck, which has no wall
+  const ib = (x, z) => inBuildingAt(x, z, P.y, 0, air ? 0.06 : SALTO.stepUp), bad = (x, z) => saltoCrosses(x0, z0, x, z, y0, y1) || (ib(x, z) && !ib(x0, z0)) || (air && ceilOver(x, z, P.y) && !ceilOver(x0, z0, P.y)); // in the air also the edge of a deck, which has no wall
   if (!bad(P.x, P.z)) return;
   P.guardN = (P.guardN || 0) + 1;
   if (!bad(mx, mz)) { P.x = mx; P.z = mz; return; }
@@ -346,7 +356,7 @@ const SALITA = {
   maxV: 9,            // m/s, the fastest slide
 };
 const salitaMin = (a, b) => a > 0 && b > 0 ? Math.min(a, b) : a < 0 && b < 0 ? Math.max(a, b) : 0; // the smaller of two rises of the same sign, else 0
-function salitaG(x, z, y) { return H.surface(x, z, y + 0.6); }
+function salitaG(x, z, y) { return walkGround(x, z, y + 0.6, 0); } // the ground, the decks and the roofs
 function footSlope(dt) { // on the ground, before the step: P.vx, P.vz are the walk he wants; this bends them to the slope and adds the slide
   const S = SALITA, p = S.passo, y = P.y, g0 = salitaG(P.x, P.z, y), sp = hyp(P.vx, P.vz), R = Math.PI / 180;
   if (sp > 0.05) { // up the way he walks

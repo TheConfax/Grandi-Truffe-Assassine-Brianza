@@ -58,12 +58,13 @@ coll = """
 function collideStatic(p, r, y, veh, skip) { /* skip: what a car rests on (fisica3.js vehAppoggio) */
   let nx = 0, nz = 0, hit = false, fx = 0, fz = 0, pinch = false; const one = (x, z) => { if (!hit) { fx = x; fz = z; } else if (x * fx + z * fz < -0.2) pinch = true; }; /* pinch: pushed from two opposite sides (between two posts narrower than it) */
   WALLS.each(p.x - r - 1, p.z - r - 1, p.x + r + 1, p.z + r + 1, s => {
-    if (s.off || (skip && skip.has(s)) || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh && s.yv !== undefined ? s.yv : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
+    if (s.off || (skip && skip.has(s)) || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh ? (s.yv !== undefined ? s.yv : s.y1) : s.yp ? s.yp.max : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
     if (s.dyn && !s.on) return;
     if (s.r) { const dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz), R = r + s.r; if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; one(dx / d, dz / d); hit = true; } return; }
     if (s.dyn && !s.on) return;
     const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez; if (L2 < 1e-6) return;
     let t = ((p.x - s.ax) * ex + (p.z - s.az) * ez) / L2, cl = false; if (t < 0) { t = 0; cl = true; } else if (t > 1) { t = 1; cl = true; }
+    if (!veh && s.yp && y > wallTopP(s, t)) return; /* on foot a building's wall stands up to its roof, not over it: the walker on a roof walks off its edge (world3.js wallTopP) */
     const cx = s.ax + ex * t, cz = s.az + ez * t, dx = p.x - cx, dz = p.z - cz, d = hyp(dx, dz);
     if (s.two || dx * s.nx + dz * s.nz >= 0 || cl) { if (d < r && d > 1e-6) { const k = (r - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; one(dx / d, dz / d); hit = true; } }
     else if (d < r) { p.x += s.nx * (r + d); p.z += s.nz * (r + d); nx += s.nx; nz += s.nz; one(s.nx, s.nz); hit = true; }
@@ -772,18 +773,18 @@ rep("    const pp = { x: P.x, z: P.z }; collideStatic(pp, 0.4, P.y + 0.4); P.x =
 rep("if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4) continue;", "if (Math.abs(v.x - P.x) > 4 || Math.abs(v.z - P.z) > 4 || v.y - P.y > 1.4 || saltoAbove(v)) continue;")
 rep("else { P.x = cx + dx / d * 2.2; P.z = cz + dz / d * 2.2; } } }\n  } else {\n    P.x = P.car.x;", "else { P.x = cx + dx / d * 2.2; P.z = cz + dz / d * 2.2; } } }\n    if (!P.climb) footGuard(x0_, y0_, z0_, mx_, mz_); else { const g_ = H.surface(P.x, P.z); if (P.y < g_) P.y = g_; } if (!P.air && !P.climb) P.yg = P.y; footRideEnd();\n  } else {\n    P.air = false; P.climb = null; P.onV = null; P.land = 0; P.jumpReq = 0;\n    P.x = P.car.x;")
 rep("else { pm.inner.rotation.x = 0; pm.inner.position.y = 0; animPed(pm, P.phase, K.hand ? 0.9 : 0.55); }", "else saltoPose(pm, dt, K.hand ? 0.9 : 0.55);")
-rep("    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false;\n", "    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y);\n")
+rep("    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false;\n", "    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false; P.y = ey_; /* on the ground, or on the roof he stopped on (fisica3.js exitSpot) */\n")
 rep("if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex;", "if (s.r || s.dyn || s.y0 > cy || s.off || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex;")
 rep("    const f = rayCam(px, pz, cx, cz, wy);", "    if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */\n    const f = rayCam(px, pz, cx, cz, wy);")
 rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = H.camCap(cx, cz, fy, Math.max(fy, H.camG(cx, cz, fy)) + ht);")
 rep("  camera.position.copy(camPos);\n  if (shake > 0)", "  if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */\n  camera.position.copy(camPos);\n  if (shake > 0)")
-rep("window.__G = { VIVI,", "window.__G = { FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
+rep("window.__G = { VIVI,", "window.__G = { FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
 # ---- a car off its wheels (Carlo, 1/11): fisica3.js. It steps with no grip, it turns round its waist, on its roof it is finished, he always gets out in a free place
 rep("    if (this.air) { this.stepAir(dt); return; }\n", "    if (this.air || (this.F && this.F.rig)) { this.stepAir(dt); return; }\n")
 rep("    const i = this.inp, k = 1 - 0.0004 * this.speed * dt;\n", "    const i = this.ko ? KO_INP : this.inp, k = 1 - 0.0004 * this.speed * dt;\n")
 rep("class Vehicle {\n", "const KO_INP = { thr: 0, brk: 0, steer: 0, hand: 0, lean: 0 }; /* a car finished on its roof: the controls do nothing */\nclass Vehicle {\n")
 rep("m.g.rotation.z = this.F ? this.ar : 0;\n", "m.g.rotation.z = this.F ? this.ar : 0;\n    if (this.F && this.F.rig) { const ca_ = Math.cos(this.ar), cp_ = Math.cos(this.ap), up_ = ca_ * cp_; if (up_ < FIS.pivHi) { const k_ = fisPivot(this.F, up_), lx_ = k_ * Math.sin(this.ar), lz_ = -k_ * ca_ * Math.sin(this.ap), sh_ = Math.sin(this.h), ch_ = Math.cos(this.h); m.g.position.x += lx_ * ch_ + lz_ * sh_; m.g.position.z += lz_ * ch_ - lx_ * sh_; m.g.position.y += k_ * (1 - up_); } } /* a body well over turns round its waist; on its wheels (a steep bank, a jump) round the point under them, as fisVert turns it (Carlo 6/11: the car went into the bank) */\n")
-rep("let x = v.x + fz * 1.6, z = v.z - fx * 1.6; if (inBuilding(x, z, 0.4)) { x = v.x - fz * 1.6; z = v.z + fx * 1.6; }", "const [x, z] = exitSpot(v);")
+rep("let x = v.x + fz * 1.6, z = v.z - fx * 1.6; if (inBuilding(x, z, 0.4)) { x = v.x - fz * 1.6; z = v.z + fx * 1.6; }", "const [x, z, ey_] = exitSpot(v);")
 rep("    toast(`${best.stolen ? (isTwo(best)", "    if (!best.ko) toast(`${best.stolen ? (isTwo(best)")
 rep("v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal;", "v.inp.thr > 0.3 && v.health > 0 && P.nitro > 1 && !v.spec.pedal && !v.ko;")
 rep("const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen,", "const live = (!!v.driver || v.fariFino > now) && v.health > 0 && !v.exploded && !v.fallen && !v.ko,") # (FARI: a little after he gets out)
@@ -828,6 +829,46 @@ rep("const [cf, cb] = this.circles(), yf = H.surface(cf[0], cf[1], this.y), yb =
 rep("propHits(v); barHits(v); v.collide();", "propHits(v); barHits(v); v.collide(x0_, z0_);")
 rep("      else { P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; P.x += P.vx * dt;", "      else { P.vx = Math.sin(P.h) * sp; P.vz = Math.cos(P.h) * sp; footSlope(dt); P.x += P.vx * dt;")
 rep("    P.air = false; P.climb = null; P.onV = null; P.land = 0; P.jumpReq = 0;\n", "    P.air = false; P.climb = null; P.onV = null; P.land = 0; P.jumpReq = 0; P.slx = P.slz = 0;\n")
-rep("v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y);", "v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y); if (v.speed > FARI.minV) v.fariFino = now + FARI.dopo; /* the lights stay on a little (extras.js FARI) */")
+rep("v.driver = null; v.boost = false; P.y = ey_;", "v.driver = null; v.boost = false; P.y = ey_; if (v.speed > FARI.minV) v.fariFino = now + FARI.dopo; /* the lights stay on a little (extras.js FARI) */")
 rep("window.__G = { acquaIn,", "window.__G = { FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn,")
+# ---- the helicopter (Carlo, 7/11): elicottero3.js. Only the pad; flown it is P.car (P.mode 'car'), so camera, radio, map and HUD follow it; its physics is its own
+rep("function step(dt) {", open(os.path.join(HERE, 'elicottero3.js'), encoding='utf-8').read() + "\nfunction step(dt) {")
+rep("  if (P.mode === 'car') {\n    const v = P.car; v.inp.thr = Math.max(", "  if (P.mode === 'car' && P.car.heli) heliInput(P.car);\n  else if (P.mode === 'car') {\n    const v = P.car; v.inp.thr = Math.max(")
+rep("  // ----- train\n", "  heliStep(dt);\n  // ----- train\n")
+rep("    if (P.knock > 0) return;\n    let best = null, bd = 4.2;", "    if (P.knock > 0) return;\n    if (heliEnter()) return;\n    let best = null, bd = 4.2;")
+rep("  } else {\n    const v = P.car, fast = v.speed > 6;", "  } else if (P.car.heli) heliExit();\n  else {\n    const v = P.car, fast = v.speed > 6;")
+rep("  if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2,", "  if (v && v.heli) heliSound(v, t, m);\n  else if (v) { const s = Math.abs(v.fwdSpeed), gs = v.maxV / 4.2,")
+rep("    if (!inCar && camPitch) {", "    if (inCar && P.car.heli) { const d0_ = 12 + sp * 0.08, h0_ = 3.4 + sp * 0.03, R_ = hyp(d0_, h0_), ph_ = Math.min(HELI.camZen, Math.atan2(h0_, d0_) + camPitch); dist = R_ * Math.cos(ph_); ht = R_ * Math.sin(ph_); } /* the helicopter: farther and higher, the rotor in view; the right stick turns the view on a sphere round it, down to straight over it (Carlo 7/11) */\n    if (!inCar && camPitch) {")
+# the camera of the helicopter (Carlo 7/11): moving it looks the way it goes (the stick held diagonally, it flies diagonally), still or nearly behind the nose; never from the front when it flies backwards
+rep("let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }", "let hx = fx, hz = fz; if (inCar && !P.car.heli && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }\n    if (inCar && P.car.heli) { const a_ = heliCamDir(P.car); hx = Math.sin(a_); hz = Math.cos(a_); }")
+rep("rev = P.car.fwdSpeed < -2;", "rev = !P.car.heli && P.car.fwdSpeed < -2;")
+rep("  { const s_ = Math.abs(P.car.speed),", "  { const s_ = P.car.heli ? HELI.camS : Math.abs(P.car.speed),")
+rep("camPitch *= Math.exp(-k * dt);", "camPitch *= Math.exp(-(P.car.heli ? HELI.camPitchK : k) * dt);")
+rep("!inCar && camFree ? CAMF.posK : 7.5", "!inCar && camFree ? CAMF.posK : inCar && P.car.heli ? HELI.camK : 7.5")
+rep("(inCar ? camPitch * 6 : 0)", "(inCar && !P.car.heli ? camPitch * 6 : 0)")
+rep("look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));", "const ld_ = inCar ? (P.car.heli ? 5 * clamp(1 - camPitch / 1.2, 0, 1) : 5) : 2; look = new THREE.Vector3(px + hx * ld_, gy + (inCar ? 1.3 : 1.5), pz + hz * ld_);")
+rep("  camera.lookAt(camLook);", "  camera.lookAt(camLook);\n  if (inCar && P.car.heli && camMode === 0) camera.rotateZ(-P.car.roll * HELI.camRoll); /* banking, the view leans a little with it */")
+# fog thins out with the height of the view (Carlo 7/11: from the helicopter everything went dark past a kilometre while the lights showed through)
+rep("scene.fog.near = lerp(lerp(160, 40, WX.rain), 2, WX.fog);", "scene.fog.near = lerp(lerp(160, 40, WX.rain), 2, WX.fog);\n  { const k_ = nebbiaQuota(); scene.fog.far *= k_; scene.fog.near *= k_; }")
+rep("  snapOf(P, INTERP_KEYS);\n}", "  snapOf(P, INTERP_KEYS);\n  for (const e of HELIS) snapOf(e, INTERP_HELI);\n}")
+rep("  interpMix(P, a);\n  return INTERP_DONE;", "  interpMix(P, a);\n  for (const e of HELIS) interpMix(e, a);\n  return INTERP_DONE;")
+rep("const INTERP_VEH = [", "const INTERP_HELI = ['x', 'y', 'z', 'h', 'pitch', 'roll'], INTERP_VEH = [")
+rep("function updVisuals(dt) {\n  const cx = camera.position.x, cz = camera.position.z;", "function updVisuals(dt) {\n  heliDraw(dt);\n  const cx = camera.position.x, cz = camera.position.z;")
+rep("m2.y = mine.y; m2.moved = true; mine.remove(); m2.sync();\n    }\n  }\n}", "m2.y = mine.y; m2.moved = true; mine.remove(); m2.sync();\n    }\n  }\n  heliSetup();\n}")
+rep("const slow = P.mode === 'foot' || P.car.speed < 2;", "const slow = P.mode === 'foot' || (P.car.speed < 2 && !(P.car.heli && P.car.alto > 2)); /* hovering up in the air nobody arrests him */")
+rep("headSpot.intensity = v && v.health > 0 ?", "headSpot.intensity = v && v.health > 0 && !v.heli ?")
+rep("interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100;", "interpSnap(); step(1 / 60); if (DEBUG) for (const v of [...VEH, ...HELIS]) if (v.health < 100 && !v.exploded) v.health = 100;")
+# the pad in the helicopter: R2 up, L2 down, L1/R1 turn, left stick tilts, square fires (not yet), d-pad right the searchlight (not yet), cross and circle free
+rep("const padKind = () => P.mode !== 'car' || !P.car ? 'foot' :", "const padKind = () => P.mode !== 'car' || !P.car ? 'foot' : P.car.heli ? 'heli' :")
+rep("  return `${n.r2} gas ·", "  if (kind === 'heli') return `${n.r2} sale · ${n.l2} scende · levetta sinistra inclina (avanti, indietro, di lato) · ${n.l1} ${n.r1} gira · ${n.t} sali/scendi · croce sinistra radio · ${com}`;\n  return `${n.r2} gas ·")
+rep("GP.lookx = GP.looky = GP.back = 0;", "GP.lookx = GP.looky = GP.back = GP.yaw = 0;", 2)
+rep("  GP.horn = kind === 'car' || kind === 'moto' ? b(10) : 0;", "  GP.horn = kind === 'car' || kind === 'moto' ? b(10) : 0;\n  GP.yaw = kind === 'heli' ? b(4) - b(5) : 0;")
+rep("  if (E[8] && P.mode === 'car')", "  if (E[8] && P.mode === 'car' && kind !== 'heli')")
+rep("  if (veh) padTap(15, down(15), dt, () => ni(kind === 'bici' ? 'Fanale' : 'Fari')", "  if (kind === 'heli') padTap(15, down(15), dt, () => ni('Faro'), () => ni('Faro')); else if (veh) padTap(15, down(15), dt, () => ni(kind === 'bici' ? 'Fanale' : 'Fari')")
+rep("  if (veh) {\n    if (E[3]) { K.use = true;", "  if (kind === 'heli') {\n    if (E[3]) { K.use = true; (GP.hold[3] || (GP.hold[3] = { t: 0, on: false, done: false })).block = true; }\n    if (E[2]) ni('Sparare');\n  } else if (veh) {\n    if (E[3]) { K.use = true;")
+# the camera behind the helicopter: a wall whose top is under both the helicopter and the camera is not between them (rayCam looked at the plan only, and over the town it kept pulling the view in and letting it go, Carlo 7/11)
+rep("function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */\n  let best = 1;", "function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */\n  const lo_ = P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity; /* from the helicopter: the walls whose top is under both ends do not count */\n  let best = 1;")
+rep("if (s.r || s.dyn || s.y0 > cy || s.off || (P.mode === 'foot' && saltoLowBar(s))) return;", "if (s.r || s.dyn || s.y0 > cy || s.off || (s.y0 !== undefined && (s.bt ? s.y1 - 3 : s.y1) < lo_) || (P.mode === 'foot' && saltoLowBar(s))) return;")
+rep("window.__G = { FARI,", "window.__G = { HELIS, HELI, heliStep, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI,")
+rep("const v = P.mode === 'car' ? P.car : null; if (!v || bumpT > 0 || v.speed < 7) return;", "const v = P.mode === 'car' ? P.car : null; if (!v || v.heli || bumpT > 0 || v.speed < 7) return;")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)

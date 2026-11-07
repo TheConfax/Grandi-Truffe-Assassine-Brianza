@@ -146,10 +146,10 @@ function layMuri(T) {
     T.bld.push(rec);
     if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
       if (COTTURA) BUILDINGS.push(rec); BLDR.add(bb[0], bb[1], bb[2], bb[3], rec); const y1 = B.zt + 3;
-      for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1 }); } }
+      for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1, yp: wallTopProfile(rec, a, c, isHole) }); } } /* yp: its top for the walker, up to the roof (wallTopP) */
       continue;
     }
-    if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); { const w = { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }; WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, w); (rec.walls || (rec.walls = [])).push(w); } } continue; }
+    if (B.t === 9) { BLDT.add(bb[0], bb[1], bb[2], bb[3], rec); for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); { const w = { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }; WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, w); (rec.walls || (rec.walls = [])).push(w); } } continue; }
     if (COTTURA) BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
     if (COTTURA && B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
     if (B.g === 4) continue; // a water tower: its plan is the tank up in the air, the solid is its shaft (paesaggio3.js lsTower)
@@ -159,7 +159,7 @@ function layMuri(T) {
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue;
         let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; }
-        const w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1 }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
+        const w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1, yp: wallTopProfile(rec, a, c, isHole) }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
       }
     }
   }
@@ -233,6 +233,55 @@ function inBuilding(x, z, m = 0) {
   BLD.each(x - m, z - m, x + m, z + m, b => { if (!f && x >= b.bb[0] - m && x <= b.bb[2] + m && z >= b.bb[1] - m && z <= b.bb[3] + m && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) f = true; });
   if (!f && m > 0) WALLS.each(x - m, z - m, x + m, z + m, s => { if (!s.r && !s.two && !s.deckw && segDist(x, z, s.ax, s.az, s.bx, s.bz) < m) f = true; });
   return f;
+}
+// ---- a building as a floor for the walker (Carlo, 7/11: "un tetto è un posto dove si sta in piedi"): its roof as the tile draws it, from the data
+// the tile has (the DBGT top of the walls zt, the roof planes from the DSM rf, flat where there are none, the tile's own pitch where it draws one), and
+// the slab of a tettoia. A ruin with no roof (st 2) has nothing on top. Only the walker stands on these: cars and their physics do not
+const BLDT = new Grid(24); // the tettoie (t 9): a slab on posts, a floor from above only
+function bldPitch(B) { // the pitch the tile draws over a volume with no roof of its own: its height, else 0 (buildTileGen)
+  if (B._ph !== undefined) return B._ph; const P = B.pts, t = B.t, area = Math.abs(sArea(P));
+  const ok = !roofPlanes(B) && B.rk !== 4 && !B.holes.length && P.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(P) || (t === 10 && P.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && B.h >= 5;
+  return (B._ph = ok ? Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12) : 0);
+}
+function bldRoofY(B, x, z) { // the roof over a point of the plan (the point inside it), or null
+  if (B.st === 2 || B.g === 4) return null;
+  if (B.t === 9) return B.ctop !== undefined ? B.ctop : (B.ctop = Math.max(...B.pts.map(p => H.ground(p[0], p[1]))) + Math.max(B.h, 3.8));
+  const top = B.gtop !== undefined ? B.gtop : (B.gtop = bldTop(B));
+  if (roofPlanes(B)) return top + roofAt(B, x, z);
+  const rh = bldPitch(B); if (!rh) return top;
+  const [cx, cz] = B._pc || (B._pc = centroid(B.pts)), P = B.pts; // the pyramid: from the eaves up to the middle of the plan
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], c = P[(i + 1) % P.length], d = (c[0] - a[0]) * (cz - a[1]) - (c[1] - a[1]) * (cx - a[0]); if (Math.abs(d) < 1e-9) continue;
+    const wm = ((c[0] - a[0]) * (z - a[1]) - (c[1] - a[1]) * (x - a[0])) / d, wa = ((c[0] - x) * (cz - z) - (c[1] - z) * (cx - x)) / d, wc = 1 - wm - wa;
+    if (wm >= -1e-6 && wa >= -1e-6 && wc >= -1e-6) return top + rh * wm;
+  }
+  return top;
+}
+const inPlan = (b, x, z, m = 0) => x >= b.bb[0] - m && x <= b.bb[2] + m && z >= b.bb[1] - m && z <= b.bb[3] + m && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h));
+function bldFloorAt(x, z, y) { // the highest roof or slab at (x, z) not above y, else -Infinity
+  let f = -Infinity; const one = b => { if (!inPlan(b, x, z)) return; const r = bldRoofY(b, x, z); if (r !== null && r <= y && r > f) f = r; };
+  BLD.each(x, z, x, z, one); BLDR.each(x, z, x, z, one); BLDT.each(x, z, x, z, one);
+  return f;
+}
+const walkGround = (x, z, y, reach = 0.05) => Math.max(H.surface(x, z, y), bldFloorAt(x, z, y + reach)); // what the walker stands on: the ground, the decks, the roofs
+// in a building at this height: inside its plan under its roof (tol over the feet), or within m of a wall of it that stands over the feet
+function inBuildingAt(x, z, y, m = 0, tol = 0.02) {
+  let f = false;
+  BLD.each(x - m, z - m, x + m, z + m, b => { if (f || !inPlan(b, x, z, m)) return; const r = bldRoofY(b, x, z); if (r === null || r > y + tol) f = true; });
+  if (!f && m > 0) WALLS.each(x - m, z - m, x + m, z + m, s => { if (f || s.r || s.two || s.deckw || s.off) return; const L2 = (s.bx - s.ax) ** 2 + (s.bz - s.az) ** 2 || 1, t = clamp(((x - s.ax) * (s.bx - s.ax) + (z - s.az) * (s.bz - s.az)) / L2, 0, 1); if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < m && (s.y1 === undefined || wallTopP(s, t) > y + tol) && (s.y0 === undefined || s.y0 < y + 1.75)) f = true; });
+  return f;
+}
+// the top of a wall the walker meets at t along it (0 at a, 1 at b): a building's wall goes up to its roof (yp: [t, top] where the roof changes),
+// the rest as drawn (y1). Cars meet their own (collideStatic yv, y1)
+function wallTopP(s, t) {
+  const p = s.yp; if (!p) return s.y1;
+  for (let k = 1; k < p.length; k++) if (t <= p[k][0] || k === p.length - 1) { const [t0, y0] = p[k - 1], [t1, y1] = p[k]; return y0 + (y1 - y0) * clamp((t - t0) / ((t1 - t0) || 1), 0, 1); }
+  return p[0][1];
+}
+function wallTopProfile(B, a, c, isHole) { // [t, top] along the side a to c of a volume, as the tile draws its top; and the highest
+  const top = B.gtop !== undefined ? B.gtop : (B.gtop = bldTop(B)), pl = roofPlanes(B) && !isHole && B.st !== 2;
+  const p = (pl ? roofBreaks(B, a, c) : [0, 1]).map(t => [t, top + (pl ? roofAt(B, a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t) : 0)]);
+  p.max = Math.max(...p.map(q => q[1])); return p;
 }
 function onFoot(x, z) { let f = false; ROADSEG.each(x - 6, z - 6, x + 6, z + 6, s => { if (!f && s.r.c === 6 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5) f = true; }); return f; }
 function onPlatform(x, z) { let f = false; PLATG.each(x, z, x, z, s => { if (!f && x >= s.bb[0] && x <= s.bb[2] && z >= s.bb[1] && z <= s.bb[3] && inPoly(x, z, s.o) && !s.k.some(h => inPoly(x, z, h))) f = true; }); return f; }
@@ -2241,8 +2290,8 @@ function* buildTileGen(T) {
       if (B.st) { kind = 'plain'; wallCol = B.st !== 1 ? pcB(['#a39a8b', '#9c9284', '#aaa08e']) : COL('#b9b6ae'); } // a ruin: bare stone and brick; a shell: concrete
       const b = wb[kind], tile = kind === 'old' ? 3.4 : kind === 'mod' ? 4.2 : 4;
       // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
-      const planes = roofPlanes(B), flatDbgt = B.rk === 4;
-      const pitched = planes ? true : !flatDbgt && !holes.length && outer.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(outer) || (t === 10 && outer.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && h >= 5;
+      const planes = roofPlanes(B);
+      const pitched = planes ? true : bldPitch(B) > 0; /* the same pitch the walker stands on (bldRoofY) */
       if (!b.ao) { b.ao = []; b.fac = []; }
       // the facades (FAC): the bays along each wall and the ground under each window first, then the floors F0 + FL k the same all round the house.
       // A wall is a run of sides that go on nearly straight (the DBGT draws a facade in many short sides): its bays run along all of it
@@ -2323,7 +2372,7 @@ function* buildTileGen(T) {
       if (B.st === 2) continue;
       if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
       else if (pitched) {
-        const [cx, cz] = centroid(outer), rh = Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
+        const [cx, cz] = centroid(outer), rh = bldPitch(B), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
         for (let i = 0; i < outer.length; i++) {
           const a = outer[i], c = outer[(i + 1) % outer.length];
           const v1 = new THREE.Vector3(a[0], top, a[1]), v2 = new THREE.Vector3(c[0], top, c[1]), v3 = new THREE.Vector3(cx, top + rh, cz);

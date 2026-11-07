@@ -24,7 +24,10 @@ MAT.lampHead.emissive = new THREE.Color(0xffd890);
 const headSpot = new THREE.SpotLight(0xfff0d0, 0, 70, 0.55, 0.6, 1.2); headSpot.castShadow = false; scene.add(headSpot, headSpot.target);
 // glare: halos round street lamps and car lights (brake and reverse lights too), stars, moon and the sun's glow
 const haloTex = glowTex([[0, 1], [0.1, 0.9], [0.3, 0.3], [0.6, 0.08], [1, 0]].map(([t, a]) => [t, 255 * a, 255 * a, 255 * a]));
-const glowMat = (size, col, extra) => new THREE.PointsMaterial(Object.assign({ map: haloTex, size, color: col, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }, extra));
+/* the halos are added light: in the fog they fade out (times 1 - fog) as the things they belong to fade into it, they do not shine through it (Carlo 7/11) */
+const GLOW_FOG = (() => { const s = THREE.ShaderChunk.fog_fragment, t = s.replace(/gl_FragColor\.rgb = mix\([^;]*;/, 'gl_FragColor.rgb *= 1.0 - fogFactor;'); return t !== s ? t : null; })();
+const glowFog = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', GLOW_FOG); };
+const glowMat = (size, col, extra) => { const m = new THREE.PointsMaterial(Object.assign({ map: haloTex, size, color: col, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: !!GLOW_FOG }, extra)); if (GLOW_FOG && m.fog) m.onBeforeCompile = glowFog; return m; };
 const LAMPGLOW_MAT = glowMat(5, 0xffd49a);
 const CARGLOW = [2.4, 1.5].map(size => { // [heads, tails]: one Points each, refilled every frame from the cars on screen
   const g = new THREE.BufferGeometry(), n = 800; g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setDrawRange(0, 0);
