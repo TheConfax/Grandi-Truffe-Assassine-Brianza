@@ -1,0 +1,6 @@
+{
+ "nota": "Correzioni locali dei tag OSM, lette da src/build_data.py subito dopo la lettura del file OSM, prima di ogni regola (docs/superfici.md). OSM online non si tocca. Ognuna: way (id OSM), tag (i tag da mettere; null toglie il tag), motivo, fonte. Solo per errori visti dal vero o in foto.",
+ "correzioni": [
+  {"way": "96763937", "tag": {"surface": "asphalt"}, "motivo": "via Monte Rosa (Seveso): OSM dice surface=sett su tutta la via, dal vero e' asfalto", "fonte": "Carlo 6/11, visto dal vero"}
+ ]
+}

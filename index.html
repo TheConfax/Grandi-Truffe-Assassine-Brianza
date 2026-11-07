@@ -149,7 +149,7 @@ body:not(.debug) .dbg { display: none !important; }
       <div class="dbg"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>
     </div>
     <button id="go" type="button">ACCENDI IL MOTORE</button>
-    <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale; <a href="https://www.radiomaria.it" target="_blank" rel="noopener">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href="https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy" target="_blank" rel="noopener">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href="https://www.mapillary.com" target="_blank" rel="noopener">Mapillary</a> e i suoi contributori, CC BY-SA 4.0.</p>
+    <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale; <a href="https://www.radiomaria.it" target="_blank" rel="noopener">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href="https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy" target="_blank" rel="noopener">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href="https://www.mapillary.com" target="_blank" rel="noopener">Mapillary</a> e i suoi contributori, CC BY-SA 4.0. Foto delle superfici (asfalto, prato, pavimenti, ghiaia, terra, ciottoli, intonaco): <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a> e <a href="https://ambientcg.com" target="_blank" rel="noopener">ambientCG</a>, CC0.</p>
     <p class="ver" id="ver" hidden></p>
   </div>
 </div>
@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo elicottero · dopo 1a2334f · assemblato 07/11 16:29 · porta ' + location.port;
+    const txt = 'locale · ramo elicottero · dopo 3bbf3fd · assemblato 07/11 17:33 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -450,12 +450,13 @@ groundTex.repeat.set(1400, 1400); ground.rotation.x = -Math.PI / 2; ground.posit
 function collideStatic(p, r, y, veh, skip) { /* skip: what a car rests on (fisica3.js vehAppoggio) */
   let nx = 0, nz = 0, hit = false, fx = 0, fz = 0, pinch = false; const one = (x, z) => { if (!hit) { fx = x; fz = z; } else if (x * fx + z * fz < -0.2) pinch = true; }; /* pinch: pushed from two opposite sides (between two posts narrower than it) */
   WALLS.each(p.x - r - 1, p.z - r - 1, p.x + r + 1, p.z + r + 1, s => {
-    if (s.off || (skip && skip.has(s)) || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh && s.yv !== undefined ? s.yv : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
+    if (s.off || (skip && skip.has(s)) || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh ? (s.yv !== undefined ? s.yv : s.y1) : s.yp ? s.yp.max : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
     if (s.dyn && !s.on) return;
     if (s.r) { const dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz), R = r + s.r; if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; one(dx / d, dz / d); hit = true; } return; }
     if (s.dyn && !s.on) return;
     const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez; if (L2 < 1e-6) return;
     let t = ((p.x - s.ax) * ex + (p.z - s.az) * ez) / L2, cl = false; if (t < 0) { t = 0; cl = true; } else if (t > 1) { t = 1; cl = true; }
+    if (!veh && s.yp && y > wallTopP(s, t)) return; /* on foot a building's wall stands up to its roof, not over it: the walker on a roof walks off its edge (world3.js wallTopP) */
     const cx = s.ax + ex * t, cz = s.az + ez * t, dx = p.x - cx, dz = p.z - cz, d = hyp(dx, dz);
     if (s.two || dx * s.nx + dz * s.nz >= 0 || cl) { if (d < r && d > 1e-6) { const k = (r - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; one(dx / d, dz / d); hit = true; } }
     else if (d < r) { p.x += s.nx * (r + d); p.z += s.nz * (r + d); nx += s.nx; nz += s.nz; one(s.nx, s.nz); hit = true; }
@@ -1759,7 +1760,7 @@ function hardAt(x, z) {
   const k = H.kind(x, z); if (k === 'road' || k === 'side' || k === 'plat') return true;
   const T = TILES[tileOf(x, z)]; if (!T) return false;
   if (!T.hardP) { const d = T.d, mk = q => { const o = dec(q.p); return { o, k: (q.k || []).map(dec), b: bbox(o) }; };
-    T.hardP = [...(d.a || []).filter(a => a.t !== 5 && a.t !== 6 && a.t !== 18 && !(a.t <= 3 || a.t >= 11 && a.t !== 17)), ...(d.cv || []), ...(d.pz || []), ...(d.ft || []), ...(d.as || [])].filter(q => q.p).map(mk); }
+    T.hardP = [...(d.a || []).filter(a => a.t !== 5 && a.t !== 6 && a.t !== 18 && !(a.t <= 3 || a.t >= 11 && a.t !== 17)), ...(d.cv || []), ...(d.pz || []), ...(d.ft || []), ...(d.as || [])].filter(q => q.p && q.m !== 'p').map(mk); } /* (a yard of grass, src/fondi.py, is no hard standing) */
   for (const q of T.hardP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
   return false;
 }
@@ -1804,10 +1805,10 @@ function layMuri(T) {
     T.bld.push(rec);
     if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
       if (COTTURA) BUILDINGS.push(rec); BLDR.add(bb[0], bb[1], bb[2], bb[3], rec); const y1 = B.zt + 3;
-      for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1 }); } }
+      for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1, yp: wallTopProfile(rec, a, c, isHole) }); } } /* yp: its top for the walker, up to the roof (wallTopP) */
       continue;
     }
-    if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); { const w = { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }; WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, w); (rec.walls || (rec.walls = [])).push(w); } } continue; }
+    if (B.t === 9) { BLDT.add(bb[0], bb[1], bb[2], bb[3], rec); for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); { const w = { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }; WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, w); (rec.walls || (rec.walls = [])).push(w); } } continue; }
     if (COTTURA) BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
     if (COTTURA && B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
     if (B.g === 4) continue; // a water tower: its plan is the tank up in the air, the solid is its shaft (paesaggio3.js lsTower)
@@ -1817,7 +1818,7 @@ function layMuri(T) {
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue;
         let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; }
-        const w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1 }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
+        const w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1, yp: wallTopProfile(rec, a, c, isHole) }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
       }
     }
   }
@@ -1891,6 +1892,55 @@ function inBuilding(x, z, m = 0) {
   BLD.each(x - m, z - m, x + m, z + m, b => { if (!f && x >= b.bb[0] - m && x <= b.bb[2] + m && z >= b.bb[1] - m && z <= b.bb[3] + m && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) f = true; });
   if (!f && m > 0) WALLS.each(x - m, z - m, x + m, z + m, s => { if (!s.r && !s.two && !s.deckw && segDist(x, z, s.ax, s.az, s.bx, s.bz) < m) f = true; });
   return f;
+}
+// ---- a building as a floor for the walker (Carlo, 7/11: "un tetto è un posto dove si sta in piedi"): its roof as the tile draws it, from the data
+// the tile has (the DBGT top of the walls zt, the roof planes from the DSM rf, flat where there are none, the tile's own pitch where it draws one), and
+// the slab of a tettoia. A ruin with no roof (st 2) has nothing on top. Only the walker stands on these: cars and their physics do not
+const BLDT = new Grid(24); // the tettoie (t 9): a slab on posts, a floor from above only
+function bldPitch(B) { // the pitch the tile draws over a volume with no roof of its own: its height, else 0 (buildTileGen)
+  if (B._ph !== undefined) return B._ph; const P = B.pts, t = B.t, area = Math.abs(sArea(P));
+  const ok = !roofPlanes(B) && B.rk !== 4 && !B.holes.length && P.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(P) || (t === 10 && P.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && B.h >= 5;
+  return (B._ph = ok ? Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12) : 0);
+}
+function bldRoofY(B, x, z) { // the roof over a point of the plan (the point inside it), or null
+  if (B.st === 2 || B.g === 4) return null;
+  if (B.t === 9) return B.ctop !== undefined ? B.ctop : (B.ctop = Math.max(...B.pts.map(p => H.ground(p[0], p[1]))) + Math.max(B.h, 3.8));
+  const top = B.gtop !== undefined ? B.gtop : (B.gtop = bldTop(B));
+  if (roofPlanes(B)) return top + roofAt(B, x, z);
+  const rh = bldPitch(B); if (!rh) return top;
+  const [cx, cz] = B._pc || (B._pc = centroid(B.pts)), P = B.pts; // the pyramid: from the eaves up to the middle of the plan
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], c = P[(i + 1) % P.length], d = (c[0] - a[0]) * (cz - a[1]) - (c[1] - a[1]) * (cx - a[0]); if (Math.abs(d) < 1e-9) continue;
+    const wm = ((c[0] - a[0]) * (z - a[1]) - (c[1] - a[1]) * (x - a[0])) / d, wa = ((c[0] - x) * (cz - z) - (c[1] - z) * (cx - x)) / d, wc = 1 - wm - wa;
+    if (wm >= -1e-6 && wa >= -1e-6 && wc >= -1e-6) return top + rh * wm;
+  }
+  return top;
+}
+const inPlan = (b, x, z, m = 0) => x >= b.bb[0] - m && x <= b.bb[2] + m && z >= b.bb[1] - m && z <= b.bb[3] + m && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h));
+function bldFloorAt(x, z, y) { // the highest roof or slab at (x, z) not above y, else -Infinity
+  let f = -Infinity; const one = b => { if (!inPlan(b, x, z)) return; const r = bldRoofY(b, x, z); if (r !== null && r <= y && r > f) f = r; };
+  BLD.each(x, z, x, z, one); BLDR.each(x, z, x, z, one); BLDT.each(x, z, x, z, one);
+  return f;
+}
+const walkGround = (x, z, y, reach = 0.05) => Math.max(H.surface(x, z, y), bldFloorAt(x, z, y + reach)); // what the walker stands on: the ground, the decks, the roofs
+// in a building at this height: inside its plan under its roof (tol over the feet), or within m of a wall of it that stands over the feet
+function inBuildingAt(x, z, y, m = 0, tol = 0.02) {
+  let f = false;
+  BLD.each(x - m, z - m, x + m, z + m, b => { if (f || !inPlan(b, x, z, m)) return; const r = bldRoofY(b, x, z); if (r === null || r > y + tol) f = true; });
+  if (!f && m > 0) WALLS.each(x - m, z - m, x + m, z + m, s => { if (f || s.r || s.two || s.deckw || s.off) return; const L2 = (s.bx - s.ax) ** 2 + (s.bz - s.az) ** 2 || 1, t = clamp(((x - s.ax) * (s.bx - s.ax) + (z - s.az) * (s.bz - s.az)) / L2, 0, 1); if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < m && (s.y1 === undefined || wallTopP(s, t) > y + tol) && (s.y0 === undefined || s.y0 < y + 1.75)) f = true; });
+  return f;
+}
+// the top of a wall the walker meets at t along it (0 at a, 1 at b): a building's wall goes up to its roof (yp: [t, top] where the roof changes),
+// the rest as drawn (y1). Cars meet their own (collideStatic yv, y1)
+function wallTopP(s, t) {
+  const p = s.yp; if (!p) return s.y1;
+  for (let k = 1; k < p.length; k++) if (t <= p[k][0] || k === p.length - 1) { const [t0, y0] = p[k - 1], [t1, y1] = p[k]; return y0 + (y1 - y0) * clamp((t - t0) / ((t1 - t0) || 1), 0, 1); }
+  return p[0][1];
+}
+function wallTopProfile(B, a, c, isHole) { // [t, top] along the side a to c of a volume, as the tile draws its top; and the highest
+  const top = B.gtop !== undefined ? B.gtop : (B.gtop = bldTop(B)), pl = roofPlanes(B) && !isHole && B.st !== 2;
+  const p = (pl ? roofBreaks(B, a, c) : [0, 1]).map(t => [t, top + (pl ? roofAt(B, a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t) : 0)]);
+  p.max = Math.max(...p.map(q => q[1])); return p;
 }
 function onFoot(x, z) { let f = false; ROADSEG.each(x - 6, z - 6, x + 6, z + 6, s => { if (!f && s.r.c === 6 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5) f = true; }); return f; }
 function onPlatform(x, z) { let f = false; PLATG.each(x, z, x, z, s => { if (!f && x >= s.bb[0] && x <= s.bb[2] && z >= s.bb[1] && z <= s.bb[3] && inPoly(x, z, s.o) && !s.k.some(h => inPoly(x, z, h))) f = true; }); return f; }
@@ -2378,6 +2428,20 @@ Object.assign(MAT, { aattS: new THREE.MeshLambertMaterial({ color: 0xb9b5ac }), 
 // the rail bed of the DBGT (SD_FER, tiles[t].sf): the gravel of the ballast without the sleepers, which each track draws over it
 const gravelTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#7e766b'; g.fillRect(0, 0, w, h); noise(g, w, h, 900, 0.5, ['#5d564d', '#9c9487', '#4a443d']); });
 Object.assign(MAT, { gravel: flatMat({ map: gravelTex }), gravelS: new THREE.MeshLambertMaterial({ map: gravelTex }) });
+/* what a surface is made of (src/fondi.py: the key m of the polygons of as, pz, ft, cv and of the yards AATT in a; docs/superfici.md): g gravel and unpaved, t earth, n paved of no
+   known material (the neutral paving: also the AATT yards and the paths the data say nothing of), b paving blocks, f porphyry setts, c cobbles, p grass, a asphalt.
+   S: the look on the whole cells of S (cellOwners), F: the drape (polyFill), vs: metres per repeat of the photo. New photos, Poly Haven CC0: tex/ghiaia.jpg gravel_floor_02
+   (x0.88), tex/terra.jpg brown_mud_dry, tex/pavimento.jpg concrete_floor_02 turned to a light grey. Built at the first use: ciottoliTex is in rotonde3.js */
+let FONDO_ = null;
+function fondoLook(m) {
+  if (!FONDO_) {
+    const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t; };
+    const mk = (map, vs) => ({ S: new THREE.MeshLambertMaterial({ map }), F: flatMat({ map }), vs });
+    FONDO_ = { g: mk(ld('ghiaia'), 2.5), t: mk(ld('terra'), 2.6), n: mk(ld('pavimento'), 3), b: { S: MAT.side, F: flatMat({ map: sidewalkTex }), vs: 4 }, f: { S: MAT.piazzaS, F: MAT.piazza, vs: 4 },
+      c: mk(ciottoliTex, 4), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
+  }
+  return FONDO_[m] || null;
+}
 Object.assign(MAT.water, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }); // the water level of a tile of S meets the banks of S, which write their depth
 // the kinds of divider the DBGT adds (build_data.py): plastered low walls, railings with vertical bars, green wire mesh, railway panels, wood
 const barsTex = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#26292c'; for (let x = 4; x < w; x += 10) g.fillRect(x, 0, 3, h); g.fillRect(0, 0, w, 5); g.fillRect(0, h - 6, w, 6); });
@@ -2742,7 +2806,7 @@ function rampWalls(dk) {
     if (ay - sp - ga < 0.05 && by - sp - gb < 0.05) continue; if (H.inPit((ax + bx) / 2, (az + bz) / 2, 0.3)) continue; // (over the road of an underpass: no wall down to it)
     const L = hyp(bx - ax, bz - az) || 1, tp = ts.find(t => pieno[t]), cx_ = (T[tp * 9] + T[tp * 9 + 3] + T[tp * 9 + 6]) / 3, cz_ = (T[tp * 9 + 1] + T[tp * 9 + 4] + T[tp * 9 + 7]) / 3, ins = ((bz - az) * (cx_ - ax) - (bx - ax) * (cz_ - az)) > 0 ? 1 : -1; // (ins: the side of the fill, where the wall gets its thickness)
     dk.rw.push([ax, az, ga - 0.3, ay - sp, bx, bz, gb - 0.3, by - sp, ins]);
-    WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: Math.min(ga, gb) - 1, y1: Math.max(ay, by), deckw: true });
+    WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: Math.min(ga, gb) - 1, y1: Math.max(ay, by) - sp, deckw: true }); // (up to the underside, as it is drawn: up to the top it was a wall nobody saw across the footbridge of x 139 z 1433, Carlo 6/11)
   }
   return dk.rw;
 }
@@ -2753,20 +2817,70 @@ function rampWalls(dk) {
 const SPALLA_LUCE = 2.0, SPALLA_BANCO = 1.5;
 function spalleNucleo(dk) {
   if (dk.sn) return dk.sn; dk.sn = []; if (!dk.nucleo || dk.free || dk.tipo === 'copertura' || dk.nucleo.length < 3) return dk.sn;
-  const N = dk.nucleo, topAt = (x, z) => { for (const o of H.deckAt(x, z)) if (o.id === dk.id) return o.top; return null; };
-  for (let i = 0; i < N.length; i++) {
-    const a = N[i], c = N[(i + 1) % N.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.3) continue;
-    let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (inPoly(mx + nx * 0.2, mz + nz * 0.2, N)) { nx = -nx; nz = -nz; } // (n: outwards)
-    const m = Math.max(1, Math.round(L)), pts = [];
+  const N0 = dk.nucleo, topAt = (x, z) => { for (const o of H.deckAt(x, z)) if (o.id === dk.id) return o.top; return null; };
+  // (Carlo 6/11, under corso Isonzo: "tanti pannelli staccati e sfalsati, con buchi e scarpate in mezzo") one wall per side of the PONTE: the outline
+  // straightened (the DBGT splits a side in pieces at small angles), a side that is an abutment for most of its length is one wall from end to end,
+  // its foot level, its top the underside of the deck
+  const dp = (P, eps) => { if (P.length < 3) return P; let k = 0, dm = 0; const [a, b] = [P[0], P[P.length - 1]]; for (let i = 1; i < P.length - 1; i++) { const d = segDist(P[i][0], P[i][1], a[0], a[1], b[0], b[1]); if (d > dm) { dm = d; k = i; } } return dm > eps ? [...dp(P.slice(0, k + 1), eps).slice(0, -1), ...dp(P.slice(k), eps)] : [a, b]; };
+  let far = 0; for (let i = 1; i < N0.length; i++) if (hyp(N0[i][0] - N0[0][0], N0[i][1] - N0[0][1]) > hyp(N0[far][0] - N0[0][0], N0[far][1] - N0[0][1])) far = i;
+  const N1 = [...dp(N0.slice(0, far + 1), 0.5).slice(0, -1), ...dp([...N0.slice(far), N0[0]], 0.5).slice(0, -1)];
+  // the sides: consecutive edges within 20 degrees of each other are one side, its wall on the straight line from its first to its last corner
+  const dirOf = (p, q) => Math.atan2(q[1] - p[1], q[0] - p[0]), sides = [];
+  for (let i = 0; i < N1.length; i++) { const p = N1[i], q = N1[(i + 1) % N1.length], s = sides[sides.length - 1]; if (s && Math.abs(Math.atan2(Math.sin(dirOf(p, q) - s.d), Math.cos(dirOf(p, q) - s.d))) < 0.35) s.c = q; else sides.push({ a: p, c: q, d: dirOf(p, q) }); }
+  if (sides.length > 1) { const f = sides[0], l = sides[sides.length - 1]; if (Math.abs(Math.atan2(Math.sin(f.d - l.d), Math.cos(f.d - l.d))) < 0.35) { f.a = l.a; sides.pop(); } }
+  for (const sd of sides) {
+    const a = sd.a, c = sd.c, L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1.0) continue;
+    let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (inPoly(mx + nx * 0.2, mz + nz * 0.2, N0)) { nx = -nx; nz = -nz; } // (n: outwards)
+    const m = Math.max(1, Math.round(L)), pts = []; let n = 0, ok = 0;
     for (let k = 0; k <= m; k++) {
       const x = a[0] + (c[0] - a[0]) * k / m, z = a[1] + (c[1] - a[1]) * k / m, t = topAt(x - nx * 0.3, z - nz * 0.3); if (t === null) { pts.push(null); continue; }
       const bot = t - dk.sp, gin = Math.min(H.base(x - nx * 0.3, z - nz * 0.3), H.base(x - nx * 1.5, z - nz * 1.5)), gout = Math.max(H.base(x + nx * 3.5, z + nz * 3.5), H.base(x + nx * 4.5, z + nz * 4.5));
-      pts.push(bot - gin > SPALLA_LUCE && bot - gout < SPALLA_BANCO ? [x, z, gin - 0.3, bot] : null);
+      const strada = q => H.mat(x + nx * q, z + nz * q) === 1 && Math.abs(H.base(x + nx * q, z + nz * q) - gin) < 0.6; // (the carriageway under it on both sides of the line: a wall there would stand in the street)
+      const st = strada(0.8) && strada(-0.8), cd = bot - gin > SPALLA_LUCE && bot - gout < SPALLA_BANCO, si = cd && !st; n++; if (si) ok++;
+      pts.push({ x, z, bot, gin, si, st, cd });
     }
-    for (let k = 0; k < m; k++) { const p = pts[k], q = pts[k + 1]; if (!p || !q) continue; dk.sn.push([p[0], p[1], p[2], p[3], q[0], q[1], q[2], q[3], 0, nx, nz]); }
+    { let j = 0; while (j < pts.length) { if (!(pts[j] && pts[j].st)) { j++; continue; } let e = j; while (e < pts.length && pts[e] && pts[e].st) e++; const lato = q => pts[q] && pts[q].cd && !pts[q].st; if (e - j <= 2 && lato(j - 1) && lato(e)) for (let q = j; q < e; q++) { pts[q].st = false; pts[q].si = pts[q].cd; } j = e; } } // (a street both sides for 1-2 m between two stretches of wall is a cell of the lattice, not the street: the wall goes on)
+    ok = pts.filter(p => p && p.si).length;
+    if (!n || ok < 0.5 * n) continue;
+    // runs between the points in the street (never a wall there): each run one wall from its first to its last abutment point, the gaps between closed
+    let k = 0;
+    while (k < pts.length) {
+      while (k < pts.length && !(pts[k] && pts[k].si)) k++; if (k >= pts.length) break;
+      let k0 = k, k1 = k; while (k < pts.length && !(pts[k] && pts[k].st)) { if (pts[k] && pts[k].si) k1 = k; k++; }
+      if (k1 - k0 < 1) continue;
+      let y0 = 1e9; for (let j = k0; j <= k1; j++) if (pts[j]) y0 = Math.min(y0, pts[j].gin - 0.3);
+      for (let j = k0; j <= k1; j++) if (!pts[j]) pts[j] = { ...pts[j - 1], x: a[0] + (c[0] - a[0]) * j / m, z: a[1] + (c[1] - a[1]) * j / m };
+      const inS = (x, z) => { const f = s => H.mat(x + nx * s, z + nz * s) === 1 && Math.abs(H.base(x + nx * s, z + nz * s) - y0 - 0.3) < 1.0; return f(0.8) && f(-0.8); }; // (the wall's foot in a carriageway on both sides)
+      const pz_ = []; for (let j = k0; j < k1; j++) { const p = pts[j], q = pts[j + 1]; pz_.push([[p.x, p.z, y0, p.bot, q.x, q.z, y0, q.bot, 0, nx, nz], inS((p.x + q.x) / 2, (p.z + q.z) / 2)]); }
+      if (pz_.filter(q => q[1]).length > 0.25 * pz_.length) continue; // a quarter of it in the street: this side crosses the street under it, no wall (a few cells of asphalt along a wall at the kerb are the lattice)
+      for (const [w] of pz_) dk.sn.push(w);
+    }
   }
   for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1] of dk.sn) { const L = hyp(bx - ax, bz - az) || 1; WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: Math.min(ya0, yb0) - 1, y1: Math.max(ya1, yb1), deckw: true }); }
   return dk.sn;
+}
+// the abutment at the end of a deck (ramo ponti-spalle, 6/11): where the deck rests on S (its spalle edges) and the ground just inside the end
+// falls away under the slab (the bank under the deck end), a concrete wall from that ground up to the underside, its thickness outwards, so no
+// slot under the end of a bridge shows the sky. Up to SPALLA_CAPO_MAX (src/controlli_ponti.py counts the gap closed up to there). Pieces of the
+// spalle edges: [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins]
+const SPALLA_CAPO_MAX = 6.0;
+window.__PONTI = { rampWalls: d => rampWalls(d), spalleNucleo: d => spalleNucleo(d), spalleCapi: d => spalleCapi(d) }; // (src/controlli_ponti.mjs measures them)
+function spalleCapi(dk) {
+  if (dk.cw) return dk.cw; dk.cw = []; if (dk.tipo === 'copertura' || !dk.spalle.length) return dk.cw;
+  const T = dk.tri, sp = dk.sp, key = (ax, az, bx, bz) => { const a = ax.toFixed(2) + ',' + az.toFixed(2), b = bx.toFixed(2) + ',' + bz.toFixed(2); return a < b ? a + ' ' + b : b + ' ' + a; };
+  const spk = new Set(dk.spalle.map(e => key(e[0], e[1], e[2], e[3])));
+  for (let i = 0; i < T.length; i += 9) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) {
+    const ax = T[i + a], az = T[i + a + 1], ay = T[i + a + 2], bx = T[i + b], bz = T[i + b + 1], by = T[i + b + 2];
+    if (!spk.has(key(ax, az, bx, bz))) continue;
+    const cx = (T[i] + T[i + 3] + T[i + 6]) / 3, cz = (T[i + 1] + T[i + 4] + T[i + 7]) / 3, L = hyp(bx - ax, bz - az) || 1;
+    let nx = (bz - az) / L, nz = -(bx - ax) / L; if (nx * (cx - ax) + nz * (cz - az) < 0) { nx = -nx; nz = -nz; } // (n: into the deck)
+    const gin = (x, z) => Math.min(H.base(x + nx * 0.5, z + nz * 0.5), H.base(x + nx * 1.0, z + nz * 1.0));
+    const ga = gin(ax, az), gb = gin(bx, bz), da = ay - sp - ga, db = by - sp - gb;
+    if (Math.max(da, db) < 0.05 || Math.max(da, db) > SPALLA_CAPO_MAX || H.inPit((ax + bx) / 2, (az + bz) / 2, 0.3)) continue;
+    const g = Math.min(ga, gb); dk.cw.push([ax, az, g - 0.3, ay - sp, bx, bz, g - 0.3, by - sp, (nx * (bz - az) - nz * (bx - ax)) > 0 ? -1 : 1]);
+    WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: g - 1, y1: Math.max(ay, by) - sp, deckw: true });
+  }
+  return dk.cw;
 }
 function drawDecks(T, top, side) {
   for (const dk of H.DECKS) {
@@ -2790,7 +2904,7 @@ function drawDecks(T, top, side) {
       const ox = nx * SPALLA_SP, oz = nz * SPALLA_SP;
       opQuad(side, [[ax, ya0, az], [bx, yb0, bz], [bx, yb1, bz], [ax, ya1, az]], -nx, 0, -nz); opQuad(side, [[ax + ox, ya0, az + oz], [bx + ox, yb0, bz + oz], [bx + ox, yb1, bz + oz], [ax + ox, ya1, az + oz]], nx, 0, nz);
     }
-    for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins] of rampWalls(dk)) { // the walls of the approach ramps and the abutments (rampWalls): concrete with a thickness towards the fill, its ends closed
+    for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins] of rampWalls(dk).concat(spalleCapi(dk))) { // the walls of the approach ramps and the abutments (rampWalls, spalleCapi): concrete with a thickness towards the fill, its ends closed
       if (tileOf((ax + bx) / 2, (az + bz) / 2) !== T.t) continue;
       const L = hyp(bx - ax, bz - az) || 1, nx = (bz - az) / L * (ins || 1), nz = -(bx - ax) / L * (ins || 1), ox = nx * SPALLA_SP, oz = nz * SPALLA_SP, ta = Math.max(ya0, ya1), tb = Math.max(yb0, yb1);
       opQuad(side, [[ax, ya0, az], [bx, yb0, bz], [bx, tb, bz], [ax, ta, az]], -nx, 0, -nz); opQuad(side, [[ax + ox, ya0, az + oz], [bx + ox, yb0, bz + oz], [bx + ox, tb, bz + oz], [ax + ox, ta, az + oz]], nx, 0, nz);
@@ -2832,7 +2946,7 @@ const ALTO_VERO = { guardrail: 0.8, newJersey: 0.82, parapetto: 0.95, passerella
 function deckInit(dk) { if (dk.pronto) return; dk.pronto = true; dk.bar = { rails: [], pillars: [] }; const r0 = GRID_REC; GRID_REC = dk.reg; try { deckInit2(dk); } finally { GRID_REC = r0; } }
 function deckInit2(dk) {
   if (dk.tipo === 'copertura') return;
-  const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null; rampWalls(dk); // the walls of its approach ramps and their collisions, once
+  const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null; rampWalls(dk); spalleCapi(dk); // the walls of its approach ramps and their collisions, once
   for (const [ax, az, bx, bz, core] of deckOutline(dk)) {
     const L = hyp(bx - ax, bz - az); if (L < 0.05) continue;
     let nx = (bz - az) / L, nz = -(bx - ax) / L; const mx = (ax + bx) / 2, mz = (az + bz) / 2;
@@ -2844,7 +2958,11 @@ function deckInit2(dk) {
       const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, qx = x + nx * 0.7, qz = z + nz * 0.7, top = (y0 + y1) / 2;
       if (H.deckAt(x + nx * 0.25, z + nz * 0.25).some(o => o.tipo !== 'copertura' && Math.abs(o.top - top) < 0.6)) continue; // the deck goes on (its ramps, another deck)
       if (top - H.base(qx, qz) < 0.8) continue; // it rests on the ground there (a spalla)
+      { let att = false; const own = roadsOn(dk); ROADSEG.each(x - 10, z - 10, x + 10, z + 10, s => { if (att || !own.has(s.r) || segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) > s.r.w / 2 + 0.3) return; const sx = s.b[0] - s.a[0], sz = s.b[1] - s.a[1], sl = hyp(sx, sz) || 1; if (Math.abs(((bx - ax) * sx + (bz - az) * sz) / (L * sl)) < 0.5) att = true; });
+        if (att) continue; } /* never across the way that runs on the deck: its end goes on as a street (Carlo 6/11, the east end of via Vignazzola) */
       const seg = { ax: ax + (bx - ax) * k / n, az: az + (bz - az) * k / n, bx: ax + (bx - ax) * (k + 1) / n, bz: az + (bz - az) * (k + 1) / n };
+      { const ux = (seg.bx - seg.ax), uz = (seg.bz - seg.az), ul = hyp(ux, uz) || 1, mx = (seg.ax + seg.bx) / 2, mz = (seg.az + seg.bz) / 2; // (one row of parapets: a piece beside one already there, parallel and under 0.8 m from it, is the same parapet, Carlo 6/11 via Vignazzola)
+        if (dk.bar.rails.some(r => { const vx = r[3] - r[0], vz = r[4] - r[1], vl = hyp(vx, vz) || 1; if (Math.abs((ux * vx + uz * vz) / (ul * vl)) < 0.94) return false; const dx = mx - (r[0] + r[3]) / 2, dz = mz - (r[1] + r[4]) / 2; return Math.abs((-vz * dx + vx * dz) / vl) < 0.8 && Math.abs((vx * dx + vz * dz) / vl) < (ul + vl) / 2 - 0.1; })) continue; }
       dk.bar.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, dk.tipo === 'pedonale' ? 2 : 1, nx, nz]);
       WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + (dk.tipo === 'pedonale' ? ALTO_VERO.passerella : ALTO_VERO.parapetto), yv: Math.max(y0, y1) + ALTO_VERO.auto, deckw: true });
     }
@@ -3213,6 +3331,7 @@ function cellOwners(T, F) {
   const c = F.n - 1, own = F.own = new Float32Array(c * c), sty = F.sty = new Array(c * c).fill(null), d = T.d, uf = new Int8Array(c * c);
   const underFree = w => { if (!uf[w]) { const i = w % c, j = (w - i) / c; let f = false; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x = F.x0 + (i + a) * F.st, z = F.z0 + (j + b) * F.st; if (H.overFree(x, z, H.base(x, z)) > H.base(x, z) + 0.01) f = true; } uf[w] = f ? 1 : 2; } return uf[w] === 1; };
   const S = (k, m, vs, col) => { const key = k + (col ? col.getHexString() : ''); return STY[key] || (STY[key] = { m, vs, col: col || null }); };
+  const SF = m => { const f = fondoLook(m); return S('m' + m, f.S, f.vs, f.col); }; // a material of src/fondi.py
   const lay = T.layers = []; // [outer, holes, rank, look]: the look of a cell a ramp takes (pitLook)
   const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && (underFree(w) || (F.ud2 && F.ud2[w])))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
@@ -3221,14 +3340,14 @@ function cellOwners(T, F) {
     else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
     else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) cover(outer, holes, 2, S('w', MAT.waterS, 9)); } /* a lake is dug and drawn by acqua3.js */
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
-    else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
+    else if (a.t === 17) cover(outer, holes, 1.1, SF(a.m || 'n')); // yards of the DBGT (AATT): their material (src/fondi.py), or the neutral paving
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
-  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('a', MAT.asphS, 9), true); // yards and drives of the DBGT (AC_VEI 0307): the asphalt of the carriageways and car parks (tiles[t].as), no lines (Carlo, 2/11)
+  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, q.m ? SF(q.m) : S('a', MAT.asphS, 9), true); // yards and drives of the DBGT (AC_VEI 0307): the asphalt of the carriageways and car parks (tiles[t].as), no lines (Carlo, 2/11)
   for (const q of d.sf || []) cover(dec(q.p), q.k.map(dec), 1.3, S('b', MAT.gravelS, 3)); // the rail bed of the DBGT (SD_FER a raso)
-  for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, S('f', MAT.footS, 4), true);
-  for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, S('a', MAT.asphS, 9), true);
-  for (const q of d.pz || []) cover(dec(q.p), q.k.map(dec), 5.1, S('z', MAT.piazzaS, 4), true);
+  for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, SF(q.m || 'n'), true); // paths: their material, or the neutral paving
+  for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, q.m ? SF(q.m) : S('a', MAT.asphS, 9), true);
+  for (const q of d.pz || []) cover(dec(q.p), q.k.map(dec), 5.1, q.m ? SF(q.m) : S('z', MAT.piazzaS, 4), true);
   // under a deck that carries a street or a railway (F.ud, terreno_gioco.py) no grass grows and the DBGT and OSM green areas, drawn from the
   // air, are the deck's top seen from above: bare earth there (29/10, via Maroncelli: a lawn under the cavalcavia), the rail bed, the
   // water and the streets at their own level stay
@@ -3244,6 +3363,42 @@ function waterInBed(a, outer, holes, T) {
   if (tot >= 4) return bed >= tot * 0.3;
   const pts = [...outer, centroid(outer)]; return pts.filter(([x, z]) => bedC(clamp(Math.floor((z - F.z0) / F.st), 0, c - 1) * c + clamp(Math.floor((x - F.x0) / F.st), 0, c - 1))).length >= pts.length * 0.3;
 }
+/* no road paint on a surface that is not asphalt (Carlo 6/11: on cobbles, setts, paving blocks, gravel or earth no lines are painted in Italy): the triangles of a paint
+   buffer (lines, crossings, stop and give way, bus stops, lettering) over a carriageway, yard or square whose material (src/fondi.py) is not asphalt are dropped; the
+   piazze with no material are porphyry. A triangle across the edge is cut in halves down to 0.4 m, each half kept or dropped by its middle */
+function naAt(T, x, z) {
+  if (!T.naP) { T.naP = []; for (const k of ['as', 'cv', 'pz']) for (const q of T.d[k] || []) if (q.m ? q.m !== 'a' : k === 'pz') { const o = dec(q.p); T.naP.push({ o, k: q.k.map(dec), b: bbox(o) }); } }
+  for (const q of T.naP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
+  return false;
+}
+function matIn(T, k, x, z) { /* the polygon of tiles[t][k] under (x, z): its material (src/fondi.py), '' with none, undefined where there is no polygon */
+  const L = (T.matP || (T.matP = {}))[k] || (T.matP[k] = (T.d[k] || []).map(q => { const o = dec(q.p); return { o, k: q.k.map(dec), b: bbox(o), m: q.m || '' }; }));
+  for (const q of L) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return q.m;
+  return undefined;
+}
+/* the material of the surface a ribbon piece of an old way lies on: the polygon under its middle, else under its ends or its sides (in this tile or the next): a piece
+   whose middle fell just off the path, or on the edge of the tile, took the neutral paving, a light square on the asphalt path along the Milano-Meda (Carlo 7/11).
+   With no polygon anywhere under it the way's own surface=* (roads[].m, build_data.py: the path along the Milano-Meda runs off its polygon at x 121.8 z 47.4), then
+   'n' for a path, null for a street or square (their own look) */
+function matSotto(T, k, pts, rm) {
+  for (const [x, z] of pts) { const U = TILES[tileOf(x, z)], m = U && U.d ? matIn(U, k, x, z) : undefined; if (m !== undefined) return m || rm || (k === 'ft' ? 'n' : null); }
+  return rm || (k === 'ft' ? 'n' : null);
+}
+function senzaStrisce(T, b) {
+  naAt(T, 0, 0); if (!T.naP.length || !b.i.length) return;
+  const nv = () => b.p.length / 3, hasC = b.c.length === b.p.length, ab = b.ab;
+  const mid = (a, c) => { const k = nv(); b.p.push((b.p[a * 3] + b.p[c * 3]) / 2, (b.p[a * 3 + 1] + b.p[c * 3 + 1]) / 2, (b.p[a * 3 + 2] + b.p[c * 3 + 2]) / 2); b.n.push(b.n[a * 3], b.n[a * 3 + 1], b.n[a * 3 + 2]); b.uv.push((b.uv[a * 2] + b.uv[c * 2]) / 2, (b.uv[a * 2 + 1] + b.uv[c * 2 + 1]) / 2); if (hasC) b.c.push(b.c[a * 3], b.c[a * 3 + 1], b.c[a * 3 + 2]); if (ab && ab[a]) ab[k] = 1; return k; };
+  const X = k => b.p[k * 3], Z = k => b.p[k * 3 + 2], out = [];
+  const go = (a, c, e, d) => {
+    const ins = [naAt(T, X(a), Z(a)), naAt(T, X(c), Z(c)), naAt(T, X(e), Z(e)), naAt(T, (X(a) + X(c) + X(e)) / 3, (Z(a) + Z(c) + Z(e)) / 3)];
+    if (ins.every(v => v)) return; if (ins.every(v => !v)) { out.push(a, c, e); return; }
+    const l1 = hyp(X(a) - X(c), Z(a) - Z(c)), l2 = hyp(X(c) - X(e), Z(c) - Z(e)), l3 = hyp(X(e) - X(a), Z(e) - Z(a)), m = Math.max(l1, l2, l3);
+    if (m < 0.4 || d > 7) return; /* (a piece across the edge goes: a line along the kerb of a cobbled street left a thin white sliver, Carlo 7/11) */
+    if (m === l1) { const k = mid(a, c); go(a, k, e, d + 1); go(k, c, e, d + 1); } else if (m === l2) { const k = mid(c, e); go(a, c, k, d + 1); go(a, k, e, d + 1); } else { const k = mid(e, a); go(a, c, k, d + 1); go(k, c, e, d + 1); }
+  };
+  const I = Array.from(b.i); for (let t = 0; t < I.length; t += 3) go(I[t], I[t + 1], I[t + 2], 0);
+  b.i.splice(0); for (let t = 0; t < out.length; t += 3) b.i.push(out[t], out[t + 1], out[t + 2]);
+}
 function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!passoTile(g).done); }
 function* buildTileGen(T) {
   if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.seme * 7919; for (const p of CAS_T.get(T.t) || []) if (!p.casFatta) { p.casFatta = true; casermeDi([p]); }
@@ -3251,6 +3406,7 @@ function* buildTileGen(T) {
   const G = new THREE.Group(); G.visible = false; scene.add(G); T.group = G;
   const put = (b, mat, ro, shadow) => { if (b.i.length) mkMesh(b, mat, ro, shadow, G); };
   const pc = a => COL(a[Math.floor(tRnd() * a.length)]), d = T.d, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
+  const FB = new Map(), fbuf = (m, rk, street, V) => { const k = m + '|' + rk; let b = FB.get(k); if (!b) { b = V ? VBuf() : FBuf(); b.rk = rk; if (street) b.street = true; if (m === 'a') { b.angc = true; b.asf = asfGrid(T); } /* asphalt as the streets' (asfCol: the direction of the road in the colour; without it the drape came out pale, Carlo 6/11) */ b.fm = m; FB.set(k, b); } return b; }; /* the drapes of the materials of src/fondi.py, one buffer per material and rank */
   // terrain patch
   const FT = H.tile(T.t); T.fine = !!FT;
   if (FT) { // new engine: the nodes of S as they are, the triangles of H.onTri (docs/motore.md 3: H.base is this mesh, H.check)
@@ -3308,13 +3464,13 @@ function* buildTileGen(T) {
         else if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) polyFill(wB, outer, holes, 0.03 * fy, 9); }
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
-        else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
+        else if (a.t === 17) { const m = a.m || 'n'; polyFill(fbuf(m, 1.1, false, true), outer, holes, 0.025 * fy, fondoLook(m).vs, fondoLook(m).col); }
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
-    const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 9); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): the asphalt of the carriageways and car parks, no lines, no traffic (Carlo, 2/11)
+    const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { if (q.m) polyFill(fbuf(q.m, 1.2, true), dec(q.p), q.k.map(dec), 0.03 * fy, fondoLook(q.m).vs, fondoLook(q.m).col); else polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 9); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): the asphalt of the carriageways and car parks, no lines, no traffic (Carlo, 2/11)
     const sB = FBuf(); sB.rk = 1.3; for (const q of d.sf || []) { try { polyFill(sB, dec(q.p), q.k.map(dec), 0.03 * fy, 3); } catch (e) { } } // the rail bed (DBGT SD_FER)
-    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.asph, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.asph, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2); for (const b of FB.values()) put(b, fondoLook(b.fm).F, 1); FB.clear();
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {
@@ -3414,7 +3570,8 @@ function* buildTileGen(T) {
     const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), lett = FBuf(), lettB = FBuf(), white = COL('#f1efe6'); asp.rk = 5; asp.angc = true; asp.asf = asfGrid(T); por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = lett.street = lettB.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
     const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
-    fill(d.as, asp, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fill(d.pz, por, 0.06 * fy, 4); fill(d.ft, foot, 0.045 * fy, 4);
+    const fillM = (list, b, rk, y, sc) => { for (const q of list || []) { const m = q.m || (b ? null : 'n'); try { if (m) polyFill(fbuf(m, rk, true), dec(q.p), q.k.map(dec), y, fondoLook(m).vs, fondoLook(m).col); else polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } }; /* a polygon with its material (src/fondi.py) in the buffer of that material */
+    fillM(d.as, asp, 5, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fillM(d.pz, por, 5.1, 0.06 * fy, 4); fillM(d.ft, null, 3, 0.045 * fy, 4);
     { const s_ = srndT; yield 'sidewalks'; srndT = s_; } /* a tile of S cuts its surfaces on the cells: in slices, so building it never stops the game for long */
     for (const q of T.sd) {
       try { polyFill(sw, q.o, q.k, SIDE_H, 4); } catch (e) { } // the cover of the step: S + SIDE_H on the cells (clipFill)
@@ -3557,8 +3714,10 @@ function* buildTileGen(T) {
             if (opSotto(p) || opSotto(q)) continue; // a way of the level above does not come down into an underpass: over it there is the deck, or the ground
             if (p[3] && q[3]) { // an old elevated way that runs on S in a tile of S (no deck of the new engine under it): drawn on the cells of S, like
               // the surfaces of the ways at grade; a flat ribbon at the height of its middle stood over the banks and sank in the slopes (collaudo 4-5)
-              const i0 = onB.p.length / 3; for (const [o, sd] of [[p, -1], [p, 1], [q, -1], [q, 1]]) { const x = o[0] + rx * hw * sd, z = o[1] + rz * hw * sd; vtx(onB, x, 0, z, 0, 1, 0, x / (onB === asp ? 9 : 4), z / (onB === asp ? 9 : 4)); }
-              triUp(onB, i0, i0 + 1, i0 + 3); triUp(onB, i0, i0 + 3, i0 + 2); continue;
+              /* (in the material of the surface it lies on, src/fondi.py: a path drawn this way stayed beige on the asphalt of its surface, light squares on the path along the Milano-Meda, Carlo 6/11) */
+              const fm = matSotto(T, r.c <= 4 ? 'as' : r.c === 5 ? 'pz' : 'ft', [[(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], [p[0], p[1]], [q[0], q[1]], [(p[0] + q[0]) / 2 + rx * hw * 0.6, (p[1] + q[1]) / 2 + rz * hw * 0.6], [(p[0] + q[0]) / 2 - rx * hw * 0.6, (p[1] + q[1]) / 2 - rz * hw * 0.6]], r.m), oB = fm ? fbuf(fm, onB.rk || 3, true) : onB, vs_ = fm ? fondoLook(fm).vs : onB === asp ? 9 : 4, col_ = fm ? fondoLook(fm).col : null;
+              const i0 = oB.p.length / 3; for (const [o, sd] of [[p, -1], [p, 1], [q, -1], [q, 1]]) { const x = o[0] + rx * hw * sd, z = o[1] + rz * hw * sd; vtx(oB, x, 0, z, 0, 1, 0, x / vs_, z / vs_, oB.asf ? asfCol(oB.asf, x, z) : col_); }
+              triUp(oB, i0, i0 + 1, i0 + 3); triUp(oB, i0, i0 + 3, i0 + 2); continue;
             }
             // road surface
             const i0 = deck.p.length / 3;
@@ -3623,7 +3782,7 @@ function* buildTileGen(T) {
     }
     if (T.fine) drawDecks(T, deck, dside);
     { const s_ = srndT; yield 'streets put'; srndT = s_; } 
-    put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
+    for (const b of [mark, lett, lettB]) senzaStrisce(T, b); put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); for (const b of FB.values()) put(b, fondoLook(b.fm).F, b.rk >= 5 ? 5 : 3); FB.clear(); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
     put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9); put(kerbS, MAT.kerb, 9);
     put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10); put(dmark, MAT.deckMark, 10); put(pil, MAT.deckSide, 10, 'cast');
   }
@@ -3790,8 +3949,8 @@ function* buildTileGen(T) {
       if (B.st) { kind = 'plain'; wallCol = B.st !== 1 ? pcB(['#a39a8b', '#9c9284', '#aaa08e']) : COL('#b9b6ae'); } // a ruin: bare stone and brick; a shell: concrete
       const b = wb[kind], tile = kind === 'old' ? 3.4 : kind === 'mod' ? 4.2 : 4;
       // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
-      const planes = roofPlanes(B), flatDbgt = B.rk === 4;
-      const pitched = planes ? true : !flatDbgt && !holes.length && outer.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(outer) || (t === 10 && outer.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && h >= 5;
+      const planes = roofPlanes(B);
+      const pitched = planes ? true : bldPitch(B) > 0; /* the same pitch the walker stands on (bldRoofY) */
       if (!b.ao) { b.ao = []; b.fac = []; }
       // the facades (FAC): the bays along each wall and the ground under each window first, then the floors F0 + FL k the same all round the house.
       // A wall is a run of sides that go on nearly straight (the DBGT draws a facade in many short sides): its bays run along all of it
@@ -3872,7 +4031,7 @@ function* buildTileGen(T) {
       if (B.st === 2) continue;
       if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
       else if (pitched) {
-        const [cx, cz] = centroid(outer), rh = Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
+        const [cx, cz] = centroid(outer), rh = bldPitch(B), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
         for (let i = 0; i < outer.length; i++) {
           const a = outer[i], c = outer[(i + 1) % outer.length];
           const v1 = new THREE.Vector3(a[0], top, a[1]), v2 = new THREE.Vector3(c[0], top, c[1]), v3 = new THREE.Vector3(cx, top + rh, cz);
@@ -3976,7 +4135,7 @@ function freeTile(T) {
   for (const p of H.PITS) if (tileOf(p.c[0], p.c[1]) === T.t) { p.built = false; p.meshes = []; } else if (p.meshes) p.meshes = p.meshes.filter(M => M.parent && M.parent !== G); // its ramp is drawn again with it
   for (const p of PROPS) if (tileOf(p.x, p.z) === T.t) { p.obj = p.lx ? p.obj : null; if (p.inst) p.inst.meshes = []; } // the props stay, as what was knocked down, but not the meshes they drew
   for (const p of PROPS) if (p.tile === T) { p.onBreak = null; p.inst.meshes = []; } // a lamp may stand just past the edge of its tile
-  for (const k of ['terrMesh', 'ownMeshes', 'cellMesh', 'cellIdx', 'sill', 'roWalls', 'roIm', 'ngShut', 'layers', 'stalls', 'streetStalls', 'nSmall']) T[k] = undefined; /* nothing of the meshes stays on the tile; its stalls are worked out again */
+  for (const k of ['terrMesh', 'ownMeshes', 'cellMesh', 'cellIdx', 'sill', 'roWalls', 'roIm', 'ngShut', 'layers', 'naP', 'matP', 'stalls', 'streetStalls', 'nSmall']) T[k] = undefined; /* nothing of the meshes stays on the tile; its stalls are worked out again */
   for (const st of CASERME) if (st.root && tileOf(st.x, st.z) === T.t) st.root = null; for (const f of FUEL) if (tileOf(f.x, f.z) === T.t) for (const q of f.pumps) { q.g = null; q.body = null; }
   for (const f of FOUNT) if (f.spray && tileOf(f.x, f.z) === T.t) f.spray = null;
 }
@@ -8451,18 +8610,19 @@ function fisRig(v, yf, yb, ty, fs) {
   for (let i = 0; i < F.n; i++) { F.x[i] = -F.droop; F.off[i] = lerp(F.off[i], -Math.min(F.droop, 0.2), 0.5); }
   v.fpBusy = true;
 }
-// where he gets out: the side as ever if it is free, else the first free place round the car, on this side of any wall. A car on its roof against a wall lets him out too
+// where he gets out: the side as ever if it is free, else the first free place round the car, on this side of any wall. A car on its roof against a wall lets him out too.
+// [x, z, the height of his feet]: a roof is a place like the ground (Carlo, 7/11: out of the helicopter on a roof he stays on the roof)
 function exitSpot(v) {
   const S = v.spec, sh = Math.sin(v.h), ch = Math.cos(v.h), L = [[1.6, 0], [-1.6, 0]], hl = S.L / 2 + 0.45;
   for (const q of [[1.6, 1.2], [-1.6, 1.2], [1.6, -1.2], [-1.6, -1.2], [0, hl], [0, -hl]]) L.push(q);
   for (let r = Math.max(2.4, hl); r < 14; r += 1) for (let n = 0; n < 16; n++) L.push([Math.cos(n * Math.PI / 8) * r, Math.sin(n * Math.PI / 8) * r]);
   for (let pass = 0; pass < 2; pass++) for (const [lx, lz] of L) {
-    const x = v.x + lx * ch + lz * sh, z = v.z - lx * sh + lz * ch, feet = H.surface(x, z, v.y + 0.5);
+    const x = v.x + lx * ch + lz * sh, z = v.z - lx * sh + lz * ch, feet = walkGround(x, z, v.y, 0.5);
     if (pass === 0 && (Math.abs(feet - v.y) > 2.5 || rayCam(v.x, v.z, x, z, feet + 1) < 1)) continue;
-    if (inBuilding(x, z, 0.4)) continue;
-    const c = capsuleFree(x, z, feet, 0.3, 0.4); if (!c || (pass === 1 && c === 'suolo')) return [x, z];
+    if (inBuildingAt(x, z, feet, 0.4, 0.05)) continue;
+    const c = capsuleFree(x, z, feet, 0.3, 0.4); if (!c || (pass === 1 && c === 'suolo')) return [x, z, feet];
   }
-  return [v.x + ch * 1.6, v.z - sh * 1.6];
+  const x = v.x + ch * 1.6, z = v.z - sh * 1.6; return [x, z, walkGround(x, z, v.y, 0.5)];
 }
 // the whole way of the frame, not only where it ends: at high speed a thin pole or a sign falls between two frames (Carlo, 30/10)
 function vehSweep(v, x0, z0) {
@@ -9376,8 +9536,8 @@ function enterExit() {
   else {
     const v = P.car, fast = v.speed > 6;
     const fx = Math.sin(v.h), fz = Math.cos(v.h);
-    const [x, z] = exitSpot(v);
-    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y); if (v.speed > FARI.minV) v.fariFino = now + FARI.dopo; /* the lights stay on a little (extras.js FARI) */
+    const [x, z, ey_] = exitSpot(v);
+    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false; P.y = ey_; if (v.speed > FARI.minV) v.fariFino = now + FARI.dopo; /* the lights stay on a little (extras.js FARI) */ /* on the ground, or on the roof he stopped on (fisica3.js exitSpot) */
     if (fast) { P.y = v.y + 0.5; P.knock = 1.3; P.vx = v.vx * 0.55; P.vz = v.vz * 0.55; P.vy = 2; P.hp -= Math.min(25, v.speed * 0.6); } v.inp = { thr: 0, brk: 0, steer: 0, hand: fast ? 0 : 1 }; P.car = null;
   }
 }
@@ -9566,22 +9726,24 @@ function capsuleFree(x, z, feet, r = SALTO.r, tol = 0.02, head = SALTO.head) {
   let hit = null;
   WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, s => {
     if (hit || s.off || (s.dyn && !s.on)) return;
-    if (s.y0 !== undefined && (feet + tol >= s.y1 || feet + head <= s.y0)) return;
+    if (s.y0 !== undefined && (feet + tol >= (s.yp ? s.yp.max : s.y1) || feet + head <= s.y0)) return;
     if (s.r) { if (hyp(x - s.x, z - s.z) < r + s.r) hit = s; return; }
-    if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < r) hit = s;
+    if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < r && (!s.yp || feet + tol < wallTopP(s, saltoT(s, x, z)))) hit = s; // a building's wall: up to its roof there
   });
   if (hit) return hit;
-  if (inBuilding(x, z, 0)) return 'edificio';
+  if (inBuildingAt(x, z, feet, 0, Math.max(tol, 0.02) + 0.02)) return 'edificio'; // under a roof; on it he is free
   if (ceilAbove(x, z, feet - 0.1) < feet + head) return 'soffitto';
   for (const o of H.deckAt(x, z)) if (o.top > feet + Math.max(tol, 0.3) && (o.bot !== undefined ? o.bot : o.top - 0.6) < feet + head) return 'soletta';
   for (const v of VEH) if (Math.abs(v.x - x) < 6 && Math.abs(v.z - z) < 6 && feet + head > v.y && vehBox(v, x, z, feet + tol, r)) return v;
   return null;
 }
 
-// ---- the floor under the feet: the ground and the decks (H.surface), a car, a street object with a top. reach: how far above the feet a top is taken
+const saltoT = (s, x, z) => { const ex = s.bx - s.ax, ez = s.bz - s.az; return clamp(((x - s.ax) * ex + (z - s.az) * ez) / (ex * ex + ez * ez || 1), 0, 1); }; // where along a wall a point is nearest
+
+// ---- the floor under the feet: the ground and the decks (H.surface), a roof (world3.js bldFloorAt), a car, a street object with a top. reach: how far above the feet a top is taken
 let saltoFV = null;
 function footFloor(x, z, feet, reach, inAir) {
-  let y = H.surface(x, z, inAir ? feet - 0.5 : feet); saltoFV = null;
+  let y = Math.max(H.surface(x, z, inAir ? feet - 0.5 : feet), bldFloorAt(x, z, feet + reach)); saltoFV = null;
   WALLS.each(x - 1.5, z - 1.5, x + 1.5, z + 1.5, s => { const q = s.sali; if (q && !s.off && (!s.dyn || s.on) && q.top <= feet + reach && q.top > y && hyp(x - s.x, z - s.z) < q.rs) y = q.top; });
   for (const v of VEH) {
     if (Math.abs(v.x - x) > 4 || Math.abs(v.z - z) > 4 || !vehCan(v)) continue;
@@ -9610,7 +9772,7 @@ function saltoStart(c) {
   const d = hyp(c.sx - P.x, c.sz - P.z); if (d < 0.02) return true; if (P.air && d > 0.9) return false;
   return !saltoAcrossTol(P.x, P.z, c.sx, c.sz, P.y);
 }
-function saltoAcrossTol(ax, az, bx, bz, y) { const L = hyp(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.15)); for (let i = 0; i <= n; i++) { const qx = ax + (bx - ax) * i / n, qz = az + (bz - az) * i / n; if (capsuleFree(qx, qz, Math.max(y, H.surface(qx, qz, y)), SALTO.r, 0.4)) return true; } return false; }
+function saltoAcrossTol(ax, az, bx, bz, y) { const L = hyp(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.15)); for (let i = 0; i <= n; i++) { const qx = ax + (bx - ax) * i / n, qz = az + (bz - az) * i / n; if (capsuleFree(qx, qz, Math.max(y, walkGround(qx, qz, y)), SALTO.r, 0.4)) return true; } return false; }
 
 function planOver(c, g) { // over something and down the far side. c: sx, sz the start, nx, nz the way across, span how far from the start to the far edge, top
   const Sx = c.sx, Sz = c.sz; let top = c.top;
@@ -9622,7 +9784,7 @@ function planOver(c, g) { // over something and down the far side. c: sx, sz the
       const q = saltoRise(Sx, Sz, Math.min(P.y, y), y, SALTO.r) || saltoAcross(Sx, Sz, ex, ez, y, SALTO.r);
       if (!q) {
         const fl = footFloor(ex, ez, y, 0.02, true), drop = saltoRise(ex, ez, fl, y, SALTO.rLand);
-        if (drop || inWater(ex, ez, fl) || inBuilding(ex, ez, SALTO.rLand)) break;
+        if (drop || inWater(ex, ez, fl) || inBuildingAt(ex, ez, fl, SALTO.rLand, 0.05)) break;
         return { sx: Sx, sz: Sz, ex, ez, y, stand: false, gx: c.gx, gz: c.gz, top, h: Math.atan2(c.nx, c.nz), nx: c.nx, nz: c.nz, v: null };
       }
       if (q.ax !== undefined && isBarrier(q) && q.y1 > top && q.y1 - g <= SALTO.maxBar) { top = q.y1; continue; } // the next piece of the same barrier, a little higher
@@ -9641,7 +9803,7 @@ function planOn(c, g) { // up onto something and stay there. c: sx, sz, ex, ez, 
 }
 // what is ahead and could be taken, best first
 function tryClimb() {
-  const S = SALTO, stick = Math.hypot(GP.steer, GP.fwd) > 0.15 && padLat, dh = stick ? padTgt : P.h, dx = Math.sin(dh), dz = Math.cos(dh), sp = hyp(P.vx, P.vz), reach = S.reach + sp * S.reachV, g = H.surface(P.x, P.z, P.y), cs = [], seen = new Set();
+  const S = SALTO, stick = Math.hypot(GP.steer, GP.fwd) > 0.15 && padLat, dh = stick ? padTgt : P.h, dx = Math.sin(dh), dz = Math.cos(dh), sp = hyp(P.vx, P.vz), reach = S.reach + sp * S.reachV, g = walkGround(P.x, P.z, P.y), cs = [], seen = new Set();
   const ahead = (qx, qz, d) => d < 0.15 ? 1 : ((qx - P.x) * dx + (qz - P.z) * dz) / d;
   WALLS.each(P.x - reach - 1, P.z - reach - 1, P.x + reach + 1, P.z + reach + 1, s => {
     if (seen.has(s)) return; seen.add(s);
@@ -9651,6 +9813,14 @@ function tryClimb() {
       const dot = ahead(s.x, s.z, d0); if (dot < S.cone) return;
       const nx = (s.x - P.x) / d0, nz = (s.z - P.z) / d0, st = Math.min(d0, s.r + S.gap), sx = s.x - nx * st, sz = s.z - nz * st;
       cs.push({ d, dot, top, sx, sz, gx: s.x - nx * s.r * 0.6, gz: s.z - nz * s.r * 0.6, ...(s.sali ? { on: true, ex: s.x - nx * s.sali.rs * 0.4, ez: s.z - nz * s.sali.rs * 0.4, endY: top } : { nx, nz, span: st + s.r }) });
+      return;
+    }
+    if (s.yp && !s.two && !s.off) { // a building's wall (Carlo, 7/11): one no higher than a barrier he climbs (a box, a garage) he climbs the same way, up onto its roof
+      const t = saltoT(s, P.x, P.z), cx = s.ax + (s.bx - s.ax) * t, cz = s.az + (s.bz - s.az) * t, d = hyp(cx - P.x, cz - P.z), top = wallTopP(s, t);
+      if ((P.x - cx) * s.nx + (P.z - cz) * s.nz < -0.05 || s.y0 > g + 0.5 || d > reach || top - g > S.maxBar || top <= P.y + 0.1) return; // from outside, under its top
+      const dot = ahead(cx, cz, d); if (dot < S.cone) return;
+      const st = Math.min(d, S.gap), sx = d < S.gap ? P.x : cx + s.nx * st, sz = d < S.gap ? P.z : cz + s.nz * st;
+      for (const k of [0.7, 1.1]) { const qx = cx - s.nx * k, qz = cz - s.nz * k, f = bldFloorAt(qx, qz, top + 1); if (f < top - 1) continue; cs.push({ d, dot, on: true, top: Math.max(top, f), sx, sz, ex: qx, ez: qz, endY: f, gx: cx, gz: cz }); break; }
       return;
     }
     if (!isBarrier(s)) return;
@@ -9694,7 +9864,7 @@ function climbStep(dt) {
   if (c.v) { const [ex, ez] = vehWorld(c.v, c.lv[0], c.lv[1]); c.ex = ex; c.ez = ez; }
   c.t += dt; P.h = wrapA(P.h + wrapA(c.h - P.h) * (1 - Math.exp(-14 * dt)));
   let t = c.t;
-  if (t < c.run) { const k = t / c.run; P.x = c.x0 + (c.sx - c.x0) * k; P.z = c.z0 + (c.sz - c.z0) * k; if (c.y0 < H.surface(P.x, P.z, c.y0) + 0.4) P.y = H.surface(P.x, P.z, P.y); c.y0r = P.y; P.phase += c.sp * dt * 3; c.ph = 0; return; }
+  if (t < c.run) { const k = t / c.run; P.x = c.x0 + (c.sx - c.x0) * k; P.z = c.z0 + (c.sz - c.z0) * k; if (c.y0 < walkGround(P.x, P.z, c.y0) + 0.4) P.y = walkGround(P.x, P.z, P.y); c.y0r = P.y; P.phase += c.sp * dt * 3; c.ph = 0; return; }
   if (c.y0r === undefined) c.y0r = P.y; t -= c.run; P.x = c.sx; P.z = c.sz;
   const y0 = c.y0r, T1 = c.tRise, T2 = T1 + c.tHold, T3 = T2 + c.tPull, T4 = T3 + c.tOver;
   if (t < T1) { c.ph = 1; const q = t / T1; P.y = y0 + ((c.yHang !== null ? c.yHang : c.y) - y0) * (c.low ? 1 - (1 - q) * (1 - q) : smooth01(q)); return; }
@@ -9736,7 +9906,7 @@ function footRide() {
 function footThrow(v) { // too fast to stay on: down on the nearest free ground at the side of the car, falling from where he stood (no fall damage is done in the game)
   const [lx, lz] = vehLocal(v, P.x, P.z), S = v.spec, sd = Math.sign(lx || 1), al = clamp(lz, -S.L / 2, S.L / 2);
   for (let d = S.W / 2 + SALTO.rLand + 0.15; d < S.W / 2 + 3.5; d += 0.35) for (const q of [sd, -sd]) {
-    const [x, z] = vehWorld(v, q * d, al), g = H.surface(x, z, P.y); if (g > P.y + 0.2 || inWater(x, z, g) || inBuilding(x, z, SALTO.rLand) || capsuleFree(x, z, g, SALTO.rLand, 0.05)) continue;
+    const [x, z] = vehWorld(v, q * d, al), g = walkGround(x, z, P.y); if (g > P.y + 0.2 || inWater(x, z, g) || inBuildingAt(x, z, g, SALTO.rLand, 0.05) || capsuleFree(x, z, g, SALTO.rLand, 0.05)) continue;
     P.x = x; P.z = z; P.air = true; P.vy = 0; P.vx = P.vz = 0; P.onV = null; P.onL = null; P.land = 0; P.thrown = (P.thrown || 0) + 1; return true;
   }
   return false;
@@ -9757,10 +9927,10 @@ function saltoCrosses(ax, az, bx, bz, y0, y1) {
   let hit = false; const dx = bx - ax, dz = bz - az; if (Math.abs(dx) + Math.abs(dz) < 1e-6) return false;
   WALLS.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => {
     if (hit || s.r || s.off || (s.dyn && !s.on)) return;
-    if (s.y0 !== undefined && (y1 < s.y0 || y0 > s.y1)) return;
+    if (s.y0 !== undefined && (y1 < s.y0 || y0 > (s.yp ? s.yp.max : s.y1))) return;
     const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
     const t = ((s.ax - ax) * ez - (s.az - az) * ex) / den, u = ((s.ax - ax) * dz - (s.az - az) * dx) / den;
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) hit = true;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && (!s.yp || y0 <= wallTopP(s, u))) hit = true;
   });
   return hit;
 }
@@ -9781,7 +9951,7 @@ function footGuard(x0, y0, z0, mx, mz) { // last word of the step. x0, y0, z0 wh
 function footGuardXZ(x0, z0, mx, mz) {
   const air = P.air || P.knock > 0, y0 = air ? P.y + 0.05 : P.y + 0.4, y1 = air ? P.y + 1.7 : y0, dd = hyp(P.x - mx, P.z - mz);
   if (air && dd > SALTO.airPush) { const k = SALTO.airPush / dd; P.x = mx + (P.x - mx) * k; P.z = mz + (P.z - mz) * k; } // in the air a push is a slide, not a pop
-  const bad = (x, z) => saltoCrosses(x0, z0, x, z, y0, y1) || (inBuilding(x, z, 0) && !inBuilding(x0, z0, 0)) || (air && ceilOver(x, z, P.y) && !ceilOver(x0, z0, P.y)); // in the air also the edge of a deck, which has no wall
+  const ib = (x, z) => inBuildingAt(x, z, P.y, 0, air ? 0.06 : SALTO.stepUp), bad = (x, z) => saltoCrosses(x0, z0, x, z, y0, y1) || (ib(x, z) && !ib(x0, z0)) || (air && ceilOver(x, z, P.y) && !ceilOver(x0, z0, P.y)); // in the air also the edge of a deck, which has no wall
   if (!bad(P.x, P.z)) return;
   P.guardN = (P.guardN || 0) + 1;
   if (!bad(mx, mz)) { P.x = mx; P.z = mz; return; }
@@ -9843,7 +10013,7 @@ const SALITA = {
   maxV: 9,            // m/s, the fastest slide
 };
 const salitaMin = (a, b) => a > 0 && b > 0 ? Math.min(a, b) : a < 0 && b < 0 ? Math.max(a, b) : 0; // the smaller of two rises of the same sign, else 0
-function salitaG(x, z, y) { return H.surface(x, z, y + 0.6); }
+function salitaG(x, z, y) { return walkGround(x, z, y + 0.6, 0); } // the ground, the decks and the roofs
 function footSlope(dt) { // on the ground, before the step: P.vx, P.vz are the walk he wants; this bends them to the slope and adds the slide
   const S = SALITA, p = S.passo, y = P.y, g0 = salitaG(P.x, P.z, y), sp = hyp(P.vx, P.vz), R = Math.PI / 180;
   if (sp > 0.05) { // up the way he walks
@@ -9966,10 +10136,7 @@ function heliPush(p, r, ya, yb, skip) {
 /* what is under one point: the ground and the decks, a roof, a tree's crown, a car's roof; y = the height of the skids */
 function heliFloorAt(x, z, y) {
   let f = H.surface(x, z, y + 0.6), k = 'suolo';
-  BLD.each(x, z, x, z, b => {
-    if (x < b.bb[0] || x > b.bb[2] || z < b.bb[1] || z > b.bb[3] || !inPoly(x, z, b.pts) || b.holes.some(q => inPoly(x, z, q))) return;
-    const t = (b.gtop !== undefined ? b.gtop : (b.gtop = bldTop(b))) + roofAt(b, x, z); if (t <= y + 1.0 && t > f) { f = t; k = 'tetto'; }
-  });
+  { const t = bldFloorAt(x, z, y + 1.0); if (t > f) { f = t; k = 'tetto'; } } /* roofs, pitches and canopies as the walker sees them (world3.js bldRoofY) */
   WALLS.each(x - 2, z - 2, x + 2, z + 2, s => { if (s.tree && s.y1 <= y + 1.0 && s.y1 > f && hyp(x - s.x, z - s.z) < 2) { f = s.y1; k = 'albero'; } });
   for (const v of VEH) if (Math.abs(v.x - x) < 4 && Math.abs(v.z - z) < 4) { const t = v.y + (v.spec.two ? 1.1 : 1.45); if (t <= y + 1.0 && t > f) for (const c of v.circles()) if (hyp(c[0] - x, c[1] - z) < v.rad) { f = t; k = 'auto'; break; } }
   return [f, k];
@@ -10084,10 +10251,10 @@ function heliEnter() {
   return true;
 }
 function heliExit() {
-  const e = P.car, [x, z] = exitSpot(e), alto = e.alto;
+  const e = P.car, [x, z, ey] = exitSpot(e), alto = e.alto; /* ey: the feet there, a roof as well as the ground */
   P.x = x; P.z = z; P.h = e.h; P.mode = 'foot'; P.model.g.visible = true; e.driver = null; P.car = null; P.vx = P.vz = P.vy = 0;
   if (alto > 1.5) { P.y = e.y + 0.3; P.knock = Math.sqrt(2 * (alto + 0.3) / 22) + 0.8; P.vx = e.vx * 0.8; P.vz = e.vz * 0.8; P.cadutaEli = P.y; } /* out in the air: he falls */
-  else P.y = H.surface(x, z, e.y + 0.5);
+  else P.y = ey;
 }
 /* drawn each frame between the physics steps: the body, the rotors turning, the blur of the rotor, the smoke of a damaged one */
 function heliDraw(dt) {
@@ -11690,5 +11857,5 @@ window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { HELIS, HELI, heliStep, camPosOf: () => camera.position, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { HELIS, HELI, heliStep, camPosOf: () => camera.position, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>

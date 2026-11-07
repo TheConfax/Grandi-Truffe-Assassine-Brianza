@@ -210,18 +210,19 @@ function fisRig(v, yf, yb, ty, fs) {
   for (let i = 0; i < F.n; i++) { F.x[i] = -F.droop; F.off[i] = lerp(F.off[i], -Math.min(F.droop, 0.2), 0.5); }
   v.fpBusy = true;
 }
-// where he gets out: the side as ever if it is free, else the first free place round the car, on this side of any wall. A car on its roof against a wall lets him out too
+// where he gets out: the side as ever if it is free, else the first free place round the car, on this side of any wall. A car on its roof against a wall lets him out too.
+// [x, z, the height of his feet]: a roof is a place like the ground (Carlo, 7/11: out of the helicopter on a roof he stays on the roof)
 function exitSpot(v) {
   const S = v.spec, sh = Math.sin(v.h), ch = Math.cos(v.h), L = [[1.6, 0], [-1.6, 0]], hl = S.L / 2 + 0.45;
   for (const q of [[1.6, 1.2], [-1.6, 1.2], [1.6, -1.2], [-1.6, -1.2], [0, hl], [0, -hl]]) L.push(q);
   for (let r = Math.max(2.4, hl); r < 14; r += 1) for (let n = 0; n < 16; n++) L.push([Math.cos(n * Math.PI / 8) * r, Math.sin(n * Math.PI / 8) * r]);
   for (let pass = 0; pass < 2; pass++) for (const [lx, lz] of L) {
-    const x = v.x + lx * ch + lz * sh, z = v.z - lx * sh + lz * ch, feet = H.surface(x, z, v.y + 0.5);
+    const x = v.x + lx * ch + lz * sh, z = v.z - lx * sh + lz * ch, feet = walkGround(x, z, v.y, 0.5);
     if (pass === 0 && (Math.abs(feet - v.y) > 2.5 || rayCam(v.x, v.z, x, z, feet + 1) < 1)) continue;
-    if (inBuilding(x, z, 0.4)) continue;
-    const c = capsuleFree(x, z, feet, 0.3, 0.4); if (!c || (pass === 1 && c === 'suolo')) return [x, z];
+    if (inBuildingAt(x, z, feet, 0.4, 0.05)) continue;
+    const c = capsuleFree(x, z, feet, 0.3, 0.4); if (!c || (pass === 1 && c === 'suolo')) return [x, z, feet];
   }
-  return [v.x + ch * 1.6, v.z - sh * 1.6];
+  const x = v.x + ch * 1.6, z = v.z - sh * 1.6; return [x, z, walkGround(x, z, v.y, 0.5)];
 }
 // the whole way of the frame, not only where it ends: at high speed a thin pole or a sign falls between two frames (Carlo, 30/10)
 function vehSweep(v, x0, z0) {

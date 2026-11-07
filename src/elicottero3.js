@@ -105,10 +105,7 @@ function heliPush(p, r, ya, yb, skip) {
 /* what is under one point: the ground and the decks, a roof, a tree's crown, a car's roof; y = the height of the skids */
 function heliFloorAt(x, z, y) {
   let f = H.surface(x, z, y + 0.6), k = 'suolo';
-  BLD.each(x, z, x, z, b => {
-    if (x < b.bb[0] || x > b.bb[2] || z < b.bb[1] || z > b.bb[3] || !inPoly(x, z, b.pts) || b.holes.some(q => inPoly(x, z, q))) return;
-    const t = (b.gtop !== undefined ? b.gtop : (b.gtop = bldTop(b))) + roofAt(b, x, z); if (t <= y + 1.0 && t > f) { f = t; k = 'tetto'; }
-  });
+  { const t = bldFloorAt(x, z, y + 1.0); if (t > f) { f = t; k = 'tetto'; } } /* roofs, pitches and canopies as the walker sees them (world3.js bldRoofY) */
   WALLS.each(x - 2, z - 2, x + 2, z + 2, s => { if (s.tree && s.y1 <= y + 1.0 && s.y1 > f && hyp(x - s.x, z - s.z) < 2) { f = s.y1; k = 'albero'; } });
   for (const v of VEH) if (Math.abs(v.x - x) < 4 && Math.abs(v.z - z) < 4) { const t = v.y + (v.spec.two ? 1.1 : 1.45); if (t <= y + 1.0 && t > f) for (const c of v.circles()) if (hyp(c[0] - x, c[1] - z) < v.rad) { f = t; k = 'auto'; break; } }
   return [f, k];
@@ -223,10 +220,10 @@ function heliEnter() {
   return true;
 }
 function heliExit() {
-  const e = P.car, [x, z] = exitSpot(e), alto = e.alto;
+  const e = P.car, [x, z, ey] = exitSpot(e), alto = e.alto; /* ey: the feet there, a roof as well as the ground */
   P.x = x; P.z = z; P.h = e.h; P.mode = 'foot'; P.model.g.visible = true; e.driver = null; P.car = null; P.vx = P.vz = P.vy = 0;
   if (alto > 1.5) { P.y = e.y + 0.3; P.knock = Math.sqrt(2 * (alto + 0.3) / 22) + 0.8; P.vx = e.vx * 0.8; P.vz = e.vz * 0.8; P.cadutaEli = P.y; } /* out in the air: he falls */
-  else P.y = H.surface(x, z, e.y + 0.5);
+  else P.y = ey;
 }
 /* drawn each frame between the physics steps: the body, the rotors turning, the blur of the rotor, the smoke of a damaged one */
 function heliDraw(dt) {
