@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo afdc6f7 · assemblato 07/11 23:39 · porta ' + location.port;
+    const txt = 'locale · ramo cimiteri-migliorati · dopo c6dcc20 · assemblato 07/11 23:56 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1728,7 +1728,7 @@ function postFree(x, z) {
   }
   POST_N.tolti++; return null;
 }
-Object.assign(window.__POSTF = window.__POSTF || {}, { postIn, postFree, offRoad, onAsph, nearAsph, hardAt, tileOf }); /* for the checks on the whole map (?tutto) */
+Object.assign(window.__POSTF = window.__POSTF || {}, { postIn, postFree, offRoad, onAsph, nearAsph, hardAt, tileOf, onAnyRoad, onFoot }); /* for the checks on the whole map (?tutto) */
 // the asphalt as drawn (tiles[t].as; in a comune with a DBGT its carriageways and car parks AC_VEI, docs/motore.md 7) is a street for all that
 // keeps off the streets (lamps, posts, signs, benches, guardrails): where a carriageway is wider than its axis says (parking lanes, junction
 // corners) the band of the axis alone let them stand on it. A bit grid at 0.5 m per tile, made the first time a tile is asked
@@ -4672,16 +4672,40 @@ function buildCemetery(T, G) {
     let ang = 0, best = 0; for (let i = 0; i < outer.length; i++) { const p = outer[i], q = outer[(i + 1) % outer.length], L = hyp(q[0] - p[0], q[1] - p[1]); if (L > best) { best = L; ang = Math.atan2(q[1] - p[1], q[0] - p[0]); } } // rows follow the longest wall
     const ux = Math.cos(ang), uz = Math.sin(ang), vx = -uz, vz = ux, cx = (bb[0] + bb[2]) / 2, cz = (bb[1] + bb[3]) / 2, R = hyp(bb[2] - bb[0], bb[3] - bb[1]) / 2;
     const inside = (x, z, m) => inPoly(x, z, outer) && !holes.some(h => inPoly(x, z, h)) && !inBuilding(x, z, m) && !onAnyRoad(x, z, 1.2) && !onFoot(x, z);
-    for (let i = -R; i <= R; i += 1.6) for (let j = -R; j <= R; j += 3.2) {
-      if (Math.abs((j / 3.2) % 5) < 0.01) continue; // a path every few rows
-      const x = cx + ux * i + vx * j, z = cz + uz * i + vz * j; if (x < bb[0] || x > bb[2] || z < bb[1] || z > bb[3]) continue;
-      if (inside(x, z, 1.2) && inside(x + vx * 1.2, z + vz * 1.2, 0.3) && inside(x - vx * 1.2, z - vz * 1.2, 0.3)) tombs.push([x, z, ang]);
+    /* graves in ordered rows, the headstone looking at the nearest path (Carlo 7/11): the map of the cemetery in cells of 0.5 m (cm: 0 not yet known, 1 free, 2 a path or any hard standing: hardAt, i.e. porphyry,
+       gravel, asphalt, footways, roads; 3 outside, hole or building). Each lawn (cells of 1 m joined together, bounded by paths) takes the rows of one of the two directions of the grid, whichever of
+       the two the paths are nearer along, and each grave looks at the nearer path of that axis. A cemetery with no path at all gets a lane every 16 m */
+    const CS = 0.5, nw = Math.ceil((bb[2] - bb[0]) / CS) + 1, nh = Math.ceil((bb[3] - bb[1]) / CS) + 1, cm = new Uint8Array(nw * nh); let lanes = false;
+    const cell = (x, z) => { const ci = Math.floor((x - bb[0]) / CS), cj = Math.floor((z - bb[1]) / CS); if (ci < 0 || cj < 0 || ci >= nw || cj >= nh) return 3; const k = cj * nw + ci; if (!cm[k]) { const X = bb[0] + (ci + 0.5) * CS, Z = bb[1] + (cj + 0.5) * CS; const jv = (X - cx) * vx + (Z - cz) * vz; cm[k] = !inPoly(X, Z, outer) || holes.some(h => inPoly(X, Z, h)) || inBuilding(X, Z, 0) ? 3 : lanes && Math.abs(jv - 16 * Math.round(jv / 16)) < 1 || hardAt(X, Z) || onAnyRoad(X, Z, 0) || onFoot(X, Z) ? 2 : 1; } return cm[k]; };
+    let anyPath = false; for (let x = bb[0]; x <= bb[2] && !anyPath; x += 1) for (let z = bb[1]; z <= bb[3]; z += 1) if (cell(x, z) === 2) { anyPath = true; break; }
+    if (!anyPath) { lanes = true; cm.fill(0); }
+    const free = (x, z, hx, hz, sx, sz) => { for (let l = -1.35; l <= 1.36; l += 0.45) for (let w = -0.83; w <= 0.84; w += 0.415) if (cell(x + hx * l + sx * w, z + hz * l + sz * w) !== 1) return false; return true; };
+    const dir = [[ux, uz], [-ux, -uz], [vx, vz], [-vx, -vz]];
+    const reach = (x, z, k) => { for (let d = 0.5; d < 90; d += 0.5) { const c = cell(x + dir[k][0] * d, z + dir[k][1] * d); if (c === 2) return d; if (c === 3) return 1e9; } return 1e9; }; /* how far to a path along one of the four directions */
+    const GS = 2, gw = Math.ceil((bb[2] - bb[0]) / GS) + 1, gh = Math.ceil((bb[3] - bb[1]) / GS) + 1, fv = new Int8Array(gw * gh); /* the direction of the rows for each cell of 2 m: 1 the nearer path is along u, 2 along v, 0 none or not a lawn */
+    for (let cj = 0; cj < gh; cj++) for (let ci = 0; ci < gw; ci++) { const X = bb[0] + (ci + 0.5) * GS, Z = bb[1] + (cj + 0.5) * GS; if (cell(X, Z) !== 1) continue; const a0 = Math.min(reach(X, Z, 0), reach(X, Z, 1)), a1 = Math.min(reach(X, Z, 2), reach(X, Z, 3)); if (a0 < 1e8 || a1 < 1e8) fv[cj * gw + ci] = a0 < a1 ? 1 : 2; }
+    const famOf = (x, z) => { const ci = Math.floor((x - bb[0]) / GS), cj = Math.floor((z - bb[1]) / GS); let n1 = 0, n2 = 0; for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const a = ci + di, b = cj + dj; if (a < 0 || b < 0 || a >= gw || b >= gh) continue; const f = fv[b * gw + a]; if (f === 1) n1++; else if (f === 2) n2++; } return n1 > n2 ? 0 : 2; }; /* the rows of a place: the way most of the cells round it go, so that a block keeps one direction */
+    const rect = (x, z, k) => { const al = k < 2 ? 1.0 : 0.475, bl = k < 2 ? 0.475 : 1.0, cu = (x - cx) * ux + (z - cz) * uz, cv = (x - cx) * vx + (z - cz) * vz; return [cu - al - 0.25, cu + al + 0.25, cv - bl - 0.25, cv + bl + 0.25]; }; /* in the frame of the rows, with a gap */
+    const taken = new Map();
+    for (const fam of [2, 0]) {
+      const su = fam === 2 ? 1.6 : 3.2, sv = fam === 2 ? 3.2 : 1.6;
+      for (let i = -R; i <= R; i += su) for (let j = -R; j <= R; j += sv) {
+        const x = cx + ux * i + vx * j, z = cz + uz * i + vz * j; if (x < bb[0] || x > bb[2] || z < bb[1] || z > bb[3]) continue;
+        if (cell(x, z) !== 1 || famOf(x, z) !== fam) continue;
+        const k0 = fam, d0 = reach(x, z, k0), d1 = reach(x, z, k0 + 1), kk = d1 < d0 ? k0 + 1 : k0 === 2 && d0 > 1e8 ? 3 : k0; /* the nearer of the two paths of the axis (none: head to +v, as it was) */
+        const hd = [-dir[kk][0], -dir[kk][1]], a = Math.atan2(-hd[0], hd[1]); /* head away from the path: the headstone looks at it */
+        const hx = hd[0], hz = hd[1], sx = Math.cos(a), sz = Math.sin(a); if (!free(x, z, hx, hz, sx, sz)) continue;
+        const r = rect(x, z, kk); let bad = false; for (let ia = Math.floor(r[0] / 4); ia <= Math.floor(r[1] / 4) && !bad; ia++) for (let ib = Math.floor(r[2] / 4); ib <= Math.floor(r[3] / 4) && !bad; ib++) for (const o of taken.get(ia * 100003 + ib) || []) if (o[0] < r[1] && o[1] > r[0] && o[2] < r[3] && o[3] > r[2]) { bad = true; break; }
+        if (bad) continue;
+        for (let ia = Math.floor(r[0] / 4); ia <= Math.floor(r[1] / 4); ia++) for (let ib = Math.floor(r[2] / 4); ib <= Math.floor(r[3] / 4); ib++) { const hk = ia * 100003 + ib; if (!taken.has(hk)) taken.set(hk, []); taken.get(hk).push(r); }
+        tombs.push([x, z, a]);
+      }
     }
     for (let i = 0; i < outer.length; i++) { const p = outer[i], q = outer[(i + 1) % outer.length], L = hyp(q[0] - p[0], q[1] - p[1]); for (let s = 4; s < L - 2; s += 9) { const t = s / L, x = lerp(p[0], q[0], t), z = lerp(p[1], q[1], t), mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let nx = -(q[1] - p[1]) / L, nz = (q[0] - p[0]) / L; if (!inPoly(x + nx * 2, z + nz * 2, outer)) { nx = -nx; nz = -nz; } const X = x + nx * 2.2, Z = z + nz * 2.2; if (inside(X, Z, 1)) cyps.push([X, Z]); } }
   }
   if (!tombs.length && !cyps.length) return;
   if (!T.cemDone) { /* graves are solid (Carlo, 2/11): two discs per slab, which you can walk up onto (28 cm), a disc for the headstone; a disc for each cypress */
-    T.cemDone = true; window.__COLL = window.__COLL || {}; window.__COLL.tombe = (window.__COLL.tombe || 0) + tombs.length;
+    T.cemDone = true; (window.__TOMBE = window.__TOMBE || []).push(...tombs); window.__COLL = window.__COLL || {}; window.__COLL.tombe = (window.__COLL.tombe || 0) + tombs.length;
     T.tombe = tombs.map(([x, z, a], i) => tombaSolida(T, x, z, a, i)); /* a car breaks them (sfondabili3.js) */
     for (const c of cyps) WALLS.add(c[0] - 0.35, c[1] - 0.35, c[0] + 0.35, c[1] + 0.35, { r: 0.35, x: c[0], z: c[1], y0: H.ground(c[0], c[1]) - 3, y1: H.ground(c[0], c[1]) + 8 });
   }
