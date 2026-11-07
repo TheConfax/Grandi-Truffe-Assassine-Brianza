@@ -59,13 +59,16 @@ def _resample(xy, step):
 # (Carlo 6/11, corso Isonzo: "guardrail storto accanto al parapetto invece di continuarlo") a guardrail that ends by a bridge goes on to the end of the parapet of
 # the deck: its last RACCORDO m are a straight line to the nearest corner of the PONTE (the deck outline the parapets follow, terreno/indice.json nucleo)
 RACCORDO = 4.0
-def _angoli_parapetti():
+def _angoli_parapetti(UXb=None):
     import os, json
     f = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json')
     if not os.path.exists(f): return None
     ind = json.load(open(f, encoding='utf-8')); base = 0.0; V = []
     for d in ind.get('decks', []):
         if d.get('tipo') not in ('strada', 'ferro') or not d.get('nucleo'): continue
+        # only the bridges that carry the expressway itself (its carriageway on a bridge, UXb): not an overpass over it (Carlo 7/11, via Vignazzola: a piece of the
+        # Milano-Meda's guardrail drawn on the carriageway of the bridge over it)
+        if UXb is None or UXb.is_empty or Polygon(d['nucleo']).buffer(0).intersection(UXb).area < 0.3 * Polygon(d['nucleo']).buffer(0).area: continue
         T = np.asarray(d['tri'], float).reshape(-1, 3)
         for q in d['nucleo']: V.append((q[0], q[1], T[np.argmin(np.hypot(T[:, 0] - q[0], T[:, 1] - q[1])), 2]))   # (x, z, the top of the deck there, m)
     return np.asarray(V, float) if V else None
@@ -296,7 +299,7 @@ def guardrail(D, cover, U_carr, raw_roads, nodes, zh=None, log=print, innesti=Tr
             pt = Point(q); j = XT.query(pt.buffer(25))
             if len(j): rs.add(min((X[k] for k in j), key=lambda ri: lin[ri].distance(pt)))
         return sorted(rs)
-    angoli = _angoli_parapetti(); _al_parapetto.n = 0
+    angoli = _angoli_parapetti(UXb); _al_parapetto.n = 0
     for L in gl:
         P = _resample(np.asarray(L.coords), 1.0); closed = L.is_closed
         if len(P) >= 5:

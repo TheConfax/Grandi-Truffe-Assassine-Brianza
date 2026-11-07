@@ -112,12 +112,12 @@
    }
   ],
   "n_luoghi": 1,
-  "punti_controllati": 11360,
-  "bordo_punti": 81,
-  "bordo_luoghi": 21
+  "punti_controllati": 11362,
+  "bordo_punti": 83,
+  "bordo_luoghi": 23
  },
  "A3": {
-  "celle_sotto_impalcati_con_strada_disegnata": 202,
+  "celle_sotto_impalcati_con_strada_disegnata": 176,
   "dipinte": 0,
   "m2": 0.0,
   "impalcati": [],
@@ -136,7 +136,7 @@
    39,
    40
   ],
-  "celle_segnate_sotto_impalcato": 1132,
+  "celle_segnate_sotto_impalcato": 1096,
   "luoghi": []
  },
  "A4": {
@@ -845,7 +845,7 @@
   "acqua_sulle_strade_luoghi": 3,
   "strade_sfondate_punti": 2,
   "strade_sfondate_luoghi": 1,
-  "strade_sfondate_bordo_punti": 81,
+  "strade_sfondate_bordo_punti": 83,
   "dipinte_sotto_impalcati_celle": 0,
   "dipinte_sotto_impalcati_ponti": 0,
   "ringhiere_m": 0,
@@ -856,6 +856,6 @@
   "tombini_sotto_strade": 48,
   "tombini_sotto_strade_sfondati": 1,
   "prove_fisse_ok": "4 su 4",
-  "tempo_s": 25.6
+  "tempo_s": 53.3
  }
 }

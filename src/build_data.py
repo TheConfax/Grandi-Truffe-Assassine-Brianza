@@ -921,12 +921,18 @@ railL = [LineString(p) for p in rails if len(p) >= 2]
 # where the rail fences open (the corridor fences and the fill-in below computed these same lists one after the other): the level crossings
 # of the flat streets and the track ends here, their unions with the platforms and the buildings, and the 4.2 m strip, on threads
 xpts = []
+# (Carlo 7/11, Seveso x 421 z 2243: the railway fence stopped on both sides of the Milano-Meda bridge, the tracks open under it) a road crossing the
+# tracks in plan under a deck (or the tracks on a deck over it) is not a level crossing: the two are at different levels, the fence goes on
+_ind_f = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json')
+_impalc = unary_union([Polygon(d_['imp']).buffer(2.0) for d_ in (json.load(open(_ind_f, encoding='utf-8')).get('decks', []) if os.path.exists(_ind_f) else []) if d_.get('tipo') != 'copertura' and len(d_.get('imp', [])) >= 3])
 for r in raw_roads:
     if not flat(r) or r['c'] > 6: continue
     for l in railL:
         if r['line'].distance(l) > 0.01: continue
         x_ = r['line'].intersection(l)
-        for g_ in ([x_] if x_.geom_type == 'Point' else [g for g in getattr(x_, 'geoms', []) if g.geom_type == 'Point']): xpts.append(g_.buffer(r['w'] / 2 + 3.5))
+        for g_ in ([x_] if x_.geom_type == 'Point' else [g for g in getattr(x_, 'geoms', []) if g.geom_type == 'Point']):
+            if not _impalc.is_empty and _impalc.contains(g_): continue
+            xpts.append(g_.buffer(r['w'] / 2 + 3.5))
 tips = [c for i, l in enumerate(railL) for c in (l.coords[0], l.coords[-1]) if not any(l2.distance(Point(c)) < 1.0 for j, l2 in enumerate(railL) if j != i)]
 _openings_f = presto(lambda: unary_union(xpts + [_plat06.result(), _bunb[0.3].result()] + [Point(c).buffer(9) for c in tips]))
 _r42_f = [presto(lambda: unary_union([l.buffer(4.2, cap_style=2) for l in railL]))]
@@ -969,6 +975,17 @@ if dbt_walls:  # the railway fences stay where the DBGT has none of its own with
     _dw = [LineString(p_) for p_, t_ in dbt_walls]; _dwt = STRtree(_dw); _fk = []
     for f_ in fences:
         L_ = LineString(f_); near_ = [_dw[j] for j in _dwt.query(L_.buffer(3))]
+        # (Carlo 7/11, Seveso x 421 z 2243: two DBGT dividers across the tracks under the Milano-Meda took 8 m of the railway fence each) only a divider that
+        # runs along the fence stands for it: its pieces within 30 degrees of the fence nearby
+        def _lungo_(n_):
+            out_ = []
+            for a_, b_ in zip(n_.coords[:-1], n_.coords[1:]):
+                sg_ = LineString([a_, b_]); dl_ = sg_.length
+                if dl_ < 0.05 or sg_.distance(L_) > 3: continue
+                s_ = L_.project(sg_.interpolate(0.5, normalized=True)); p0_, p1_ = L_.interpolate(max(0, s_ - 1)), L_.interpolate(min(L_.length, s_ + 1)); fl_ = p0_.distance(p1_) or 1
+                if abs(((b_[0] - a_[0]) * (p1_.x - p0_.x) + (b_[1] - a_[1]) * (p1_.y - p0_.y)) / (dl_ * fl_)) > 0.87: out_.append(sg_)
+            return out_
+        near_ = [q_ for n_ in near_ for q_ in _lungo_(n_)]
         rest_ = L_.difference(unary_union([n_.buffer(3) for n_ in near_])) if near_ else L_
         for part in (list(rest_.geoms) if hasattr(rest_, 'geoms') else [rest_]):
             if isinstance(part, LineString) and part.length > 2: _fk.append(list(part.coords))

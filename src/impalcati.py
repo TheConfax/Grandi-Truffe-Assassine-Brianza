@@ -32,6 +32,7 @@ RAMPA_PEND = {'strada': 0.10, 'ferro': 0.04, 'pedonale': 0.12}   # the steepest 
 DENTRO_BUF, DENTRO_FRAC, DENTRO_DZ = 1.5, 0.6, 1.5   # a deck with this share of its footprint within DENTRO_BUF m of bigger ones, its top within DENTRO_DZ m of theirs, is a piece of them
 EDIFICIO_CAPO = 3.0   # m: an end with a building this near beyond it ends at the building (no ramp)
 WIN = max(EXT_MAX, RAMPA_MAX) + 2 * SF
+END_W = 4.0   # m: the end of a PONTE whose width the cells past it keep (Impalcati.striscia)
 SENTIERI = {'footway', 'path', 'cycleway', 'track', 'bridleway', 'steps', 'pedestrian'}   # the ways that make a bridge a footbridge when they are all it links   # m: the window round a PONTE where its ends are looked for
 def tol(tipo, ped=False): return LEVEL_PED if (tipo == 'pedonale' or ped) else LEVEL_TOL
 RC = 10.0         # the pull of the deck top onto the ground at its spalle fades over about this distance
@@ -459,18 +460,15 @@ class Impalcati:
         if not E: E = [e for e in getattr(s.s, 'edifici', []) if e is not None and not e.is_empty]
         s.case = shapely.STRtree(E)
 
-    def striscia(s, core):   # the strip of the PONTE past its ends: between its two long sides carried on straight (each the line of its longest side along dir), WIN m past each end
-        dv = np.asarray(core['dir'], float); nv = np.array([-dv[1], dv[0]]); P = np.asarray(core['g'].exterior.coords)
-        u, v = P @ dv, P @ nv; u0, u1 = u.min() - WIN, u.max() + WIN; vc = (v.min() + v.max()) / 2; lati = {}
-        for a, b in zip(P[:-1], P[1:]):
-            e = b - a; L = np.hypot(*e)
-            if L < 1.0 or abs(e @ dv) / L < 0.9: continue
-            k = int(((a + b) / 2) @ nv > vc)
-            if k not in lati or L > lati[k][2]: lati[k] = (a, e / L, L)
-        if len(lati) < 2: return Polygon([dv * a + nv * b for a, b in ((u0, v.min()), (u1, v.min()), (u1, v.max()), (u0, v.max()))])
-        def su(k, uu): a, e, _ = lati[k]; return a + e * (uu - a @ dv) / (e @ dv)   # the point of side k at the distance uu along dir
-        q = Polygon([su(0, u0), su(0, u1), su(1, u1), su(1, u0)])
-        return q if q.is_valid and q.area > 0 else q.buffer(0)
+    def striscia(s, core):   # the strip of the PONTE past its ends: at each end the width of the PONTE there (its outline within END_W m of the end), carried on straight along dir
+        # (Carlo 7/11, via Vignazzola: the longest side of a curved PONTE carried on cut a corner off the deck end, a notch with a parapet and walls in the carriageway)
+        dv = np.asarray(core['dir'], float); nv = np.array([-dv[1], dv[0]]); P = np.asarray(core['g'].exterior.coords); u, v = P @ dv, P @ nv; out = [core['g']]
+        for sg, e in ((-1, u.min()), (1, u.max())):
+            k = np.abs(u - e) < END_W
+            if k.sum() < 2: k = np.ones(len(u), bool)
+            v0, v1 = v[k].min(), v[k].max(); a, b = (e - END_W, e + WIN) if sg > 0 else (e - WIN, e + END_W)
+            out.append(Polygon([dv * x + nv * y for x, y in ((a, v0), (b, v0), (b, v1), (a, v1))]))
+        return shapely.union_all(out)
 
     def davanti_casa(s, pe, dv, sg):   # a building within EDIFICIO_CAPO past the end points pe (direction dv, side sg)
         s.carica_case()

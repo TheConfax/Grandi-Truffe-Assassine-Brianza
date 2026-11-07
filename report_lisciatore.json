@@ -1866,10 +1866,10 @@
 }
 },
 "terreno": {
-"nodi_sul_profilo": 47322,
+"nodi_sul_profilo": 47325,
 "nodi_attorno": 812,
 "mossi_sul_profilo_m": {
-"n": 47322,
+"n": 47325,
 "p50": 0.041,
 "p90": 0.308,
 "p99": 0.659,
@@ -1890,8 +1890,8 @@
 }
 },
 "bordo_barriere": {
-"metri_di_recinzione": 2544,
-"nodi": 1256,
+"metri_di_recinzione": 2556,
+"nodi": 1257,
 "mossi_m": {
 "p50": 0.41,
 "p90": 0.72,
@@ -2579,13 +2579,13 @@
 "dente_su_m": 6.36,
 "dente_giu_m": -1.5,
 "buche_m": {
-"n": 109125,
+"n": 109126,
 "p50": 0.5,
 "p90": 1.59,
 "p99": 2.79,
 "max": 6.0
 },
-"nodi_mossi": 526367,
+"nodi_mossi": 526368,
 "nodi_griglia": 7880626,
 "limite_dente_m": 1.5
 },
@@ -2601,7 +2601,7 @@
 "tombini_sotto_i_binari": 6,
 "ferrovia": 0,
 "ferrovia_sul_profilo": 11867,
-"ferrovia_sotto_le_recinzioni_sulle_strade": 618,
+"ferrovia_sotto_le_recinzioni_sulle_strade": 620,
 "rampe": 0
 },
 "gradini_cresciuti": {

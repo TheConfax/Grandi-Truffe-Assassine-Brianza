@@ -8,13 +8,13 @@
  "gradino": {
   "n": 86,
   "p50": 0.01,
-  "p90": 0.055,
+  "p90": 0.085,
   "p99": 2.146,
   "max": 3.71
  },
  "vuoto": {
   "n": 86,
-  "p50": -0.51,
+  "p50": -0.515,
   "p90": 0,
   "p99": 2.139,
   "max": 3.38
@@ -61,7 +61,7 @@
    "x": -501.8,
    "z": 131.6,
    "gradino": 0.68,
-   "vuoto": 1.35,
+   "vuoto": 1.36,
    "link": "?x=-501.8&z=131.6",
    "stato": "fuori"
   },
@@ -116,10 +116,10 @@
    "continua": 0,
    "edificio": 1,
    "x": 723.2,
-   "z": -1416.9,
+   "z": -1417,
    "gradino": 0.02,
    "vuoto": -0.5,
-   "link": "?x=723.2&z=-1416.9",
+   "link": "?x=723.2&z=-1417.0",
    "stato": "ok"
   },
   {
@@ -142,9 +142,9 @@
    "tipo": "pedonale",
    "fonte": "PONTE 2",
    "capo": "fine",
-   "punti": 9,
+   "punti": 12,
    "continua": 0,
-   "edificio": 7,
+   "edificio": 9,
    "stato": "prosegue"
   },
   {
@@ -308,7 +308,7 @@
    "x": 86.2,
    "z": 231.6,
    "gradino": 0.01,
-   "vuoto": -0.46,
+   "vuoto": -0.47,
    "link": "?x=86.2&z=231.6",
    "stato": "ok"
   },
@@ -392,14 +392,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10",
    "capo": "inizio",
-   "punti": 31,
+   "punti": 33,
    "continua": 0,
    "edificio": 0,
-   "x": 72.5,
+   "x": 73,
    "z": 229.6,
    "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=72.5&z=229.6",
+   "link": "?x=73.0&z=229.6",
    "stato": "ok"
   },
   {
@@ -407,14 +407,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10",
    "capo": "fine",
-   "punti": 19,
+   "punti": 13,
    "continua": 0,
    "edificio": 0,
-   "x": 76,
+   "x": 74.5,
    "z": 195.6,
    "gradino": 0.01,
    "vuoto": -0.9,
-   "link": "?x=76.0&z=195.6",
+   "link": "?x=74.5&z=195.6",
    "stato": "ok"
   },
   {
@@ -452,14 +452,14 @@
    "tipo": "strada",
    "fonte": "PONTE 12",
    "capo": "inizio",
-   "punti": 8,
+   "punti": 4,
    "continua": 0,
    "edificio": 0,
-   "x": -555.8,
-   "z": 147.6,
-   "gradino": 0,
-   "vuoto": 0,
-   "link": "?x=-555.8&z=147.6",
+   "x": -556.8,
+   "z": 148.6,
+   "gradino": 0.15,
+   "vuoto": -0.44,
+   "link": "?x=-556.8&z=148.6",
    "stato": "ok"
   },
   {
@@ -473,7 +473,7 @@
    "x": -501.8,
    "z": 131.6,
    "gradino": 0.68,
-   "vuoto": 1.35,
+   "vuoto": 1.36,
    "link": "?x=-501.8&z=131.6",
    "stato": "fuori"
   },
@@ -617,14 +617,14 @@
    "tipo": "strada",
    "fonte": "PONTE 16",
    "capo": "fine",
-   "punti": 17,
+   "punti": 19,
    "continua": 0,
    "edificio": 0,
-   "x": 83,
-   "z": -204.4,
+   "x": 83.2,
+   "z": -205.2,
    "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=83.0&z=-204.4",
+   "link": "?x=83.2&z=-205.2",
    "stato": "ok"
   },
   {
@@ -672,14 +672,14 @@
    "tipo": "strada",
    "fonte": "PONTE 18",
    "capo": "fine",
-   "punti": 16,
+   "punti": 17,
    "continua": 0,
    "edificio": 0,
-   "x": 777.2,
+   "x": 777.5,
    "z": -1448.4,
    "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=777.2&z=-1448.4",
+   "link": "?x=777.5&z=-1448.4",
    "stato": "ok"
   },
   {
@@ -798,7 +798,7 @@
    "x": -1359.2,
    "z": 679.6,
    "gradino": 0.11,
-   "vuoto": -0.55,
+   "vuoto": -0.52,
    "link": "?x=-1359.2&z=679.6",
    "stato": "ok"
   },
@@ -822,9 +822,9 @@
    "tipo": "pedonale",
    "fonte": "PONTE 10000010",
    "capo": "fine",
-   "punti": 8,
+   "punti": 9,
    "continua": 0,
-   "edificio": 8,
+   "edificio": 9,
    "stato": "prosegue"
   },
   {
@@ -838,7 +838,7 @@
    "x": -1128.8,
    "z": 333.8,
    "gradino": 0,
-   "vuoto": -0.5,
+   "vuoto": -0.89,
    "link": "?x=-1128.8&z=333.8",
    "stato": "ok"
   },
@@ -847,14 +847,14 @@
    "tipo": "pedonale",
    "fonte": "PONTE 10000011",
    "capo": "fine",
-   "punti": 12,
+   "punti": 11,
    "continua": 0,
    "edificio": 0,
-   "x": -1113.8,
-   "z": 336.3,
+   "x": -1114.8,
+   "z": 336,
    "gradino": 0.06,
-   "vuoto": -0.25,
-   "link": "?x=-1113.8&z=336.3",
+   "vuoto": 0,
+   "link": "?x=-1114.8&z=336.0",
    "stato": "ok"
   },
   {
@@ -907,14 +907,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000013",
    "capo": "fine",
-   "punti": 15,
+   "punti": 12,
    "continua": 0,
    "edificio": 0,
    "x": -476.8,
-   "z": 1251.3,
+   "z": 1250.6,
    "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=-476.8&z=1251.3",
+   "link": "?x=-476.8&z=1250.6",
    "stato": "ok"
   },
   {
@@ -922,14 +922,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000014",
    "capo": "inizio",
-   "punti": 45,
+   "punti": 44,
    "continua": 0,
    "edificio": 0,
-   "x": 414.9,
+   "x": 415.2,
    "z": 2217.6,
    "gradino": 0,
    "vuoto": 0,
-   "link": "?x=414.9&z=2217.6",
+   "link": "?x=415.2&z=2217.6",
    "stato": "ok"
   },
   {
@@ -967,14 +967,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000015",
    "capo": "fine",
-   "punti": 19,
+   "punti": 13,
    "continua": 0,
    "edificio": 0,
-   "x": -760.8,
-   "z": 2262.3,
+   "x": -761.5,
+   "z": 2261.6,
    "gradino": 0.01,
    "vuoto": -0.9,
-   "link": "?x=-760.8&z=2262.3",
+   "link": "?x=-761.5&z=2261.6",
    "stato": "ok"
   },
   {
@@ -1042,14 +1042,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000018",
    "capo": "inizio",
-   "punti": 21,
+   "punti": 20,
    "continua": 0,
    "edificio": 0,
    "x": -1250.8,
-   "z": 1092.8,
+   "z": 1092.6,
    "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=-1250.8&z=1092.8",
+   "link": "?x=-1250.8&z=1092.6",
    "stato": "ok"
   },
   {
@@ -1072,14 +1072,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000019",
    "capo": "inizio",
-   "punti": 9,
+   "punti": 10,
    "continua": 0,
-   "edificio": 5,
+   "edificio": 6,
    "x": -352.8,
-   "z": 896.6,
+   "z": 896.7,
    "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=-352.8&z=896.6",
+   "link": "?x=-352.8&z=896.7",
    "stato": "ok"
   },
   {
@@ -1102,14 +1102,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000020",
    "capo": "inizio",
-   "punti": 48,
+   "punti": 46,
    "continua": 0,
    "edificio": 0,
-   "x": -1344.7,
-   "z": 667.7,
+   "x": -1344.8,
+   "z": 668.1,
    "gradino": 0.03,
    "vuoto": -0.9,
-   "link": "?x=-1344.7&z=667.7",
+   "link": "?x=-1344.8&z=668.1",
    "stato": "ok"
   },
   {
@@ -1177,14 +1177,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000022",
    "capo": "fine",
-   "punti": 10,
+   "punti": 8,
    "continua": 0,
    "edificio": 0,
-   "x": 361.7,
+   "x": 363.2,
    "z": 2017.6,
-   "gradino": 0,
+   "gradino": 0.02,
    "vuoto": -0.9,
-   "link": "?x=361.7&z=2017.6",
+   "link": "?x=363.2&z=2017.6",
    "stato": "ok"
   },
   {
@@ -1237,14 +1237,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000024",
    "capo": "fine",
-   "punti": 16,
+   "punti": 20,
    "continua": 0,
    "edificio": 0,
    "x": -0.8,
-   "z": 773.6,
-   "gradino": 0.02,
+   "z": 772.6,
+   "gradino": 0,
    "vuoto": 0,
-   "link": "?x=-0.8&z=773.6",
+   "link": "?x=-0.8&z=772.6",
    "stato": "ok"
   },
   {
@@ -1252,14 +1252,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000025",
    "capo": "inizio",
-   "punti": 18,
+   "punti": 17,
    "continua": 0,
    "edificio": 0,
    "x": -6.8,
-   "z": 947.1,
+   "z": 947.4,
    "gradino": 0.02,
    "vuoto": 0,
-   "link": "?x=-6.8&z=947.1",
+   "link": "?x=-6.8&z=947.4",
    "stato": "ok"
   },
   {
@@ -1318,7 +1318,7 @@
    "x": -2584.8,
    "z": 1475.9,
    "gradino": 0.01,
-   "vuoto": -0.51,
+   "vuoto": -0.52,
    "link": "?x=-2584.8&z=1475.9",
    "stato": "ok"
   },
@@ -1333,7 +1333,7 @@
    "x": -2596.8,
    "z": 1481.6,
    "gradino": 0.03,
-   "vuoto": -0.52,
+   "vuoto": -0.51,
    "link": "?x=-2596.8&z=1481.6",
    "stato": "ok"
   },
@@ -1430,13 +1430,13 @@
  ],
  "soglia": "0 capi fuori",
  "ok": false,
- "tempo_s": 1.9,
+ "tempo_s": 6.8,
  "barriere": {
   "decks": 45,
-  "parapetti_m": 1887.4,
-  "muri": 1037,
+  "parapetti_m": 1953.3,
+  "muri": 875,
   "accavallati_m": 0,
-  "scatti": 106,
+  "scatti": 102,
   "in_strada": 8,
   "posti_accavallati": [],
   "posti_scatti": [
@@ -1456,9 +1456,9 @@
    },
    {
     "fonte": "PONTE 10000020",
-    "x": -1325.8,
-    "z": 672.6,
-    "link": "?x=-1325.8&z=672.6",
+    "x": -1327.8,
+    "z": 670.6,
+    "link": "?x=-1327.8&z=670.6",
     "n": 6
    },
    {
@@ -1511,6 +1511,13 @@
     "n": 3
    },
    {
+    "fonte": "PONTE 10000024",
+    "x": -4.5,
+    "z": 766.1,
+    "link": "?x=-4.5&z=766.1",
+    "n": 3
+   },
+   {
     "fonte": "PONTE 10000018",
     "x": -1241,
     "z": 1085.6,
@@ -1525,20 +1532,6 @@
     "n": 3
    },
    {
-    "fonte": "PONTE 10000022",
-    "x": 334,
-    "z": 2007.6,
-    "link": "?x=334&z=2007.6",
-    "n": 3
-   },
-   {
-    "fonte": "PONTE 10000022",
-    "x": 354.8,
-    "z": 1987.6,
-    "link": "?x=354.8&z=1987.6",
-    "n": 3
-   },
-   {
     "fonte": "PONTE 10000014",
     "x": 412.8,
     "z": 2270.1,
@@ -1547,23 +1540,16 @@
    },
    {
     "fonte": "PONTE 12",
-    "x": -527.9,
-    "z": 155.4,
-    "link": "?x=-527.9&z=155.4",
+    "x": -506.4,
+    "z": 128.1,
+    "link": "?x=-506.4&z=128.1",
     "n": 2
    },
    {
     "fonte": "PONTE 12",
-    "x": -502.8,
-    "z": 131.6,
-    "link": "?x=-502.8&z=131.6",
-    "n": 2
-   },
-   {
-    "fonte": "PONTE 8",
-    "x": 69.2,
-    "z": 364.8,
-    "link": "?x=69.2&z=364.8",
+    "x": -539.9,
+    "z": 135.6,
+    "link": "?x=-539.9&z=135.6",
     "n": 2
    },
    {
@@ -1630,13 +1616,6 @@
     "n": 2
    },
    {
-    "fonte": "PONTE 10000022",
-    "x": 363.1,
-    "z": 2014.4,
-    "link": "?x=363.1&z=2014.4",
-    "n": 2
-   },
-   {
     "fonte": "PONTE 10000014",
     "x": 407.4,
     "z": 2252.4,
@@ -1644,10 +1623,31 @@
     "n": 2
    },
    {
-    "fonte": "PONTE 9",
-    "x": 88.7,
-    "z": 231.6,
-    "link": "?x=88.7&z=231.6",
+    "fonte": "PONTE 12",
+    "x": -553.4,
+    "z": 148.1,
+    "link": "?x=-553.4&z=148.1",
+    "n": 1
+   },
+   {
+    "fonte": "PONTE 12",
+    "x": -527.9,
+    "z": 155.4,
+    "link": "?x=-527.9&z=155.4",
+    "n": 1
+   },
+   {
+    "fonte": "PONTE 9 (pezzo staccato)",
+    "x": 93.2,
+    "z": 182.6,
+    "link": "?x=93.2&z=182.6",
+    "n": 1
+   },
+   {
+    "fonte": "PONTE 9 (pezzo staccato)",
+    "x": 95.8,
+    "z": 192.6,
+    "link": "?x=95.8&z=192.6",
     "n": 1
    }
   ],
