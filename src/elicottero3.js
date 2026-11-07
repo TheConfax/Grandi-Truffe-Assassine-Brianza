@@ -15,7 +15,8 @@ const HELI = {
   climb: 7.6, sink: 6, vyK: 1.8,     /* climb and sink speed at full R2/L2 (m/s), how fast the vertical speed follows (1/s) */
   yawRate: 1.4, yawK: 4,             /* turn on the spot with L1/R1 (rad/s) and its ease (1/s) */
   bankV0: 2, bankV1: 7, bankVmin: 5, /* autotimone (Carlo 7/11): banked, the nose goes into the turn in full (g tan(roll) / speed) from bankV0 to bankV1 m/s forward; bankVmin keeps the rate sane when slow */
-  grip: 4, gripV0: 4, gripV1: 10,    /* grip on the air: the speed across the nose dies at grip 1/s (2 % left after a second), from none at gripV0 to full at gripV1 m/s forward; the speed goes along the nose */
+  bankHi: 2, bankHiV0: 15, bankHiV1: 45, /* fast, the nose turns up to bankHi times the coordinated rate (half the radius at 45 m/s, Carlo 7/11), growing smoothly between these speeds (m/s forward); slow flight as before */
+  grip: 4, gripV0: 4, gripV1: 10,   /* grip on the air: the speed across the nose dies at grip 1/s (2 % left after a second), from none at gripV0 to full at gripV1 m/s forward; the speed goes along the nose */
   skid: 5,                           /* on the ground the skids stop it (1/s) */
   landSafe: 5.5, landHs: 10,         /* touch down faster than this (m/s, down / across) and it gets damaged */
   rotorR: 4.8, rotorY: 2.35,         /* rotor radius, height of the rotor over the skids */
@@ -144,12 +145,16 @@ function heliStep1(e, dt) {
   const vf = e.vx * fx + e.vz * fz, vs = e.vx * rx + e.vz * rz, sp = hyp(e.vx, e.vz);
   /* turning: L1/R1, and in a banked turn at speed the nose follows the bank */
   let yT = yaw * HELI.yawRate * (e.ground ? 0.6 * lift : 1);
-  if (!e.ground) yT -= 9.81 * Math.tan(e.roll) / Math.max(sp, HELI.bankVmin) * clamp((vf - HELI.bankV0) / (HELI.bankV1 - HELI.bankV0), 0, 1);
+  if (!e.ground) {
+    const hi = clamp((vf - HELI.bankHiV0) / (HELI.bankHiV1 - HELI.bankHiV0), 0, 1);
+    yT -= 9.81 * Math.tan(e.roll) / Math.max(sp, HELI.bankVmin) * clamp((vf - HELI.bankV0) / (HELI.bankV1 - HELI.bankV0), 0, 1) * (1 + (HELI.bankHi - 1) * hi * hi * (3 - 2 * hi));
+  }
   e.yr += (yT - e.yr) * (1 - Math.exp(-HELI.yawK * dt)); e.h = wrapA(e.h + e.yr * dt);
   /* tilt: the stick, or with the stick let go against the drift (hover); on the ground the slope under the skids */
   let pT = e.gp, rT = e.gr;
   if (!e.ground) {
-    pT = Math.abs(sf) > 0.05 ? sf * HELI.tilt : clamp(-vf * HELI.hold, -HELI.holdMax, HELI.holdMax);
+    /* the brake against the drift only with the stick let go; the stick held only sideways keeps the speed it has (the nose down just enough against the drag) */
+    pT = Math.abs(sf) > 0.05 ? sf * HELI.tilt : Math.abs(ss) > 0.05 ? clamp(Math.atan((HELI.drag1 + HELI.drag2 * sp) * vf / (9.81 * Math.max(lift, 0.1))), -HELI.tilt, HELI.tilt) : clamp(-vf * HELI.hold, -HELI.holdMax, HELI.holdMax);
     rT = Math.abs(ss) > 0.05 ? ss * HELI.tilt : clamp(-vs * HELI.hold, -HELI.holdMax, HELI.holdMax);
     if (!alive) { pT = 0.25; rT = Math.sin(now * 1.7) * 0.3; } /* broken: it tumbles */
   }
