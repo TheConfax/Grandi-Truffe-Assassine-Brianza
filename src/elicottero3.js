@@ -26,7 +26,7 @@ const HELI = {
   camRoll: 0.3, camZen: 1.52,        /* the share of the bank the view leans with, the highest view (rad over the horizon: 87 degrees, straight over it) */
   camW0: 2, camW1: 10,               /* the view turns from the nose to the way it goes between these speeds (m/s) */
   fogAlt: 50,                        /* the fog's reach grows by one time its own every fogAlt metres of the view over the ground (past the first 15) */
-  home: [[562.7, -428, 0]],          /* where the helicopters stand at the start: the round paved yard in the park among the blocks at Meda (Carlo, 7/11) */
+  home: [[507.4, -479.2, 0]],        /* unico elicottero, punto scelto da Carlo il 7/11; i punti di spawn veri sono ancora da definire (behind the Medateca, via Gagarin, Meda; heading 0) */
 };
 const HELI_ZERO = { col: 0, yaw: 0, fwd: 0, side: 0 };
 const HELIS = [];

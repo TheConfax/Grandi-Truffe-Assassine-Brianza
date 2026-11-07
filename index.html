@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo elicottero · dopo 31a79b8 · assemblato 07/11 23:15 · porta ' + location.port;
+    const txt = 'locale · ramo elicottero · dopo 5865e5d · assemblato 07/11 23:36 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -10057,7 +10057,7 @@ const HELI = {
   camRoll: 0.3, camZen: 1.52,        /* the share of the bank the view leans with, the highest view (rad over the horizon: 87 degrees, straight over it) */
   camW0: 2, camW1: 10,               /* the view turns from the nose to the way it goes between these speeds (m/s) */
   fogAlt: 50,                        /* the fog's reach grows by one time its own every fogAlt metres of the view over the ground (past the first 15) */
-  home: [[562.7, -428, 0]],          /* where the helicopters stand at the start: the round paved yard in the park among the blocks at Meda (Carlo, 7/11) */
+  home: [[507.4, -479.2, 0]],        /* unico elicottero, punto scelto da Carlo il 7/11; i punti di spawn veri sono ancora da definire (behind the Medateca, via Gagarin, Meda; heading 0) */
 };
 const HELI_ZERO = { col: 0, yaw: 0, fwd: 0, side: 0 };
 const HELIS = [];
