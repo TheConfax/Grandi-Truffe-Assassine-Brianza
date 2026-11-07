@@ -9,9 +9,10 @@
 import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
+import { trovaChrome } from './chrome.mjs';
 const url = process.argv[2] || 'http://127.0.0.1:8013/', out = process.argv[3] || 'report_ponti.json';
 const { chromium } = await import(process.env.PLAYWRIGHT ? pathToFileURL(path.resolve(process.env.PLAYWRIGHT)).href : 'playwright');
-const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu'] });
+const browser = await chromium.launch({ executablePath: process.env.CHROME || trovaChrome(), args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu'] });
 const page = await browser.newPage({ viewport: { width: 640, height: 360 } }); const errs = [];
 page.on('pageerror', e => errs.push(e.message));
 await page.goto(url + '?tutto');

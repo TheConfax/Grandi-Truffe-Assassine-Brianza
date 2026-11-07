@@ -151,13 +151,13 @@ def main(argv=None):
     print('cotti', scrivi(a.root, B, IND, PK, g, json.load(open(c, encoding='utf-8')), dem))
     os.remove(c)
     # the check of the parapets and walls of the bridges, in the game just written (src/controlli_ponti.mjs, key barriere of report_ponti.json)
-    srv = Server(('127.0.0.1', 0), Muto); threading.Thread(target=srv.serve_forever, daemon=True).start()
+    srv = server(a.root)
     subprocess.call(['node', os.path.join(ROOT, 'src', 'controlli_ponti.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], os.path.join(a.root, 'report_ponti.json')])
     srv.shutdown()
 
 
-def cottura(root, c, webp, mappa=None):
-    """src/cuoci.mjs sul sito in root; mappa: un'altra cartella da servire al posto di root/mappa (i pezzi crudi della build attorno al punto). Rende il codice di uscita"""
+def server(root, mappa=None):
+    """Il server HTTP locale sul sito in root (mappa: un'altra cartella da servire al posto di root/mappa). Già avviato"""
     class Muto(http.server.SimpleHTTPRequestHandler):
         def __init__(s, *p, **k): super().__init__(*p, directory=root, **k)
         def log_message(s, *p): pass
@@ -167,6 +167,12 @@ def cottura(root, c, webp, mappa=None):
             return super().translate_path(path)
     class Server(http.server.ThreadingHTTPServer): request_queue_size = 256   # the invisible browser opens 16 connections at once (5 fails on Windows)
     srv = Server(('127.0.0.1', 0), Muto); threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def cottura(root, c, webp, mappa=None):
+    """src/cuoci.mjs sul sito in root; mappa: un'altra cartella da servire al posto di root/mappa (i pezzi crudi della build attorno al punto). Rende il codice di uscita"""
+    srv = server(root, mappa)
     rc = subprocess.call(['node', os.path.join(ROOT, 'src', 'cuoci.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], c, webp])
     srv.shutdown()
     return rc

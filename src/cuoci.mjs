@@ -4,9 +4,10 @@
 import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
+import { trovaChrome } from './chrome.mjs';
 const [url, out, png] = process.argv.slice(2);
 const { chromium } = await import(process.env.PLAYWRIGHT ? pathToFileURL(path.resolve(process.env.PLAYWRIGHT)).href : 'playwright');
-const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu'] });
+const browser = await chromium.launch({ executablePath: process.env.CHROME || trovaChrome(), args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu'] });
 const page = await browser.newPage({ viewport: { width: 640, height: 360 } }); let fallita = null;
 page.on('pageerror', e => { fallita = e.stack || e.message; console.error('ERRORE', fallita); });
 page.on('console', m => { if (m.type() === 'error' && !/404/.test(m.text())) console.error('console', m.text()); });
