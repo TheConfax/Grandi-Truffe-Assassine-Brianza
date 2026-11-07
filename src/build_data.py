@@ -497,8 +497,23 @@ roads, raw_roads = [], []
 import fondi as _FO  # the materials of surface=* (src/fondi.py)
 rails, rivers, rows, rail_raw, barriers = [], [], [], [], []
 bar_runs, gate_ways = [], []
+# a bridge is of the kind of the ways it links (Carlo 6/11, the abandoned overpass of Seveso x 145 z 1440: a service road as wide as a street that links two
+# paths). A bridge way whose ends meet only paths, footways, cycleways or tracks is a footbridge: a path for the game, no carriageway, no markings, no
+# traffic (src/impalcati.py solo_sentieri makes its deck a footbridge too)
+SENTIERI = {'footway', 'path', 'cycleway', 'track', 'bridleway', 'steps', 'pedestrian'}
+_nodo_vie = {}
+for _wid, (_refs, _t) in ways.items():
+    if _t.get('highway'):
+        for _n in _refs: _nodo_vie.setdefault(_n, []).append(_wid)
+PASSERELLE = set()
+for _wid, (_refs, _t) in ways.items():
+    if _t.get('highway') in DRIVE and _t.get('bridge') not in (None, 'no') and _refs:
+        _hw = [ways[o][1].get('highway') for n in (_refs[0], _refs[-1]) for o in _nodo_vie.get(n, []) if o != _wid]
+        if _hw and all(h in SENTIERI for h in _hw): PASSERELLE.add(_wid)
+log('ponti che collegano solo sentieri, fatti passerelle:', sorted(PASSERELLE))
 for wid, (refs, t) in ways.items():
     hw = t.get('highway')
+    if wid in PASSERELLE: hw = 'footway'
     if hw in DRIVE or hw in FOOT:
         if t.get('area') == 'yes': continue
         if t.get('access') == 'private' and hw == 'service' and t.get('service') in ('driveway', 'parking_aisle'): pass
@@ -916,12 +931,18 @@ railL = [LineString(p) for p in rails if len(p) >= 2]
 # where the rail fences open (the corridor fences and the fill-in below computed these same lists one after the other): the level crossings
 # of the flat streets and the track ends here, their unions with the platforms and the buildings, and the 4.2 m strip, on threads
 xpts = []
+# (Carlo 7/11, Seveso x 421 z 2243: the railway fence stopped on both sides of the Milano-Meda bridge, the tracks open under it) a road crossing the
+# tracks in plan under a deck (or the tracks on a deck over it) is not a level crossing: the two are at different levels, the fence goes on
+_ind_f = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json')
+_impalc = unary_union([Polygon(d_['imp']).buffer(2.0) for d_ in (json.load(open(_ind_f, encoding='utf-8')).get('decks', []) if os.path.exists(_ind_f) else []) if d_.get('tipo') != 'copertura' and len(d_.get('imp', [])) >= 3])
 for r in raw_roads:
     if not flat(r) or r['c'] > 6: continue
     for l in railL:
         if r['line'].distance(l) > 0.01: continue
         x_ = r['line'].intersection(l)
-        for g_ in ([x_] if x_.geom_type == 'Point' else [g for g in getattr(x_, 'geoms', []) if g.geom_type == 'Point']): xpts.append(g_.buffer(r['w'] / 2 + 3.5))
+        for g_ in ([x_] if x_.geom_type == 'Point' else [g for g in getattr(x_, 'geoms', []) if g.geom_type == 'Point']):
+            if not _impalc.is_empty and _impalc.contains(g_): continue
+            xpts.append(g_.buffer(r['w'] / 2 + 3.5))
 tips = [c for i, l in enumerate(railL) for c in (l.coords[0], l.coords[-1]) if not any(l2.distance(Point(c)) < 1.0 for j, l2 in enumerate(railL) if j != i)]
 _openings_f = presto(lambda: unary_union(xpts + [_plat06.result(), _bunb[0.3].result()] + [Point(c).buffer(9) for c in tips]))
 _r42_f = [presto(lambda: unary_union([l.buffer(4.2, cap_style=2) for l in railL]))]
@@ -964,6 +985,17 @@ if dbt_walls:  # the railway fences stay where the DBGT has none of its own with
     _dw = [LineString(p_) for p_, t_ in dbt_walls]; _dwt = STRtree(_dw); _fk = []
     for f_ in fences:
         L_ = LineString(f_); near_ = [_dw[j] for j in _dwt.query(L_.buffer(3))]
+        # (Carlo 7/11, Seveso x 421 z 2243: two DBGT dividers across the tracks under the Milano-Meda took 8 m of the railway fence each) only a divider that
+        # runs along the fence stands for it: its pieces within 30 degrees of the fence nearby
+        def _lungo_(n_):
+            out_ = []
+            for a_, b_ in zip(n_.coords[:-1], n_.coords[1:]):
+                sg_ = LineString([a_, b_]); dl_ = sg_.length
+                if dl_ < 0.05 or sg_.distance(L_) > 3: continue
+                s_ = L_.project(sg_.interpolate(0.5, normalized=True)); p0_, p1_ = L_.interpolate(max(0, s_ - 1)), L_.interpolate(min(L_.length, s_ + 1)); fl_ = p0_.distance(p1_) or 1
+                if abs(((b_[0] - a_[0]) * (p1_.x - p0_.x) + (b_[1] - a_[1]) * (p1_.y - p0_.y)) / (dl_ * fl_)) > 0.87: out_.append(sg_)
+            return out_
+        near_ = [q_ for n_ in near_ for q_ in _lungo_(n_)]
         rest_ = L_.difference(unary_union([n_.buffer(3) for n_ in near_])) if near_ else L_
         for part in (list(rest_.geoms) if hasattr(rest_, 'geoms') else [rest_]):
             if isinstance(part, LineString) and part.length > 2: _fk.append(list(part.coords))
@@ -2275,14 +2307,32 @@ _md_ponte = _op.senza_strada_di_sopra.sul_ponte   # the islands of the road over
 _mdp_ = _op.sotto_impalcato_sopra(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json'), _pst)
 if _mdp_ is not None and not _mdp_.is_empty:
     _sp_ = []
+    _md0 = STR.md_dbgt if STR is not None else None
     if STR is not None and STR.md_dbgt is not None and not STR.md_dbgt.is_empty and STR.md_dbgt.intersects(_mdp_):
         _q_ = STR.md_dbgt.intersection(_mdp_); _sp_.append(_q_); STR.md_dbgt = STR.md_dbgt.difference(_mdp_.buffer(0.05))
     _ag_ = []
+    # (Carlo 6/11, via Vignazzola x -1 z 776: a square of grass in the middle of the carriageway of the bridge) a grass area under the deck goes on the deck
+    # only off the carriageway of the ways on the bridge
+    _cp_ = unary_union([LineString([nodes[n_] for n_ in r_['refs']]).buffer(r_['w'] / 2 + 0.5) for r_ in raw_roads if r_.get('bridge') and r_['c'] <= 5 and len(r_['refs']) >= 2])
     for at_, g_ in area_geoms:
-        if at_ in (1, 2) and g_.intersects(_mdp_): _sp_.append(g_.intersection(_mdp_)); g_ = g_.difference(_mdp_.buffer(0.05))
+        if at_ in (1, 2) and g_.intersects(_mdp_): _sp_.append(g_.intersection(_mdp_).difference(_cp_)); g_ = g_.difference(_mdp_.buffer(0.05))
         _ag_.append((at_, g_))
     area_geoms[:] = [(a_, g_) for a_, g_ in _ag_ if not g_.is_empty]
     _sp_ = [q_ for q_ in _sp_ if not q_.is_empty and q_.area > 0.3]
+    # (Carlo 6/11, via Vignazzola x -21 z 765: a square of grass in the carriageway of the bridge) only the islands of the road over the bridge go on its deck:
+    # an island that runs across the deck (its long side more than 45 degrees off the deck) is the median of the road under it, going on under the bridge
+    _dk_ = [(Polygon(d_['imp']).buffer(0), np.asarray(d_['dir'], float)) for d_ in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json'), encoding='utf-8')).get('decks', []) if d_.get('dir')]
+    _md0_ = [g_ for g_ in getattr(_md0, 'geoms', [_md0])] if _md0 is not None else []
+    def _lungo(g_):
+        c_ = np.asarray(g_.minimum_rotated_rectangle.exterior.coords)[:3]; e1, e2 = c_[1] - c_[0], c_[2] - c_[1]; e_ = e1 if np.hypot(*e1) >= np.hypot(*e2) else e2; return e_ / (np.hypot(*e_) or 1)
+    _tieni_ = []
+    for q_ in _sp_:
+        for pq in getattr(q_, 'geoms', [q_]):
+            if pq.geom_type != 'Polygon' or pq.is_empty: continue
+            dk_ = [v for g_, v in _dk_ if g_.contains(pq.representative_point())]; isl = [g_ for g_ in _md0_ if g_.intersects(pq)]
+            if dk_ and isl and abs(float(_lungo(max(isl, key=lambda g_: g_.intersection(pq).area)) @ dk_[0])) < 0.707: continue
+            _tieni_.append(pq)
+    _sp_ = _tieni_
     if _sp_: _md_ponte = unary_union(([_md_ponte] if _md_ponte is not None else []) + _sp_); log('isole della strada di sopra sotto la coda degli impalcati, sul ponte m2', round(sum(q_.area for q_ in _sp_), 1))
 if not median.is_empty: median = _op.senza_strada_di_sopra(_pst, {}, median, [], log)[1]
 area_geoms[:] = [(at, g.difference(_via) if g.intersects(_via) else g) for at, g in area_geoms]

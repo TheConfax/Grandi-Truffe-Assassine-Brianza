@@ -635,12 +635,16 @@ def opere_dbgt(sup, S):
     muri, linee = pezzi_dbgt(sup); ponti_s = ponti_sopra(D)
     sup.SPALLE_N = np.zeros(S.shape, bool); sup.SPALLE_G = []   # (the ground under the abutments, point 5: no other pass puts it back up; the deck covers it, impalcati._deck)
     tm = shapely.STRtree([g for g, _, _ in muri]) if muri else None; tl = shapely.STRtree([g for g, _, _ in linee]) if linee else None
+    tutti_p = [sf.poly(P, j).buffer(0) for j in range(len(P['off']) - 1)]; top_p = [float(np.nanmedian(P['z'][P['off'][j]:P['off'][j + 1]])) for j in range(len(P['off']) - 1)]
     for i in range(len(P['off']) - 1):
         g = sf.poly(P, i)
         if not g.is_valid: g = g.buffer(0)
         mi = [j for j in (tm.query(g.buffer(VICINO_OPERA)) if tm is not None else []) if muri[j][0].distance(g) <= VICINO_OPERA]
         li = [j for j in (tl.query(g.buffer(VICINO_OPERA)) if tl is not None else []) if linee[j][0].distance(g) <= VICINO_OPERA]
-        if not mi and not li: continue
+        # (ramo ponti-spalle, Carlo 6/11: under the Milano-Meda over the railway at Seveso two cones of grass rose to the deck between the street and the tracks, the
+        # fences climbing them. Every PONTE that carries a street over another is a work like corso Isonzo, DBGT walls and banks or not: under it the ground stays at
+        # the level of what passes under, the abutments stand at its sides)
+        if not mi and not li and not any(q[0].intersection(g).area > 0.5 * g.area for q in ponti_s): continue
         top = float(np.nanmedian(P['z'][P['off'][i]:P['off'][i + 1]])); bot = top - SP_SOLETTA
         O = shapely.union_all([g.buffer(ATTORNO)] + [muri[j][0] for j in mi] + [linee[j][0].buffer(FILO_SCARPT * 2) for j in li]).buffer(3.0).buffer(-3.0)
         w = sup.R.win(O.bounds, 2 * sf.SF)
@@ -650,7 +654,10 @@ def opere_dbgt(sup, S):
         V = np.full(W.shape, np.nan)
         # 1. the streets, rails and beds as strade() burned them. The street over it outside the PONTE is on its bank (the DBGT has the bank: MU_SOS, SCARPT),
         # not a deck part where the DTM is low: its nodes go back to the ground at their DBGT height (the deck stops at the PONTE and rests there)
-        ponte_m = shapely.contains(g, pts); Ar = sup.AIR[r0:r1, c0:c1]; sopra = dentro & Ar & ~ponte_m & np.isfinite(sup.ZF[r0:r1, c0:c1])
+        # the strips of the same bridge the DBGT gives as PONTE pieces of their own along it (Seveso, the Milano-Meda over the railway: sidewalks 1 m under its top,
+        # their nodes left at a level of their own, two cones of grass up to the deck between the street and the tracks, Carlo 6/11): under them as under it
+        gg = shapely.union_all([g] + [q for j_, q in enumerate(tutti_p) if j_ != i and q.distance(g) < 1.5 and abs(top_p[j_] - top) < 2.0])
+        ponte_m = shapely.contains(gg, pts); Ar = sup.AIR[r0:r1, c0:c1]; sopra = dentro & Ar & ~ponte_m & np.isfinite(sup.ZF[r0:r1, c0:c1])
         if sopra.any():
             W[sopra] = sup.ZF[r0:r1, c0:c1][sopra]; Ar[sopra] = False; sup.BR[r0:r1, c0:c1][sopra] = False; sup.FIX[r0:r1, c0:c1][sopra] = True; sup.RANK[r0:r1, c0:c1][sopra] = sf.R_VEI
         fx = sup.FIX[r0:r1, c0:c1] & dentro & ~Ar; V[fx] = W[fx]
@@ -691,7 +698,7 @@ def opere_dbgt(sup, S):
             for a_, e_ in zip(ring[:-1], ring[1:]):
                 d_ = e_ - a_; n_ = np.hypot(*d_)
                 if n_ > 1.0 and abs(d_ @ v_) / n_ < SPALLA_COS: lati.append(LineString([a_, e_]).buffer(SPALLA_FUORI, cap_style=2))
-            zona_g = shapely.union_all([g.buffer(0.05)] + lati); zona = shapely.contains(zona_g, pts) & dentro
+            zona_g = shapely.union_all([gg.buffer(0.05)] + lati); zona = shapely.contains(zona_g, pts) & dentro
             strada_ = np.isin(sup.CLS[r0:r1, c0:c1], (sf.C_VEI, sf.C_VEIT, sf.C_PED, sf.C_AREA, sf.C_FER)) & sup.FIX[r0:r1, c0:c1]
             # the street under it, as made above, at the height of its axes (within 0.6 m: the sidewalks): the island of the Milano-Meda over corso Isonzo
             # (MAN_TR, 212.8 between 211.1 and 217) was burned on the street under the bridge, a hump of grass on the sidewalk and a spike up to the deck
@@ -707,7 +714,7 @@ def opere_dbgt(sup, S):
                 giu = zona & ~base_ & (W > vb + 0.05); W[giu] = vb[giu]
                 in_c = shapely.contains(c_, pts) if not c_.is_empty else np.zeros(pts.shape, bool); in_b = shapely.contains(b_, pts) if not b_.is_empty else np.zeros(pts.shape, bool)
                 CL, FI = sup.CLS[r0:r1, c0:c1], sup.FIX[r0:r1, c0:c1]
-                k_ = zona & ~base_
+                k_ = zona & ~base_ & shapely.contains(shapely.union_all([g.buffer(0.05)] + lati), pts)   # (the strips alongside only go down: what they are stays, the railway fence under them, Carlo 6/11)
                 CL[k_ & in_c] = sf.C_VEI; CL[k_ & in_b & ~in_c] = sf.C_PED; FI[k_ & in_b] = True
                 CL[k_ & ~in_b] = sf.C_NONE; FI[k_ & ~in_b] = False
                 for nm_ in ('SCARP', 'INT'):

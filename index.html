@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo fb882ff · assemblato 07/11 15:47 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo e133a59 · assemblato 07/11 16:09 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2754,7 +2754,7 @@ function rampWalls(dk) {
     if (ay - sp - ga < 0.05 && by - sp - gb < 0.05) continue; if (H.inPit((ax + bx) / 2, (az + bz) / 2, 0.3)) continue; // (over the road of an underpass: no wall down to it)
     const L = hyp(bx - ax, bz - az) || 1, tp = ts.find(t => pieno[t]), cx_ = (T[tp * 9] + T[tp * 9 + 3] + T[tp * 9 + 6]) / 3, cz_ = (T[tp * 9 + 1] + T[tp * 9 + 4] + T[tp * 9 + 7]) / 3, ins = ((bz - az) * (cx_ - ax) - (bx - ax) * (cz_ - az)) > 0 ? 1 : -1; // (ins: the side of the fill, where the wall gets its thickness)
     dk.rw.push([ax, az, ga - 0.3, ay - sp, bx, bz, gb - 0.3, by - sp, ins]);
-    WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: Math.min(ga, gb) - 1, y1: Math.max(ay, by), deckw: true });
+    WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: Math.min(ga, gb) - 1, y1: Math.max(ay, by) - sp, deckw: true }); // (up to the underside, as it is drawn: up to the top it was a wall nobody saw across the footbridge of x 139 z 1433, Carlo 6/11)
   }
   return dk.rw;
 }
@@ -2765,20 +2765,70 @@ function rampWalls(dk) {
 const SPALLA_LUCE = 2.0, SPALLA_BANCO = 1.5;
 function spalleNucleo(dk) {
   if (dk.sn) return dk.sn; dk.sn = []; if (!dk.nucleo || dk.free || dk.tipo === 'copertura' || dk.nucleo.length < 3) return dk.sn;
-  const N = dk.nucleo, topAt = (x, z) => { for (const o of H.deckAt(x, z)) if (o.id === dk.id) return o.top; return null; };
-  for (let i = 0; i < N.length; i++) {
-    const a = N[i], c = N[(i + 1) % N.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.3) continue;
-    let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (inPoly(mx + nx * 0.2, mz + nz * 0.2, N)) { nx = -nx; nz = -nz; } // (n: outwards)
-    const m = Math.max(1, Math.round(L)), pts = [];
+  const N0 = dk.nucleo, topAt = (x, z) => { for (const o of H.deckAt(x, z)) if (o.id === dk.id) return o.top; return null; };
+  // (Carlo 6/11, under corso Isonzo: "tanti pannelli staccati e sfalsati, con buchi e scarpate in mezzo") one wall per side of the PONTE: the outline
+  // straightened (the DBGT splits a side in pieces at small angles), a side that is an abutment for most of its length is one wall from end to end,
+  // its foot level, its top the underside of the deck
+  const dp = (P, eps) => { if (P.length < 3) return P; let k = 0, dm = 0; const [a, b] = [P[0], P[P.length - 1]]; for (let i = 1; i < P.length - 1; i++) { const d = segDist(P[i][0], P[i][1], a[0], a[1], b[0], b[1]); if (d > dm) { dm = d; k = i; } } return dm > eps ? [...dp(P.slice(0, k + 1), eps).slice(0, -1), ...dp(P.slice(k), eps)] : [a, b]; };
+  let far = 0; for (let i = 1; i < N0.length; i++) if (hyp(N0[i][0] - N0[0][0], N0[i][1] - N0[0][1]) > hyp(N0[far][0] - N0[0][0], N0[far][1] - N0[0][1])) far = i;
+  const N1 = [...dp(N0.slice(0, far + 1), 0.5).slice(0, -1), ...dp([...N0.slice(far), N0[0]], 0.5).slice(0, -1)];
+  // the sides: consecutive edges within 20 degrees of each other are one side, its wall on the straight line from its first to its last corner
+  const dirOf = (p, q) => Math.atan2(q[1] - p[1], q[0] - p[0]), sides = [];
+  for (let i = 0; i < N1.length; i++) { const p = N1[i], q = N1[(i + 1) % N1.length], s = sides[sides.length - 1]; if (s && Math.abs(Math.atan2(Math.sin(dirOf(p, q) - s.d), Math.cos(dirOf(p, q) - s.d))) < 0.35) s.c = q; else sides.push({ a: p, c: q, d: dirOf(p, q) }); }
+  if (sides.length > 1) { const f = sides[0], l = sides[sides.length - 1]; if (Math.abs(Math.atan2(Math.sin(f.d - l.d), Math.cos(f.d - l.d))) < 0.35) { f.a = l.a; sides.pop(); } }
+  for (const sd of sides) {
+    const a = sd.a, c = sd.c, L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 1.0) continue;
+    let nx = (c[1] - a[1]) / L, nz = -(c[0] - a[0]) / L; const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (inPoly(mx + nx * 0.2, mz + nz * 0.2, N0)) { nx = -nx; nz = -nz; } // (n: outwards)
+    const m = Math.max(1, Math.round(L)), pts = []; let n = 0, ok = 0;
     for (let k = 0; k <= m; k++) {
       const x = a[0] + (c[0] - a[0]) * k / m, z = a[1] + (c[1] - a[1]) * k / m, t = topAt(x - nx * 0.3, z - nz * 0.3); if (t === null) { pts.push(null); continue; }
       const bot = t - dk.sp, gin = Math.min(H.base(x - nx * 0.3, z - nz * 0.3), H.base(x - nx * 1.5, z - nz * 1.5)), gout = Math.max(H.base(x + nx * 3.5, z + nz * 3.5), H.base(x + nx * 4.5, z + nz * 4.5));
-      pts.push(bot - gin > SPALLA_LUCE && bot - gout < SPALLA_BANCO ? [x, z, gin - 0.3, bot] : null);
+      const strada = q => H.mat(x + nx * q, z + nz * q) === 1 && Math.abs(H.base(x + nx * q, z + nz * q) - gin) < 0.6; // (the carriageway under it on both sides of the line: a wall there would stand in the street)
+      const st = strada(0.8) && strada(-0.8), cd = bot - gin > SPALLA_LUCE && bot - gout < SPALLA_BANCO, si = cd && !st; n++; if (si) ok++;
+      pts.push({ x, z, bot, gin, si, st, cd });
     }
-    for (let k = 0; k < m; k++) { const p = pts[k], q = pts[k + 1]; if (!p || !q) continue; dk.sn.push([p[0], p[1], p[2], p[3], q[0], q[1], q[2], q[3], 0, nx, nz]); }
+    { let j = 0; while (j < pts.length) { if (!(pts[j] && pts[j].st)) { j++; continue; } let e = j; while (e < pts.length && pts[e] && pts[e].st) e++; const lato = q => pts[q] && pts[q].cd && !pts[q].st; if (e - j <= 2 && lato(j - 1) && lato(e)) for (let q = j; q < e; q++) { pts[q].st = false; pts[q].si = pts[q].cd; } j = e; } } // (a street both sides for 1-2 m between two stretches of wall is a cell of the lattice, not the street: the wall goes on)
+    ok = pts.filter(p => p && p.si).length;
+    if (!n || ok < 0.5 * n) continue;
+    // runs between the points in the street (never a wall there): each run one wall from its first to its last abutment point, the gaps between closed
+    let k = 0;
+    while (k < pts.length) {
+      while (k < pts.length && !(pts[k] && pts[k].si)) k++; if (k >= pts.length) break;
+      let k0 = k, k1 = k; while (k < pts.length && !(pts[k] && pts[k].st)) { if (pts[k] && pts[k].si) k1 = k; k++; }
+      if (k1 - k0 < 1) continue;
+      let y0 = 1e9; for (let j = k0; j <= k1; j++) if (pts[j]) y0 = Math.min(y0, pts[j].gin - 0.3);
+      for (let j = k0; j <= k1; j++) if (!pts[j]) pts[j] = { ...pts[j - 1], x: a[0] + (c[0] - a[0]) * j / m, z: a[1] + (c[1] - a[1]) * j / m };
+      const inS = (x, z) => { const f = s => H.mat(x + nx * s, z + nz * s) === 1 && Math.abs(H.base(x + nx * s, z + nz * s) - y0 - 0.3) < 1.0; return f(0.8) && f(-0.8); }; // (the wall's foot in a carriageway on both sides)
+      const pz_ = []; for (let j = k0; j < k1; j++) { const p = pts[j], q = pts[j + 1]; pz_.push([[p.x, p.z, y0, p.bot, q.x, q.z, y0, q.bot, 0, nx, nz], inS((p.x + q.x) / 2, (p.z + q.z) / 2)]); }
+      if (pz_.filter(q => q[1]).length > 0.25 * pz_.length) continue; // a quarter of it in the street: this side crosses the street under it, no wall (a few cells of asphalt along a wall at the kerb are the lattice)
+      for (const [w] of pz_) dk.sn.push(w);
+    }
   }
   for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1] of dk.sn) { const L = hyp(bx - ax, bz - az) || 1; WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: Math.min(ya0, yb0) - 1, y1: Math.max(ya1, yb1), deckw: true }); }
   return dk.sn;
+}
+// the abutment at the end of a deck (ramo ponti-spalle, 6/11): where the deck rests on S (its spalle edges) and the ground just inside the end
+// falls away under the slab (the bank under the deck end), a concrete wall from that ground up to the underside, its thickness outwards, so no
+// slot under the end of a bridge shows the sky. Up to SPALLA_CAPO_MAX (src/controlli_ponti.py counts the gap closed up to there). Pieces of the
+// spalle edges: [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins]
+const SPALLA_CAPO_MAX = 6.0;
+window.__PONTI = { rampWalls: d => rampWalls(d), spalleNucleo: d => spalleNucleo(d), spalleCapi: d => spalleCapi(d) }; // (src/controlli_ponti.mjs measures them)
+function spalleCapi(dk) {
+  if (dk.cw) return dk.cw; dk.cw = []; if (dk.tipo === 'copertura' || !dk.spalle.length) return dk.cw;
+  const T = dk.tri, sp = dk.sp, key = (ax, az, bx, bz) => { const a = ax.toFixed(2) + ',' + az.toFixed(2), b = bx.toFixed(2) + ',' + bz.toFixed(2); return a < b ? a + ' ' + b : b + ' ' + a; };
+  const spk = new Set(dk.spalle.map(e => key(e[0], e[1], e[2], e[3])));
+  for (let i = 0; i < T.length; i += 9) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) {
+    const ax = T[i + a], az = T[i + a + 1], ay = T[i + a + 2], bx = T[i + b], bz = T[i + b + 1], by = T[i + b + 2];
+    if (!spk.has(key(ax, az, bx, bz))) continue;
+    const cx = (T[i] + T[i + 3] + T[i + 6]) / 3, cz = (T[i + 1] + T[i + 4] + T[i + 7]) / 3, L = hyp(bx - ax, bz - az) || 1;
+    let nx = (bz - az) / L, nz = -(bx - ax) / L; if (nx * (cx - ax) + nz * (cz - az) < 0) { nx = -nx; nz = -nz; } // (n: into the deck)
+    const gin = (x, z) => Math.min(H.base(x + nx * 0.5, z + nz * 0.5), H.base(x + nx * 1.0, z + nz * 1.0));
+    const ga = gin(ax, az), gb = gin(bx, bz), da = ay - sp - ga, db = by - sp - gb;
+    if (Math.max(da, db) < 0.05 || Math.max(da, db) > SPALLA_CAPO_MAX || H.inPit((ax + bx) / 2, (az + bz) / 2, 0.3)) continue;
+    const g = Math.min(ga, gb); dk.cw.push([ax, az, g - 0.3, ay - sp, bx, bz, g - 0.3, by - sp, (nx * (bz - az) - nz * (bx - ax)) > 0 ? -1 : 1]);
+    WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: (bz - az) / L, nz: -(bx - ax) / L, two: true, y0: g - 1, y1: Math.max(ay, by) - sp, deckw: true });
+  }
+  return dk.cw;
 }
 function drawDecks(T, top, side) {
   for (const dk of H.DECKS) {
@@ -2802,7 +2852,7 @@ function drawDecks(T, top, side) {
       const ox = nx * SPALLA_SP, oz = nz * SPALLA_SP;
       opQuad(side, [[ax, ya0, az], [bx, yb0, bz], [bx, yb1, bz], [ax, ya1, az]], -nx, 0, -nz); opQuad(side, [[ax + ox, ya0, az + oz], [bx + ox, yb0, bz + oz], [bx + ox, yb1, bz + oz], [ax + ox, ya1, az + oz]], nx, 0, nz);
     }
-    for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins] of rampWalls(dk)) { // the walls of the approach ramps and the abutments (rampWalls): concrete with a thickness towards the fill, its ends closed
+    for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1, ins] of rampWalls(dk).concat(spalleCapi(dk))) { // the walls of the approach ramps and the abutments (rampWalls, spalleCapi): concrete with a thickness towards the fill, its ends closed
       if (tileOf((ax + bx) / 2, (az + bz) / 2) !== T.t) continue;
       const L = hyp(bx - ax, bz - az) || 1, nx = (bz - az) / L * (ins || 1), nz = -(bx - ax) / L * (ins || 1), ox = nx * SPALLA_SP, oz = nz * SPALLA_SP, ta = Math.max(ya0, ya1), tb = Math.max(yb0, yb1);
       opQuad(side, [[ax, ya0, az], [bx, yb0, bz], [bx, tb, bz], [ax, ta, az]], -nx, 0, -nz); opQuad(side, [[ax + ox, ya0, az + oz], [bx + ox, yb0, bz + oz], [bx + ox, tb, bz + oz], [ax + ox, ta, az + oz]], nx, 0, nz);
@@ -2844,7 +2894,7 @@ const ALTO_VERO = { guardrail: 0.8, newJersey: 0.82, parapetto: 0.95, passerella
 function deckInit(dk) { if (dk.pronto) return; dk.pronto = true; dk.bar = { rails: [], pillars: [] }; const r0 = GRID_REC; GRID_REC = dk.reg; try { deckInit2(dk); } finally { GRID_REC = r0; } }
 function deckInit2(dk) {
   if (dk.tipo === 'copertura') return;
-  const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null; rampWalls(dk); // the walls of its approach ramps and their collisions, once
+  const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null; rampWalls(dk); spalleCapi(dk); // the walls of its approach ramps and their collisions, once
   for (const [ax, az, bx, bz, core] of deckOutline(dk)) {
     const L = hyp(bx - ax, bz - az); if (L < 0.05) continue;
     let nx = (bz - az) / L, nz = -(bx - ax) / L; const mx = (ax + bx) / 2, mz = (az + bz) / 2;
@@ -2856,7 +2906,11 @@ function deckInit2(dk) {
       const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, qx = x + nx * 0.7, qz = z + nz * 0.7, top = (y0 + y1) / 2;
       if (H.deckAt(x + nx * 0.25, z + nz * 0.25).some(o => o.tipo !== 'copertura' && Math.abs(o.top - top) < 0.6)) continue; // the deck goes on (its ramps, another deck)
       if (top - H.base(qx, qz) < 0.8) continue; // it rests on the ground there (a spalla)
+      { let att = false; const own = roadsOn(dk); ROADSEG.each(x - 10, z - 10, x + 10, z + 10, s => { if (att || !own.has(s.r) || segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) > s.r.w / 2 + 0.3) return; const sx = s.b[0] - s.a[0], sz = s.b[1] - s.a[1], sl = hyp(sx, sz) || 1; if (Math.abs(((bx - ax) * sx + (bz - az) * sz) / (L * sl)) < 0.5) att = true; });
+        if (att) continue; } /* never across the way that runs on the deck: its end goes on as a street (Carlo 6/11, the east end of via Vignazzola) */
       const seg = { ax: ax + (bx - ax) * k / n, az: az + (bz - az) * k / n, bx: ax + (bx - ax) * (k + 1) / n, bz: az + (bz - az) * (k + 1) / n };
+      { const ux = (seg.bx - seg.ax), uz = (seg.bz - seg.az), ul = hyp(ux, uz) || 1, mx = (seg.ax + seg.bx) / 2, mz = (seg.az + seg.bz) / 2; // (one row of parapets: a piece beside one already there, parallel and under 0.8 m from it, is the same parapet, Carlo 6/11 via Vignazzola)
+        if (dk.bar.rails.some(r => { const vx = r[3] - r[0], vz = r[4] - r[1], vl = hyp(vx, vz) || 1; if (Math.abs((ux * vx + uz * vz) / (ul * vl)) < 0.94) return false; const dx = mx - (r[0] + r[3]) / 2, dz = mz - (r[1] + r[4]) / 2; return Math.abs((-vz * dx + vx * dz) / vl) < 0.8 && Math.abs((vx * dx + vz * dz) / vl) < (ul + vl) / 2 - 0.1; })) continue; }
       dk.bar.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, dk.tipo === 'pedonale' ? 2 : 1, nx, nz]);
       WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + (dk.tipo === 'pedonale' ? ALTO_VERO.passerella : ALTO_VERO.parapetto), yv: Math.max(y0, y1) + ALTO_VERO.auto, deckw: true });
     }
