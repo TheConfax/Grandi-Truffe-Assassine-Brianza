@@ -2677,7 +2677,16 @@ function updGates(dt) {
 
 // ---------------------------------------------------------------- fountains
 const FOUNT = (D.fountains || []).map(([X, Z, R]) => ({ x: X / 10, z: Z / 10, r: R }));
-function layFontana(f) { f.gy = H.ground(f.x, f.z); WALLS.add(f.x - f.r - 0.5, f.z - f.r - 0.5, f.x + f.r + 0.5, f.z + f.r + 0.5, { r: f.r + 0.35, x: f.x, z: f.z, y0: f.gy - 3, y1: f.gy + 0.9 }); }
+function layFontana(f) { /* the basin is a ring of low two-sided barriers (vaulted like any low wall) round water the walker can enter (acqua3.js, fontanaVasca); the pedestal in the middle stays solid */
+  f.gy = H_GROUND_RAW(f.x, f.z);
+  for (const w of f.walls || []) w.r !== undefined ? WALLS.del(w.x - 0.2, w.z - 0.2, w.x + 0.2, w.z + 0.2, w) : WALLS.del(w.ax, w.az, w.bx, w.bz, w);
+  f.walls = []; const gy = f.gy, Rm = f.r + 0.17, N = Math.max(12, Math.min(96, Math.ceil(2 * Math.PI * Rm / 1.2)));
+  for (let i = 0; i < N; i++) {
+    const a0 = i / N * Math.PI * 2, a1 = (i + 1) / N * Math.PI * 2, am = (a0 + a1) / 2, ax = f.x + Math.cos(a0) * Rm, az = f.z + Math.sin(a0) * Rm, bx = f.x + Math.cos(a1) * Rm, bz = f.z + Math.sin(a1) * Rm;
+    const w = { ax, az, bx, bz, nx: Math.cos(am), nz: Math.sin(am), two: true, y0: gy - 3, y1: gy + 0.6, yv: gy + 1.2 }; WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), w); f.walls.push(w);
+  }
+  if (f.r >= 2) { const w = { r: Math.min(0.65, f.r * 0.2) + 0.1, x: f.x, z: f.z, y0: gy - 3, y1: gy + 1.9 }; WALLS.add(f.x - 0.2, f.z - 0.2, f.x + 0.2, f.z + 0.2, w); f.walls.push(w); }
+}
 const SPRAY_MAT = new THREE.PointsMaterial({ color: 0xe6f2fb, size: 0.13, transparent: true, opacity: 0.8, depthWrite: false });
 function buildFountains(T, G) {
   for (const f of FOUNT) {
@@ -2685,9 +2694,9 @@ function buildFountains(T, G) {
     const root = new THREE.Group(); root.position.set(f.x, f.gy, f.z); G.add(root);
     const stone = lam(0xd2c9b6), R = f.r;
     const outer = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.35, R + 0.42, 0.6, 48, 1, true), stone); outer.position.y = 0.3; outer.castShadow = true; root.add(outer);
-    const inner = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 0.6, 48, 1, true), lam(0xb9b09d, { side: THREE.BackSide })); inner.position.y = 0.3; root.add(inner);
+    const inner = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 0.75, 48, 1, true), lam(0xb9b09d, { side: THREE.BackSide })); inner.position.y = 0.225; root.add(inner);
     const top = new THREE.Mesh(new THREE.RingGeometry(R, R + 0.35, 48), lam(0xe0d8c6, { side: THREE.DoubleSide })); top.rotation.x = -Math.PI / 2; top.position.y = 0.6; root.add(top);
-    const water = new THREE.Mesh(new THREE.CircleGeometry(R, 48), new THREE.MeshLambertMaterial({ color: 0x4f93ad, emissive: 0x0c2a36, transparent: true, opacity: 0.88 })); water.rotation.x = -Math.PI / 2; water.position.y = 0.45; root.add(water);
+    fontanaVasca(f, T, G); /* the water, the floor and the registry of the basin (acqua3.js) */
     let jy = 0.6;
     if (R >= 2) {
       const ped = new THREE.Mesh(new THREE.CylinderGeometry(Math.min(0.5, R * 0.15), Math.min(0.65, R * 0.2), 1.2, 16), stone); ped.position.y = 0.6; root.add(ped);
