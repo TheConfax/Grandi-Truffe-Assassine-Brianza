@@ -19,6 +19,7 @@ OSM_M = {'asphalt': 'a', 'chipseal': 'a', 'paved': 'n', 'concrete': 'n', 'concre
          'grass': 'p', 'grass_paver': 'p'}
 LARGO = {'footway': 2.0, 'path': 1.5, 'cycleway': 2.5, 'steps': 2.0, 'bridleway': 2.0, 'track': 3.0, 'pedestrian': 4.0, 'service': 4.0,
          'living_street': 5.0, 'residential': 6.0, 'unclassified': 6.0, 'tertiary': 7.0, 'secondary': 8.0, 'primary': 8.0}
+SERVIZIO = ("service", "track")   # vie di servizio: corsie dei parcheggi, accessi, carraie (Fondi.strade)
 COPRE = 0.5        # un'area OSM (o la sede di una via) da' il suo materiale a un pezzo che copre almeno per tanto
 OMBRA = 45         # pixel piu' scuri di cosi' (luce media 0-255) sono ombra: non contano
 MIN_PIX = 40       # pixel buoni minimi per decidere dalla foto
@@ -63,12 +64,12 @@ class Fondi:
         passo m): il confine e' a meta' fra due assi, dove cambia la strada. Zone di genere 'strada' (per le carreggiate)"""
         import shapely
         from shapely.geometry import MultiPoint
-        assi = []
+        assi = []; serv = []   # serv: la via e' di servizio (corsia di un parcheggio, accesso, carraia)
         for wid, (refs, t) in ways.items():
             h = t.get('highway')
             if not h or h in PIEDI or t.get('area') == 'yes' or h in ('proposed', 'construction', 'platform', 'bus_stop'): continue
             pts = [nodes[r] for r in refs if r in nodes]
-            if len(pts) >= 2: assi.append((LineString(pts), OSM_M.get(t.get('surface')) or 'a'))
+            if len(pts) >= 2: assi.append((LineString(pts), OSM_M.get(t.get('surface')) or 'a')); serv.append(h in SERVIZIO)
         sur = [(L, m) for L, m in assi if m != 'a']
         if not sur: return
         zona = unary_union([L.buffer(raggio) for L, m in sur]); vicino = zona.buffer(raggio); shapely.prepare(vicino)
@@ -89,7 +90,10 @@ class Fondi:
         ZM = {m: unary_union(gs).intersection(zona) for m, gs in per.items()}
         # il confine segue il bordo vero dove il DBGT lo ha (Carlo 7/11: in via Garibaldi i ciottoli di via Antona Traversi entravano nell'incrocio
         # con un taglio obliquo a meta' fra i due assi). Celle: [(poligono AC_VEI, zona)]. Un incrocio, una rotonda, una piazza veicolare (02xx)
-        # prende intero il materiale della via che ci corre per piu' metri; in un'altra cella un materiale entra solo se una sua via ci corre, e se
+        # prende intero il materiale della via che ci corre per piu' metri; in un'altra cella un materiale entra solo se una sua via ci corre, e
+        # non solo vie di servizio dove ci corre una strada vera (Carlo 7/11, via Indipendenza x 824 z -87: la corsia di un parcheggio in
+        # autobloccanti, service=parking_aisle, che entra per 12 m nella cella della strada metteva una fascia rossa di traverso alla
+        # carreggiata e il piazzale oltre la riga del bordo), e se
         # la copre per il 60% la prende intera; le altre (celle lunghe che prendono piu' strade) restano divise a meta' fra gli assi
         nc = dict(incroci=0, intere=0, divise=0)
         if celle:
@@ -98,10 +102,12 @@ class Fondi:
             for i in sorted(set(TC.query(zona, predicate='intersects').tolist())):
                 g, zon = celle[i]; A = g.area
                 if A <= 0: continue
-                lun = {}
+                lun = {}; strada = {}   # strada: i metri delle vie che non sono di servizio
                 for j in AT.query(g, predicate='intersects'):
                     L, m = assi[j]; l = g.intersection(L).length
-                    if l > 0: lun[m] = lun.get(m, 0) + l
+                    if l > 0:
+                        lun[m] = lun.get(m, 0) + l
+                        if not serv[j]: strada[m] = strada.get(m, 0) + l
                 if str(zon)[:2] == '02':
                     if lun: intere[i] = max(lun, key=lun.get); nc['incroci'] += 1
                     continue
@@ -109,6 +115,8 @@ class Fondi:
                 for m, Zm in ZM.items():
                     if not Zm.intersects(g): continue
                     if lun.get(m, 0) < 2.0: fuori.append((m, g)); continue   # nessuna via di quel materiale corre nella cella: non ci entra
+                    if not strada.get(m) and any(v > 0 for k, v in strada.items() if k != m):   # solo vie di servizio di quel materiale in una cella di una strada
+                        fuori.append((m, g)); nc['servizio'] = nc.get('servizio', 0) + 1; nc['servizio_m2'] = nc.get('servizio_m2', 0) + round(Zm.intersection(g).area); continue
                     q[m] = Zm.intersection(g).area
                 if not q: continue
                 m = max(q, key=q.get)

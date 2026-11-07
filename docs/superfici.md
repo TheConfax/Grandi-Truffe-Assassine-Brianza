@@ -71,7 +71,9 @@ Il materiale di un pezzo, in quest'ordine, senza coordinate scritte a mano:
    una striscia di ciottoli fra chiazze d'asfalto in piazza Vittorio Veneto). Dove il DBGT ha le celle della carreggiata (AC_VEI) il confine
    segue il loro bordo (Carlo 7/11, via Garibaldi: i ciottoli entravano nell'incrocio con un taglio obliquo): un incrocio, una rotonda o una
    piazza veicolare (02xx) prende intero il materiale della via che ci corre per più metri; in un'altra cella un materiale entra solo se una sua
-   via ci corre, e se la copre per il 60% la prende intera; un pezzetto d'asfalto fino a 300 m² chiuso per metà del contorno da un materiale
+   via ci corre e non è solo una via di servizio (corsia di parcheggio, accesso, carraia) dentro la cella di una strada vera (Carlo 7/11, via
+   Indipendenza x 824 z -87: gli autobloccanti di un parcheggio attraversavano la carreggiata; erano 8 celle, 959 m² in Meda e Seveso, dopo 0), e se
+   la copre per il 60% la prende intera; un pezzetto d'asfalto fino a 300 m² chiuso per metà del contorno da un materiale
    prende quello. Per vialetti, piazze e cortili la via vale per la sua sede (`width=` o la classe).
    Le vie disegnate a nastro (le vecchie vie a raso del gioco) prendono il materiale del poligono sotto il loro centro, i capi o i lati; senza
    poligono il `surface=*` della via stessa (`roads[].m`); senza nemmeno quello il neutro.
