@@ -115,6 +115,7 @@ def guardrail(D, cover, U_carr, raw_roads, nodes, zh=None, log=print, innesti=Tr
             isx.append(bool(best and best[1]))
         else: isx.append(lx > 0 and lx >= lo)
     UX = unary_union([g for (g, a), f in zip(vei, isx) if f]); UXb = unary_union([g for (g, a), f in zip(vei, isx) if f and on_br(a)])
+    if UX.is_empty: return [], set(), dict(rep), (None, [], None, UX)   # nessuna superstrada (un pezzo di mappa della build attorno al punto, src/zona.py): niente guardrail
     oth = []
     for (g, a), f in zip(vei, isx):
         if f or (not innesti and (on_br(a) or a.get('sed') == '03')) or g.distance(UX) > OFF + APRI + 0.5: continue   # (anche un pezzo su un ponte: la rampa che sale su un cavalcavia e lì si innesta, x 72 z 223)

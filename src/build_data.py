@@ -28,6 +28,8 @@ from vicini import PuntiVicini  # nearby points without a whole scan (src/vicini
 from processi import differenze, intersezioni  # many differences or intersections against one big geometry in processes of their own (src/processi.py)
 import os; os.environ.setdefault('GTA_CACHE', os.path.join(os.path.dirname(os.path.abspath(dst)), 'cache_build'))  # the cache of the slow pure steps, next to the output (src/build_cache.py; GTA_NOCACHE=1 to do without)
 from presto import presto, in_parallelo, subito  # the heavy GEOS calls on all the cores, each the same call as before (src/presto.py)
+os.environ.setdefault('GTA_COSTANTI_SCRIVI', os.path.join(os.path.dirname(os.path.abspath(dst)), 'costanti_build.json'))   # what looks at the whole map, for the build around the point (src/costanti.py)
+import costanti; from costanti import costante
 
 # ------------------------------------------------------------------ parse
 nodes, ntags, ways, rels, wrefs = {}, {}, {}, [], {}
@@ -713,7 +715,7 @@ if dbt_roads:
             z_ = _zdbt(nodes[n_], tang(nodes[refs[max(0, i - 1)]], nodes[refs[min(len(refs) - 1, i + 1)]]))
             if z_ is not None: zn[n_].append(z_)
     _df = sorted(z_ - TBASE - ground(*nodes[n_]) for n_, zs_ in zn.items() for z_ in zs_); _near = [d_ for d_ in _df if abs(d_) < 4]
-    _off = _near[len(_near) // 2] if _near else 0
+    _off = costante('quote_strade_scarto', lambda: _near[len(_near) // 2] if _near else 0)   # on all the streets of the map: the build around the point takes the full build's (src/costanti.py)
     zh = {n_: sorted(zs_)[len(zs_) // 2] - _off - TBASE for n_, zs_ in zn.items()}
     # a node the DBGT has no axis for (none within 5 m running the same way) takes its height from its neighbours along the streets, as a
     # weighted mean that settles into a straight line along a chain (it used to keep the guess: a 6.6 m spike between nodes at 1 m). A bridge
@@ -1824,7 +1826,7 @@ for row in rows:
 import dbgt_verde
 VERDE = dbgt_verde.Verde(DBT_DIR, _comuni, dbt_cover, log, lambda lon_, lat_: ((lon_ - lon0) * KX, -(lat_ - lat0) * KZ), (-HW, -HH)); _n_tr = len(trees)
 # forests: scatter trees inside wood polygons (deterministic), avoiding roads & buildings
-rng = np.random.default_rng(20821)
+rng = np.random.default_rng(20821); _srt = costanti.Sorteggi('sorteggi_boschi_osm', rng)
 _railbuf = unary_union([l.buffer(4) for l in railL]) if railL else GeometryCollection(); prepare(_railbuf)
 roadsU = _rbuf('roadsU')
 prepare(roadsU)
@@ -1833,11 +1835,13 @@ for at, g in area_geoms:
     dens = {11: 1 / 70, 12: 1 / 220, 2: 1 / 260}[at]
     n = int(min(4000, g.area * dens)); minx, minz, maxx, maxz = g.bounds
     if n <= 0: continue
+    _srt.prima('%.2f %.2f %.2f' % (g.centroid.x, g.centroid.y, g.area))   # (the build around the point starts each wood where the full build did: src/costanti.py)
     xs_ = rng.uniform(minx, maxx, n * 3); zs_ = rng.uniform(minz, maxz, n * 3)
     import shapely
     ptsg = shapely.points(xs_, zs_)
     ok = shapely.contains(g, ptsg) & ~shapely.intersects(roadsU, ptsg) & ~shapely.intersects(bunion, ptsg) & ~shapely.intersects(_railbuf, ptsg) & (np.abs(xs_) <= HW) & (np.abs(zs_) <= HH)
     for x, z in list(zip(xs_[ok], zs_[ok]))[:n]: trees.append((x, z))
+_srt.fine()
 area_geoms, land = VERDE.aree(area_geoms, land, cons=_cons_f.result())  # after OSM's woods got their trees: the scatter outside the DBGT stays as it was
 area_geoms, land = MANUF.aree(area_geoms, land)
 log('pois', len(pois), 'places', len(places), 'trees', len(trees), 'crossings', len(crossings))
@@ -2548,4 +2552,5 @@ out.setdefault('report', {})['controlli_28_10'] = _ctl
 out.setdefault('report', {})['cantieri'] = _crep  # the dividers the building sites' hoarding replaces (src/barriere.py cantieri)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
+costanti.salva()
 log('written', dst, len(s) // 1024, 'KB', 'tiles', ntx, 'x', ntz, 'roads', len(out_roads), 'nodes', len(NODES))

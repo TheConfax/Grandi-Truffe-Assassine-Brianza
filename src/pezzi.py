@@ -57,7 +57,8 @@ def suolo_esteso(B, g, dem):
     return dict(x0=float(X0), z0=float(Z0), step=st, nx=int(NX), nz=int(NZ), base=T['base']), gz(D.astype('<i2').tobytes()), int(abs(d[dist < 11]).max()) if len(d) else 0
 
 
-def scrivi(root, B, IND, PK, g, cotta, dem):
+def scrivi(root, B, IND, PK, g, cotta, dem, solo=None):
+    """solo: i tile (numeri della griglia) da scrivere, gli altri pezzi in mappa/p restano come sono (la build attorno al punto, src/zona.py); None: tutti, la cartella rifatta"""
     meta0 = B['meta']; DX, DZ = g['dx'], g['dz']; ntx0, ntz0 = meta0['ntx'], meta0['ntz']; NTX, NTZ = g['ntx'], g['ntz']
     tn = lambda t0: (t0 % ntx0 + DX) + NTX * (t0 // ntx0 + DZ)
     k0n = lambda k: '%d_%d' % (int(k.split('_')[0]) + DX, int(k.split('_')[1]) + DZ)
@@ -65,8 +66,8 @@ def scrivi(root, B, IND, PK, g, cotta, dem):
     tof = lambda x, z: min(NTX - 1, max(0, int((x + meta0['hw']) // TILE) + DX)) + NTX * min(NTZ - 1, max(0, int((z + meta0['hh']) // TILE) + DZ))
     box = lambda x0, z0, x1, z1: [i + NTX * j for j in range(max(0, int((z0 + HH) // TILE)), min(NTZ - 1, int((z1 + HH) // TILE)) + 1) for i in range(max(0, int((x0 + HW) // TILE)), min(NTX - 1, int((x1 + HW) // TILE)) + 1)]
     out = os.path.join(root, 'mappa'); pd = os.path.join(out, 'p')
-    if os.path.isdir(pd): shutil.rmtree(pd)
-    os.makedirs(pd)
+    if solo is None and os.path.isdir(pd): shutil.rmtree(pd)
+    os.makedirs(pd, exist_ok=True)
     tiles = {}   # t della griglia -> JSON del pezzo
     rl, rv = [], []
     for t0, td in enumerate(B['tiles']):
@@ -114,7 +115,8 @@ def scrivi(root, B, IND, PK, g, cotta, dem):
     pezzi = {}
     for t in sorted(tiles):
         d = tiles[t]; b = S.get(t, b''); j = js(d); tx, tz = t % NTX, t // NTX
-        with open(os.path.join(pd, '%d_%d.bin' % (tx, tz)), 'wb') as f: f.write(gz(struct.pack('<I', len(j)) + j + b))
+        if solo is None or t in solo:
+            with open(os.path.join(pd, '%d_%d.bin' % (tx, tz)), 'wb') as f: f.write(gz(struct.pack('<I', len(j)) + j + b))
         pezzi[str(t)] = IND['tiles'].get('%d_%d' % (tx - DX, tz - DZ), 0)
     info, sg, salto = suolo_esteso(B, g, dem)
     open(os.path.join(out, 'suolo.bin'), 'wb').write(sg)
@@ -122,7 +124,9 @@ def scrivi(root, B, IND, PK, g, cotta, dem):
     glob = dict(meta=meta, terrain=info, nodes=B['nodes'], roads=B['roads'], names=B['names'], pois=B['pois'], places=B['places'], signals=B.get('signals', []), fountains=B.get('fountains', []), bus=B.get('bus', []), trains=B.get('trains', []), cut=B.get('cut', []),
                 rl=rl, rv=rv, binari=IND.get('binari', []), ondeck=sorted({r for d in IND.get('decks', []) for r in d.get('ra', [])}), pezzi=pezzi, cotta=(cotta or {}).get('globale'))
     h = hashlib.sha1(js(glob) + sg)
-    for t in sorted(tiles): h.update(open(os.path.join(pd, '%d_%d.bin' % (t % NTX, t // NTX)), 'rb').read())
+    for t in sorted(tiles):
+        fp = os.path.join(pd, '%d_%d.bin' % (t % NTX, t // NTX))
+        if solo is None or os.path.exists(fp): h.update(open(fp, 'rb').read())
     glob['ver'] = h.hexdigest()[:10]
     open(os.path.join(out, 'globale.bin'), 'wb').write(gz(js(glob)))
     if not cotta: open(os.path.join(out, 'solo_cottura.json'), 'wb').write(js(dict(ng=B.get('ng', []))))
@@ -142,17 +146,26 @@ def main(argv=None):
         print(scrivi(a.root, B, IND, PK, g, json.load(open(a.cotta, encoding='utf-8')), dem)); return
     print('crudi', scrivi(a.root, B, IND, PK, g, None, dem))
     if a.solo_crudi: return
-    class Muto(http.server.SimpleHTTPRequestHandler):
-        def __init__(s, *p, **k): super().__init__(*p, directory=a.root, **k)
-        def log_message(s, *p): pass
-    class Server(http.server.ThreadingHTTPServer): request_queue_size = 256   # the invisible browser opens 16 connections at once (5 fails on Windows)
-    srv = Server(('127.0.0.1', 0), Muto); threading.Thread(target=srv.serve_forever, daemon=True).start()
     c = os.path.join(a.root, 'mappa', 'cotta.json')
-    rc = subprocess.call(['node', os.path.join(ROOT, 'src', 'cuoci.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], c, os.path.join(a.root, 'mappa', 'grande.webp')])
-    srv.shutdown()
-    if rc: sys.exit('cottura fallita')
+    if cottura(a.root, c, os.path.join(a.root, 'mappa', 'grande.webp')): sys.exit('cottura fallita')
     print('cotti', scrivi(a.root, B, IND, PK, g, json.load(open(c, encoding='utf-8')), dem))
     os.remove(c)
+
+
+def cottura(root, c, webp, mappa=None):
+    """src/cuoci.mjs sul sito in root; mappa: un'altra cartella da servire al posto di root/mappa (i pezzi crudi della build attorno al punto). Rende il codice di uscita"""
+    class Muto(http.server.SimpleHTTPRequestHandler):
+        def __init__(s, *p, **k): super().__init__(*p, directory=root, **k)
+        def log_message(s, *p): pass
+        def translate_path(s, path):
+            q = path.split('?', 1)[0].split('#', 1)[0]
+            if mappa and q.startswith('/mappa/') and os.path.exists(os.path.join(mappa, *q[len('/mappa/'):].split('/'))): return os.path.join(mappa, *q[len('/mappa/'):].split('/'))
+            return super().translate_path(path)
+    class Server(http.server.ThreadingHTTPServer): request_queue_size = 256   # the invisible browser opens 16 connections at once (5 fails on Windows)
+    srv = Server(('127.0.0.1', 0), Muto); threading.Thread(target=srv.serve_forever, daemon=True).start()
+    rc = subprocess.call(['node', os.path.join(ROOT, 'src', 'cuoci.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], c, webp])
+    srv.shutdown()
+    return rc
 
 
 if __name__ == '__main__': main()

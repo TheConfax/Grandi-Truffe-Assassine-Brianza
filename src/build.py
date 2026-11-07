@@ -1,5 +1,6 @@
 """Rigenera brianza.json: controlla che in data/ ci sia tutto, poi lancia build_data.py con gli argomenti giusti.
 uso: python src/build.py [out.json]      (di default brianza.json nella cartella del repo; dura una ventina di minuti con due comuni; dopo: terreno_gioco.py, poi pezzi.py)
+     python src/build.py --zona X Z [R]   la build attorno al punto: dati e pezzi solo per i tile vicini (src/zona.py), pochi minuti
 La cartella dei dati si può spostare con la variabile GTA_DATA. Le fonti sono descritte in docs/dati.md."""
 import os, sys, glob, subprocess
 
@@ -38,6 +39,8 @@ want = ['D%d%04d' % (la, lo) for la in range(int(RQ.S * 100), int(RQ.N * 100) + 
 named = [t for t in want if any(t in os.path.basename(f).upper() for f in lid)]
 print('LiDAR: %d file in terreno/lidar' % len(lid) + ('' if not lid or not named else ', mancano le tessere ' + (', '.join(t for t in want if t not in named) or 'nessuna')))
 
+if len(sys.argv) > 1 and sys.argv[1] == '--zona':   # la build attorno al punto: python src/build.py --zona X Z [R] (src/zona.py)
+    import zona; zona.main(sys.argv[2:]); sys.exit(0)
 out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'brianza.json')
 env = dict(os.environ, GTA_DATA=DATA, PYTHONIOENCODING='utf-8')
 rc = subprocess.call([sys.executable, '-u', os.path.join(ROOT, 'src', 'build_data.py'), OSM, DEM, out, S, N, W, E], env=env)
