@@ -629,7 +629,7 @@ rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
 rep("v -= 21 * dt * i.brk;", "v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
 rep("updGlow();", "updGlow(); updSkyFx(running && !paused ? dt : 0);")
-rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true) };")
+rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), HELI: cheatHeli };")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')
@@ -868,6 +868,6 @@ rep("  if (veh) {\n    if (E[3]) { K.use = true;", "  if (kind === 'heli') {\n  
 # the camera behind the helicopter: a wall whose top is under both the helicopter and the camera is not between them (rayCam looked at the plan only, and over the town it kept pulling the view in and letting it go, Carlo 7/11)
 rep("function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */\n  let best = 1;", "function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */\n  const lo_ = P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity; /* from the helicopter: the walls whose top is under both ends do not count */\n  let best = 1;")
 rep("if (s.r || s.dyn || s.y0 > cy || s.off || (P.mode === 'foot' && saltoLowBar(s))) return;", "if (s.r || s.dyn || s.y0 > cy || s.off || (s.y0 !== undefined && (s.bt ? s.y1 - 3 : s.y1) < lo_) || (P.mode === 'foot' && saltoLowBar(s))) return;")
-rep("window.__G = { FARI,", "window.__G = { HELIS, HELI, heliStep, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI,")
+rep("window.__G = { FARI,", "window.__G = { HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI,")
 rep("const v = P.mode === 'car' ? P.car : null; if (!v || bumpT > 0 || v.speed < 7) return;", "const v = P.mode === 'car' ? P.car : null; if (!v || v.heli || bumpT > 0 || v.speed < 7) return;")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)

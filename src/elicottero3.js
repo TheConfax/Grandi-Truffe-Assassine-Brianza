@@ -85,6 +85,13 @@ function heliWalls(e) {
   }
   GRID_REC = rec0;
 }
+/* the HELI code (Carlo 8/11): a helicopter here, a few metres in front of you on foot (or beside the car); the other side if a building is in the way */
+function cheatHeli() {
+  const fx = Math.sin(P.h), fz = Math.cos(P.h); let x = P.x + fx * 8, z = P.z + fz * 8;
+  if (inBuilding(x, z, 3)) { x = P.x - fx * 8; z = P.z - fz * 8; }
+  if (inBuilding(x, z, 3)) { x = P.x + fz * 8; z = P.z - fx * 8; }
+  heliNew(x, z, P.h); toast('🚁 Elicottero!');
+}
 function heliSetup() {
   for (const [x, z, h] of HELI.home) heliNew(x, z, h);
   /* a link that starts by a helicopter (?x=&z= within 40 m): on foot beside it, facing it, not in the car on the lane */

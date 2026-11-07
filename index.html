@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo d0935ba · assemblato 08/11 00:20 · porta ' + location.port;
+    const txt = 'locale · ramo codice-heli · dopo 3399a2f · assemblato 08/11 00:35 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -10194,6 +10194,13 @@ function heliWalls(e) {
   }
   GRID_REC = rec0;
 }
+/* the HELI code (Carlo 8/11): a helicopter here, a few metres in front of you on foot (or beside the car); the other side if a building is in the way */
+function cheatHeli() {
+  const fx = Math.sin(P.h), fz = Math.cos(P.h); let x = P.x + fx * 8, z = P.z + fz * 8;
+  if (inBuilding(x, z, 3)) { x = P.x - fx * 8; z = P.z - fz * 8; }
+  if (inBuilding(x, z, 3)) { x = P.x + fz * 8; z = P.z - fx * 8; }
+  heliNew(x, z, P.h); toast('🚁 Elicottero!');
+}
 function heliSetup() {
   for (const [x, z, h] of HELI.home) heliNew(x, z, h);
   /* a link that starts by a helicopter (?x=&z= within 40 m): on foot beside it, facing it, not in the car on the lane */
@@ -11971,7 +11978,7 @@ function cheatFerari() { // on foot: a Ferari right in front of you; driving: wh
   }
   toast('🏎 Ferari!');
 }
-const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true) };
+const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), HELI: cheatHeli };
 let last = performance.now(), acc = 0;
 function frame(t) {
   requestAnimationFrame(frame);
@@ -12004,5 +12011,5 @@ window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { HELIS, HELI, heliStep, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>
