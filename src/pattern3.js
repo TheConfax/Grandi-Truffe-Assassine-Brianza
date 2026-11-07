@@ -29,7 +29,7 @@ const PAT_FRAG = org => `
     mean = textureLod(map, vUv, 12.).rgb;
 #endif
     tc = mean + (.7 * (tc - mean) + .3 * (tb - mean)) / .7616;` : `
-    tc *= 1. + (hA - .5) * .16;`}
+    tc *= 1. + (hA - .5) * .05;`}
     texelColor = vec4(tc, 1.);
     float ORGK = ${org ? "1.08" : "1."};
     vec2 P = vWp.xz; float sn = slowN(P + 53., 1.6), sm = slowN(P + 191., 2.1);

@@ -901,6 +901,30 @@ function asfCol(g, x, z) {
   }
   const l = hyp(sx, sz); return l > 1e-9 ? { r: 0.5 + 0.5 * sx / l, g: 0.5 + 0.5 * sz / l, b: 1 } : ASF_NO;
 }
+/* porphyry (Carlo 7/11): the rows of setts run along the nearest long edge of the porphyry polygons (squares, streets with material f, yards, paths), as laid by hand. The direction at a
+   point is the axis (doubled angle) of the edges of the porphyry polygons of the tile within 32 m, each weighted by its length over the squared distance to it (+ 3 m, so the long side wins
+   in the middle of a square and the notches and little ends count little), rounded to 2 degrees. The edges that only lie on the border of the tile (a polygon cut there) are not edges. porAng returns the angle of
+   the rows (radians), or 0 where there is no porphyry edge near. The same function gives the whole cells of S and the drapes (clipFill, b.pg) the same angle: no seam */
+function porGrid(T) {
+  if (T.porG) return T.porG; const B = 32, K = (i, j) => (i + 4096) * 8192 + (j + 4096), g = new Map(), d = T.d, X0 = T.cx - TS / 2, Z0 = T.cz - TS / 2, X1 = X0 + TS, Z1 = Z0 + TS; T.porG = g; g.B = B; g.K = K;
+  const ons = (a, c) => (Math.abs(a[0] - X0) < 0.06 && Math.abs(c[0] - X0) < 0.06) || (Math.abs(a[0] - X1) < 0.06 && Math.abs(c[0] - X1) < 0.06) || (Math.abs(a[1] - Z0) < 0.06 && Math.abs(c[1] - Z0) < 0.06) || (Math.abs(a[1] - Z1) < 0.06 && Math.abs(c[1] - Z1) < 0.06);
+  const polys = []; for (const a of d.a || []) if (a.t === 10 || (a.t === 17 && a.m === 'f')) polys.push(a);
+  for (const q of d.pz || []) if (!q.m || q.m === 'f') polys.push(q);
+  for (const list of [d.as, d.cv, d.ft]) for (const q of list || []) if (q.m === 'f') polys.push(q);
+  for (const q of polys) for (const r of [dec(q.p), ...q.k.map(dec)]) for (let i = 0; i < r.length; i++) {
+    const a = r[i], c = r[(i + 1) % r.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5 || ons(a, c)) continue; const e = [a[0], a[1], c[0], c[1], L, (c[0] - a[0]) / L, (c[1] - a[1]) / L], n = Math.ceil(L / 16);
+    let last = -1; for (let k = 0; k <= n; k++) { const key = K(Math.floor((a[0] + (c[0] - a[0]) * k / n) / B), Math.floor((a[1] + (c[1] - a[1]) * k / n) / B)); if (key === last) continue; last = key; let l = g.get(key); if (!l) g.set(key, l = []); if (l[l.length - 1] !== e) l.push(e); }
+  }
+  return g;
+}
+function porAng(g, x, z) {
+  const B = g.B, ix = Math.floor(x / B), iz = Math.floor(z / B), seen = new Set(); let sx = 0, sz = 0;
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const l = g.get(g.K(ix + i, iz + j)); if (!l) continue;
+    for (const e of l) { if (seen.has(e)) continue; seen.add(e); const [ax, az, bx, bz, L, dx, dz] = e, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L)), d = hyp(ax + (bx - ax) * t - x, az + (bz - az) * t - z), w = L / ((d + 3) * (d + 3)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
+  }
+  return hyp(sx, sz) > 1e-9 ? Math.round(Math.atan2(sz, sx) / 2 / 0.0349) * 0.0349 : 0;
+}
 /* angle of the long side of the paving blocks to the kerb: 0 = along it, Math.PI / 2 = across it (from the kerb towards the wall); the one number to turn them */
 const PAVER_ROT = Math.PI / 2;
 function clipFill(b, outer, holes, y, vScale, col) {
@@ -913,6 +937,7 @@ function clipFill(b, outer, holes, y, vScale, col) {
   if (b.orient) { sg = []; for (const r of [outer, ...holes]) for (let i = 0; i < r.length; i++) { const a = r[i], c = r[(i + 1) % r.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L > 0.05) sg.push([(a[0] + c[0]) / 2, (a[1] + c[1]) / 2, L, (c[0] - a[0]) / L, (c[1] - a[1]) / L]); } }
   return H.clipPoly(outer, holes, (P, fine) => {
     const i0 = b.p.length / 3; let co = 1 / vScale, si = 0;
+    if (b.pg) { let mx = 0, mz = 0; for (const p of P) { mx += p[0]; mz += p[1]; } const th = porAng(b.pg, mx / P.length, mz / P.length); co = Math.cos(th) / vScale; si = Math.sin(th) / vScale; }
     if (sg) {
       let mx = 0, mz = 0; for (const p of P) { mx += p[0]; mz += p[1]; } mx /= P.length; mz /= P.length;
       let sx = 0, sz = 0; for (const [x, z, L, dx, dz] of sg) { const d = hyp(x - mx, z - mz), w = L / ((d + 1) * (d + 1)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
@@ -1698,7 +1723,7 @@ function* buildTileGen(T) {
   const G = new THREE.Group(); G.visible = false; scene.add(G); T.group = G;
   const put = (b, mat, ro, shadow) => { if (b.i.length) mkMesh(b, mat, ro, shadow, G); };
   const pc = a => COL(a[Math.floor(tRnd() * a.length)]), d = T.d, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
-  const FB = new Map(), fbuf = (m, rk, street, V) => { const k = m + '|' + rk; let b = FB.get(k); if (!b) { b = V ? VBuf() : FBuf(); b.rk = rk; if (street) b.street = true; if (m === 'a') { b.angc = true; b.asf = asfGrid(T); } /* asphalt as the streets' (asfCol: the direction of the road in the colour; without it the drape came out pale, Carlo 6/11) */ b.fm = m; FB.set(k, b); } return b; }; /* the drapes of the materials of src/fondi.py, one buffer per material and rank */
+  const FB = new Map(), fbuf = (m, rk, street, V) => { const k = m + '|' + rk; let b = FB.get(k); if (!b) { b = V ? VBuf() : FBuf(); b.rk = rk; if (street) b.street = true; if (m === 'a') { b.angc = true; b.asf = asfGrid(T); } /* asphalt as the streets' (asfCol: the direction of the road in the colour; without it the drape came out pale, Carlo 6/11) */ b.fm = m; if (m === 'f') b.pg = porGrid(T); FB.set(k, b); } return b; }; /* the drapes of the materials of src/fondi.py, one buffer per material and rank */
   // terrain patch
   const FT = H.tile(T.t); T.fine = !!FT;
   if (FT) { // new engine: the nodes of S as they are, the triangles of H.onTri (docs/motore.md 3: H.base is this mesh, H.check)
@@ -1714,8 +1739,9 @@ function* buildTileGen(T) {
       // triangle: built that way this slice took 40-60 ms in the town centre (a stutter while driving), now about as long as the bare terrain
       const sy = FT.sty[w]; let B = byStyle.get(sy); if (!B) byStyle.set(sy, B = { b: Buf(), sy, k: byStyle.size + 1 });
       if (tri & 1) { T.cellIdx[w] = B.b.i.length; T.cellMesh[w] = B.k; } const i0 = B.b.p.length / 3, vs = sy.vs;
+      const por_ = sy.m === MAT.piazzaS, pth = por_ ? porAng(porGrid(T), (ax + bx + cx) / 3, (az + bz + cz) / 3) : 0, pco = Math.cos(pth) / vs, psi = Math.sin(pth) / vs; /* porphyry: the rows along the edge (porAng) */
       const asf = sy.m === MAT.asphS ? asfGrid(T) : null; /* asphalt: the direction of the road at each corner (asfCol) in place of a colour */
-      vtx(B.b, ax, ay, az, 0, 1, 0, ax / vs, az / vs, asf ? asfCol(asf, ax, az) : sy.col); vtx(B.b, bx, by, bz, 0, 1, 0, bx / vs, bz / vs, asf ? asfCol(asf, bx, bz) : sy.col); vtx(B.b, cx, cy, cz, 0, 1, 0, cx / vs, cz / vs, asf ? asfCol(asf, cx, cz) : sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
+      vtx(B.b, ax, ay, az, 0, 1, 0, por_ ? ax * pco + az * psi : ax / vs, por_ ? -ax * psi + az * pco : az / vs, asf ? asfCol(asf, ax, az) : sy.col); vtx(B.b, bx, by, bz, 0, 1, 0, por_ ? bx * pco + bz * psi : bx / vs, por_ ? -bx * psi + bz * pco : bz / vs, asf ? asfCol(asf, bx, bz) : sy.col); vtx(B.b, cx, cy, cz, 0, 1, 0, por_ ? cx * pco + cz * psi : cx / vs, por_ ? -cx * psi + cz * pco : cz / vs, asf ? asfCol(asf, cx, cz) : sy.col); triUp(B.b, i0, i0 + 1, i0 + 2);
     });
     { const s_ = srndT; yield 'terrain 2'; srndT = s_; } for (const { b, sy } of byStyle.values()) T.ownMeshes.push(mkMesh(b, sy.m, -2, false, G));
     { const s_ = srndT; yield 'terrain 3'; srndT = s_; }
@@ -1745,7 +1771,7 @@ function* buildTileGen(T) {
   // land use
   {
     const gB = VBuf(), iB = VBuf(), pB = VBuf(), yB = VBuf(), zB = FBuf(), wB = VBuf(), fy = T.fine ? 0 : 1; // in a tile of S the surfaces lie on it (no lift: polygonOffset)
-    gB.rk = 1; iB.rk = 1; pB.rk = 1.1; yB.rk = 1.1; wB.rk = 2; zB.rk = 4; // their rank among the layers that own whole cells (cellOwners)
+    gB.rk = 1; iB.rk = 1; pB.rk = 1.1; yB.rk = 1.1; wB.rk = 2; zB.rk = 4; zB.pg = porGrid(T); // their rank among the layers that own whole cells (cellOwners)
     let tLu = performance.now();
     for (const a of d.a || []) {
       if (performance.now() - tLu > 2.5) { const s_ = srndT; yield 'landuse'; srndT = s_; tLu = performance.now(); } // a town tile has hundreds of areas: this slice alone took 30 ms
@@ -1859,7 +1885,7 @@ function* buildTileGen(T) {
   yield 'streets';
   // street surfaces
   {
-    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), lett = FBuf(), lettB = FBuf(), white = COL('#f1efe6'); asp.rk = 5; asp.angc = true; asp.asf = asfGrid(T); por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = lett.street = lettB.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
+    const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), lett = FBuf(), lettB = FBuf(), white = COL('#f1efe6'); asp.rk = 5; asp.angc = true; asp.asf = asfGrid(T); por.rk = 5.1; por.pg = porGrid(T); foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = lett.street = lettB.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
     const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
     const fillM = (list, b, rk, y, sc) => { for (const q of list || []) { const m = q.m || (b ? null : 'n'); try { if (m) polyFill(fbuf(m, rk, true), dec(q.p), q.k.map(dec), y, fondoLook(m).vs, fondoLook(m).col); else polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } }; /* a polygon with its material (src/fondi.py) in the buffer of that material */
