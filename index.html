@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo porfido · dopo fd77f32 · assemblato 07/11 19:49 · porta ' + location.port;
+    const txt = 'locale · ramo porfido · dopo 5a51736 · assemblato 07/11 19:59 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2574,12 +2574,13 @@ function porGrid(T) {
   return g;
 }
 function porAng(g, x, z) {
+  x = (Math.floor(x / 8) + 0.5) * 8; z = (Math.floor(z / 8) + 0.5) * 8; /* one angle for each block of 8 m: the changes of angle are straight cuts across the paving, not arcs round a bend */
   const B = g.B, ix = Math.floor(x / B), iz = Math.floor(z / B), seen = new Set(); let sx = 0, sz = 0;
   for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
     const l = g.get(g.K(ix + i, iz + j)); if (!l) continue;
-    for (const e of l) { if (seen.has(e)) continue; seen.add(e); const [ax, az, bx, bz, L, dx, dz] = e, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L)), d = hyp(ax + (bx - ax) * t - x, az + (bz - az) * t - z), w = L / ((d + 3) * (d + 3)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
+    for (const e of l) { if (seen.has(e)) continue; seen.add(e); const [ax, az, bx, bz, L, dx, dz] = e, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L)), d = hyp(ax + (bx - ax) * t - x, az + (bz - az) * t - z), w = L / ((d + 6) * (d + 6)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
   }
-  return hyp(sx, sz) > 1e-9 ? Math.round(Math.atan2(sz, sx) / 2 / 0.0349) * 0.0349 : 0;
+  return hyp(sx, sz) > 1e-9 ? Math.round(Math.atan2(sz, sx) / 2 / 0.0873) * 0.0873 + Math.PI / 2 : 0;
 }
 /* angle of the long side of the paving blocks to the kerb: 0 = along it, Math.PI / 2 = across it (from the kerb towards the wall); the one number to turn them */
 const PAVER_ROT = Math.PI / 2;
@@ -11290,7 +11291,7 @@ const PAT_FRAG = org => `
     texelColor = vec4(tc, 1.);
     float ORGK = ${org ? "1.08" : "1."};
     vec2 P = vWp.xz; float sn = slowN(P + 53., 1.6), sm = slowN(P + 191., 2.1);
-    texelColor.rgb *= ORGK * (1. + .24 * (sn - .5)) * vec3(1. + .09 * (sm - .5), 1. + .05 * (sm - .5), 1. - .12 * (sm - .5));
+    texelColor.rgb *= ORGK * (1. + ${org ? '.24' : '.10'} * (sn - .5)) * vec3(1. + .09 * (sm - .5), 1. + .05 * (sm - .5), 1. - .12 * (sm - .5));
   }
   texelColor = mapTexelToLinear(texelColor);
   diffuseColor *= texelColor;`;

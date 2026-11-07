@@ -33,7 +33,7 @@ const PAT_FRAG = org => `
     texelColor = vec4(tc, 1.);
     float ORGK = ${org ? "1.08" : "1."};
     vec2 P = vWp.xz; float sn = slowN(P + 53., 1.6), sm = slowN(P + 191., 2.1);
-    texelColor.rgb *= ORGK * (1. + .24 * (sn - .5)) * vec3(1. + .09 * (sm - .5), 1. + .05 * (sm - .5), 1. - .12 * (sm - .5));
+    texelColor.rgb *= ORGK * (1. + ${org ? '.24' : '.10'} * (sn - .5)) * vec3(1. + .09 * (sm - .5), 1. + .05 * (sm - .5), 1. - .12 * (sm - .5));
   }
   texelColor = mapTexelToLinear(texelColor);
   diffuseColor *= texelColor;`;

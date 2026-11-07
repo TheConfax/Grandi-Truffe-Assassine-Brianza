@@ -918,12 +918,13 @@ function porGrid(T) {
   return g;
 }
 function porAng(g, x, z) {
+  x = (Math.floor(x / 8) + 0.5) * 8; z = (Math.floor(z / 8) + 0.5) * 8; /* one angle for each block of 8 m: the changes of angle are straight cuts across the paving, not arcs round a bend */
   const B = g.B, ix = Math.floor(x / B), iz = Math.floor(z / B), seen = new Set(); let sx = 0, sz = 0;
   for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
     const l = g.get(g.K(ix + i, iz + j)); if (!l) continue;
-    for (const e of l) { if (seen.has(e)) continue; seen.add(e); const [ax, az, bx, bz, L, dx, dz] = e, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L)), d = hyp(ax + (bx - ax) * t - x, az + (bz - az) * t - z), w = L / ((d + 3) * (d + 3)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
+    for (const e of l) { if (seen.has(e)) continue; seen.add(e); const [ax, az, bx, bz, L, dx, dz] = e, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L)), d = hyp(ax + (bx - ax) * t - x, az + (bz - az) * t - z), w = L / ((d + 6) * (d + 6)); sx += w * (dx * dx - dz * dz); sz += w * 2 * dx * dz; }
   }
-  return hyp(sx, sz) > 1e-9 ? Math.round(Math.atan2(sz, sx) / 2 / 0.0349) * 0.0349 : 0;
+  return hyp(sx, sz) > 1e-9 ? Math.round(Math.atan2(sz, sx) / 2 / 0.0873) * 0.0873 + Math.PI / 2 : 0;
 }
 /* angle of the long side of the paving blocks to the kerb: 0 = along it, Math.PI / 2 = across it (from the kerb towards the wall); the one number to turn them */
 const PAVER_ROT = Math.PI / 2;
