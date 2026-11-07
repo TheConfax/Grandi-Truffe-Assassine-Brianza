@@ -11941,24 +11941,24 @@
   "osm_tenuti": 2910,
   "osm_tolti_vicini_dbgt": 1932,
   "osm_tolti_nei_boschi": 62,
-  "sparsi_osm_dentro": 33893,
+  "sparsi_osm_dentro": 33894,
   "sparsi_osm_tenuti": 16,
   "sparsi_boschi_dbgt": 20819,
-  "su_superfici_vietate": 2006,
+  "su_superfici_vietate": 2007,
   "esito": {
    "spostati": 1165,
    "restano_in_aiuola": 50,
    "tolti": 744,
-   "bosco": 47
+   "bosco": 48
   },
   "doppi": 377,
-  "finali_dentro": 41371,
+  "finali_dentro": 41370,
   "fuori": 47367,
   "per_fonte": {
    "albero": 16942,
    "filare": 1473,
    "osm": 2500,
-   "bosco": 20456
+   "bosco": 20455
   },
   "tolti_dbgt": [
    [

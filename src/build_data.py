@@ -487,8 +487,23 @@ def street_parking(t):  # [left, right] of the way: 0 none, 1 parallel, 2 diagon
 roads, raw_roads = [], []
 rails, rivers, rows, rail_raw, barriers = [], [], [], [], []
 bar_runs, gate_ways = [], []
+# a bridge is of the kind of the ways it links (Carlo 6/11, the abandoned overpass of Seveso x 145 z 1440: a service road as wide as a street that links two
+# paths). A bridge way whose ends meet only paths, footways, cycleways or tracks is a footbridge: a path for the game, no carriageway, no markings, no
+# traffic (src/impalcati.py solo_sentieri makes its deck a footbridge too)
+SENTIERI = {'footway', 'path', 'cycleway', 'track', 'bridleway', 'steps', 'pedestrian'}
+_nodo_vie = {}
+for _wid, (_refs, _t) in ways.items():
+    if _t.get('highway'):
+        for _n in _refs: _nodo_vie.setdefault(_n, []).append(_wid)
+PASSERELLE = set()
+for _wid, (_refs, _t) in ways.items():
+    if _t.get('highway') in DRIVE and _t.get('bridge') not in (None, 'no') and _refs:
+        _hw = [ways[o][1].get('highway') for n in (_refs[0], _refs[-1]) for o in _nodo_vie.get(n, []) if o != _wid]
+        if _hw and all(h in SENTIERI for h in _hw): PASSERELLE.add(_wid)
+log('ponti che collegano solo sentieri, fatti passerelle:', sorted(PASSERELLE))
 for wid, (refs, t) in ways.items():
     hw = t.get('highway')
+    if wid in PASSERELLE: hw = 'footway'
     if hw in DRIVE or hw in FOOT:
         if t.get('area') == 'yes': continue
         if t.get('access') == 'private' and hw == 'service' and t.get('service') in ('driveway', 'parking_aisle'): pass
@@ -2264,14 +2279,32 @@ _md_ponte = _op.senza_strada_di_sopra.sul_ponte   # the islands of the road over
 _mdp_ = _op.sotto_impalcato_sopra(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json'), _pst)
 if _mdp_ is not None and not _mdp_.is_empty:
     _sp_ = []
+    _md0 = STR.md_dbgt if STR is not None else None
     if STR is not None and STR.md_dbgt is not None and not STR.md_dbgt.is_empty and STR.md_dbgt.intersects(_mdp_):
         _q_ = STR.md_dbgt.intersection(_mdp_); _sp_.append(_q_); STR.md_dbgt = STR.md_dbgt.difference(_mdp_.buffer(0.05))
     _ag_ = []
+    # (Carlo 6/11, via Vignazzola x -1 z 776: a square of grass in the middle of the carriageway of the bridge) a grass area under the deck goes on the deck
+    # only off the carriageway of the ways on the bridge
+    _cp_ = unary_union([LineString([nodes[n_] for n_ in r_['refs']]).buffer(r_['w'] / 2 + 0.5) for r_ in raw_roads if r_.get('bridge') and r_['c'] <= 5 and len(r_['refs']) >= 2])
     for at_, g_ in area_geoms:
-        if at_ in (1, 2) and g_.intersects(_mdp_): _sp_.append(g_.intersection(_mdp_)); g_ = g_.difference(_mdp_.buffer(0.05))
+        if at_ in (1, 2) and g_.intersects(_mdp_): _sp_.append(g_.intersection(_mdp_).difference(_cp_)); g_ = g_.difference(_mdp_.buffer(0.05))
         _ag_.append((at_, g_))
     area_geoms[:] = [(a_, g_) for a_, g_ in _ag_ if not g_.is_empty]
     _sp_ = [q_ for q_ in _sp_ if not q_.is_empty and q_.area > 0.3]
+    # (Carlo 6/11, via Vignazzola x -21 z 765: a square of grass in the carriageway of the bridge) only the islands of the road over the bridge go on its deck:
+    # an island that runs across the deck (its long side more than 45 degrees off the deck) is the median of the road under it, going on under the bridge
+    _dk_ = [(Polygon(d_['imp']).buffer(0), np.asarray(d_['dir'], float)) for d_ in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json'), encoding='utf-8')).get('decks', []) if d_.get('dir')]
+    _md0_ = [g_ for g_ in getattr(_md0, 'geoms', [_md0])] if _md0 is not None else []
+    def _lungo(g_):
+        c_ = np.asarray(g_.minimum_rotated_rectangle.exterior.coords)[:3]; e1, e2 = c_[1] - c_[0], c_[2] - c_[1]; e_ = e1 if np.hypot(*e1) >= np.hypot(*e2) else e2; return e_ / (np.hypot(*e_) or 1)
+    _tieni_ = []
+    for q_ in _sp_:
+        for pq in getattr(q_, 'geoms', [q_]):
+            if pq.geom_type != 'Polygon' or pq.is_empty: continue
+            dk_ = [v for g_, v in _dk_ if g_.contains(pq.representative_point())]; isl = [g_ for g_ in _md0_ if g_.intersects(pq)]
+            if dk_ and isl and abs(float(_lungo(max(isl, key=lambda g_: g_.intersection(pq).area)) @ dk_[0])) < 0.707: continue
+            _tieni_.append(pq)
+    _sp_ = _tieni_
     if _sp_: _md_ponte = unary_union(([_md_ponte] if _md_ponte is not None else []) + _sp_); log('isole della strada di sopra sotto la coda degli impalcati, sul ponte m2', round(sum(q_.area for q_ in _sp_), 1))
 if not median.is_empty: median = _op.senza_strada_di_sopra(_pst, {}, median, [], log)[1]
 area_geoms[:] = [(at, g.difference(_via) if g.intersects(_via) else g) for at, g in area_geoms]

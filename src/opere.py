@@ -714,7 +714,7 @@ def opere_dbgt(sup, S):
                 giu = zona & ~base_ & (W > vb + 0.05); W[giu] = vb[giu]
                 in_c = shapely.contains(c_, pts) if not c_.is_empty else np.zeros(pts.shape, bool); in_b = shapely.contains(b_, pts) if not b_.is_empty else np.zeros(pts.shape, bool)
                 CL, FI = sup.CLS[r0:r1, c0:c1], sup.FIX[r0:r1, c0:c1]
-                k_ = zona & ~base_
+                k_ = zona & ~base_ & shapely.contains(shapely.union_all([g.buffer(0.05)] + lati), pts)   # (the strips alongside only go down: what they are stays, the railway fence under them, Carlo 6/11)
                 CL[k_ & in_c] = sf.C_VEI; CL[k_ & in_b & ~in_c] = sf.C_PED; FI[k_ & in_b] = True
                 CL[k_ & ~in_b] = sf.C_NONE; FI[k_ & ~in_b] = False
                 for nm_ in ('SCARP', 'INT'):

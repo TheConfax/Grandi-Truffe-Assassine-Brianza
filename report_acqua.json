@@ -198,7 +198,7 @@
   ]
  },
  "A5": {
-  "metri_controllati": 19374,
+  "metri_controllati": 19384,
   "metri_lontani_dal_fondo": 265,
   "sopra_il_fondo": {
    "n": 132,
@@ -856,6 +856,6 @@
   "tombini_sotto_strade": 48,
   "tombini_sotto_strade_sfondati": 1,
   "prove_fisse_ok": "4 su 4",
-  "tempo_s": 28.6
+  "tempo_s": 25.6
  }
 }

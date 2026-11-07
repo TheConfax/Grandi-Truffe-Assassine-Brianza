@@ -1866,10 +1866,10 @@
 }
 },
 "terreno": {
-"nodi_sul_profilo": 47364,
+"nodi_sul_profilo": 47322,
 "nodi_attorno": 812,
 "mossi_sul_profilo_m": {
-"n": 47364,
+"n": 47322,
 "p50": 0.041,
 "p90": 0.308,
 "p99": 0.659,
@@ -1890,8 +1890,8 @@
 }
 },
 "bordo_barriere": {
-"metri_di_recinzione": 2548,
-"nodi": 1258,
+"metri_di_recinzione": 2544,
+"nodi": 1256,
 "mossi_m": {
 "p50": 0.41,
 "p90": 0.72,
@@ -1913,9 +1913,9 @@
 }
 },
 "dente": {
-"nodi_mossi": 422975,
+"nodi_mossi": 422978,
 "spostamento_m": {
-"n": 422975,
+"n": 422978,
 "p50": 0.085,
 "p90": 0.278,
 "p99": 0.658,
@@ -2570,7 +2570,7 @@
 },
 "spostamento": {
 "dente_m": {
-"n": 417239,
+"n": 417242,
 "p50": 0.09,
 "p90": 0.28,
 "p99": 1.02,
@@ -2579,13 +2579,13 @@
 "dente_su_m": 6.36,
 "dente_giu_m": -1.5,
 "buche_m": {
-"n": 109167,
+"n": 109125,
 "p50": 0.5,
 "p90": 1.59,
 "p99": 2.79,
 "max": 6.0
 },
-"nodi_mossi": 526406,
+"nodi_mossi": 526367,
 "nodi_griglia": 7880626,
 "limite_dente_m": 1.5
 },
@@ -2594,7 +2594,7 @@
 "nodi_nella_fascia_protetta_cambiati_nei_pozzetti": 20,
 "carreggiate_cambiate": 7,
 "carreggiate_ai_passaggi_a_livello": 565,
-"bordo_carreggiate_alle_recinzioni": 149,
+"bordo_carreggiate_alle_recinzioni": 147,
 "carreggiate_nei_pozzetti_riempiti": 284,
 "impalcati_e_sotto": 0,
 "acqua_e_alvei": 0,

@@ -56,6 +56,37 @@ def _resample(xy, step):
     return np.column_stack((np.interp(s, d, xy[:, 0]), np.interp(s, d, xy[:, 1])))
 
 
+# (Carlo 6/11, corso Isonzo: "guardrail storto accanto al parapetto invece di continuarlo") a guardrail that ends by a bridge goes on to the end of the parapet of
+# the deck: its last RACCORDO m are a straight line to the nearest corner of the PONTE (the deck outline the parapets follow, terreno/indice.json nucleo)
+RACCORDO = 4.0
+def _angoli_parapetti():
+    import os, json
+    f = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json')
+    if not os.path.exists(f): return None
+    ind = json.load(open(f, encoding='utf-8')); base = 0.0; V = []
+    for d in ind.get('decks', []):
+        if d.get('tipo') not in ('strada', 'ferro') or not d.get('nucleo'): continue
+        T = np.asarray(d['tri'], float).reshape(-1, 3)
+        for q in d['nucleo']: V.append((q[0], q[1], T[np.argmin(np.hypot(T[:, 0] - q[0], T[:, 1] - q[1])), 2]))   # (x, z, the top of the deck there, m)
+    return np.asarray(V, float) if V else None
+
+
+def _al_parapetto(P, V, quota=None):
+    if V is None or len(P) < 3: return P
+    for fine in (True, False):
+        Q = P[::-1] if fine else P; e = Q[0]; d = np.hypot(*(V[:, :2] - e).T); j = int(np.argmin(d))
+        if d[j] > RACCORDO: continue
+        if quota is not None:   # only a deck at the level of the road the guardrail runs along (not an overpass over it)
+            q_ = quota(Point(*e))
+            if q_ is not None and abs(q_ - V[j, 2]) > 1.5: continue   # (no heights of the ways here: the corner nearest the end of the guardrail)
+        s = np.concatenate(([0], np.cumsum(np.hypot(*np.diff(Q, axis=0).T)))); k = int(np.searchsorted(s, RACCORDO))
+        if k >= len(Q) - 1: continue
+        v = V[j, :2]; Q = np.vstack((v[None], np.linspace(v, Q[k], max(2, int(np.ceil(s[k]))))[1:-1], Q[k:]))
+        P = Q[::-1] if fine else Q; _al_parapetto.n += 1
+    return P
+_al_parapetto.n = 0
+
+
 def guardrail(D, cover, U_carr, raw_roads, nodes, zh=None, log=print, innesti=True):
     """zh: la quota delle vie nodo per nodo (dal DBGT, build_data.py): un'altra strada a più di QUOTA m dalla superstrada passa sopra o sotto e non apre"""
     rep = Counter()
@@ -265,6 +296,7 @@ def guardrail(D, cover, U_carr, raw_roads, nodes, zh=None, log=print, innesti=Tr
             pt = Point(q); j = XT.query(pt.buffer(25))
             if len(j): rs.add(min((X[k] for k in j), key=lambda ri: lin[ri].distance(pt)))
         return sorted(rs)
+    angoli = _angoli_parapetti(); _al_parapetto.n = 0
     for L in gl:
         P = _resample(np.asarray(L.coords), 1.0); closed = L.is_closed
         if len(P) >= 5:
@@ -274,7 +306,9 @@ def guardrail(D, cover, U_carr, raw_roads, nodes, zh=None, log=print, innesti=Tr
             S[d < DENTRO] = P[d < DENTRO]
             if not closed: S[0], S[-1] = P[0], P[-1]
             P = S
+        if not closed: P = _al_parapetto(P, angoli, quota_x)
         out.append(dict(k=1, p=[(round(float(x), 2), round(float(z), 2)) for x, z in P], r=vie_accanto(P)))
+    rep['guardrail_attaccati_ai_parapetti'] = _al_parapetto.n
     for L in nj_out:
         P = _resample(np.asarray(L.coords), 1.0)
         out.append(dict(k=2, p=[(round(float(x), 2), round(float(z), 2)) for x, z in P], r=vie_accanto(P)))
