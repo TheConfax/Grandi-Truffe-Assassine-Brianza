@@ -14,6 +14,8 @@ const HELI = {
   drag1: 0.015, drag2: 0.00074,      /* air drag, linear and quadratic: full stick ends at 70.5 m/s, the H135's fast cruise */
   climb: 7.6, sink: 6, vyK: 1.8,     /* climb and sink speed at full R2/L2 (m/s), how fast the vertical speed follows (1/s) */
   yawRate: 1.4, yawK: 4,             /* turn on the spot with L1/R1 (rad/s) and its ease (1/s) */
+  bankV0: 2, bankV1: 7, bankVmin: 5, /* autotimone (Carlo 7/11): banked, the nose goes into the turn in full (g tan(roll) / speed) from bankV0 to bankV1 m/s forward; bankVmin keeps the rate sane when slow */
+  grip: 4, gripV0: 4, gripV1: 10,    /* grip on the air: the speed across the nose dies at grip 1/s (2 % left after a second), from none at gripV0 to full at gripV1 m/s forward; the speed goes along the nose */
   skid: 5,                           /* on the ground the skids stop it (1/s) */
   landSafe: 5.5, landHs: 10,         /* touch down faster than this (m/s, down / across) and it gets damaged */
   rotorR: 4.8, rotorY: 2.35,         /* rotor radius, height of the rotor over the skids */
@@ -142,7 +144,7 @@ function heliStep1(e, dt) {
   const vf = e.vx * fx + e.vz * fz, vs = e.vx * rx + e.vz * rz, sp = hyp(e.vx, e.vz);
   /* turning: L1/R1, and in a banked turn at speed the nose follows the bank */
   let yT = yaw * HELI.yawRate * (e.ground ? 0.6 * lift : 1);
-  if (!e.ground) yT -= 9.81 * Math.tan(e.roll) / Math.max(sp, 8) * clamp((sp - 5) / 10, 0, 1) * 0.8;
+  if (!e.ground) yT -= 9.81 * Math.tan(e.roll) / Math.max(sp, HELI.bankVmin) * clamp((vf - HELI.bankV0) / (HELI.bankV1 - HELI.bankV0), 0, 1);
   e.yr += (yT - e.yr) * (1 - Math.exp(-HELI.yawK * dt)); e.h = wrapA(e.h + e.yr * dt);
   /* tilt: the stick, or with the stick let go against the drift (hover); on the ground the slope under the skids */
   let pT = e.gp, rT = e.gr;
@@ -157,6 +159,12 @@ function heliStep1(e, dt) {
     const g = 9.81 * lift, af = g * Math.tan(e.pitch), as = g * Math.tan(e.roll), dr = HELI.drag1 + HELI.drag2 * sp;
     e.vx += (fx * af + rx * as - e.vx * dr) * dt; e.vz += (fz * af + rz * as - e.vz * dr) * dt;
     if (Math.abs(sf) < 0.05 && Math.abs(ss) < 0.05 && sp < 0.4) { const k = Math.exp(-3 * dt); e.vx *= k; e.vz *= k; }
+    /* grip on the air: going forward, the speed across the nose turns into speed along it (no sliding as on ice); slow, it slides freely as before */
+    const gw = heliGrip(e, fx, fz);
+    if (gw > 0) {
+      const f1 = e.vx * fx + e.vz * fz, s1 = e.vx * rx + e.vz * rz, s2 = s1 * Math.exp(-HELI.grip * gw * dt), f2 = Math.sqrt(Math.max(0, f1 * f1 + s1 * s1 - s2 * s2));
+      e.vx = fx * f2 + rx * s2; e.vz = fz * f2 + rz * s2;
+    }
   } else { const k = Math.exp(-HELI.skid * dt); e.vx *= k; e.vz *= k; }
   /* up and down: R2/L2 set the vertical speed, nothing held keeps the height; with no rotor it falls */
   const vyT = me && alive ? (col > 0 ? col * HELI.climb : col * HELI.sink) : -4;
@@ -245,10 +253,13 @@ function heliSound(v, t, m) {
   AU.eng.o1.frequency.setTargetAtTime(24 + r * 30 + (v.inp.col || 0) * 4, t, 0.1); AU.eng.o2.frequency.setTargetAtTime(24 + r * 30, t, 0.1);
   AU.eng.lp.frequency.setTargetAtTime(220 + r * 380, t, 0.1); AU.eng.eg.gain.setTargetAtTime(m * (v.health > 0 ? (0.05 + 0.13 * r) * beat : 0), t, 0.012);
 }
-/* where the camera looks from behind the helicopter: the nose when still, the way it goes when it moves (the stick held diagonally: diagonally); going backwards it stays behind the nose */
+/* how much the air grips it: 0 under gripV0 m/s forward, 1 over gripV1, smooth between */
+function heliGrip(e, fx, fz) { const t = clamp((e.vx * fx + e.vz * fz - HELI.gripV0) / (HELI.gripV1 - HELI.gripV0), 0, 1); return t * t * (3 - 2 * t); }
+/* where the camera looks from behind the helicopter: the nose when still, the way it goes when it moves slowly (the stick held diagonally: diagonally),
+   behind the nose again at speed, where the grip makes the nose and the way it goes one; going backwards it stays behind the nose */
 function heliCamDir(e) {
   const sp = hyp(e.vx, e.vz); if (sp < 0.3) return e.h;
-  const d = wrapA(Math.atan2(e.vx, e.vz) - e.h), w = clamp((sp - HELI.camW0) / (HELI.camW1 - HELI.camW0), 0, 1) * clamp((Math.cos(d) + 0.35) / 0.7, 0, 1);
+  const d = wrapA(Math.atan2(e.vx, e.vz) - e.h), w = clamp((sp - HELI.camW0) / (HELI.camW1 - HELI.camW0), 0, 1) * clamp((Math.cos(d) + 0.35) / 0.7, 0, 1) * (1 - heliGrip(e, Math.sin(e.h), Math.cos(e.h)));
   return wrapA(e.h + d * w);
 }
 /* the fog thins out with the height of the view over the ground: from up high one sees far, as the lights do */
