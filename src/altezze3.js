@@ -29,6 +29,139 @@ function riverCut(x, z) { // old engine only (the tiles without .bin, outside Me
 
 const TERRENO = { binari: D.binari };
 const disfaGriglie = reg => { for (let i = 0; i < reg.length; i += 6) reg[i].del(reg[i + 1], reg[i + 2], reg[i + 3], reg[i + 4], reg[i + 5]); };
+// <imbuto>
+// The cavalcavia cut clean (ramo ponti-imbuto, Carlo 7/11, corso Isonzo and via Vignazzola: "frastagliato", "sporco all'attacco"). A road deck
+// whose roads run straight over it keeps the width of its PONTE, but its two sides become straight lines (the long sides of the PONTE, moved out to
+// where the top reaches), and past each end of the PONTE the side runs straight from the corner to the edge of the road beyond (axis +- w/2): a
+// funnel; past the funnel it follows that edge. The top is cut along those lines (what stuck out of them goes) and the notches up to IMB_FILL m
+// inside them are filled at the height of the top beside them. The edges of the top that the top itself covers (the fill over the old cells) are
+// hidden (nasc): no side, no parapet, no wall on them. Pure: T the top [x, z, y] x 3, spalle [[x1, z1, x2, z2]], nucleo [[x, z]], roads
+// [{ pts: [[x, z]], w, ra }] (ra: one of the deck's own, else the way beyond it). Returns { tri, spalle, nasc } or null (left as it is)
+const IMB_FILL = 3.0, IMB_DRITTE = 12 * Math.PI / 180;
+function imbutoForma(T, spalle, nucleo, roads) {
+  const hy = Math.hypot, key = (ax, az, bx, bz) => { const a = ax.toFixed(2) + ',' + az.toFixed(2), b = bx.toFixed(2) + ',' + bz.toFixed(2); return a < b ? a + ' ' + b : b + ' ' + a; };
+  let bx0 = 1e9, bz0 = 1e9, bx1 = -1e9, bz1 = -1e9; for (let i = 0; i < T.length; i += 3) { bx0 = Math.min(bx0, T[i]); bx1 = Math.max(bx1, T[i]); bz0 = Math.min(bz0, T[i + 1]); bz1 = Math.max(bz1, T[i + 1]); }
+  const inBox = (x, z) => x > bx0 - 1 && x < bx1 + 1 && z > bz0 - 1 && z < bz1 + 1;
+  // the direction of the roads on it (double angle, by length), and all of them within IMB_DRITTE of it
+  let c2 = 0, s2 = 0; const own = [];
+  for (const r of roads) if (r.ra) for (let k = 1; k < r.pts.length; k++) { const a = r.pts[k - 1], b = r.pts[k], L = hy(b[0] - a[0], b[1] - a[1]); if (L < 0.5 || !(inBox(a[0], a[1]) || inBox(b[0], b[1]) || inBox((a[0] + b[0]) / 2, (a[1] + b[1]) / 2))) continue; const an = Math.atan2(b[1] - a[1], b[0] - a[0]); c2 += L * Math.cos(2 * an); s2 += L * Math.sin(2 * an); own.push(an); }
+  if (!own.length) return null;
+  const A = Math.atan2(s2, c2) / 2, ux = Math.cos(A), uz = Math.sin(A);
+  for (const an of own) if (Math.abs(Math.sin(an - A)) > Math.sin(IMB_DRITTE)) return null; // a curve, a junction on it: as it is
+  let cx = 0, cz = 0; for (const p of nucleo) { cx += p[0]; cz += p[1]; } cx /= nucleo.length; cz /= nucleo.length;
+  const S = (x, z) => (x - cx) * ux + (z - cz) * uz, V = (x, z) => -(x - cx) * uz + (z - cz) * ux, X = (s, v) => cx + s * ux - v * uz, Z = (s, v) => cz + s * uz + v * ux;
+  // the long sides of the PONTE: its outline straightened (as spalleNucleo), consecutive edges within 20 degrees one side, the longest one along the roads on each hand
+  const sd_ = (x, z, ax, az, bx, bz) => { const ex = bx - ax, ez = bz - az, l2 = ex * ex + ez * ez || 1e-9, t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / l2)); return hy(x - ax - ex * t, z - az - ez * t); };
+  const dp = (P, eps) => { if (P.length < 3) return P; let k = 0, dm = 0; const [a, b] = [P[0], P[P.length - 1]]; for (let i = 1; i < P.length - 1; i++) { const d = sd_(P[i][0], P[i][1], a[0], a[1], b[0], b[1]); if (d > dm) { dm = d; k = i; } } return dm > eps ? [...dp(P.slice(0, k + 1), eps).slice(0, -1), ...dp(P.slice(k), eps)] : [a, b]; };
+  let far = 0; for (let i = 1; i < nucleo.length; i++) if (hy(nucleo[i][0] - nucleo[0][0], nucleo[i][1] - nucleo[0][1]) > hy(nucleo[far][0] - nucleo[0][0], nucleo[far][1] - nucleo[0][1])) far = i;
+  const N1 = [...dp(nucleo.slice(0, far + 1), 0.5).slice(0, -1), ...dp([...nucleo.slice(far), nucleo[0]], 0.5).slice(0, -1)];
+  const dirOf = (p, q) => Math.atan2(q[1] - p[1], q[0] - p[0]), sides = [];
+  for (let i = 0; i < N1.length; i++) { const p = N1[i], q = N1[(i + 1) % N1.length], s = sides[sides.length - 1]; if (s && Math.abs(Math.atan2(Math.sin(dirOf(p, q) - s.d), Math.cos(dirOf(p, q) - s.d))) < 0.35) s.c = q; else sides.push({ a: p, c: q, d: dirOf(p, q) }); }
+  if (sides.length > 1) { const f = sides[0], l = sides[sides.length - 1]; if (Math.abs(Math.atan2(Math.sin(f.d - l.d), Math.cos(f.d - l.d))) < 0.35) { f.a = l.a; sides.pop(); } }
+  const best = { '-1': null, '1': null };
+  for (const sd of sides) {
+    const sa = S(sd.a[0], sd.a[1]), va = V(sd.a[0], sd.a[1]), sc = S(sd.c[0], sd.c[1]), vc = V(sd.c[0], sd.c[1]), L = hy(sc - sa, vc - va); if (L < 3 || Math.abs(vc - va) / L > Math.sin(25 * Math.PI / 180)) continue;
+    const g = (va + vc) / 2 < 0 ? '-1' : '1'; if (!best[g] || L > best[g].L) best[g] = { L, lo: sa < sc ? [sa, va] : [sc, vc], hi: sa < sc ? [sc, vc] : [sa, va] };
+  }
+  if (!best['-1'] || !best['1']) return null;
+  const line = (g, s) => { const b = best[g], f = (s - b.lo[0]) / ((b.hi[0] - b.lo[0]) || 1e-9); return b.lo[1] + (b.hi[1] - b.lo[1]) * f + (b.sh || 0) * +g; };
+  // the boundary of the top (not its spalle), sampled every 0.5 m
+  const spk = new Set(spalle.map(e => key(e[0], e[1], e[2], e[3]))), cnt = new Map();
+  for (let i = 0; i < T.length; i += 9) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) { const k = key(T[i + a], T[i + a + 1], T[i + b], T[i + b + 1]); const c = cnt.get(k); if (c) c.n++; else cnt.set(k, { n: 1, e: [T[i + a], T[i + a + 1], T[i + b], T[i + b + 1]] }); }
+  const smp = [];
+  for (const [k, c] of cnt) { if (c.n !== 1 || spk.has(k)) continue; const [ax, az, bx, bz] = c.e, n = Math.max(1, Math.round(hy(bx - ax, bz - az) / 0.5)); for (let j = 0; j <= n; j++) { const x = ax + (bx - ax) * j / n, z = az + (bz - az) * j / n; smp.push([S(x, z), V(x, z)]); } }
+  const mid = s => (line('-1', s) + line('1', s)) / 2;
+  for (const g of ['-1', '1']) { // each side moved out to where the top reaches along most of the span (the median of the boundary on that hand), up to IMB_FILL
+    const b = best[g], d = []; for (const [s, v] of smp) if (s > b.lo[0] + 0.5 && s < b.hi[0] - 0.5 && +g * (v - mid(s)) > 0) { const e = +g * (v - line(g, s)); if (Math.abs(e) < IMB_FILL + 0.5) d.push(e); }
+    d.sort((p, q) => p - q); b.sh = d.length >= 3 ? Math.max(0, Math.min(IMB_FILL, d[Math.floor(0.5 * (d.length - 1))])) : 0;
+  }
+  // the edge of the roads at s on hand g: the outermost axis +- w/2 of those spanning s, else of the nearest end
+  const RS = roads.map(r => ({ w: r.w, p: r.pts.map(q => [S(q[0], q[1]), V(q[0], q[1])]) }));
+  const edge = (g, s) => {
+    let e = null, near = 1e9, en = null;
+    for (const r of RS) for (let k = 1; k < r.p.length; k++) {
+      const a = r.p[k - 1], b = r.p[k], s0 = Math.min(a[0], b[0]), s1 = Math.max(a[0], b[0]);
+      if (Math.abs(Math.sin(Math.atan2(b[1] - a[1], b[0] - a[0]))) > 0.45) continue; // (a piece across: not this way)
+      if (s >= s0 && s <= s1 && s1 > s0) { const v = a[1] + (b[1] - a[1]) * (s - a[0]) / (b[0] - a[0]), o = +g * v + r.w / 2; if (e === null || o > e) e = o; }
+      else for (const q of [a, b]) { const dd = Math.abs(q[0] - s); if (dd < near) { near = dd; en = +g * q[1] + r.w / 2; } }
+    }
+    return e !== null ? +g * e : en === null ? null : +g * en;
+  };
+  // the line of each hand: a polyline in (s, v), straight on the span, the funnels at its ends, the road edge past them
+  let smin = 1e9, smax = -1e9; for (let i = 0; i < T.length; i += 3) { const s = S(T[i], T[i + 1]); smin = Math.min(smin, s); smax = Math.max(smax, s); }
+  const PL = {};
+  for (const g of ['-1', '1']) {
+    const b = best[g], pl = [[b.lo[0], line(g, b.lo[0])], [b.hi[0], line(g, b.hi[0])]];
+    for (const dir of [-1, 1]) {
+      const s0 = dir < 0 ? b.lo[0] : b.hi[0], v0 = line(g, s0);
+      let ext = 0; for (const [s, v] of smp) if (dir * (s - s0) > 0 && +g * (v - mid(s)) > 0 && Math.abs(v - line(g, s)) < IMB_FILL + 1) ext = Math.max(ext, dir * (s - s0));
+      const e6 = edge(g, s0 + dir * 6), dlt = e6 === null ? 0 : +g * (v0 - e6);
+      if (dlt < 0.3) { pl.push([s0 + dir * 300, line(g, s0 + dir * 300)]); continue; } // the road as wide as the bridge or wider: the side goes on straight
+      let extC = 0; for (let i = 0; i < T.length; i += 3) { const s = S(T[i], T[i + 1]), v = V(T[i], T[i + 1]); if (e6 !== null && +g * v > +g * e6 - 0.5) extC = Math.max(extC, dir * (s - s0)); } let F = Math.max(3, Math.min(15, Math.max(ext, 2.5 * dlt))); if (extC >= 1.5) F = Math.min(F, extC); // (the funnel ends where the deck ends beside the road: its end as wide as the road)
+      const e1 = edge(g, s0 + dir * F), e2 = edge(g, s0 + dir * (F + 10));
+      if (e1 === null || +g * (v0 - e1) < 0) { pl.push([s0 + dir * 300, line(g, s0 + dir * 300)]); continue; }
+      const sl = e2 === null ? 0 : (e2 - e1) / 10; pl.push([s0 + dir * F, e1], [s0 + dir * (F + 300), e1 + sl * 300]);
+    }
+    pl.sort((p, q) => p[0] - q[0]); PL[g] = pl;
+  }
+  const at = (g, s) => { const pl = PL[g]; if (s <= pl[0][0]) return pl[0][1]; for (let k = 1; k < pl.length; k++) if (s <= pl[k][0]) { const a = pl[k - 1], b = pl[k]; return a[1] + (b[1] - a[1]) * (s - a[0]) / ((b[0] - a[0]) || 1e-9); } return pl[pl.length - 1][1]; };
+  for (let s = smin; s <= smax; s += 0.5) if (at('1', s) - at('-1', s) < 2) return null; // (the two lines cross: data we do not understand)
+  // the cut: each triangle in (s, v, y) clipped to v >= at(-1, s) and v <= at(1, s), split at the corners of the lines
+  const cuts = [...new Set([...PL['-1'], ...PL['1']].map(p => p[0]))].sort((p, q) => p - q);
+  const clip = (P, a, b, c) => { const o = []; for (let i = 0; i < P.length; i++) { const p = P[i], q = P[(i + 1) % P.length], fp = a * p[0] + b * p[1] - c, fq = a * q[0] + b * q[1] - c; if (fp <= 0) o.push(p); if ((fp < 0 && fq > 0) || (fp > 0 && fq < 0)) { const t = fp / (fp - fq); o.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t]); } } return o; };
+  const inQ = (s, v, m) => v >= at('-1', s) - m && v <= at('1', s) + m;
+  const out = [], put = P => { for (let k = 1; k + 1 < P.length; k++) for (const p of [P[0], P[k], P[k + 1]]) out.push(X(p[0], p[1]), Z(p[0], p[1]), p[2]); };
+  let cut = 0;
+  for (let i = 0; i < T.length; i += 9) {
+    const P = [0, 3, 6].map(o => [S(T[i + o], T[i + o + 1]), V(T[i + o], T[i + o + 1]), T[i + o + 2]]);
+    if (P.every(p => inQ(p[0], p[1], 1e-6))) { for (let o = 0; o < 9; o++) out.push(T[i + o]); continue; }
+    cut++; const s0 = Math.min(P[0][0], P[1][0], P[2][0]), s1 = Math.max(P[0][0], P[1][0], P[2][0]), br = [-1e9, ...cuts.filter(s => s > s0 && s < s1), 1e9];
+    for (let k = 1; k < br.length; k++) {
+      let Q = clip(P, -1, 0, -br[k - 1]); Q = clip(Q, 1, 0, br[k]); if (Q.length < 3) continue;
+      const sm = Math.max(s0, br[k - 1]) / 2 + Math.min(s1, br[k]) / 2, h = 0.01, sl = g => (at(g, sm + h) - at(g, sm - h)) / (2 * h);
+      // v <= at(1, s): v - sl s <= at(1, sm) - sl sm; v >= at(-1, s)
+      Q = clip(Q, -sl('1'), 1, at('1', sm) - sl('1') * sm); if (Q.length < 3) continue;
+      Q = clip(Q, sl('-1'), -1, -(at('-1', sm) - sl('-1') * sm)); if (Q.length < 3) continue;
+      let ar = 0; for (let j = 0; j < Q.length; j++) { const p = Q[j], q = Q[(j + 1) % Q.length]; ar += p[0] * q[1] - q[0] * p[1]; } if (Math.abs(ar) < 1e-4) continue;
+      put(Q);
+    }
+  }
+  // the top as cut, on a 2 m grid, for the fill and for the hidden edges
+  const G = new Map(), gk = (i, j) => i + ',' + j, addG = (U, i) => { const xs = [U[i], U[i + 3], U[i + 6]], zs = [U[i + 1], U[i + 4], U[i + 7]]; for (let a = Math.floor(Math.min(...xs) / 2); a <= Math.floor(Math.max(...xs) / 2); a++) for (let b = Math.floor(Math.min(...zs) / 2); b <= Math.floor(Math.max(...zs) / 2); b++) { const k = gk(a, b); let l = G.get(k); if (!l) G.set(k, l = []); l.push([U, i]); } };
+  const yAt = (x, z) => { const l = G.get(gk(Math.floor(x / 2), Math.floor(z / 2))); if (!l) return null; for (const [U, i] of l) { const ax = U[i], az = U[i + 1], bx = U[i + 3], bz = U[i + 4], qx = U[i + 6], qz = U[i + 7], den = (bz - qz) * (ax - qx) + (qx - bx) * (az - qz); if (Math.abs(den) < 1e-12) continue; const l1 = ((bz - qz) * (x - qx) + (qx - bx) * (z - qz)) / den, l2 = ((qz - az) * (x - qx) + (ax - qx) * (z - qz)) / den, l3 = 1 - l1 - l2; if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue; return l1 * U[i + 2] + l2 * U[i + 5] + l3 * U[i + 8]; } return null; };
+  for (let i = 0; i < out.length; i += 9) addG(out, i);
+  // the fill: columns every 0.5 m across the lines, from the line in to the top (up to IMB_FILL), a strip between two columns that have it
+  const fill = [];
+  for (const g of ['-1', '1']) {
+    let prev = null;
+    for (let s = Math.floor(smin * 2) / 2; s <= smax + 0.5; s += 0.5) {
+      const vl = at(g, s); let t0 = null;
+      for (let t = 0; t <= IMB_FILL; t += 0.25) { const v = vl - +g * (t + 0.05); if (yAt(X(s, v), Z(s, v)) !== null) { t0 = t; break; } }
+      let col = null;
+      if (t0 !== null) { const vo = vl - +g * (t0 + 0.05), yo = yAt(X(s, vo), Z(s, vo)), vi = vl - +g * (t0 + 0.35), yi = yAt(X(s, vi), Z(s, vi)); col = { s, vl, vi, t0, yo, yi: yi === null ? yo : yi }; }
+      if (col && prev && (col.t0 > 0 || prev.t0 > 0)) {
+        const a = [X(prev.s, prev.vi), Z(prev.s, prev.vi), prev.yi], b = [X(col.s, col.vi), Z(col.s, col.vi), col.yi], c = [X(col.s, col.vl), Z(col.s, col.vl), col.yo], d = [X(prev.s, prev.vl), Z(prev.s, prev.vl), prev.yo];
+        fill.push(...a, ...b, ...c, ...a, ...c, ...d);
+      }
+      prev = col;
+    }
+  }
+  const U = out.concat(fill); for (let i = out.length; i < U.length; i += 9) addG(U, i);
+  // the boundary of the new top: an edge the top covers just past it is hidden; one on an old spalla stays a spalla
+  const c2_ = new Map();
+  for (let i = 0; i < U.length; i += 9) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) { const k = key(U[i + a], U[i + a + 1], U[i + b], U[i + b + 1]); const c = c2_.get(k); if (c) c.n++; else c2_.set(k, { n: 1, e: [U[i + a], U[i + a + 1], U[i + a + 2], U[i + b], U[i + b + 1], U[i + b + 2]], i }); }
+  const nasc = new Set(), sp2 = [];
+  for (const [k, c] of c2_) {
+    if (c.n !== 1) continue; const [ax, az, ay, bx, bz, by] = c.e, L = hy(bx - ax, bz - az); if (L < 1e-3) { nasc.add(k); continue; }
+    const i = c.i, gx = (U[i] + U[i + 3] + U[i + 6]) / 3, gz = (U[i + 1] + U[i + 4] + U[i + 7]) / 3, mx = (ax + bx) / 2, mz = (az + bz) / 2;
+    let nx = (bz - az) / L, nz = -(bx - ax) / L; if (nx * (gx - mx) + nz * (gz - mz) > 0) { nx = -nx; nz = -nz; } // (n: outwards)
+    let cov = true; for (const f of [0.15, 0.5, 0.85]) { const x = ax + (bx - ax) * f + nx * 0.12, z = az + (bz - az) * f + nz * 0.12, y = yAt(x, z); if (y === null || Math.abs(y - (ay + (by - ay) * f)) > 0.3) { cov = false; break; } }
+    if (cov) { nasc.add(k); continue; }
+    if (spalle.some(e => sd_(ax, az, e[0], e[1], e[2], e[3]) < 0.05 && sd_(bx, bz, e[0], e[1], e[2], e[3]) < 0.05)) sp2.push([ax, az, bx, bz]);
+  }
+  return { tri: Float64Array.from(U), spalle: sp2, nasc, cut, fill: fill.length / 9, PL, frame: [cx, cz, ux, uz] };
+}
+// </imbuto>
 const H = (() => {
   const TSZ = META.tile, HW = META.dati.hw, HHt = META.dati.hh, DX = Math.round((META.hw - HW) / TSZ), DZ = Math.round((META.hh - HHt) / TSZ), NX = META.ntx, NZ = META.ntz, B0 = TER.base; // the corners of the tiles counted from where the data were cut: DX, DZ tiles of grid before them. Polygons end on these lines to the last bit
   const STEP = new Uint8Array(NX * NZ), FT = new Array(NX * NZ).fill(null);
@@ -320,11 +453,32 @@ const H = (() => {
   }
   // decks (docs/motore.md 1.5): triangles of the top in game heights, indexed on a 16 m grid
   const DECKS = [], DECK_ORD = new Map(), DKG = new Grid(16);
+  // the roads of a deck and the way beyond each of its ends, up to 40 m, for imbutoForma: at a node where a road ends the one that goes on most
+  // straight (within 35 degrees). ?imbuto=0 in the link: the decks as the build made them
+  const IMBUTO = !/[?&]imbuto=0/.test(location.search), IMB_LOG = window.__IMB = new Map(); let FINI = null;
+  function imbutoStrade(ra) {
+    if (!FINI) { FINI = new Map(); D.roads.forEach((r, i) => { for (const n of [r.g[0], r.g[r.g.length - 1]]) { let l = FINI.get(n); if (!l) FINI.set(n, l = []); l.push(i); } }); }
+    const out = [], seen = new Set(ra);
+    for (const ri of ra) {
+      const r = D.roads[ri]; if (!r) continue; out.push({ pts: r.g.map(n => N[n]), w: r.w, ra: true });
+      for (const end of [0, 1]) {
+        let g = end ? r.g : r.g.slice().reverse(), len = 0;
+        while (len < 40 && g.length > 1) {
+          const n = g[g.length - 1], p = N[g[g.length - 2]], q = N[n], dl = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1, dx = (q[0] - p[0]) / dl, dz = (q[1] - p[1]) / dl; let bestR = -1, bestC = Math.cos(35 * Math.PI / 180), bestG = null;
+          for (const ci of FINI.get(n) || []) { if (seen.has(ci)) continue; const cg = D.roads[ci].g[0] === n ? D.roads[ci].g : D.roads[ci].g.slice().reverse(), a = N[cg[0]], b = N[cg[1]], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, c = ((b[0] - a[0]) * dx + (b[1] - a[1]) * dz) / l; if (c > bestC) { bestC = c; bestR = ci; bestG = cg; } }
+          if (bestR < 0) break; seen.add(bestR); out.push({ pts: bestG.map(k => N[k]), w: D.roads[bestR].w, ra: false });
+          for (let k = 1; k < bestG.length; k++) len += Math.hypot(N[bestG[k]][0] - N[bestG[k - 1]][0], N[bestG[k]][1] - N[bestG[k - 1]][1]); g = bestG;
+        }
+      }
+    }
+    return out;
+  }
   function deckDentro(d) { // the first piece that brings a deck makes it; the others count (pezzi3.js): what goes in the grids is noted in o.reg
     let o = DECK_ORD.get(d.ord); if (o) { o.refs++; return o; }
-    const tri = new Float64Array(d.tri.length); for (let i = 0; i < tri.length; i += 3) { tri[i] = d.tri[i]; tri[i + 1] = d.tri[i + 1]; tri[i + 2] = d.tri[i + 2] - B0; }
+    let tri = new Float64Array(d.tri.length), spalle = d.spalle || [], nasc = null; for (let i = 0; i < tri.length; i += 3) { tri[i] = d.tri[i]; tri[i + 1] = d.tri[i + 1]; tri[i + 2] = d.tri[i + 2] - B0; }
+    if (IMBUTO && d.tipo === 'strada' && d.nucleo && d.nucleo.length >= 3 && d.ra && d.ra.length) { try { const rs_ = imbutoStrade(d.ra), f = imbutoForma(tri, spalle, d.nucleo, rs_); if (f) { tri = f.tri; spalle = f.spalle; nasc = f.nasc; IMB_LOG.set(d.id, { PL: f.PL, frame: f.frame, cut: f.cut, fill: f.fill, rs: rs_ }); } else IMB_LOG.set(d.id, null); } catch (e) { console.warn('imbuto', d.id, e); } } // straight sides and funnels (imbutoForma)
     const free = d.tipo !== 'copertura' && !(d.sotto && (d.sotto.strade || d.sotto.ferrovia)); // nothing passes under it but water or field
-    o = { id: d.id, ord: d.ord, tiles: d.tiles, refs: 1, reg: [], tipo: d.tipo, fonte: d.fonte, sp: d.sp, luce: d.luce - B0, tri, imp: d.imp, nucleo: d.nucleo || null, spalle: d.spalle || [], ra: d.ra || [], free };
+    o = { id: d.id, ord: d.ord, tiles: d.tiles, refs: 1, reg: [], tipo: d.tipo, fonte: d.fonte, sp: d.sp, luce: d.luce - B0, tri, imp: d.imp, nucleo: d.nucleo || null, spalle, nasc, ra: d.ra || [], free };
     DECKS.push(o); DECK_ORD.set(d.ord, o);
     const rec0 = GRID_REC; GRID_REC = o.reg;
     for (let i = 0; i < tri.length; i += 9) { const xs = [tri[i], tri[i + 3], tri[i + 6]], zs = [tri[i + 1], tri[i + 4], tri[i + 7]]; DKG.add(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), { d: o, i }); }

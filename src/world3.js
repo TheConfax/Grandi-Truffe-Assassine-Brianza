@@ -1054,7 +1054,7 @@ function deckEdges(dk) {
   const key = (ax, az, bx, bz) => { const a = ax.toFixed(2) + ',' + az.toFixed(2), b = bx.toFixed(2) + ',' + bz.toFixed(2); return a < b ? a + ' ' + b : b + ' ' + a; };
   const cnt = new Map(), T = dk.tri, sp = new Set(dk.spalle.map(e => key(e[0], e[1], e[2], e[3])));
   for (let i = 0; i < T.length; i += 9) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) { const k = key(T[i + a], T[i + a + 1], T[i + b], T[i + b + 1]); const c = cnt.get(k); cnt.set(k, c ? { n: c.n + 1 } : { n: 1, e: [T[i + a], T[i + a + 1], T[i + a + 2], T[i + b], T[i + b + 1], T[i + b + 2]] }); }
-  dk.edges = []; for (const [k, c] of cnt) if (c.n === 1 && !sp.has(k)) dk.edges.push(c.e);
+  dk.edges = []; for (const [k, c] of cnt) if (c.n === 1 && !sp.has(k) && !(dk.nasc && dk.nasc.has(k))) dk.edges.push(c.e); // (nasc: an edge the top covers, altezze3.js imbutoForma)
   return dk.edges;
 }
 // the approach ramps (29/10, via Maroncelli: the deck floated 1-3 m over a lawn, a dark roof over a grass tunnel under the ramp). Under a deck
@@ -1078,7 +1078,7 @@ function rampWalls(dk) {
   const spk = new Set(dk.spalle.map(e => key(e[0], e[1], e[2], e[3]))), E = new Map();
   for (let t = 0; t < nt; t++) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) { const i = t * 9, k = key(T[i + a], T[i + a + 1], T[i + b], T[i + b + 1]); let l = E.get(k); if (!l) E.set(k, l = { ts: [], e: [T[i + a], T[i + a + 1], T[i + a + 2], T[i + b], T[i + b + 1], T[i + b + 2]] }); l.ts.push(t); }
   for (const [k, { ts, e }] of E) {
-    const wall = ts.length === 1 ? pieno[ts[0]] && !spk.has(k) : ts.length === 2 && pieno[ts[0]] !== pieno[ts[1]]; if (!wall) continue;
+    const wall = ts.length === 1 ? pieno[ts[0]] && !spk.has(k) && !(dk.nasc && dk.nasc.has(k)) : ts.length === 2 && pieno[ts[0]] !== pieno[ts[1]]; if (!wall) continue;
     const [ax, az, ay, bx, bz, by] = e; let ga = H.base(ax, az), gb = H.base(bx, bz);
     if (ts.length === 2) { const to = ts.find(t => !pieno[t]) * 9, ox = (T[to] + T[to + 3] + T[to + 6]) / 3, oz = (T[to + 1] + T[to + 4] + T[to + 7]) / 3, mx = (ax + bx) / 2, mz = (az + bz) / 2, d = hyp(ox - mx, oz - mz) || 1; let g = Math.min(ga, gb); for (const f of [0.5, 1, 2, 3]) g = Math.min(g, H.base(mx + (ox - mx) / d * f, mz + (oz - mz) / d * f)); ga = Math.min(ga, g); gb = Math.min(gb, g); } // the abutment: down to the ground in front of it, not to the top of the fill it holds
     if (ay - sp - ga < 0.05 && by - sp - gb < 0.05) continue; if (H.inPit((ax + bx) / 2, (az + bz) / 2, 0.3)) continue; // (over the road of an underpass: no wall down to it)
@@ -1201,7 +1201,7 @@ function deckTopAt(dk, x, z) { for (const o of H.deckAt(x, z)) if (o.d === dk) r
 // the edges the parapets follow: the PONTE footprint (nucleo), straight, and the boundary edges of the triangles off it (the spalla cells, the
 // extensions and the approach ramps, in 2 m steps: past the end of the parapet of PONTE 16 a walker fell 3.3 m off them into the Seveso)
 function deckOutline(dk) {
-  const out = [], o = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null;
+  const out = [], o = dk.nucleo && dk.nucleo.length >= 3 && !dk.nasc ? dk.nucleo : null; // (a deck cut clean, altezze3.js imbutoForma: its own straight edges, not the outline of the PONTE)
   if (o) for (let i = 0; i < o.length; i++) out.push([o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1], 1]);
   const onO = (x, z) => { for (let i = 0; i < o.length; i++) if (segDist(x, z, o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1]) < 0.35) return true; return false; };
   const along = (ax, az, bx, bz) => o && (inPoly((ax + bx) / 2, (az + bz) / 2, o) || (onO(ax, az) && onO(bx, bz) && onO((ax + bx) / 2, (az + bz) / 2))); // inside the core or along its outline
@@ -1309,7 +1309,7 @@ function* roadBarriers(T) {
           let rail = null;
           if (!nearJ(cx, cz, hw + 8) && !nearAsph(cx + ex * offS, cz + ez * offS, 0.1) && !nearDeckCarr(cx + ex * offS, cz + ez * offS, yc, 0.1)) {
             const gx = cx + ex * offS, gz = cz + ez * offS, yE = H.surface(gx, gz, yc + 0.3);
-            const onCore = H.deckAt(gx, gz).some(o => o.d.nucleo && inPoly(gx, gz, o.d.nucleo) && Math.abs(o.top - yc) < 0.6); // the parapets of the deck
+            const onCore = H.deckAt(gx, gz).some(o => (o.d.nasc || (o.d.nucleo && inPoly(gx, gz, o.d.nucleo))) && Math.abs(o.top - yc) < 0.6); // the parapets of the deck (a deck cut clean, altezze3.js imbutoForma: all of it, its funnels too)
             let other = false; ROADSEG.each(gx - 4, gz - 4, gx + 4, gz + 4, o => { if (!other && o.r !== r && o.r.c <= 5 && segDist(gx, gz, o.a[0], o.a[1], o.b[0], o.b[1]) < o.r.w / 2 + 0.3 && Math.abs(lerp(H.node(o.ia), H.node(o.ib), 0.5) - yE) < 1.5) other = true; });
             if (!onCore && !other && !H.inPit(gx, gz, 0.5) && !H.inPit(cx, cz, 0.5) && !H.gallAt(cx, cz)) { /* (in the trench of an underpass its walls hold the car) */
               if (Math.abs(yE - yc) < 0.5) {
