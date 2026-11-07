@@ -7,10 +7,12 @@
 // so the camera, the radio, the map and the HUD follow it as they follow a car; it is not in VEH (traffic, police and the car physics do not see it)
 const HELI = {
   spinUp: 3.5, spinDown: 7,          /* seconds for the rotor to reach full speed, and to stop */
-  tilt: 0.40, tiltK: 3.2,            /* most tilt from the stick (rad), how fast the body follows it (1/s) */
-  hold: 0.06, holdMax: 0.30,         /* stick let go: tilt against the drift (rad per m/s) and its cap */
-  drag1: 0.06, drag2: 0.0025,        /* air drag, linear and quadratic: full stick ends near 30 m/s */
-  climb: 7, sink: 5, vyK: 1.8,       /* climb and sink speed at full R2/L2 (m/s), how fast the vertical speed follows (1/s) */
+  /* the numbers of a real light twin, the Airbus H135 of the air ambulances (Carlo 7/11: "un po' lento per essere un elicottero"): fast cruise 254 km/h = 70.5 m/s
+     at full weight, climb 7.6 m/s (1500 ft/min) (airbus.com, H135 technical information; LPR, the Polish air ambulance). The sink is not in the data sheets: 6 m/s */
+  tilt: 0.45, tiltK: 3.2,            /* most tilt from the stick (rad, 26 degrees: g tan = 4.7 m/s2 at the start), how fast the body follows it (1/s) */
+  hold: 0.06, holdMax: 0.45,         /* stick let go: tilt against the drift (rad per m/s) and its cap */
+  drag1: 0.015, drag2: 0.00074,      /* air drag, linear and quadratic: full stick ends at 70.5 m/s, the H135's fast cruise */
+  climb: 7.6, sink: 6, vyK: 1.8,     /* climb and sink speed at full R2/L2 (m/s), how fast the vertical speed follows (1/s) */
   yawRate: 1.4, yawK: 4,             /* turn on the spot with L1/R1 (rad/s) and its ease (1/s) */
   skid: 5,                           /* on the ground the skids stop it (1/s) */
   landSafe: 5.5, landHs: 10,         /* touch down faster than this (m/s, down / across) and it gets damaged */
@@ -57,7 +59,7 @@ function heliNew(x, z, h) {
   const e = {
     heli: true, kind: 'heli', spec: { name: 'Elicottero', two: false, pedal: false, L: 4, W: 1.6, snd: 1 },
     x, z, h, y: H.surface(x, z), vx: 0, vy: 0, vz: 0, yr: 0, pitch: 0, roll: 0, gp: 0, gr: 0, rs: 0, rotA: 0, tailA: 0,
-    speed: 0, fwdSpeed: 0, health: 100, maxV: 30, drift: 0, boost: false, ko: false, driver: null, ground: true, alto: 0,
+    speed: 0, fwdSpeed: 0, health: 100, maxV: 70, drift: 0, boost: false, ko: false, driver: null, ground: true, alto: 0,
     inp: { thr: 0, brk: 0, steer: 0, hand: 0, col: 0, yaw: 0, fwd: 0, side: 0 }, home: [x, z, h], walls: [], wset: new Set(), rad: 1.3, co: 0,
     circles() { return [[this.x, this.z]]; }, /* what a car's code may ask of P.car */
   };
@@ -164,7 +166,7 @@ function heliStep1(e, dt) {
   /* move, then the walls (the body low, the rotor high) */
   const x0 = e.x, z0 = e.z; e.x += e.vx * dt; e.z += e.vz * dt; e.y += e.vy * dt;
   e.x = clamp(e.x, ZONA[0] + 5, ZONA[2] - 5); e.z = clamp(e.z, ZONA[1] + 5, ZONA[3] - 5); if (e.y > HELI.maxAlt) { e.y = HELI.maxAlt; e.vy = Math.min(e.vy, 0); }
-  heliTagBld(e.x, e.z, HELI.rotorR + 4);
+  heliTagBld(e.x, e.z, 40); /* the roofs round it and between it and the camera (rayCam) */
   let hb = null, hr = null;
   for (const [lz, r] of [[0.3, 1.3], [-4.4, 0.6]]) { const cx = e.x + fx * lz, cz = e.z + fz * lz, p = { x: cx, z: cz }, n = heliPush(p, r, e.y + 0.15, e.y + 2.1, e.wset); if (n) { e.x += p.x - cx; e.z += p.z - cz; hb = n; } }
   { const p = { x: e.x, z: e.z }, n = heliPush(p, HELI.rotorR, e.y + HELI.rotorY, e.y + HELI.rotorY + 0.3, e.wset); if (n) { e.x = p.x; e.z = p.z; hr = n; } }
