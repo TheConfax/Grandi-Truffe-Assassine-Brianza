@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo collisioni · dopo afdc6f7 · assemblato 07/11 23:40 · porta ' + location.port;
+    const txt = 'locale · ramo collisioni · dopo 0dadb76 · assemblato 08/11 00:47 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1093,31 +1093,61 @@ function interpEnd(done) { for (const o of done) { const c = o._c, keys = o._pk;
 
 // ---------------------------------------------------------------- street furniture you can knock down: street lamps, traffic lights, level-crossing barriers
 // Each prop is a post in the collision grid (dyn, so it can be switched off) plus a way to draw it falling: an Object3D whose origin is at its foot,
-// or one instance of a per-tile InstancedMesh. Ram it fast enough and it tips over away from you, the car loses a little speed, a lamp goes dark.
-const PROPS = [], PROPG = new Grid(16), PROP_FALL = [];
-function addProp(p) { // { x, z, r, obj | inst: { meshes, i, ry, base }, onBreak }
-  p.wall = { r: p.r, x: p.x, z: p.z, dyn: true, on: true, y0: p.y - 3, y1: p.y + (p.h || 6) };
-  if (p.sali) p.wall.sali = { rs: p.sali.rs, top: p.y + p.sali.dy }; if (p.scav) p.wall.scav = true; // climbing on foot (salto3.js): stand on it, go over it
-  WALLS.add(p.x - p.r - 0.2, p.z - p.r - 0.2, p.x + p.r + 0.2, p.z + p.r + 0.2, p.wall);
-  PROPS.push(p); PROPG.add(p.x - 2, p.z - 2, p.x + 2, p.z + 2, p); return p;
+// or one instance of a per-tile InstancedMesh. Ram it hard enough and it tips over away from you, the car loses a little speed, a lamp goes dark.
+// One collision per object, the same for the walker, every vehicle and the helicopter: its posts in WALLS. What a vehicle does to it depends on
+// the blow (speed times the vehicle's mass, propForza) and on the group of the object (Carlo, 8/11): FORZA.leggero (signs, bollards, meters,
+// bins, benches, columns, the fuel totem) goes at a gentle knock, FORZA.medio (lamp posts, small trees, bus shelters, bales, concrete blocks)
+// needs speed and mass; what is never broken has no prop, only its wall. A weaker blow stops the vehicle; on foot nothing breaks.
+// via: the object is not knocked over but moves (bales roll away, blocks slide) and stands again where it stops, still solid.
+const PROPS = [], PROPG = new Grid(16), PROP_FALL = [], PROP_MOVE = [];
+const FORZA = { leggero: 3.5, medio: 9 }; // m/s of a car of mass 1 (a hatchback); a two-wheeler weighs a quarter of it (as in the crashes between vehicles)
+const propMassa = v => isTwo(v) ? 0.25 : clamp(v.spec.L * v.spec.W / 7.39, 0.5, 3);
+const propForza = v => v.speed * propMassa(v);
+function addProp(p) { // { x, z, r, obj | inst: { meshes, i, ry, base }, onBreak, forza, via, parts: [[x, z, r]], wall (already in WALLS) }
+  if (!p.wall) {
+    p.wall = { r: p.r, x: p.x, z: p.z, dyn: true, on: true, y0: p.y - 3, y1: p.y + (p.h || 6) };
+    if (p.sali) p.wall.sali = { rs: p.sali.rs, top: p.y + p.sali.dy }; if (p.scav) p.wall.scav = true; // climbing on foot (salto3.js): stand on it, go over it
+    WALLS.add(p.x - p.r - 0.2, p.z - p.r - 0.2, p.x + p.r + 0.2, p.z + p.r + 0.2, p.wall);
+  }
+  p.pw = (p.parts || []).map(([x, z, r]) => { const w = { r, x, z, dyn: true, on: p.wall.on, y0: p.y - 3, y1: p.y + (p.h || 6) }; WALLS.add(x - r - 0.2, z - r - 0.2, x + r + 0.2, z + r + 0.2, w); return w; }); // the other posts of one object: they go with it
+  PROPS.push(p); PROPG.add(p.x - 3, p.z - 3, p.x + 3, p.z + 3, p); return p;
 }
-const SFONDA = { v: 3.5, slow: 0.86, dmg: 2 }; // a car breaks a thing it hits at v m/s or more, and loses slow of its speed and dmg of its health (the graves have their own, sfondabili3.js TOMBE)
+const SFONDA = { slow: 0.86, dmg: 2 }; // what a vehicle loses of its speed and its health breaking a thing (the graves have their own, sfondabili3.js TOMBE)
 function breakProp(p, v) {
-  if (p.broken) return; p.broken = true; p.wall.on = false;
+  if (p.broken) return; p.broken = true; p.wall.on = false; for (const w of p.pw || []) w.on = false;
   let dx = v ? v.vx : 1, dz = v ? v.vz : 0; const l = hyp(dx, dz) || 1; dx /= l; dz /= l;
   const axis = new THREE.Vector3(dz, 0, -dx); // tips over along the car's way
-  let o = p.obj;
-  if (!o && p.inst) { o = new THREE.Object3D(); o.position.set(p.x, p.inst.base, p.z); o.rotation.y = p.inst.ry; if (p.inst.sx) o.scale.set(p.inst.sx, 1, 1); o.updateMatrix(); } // sx: a panel stretched to its length
-  if (o) PROP_FALL.push({ o, p, axis, a: 0, w: 0.6 + (v ? Math.min(2.5, v.speed * 0.08) : 0), max: 1.42 + Math.random() * 0.12 });
+  let o = p.obj, m0 = null;
+  if (!o && p.inst) { o = new THREE.Object3D(); o.position.set(p.x, p.inst.base, p.z); o.updateMatrix(); m0 = propMatrici(p); } // a pivot at its foot: each instance turns about it from the matrix it had
+  if (o) PROP_FALL.push({ o, p, axis, m0, a: 0, w: 0.6 + (v ? Math.min(2.5, v.speed * 0.08) : 0), max: 1.42 + Math.random() * 0.12 });
   if (p.onBreak) p.onBreak();
-  if (v) { const sp = v.speed; v.vx *= SFONDA.slow; v.vz *= SFONDA.slow; v.health = Math.max(0, v.health - SFONDA.dmg); if (v === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
+  if (v) propUrto(v);
+}
+function propUrto(v) { const sp = v.speed; v.vx *= SFONDA.slow; v.vz *= SFONDA.slow; v.health = Math.max(0, v.health - SFONDA.dmg); if (v === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
+function propMatrici(p) { return p.inst.meshes.map(m => { const M = new THREE.Matrix4(); m.getMatrixAt(p.inst.i, M); return M; }); }
+const _pm = new THREE.Matrix4(), _pt = new THREE.Matrix4();
+function propScrivi(p, o, m0, x0, y0, z0) { /* each instance: the pivot's matrix times the way from where the pivot was to the instance as it was */
+  o.updateMatrix(); _pt.makeTranslation(-x0, -y0, -z0);
+  p.inst.meshes.forEach((m, j) => { _pm.copy(o.matrix).multiply(_pt).multiply(m0[j]); m.setMatrixAt(p.inst.i, _pm); m.instanceMatrix.needsUpdate = true; });
+}
+/* a tile built again: its instances of what was knocked down hide, what was moved stands where it stopped */
+function propRifai(p, meshes, i) {
+  p.inst.meshes = meshes; p.inst.i = i; const M = new THREE.Matrix4();
+  if (p.broken) { M.makeScale(0, 0, 0); for (const m of meshes) m.setMatrixAt(i, M); }
+  else if (p.inst.mf) meshes.forEach((m, j) => m.setMatrixAt(i, p.inst.mf[j] || p.inst.mf[0]));
+}
+function propSpingi(p, v) { // pushed: it takes the vehicle's way at part of its speed (a bale more, a block less), the vehicle loses some
+  const l = hyp(v.vx, v.vz) || 1, k = p.via === 'rotola' ? 0.8 : 0.6;
+  p.vx = v.vx / l * v.speed * k; p.vz = v.vz / l * v.speed * k;
+  if (!p.moving) { p.moving = true; PROP_MOVE.push(p); if (p.inst) { p.mo = new THREE.Object3D(); p.mo.position.set(p.x, p.y, p.z); p.mo.updateMatrix(); p.m0 = propMatrici(p); p.p0 = [p.x, p.y, p.z]; } }
+  propUrto(v);
 }
 function propHits(v) {
   tombHits(v);
-  if (v.speed < SFONDA.v) return;
+  const F = propForza(v); if (F < FORZA.leggero) return;
   PROPG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, p => {
-    if (p.broken || Math.abs(v.y - p.y) > 3) return;
-    for (const c of v.circles()) if (hyp(c[0] - p.x, c[1] - p.z) < v.rad + p.r + 0.15) { breakProp(p, v); return; }
+    if (p.broken || Math.abs(v.y - p.y) > 3 || F < FORZA[p.forza || 'leggero']) return;
+    for (const c of v.circles()) if (hyp(c[0] - p.x, c[1] - p.z) < v.rad + p.r + 0.15 || (p.pw || []).some(w => hyp(c[0] - w.x, c[1] - w.z) < v.rad + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < v.speed * 0.5) propSpingi(p, v); } else breakProp(p, v); return; }
   });
   // a lowered level-crossing arm across the road snaps off and flies
   for (const g of LX) if (g.bars && Math.abs(g.x - v.x) < 14 && Math.abs(g.z - v.z) < 14) for (const b of g.bars) {
@@ -1137,8 +1167,24 @@ function updProps(dt) {
   for (let i = PROP_FALL.length - 1; i >= 0; i--) {
     const f = PROP_FALL[i]; f.w += 7 * Math.sin(Math.max(0.15, f.a)) * dt; const da = Math.min(f.max - f.a, f.w * dt); f.a += da;
     f.o.rotateOnWorldAxis(f.axis, da);
-    if (f.p.inst) { f.o.updateMatrix(); for (const m of f.p.inst.meshes) { m.setMatrixAt(f.p.inst.i, f.o.matrix); m.instanceMatrix.needsUpdate = true; } }
+    if (f.m0) propScrivi(f.p, f.o, f.m0, f.p.x, f.p.inst.base, f.p.z);
     if (f.a >= f.max - 1e-4) PROP_FALL.splice(i, 1);
+  }
+  for (let i = PROP_MOVE.length - 1; i >= 0; i--) { // rolling and sliding: friction, the walls round it, its own wall going with it
+    const p = PROP_MOVE[i], sp = hyp(p.vx, p.vz), ns = Math.max(0, sp - (p.via === 'rotola' ? 5 : 7) * dt), k = sp > 1e-6 ? ns / sp : 0;
+    p.vx *= k; p.vz *= k;
+    const q = { x: p.x + p.vx * dt, z: p.z + p.vz * dt }, gq = H.ground(q.x, q.z);
+    if (collideStatic(q, p.r, gq + 0.4, true, new Set([p.wall, ...(p.pw || [])]))) { p.vx *= 0.3; p.vz *= 0.3; }
+    const mx = q.x - p.x, mz = q.z - p.z, w = p.wall, r = p.r + 0.2;
+    WALLS.del(p.x - r, p.z - r, p.x + r, p.z + r, w); PROPG.del(p.x - 3, p.z - 3, p.x + 3, p.z + 3, p);
+    p.x = q.x; p.z = q.z; const gy = H.ground(p.x, p.z), dy = gy - p.y; p.y = gy; w.x = p.x; w.z = p.z; w.y0 += dy; w.y1 += dy; if (w.sali) w.sali.top += dy;
+    WALLS.add(p.x - r, p.z - r, p.x + r, p.z + r, w); PROPG.add(p.x - 3, p.z - 3, p.x + 3, p.z + 3, p);
+    if (p.mo) {
+      p.mo.position.set(p.x, p.y, p.z); const d = hyp(mx, mz);
+      if (p.via === 'rotola' && d > 1e-6) p.mo.rotateOnWorldAxis(new THREE.Vector3(mz / d, 0, -mx / d), d / Math.max(0.3, p.r));
+      propScrivi(p, p.mo, p.m0, p.p0[0], p.p0[1], p.p0[2]);
+    }
+    if (ns < 0.05) { p.moving = false; PROP_MOVE.splice(i, 1); if (p.inst) p.inst.mf = propMatrici(p); }
   }
   for (let i = PROP_DEBRIS.length - 1; i >= 0; i--) {
     const d = PROP_DEBRIS[i], o = d.o; d.t += dt; d.vy -= 9.8 * dt;
@@ -1824,7 +1870,7 @@ function layMuri(T) {
   }
   for (const q of T.feQ) T.fe.push(q); T.feQ = null; // fences follow the ground every 3 m (walls and collisions are built later)
   const noTree = (d.ls || []).filter(q => q.s.startsWith('sport') || q.s.startsWith('pista')).map(q => { const P_ = dec(q.p); return { P: P_, b: bbox(P_) }; }); /* no tree on a pitch or a track (Carlo, 2/11, the bocce court of x 2345 z 18) */
-  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; if (noTree.some(q => x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.P))) { window.__ALBERI_TOLTI = (window.__ALBERI_TOLTI || 0) + 1; continue; } T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
+  T.trW = new Map(); for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; if (noTree.some(q => x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.P))) { window.__ALBERI_TOLTI = (window.__ALBERI_TOLTI || 0) + 1; continue; } const small = TH && TH / 10 < TREE_SMALL, tk = x.toFixed(1) + ',' + z.toFixed(1); if (small && TREE_PROPS.has(tk) && TREE_PROPS.get(tk).broken) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); const tw_ = { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1, ...(small ? { dyn: true, on: true } : {}) }; WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, tw_); if (small) (T.trW || (T.trW = new Map())).set(tk, tw_); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const [br, pts] of T.baQ) {
     const sp = BAR_PANEL[br.t], rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + br.h, yv: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
@@ -2729,6 +2775,7 @@ function kerbRing(b, ring, h, yf, flip, top) {
 }
 const streetY = (x, z) => H.overFree(x, z, H.base(x, z)); // where the street surfaces and the step covers stand in a tile of S
 const TREE_SMALL = 7; /* m: a tree the DSM sees lower than this has the small model */
+const TREE_PROPS = new Map(); /* the small trees as props, by place: one knocked down stays down */
 const trHash = (x, z) => { const t = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return t - Math.floor(t); };
 const GREENS = ['#4f7a35', '#5d8a3b', '#6b8f3e', '#47703a', '#7f9a45', '#a08d3c'];
 function addBox(b, x, y, z, w, h, d, col, ry = 0) { // axis box rotated about y, into a buffer
@@ -4091,6 +4138,9 @@ function* buildTileGen(T) {
         const yb = Math.max(0.8, 0.28 * th), hc = th - yb, D = clamp(td, 0.75 * hc, 1.6 * hc), sx = D / 5.4 * (0.94 + tRnd() * 0.12), sy = hc / 4.5 * (0.95 + tRnd() * 0.1), yc = th - 2.5 * sy, tw = clamp(0.35 + 0.06 * th, 0.5, 0.8);
         q.identity(); m.compose(p.set(x, gy, z), q, s.set(tw, yb + 0.65 * hc, tw)); trunks.setMatrixAt(j, m); /* the stem ends at 65% of the crown: inside it */
         q.setFromEuler(e.set((tRnd() - 0.5) * 0.15, tRnd() * TAU, 0)); m.compose(p.set(x, gy + yc, z), q, s.set(sx, sy, sx * (0.94 + tRnd() * 0.12))); crowns.setMatrixAt(j, m);
+        const tk = x.toFixed(1) + ',' + z.toFixed(1), tw_ = T.trW && T.trW.get(tk), tp = TREE_PROPS.get(tk); /* a small tree goes down under a hard blow (props3.js FORZA.medio) */
+        if (tw_ && !tp) TREE_PROPS.set(tk, addProp({ x, z, y: gy, r: 0.4, h: th, forza: 'medio', wall: tw_, inst: { meshes: [trunks, crowns], i: j, ry: 0, base: gy } }));
+        else if (tw_) { tp.wall = tw_; propRifai(tp, [trunks, crowns], j); }
       } else if (th) { // height th and crown diameter td from the DSM (dbgt_manufatti.py): the crown model is about 5.4 m across and 4.5 m high, its bottom 2 m under its origin and its top 2.5 m over it
         // the crown takes 65% of the height on a broad tree (td at least 0.55 th), 85% on a narrow one (a cypress, a spruce: td at most 0.35 th), on a broad one at least 2 m off the ground
         // and lower where it is much wider than tall. The trunk (4.4 m, its three branches from 2.6 to 4.3 m) grows so that the branches start a fifth of the way up the crown and stay inside it:
@@ -4119,7 +4169,7 @@ function* buildTileGen(T) {
       const py = H.surface(hx, hz, 1e4) + 0.14, k = pool.p.length / 3, R = 7, cy = (x, z) => T.fine && py - 0.14 <= streetY(hx, hz) + 0.2 ? streetY(x, z) + 0.14 : py; // warm light pool on the street at night; in a tile of S its corners on S, so the ground (which writes its depth) does not cut it on a slope
       vtx(pool, hx - R, cy(hx - R, hz - R), hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, cy(hx + R, hz - R), hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, cy(hx + R, hz + R), hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, cy(hx - R, hz + R), hz + R, 0, 1, 0, 0, 1); triUp(pool, k, k + 1, k + 2); triUp(pool, k, k + 2, k + 3);
       gp.push(hx, gy + 6.82, hz); // glare under the lamp head
-      if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
+      if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, forza: 'medio', inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
       else for (const p of PROPS) if (p.tile === T && p.li === i) { p.inst.meshes = [pm, hm]; if (p.broken) { o.scale.set(0, 0, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix); o.scale.set(1, 1, 1); } } // built again: the lamps knocked down stay down
     });
     G.add(pm, hm); const poolM = pool.i.length ? mkMesh(pool, LAMPPOOL_MAT, 12, false, G) : null;
@@ -4163,6 +4213,7 @@ function layCancelli(T) { T.gates = []; for (const [X0, Z0, X1, Z1, k, h, auto] 
   const key = X0 + ',' + Z0 + ',' + X1, rotto = GATE_ROTTI.has(key), g = { key, ax, az, bx, bz, ux, uz, W, k, h, gy, broken: rotto, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [] };
   if (k !== 'o' && !g.perm) { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: !rotto, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
   T.gates.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
+  for (const [x, z] of k !== 'l' ? [[ax, az], [bx, bz]] : [[ax, az]]) { const r = k !== 'l' ? 0.2 : 0.15, g0 = H.ground(x, z); WALLS.add(x - r - 0.2, z - r - 0.2, x + r + 0.2, z + r + 0.2, { r, x, z, y0: g0 - 3, y1: g0 + (k !== 'l' ? h + 0.25 : 1.15) }); } /* the pillars (buildGates) */
 } }
 /* doors drawn flush on a facade (gaps along a house wall): p front door, n large door, b garage door; solid like the wall */
 function layPorte(T) { T.doors = []; for (const [X0, Z0, X1, Z1, k, h] of T.d.dr || []) {
@@ -4435,12 +4486,9 @@ function layPompe(f) {
   f.gy = H.ground(f.x, f.z);
   for (const pump of f.pumps) WALLS.add(pump.x - 1.3, pump.z - 1.3, pump.x + 1.3, pump.z + 1.3, pump.wall = { r: 1.0, x: pump.x, z: pump.z, y0: f.gy - 2, y1: f.gy + 2 });
   for (const [a, b] of [[-6.5, -3.8], [6.5, -3.8], [-6.5, 3.8], [6.5, 3.8]]) { const qx = f.x + f.ux * a + f.nx * b, qz = f.z + f.uz * a + f.nz * b; WALLS.add(qx - 0.4, qz - 0.4, qx + 0.4, qz + 0.4, { r: 0.25, x: qx, z: qz, y0: f.gy - 2, y1: f.gy + 4 }); }
-  /* the brand totem with the prices (buildFuel, 1.6 x 0.4 m, 4.4 m high): a wall along its face, solid like a pole or a low wall */
-  const [ax, az] = fuelAt(f, FUEL_TOT[0] - 0.8, FUEL_TOT[1]), [bx, bz] = fuelAt(f, FUEL_TOT[0] + 0.8, FUEL_TOT[1]);
-  WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -f.uz, nz: f.ux, two: true, y0: f.gy - 2, y1: f.gy + 4.4 });
 }
 /* world point of a spot in the frame buildFuel draws the station in (root: x along the road, z across it) */
-const FUEL_TOT = [9.5, -6.5];
+const FUEL_TOT = [9.5, -6.5], FUEL_TOT_PROPS = new Map(); /* the brand totem (1.6 x 0.4 m, 4.4 m high): a sign, knocked down like one (props3.js FORZA.leggero) */
 function fuelAt(f, lx, lz) { return [f.x + lx * f.ux - lz * f.uz, f.z + lx * f.uz + lz * f.ux]; }
 /* a roof (OSM or DBGT) lying for more than half inside the canopy the game draws on a fuel station is not drawn: it would be a second canopy */
 let FUEL_ROOFS = 0;
@@ -4482,7 +4530,11 @@ function buildFuel(T, G) {
     const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256; const gg = cv.getContext('2d'); gg.fillStyle = bg; gg.fillRect(0, 0, 128, 256); gg.fillStyle = fg; gg.textAlign = 'center'; gg.textBaseline = 'middle'; let fs = 46; const nm = (f.p.n || 'CARBURANTI').toUpperCase(); gg.font = `bold ${fs}px Arial`; while (gg.measureText(nm).width > 118 && fs > 14) { fs -= 2; gg.font = `bold ${fs}px Arial`; } gg.fillText(nm, 64, 60);
     gg.fillStyle = 'rgba(0,0,0,.55)'; gg.fillRect(8, 120, 112, 120); gg.fillStyle = '#7dff9a'; gg.font = 'bold 22px monospace'; gg.textAlign = 'left'; gg.fillText('SELF 1.79', 14, 150); gg.fillText('DIES 1.69', 14, 185); gg.fillText('GPL  0.72', 14, 220);
     const tex = new THREE.CanvasTexture(cv), tm = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(tm);
-    const tot = new THREE.Mesh(boxG(1.6, 4.4, 0.4), [lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), tm, tm]); tot.position.set(FUEL_TOT[0], 2.2, FUEL_TOT[1]); tot.castShadow = true; root.add(tot);
+    const tot = new THREE.Mesh(boxG(1.6, 4.4, 0.4), [lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), tm, tm]); tot.position.set(0, 2.2, 0); tot.castShadow = true;
+    const [tx, tz] = fuelAt(f, FUEL_TOT[0], FUEL_TOT[1]), tg = new THREE.Group(); tg.position.set(tx, f.gy, tz); tg.rotation.y = root.rotation.y; tg.add(tot); G.add(tg);
+    const tkey = f.x.toFixed(1) + ',' + f.z.toFixed(1), tp = FUEL_TOT_PROPS.get(tkey);
+    if (!tp) FUEL_TOT_PROPS.set(tkey, addProp({ x: tx, z: tz, y: f.gy, r: 0.25, h: 4.4, obj: tg, parts: [fuelAt(f, FUEL_TOT[0] - 0.6, FUEL_TOT[1]).concat(0.25), fuelAt(f, FUEL_TOT[0] + 0.6, FUEL_TOT[1]).concat(0.25)] }));
+    else { tp.obj = tg; if (tp.broken) tg.visible = false; }
   }
 }
 // a pump goes up, scorches black and catches fire; the blast sets off every other pump nearby, so the fire runs across the forecourt
@@ -4735,7 +4787,8 @@ function buildSignals(T, G) {
     const sp = new THREE.Mesh(boxG(0.06, 2.7, 0.06), lam(0x5a6068)); sp.position.set(0.7, 1.35, 1.9); root.add(sp);
     // the shelter goes over when rammed, like the street lamps; built again, a fallen one stays down
     const key = X + ',' + Z, old = BUS_PROPS.get(key);
-    if (!old) BUS_PROPS.set(key, addProp({ x: x - Math.cos(root.rotation.y) * 0.3, z: z + Math.sin(root.rotation.y) * 0.3, y: gy, r: 1.1, h: 2.5, obj: root, sali: { rs: 0.7, dy: 2.49 } }));
+    const cy = Math.cos(yaw), sy_ = Math.sin(yaw), at = (lx, lz) => [x + lx * cy + lz * sy_, z - lx * sy_ + lz * cy];
+    if (!old) BUS_PROPS.set(key, addProp({ x: x - cy * 0.3, z: z + sy_ * 0.3, y: gy, r: 1.1, h: 2.5, obj: root, sali: { rs: 0.7, dy: 2.49 }, forza: 'medio', parts: [[...at(-0.75, -1.6), 0.1], [...at(-0.75, 1.6), 0.1], [...at(0.7, 1.9), 0.08]] }));
     else { old.obj = root; if (old.broken) root.visible = false; }
   }
 }
@@ -4896,6 +4949,35 @@ const LMAT = {
   warm: new THREE.MeshLambertMaterial({ color: 0x2f3036, emissive: 0xffc77a, emissiveIntensity: 0, side: THREE.DoubleSide }), // windows lit from inside at night
 };
 LM_GLOW.push({ m: LMAT.warm, a: 0, b: 0.8 });
+/* one geometry from boxes [w, h, d, x, y, z, colour or null] in a local frame whose origin is the foot of the object (for the instances of propIstanze) */
+function propGeo(boxes) {
+  const P = [], Nn = [], C = [], I = []; let colori = false;
+  for (const [w, h, d, x, y, z, col] of boxes) {
+    const g = new THREE.BoxGeometry(w, h, d).translate(x, y, z), o = P.length / 3, c = col ? new THREE.Color(col) : null; if (c) colori = true;
+    P.push(...g.attributes.position.array); Nn.push(...g.attributes.normal.array); for (let k = 0; k < g.attributes.position.count; k++) C.push(c ? c.r : 1, c ? c.g : 1, c ? c.b : 1);
+    for (const k of g.index.array) I.push(o + k);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(Nn, 3));
+  if (colori) g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I); return g;
+}
+/* things of one kind standing in a tile, each knocked down on its own (props3.js): list [x, z, gy, ry], parti [[geometry, material, cast]],
+   S { r, h, forza }; built again, what was knocked down stays down */
+const ISTA_PROPS = new Map();
+function propIstanze(G, kind, list, parti, S) {
+  if (!list.length) return;
+  const ims = parti.map(([g, m, c]) => { const im = new THREE.InstancedMesh(g, m, list.length); im.castShadow = !!c; im.renderOrder = 10; return im; }), o3 = new THREE.Object3D();
+  list.forEach(([x, z, gy, ry], i) => {
+    o3.position.set(x, gy, z); o3.rotation.set(0, ry || 0, 0); o3.updateMatrix(); for (const im of ims) im.setMatrixAt(i, o3.matrix);
+    const key = kind + ':' + x.toFixed(1) + ',' + z.toFixed(1), q = ISTA_PROPS.get(key);
+    if (!q) ISTA_PROPS.set(key, addProp({ x, z, y: gy, r: S.r, h: S.h, forza: S.forza, inst: { meshes: ims, i, ry: ry || 0, base: gy } })); else propRifai(q, ims, i);
+  });
+  for (const im of ims) G.add(im);
+}
+const LAMP_PARCO_G = [propGeo([[0.11, 4.0, 0.11, 0, 2.0, 0, null]]), propGeo([[0.42, 0.22, 0.42, 0, 4.05, 0, null]])];
+const LAMP_PARK_G = [propGeo([[0.15, 7.6, 0.15, 0, 3.8, 0, null]]), propGeo([[1.2, 0.18, 0.35, 0.5, 7.55, 0, null], [1.2, 0.18, 0.35, -0.5, 7.55, 0, null]])];
+const LAMP_BIN_G = [propGeo([[0.14, 4.6, 0.14, 0, 2.3, 0, '#5d646b']]), propGeo([[0.6, 0.12, 0.25, 0, 4.55, 0, null]])];
+const METER_G = propGeo([[0.3, 1.5, 0.25, 0, 0.75, 0, '#3c4650'], [0.32, 0.25, 0.27, 0, 1.5, 0, '#e2b436']]);
+const BOARD_POST_M = new THREE.MeshLambertMaterial({ color: 0x5d646b });
 
 // local frame helpers: everything is modelled in metres around (0,0,0) and moved into place by M while it goes into the buffers
 function lmFrame(M) {
@@ -4947,7 +5029,7 @@ function lmSection(poly, cx, cz, ux, uz, s) {
 }
 function buildPlatforms(T, G) {
   if (!T.pf) return;
-  const top = FBuf(), side = Buf(), line = FBuf(), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf(), warm: Buf() }, boards = new Map();
+  const top = FBuf(), side = Buf(), line = FBuf(), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf(), warm: Buf() }, benches = [], lampade = [];
   const WHITE = COL('#f2f0ea'), YELLOW = COL('#f2c230'), METAL = COL('#7d858d'), POST = COL('#5d646b'), DARK = COL('#1f2022'), WOOD = COL('#8a6a48');
   for (const P of T.pf) {
     try { polyFill(top, P.o, P.k, PLAT_H, 4); } catch (e) { }
@@ -4968,30 +5050,34 @@ function buildPlatforms(T, G) {
     const ang = alignRowAxis(P, 0.5 * Math.atan2(2 * sxz, sxx - szz)), ux = Math.cos(ang), uz = Math.sin(ang), proj = P.o.map(([x, z]) => (x - cx) * ux + (z - cz) * uz), s0 = Math.min(...proj) + 2, s1 = Math.max(...proj) - 2;
     const name = (st.n || '').replace(/^Stazione di /, '').toUpperCase(), ry = Math.atan2(-uz, ux);
     const at = (s, v) => [cx + ux * s - uz * v, cz + uz * s + ux * v];
-    let lastPost = null, stairs = false;
+    let lastPost = null, stairs = false; const solidi = !T.pfMuri;
     for (let s = s0; s <= s1; s += 1) {
       const sec = lmSection(P.o, cx, cz, ux, uz, s); if (!sec) continue; const wd = sec[1] - sec[0]; if (wd < 2.6) continue;
       const vm = (sec[0] + sec[1]) / 2, [x, z] = at(s, vm), gy = H.ground(x, z), dst = hyp(x - st.x, z - st.z), si = Math.round(s - s0);
       const covered = dst < 60;
       if (covered && si % 7 === 0) { // canopy: posts down the middle, a metal roof between them, lights underneath
-        F.geo(Bs.trim, lmBox(0.22, 3.4, 0.22, x, gy + 1.7, z), null, POST);
+        F.geo(Bs.trim, lmBox(0.22, 3.4, 0.22, x, gy + 1.7, z), null, POST); if (solidi) WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.16, x, z, y0: gy - 3, y1: gy + 3.4 }); /* it holds the roof: never knocked down */
         if (lastPost && s - lastPost.s <= 7.5) { const cw = Math.min(wd - 0.6, 4.4), mx = (x + lastPost.x) / 2, mz = (z + lastPost.z) / 2, my = (gy + lastPost.gy) / 2 + 3.5; F.geo(Bs.trim, lmBox(s - lastPost.s + 0.1, 0.16, cw, mx, my, mz, ry), null, METAL); F.geo(Bs.warm, lmBox(s - lastPost.s - 0.6, 0.05, 0.25, mx, my - 0.11, mz, ry)); F.geo(Bs.trim, lmBox(s - lastPost.s + 0.1, 0.3, 0.12, mx, my - 0.2, mz, ry), null, POST); }
         lastPost = { s, x, z, gy };
       }
-      if (covered && si % 14 === 3 && wd > 3.4) { // bench
-        F.geo(Bs.trim, lmBox(1.8, 0.08, 0.45, x, gy + 0.45, z, ry), null, WOOD); F.geo(Bs.trim, lmBox(1.8, 0.4, 0.06, 0, 0, 0, 0).translate(0, gy + 0.75, -0.22).rotateY(ry).translate(x, 0, z), null, WOOD);
-        for (const e of [-0.75, 0.75]) F.geo(Bs.trim, lmBox(0.08, 0.45, 0.4, 0, gy + 0.22, 0).translate(e, 0, 0).rotateY(ry).translate(x, 0, z), null, POST);
-      }
-      if (!covered && si % 15 === 7) { F.geo(Bs.trim, lmBox(0.14, 4.6, 0.14, x, gy + 2.3, z), null, POST); F.geo(Bs.warm, lmBox(0.6, 0.12, 0.25, x, gy + 4.55, z, ry)); } // platform lamp
-      if (si % 40 === 20 && name) { // name board on two posts, readable from the trains
-        for (const e of [-1.4, 1.4]) { const [px, pz] = [x + ux * e, z + uz * e]; F.geo(Bs.trim, lmBox(0.1, 3.0, 0.1, px, gy + 1.5, pz), null, POST); }
-        const b = boards.get(name) || Buf(); boards.set(name, b); const i0 = b.p.length / 3, nx2 = -uz, nz2 = ux;
-        for (const [e, yy, u, v] of [[-1.5, 2.2, 0, 0], [1.5, 2.2, 1, 0], [1.5, 2.85, 1, 1], [-1.5, 2.85, 0, 1]]) vtx(b, x + ux * e + nx2 * 0.06, gy + yy, z + uz * e + nz2 * 0.06, nx2, 0, nz2, u, v);
-        b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
+      if (covered && si % 14 === 3 && wd > 3.4) benches.push([x, z, ry, gy]); // bench: the one of the parks, knocked down like it
+      if (!covered && si % 15 === 7) lampade.push([x, z, gy, ry]); // platform lamp
+      if (si % 40 === 20 && name) { // name board on two posts, readable from the trains: a sign, knocked down whole
+        const root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = Math.atan2(-uz, ux); G.add(root);
+        for (const e of [-1.4, 1.4]) { const m = new THREE.Mesh(boxG(0.1, 3.0, 0.1), BOARD_POST_M); m.position.set(e, 1.5, 0); m.castShadow = true; root.add(m); }
+        const bd = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.65), stationSignMat(name)); bd.position.set(0, 2.525, 0.06); bd.renderOrder = 10; root.add(bd);
+        const key = 'tabella:' + x.toFixed(1) + ',' + z.toFixed(1), q = ISTA_PROPS.get(key);
+        if (!q) ISTA_PROPS.set(key, addProp({ x: x - ux * 1.4, z: z - uz * 1.4, y: gy, r: 0.1, h: 3, obj: root, parts: [[x + ux * 1.4, z + uz * 1.4, 0.1]] }));
+        else { q.obj = root; if (q.broken) root.visible = false; }
       }
       if (!stairs && dst < 25 && wd > 4.2 && si > 8 && s < s1 - 8) { // stairs down to the underpass: railed opening, a little glass roof
         stairs = true; const L2 = 6.5, W2 = 0.9;
         F.geo(Bs.trim, lmBox(L2, 0.04, 2 * W2, x, gy + 0.03, z, ry), null, DARK);
+        if (solidi) { /* the railing round the opening and the posts of its roof: solid, never broken */
+          const at2 = (a, b) => [x + ux * a - uz * b, z + uz * a + ux * b], seg = (A, B) => { const L = hyp(B[0] - A[0], B[1] - A[1]) || 1; WALLS.add(Math.min(A[0], B[0]), Math.min(A[1], B[1]), Math.max(A[0], B[0]), Math.max(A[1], B[1]), { ax: A[0], az: A[1], bx: B[0], bz: B[1], nx: (B[1] - A[1]) / L, nz: -(B[0] - A[0]) / L, two: true, y0: gy - 3, y1: gy + 1.1 }); };
+          for (const e of [-1, 1]) seg(at2(-L2 / 2, e * (W2 + 0.05)), at2(L2 / 2, e * (W2 + 0.05))); seg(at2(L2 / 2, -(W2 + 0.05)), at2(L2 / 2, W2 + 0.05));
+          for (const e of [-1, 1]) { const [qx, qz] = at2(e * L2 / 2, W2 + 0.3); WALLS.add(qx - 0.3, qz - 0.3, qx + 0.3, qz + 0.3, { r: 0.08, x: qx, z: qz, y0: gy - 3, y1: gy + 2.6 }); }
+        }
         for (const e of [-1, 1]) F.geo(Bs.trim, lmBox(L2, 0.06, 0.06, 0, gy + 1.05, e * (W2 + 0.05)).rotateY(ry).translate(x, 0, z), null, COL('#9aa1a8'));
         for (let k = 0; k <= 4; k++) for (const e of [-1, 1]) F.geo(Bs.trim, lmBox(0.05, 1.05, 0.05, 0, gy + 0.52, 0).translate(-L2 / 2 + k * L2 / 4, 0, e * (W2 + 0.05)).rotateY(ry).translate(x, 0, z), null, COL('#9aa1a8'));
         F.geo(Bs.trim, lmBox(0.06, 1.05, 2 * W2, 0, gy + 0.52, 0).translate(L2 / 2, 0, 0).rotateY(ry).translate(x, 0, z), null, COL('#9aa1a8'));
@@ -5002,7 +5088,8 @@ function buildPlatforms(T, G) {
   }
   mkMesh(top, PLAT_MAT.top, 9, false, G); mkMesh(side, PLAT_MAT.side, 9, false, G); mkMesh(line, PLAT_MAT.line, 10, false, G);
   mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G); if (Bs.warm.i.length) mkMesh(Bs.warm, LMAT.warm, 10, false, G);
-  for (const [n, b] of boards) mkMesh(b, stationSignMat(n), 10, false, G);
+  parkProps(G, 'panchina', benches); propIstanze(G, 'lampione binario', lampade, [[LAMP_BIN_G[0], LMAT.trim, true], [LAMP_BIN_G[1], LMAT.warm, false]], { r: 0.12, h: 4.6, forza: 'medio' });
+  T.pfMuri = true;
 }
 
 // parking stalls: white lines across the long side of every car park, one or two rows depending on its width, never over the aisles (OSM service
@@ -5127,7 +5214,7 @@ function mergeLotPolys(A, B) {
   return out.length === rest.length && out.length >= 3 ? out : null; /* a single loop, else they stay two */
 }
 function buildParkingLines(T, G) {
-  const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf();
+  const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lampade = [], metri = [];
   T.stalls = []; T.streetStalls = [];
   const quad = (x, z, ux, uz, a0, a1, w0, w1, col) => { const nx = -uz, nz = ux;
     if (H.fineAt(x, z)) { // a tile of S: thin paint on a flat car park, in pieces of at most 2.5 m along it, each corner 5 cm over S (b.noclip: cut on the cells it would cost four times the triangles)
@@ -5218,7 +5305,7 @@ function buildParkingLines(T, G) {
     if (inLot.length >= 10) lot.push(...inLot); // the furniture below goes on the lots mapped space by space too
     if (lot.length >= 10 && !handLot) { // furniture on the bigger lots: lamps along the middle, the meter and the P sign at one end
       const mid = (S0 + S1) / 2, sec = lmSection(P, cx, cz, ux, uz, mid);
-      for (let s = S0 + 6; s < S1 - 3; s += 22) { const sc = lmSection(P, cx, cz, ux, uz, s); if (!sc) continue; const v = (sc[0] + sc[1]) / 2, x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; if (onAnyRoad(x, z, 0.5) && !onFoot(x, z) || inBuilding(x, z, 0.5)) continue; const gy = H.ground(x, z); addBox(lamps, x, gy + 3.8, z, 0.15, 7.6, 0.15, null); addBox(heads, x + ux * 0.5, gy + 7.55, z + uz * 0.5, 1.2, 0.18, 0.35, null); addBox(heads, x - ux * 0.5, gy + 7.55, z - uz * 0.5, 1.2, 0.18, 0.35, null); }
+      for (let s = S0 + 6; s < S1 - 3; s += 22) { const sc = lmSection(P, cx, cz, ux, uz, s); if (!sc) continue; const v = (sc[0] + sc[1]) / 2, x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; if (onAnyRoad(x, z, 0.5) && !onFoot(x, z) || inBuilding(x, z, 0.5)) continue; lampade.push([x, z, H.ground(x, z), Math.atan2(-uz, ux)]); }
       const e = lmSection(P, cx, cz, ux, uz, S0 + 0.5);
       if (e) { const x = cx + ux * (S0 + 0.3) + nx * e[0] - nx * -0.6, z = cz + uz * (S0 + 0.3) + nz * e[0] + nz * 0.6, gy = H.ground(x, z), ry = Math.atan2(-uz, ux);
         { const [pw, ph] = segDims('parcheggio'), [front, rear] = segTexOf('parcheggio'), top = 2.3, root = new THREE.Group(); /* the real plate (Fig. II 76) of segnali3.js, the post behind it, the face to those driving in (along u) */
@@ -5228,12 +5315,13 @@ function buildParkingLines(T, G) {
           const back = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), rear); back.position.set(0, top, -0.06); back.rotation.y = Math.PI; back.scale.x = -1; root.add(back);
           const key = T.t + '_' + Math.round(x * 10) + '_' + Math.round(z * 10), old = PSIGN_PROP.get(key);
           if (!old) PSIGN_PROP.set(key, addProp({ x, z, y: gy, r: 0.1, h: 3, obj: root })); else { old.obj = root; if (old.broken) root.rotation.x = -1.45; } }
-        const mx = x + nx * 1.5, mz = z + nz * 1.5; F.geo(Bs.trim, lmBox(0.3, 1.5, 0.25, 0, 0, 0).rotateY(ry).translate(mx, gy + 0.75, mz), null, COL('#3c4650')); F.geo(Bs.trim, lmBox(0.32, 0.25, 0.27, 0, 0, 0).rotateY(ry).translate(mx, gy + 1.5, mz), null, COL('#e2b436')); } // parking meter
+        const mx = x + nx * 1.5, mz = z + nz * 1.5; metri.push([mx, mz, gy, ry]); } // parking meter
     }
   }
   if (b.i.length) mkMesh(b, PLAT_MAT.line, 5, false, G);
   if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
-  if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
+  propIstanze(G, 'lampione parcheggio', lampade, [[LAMP_PARK_G[0], MAT.lamp, true], [LAMP_PARK_G[1], MAT.lampHead, false]], { r: 0.15, h: 7.6, forza: 'medio' });
+  propIstanze(G, 'parchimetro', metri, [[METER_G, LMAT.trim, true]], { r: 0.2, h: 1.6, forza: 'leggero' });
 }
 // the benches and bins of the parks: one instance each, the models of oggetti3.js, knocked down like the street lamps; built again, a fallen one
 // stays down (as the lamps)
@@ -5257,7 +5345,7 @@ function buildParkFurniture(T, G) {
   const inPark = (x, z, m = 8) => parks.some(p => { // inside a park or garden, or along its edge
     if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) return false; if (inPoly(x, z, p.o)) return true;
     for (let i = 0; i < p.o.length; i++) { const A = p.o[i], C = p.o[(i + 1) % p.o.length]; if (segDist(x, z, A[0], A[1], C[0], C[1]) < m) return true; } return false; });
-  const F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), benches = [], bins = [];
+  const F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lampade = [], benches = [], bins = [];
   const x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
   for (const r of D.roads) {
     if (r.c !== 6 || r.d || r.t) continue;
@@ -5273,7 +5361,7 @@ function buildParkFurniture(T, G) {
         if (k % 3) { // bench facing the path, a bin beside it: both knocked down like the street lamps (parkProps)
           const R = ry + (sd > 0 ? Math.PI : 0), qx = bx + Math.cos(R) * 1.4, qz = bz - Math.sin(R) * 1.4;
           benches.push([bx, bz, R, gy]); bins.push([qx, qz, R, H.ground(qx, qz)]);
-        } else { addBox(lamps, bx, gy + 2.0, bz, 0.11, 4.0, 0.11, null); addBox(heads, bx, gy + 4.05, bz, 0.42, 0.22, 0.42, null); } // park lamp
+        } else lampade.push([bx, bz, gy, 0]); // park lamp
       }
       acc += Ln;
     }
@@ -5289,7 +5377,7 @@ function buildParkFurniture(T, G) {
   }
   parkProps(G, 'panchina', benches); parkProps(G, 'cestino', bins);
   if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
-  if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
+  propIstanze(G, 'lampione parco', lampade, [[LAMP_PARCO_G[0], MAT.lamp, true], [LAMP_PARCO_G[1], MAT.lampHead, false]], { r: 0.12, h: 4, forza: 'medio' });
 }
 
 // ---------------------------------------------------------------- street objects from OSM (build_data.py: og per tile, pw for the wires)
@@ -5302,7 +5390,7 @@ const OGG_KINDS = ['traliccio', 'palo', 'dosso', 'rallentatore', 'piattaforma', 
 const OGG_MAT = new THREE.MeshLambertMaterial({ vertexColors: true }), WIRE_MAT = new THREE.LineBasicMaterial({ color: 0x2b2d30 });
 // collision: r radius, h height, knock (falls over) or solid; tall ones are scaled from their modelled height to the mapped one
 const OGG_SPEC = {
-  traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8, sali: 0.5 },
+  traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8, sali: 0.5, knock: true, forza: 'medio', via: 'scivola' },
   idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true, sali: 0.5 }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
   panchina: { r: 0.8, h: 0.9, knock: true, sali: 0.4 }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: { r: 0.8, h: 2.3, parts: [[-1.6, 0, 0.7, 2.3], [1.6, 0, 0.7, 2.3], [3.4, 0, 0.7, 1.5], [3.4, -1.4, 0.7, 0.8], [0, 0, 0.9, 0.5]] }, /* swing frame, seats, slide: solid */
   telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true, sali: 0.35 }, rastrelliera: { r: 0.6, h: 0.8, knock: true }, cassetta: { r: 0.22, h: 1.2, knock: true },
@@ -5449,8 +5537,8 @@ function buildOggetti(T, G) {
       o3.position.set(x, gy, z); o3.rotation.set(0, a, 0); o3.scale.set(1, sy, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix);
       if (!S.r) return;
       if (S.knock) {
-        if (!T.ogDone) addProp({ x, z, y: gy, r: S.r, h: S.h, inst: { meshes: [im], i, ry: a, base: gy }, ogTile: T, og: oi, sali: S.sali ? { rs: S.sali, dy: S.h * sy } : null });
-        else for (const p of PROPS) if (p.ogTile === T && p.og === oi) { p.inst.meshes = [im]; if (p.broken) { o3.scale.set(0, 0, 0); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); } } // built again: what was knocked down stays down
+        if (!T.ogDone) addProp({ x, z, y: gy, r: S.r, h: S.h, forza: S.forza, via: S.via, inst: { meshes: [im], i, ry: a, base: gy }, ogTile: T, og: oi, sali: S.sali ? { rs: S.sali, dy: S.h * sy } : null });
+        else for (const p of PROPS) if (p.ogTile === T && p.og === oi) propRifai(p, [im], i); // built again: what was knocked down stays down, what was pushed stands where it stopped
 
       } else if (!T.ogDone) WALLS.add(x - S.r, z - S.r, x + S.r, z + S.r, { r: S.r, x, z, y0: gy - 3, y1: gy + S.h * sy, ...(S.sali ? { sali: { rs: S.sali, top: gy + S.h * sy } } : {}) });
       if (S.parts && !S.knock && !T.ogDone) for (const [dx, dz, rr, hh] of S.parts) { const wx = x + dx * Math.cos(a) + dz * Math.sin(a), wz = z - dx * Math.sin(a) + dz * Math.cos(a); WALLS.add(wx - rr, wz - rr, wx + rr, wz + rr, { r: rr, x: wx, z: wz, y0: gy - 3, y1: gy + hh }); }
@@ -5527,7 +5615,7 @@ function buildManufatti(T, G) {
   }
   // ladders, rails, catwalks
   for (const S of silos) {
-    const a = LS_HASH(S.x, S.z, 'scala') * TAU, ux = Math.cos(a), uz = Math.sin(a), ry = Math.atan2(ux, uz), o = S.r + 0.25;
+    const a = LS_HASH(S.x, S.z, 'scala') * TAU, ux = Math.cos(a), uz = Math.sin(a), ry = Math.atan2(ux, uz), o = S.r + 0.06; /* against the silo: inside its wall for whoever walks or drives up to it */
     for (const q of [-0.22, 0.22]) bx(0.05, S.eave - S.gy + 1, 0.05, S.x + ux * o - uz * q, (S.eave + S.gy + 1) / 2, S.z + uz * o + ux * q, STEEL);
     for (let y = S.gy + 0.4; y < S.eave + 0.9; y += 0.6) bx(0.44, 0.03, 0.03, S.x + ux * o, y, S.z + uz * o, STEEL, ry);
     for (let y = S.gy + 2.4; y < S.eave + 1; y += 1.2) geo(new THREE.TorusGeometry(0.3, 0.02, 3, 10, Math.PI).rotateX(Math.PI / 2).rotateY(ry).translate(S.x + ux * o, y, S.z + uz * o), STEEL);
@@ -6960,7 +7048,7 @@ const LS_BALE_G = (() => { const g = new THREE.CylinderGeometry(0.75, 0.75, 1.2,
 // a hoarding panel 1 m long (stretched to its length along x), 2 m high, with its post at one end; the colour comes per instance
 const LS_PANEL_G = (() => { const b = Buf(), F = lmFrame(new THREE.Matrix4()); F.geo(b, lmBox(1, 2, 0.05, 0, 1, 0), null, COL('#ffffff')); F.geo(b, lmBox(0.05, 2.1, 0.07, -0.5, 1.05, 0), null, COL('#8f949a'));
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(b.c, 3)); g.setIndex(b.i); return g; })();
-const LS_PANEL_M = new THREE.MeshLambertMaterial({ vertexColors: true }), LS_PANEL_PROPS = new Map();
+const LS_PANEL_M = new THREE.MeshLambertMaterial({ vertexColors: true }), LS_PANEL_PROPS = new Map(), LS_BALE_PROPS = new Map();
 const LS_POT_G = (() => { const g = new THREE.IcosahedronGeometry(0.32, 0); g.translate(0, 0.45, 0); return g; })();
 
 function* buildPaesaggio(T, G) {
@@ -7215,7 +7303,11 @@ function* buildPaesaggio(T, G) {
     list.forEach(([x, z, r], i) => { o3.position.set(x, H.ground(x, z), z); o3.rotation.set(0, r || 0, 0); const k = sc ? sc(x, z) : 1; o3.scale.set(k, k, k); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); if (colOf) im.setColorAt(i, COL(colOf(x, z))); });
     G.add(im); return im;
   };
-  inst(LS_BALE_G, LS_BALE_M, bales);
+  { const im = inst(LS_BALE_G, LS_BALE_M, bales); if (im) bales.forEach(([x, z, r], i) => { /* a bale rolls away under a hard blow (props3.js FORZA.medio, via) and is solid again where it stops */
+    const id = T.t + ':' + i, p = LS_BALE_PROPS.get(id), gy = H.ground(x, z);
+    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'medio', via: 'rotola', inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
+    else propRifai(p, [im], i);
+  }); }
   yield 'terreni balle';
   if (panels.length) { // building-site hoarding: one instance per panel, each knocked over on its own like the street lamps
     const im = new THREE.InstancedMesh(LS_PANEL_G, LS_PANEL_M, panels.length); im.castShadow = true;
@@ -7234,7 +7326,6 @@ function* buildPaesaggio(T, G) {
   lsInstances(G, LS_POTP_G, pots); lsInstances(G, LS_BLOB_G, potPlants); lsInstances(G, LS_BLOB_G, crops); lsInstances(G, LS_STAKE_G, stakes); lsInstances(G, LS_FRUIT_G, fruitG.map(f => [f[0], f[1], f[2], 1.4, 1.4, 1.4, f[6]]));
   if (!T.lsDone) {
     for (const [x, z, r, hh] of solids) { const gy = H.ground(x, z); WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: gy - 3, y1: gy + hh }); }
-    for (const [x, z] of bales) { const gy = H.ground(x, z); WALLS.add(x - 0.8, z - 0.8, x + 0.8, z + 0.8, { r: 0.75, x, z, y0: gy - 3, y1: gy + 1.5, sali: { rs: 0.55, top: gy + 1.5 } }); }
   }
   T.lsDone = true;
 }

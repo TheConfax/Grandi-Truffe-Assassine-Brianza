@@ -8,7 +8,7 @@ const OGG_KINDS = ['traliccio', 'palo', 'dosso', 'rallentatore', 'piattaforma', 
 const OGG_MAT = new THREE.MeshLambertMaterial({ vertexColors: true }), WIRE_MAT = new THREE.LineBasicMaterial({ color: 0x2b2d30 });
 // collision: r radius, h height, knock (falls over) or solid; tall ones are scaled from their modelled height to the mapped one
 const OGG_SPEC = {
-  traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8, sali: 0.5 },
+  traliccio: { r: 2.6, h: 30, scale: 30 }, palo: { r: 0.16, h: 9, knock: true }, paletto: { r: 0.1, h: 0.9, knock: true }, blocco: { r: 0.65, h: 0.8, sali: 0.5, knock: true, forza: 'medio', via: 'scivola' },
   idrante: { r: 0.15, h: 0.8, knock: true }, campana: { r: 0.8, h: 1.9, knock: true, sali: 0.5 }, ricarica: { r: 0.3, h: 1.4, knock: true }, antenna: { r: 0.6, h: 25, scale: 25 },
   panchina: { r: 0.8, h: 0.9, knock: true, sali: 0.4 }, cestino: { r: 0.25, h: 1, knock: true }, fontanella: { r: 0.2, h: 1.2, knock: true }, giochi: { r: 0.8, h: 2.3, parts: [[-1.6, 0, 0.7, 2.3], [1.6, 0, 0.7, 2.3], [3.4, 0, 0.7, 1.5], [3.4, -1.4, 0.7, 0.8], [0, 0, 0.9, 0.5]] }, /* swing frame, seats, slide: solid */
   telecamera: { r: 0.1, h: 4, knock: true }, distributore: { r: 0.55, h: 1.8, knock: true, sali: 0.35 }, rastrelliera: { r: 0.6, h: 0.8, knock: true }, cassetta: { r: 0.22, h: 1.2, knock: true },
@@ -155,8 +155,8 @@ function buildOggetti(T, G) {
       o3.position.set(x, gy, z); o3.rotation.set(0, a, 0); o3.scale.set(1, sy, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix);
       if (!S.r) return;
       if (S.knock) {
-        if (!T.ogDone) addProp({ x, z, y: gy, r: S.r, h: S.h, inst: { meshes: [im], i, ry: a, base: gy }, ogTile: T, og: oi, sali: S.sali ? { rs: S.sali, dy: S.h * sy } : null });
-        else for (const p of PROPS) if (p.ogTile === T && p.og === oi) { p.inst.meshes = [im]; if (p.broken) { o3.scale.set(0, 0, 0); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); } } // built again: what was knocked down stays down
+        if (!T.ogDone) addProp({ x, z, y: gy, r: S.r, h: S.h, forza: S.forza, via: S.via, inst: { meshes: [im], i, ry: a, base: gy }, ogTile: T, og: oi, sali: S.sali ? { rs: S.sali, dy: S.h * sy } : null });
+        else for (const p of PROPS) if (p.ogTile === T && p.og === oi) propRifai(p, [im], i); // built again: what was knocked down stays down, what was pushed stands where it stopped
 
       } else if (!T.ogDone) WALLS.add(x - S.r, z - S.r, x + S.r, z + S.r, { r: S.r, x, z, y0: gy - 3, y1: gy + S.h * sy, ...(S.sali ? { sali: { rs: S.sali, top: gy + S.h * sy } } : {}) });
       if (S.parts && !S.knock && !T.ogDone) for (const [dx, dz, rr, hh] of S.parts) { const wx = x + dx * Math.cos(a) + dz * Math.sin(a), wz = z - dx * Math.sin(a) + dz * Math.cos(a); WALLS.add(wx - rr, wz - rr, wx + rr, wz + rr, { r: rr, x: wx, z: wz, y0: gy - 3, y1: gy + hh }); }
@@ -233,7 +233,7 @@ function buildManufatti(T, G) {
   }
   // ladders, rails, catwalks
   for (const S of silos) {
-    const a = LS_HASH(S.x, S.z, 'scala') * TAU, ux = Math.cos(a), uz = Math.sin(a), ry = Math.atan2(ux, uz), o = S.r + 0.25;
+    const a = LS_HASH(S.x, S.z, 'scala') * TAU, ux = Math.cos(a), uz = Math.sin(a), ry = Math.atan2(ux, uz), o = S.r + 0.06; /* against the silo: inside its wall for whoever walks or drives up to it */
     for (const q of [-0.22, 0.22]) bx(0.05, S.eave - S.gy + 1, 0.05, S.x + ux * o - uz * q, (S.eave + S.gy + 1) / 2, S.z + uz * o + ux * q, STEEL);
     for (let y = S.gy + 0.4; y < S.eave + 0.9; y += 0.6) bx(0.44, 0.03, 0.03, S.x + ux * o, y, S.z + uz * o, STEEL, ry);
     for (let y = S.gy + 2.4; y < S.eave + 1; y += 1.2) geo(new THREE.TorusGeometry(0.3, 0.02, 3, 10, Math.PI).rotateX(Math.PI / 2).rotateY(ry).translate(S.x + ux * o, y, S.z + uz * o), STEEL);

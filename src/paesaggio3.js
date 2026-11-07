@@ -80,7 +80,7 @@ const LS_BALE_G = (() => { const g = new THREE.CylinderGeometry(0.75, 0.75, 1.2,
 // a hoarding panel 1 m long (stretched to its length along x), 2 m high, with its post at one end; the colour comes per instance
 const LS_PANEL_G = (() => { const b = Buf(), F = lmFrame(new THREE.Matrix4()); F.geo(b, lmBox(1, 2, 0.05, 0, 1, 0), null, COL('#ffffff')); F.geo(b, lmBox(0.05, 2.1, 0.07, -0.5, 1.05, 0), null, COL('#8f949a'));
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(b.c, 3)); g.setIndex(b.i); return g; })();
-const LS_PANEL_M = new THREE.MeshLambertMaterial({ vertexColors: true }), LS_PANEL_PROPS = new Map();
+const LS_PANEL_M = new THREE.MeshLambertMaterial({ vertexColors: true }), LS_PANEL_PROPS = new Map(), LS_BALE_PROPS = new Map();
 const LS_POT_G = (() => { const g = new THREE.IcosahedronGeometry(0.32, 0); g.translate(0, 0.45, 0); return g; })();
 
 function* buildPaesaggio(T, G) {
@@ -335,7 +335,11 @@ function* buildPaesaggio(T, G) {
     list.forEach(([x, z, r], i) => { o3.position.set(x, H.ground(x, z), z); o3.rotation.set(0, r || 0, 0); const k = sc ? sc(x, z) : 1; o3.scale.set(k, k, k); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); if (colOf) im.setColorAt(i, COL(colOf(x, z))); });
     G.add(im); return im;
   };
-  inst(LS_BALE_G, LS_BALE_M, bales);
+  { const im = inst(LS_BALE_G, LS_BALE_M, bales); if (im) bales.forEach(([x, z, r], i) => { /* a bale rolls away under a hard blow (props3.js FORZA.medio, via) and is solid again where it stops */
+    const id = T.t + ':' + i, p = LS_BALE_PROPS.get(id), gy = H.ground(x, z);
+    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'medio', via: 'rotola', inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
+    else propRifai(p, [im], i);
+  }); }
   yield 'terreni balle';
   if (panels.length) { // building-site hoarding: one instance per panel, each knocked over on its own like the street lamps
     const im = new THREE.InstancedMesh(LS_PANEL_G, LS_PANEL_M, panels.length); im.castShadow = true;
@@ -354,7 +358,6 @@ function* buildPaesaggio(T, G) {
   lsInstances(G, LS_POTP_G, pots); lsInstances(G, LS_BLOB_G, potPlants); lsInstances(G, LS_BLOB_G, crops); lsInstances(G, LS_STAKE_G, stakes); lsInstances(G, LS_FRUIT_G, fruitG.map(f => [f[0], f[1], f[2], 1.4, 1.4, 1.4, f[6]]));
   if (!T.lsDone) {
     for (const [x, z, r, hh] of solids) { const gy = H.ground(x, z); WALLS.add(x - r, z - r, x + r, z + r, { r, x, z, y0: gy - 3, y1: gy + hh }); }
-    for (const [x, z] of bales) { const gy = H.ground(x, z); WALLS.add(x - 0.8, z - 0.8, x + 0.8, z + 0.8, { r: 0.75, x, z, y0: gy - 3, y1: gy + 1.5, sali: { rs: 0.55, top: gy + 1.5 } }); }
   }
   T.lsDone = true;
 }

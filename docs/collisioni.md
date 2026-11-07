@@ -1,84 +1,90 @@
-# Collisioni: cosa si vede solido ma si attraversa
+# Collisioni degli oggetti
 
-Censimento del 7/11/2026 (ramo `collisioni`), chiesto da Carlo. Qui ci sono solo gli oggetti che auto o pedone attraversano: nessuno di questi è stato corretto, li sistemerà chi decide Carlo. L'unico corretto su questo ramo è il totem dei distributori (vedi in fondo).
+## La regola (Carlo, 8/11/2026)
 
-## Come è stato fatto
+- Tutto ciò che si vede collide. Ogni oggetto ha una collisione sola, i suoi pali o il suo ingombro nella griglia `WALLS`, e la stessa vale per il pedone, l'auto, la moto, la bici e l'elicottero.
+- Quello che succede dipende dalla forza dell'urto, cioè la velocità per la massa del mezzo (`propForza`, src/props3.js). Un urto piano ferma. Un urto forte rompe l'oggetto, se è rompibile.
+- A piedi non si sfonda niente. Anche l'elicottero si ferma contro tutto e non abbatte niente.
+- Tre gruppi (`FORZA` in src/props3.js):
 
-1. **Censimento automatico** su 29 punti sparsi per Meda, Seveso e dintorni (centri, stazioni, parchi, parcheggi, distributori, periferie). Per ogni tile costruito, ogni mesh è stata divisa in pezzi (le istanze, o i gruppi di vertici attaccati). Si tengono i pezzi che stanno ad altezza di auto o pedone (sopra 0,45 m dal suolo, con la base sotto 1,6 m, larghi meno di 14 m) e per ognuno si guarda se nella griglia `WALLS` c'è un muro, un palo o un oggetto abbattibile che lo copre. Ogni pezzo è legato alla fetta di `buildTileGen` che l'ha disegnato.
-2. **Prove vere** in headless sugli oggetti trovati e su un campione di quelli solidi: un'auto guidata dal giocatore che parte da 10 m e va a tutto gas contro l'oggetto, e il pedone che ci cammina contro da 3 m, ciascuno da una o due direzioni con la rincorsa libera. "Passa" vuol dire che il centro dell'auto o del pedone è andato oltre il centro dell'oggetto.
+| Gruppo | Soglia per un'auto compatta | Cosa fa |
+|---|---|---|
+| **leggero** | 3,5 m/s (12,6 km/h) | si abbatte o si rompe anche piano |
+| **medio** | 9 m/s (32 km/h) | serve velocità e massa: si abbatte, oppure si sposta (le rotoballe rotolano, i blocchi di cemento scivolano) |
+| **indistruttibile** | mai | ferma a qualunque velocità |
 
-Script: `coll_h.mjs`, `coll_censo.mjs`, `coll_spinta.mjs` nella cartella `prove` della scratchpad della sessione.
+La massa è quella che il gioco usa già negli urti tra mezzi: un mezzo a due ruote pesa un quarto di un'auto. Per le auto la massa va con l'ingombro (lunghezza per larghezza, rispetto alla compatta che vale 1), tra 0,5 e 3. Quindi uno scooter abbatte un oggetto leggero solo da 14 m/s e uno medio mai; un furgone, che pesa di più, ci riesce più piano di un'auto.
 
-## Oggetti senza collisione
+Una rotoballa o un blocco spinto parte nella direzione del mezzo, rallenta per l'attrito, si ferma contro i muri e torna solido dove si ferma. Se il tile viene ricostruito resta lì. Gli oggetti abbattuti restano giù, come i lampioni di prima.
 
-Nessuno di questi si rompe, si abbatte o si sposta: l'auto ci passa dentro, piano e forte.
+Le barriere di `sfondabili3.js` (siepi, reti, staccionate) e le tombe tengono le soglie che avevano, solo in velocità: siepi 2,5 m/s, reti e staccionate 3 m/s, tombe 6 m/s. Le colonnine dei distributori esplodono da 3 m/s.
 
-| Oggetto | Funzione (file:riga) | Auto | Pedone | Comportamento oggi | Dove vederlo (x z) |
-|---|---|---|---|---|---|
-| Pali della pensilina dei binari (3,4 m) | `buildPlatforms`, src/landmarks3.js:91 | — (*) | passa | attraversabile | 353.6 -510.9 (Meda FNM) |
-| Panchine sui binari | `buildPlatforms`, src/landmarks3.js:96 | passa | passa | attraversabile | -1056.5 1005.9 (Seveso), 1141.6 -2057.4 |
-| Lampioni dei binari (4,6 m) | `buildPlatforms`, src/landmarks3.js:100 | — (*) | passa | attraversabile | -1035.8 1062.1, -1616 -1275.3 |
-| Pali del cartello col nome della stazione | `buildPlatforms`, src/landmarks3.js:101 | — (*) | passa | attraversabile | -1039 1041.8 |
-| Ringhiera e pali della tettoia della scala al sottopasso | `buildPlatforms`, src/landmarks3.js:107 | passa | passa | attraversabile | 362.3 -520.3 |
-| Lampioni dei parcheggi (7,6 m, due teste) | `buildParkingLines`, src/landmarks3.js:336 | passa | passa | attraversabile | -241.2 1887.1 (Famila), 23.9 -635.5 |
-| Parchimetro (palo scuro con la testa gialla) | `buildParkingLines`, src/landmarks3.js:346 | passa | passa | attraversabile | 1622.05 209.6 (Unes, via Indipendenza), 301.5 -418.6 |
-| Lampioni dei parchi (4 m) | `buildParkFurniture`, src/landmarks3.js:391 | passa | passa | attraversabile | 2228.5 -323.8, 1114.9 -2093.7 (parco della Libertà) |
-| Pensilina del bus: i due pali alle estremità e il palo del cartello | `buildSignals`, src/world3.js:3073 e 3076 | si abbatte (**) | passa | la pensilina si abbatte, i pali alle estremità no | 48.6 1909.7, -1372.3 1650.7 |
-| Pilastri di alcuni cancelli isolati (senza recinzione attorno) | `buildGates`, src/world3.js:2589 | passa | fermo | attraversabile in auto | -1582.4 -1082.1, 246.7 -604.3 |
-| Scale a pioli dei silos (fuori dal silo di 25 cm) | `buildManufatti`, src/oggetti3.js:234 | passa | passa | attraversabile | -880 -239.4 |
+## Ogni oggetto
 
-(*) Sui marciapiedi dei binari l'auto non sale quasi mai: la ferma il bordo del marciapiede, non l'oggetto. Dove ci sale (1141.6 -2057.4) passa.
+| Oggetto | Funzione | Gruppo | Piano | Forte |
+|---|---|---|---|---|
+| Cartelli stradali, semafori | `buildSegnali`, `buildSignals` | leggero | ferma | si abbatte |
+| Cartello P dei parcheggi | `buildParkingLines` | leggero | ferma | si abbatte |
+| **Parchimetro** (prima attraversabile) | `buildParkingLines`, `propIstanze` | leggero | ferma | si abbatte |
+| **Tabella col nome della stazione** (prima i pali erano attraversabili) | `buildPlatforms` | leggero | ferma | si abbatte intera |
+| **Totem dei prezzi dei distributori** | `buildFuel` | leggero | ferma | si abbatte |
+| Panchine e cestini dei parchi | `parkProps` | leggero | ferma | si abbatte |
+| **Panchine dei binari** (prima attraversabili; ora sono la panchina dei parchi) | `buildPlatforms`, `parkProps` | leggero | ferma | si abbatte |
+| Oggetti OSM piccoli (pali, paletti, idranti, campane del vetro, colonnine di ricarica, panchine, cestini, fontanelle, telecamere, distributori automatici, rastrelliere, cassette postali, tavoli da picnic) | `buildOggetti` | leggero | ferma | si abbatte |
+| Pannelli dei cantieri | `paesaggio3.js` | leggero | ferma | si abbatte |
+| Siepi, reti, staccionate | `sfondabili3.js` | leggero (soglie loro) | ferma | si apre o si rompe il pezzo colpito |
+| Tombe | `sfondabili3.js` | (soglia loro, 6 m/s) | ferma | si abbatte |
+| **Lampioni di strada** (prima si abbattevano a 3,5 m/s) | world3.js, `LPS` | medio | ferma | si abbatte e si spegne |
+| **Lampioni dei parcheggi** (prima attraversabili) | `buildParkingLines`, `propIstanze` | medio | ferma | si abbatte |
+| **Lampioni dei parchi** (prima attraversabili) | `buildParkFurniture`, `propIstanze` | medio | ferma | si abbatte |
+| **Lampioni dei binari** (prima attraversabili) | `buildPlatforms`, `propIstanze` | medio | ferma | si abbatte |
+| **Alberi piccoli** (sotto i 7 m del DSM, il modello piccolo; prima fissi) | world3.js, `TREE_PROPS` | medio | ferma | si abbatte |
+| **Pensiline del bus** (prima si abbattevano a 3,5 m/s e i pali alle estremità erano attraversabili) | `buildSignals` | medio | ferma | si abbatte con i suoi pali |
+| **Rotoballe** (prima fisse) | `paesaggio3.js` | medio | ferma | rotola via, poi torna solida dove si ferma |
+| **Blocchi di cemento** (prima fissi) | `buildOggetti` | medio | ferma | scivola via, poi torna solido |
+| Alberi grandi (dal DSM 7 m o più, e quelli senza altezza) | world3.js | indistruttibile | ferma | ferma |
+| Edifici, muri, muretti con ringhiera, muri di contenimento, recinzioni della ferrovia | world3.js, barriere | indistruttibile | ferma | ferma |
+| Tralicci, antenne, torri dell'acqua, giochi, armadietti, pannelli, attrezzi fitness | `buildOggetti` | indistruttibile | ferma | ferma |
+| Silos, cisterne, vasche; **le scale dei silos** ora attaccate al silo (prima 25 cm fuori) | `buildManufatti` | indistruttibile | ferma | ferma |
+| Fontane | `layFontana` | indistruttibile | ferma | ferma |
+| Cespugli delle rotonde | `rotonde3.js` | indistruttibile | ferma | ferma |
+| Colonnine dei distributori | `layPompe` | (esplodono, 3 m/s) | ferma | esplode |
+| Pilastri della pensilina dei distributori | `layPompe` | indistruttibile | ferma | ferma |
+| **Pilastri dei cancelli** (prima solo quelli con la recinzione accanto) | `layCancelli` | indistruttibile | ferma | ferma |
+| Ante dei cancelli | `gateHits` | (si sfondano da 3 m/s) | ferma | si sfonda |
+| **Pali della pensilina dei binari** (prima attraversabili; reggono il tetto) | `buildPlatforms` | indistruttibile | ferma | ferma |
+| **Ringhiera e pali della tettoia della scala del sottopasso** (prima attraversabili) | `buildPlatforms` | indistruttibile | ferma | ferma |
 
-(**) La pensilina del bus è un oggetto abbattibile con un solo cerchio di 1,1 m al centro: l'auto veloce la abbatte, piano si ferma. Il pedone però passa dentro i pali alle estremità (sono a 1,6 m dal centro) e dentro il palo del cartello della fermata.
+## Prove (headless, 8/11)
 
-### Il caso di Carlo all'Unes (1622.3 205.1)
+Pedone che cammina contro l'oggetto. Auto compatta piano (frenata a 2,5 m/s) e forte (a tutto gas da 25 m, 15–23 m/s), con il traffico tolto dalla strada della prova.
 
-Il "palo scuro con la testa gialla accesa" è il **parchimetro** del parcheggio (`buildParkingLines`, src/landmarks3.js:346): non è abbattibile e non ha muro, quindi l'auto e il pedone ci passano attraverso (prova: auto oltre di 44 m, pedone oltre di 5 m). Accanto c'è una colonnina di ricarica (oggetto OSM `ricarica`, abbattibile) a circa 1 m. È probabile che l'urto sentito fosse quello della colonnina. Il cartello P lì vicino invece si abbatte.
+| Oggetto | Punto x z | Pedone | Auto piano | Auto forte |
+|---|---|---|---|---|
+| Parchimetro (leggero) | 1622.05 209.6 (Unes) | fermo | ferma | abbattuto a 22,8 m/s |
+| Totem MORO (leggero) | -859.4 1636.1 | fermo | ferma | abbattuto a 20,6 m/s |
+| Totem Eni (leggero) | 756.0 -102.5 | fermo | ferma | abbattuto a 23,1 m/s |
+| Lampione del parcheggio (medio) | -241.2 1887.1 | fermo | ferma | abbattuto a 20,6 m/s |
+| Lampione del parco (medio) | 2228.5 -323.8 | fermo | ferma | abbattuto a 24,8 m/s |
+| Lampione di strada (medio) | -8.9 -581.3 | fermo | ferma | abbattuto a 15,9 m/s |
+| Albero piccolo (medio) | 573 -300.5 | fermo | ferma | abbattuto a 11,2 m/s |
+| Pensilina del bus (medio) | 421.22 -392.38 | fermo | ferma | abbattuta a 16,9 m/s |
+| Rotoballa (medio, rotola) | 2239.9 1509.1 | fermo | ferma | rotolata via di 18 m |
+| Fontana (indistruttibile) | 1102.7 -2031.3 | fermo | ferma | ferma |
+| Blocco di cemento (medio, scivola) | nessuno nei 10 punti cercati | — | — | non provato: stesso codice della rotoballa, senza rotolare |
+| Pilastro di cancello isolato (indistruttibile) | -1582.4 -1082.1 | fermo | ferma | ferma a 17 m/s |
+| Albero grande (indistruttibile) | 120.7 -548.3 | fermo | ferma | ferma a 17 m/s |
+| Palo della pensilina dei binari (indistruttibile) | 353.6 -510.9 | fermo | — | — |
+| Tabella della stazione, panchina e lampione dei binari | 389.33 -528.1, 388.07 -527.11, 433.11 -567.48 | fermo | — | — |
 
-La **colonnina di ricarica** a destra nella foto (1617.8 207.6) è messa alla quota giusta: la base è a 32.63, uguale al suolo `H.ground`, e vista da vicino in basso poggia sull'asfalto. Nella foto sembrava sospesa per l'ombra, che con il sole basso cade lontana dalla base. Ferma il pedone e l'auto la abbatte, come deve.
+Sui marciapiedi dei binari l'auto non arriva: la ferma il bordo del marciapiede. Per gli oggetti dei binari conta il pedone. L'avvio è senza errori in console.
 
-### Casi isolati (pochi pezzi, da guardare solo se capita)
+## Rimasti da fare
 
-- Arredi davanti ad alcuni negozi (pannelli sottili alti 2,4 m): 9 pezzi su 2300, es. -1377.2 1637.4 e -909.9 1172.9 (`negozi3.js`).
-- Paletti di recinzione: 3 su 23 000, es. -78.5 -733.3.
+- **Pannelli delle vetrine**: 9 pezzi su 2300 (es. -1377.2 1637.4, -909.9 1172.9). Sono parti delle facciate dei negozi (`negozi3.js`): un montante della tenda o della cornice che sta fuori dal muro dell'edificio. Non ho trovato in tempo quale pezzo del modello sia; servono una foto da vicino e un giro sul codice delle tende.
+- **3 pali di recinzione** su 23 000 (es. -78.5 -733.3, -1304.4 1572.3): pali alla fine di una recinzione, dove il tratto del muro finisce prima del palo. Non corretti.
+- Le altezze restano diverse per chi va a piedi e per chi va in mezzo, come prima. Per l'auto un muretto basso è alto almeno 1,2 m (`yv`), così non lo scavalca. A piedi il muro di un edificio arriva fino al tetto (`yp`). L'ingombro è lo stesso per tutti.
 
-## Cosa è solido e cosa succede quando l'auto ci va contro
+## Il censimento del 7/11
 
-"Piano" vuol dire a passo d'uomo, "forte" sopra la soglia indicata (3,5 m/s sono 12,6 km/h). "Si abbatte": cade e resta a terra, il suo muro sparisce. "Si rompe": il pezzo colpito vola via in frammenti. "Fisso": ferma l'auto a qualunque velocità, senza muoversi. Nessun oggetto fisso del mondo "si sposta" (lo fanno solo i veicoli).
-
-| Oggetto | Funzione | Piano | Forte | Pedone | Punto di prova |
-|---|---|---|---|---|---|
-| Alberi | world3.js:168 | ferma | **fisso** | ferma | 120.7 -548.3 |
-| Rotoballe di fieno | paesaggio3.js:357 | ferma | **fisso** (provato a 61 km/h da 4 lati: non si muove né si rompe) | ferma, ci si sale sopra | 2202.6 1568.3, 2239.9 1509.1 |
-| Lampioni di strada | world3.js:2455, props3.js | ferma | si abbatte (da 3,5 m/s) | ferma | -8.9 -581.3 |
-| Cartelli stradali e semafori | segnali3.js, world3.js:3039 | ferma | si abbatte (da 3,5 m/s) | ferma | 365.7 -549.1 |
-| Cartello P dei parcheggi | landmarks3.js:345 | ferma | si abbatte | ferma | 1622.4 208.1 |
-| Pensilina del bus (il centro) | world3.js:3079 | ferma | si abbatte | vedi sopra | 48.6 1909.7 |
-| Panchine e cestini dei parchi | landmarks3.js:356 | ferma | si abbatte | ferma | 1113.3 -2115.5 |
-| Oggetti OSM piccoli: pali, paletti, idranti, campane del vetro, colonnine di ricarica, panchine, cestini, fontanelle, telecamere, distributori automatici, rastrelliere, cassette postali, tavoli da picnic | oggetti3.js:10 (`knock`) | ferma | si abbatte (da 3,5 m/s) | ferma | 1617.8 207.6 (colonnina Unes) |
-| Oggetti OSM grandi: blocchi di cemento, tralicci, antenne, giochi dei parchi, armadietti, pannelli, attrezzi fitness, torri dell'acqua | oggetti3.js:10 | ferma | **fisso** | ferma | dal censimento |
-| Tombe | sfondabili3.js:332 | ferma | si abbatte (da 6 m/s) | ferma | non provato |
-| Siepi | sfondabili3.js:10 | ferma | si apre un buco largo come l'auto (da 2,5 m/s), l'auto rallenta | ferma | 2735.6 1104.9 |
-| Reti metalliche e staccionate | sfondabili3.js:9 | ferma | si rompe il pannello colpito (da 3 m/s) | ferma | -1303.3 1122.8, 235.7 -733.2 |
-| Muri, muretti con ringhiera, muri di contenimento, recinzioni della ferrovia | world3.js, barriere | ferma | **fisso** | ferma | 149.3 -362.6, 2652.3 1159.6 |
-| Ante dei cancelli | world3.js:2609 | ferma | si sfonda (da 3 m/s) | ferma | -3.5 -590.4 |
-| Pilastri dei cancelli con recinzione | world3.js:2589 | ferma | **fisso** | ferma | -3.5 -590.4 |
-| Fontane | world3.js:2653 | ferma | **fisso** | ferma | 1102.7 -2031.3 |
-| Cespugli delle rotonde | rotonde3.js:66 | ferma | **fisso** | ferma | dal codice |
-| Distributori: colonnine | world3.js:2775 | ferma | **esplode** e prende fuoco (da 3 m/s), fa esplodere le vicine | ferma | -845.7 1632.1 |
-| Distributori: pilastri della pensilina e totem | world3.js:2775 | ferma | **fisso** | ferma | -841.8 1629, -859.4 1636.1 |
-| Sbarre del passaggio a livello | world3.js:3087 | ferma | il braccio si spezza e vola, il palo si abbatte | ferma | non provato |
-| Arredi dei negozi | negozi3.js:896 | ferma | quello provato **fisso**; i piccoli si abbattono | ferma | 22.1 -603.5 |
-| Silos, cisterne, vasche | oggetti3.js:193 | ferma | **fisso** | ferma | dal codice |
-| Edifici | world3.js:149 | ferma | **fisso** | ferma | ovunque |
-
-## Limiti del censimento
-
-- Sono esclusi i pezzi lunghi più di 14 m (recinzioni, muri, siepi lunghe): nel censimento i loro pezzi corti risultano tutti coperti da muri, e una siepe provata con auto e pedone (1.8 -652.5) ferma.
-- Sono esclusi i pezzi bassi (sotto 0,45 m: cordoli, fermaruote, aiuole), che l'auto sale.
-- Un oggetto attaccato a un muro risulta coperto dal muro anche se non ne ha uno suo: lì l'elenco può averne perso qualcuno.
-- Non sono capitati nei punti campione: cimiteri, campi sportivi e cantieri (`paesaggio3.js`). Dal codice hanno tutti muri (`solidAt`, `TOMBE`, cipressi a world3.js:3000), ma non li ho provati.
-
-## Corretto su questo ramo
-
-**Totem dei prezzi dei distributori** (`buildFuel` / `layPompe`, src/world3.js): ora ha un muro a due facce lungo la faccia del totem (1,6 m, alto 4,4 m), come i pali. La posizione sta in `FUEL_TOT`, la stessa per il disegno e per il muro. Prima l'auto passava oltre il totem del MORO di 9,6 m e il pedone di 5,4 m. Ora l'auto si ferma a circa 2 m dal centro e il pedone a 0,4 m, su MORO (-859.4 1636.1), Eni (756.0 -102.5) ed Esso (560.1 -349.3). Colonnine e pilastri della pensilina erano già solidi.
+Il primo giro aveva trovato gli oggetti attraversabili con un censimento automatico su 29 punti: ogni mesh dei tile divisa in pezzi, e per ognuno la ricerca di un muro che lo copra in `WALLS`. Poi auto e pedone sono stati spinti contro gli oggetti trovati. L'elenco di allora è la colonna "prima attraversabile" della tabella sopra. Script: `coll_h.mjs`, `coll_censo.mjs`, `coll_spinta.mjs`, `coll_gruppi.mjs` nella cartella `prove` della scratchpad della sessione.
