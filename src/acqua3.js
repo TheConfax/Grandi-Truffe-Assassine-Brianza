@@ -125,7 +125,7 @@ const H_GROUND_RAW = (x, z) => H_GROUND_RAW.f.call(H, x, z); H_GROUND_RAW.f = H.
 // Returns null out of the water, else { y: height of the water surface, depth: how far the water stands over the feet at (x, z), fondo: the ground under it, kind: 'piscina' | 'fiume' }
 function acquaIn(x, z, feetY) {
   const p = POOLS.size ? poolAt(x, z) : null;
-  if (p) { if (!inPoly(x, z, p.W)) return null; const g = poolGround(p, x, z), d = p.water - g; return d > 0 ? { y: p.water, depth: d, fondo: g, kind: p.lake ? 'lago' : 'piscina' } : null; }
+  if (p) { if (!inPoly(x, z, p.W)) return null; const g = poolGround(p, x, z), d = p.water - g; return d > 0 ? { y: p.water, depth: d, fondo: g, kind: p.kind || (p.lake ? 'lago' : 'piscina') } : null; }
   if (!H.fineAt(x, z)) return null; const w = H.water(x, z); if (w === null) return null; const g = H.base(x, z); return w > g ? { y: w, depth: w - g, fondo: g, kind: 'fiume' } : null;
 }
 
@@ -224,6 +224,19 @@ function piscina(P, A, T, TL, solid) {
     for (const v of W) { b.p.push(v[0], water, v[1]); b.n.push(0, 1, 0); b.uv.push(Math.max(0.05, water - floor(v[0], v[1])), 99); } for (const f of faces) b.i.push(base + f[0], base + f[1], base + f[2]); }
   void g0; void ACQ_POOL;
   return true;
+}
+// ---- the basin of a fountain (buildFountains, world3.js): shallow water (60 cm) you walk in, over a floor 15 cm under the ground; the same registry, mask and water of a pool
+function fontanaVasca(f, T, G) {
+  const gy = f.gy, R = f.r, N = 48, W = [], tl = acquaTile(), rim = gy + 0.6, water = gy + 0.45, fy = gy - 0.15, floor = () => fy;
+  for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2; W.push([f.x + Math.cos(a) * (R + 0.03), f.z + Math.sin(a) * (R + 0.03)]); }
+  const bb = [f.x - R - 0.1, f.z - R - 0.1, f.x + R + 0.1, f.z + R + 0.1], key = 'F' + f.x.toFixed(1) + ',' + f.z.toFixed(1);
+  (T.poolKeys || (T.poolKeys = [])).push(key); poolAdd(key, { W, O: W, bb, rim, water, floor, stairs: [], kind: 'fontana' }); tl.n++;
+  aqPoly(tl.hole, W, () => rim, () => [0, 0], [0, 1, 0]);
+  aqPoly(tl.floor, W, () => fy, (x, z) => [x, z], [0, 1, 0]);
+  for (let k = 0; k < N; k++) tl.floor.c.push(0.78, 0.78, 0.78);
+  { const b = tl.water, base = b.p.length / 3, faces = THREE.ShapeUtils.triangulateShape(W.map(v => new THREE.Vector2(v[0], v[1])), []);
+    for (const v of W) { b.p.push(v[0], water, v[1]); b.n.push(0, 1, 0); b.uv.push(water - fy, 99); } for (const q of faces) b.i.push(base + q[0], base + q[1], base + q[2]); }
+  acquaMesh(tl, G);
 }
 // ---- ponds and lakes (DBGT water areas outside the river beds, that are not a pool): a bowl dug where the outline is, the ground left out by the same mask, the water in it
 // DBGT says where the water is and nothing of how deep: a shallow shore going down to a flat bottom, as deep as a pond of that size can be (1 m at most)
