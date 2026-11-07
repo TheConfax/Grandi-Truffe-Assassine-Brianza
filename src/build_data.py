@@ -48,6 +48,15 @@ for ev, el in ET.iterparse(src):
         rels.append(([(m.get('type'), m.get('ref'), m.get('role')) for m in el.findall('member')], {x.get('k'): x.get('v') for x in el.findall('tag')}))
         el.clear()
 log('parsed', len(nodes), 'nodes', len(ways), 'ways')
+# local corrections of OSM tags (src/correzioni_osm.json, docs/superfici.md): errors seen on the spot, before any rule; OSM online is not touched
+_corr_n = 0
+for _c in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'correzioni_osm.json'), encoding='utf-8')).get('correzioni', []):
+    if _c['way'] in ways:
+        for _k, _v in _c['tag'].items():
+            if _v is None: ways[_c['way']][1].pop(_k, None)
+            else: ways[_c['way']][1][_k] = _v
+        _corr_n += 1
+log('correzioni OSM locali', _corr_n)
 
 def h01(s): return int(hashlib.md5(str(s).encode()).hexdigest()[:8], 16) / 0xffffffff
 def num(v):
@@ -485,6 +494,7 @@ def street_parking(t):  # [left, right] of the way: 0 none, 1 parallel, 2 diagon
         out.append(k)
     return out if any(out) else None
 roads, raw_roads = [], []
+import fondi as _FO  # the materials of surface=* (src/fondi.py)
 rails, rivers, rows, rail_raw, barriers = [], [], [], [], []
 bar_runs, gate_ways = [], []
 for wid, (refs, t) in ways.items():
@@ -503,7 +513,7 @@ for wid, (refs, t) in ways.items():
                               'o': t.get('oneway') in ('yes', '1') or hw in ('motorway', 'motorway_link') or t.get('junction') == 'roundabout',
                               'bridge': bridge, 'layer': layer, 'emb': t.get('embankment') == 'yes', 'tunnel': t.get('tunnel') in ('yes', 'covered') or layer < 0, 'under': t.get('tunnel') in ('yes', 'covered', 'building_passage') or layer < 0,
                               'x': hw in ('motorway', 'trunk', 'motorway_link', 'trunk_link'), 'priv': t.get('access') in ('private', 'no'), 'drv': t.get('service') == 'driveway', 'ms': num(t.get('maxspeed')) if str(t.get('maxspeed', '')).replace('.', '').isdigit() else None, 'pk': street_parking(t),
-                              'ln': [num(t.get(k_)) for k_ in ('lanes', 'lanes:forward', 'lanes:backward')]})  # the lanes OSM maps: the markings (dbgt_righe.py)
+                              'ln': [num(t.get(k_)) for k_ in ('lanes', 'lanes:forward', 'lanes:backward')], 'sf': t.get('surface')})  # the lanes OSM maps: the markings (dbgt_righe.py); sf: surface=*, src/fondi.py
     elif t.get('railway') == 'rail' and (t.get('tunnel') != 'yes' or sum(math.dist(nodes[a], nodes[b]) for a, b in zip(refs, refs[1:]) if a in nodes and b in nodes) < 200) and t.get('service') not in ('yard', 'siding', 'spur'):  # short rail tunnels (underpasses) stay as track at grade
         lay = num(t.get('layer')) or 0
         for run in clip_runs(refs, 300): rails.append([nodes[r] for r in run]); rail_raw.append({'refs': run, 'bridge': t.get('bridge') in ('yes', 'viaduct') or lay >= 1, 'emb': t.get('embankment') == 'yes', 'layer': lay, 'wid': wid, 't': t})
@@ -2137,6 +2147,7 @@ used_nodes = {}
 out_roads = []
 for r in raw_roads:
     rec = {'g': [gnode(n_) for n_ in r['refs']], 'w': r['w'], 'c': r['c'], 'n': r['n'], 'mh': r['mh'], 'wk': r['wk'], 'sp': round(r['ms'] / 3.6 * 0.95, 1) if r['ms'] else SPEED.get(r['hw'], 0)}
+    if _FO.OSM_M.get(r.get('sf')): rec['m'] = _FO.OSM_M[r['sf']]   # the way's own material (world3.js matSotto: a piece of it with no surface polygon under it)
     if r['o']: rec['o'] = 1
     if r['bridge']: rec['b'] = 1
     if r.get('deck'): rec['d'] = 1
@@ -2277,24 +2288,48 @@ if not median.is_empty: median = _op.senza_strada_di_sopra(_pst, {}, median, [],
 area_geoms[:] = [(at, g.difference(_via) if g.intersects(_via) else g) for at, g in area_geoms]
 log('sottopassi', len(_sott), 'vernice tolta m2', round(_via.area))
 SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}
+# ---- what each surface is made of (src/fondi.py, docs/superfici.md): OSM surface=*, then the DBGT (AC_VEI_FON 02 and AR_VMS unpaved, AC_PED and
+# AC_CIC paved), then the aerial photo for the pieces the data say nothing of (OSM-only footpaths here, the DBGT yards AATT below). Key 'm' of the polygons
+import fondi as _FO
+FONDI = _FO.Fondi(ways, nodes, lambda x_, z_: (lon0 + x_ / KX, lat0 - z_ / KZ), log)
+_ng = lambda L_: unary_union(L_) if L_ else Polygon()
+FONDI.strade(ways, nodes, [(g_, a_['zon']) for g_, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else ())   # a street's surface=* on its carriageway up to where the next street begins (DBGT cells where it can)
+_vei02 = _ng([g_ for g_, a_ in STR.D['vei'] if a_.get('fon') == '02']) if STR else Polygon()   # AC_VEI_FON 02: "non pavimentato"
+_vms = _ng([g_ for g_, a_ in STR.D['avms']]) if STR else Polygon()                                # AR_VMS: carrarecce
+_pedcic = _ng([g_ for g_, a_ in STR.D['ped']] + [g_ for g_, a_ in STR.D['acic']]) if STR else Polygon()   # AC_PED, AC_CIC: FON 01 "pavimentato"
+_ffoto = lambda p_: {'terra': 't', 'pav': 'n'}.get(FONDI.da_foto(p_))
+SURFM = {}
+for k_, g_ in SURF.items():
+    if g_.is_empty: continue
+    SURFM[k_] = (FONDI.dividi(g_, [(_vei02, 'g')], ('strada',), base='a', isole=True) if k_ == 'as' else FONDI.dividi(g_, [], ('piedi', 'area'), vicini=True) if k_ == 'pz' else
+                 FONDI.dividi(g_, [(_vms, 'g'), (_pedcic, 'n')], ('piedi',), foto=_ffoto, vicini=True) if k_ == 'ft' else {None: g_})
+FONDI.rep['superfici'] = {k_: {str(m_): round(g_.area) for m_, g_ in d_.items()} for k_, d_ in SURFM.items()}
+log('fondi', FONDI.rep['superfici'])
 parts_of = lambda g: [p for p in (list(g.geoms) if hasattr(g, 'geoms') else [g]) if not p.is_empty]
-SURFP = {k: parts_of(g) for k, g in SURF.items() if not g.is_empty}
-SURFT = {k: STRtree(v) for k, v in SURFP.items()}
+SURFP = {(k, m): parts_of(g) for k, d_ in SURFM.items() for m, g in d_.items() if not g.is_empty}
+SURFT = {k: STRtree(v) for k, v in SURFP.items() if v}
 AG = [g for at, g in area_geoms]; AT = STRtree(AG)
+_fa = {}; _fa_n = {}   # the yards AATT of the DBGT (area 17): material of each, decided once on the whole yard
 for t in range(ntx * ntz):
     bx = tbox(t)
-    for k, tree in SURFT.items():
+    for (k, m), tree in SURFT.items():
         idx = tree.query(bx)
         if not len(idx): continue
-        c = unary_union([SURFP[k][i].intersection(bx) for i in idx])
+        c = unary_union([SURFP[(k, m)][i].intersection(bx) for i in idx])
         if not c.is_empty:
             ps = polys_of(c)
-            if ps: tiles[t][k] = ps
+            if m:
+                for p in ps: p['m'] = m
+            if ps: tiles[t].setdefault(k, []).extend(ps)
     for i in AT.query(bx):
         c = AG[i].intersection(bx)
         for p in polys_of(c, 0.3, 2):
             p['t'] = area_geoms[i][0]; push(t, 'a', p)
             if id(AG[i]) in MANUF.ns_ids: p['ns'] = 1  # a car park of the DBGT draws its stalls
+            if p['t'] == 17:
+                if i not in _fa: _fa[i] = FONDI.cortile(AG[i]); _fa_n[str(_fa[i])] = _fa_n.get(str(_fa[i]), 0) + round(AG[i].area)
+                if _fa[i][0]: p['m'] = _fa[i][0]
+FONDI.rep['cortili_aatt_m2'] = _fa_n; log('fondi: cortili AATT', _fa_n)
 def push_lines(key_, lines, extra=None):
     for i, pts in enumerate(lines):
         L = LineString(pts)
@@ -2372,7 +2407,11 @@ for t in range(ntx * ntz):
 import rotonde  # the aiuole of the roundabouts of Meda (src/rotonde.py, docs/rotonde.md): their islands filled, what stands on them in tiles[].ro
 ROT = rotonde.Rotonde(STR.isole, log) if STR else None
 if ROT: STR.md_dbgt = ROT.riempi(STR.md_dbgt); ROT.push_tiles(tid, polys_of, push, q)
-if STR: STR.togli_cortili(VERDE.cons, _cv_f.result()); STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)
+if STR:
+    STR.togli_cortili(VERDE.cons, _cv_f.result())
+    STR.cv_m = FONDI.dividi(STR.cv, [(_vei02, 'g')], ('auto', 'area'), base='a') if not STR.cv.is_empty else {}   # the yards AC_VEI 0307: unpaved where FON 02 or OSM says so
+    FONDI.rep['cortili_ac_vei'] = {str(m_): round(g_.area) for m_, g_ in STR.cv_m.items()}; log('fondi: cortili AC_VEI', FONDI.rep['cortili_ac_vei'])
+    STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)  # yards (cv) and the DBGT islands (md, g: 1)
 if _md_ponte is not None and not _md_ponte.is_empty:   # (dk: on the deck of the bridge, at its height: src/opere.py senza_strada_di_sopra, world3.js medianDeck)
     for t in range(ntx * ntz):
         bx = tbox(t)
@@ -2511,6 +2550,7 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'pois': pois, 'ng': negozi, 'gates': gate_out, 'doors': doors_out, 'fountains': fountains, 'places': places, 'signals': [node_index[r_] for r_, t in ntags.items() if t.get('highway') == 'traffic_signals' and r_ in node_index] + signals_extra,
        'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0) and r_ not in _fermate_tolte]}
 if ROT: out.setdefault('report', {})['rotonde'] = ROT.rep
+out.setdefault('report', {})['fondi'] = FONDI.rep  # src/fondi.py: m2 per material
 if ED:  # the buildings of the DBGT: entrances, checks, report
     for x_, z_ in ED.acc:
         if inside((x_, z_), 0): push(tid(x_, z_), 'ai', [q(x_), q(z_)])

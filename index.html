@@ -149,7 +149,7 @@ body:not(.debug) .dbg { display: none !important; }
       <div class="dbg"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>
     </div>
     <button id="go" type="button">ACCENDI IL MOTORE</button>
-    <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale; <a href="https://www.radiomaria.it" target="_blank" rel="noopener">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href="https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy" target="_blank" rel="noopener">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href="https://www.mapillary.com" target="_blank" rel="noopener">Mapillary</a> e i suoi contributori, CC BY-SA 4.0.</p>
+    <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale; <a href="https://www.radiomaria.it" target="_blank" rel="noopener">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href="https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy" target="_blank" rel="noopener">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href="https://www.mapillary.com" target="_blank" rel="noopener">Mapillary</a> e i suoi contributori, CC BY-SA 4.0. Foto delle superfici (asfalto, prato, pavimenti, ghiaia, terra, ciottoli, intonaco): <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a> e <a href="https://ambientcg.com" target="_blank" rel="noopener">ambientCG</a>, CC0.</p>
     <p class="ver" id="ver" hidden></p>
   </div>
 </div>
@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 7f45618 · assemblato 06/11 23:29 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo fb882ff · assemblato 07/11 15:47 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1757,7 +1757,7 @@ function hardAt(x, z) {
   const k = H.kind(x, z); if (k === 'road' || k === 'side' || k === 'plat') return true;
   const T = TILES[tileOf(x, z)]; if (!T) return false;
   if (!T.hardP) { const d = T.d, mk = q => { const o = dec(q.p); return { o, k: (q.k || []).map(dec), b: bbox(o) }; };
-    T.hardP = [...(d.a || []).filter(a => a.t !== 5 && a.t !== 6 && a.t !== 18 && !(a.t <= 3 || a.t >= 11 && a.t !== 17)), ...(d.cv || []), ...(d.pz || []), ...(d.ft || []), ...(d.as || [])].filter(q => q.p).map(mk); }
+    T.hardP = [...(d.a || []).filter(a => a.t !== 5 && a.t !== 6 && a.t !== 18 && !(a.t <= 3 || a.t >= 11 && a.t !== 17)), ...(d.cv || []), ...(d.pz || []), ...(d.ft || []), ...(d.as || [])].filter(q => q.p && q.m !== 'p').map(mk); } /* (a yard of grass, src/fondi.py, is no hard standing) */
   for (const q of T.hardP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
   return false;
 }
@@ -2376,6 +2376,20 @@ Object.assign(MAT, { aattS: new THREE.MeshLambertMaterial({ color: 0xb9b5ac }), 
 // the rail bed of the DBGT (SD_FER, tiles[t].sf): the gravel of the ballast without the sleepers, which each track draws over it
 const gravelTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#7e766b'; g.fillRect(0, 0, w, h); noise(g, w, h, 900, 0.5, ['#5d564d', '#9c9487', '#4a443d']); });
 Object.assign(MAT, { gravel: flatMat({ map: gravelTex }), gravelS: new THREE.MeshLambertMaterial({ map: gravelTex }) });
+/* what a surface is made of (src/fondi.py: the key m of the polygons of as, pz, ft, cv and of the yards AATT in a; docs/superfici.md): g gravel and unpaved, t earth, n paved of no
+   known material (the neutral paving: also the AATT yards and the paths the data say nothing of), b paving blocks, f porphyry setts, c cobbles, p grass, a asphalt.
+   S: the look on the whole cells of S (cellOwners), F: the drape (polyFill), vs: metres per repeat of the photo. New photos, Poly Haven CC0: tex/ghiaia.jpg gravel_floor_02
+   (x0.88), tex/terra.jpg brown_mud_dry, tex/pavimento.jpg concrete_floor_02 turned to a light grey. Built at the first use: ciottoliTex is in rotonde3.js */
+let FONDO_ = null;
+function fondoLook(m) {
+  if (!FONDO_) {
+    const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t; };
+    const mk = (map, vs) => ({ S: new THREE.MeshLambertMaterial({ map }), F: flatMat({ map }), vs });
+    FONDO_ = { g: mk(ld('ghiaia'), 2.5), t: mk(ld('terra'), 2.6), n: mk(ld('pavimento'), 3), b: { S: MAT.side, F: flatMat({ map: sidewalkTex }), vs: 4 }, f: { S: MAT.piazzaS, F: MAT.piazza, vs: 4 },
+      c: mk(ciottoliTex, 4), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
+  }
+  return FONDO_[m] || null;
+}
 Object.assign(MAT.water, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }); // the water level of a tile of S meets the banks of S, which write their depth
 // the kinds of divider the DBGT adds (build_data.py): plastered low walls, railings with vertical bars, green wire mesh, railway panels, wood
 const barsTex = canvasTex(64, 64, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#26292c'; for (let x = 4; x < w; x += 10) g.fillRect(x, 0, 3, h); g.fillRect(0, 0, w, 5); g.fillRect(0, h - 6, w, 6); });
@@ -3211,6 +3225,7 @@ function cellOwners(T, F) {
   const c = F.n - 1, own = F.own = new Float32Array(c * c), sty = F.sty = new Array(c * c).fill(null), d = T.d, uf = new Int8Array(c * c);
   const underFree = w => { if (!uf[w]) { const i = w % c, j = (w - i) / c; let f = false; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x = F.x0 + (i + a) * F.st, z = F.z0 + (j + b) * F.st; if (H.overFree(x, z, H.base(x, z)) > H.base(x, z) + 0.01) f = true; } uf[w] = f ? 1 : 2; } return uf[w] === 1; };
   const S = (k, m, vs, col) => { const key = k + (col ? col.getHexString() : ''); return STY[key] || (STY[key] = { m, vs, col: col || null }); };
+  const SF = m => { const f = fondoLook(m); return S('m' + m, f.S, f.vs, f.col); }; // a material of src/fondi.py
   const lay = T.layers = []; // [outer, holes, rank, look]: the look of a cell a ramp takes (pitLook)
   const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && (underFree(w) || (F.ud2 && F.ud2[w])))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
@@ -3219,14 +3234,14 @@ function cellOwners(T, F) {
     else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
     else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) cover(outer, holes, 2, S('w', MAT.waterS, 9)); } /* a lake is dug and drawn by acqua3.js */
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
-    else if (a.t === 17) cover(outer, holes, 1.1, S('y', MAT.aattS, 10)); // yards of the DBGT (AATT): plain paving, no asphalt texture
+    else if (a.t === 17) cover(outer, holes, 1.1, SF(a.m || 'n')); // yards of the DBGT (AATT): their material (src/fondi.py), or the neutral paving
     else cover(outer, holes, 1.1, S('p', MAT.pavedS, 10, COL(AREA_COL[a.t])));
   }
-  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, S('a', MAT.asphS, 9), true); // yards and drives of the DBGT (AC_VEI 0307): the asphalt of the carriageways and car parks (tiles[t].as), no lines (Carlo, 2/11)
+  for (const q of d.cv || []) cover(dec(q.p), q.k.map(dec), 1.2, q.m ? SF(q.m) : S('a', MAT.asphS, 9), true); // yards and drives of the DBGT (AC_VEI 0307): the asphalt of the carriageways and car parks (tiles[t].as), no lines (Carlo, 2/11)
   for (const q of d.sf || []) cover(dec(q.p), q.k.map(dec), 1.3, S('b', MAT.gravelS, 3)); // the rail bed of the DBGT (SD_FER a raso)
-  for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, S('f', MAT.footS, 4), true);
-  for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, S('a', MAT.asphS, 9), true);
-  for (const q of d.pz || []) cover(dec(q.p), q.k.map(dec), 5.1, S('z', MAT.piazzaS, 4), true);
+  for (const q of d.ft || []) cover(dec(q.p), q.k.map(dec), 3, SF(q.m || 'n'), true); // paths: their material, or the neutral paving
+  for (const q of d.as || []) cover(dec(q.p), q.k.map(dec), 5, q.m ? SF(q.m) : S('a', MAT.asphS, 9), true);
+  for (const q of d.pz || []) cover(dec(q.p), q.k.map(dec), 5.1, q.m ? SF(q.m) : S('z', MAT.piazzaS, 4), true);
   // under a deck that carries a street or a railway (F.ud, terreno_gioco.py) no grass grows and the DBGT and OSM green areas, drawn from the
   // air, are the deck's top seen from above: bare earth there (29/10, via Maroncelli: a lawn under the cavalcavia), the rail bed, the
   // water and the streets at their own level stay
@@ -3242,6 +3257,42 @@ function waterInBed(a, outer, holes, T) {
   if (tot >= 4) return bed >= tot * 0.3;
   const pts = [...outer, centroid(outer)]; return pts.filter(([x, z]) => bedC(clamp(Math.floor((z - F.z0) / F.st), 0, c - 1) * c + clamp(Math.floor((x - F.x0) / F.st), 0, c - 1))).length >= pts.length * 0.3;
 }
+/* no road paint on a surface that is not asphalt (Carlo 6/11: on cobbles, setts, paving blocks, gravel or earth no lines are painted in Italy): the triangles of a paint
+   buffer (lines, crossings, stop and give way, bus stops, lettering) over a carriageway, yard or square whose material (src/fondi.py) is not asphalt are dropped; the
+   piazze with no material are porphyry. A triangle across the edge is cut in halves down to 0.4 m, each half kept or dropped by its middle */
+function naAt(T, x, z) {
+  if (!T.naP) { T.naP = []; for (const k of ['as', 'cv', 'pz']) for (const q of T.d[k] || []) if (q.m ? q.m !== 'a' : k === 'pz') { const o = dec(q.p); T.naP.push({ o, k: q.k.map(dec), b: bbox(o) }); } }
+  for (const q of T.naP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
+  return false;
+}
+function matIn(T, k, x, z) { /* the polygon of tiles[t][k] under (x, z): its material (src/fondi.py), '' with none, undefined where there is no polygon */
+  const L = (T.matP || (T.matP = {}))[k] || (T.matP[k] = (T.d[k] || []).map(q => { const o = dec(q.p); return { o, k: q.k.map(dec), b: bbox(o), m: q.m || '' }; }));
+  for (const q of L) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return q.m;
+  return undefined;
+}
+/* the material of the surface a ribbon piece of an old way lies on: the polygon under its middle, else under its ends or its sides (in this tile or the next): a piece
+   whose middle fell just off the path, or on the edge of the tile, took the neutral paving, a light square on the asphalt path along the Milano-Meda (Carlo 7/11).
+   With no polygon anywhere under it the way's own surface=* (roads[].m, build_data.py: the path along the Milano-Meda runs off its polygon at x 121.8 z 47.4), then
+   'n' for a path, null for a street or square (their own look) */
+function matSotto(T, k, pts, rm) {
+  for (const [x, z] of pts) { const U = TILES[tileOf(x, z)], m = U && U.d ? matIn(U, k, x, z) : undefined; if (m !== undefined) return m || rm || (k === 'ft' ? 'n' : null); }
+  return rm || (k === 'ft' ? 'n' : null);
+}
+function senzaStrisce(T, b) {
+  naAt(T, 0, 0); if (!T.naP.length || !b.i.length) return;
+  const nv = () => b.p.length / 3, hasC = b.c.length === b.p.length, ab = b.ab;
+  const mid = (a, c) => { const k = nv(); b.p.push((b.p[a * 3] + b.p[c * 3]) / 2, (b.p[a * 3 + 1] + b.p[c * 3 + 1]) / 2, (b.p[a * 3 + 2] + b.p[c * 3 + 2]) / 2); b.n.push(b.n[a * 3], b.n[a * 3 + 1], b.n[a * 3 + 2]); b.uv.push((b.uv[a * 2] + b.uv[c * 2]) / 2, (b.uv[a * 2 + 1] + b.uv[c * 2 + 1]) / 2); if (hasC) b.c.push(b.c[a * 3], b.c[a * 3 + 1], b.c[a * 3 + 2]); if (ab && ab[a]) ab[k] = 1; return k; };
+  const X = k => b.p[k * 3], Z = k => b.p[k * 3 + 2], out = [];
+  const go = (a, c, e, d) => {
+    const ins = [naAt(T, X(a), Z(a)), naAt(T, X(c), Z(c)), naAt(T, X(e), Z(e)), naAt(T, (X(a) + X(c) + X(e)) / 3, (Z(a) + Z(c) + Z(e)) / 3)];
+    if (ins.every(v => v)) return; if (ins.every(v => !v)) { out.push(a, c, e); return; }
+    const l1 = hyp(X(a) - X(c), Z(a) - Z(c)), l2 = hyp(X(c) - X(e), Z(c) - Z(e)), l3 = hyp(X(e) - X(a), Z(e) - Z(a)), m = Math.max(l1, l2, l3);
+    if (m < 0.4 || d > 7) return; /* (a piece across the edge goes: a line along the kerb of a cobbled street left a thin white sliver, Carlo 7/11) */
+    if (m === l1) { const k = mid(a, c); go(a, k, e, d + 1); go(k, c, e, d + 1); } else if (m === l2) { const k = mid(c, e); go(a, c, k, d + 1); go(a, k, e, d + 1); } else { const k = mid(e, a); go(a, c, k, d + 1); go(k, c, e, d + 1); }
+  };
+  const I = Array.from(b.i); for (let t = 0; t < I.length; t += 3) go(I[t], I[t + 1], I[t + 2], 0);
+  b.i.splice(0); for (let t = 0; t < out.length; t += 3) b.i.push(out[t], out[t + 1], out[t + 2]);
+}
 function buildTile(T) { const g = T.gen || buildTileGen(T); T.gen = null; while (!passoTile(g).done); }
 function* buildTileGen(T) {
   if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.seme * 7919; for (const p of CAS_T.get(T.t) || []) if (!p.casFatta) { p.casFatta = true; casermeDi([p]); }
@@ -3249,6 +3300,7 @@ function* buildTileGen(T) {
   const G = new THREE.Group(); G.visible = false; scene.add(G); T.group = G;
   const put = (b, mat, ro, shadow) => { if (b.i.length) mkMesh(b, mat, ro, shadow, G); };
   const pc = a => COL(a[Math.floor(tRnd() * a.length)]), d = T.d, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
+  const FB = new Map(), fbuf = (m, rk, street, V) => { const k = m + '|' + rk; let b = FB.get(k); if (!b) { b = V ? VBuf() : FBuf(); b.rk = rk; if (street) b.street = true; if (m === 'a') { b.angc = true; b.asf = asfGrid(T); } /* asphalt as the streets' (asfCol: the direction of the road in the colour; without it the drape came out pale, Carlo 6/11) */ b.fm = m; FB.set(k, b); } return b; }; /* the drapes of the materials of src/fondi.py, one buffer per material and rank */
   // terrain patch
   const FT = H.tile(T.t); T.fine = !!FT;
   if (FT) { // new engine: the nodes of S as they are, the triangles of H.onTri (docs/motore.md 3: H.base is this mesh, H.check)
@@ -3306,13 +3358,13 @@ function* buildTileGen(T) {
         else if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
         else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) polyFill(wB, outer, holes, 0.03 * fy, 9); }
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
-        else if (a.t === 17) polyFill(yB, outer, holes, 0.025 * fy, 10);
+        else if (a.t === 17) { const m = a.m || 'n'; polyFill(fbuf(m, 1.1, false, true), outer, holes, 0.025 * fy, fondoLook(m).vs, fondoLook(m).col); }
         else polyFill(pB, outer, holes, (a.t === 8 || a.t === 9 ? 0.015 : 0.025) * fy, 10, COL(AREA_COL[a.t]));
       } catch (e) { }
     }
-    const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 9); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): the asphalt of the carriageways and car parks, no lines, no traffic (Carlo, 2/11)
+    const cB = FBuf(); cB.rk = 1.2; cB.street = true; for (const q of d.cv || []) { try { if (q.m) polyFill(fbuf(q.m, 1.2, true), dec(q.p), q.k.map(dec), 0.03 * fy, fondoLook(q.m).vs, fondoLook(q.m).col); else polyFill(cB, dec(q.p), q.k.map(dec), 0.03 * fy, 9); } catch (e) { } } // yards and drives (DBGT AC_VEI 0307): the asphalt of the carriageways and car parks, no lines, no traffic (Carlo, 2/11)
     const sB = FBuf(); sB.rk = 1.3; for (const q of d.sf || []) { try { polyFill(sB, dec(q.p), q.k.map(dec), 0.03 * fy, 3); } catch (e) { } } // the rail bed (DBGT SD_FER)
-    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.asph, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2);
+    { const s_ = srndT; yield 'landuse put'; srndT = s_; } put(gB, MAT.grass, 1); put(iB, MAT.incolto, 1); put(pB, MAT.paved, 1); put(cB, MAT.asph, 1); put(sB, MAT.gravel, 1); put(yB, MAT.aatt, 1); put(zB, MAT.piazza, 4); put(wB, MAT.water, 2); for (const b of FB.values()) put(b, fondoLook(b.fm).F, 1); FB.clear();
     { const s_ = srndT; yield 'rivers'; srndT = s_; } 
     const rv = Buf(), wallsR = Buf(), rail = Buf();
     for (const r of d.rv || []) {
@@ -3412,7 +3464,8 @@ function* buildTileGen(T) {
     const asp = FBuf(), por = FBuf(), foot = FBuf(), sw = FBuf(), kerb = FBuf(), mark = FBuf(), lett = FBuf(), lettB = FBuf(), white = COL('#f1efe6'); asp.rk = 5; asp.angc = true; asp.asf = asfGrid(T); por.rk = 5.1; foot.rk = 3; sw.orient = true; asp.street = por.street = foot.street = sw.street = mark.street = lett.street = lettB.street = true; // street paint: none on the cells under a deck where S is no street (H.ud)
     const fill = (list, b, y, sc) => { for (const q of list || []) { try { polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } };
     const fy = T.fine ? 0 : 1, kerbS = Buf(); // in a tile of S: on it, and the kerbs cut on its cells (kerbRing)
-    fill(d.as, asp, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fill(d.pz, por, 0.06 * fy, 4); fill(d.ft, foot, 0.045 * fy, 4);
+    const fillM = (list, b, rk, y, sc) => { for (const q of list || []) { const m = q.m || (b ? null : 'n'); try { if (m) polyFill(fbuf(m, rk, true), dec(q.p), q.k.map(dec), y, fondoLook(m).vs, fondoLook(m).col); else polyFill(b, dec(q.p), q.k.map(dec), y, sc); } catch (e) { } } }; /* a polygon with its material (src/fondi.py) in the buffer of that material */
+    fillM(d.as, asp, 5, 0.06 * fy, 9); { const s_ = srndT; yield 'streets 2'; srndT = s_; } fillM(d.pz, por, 5.1, 0.06 * fy, 4); fillM(d.ft, null, 3, 0.045 * fy, 4);
     { const s_ = srndT; yield 'sidewalks'; srndT = s_; } /* a tile of S cuts its surfaces on the cells: in slices, so building it never stops the game for long */
     for (const q of T.sd) {
       try { polyFill(sw, q.o, q.k, SIDE_H, 4); } catch (e) { } // the cover of the step: S + SIDE_H on the cells (clipFill)
@@ -3555,8 +3608,10 @@ function* buildTileGen(T) {
             if (opSotto(p) || opSotto(q)) continue; // a way of the level above does not come down into an underpass: over it there is the deck, or the ground
             if (p[3] && q[3]) { // an old elevated way that runs on S in a tile of S (no deck of the new engine under it): drawn on the cells of S, like
               // the surfaces of the ways at grade; a flat ribbon at the height of its middle stood over the banks and sank in the slopes (collaudo 4-5)
-              const i0 = onB.p.length / 3; for (const [o, sd] of [[p, -1], [p, 1], [q, -1], [q, 1]]) { const x = o[0] + rx * hw * sd, z = o[1] + rz * hw * sd; vtx(onB, x, 0, z, 0, 1, 0, x / (onB === asp ? 9 : 4), z / (onB === asp ? 9 : 4)); }
-              triUp(onB, i0, i0 + 1, i0 + 3); triUp(onB, i0, i0 + 3, i0 + 2); continue;
+              /* (in the material of the surface it lies on, src/fondi.py: a path drawn this way stayed beige on the asphalt of its surface, light squares on the path along the Milano-Meda, Carlo 6/11) */
+              const fm = matSotto(T, r.c <= 4 ? 'as' : r.c === 5 ? 'pz' : 'ft', [[(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], [p[0], p[1]], [q[0], q[1]], [(p[0] + q[0]) / 2 + rx * hw * 0.6, (p[1] + q[1]) / 2 + rz * hw * 0.6], [(p[0] + q[0]) / 2 - rx * hw * 0.6, (p[1] + q[1]) / 2 - rz * hw * 0.6]], r.m), oB = fm ? fbuf(fm, onB.rk || 3, true) : onB, vs_ = fm ? fondoLook(fm).vs : onB === asp ? 9 : 4, col_ = fm ? fondoLook(fm).col : null;
+              const i0 = oB.p.length / 3; for (const [o, sd] of [[p, -1], [p, 1], [q, -1], [q, 1]]) { const x = o[0] + rx * hw * sd, z = o[1] + rz * hw * sd; vtx(oB, x, 0, z, 0, 1, 0, x / vs_, z / vs_, oB.asf ? asfCol(oB.asf, x, z) : col_); }
+              triUp(oB, i0, i0 + 1, i0 + 3); triUp(oB, i0, i0 + 3, i0 + 2); continue;
             }
             // road surface
             const i0 = deck.p.length / 3;
@@ -3621,7 +3676,7 @@ function* buildTileGen(T) {
     }
     if (T.fine) drawDecks(T, deck, dside);
     { const s_ = srndT; yield 'streets put'; srndT = s_; } 
-    put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
+    for (const b of [mark, lett, lettB]) senzaStrisce(T, b); put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); for (const b of FB.values()) put(b, fondoLook(b.fm).F, b.rk >= 5 ? 5 : 3); FB.clear(); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
     put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9); put(kerbS, MAT.kerb, 9);
     put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10); put(dmark, MAT.deckMark, 10); put(pil, MAT.deckSide, 10, 'cast');
   }
@@ -3974,7 +4029,7 @@ function freeTile(T) {
   for (const p of H.PITS) if (tileOf(p.c[0], p.c[1]) === T.t) { p.built = false; p.meshes = []; } else if (p.meshes) p.meshes = p.meshes.filter(M => M.parent && M.parent !== G); // its ramp is drawn again with it
   for (const p of PROPS) if (tileOf(p.x, p.z) === T.t) { p.obj = p.lx ? p.obj : null; if (p.inst) p.inst.meshes = []; } // the props stay, as what was knocked down, but not the meshes they drew
   for (const p of PROPS) if (p.tile === T) { p.onBreak = null; p.inst.meshes = []; } // a lamp may stand just past the edge of its tile
-  for (const k of ['terrMesh', 'ownMeshes', 'cellMesh', 'cellIdx', 'sill', 'roWalls', 'roIm', 'ngShut', 'layers', 'stalls', 'streetStalls', 'nSmall']) T[k] = undefined; /* nothing of the meshes stays on the tile; its stalls are worked out again */
+  for (const k of ['terrMesh', 'ownMeshes', 'cellMesh', 'cellIdx', 'sill', 'roWalls', 'roIm', 'ngShut', 'layers', 'naP', 'matP', 'stalls', 'streetStalls', 'nSmall']) T[k] = undefined; /* nothing of the meshes stays on the tile; its stalls are worked out again */
   for (const st of CASERME) if (st.root && tileOf(st.x, st.z) === T.t) st.root = null; for (const f of FUEL) if (tileOf(f.x, f.z) === T.t) for (const q of f.pumps) { q.g = null; q.body = null; }
   for (const f of FOUNT) if (f.spray && tileOf(f.x, f.z) === T.t) f.spray = null;
 }
