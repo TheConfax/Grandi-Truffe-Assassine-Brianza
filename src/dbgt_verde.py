@@ -290,13 +290,16 @@ class Verde:
         one every 70 m2 of OSM's woods but draws only three candidates a tree: in the long woods along the Seveso (a fifth of their box)
         that gave one every 120-220 m2, in the round ones one every 75; 100 m2 is what OSM's woods of Meda had on average, everywhere the same"""
         rng = np.random.default_rng(20822); out = []
+        import costanti; srt = costanti.Sorteggi('sorteggi_boschi_dbgt', rng)   # one generator in a row over the map: the build around the point starts each wood where the full build did (src/costanti.py)
         for t, g in self.forest:
             n = int(min(4000, g.area / (BOSCO_M2 if t == 11 else SCRUB_M2)))
             if n <= 0: continue
+            srt.prima('%.2f %.2f %.2f' % (g.centroid.x, g.centroid.y, g.area))
             x0, z0, x1, z1 = g.bounds; m = int(n * min(40, 1.3 * (x1 - x0) * (z1 - z0) / g.area)) + 8
             xs = rng.uniform(x0, x1, m); zs = rng.uniform(z0, z1, m)
             ok = shapely.contains_xy(g, xs, zs) & ~shapely.intersects_xy(strade, xs, zs)
             out += list(zip(xs[ok], zs[ok]))[:n]
+        srt.fine()
         return np.array(out) if out else np.zeros((0, 2))
 
     def alberi(self, trees, n_gen, vietati=(), rail=(), posti=(), strade=None, morbidi=()):

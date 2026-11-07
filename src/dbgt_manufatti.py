@@ -280,7 +280,8 @@ class Manufatti:
             if kind == CONT and o['h_dsm'] is None and (p90 if p90 is not None else 99) < INTERRATO: o['kind'] = None; o['seen'] = 'interrato'
         # the typical height is the one of the same code (MN_IND_TY): the serbatoio 0702 of x -431 z -75, flat ground in the DSM, took the
         # 10.9 m of the silos 07; a code with nothing seen takes the lowest height of its kind
-        self.typ = {k: round(float(np.median(v)), 1) for k, v in per.items()}
+        from costanti import costante   # the typical heights over the whole map: the build around the point takes the full build's (src/costanti.py)
+        self.typ = costante('manufatti_altezze_tipiche', lambda: {k: round(float(np.median(v)), 1) for k, v in per.items()})
         for o in self.ind:
             k = o['kind']
             if k is None: continue
@@ -462,7 +463,8 @@ class Manufatti:
                 X, Z = _pts_in(o['g'].buffer(1.5)); hv = G.at(G.N, X, Z)
                 if np.isfinite(hv).any() and np.nanmax(hv) >= TOWER_MIN_DSM: h = round(float(np.nanmax(hv)), 1)
             towers.append({'x': c.x, 'z': c.y, 'h_dsm': h, 'm2': round(o['g'].area, 1)})
-        hs = [t['h_dsm'] for t in towers if t['h_dsm'] is not None]; htyp = round(float(np.median(hs)), 1) if hs else 30.0
+        from costanti import costante
+        hs = [t['h_dsm'] for t in towers if t['h_dsm'] is not None]; htyp = costante('tralicci_altezza_tipica', lambda: round(float(np.median(hs)), 1) if hs else 30.0)
         for t in towers: t['h'] = t['h_dsm'] if t['h_dsm'] is not None else htyp
         # OSM pylons matched to a DBGT base
         T = np.array([(t['x'], t['z']) for t in towers]) if towers else np.zeros((0, 2))
@@ -620,13 +622,16 @@ class Manufatti:
         inb = shapely.contains_xy(boschi, P[:, 0], P[:, 1]) if boschi is not None and not boschi.is_empty else np.zeros(len(P), bool)
         # the trees the DSM does not see take the typical height of the seen ones in the same setting: in a wood the wood's, outside the
         # street and garden trees' (the median of all, 11.5 m, was the woods' pulling up the young trees planted after 2008)
-        htyp = float(np.nanmedian(H)) if seen.any() else 8.0; rtyp = float(np.nanmedian(D / H)) if seen.any() else 0.6
-        HT = np.full(len(P), htyp); RT = np.full(len(P), rtyp)
-        for m in (inb, ~inb):
-            if (m & seen).sum() >= 20: HT[m] = float(np.median(H[m & seen])); RT[m] = float(np.median(D[m & seen] / H[m & seen]))
+        def tipici():   # [height, crown/height] in the woods and outside: medians over the whole map, the build around the point takes the full build's (src/costanti.py)
+            htyp = float(np.nanmedian(H)) if seen.any() else 8.0; rtyp = float(np.nanmedian(D / H)) if seen.any() else 0.6; t = []
+            for m in (inb, ~inb): t += [float(np.median(H[m & seen])), float(np.median(D[m & seen] / H[m & seen]))] if (m & seen).sum() >= 20 else [htyp, rtyp]
+            return t + [htyp, rtyp]
+        from costanti import costante
+        hb_, rb_, ho_, ro_, htyp, rtyp = costante('alberi_tipici', tipici)
+        HT = np.where(inb, hb_, ho_).astype(float); RT = np.where(inb, rb_, ro_).astype(float)
         self.htyp_ctx = {'nei_boschi': round(float(HT[inb][0]), 1) if inb.any() else None, 'fuori': round(float(HT[~inb][0]), 1) if (~inb).any() else None}
         # under a line the strip is kept low (the DSM sees it so): a tree there it does not see is not a tree of the wood around it
-        HT[wz & inb] = HT[~inb][0] if (~inb).any() else HT[wz & inb]; RT[wz & inb] = RT[~inb][0] if (~inb).any() else RT[wz & inb]
+        HT[wz & inb] = ho_ if (~inb).any() else HT[wz & inb]; RT[wz & inb] = ro_ if (~inb).any() else RT[wz & inb]
         H = np.where(seen, H, HT); D = np.where(seen, D, np.clip(np.minimum(RT * HT, np.maximum(3.0, 2.0 * nn)), *ALB_D))
         # trees on the islands of the roads (roundabout centres, splitter islands, medians: MAN_TR 01-03, `isole`): the DSM of 2008 sees many of them as saplings of
         # 3-4 m (the roads were made after, or the trees were planted with them), but the DBGT of 2015 and the orthophoto of 2018-19 show grown trees (Carlo, 28/10:
@@ -636,8 +641,8 @@ class Manufatti:
         if len(isole) and len(P):
             it = STRtree(list(isole)); a_, b_ = it.query(shapely.points(P), predicate='dwithin', distance=ALB_ISOLA_D); isl[np.unique(a_)] = True
         grown = isl & seen & keep & (H < ALB_ISOLA); tall = isl & seen & keep & (H >= ALB_ISOLA)
+        hi_, di_ = costante('alberi_isole', lambda: [float(np.median(H[tall])) if tall.sum() >= 5 else htyp, float(np.median(D[tall])) if tall.sum() >= 5 else float(np.clip(rtyp * htyp, *ALB_D))])   # (over all the islands of the map)
         if grown.any():
-            hi_ = float(np.median(H[tall])) if tall.sum() >= 5 else htyp; di_ = float(np.median(D[tall])) if tall.sum() >= 5 else float(np.clip(rtyp * htyp, *ALB_D))
             H[grown] = hi_; D[grown] = di_
         self.rep['alberi_isole'] = {'su_isole': int((isl & keep).sum()), 'visti_dal_dsm': int((isl & seen & keep).sum()), 'sotto_%g_m_prima' % ALB_ISOLA: int(grown.sum()), 'sotto_%g_m_dopo' % ALB_ISOLA: int((isl & seen & keep & (H < ALB_ISOLA)).sum()),
                                     'altezza_e_chioma_date': [round(float(H[grown][0]), 1), round(float(D[grown][0]), 1)] if grown.any() else None}

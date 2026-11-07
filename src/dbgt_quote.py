@@ -307,6 +307,8 @@ def load_dbgt(path, lidar=None, confine=None, outl=OUTL, offset=True):
     info = dict(file=path, outl=outl, t_lettura=round(t1 - t0, 1))
     if lidar is not None:  # offset on the raw axes, then an "outlier" within RESCUE of the LiDAR is a real step of the ground: kept
         off = offset_comune(D, lidar, confine); info['offset'] = off
+        from costanti import costante   # over the whole comune: the build around the point takes the full build's (src/costanti.py)
+        off['valore'] = costante('dbgt_offset_' + os.path.basename(os.path.dirname(os.path.abspath(path))), lambda: off['valore'])
         for L in D.values():
             o = np.where(L['scarto'] == SC_OUT)[0]
             if not len(o): continue

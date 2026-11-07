@@ -296,8 +296,9 @@ class Edifici:
         dzc = {}   # one offset per comune, as the ground (dbgt_quote.load_dbgt_comuni): a single one for the whole map would move the roofs of a comune when another is added
         for v in self.vol:
             if 'gmed' in v: dzc.setdefault(self.ed[v['ed']]['comune'], []).append(v['zmin'] - v['gmed'])
-        self.off_c = {c: float(np.median(a)) for c, a in dzc.items()}
-        dz = np.asarray(dz); self.off = float(np.median(dz)) if len(dz) else 0.0
+        from costanti import costante   # medians over the whole comune: the build around the point takes the full build's (src/costanti.py)
+        self.off_c = {self.rep['comuni'].index(n): v for n, v in costante('edifici_offset_comuni', lambda: [[self.rep['comuni'][c], float(np.median(a))] for c, a in dzc.items()]) if n in self.rep['comuni']}
+        dz = np.asarray(dz); self.off = costante('edifici_offset', lambda: float(np.median(dz)) if len(dz) else 0.0)
         self.rep['offset_per_comune'] = {self.rep['comuni'][c]: round(a, 3) for c, a in sorted(self.off_c.items())}
         if len(self.off_c) == 1: self.off = next(iter(self.off_c.values()))
         self.rep['offset_dbgt_lidar'] = dict(valore=round(self.off, 3), p10=round(float(np.percentile(dz, 10)), 2) if len(dz) else None, p90=round(float(np.percentile(dz, 90)), 2) if len(dz) else None, n=int(len(dz)))
@@ -528,6 +529,11 @@ class Edifici:
             e = self.ed[i]; g = geo[i]
             if e['kind'] != 'E' or g.area <= 20: continue
             (pos if has_osm(g) else cand).append(i)
+        import costanti   # the classifier is trained on the whole map: the build around the point takes the full build's choices (src/costanti.py)
+        chiave_d = lambda i: '%.2f %.2f %.2f' % (geo[i].centroid.x, geo[i].centroid.y, geo[i].area)
+        if costanti.letta('demoliti') is not None:
+            via = set(costanti.letta('demoliti')); gone = {i for i in cand if chiave_d(i) in via}
+            log('dbgt edifici: demoliti dalla build completa (src/costanti.py): tolti %d su %d senza OSM' % (len(gone), len(cand))); return gone
         def erode(g):
             q = g.buffer(-1.0)
             return None if q.is_empty else q
@@ -587,6 +593,7 @@ class Edifici:
         log('dbgt edifici: demoliti: controllati %d (su %d senza OSM, area>20 m2), tolti %d (%.0f m2); soglia p<%.4f; errore stimato (tetti sicuri che finirebbero tolti, convalida incrociata su %d) %.2f%%, terreno nudo riconosciuto %.1f%% (su %d); %.0fs' %
             (len(kc), len(cand), len(gone), self.rep['demoliti']['m2'], T, len(Xp), 100 * err, 100 * rec, len(Xn), time.time() - t0))
         for l in link: log('   tolto:', l)
+        costanti.scrivi('demoliti', sorted(chiave_d(i) for i in gone))
         return gone
 
     # ---------------------------------------------------------------- roofs
