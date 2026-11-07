@@ -542,11 +542,13 @@ function pedLine(a, e, side) {
     for (let k = 0; k <= m; k++) {
       const x = ax + (bx - ax) * k / m + rx * o, z = az + (bz - az) * k / m + rz * o;
       if (pedBadAt(x, z, r, false)) return false;
+      if (r.d) { const y = lerp(H.node(a), H.node(e.to), k / m); if (y - H.surface(x, z, y + 0.5) > 1.0) return false; } /* a road that goes over a bridge: never a line off its deck, over the drop (the decks cut to their roads, altezze3.js deckComeStrada) */
       if (asph && onAsph(x, z, r.d ? 'ap' : 'as')) { run++; tot++; if (run * st > PED_CROSS_FREE) return false; } else run = 0;
     }
     return !asph || tot <= 0.25 * (m + 1);
   };
   for (const ex of (r.c <= 3 ? PED_EXTRA : [0])) { const o = (e.off + ex) * side; if (free(o, r.c <= 3)) return (c[i] = { o }); }
+  if (r.d) for (let ex = 0.25; e.off - ex >= r.w / 2 + 0.3; ex += 0.25) { const o = (e.off - ex) * side; if (free(o, false)) return (c[i] = { o }); } /* over a bridge as wide as its road: on the kerb inside the parapet */
   /* no clear line: a small street, a lane or a yard is shared with the cars; a big road is not walked on this side */
   if (r.c >= 3 || (r.c === 2 && r.w <= PED_SHARED_W)) { const o = e.off * side; if (free(o, false)) return (c[i] = { o, shared: true }); }
   return (c[i] = null);
@@ -1057,6 +1059,12 @@ function deckEdges(dk) {
   dk.edges = []; for (const [k, c] of cnt) if (c.n === 1 && !sp.has(k)) dk.edges.push(c.e);
   return dk.edges;
 }
+function deckSpalle(dk) { // the edges of the outline where it rests on S, with their heights
+  if (dk.spE) return dk.spE; const key = (ax, az, bx, bz) => { const a = ax.toFixed(2) + ',' + az.toFixed(2), b = bx.toFixed(2) + ',' + bz.toFixed(2); return a < b ? a + ' ' + b : b + ' ' + a; };
+  const sp = new Set(dk.spalle.map(e => key(e[0], e[1], e[2], e[3]))), T = dk.tri; dk.spE = [];
+  for (let i = 0; i < T.length; i += 9) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) if (sp.has(key(T[i + a], T[i + a + 1], T[i + b], T[i + b + 1]))) dk.spE.push([T[i + a], T[i + a + 1], T[i + a + 2], T[i + b], T[i + b + 1], T[i + b + 2]]);
+  return dk.spE;
+}
 // the approach ramps (29/10, via Maroncelli: the deck floated 1-3 m over a lawn, a dark roof over a grass tunnel under the ramp). Under a deck
 // that carries a street or a railway over another (not a free one), where its underside stands less than RAMPA_H over S and nothing passes
 // under it (no street, sidewalk, rail bed or water), it rests on a fill held by walls, as the approach ramps of a cavalcavia: a wall from S
@@ -1171,10 +1179,11 @@ function drawDecks(T, top, side) {
       const u = side.p.length / 3; for (const o of [0, 3, 6]) vtx(side, R[i + o], R[i + o + 2] - sp, R[i + o + 1], 0, -1, 0, 0, 0);
       triUp(side, u, u + 1, u + 2); const t3 = side.i.splice(-3); side.i.push(t3[0], t3[2], t3[1]); // facing down
     }
-    for (const [ax, az, ay, bx, bz, by] of deckEdges(dk)) {
+    const nE = deckEdges(dk).length;
+    for (const [k, [ax, az, ay, bx, bz, by]] of (dk.comeStrada ? deckEdges(dk).concat(deckSpalle(dk)) : deckEdges(dk)).entries()) { // (a deck cut to its roads: its ends too, buried where S is at its level, a clean end where S falls away)
       if (tileOf((ax + bx) / 2, (az + bz) / 2) !== T.t) continue;
-      const L = hyp(bx - ax, bz - az) || 1, nx = (bz - az) / L, nz = -(bx - ax) / L, b0 = side.p.length / 3;
-      vtx(side, ax, ay - sp, az, nx, 0, nz, 0, 0); vtx(side, bx, by - sp, bz, nx, 0, nz, L / 2, 0); vtx(side, bx, by + 0.02, bz, nx, 0, nz, L / 2, 1); vtx(side, ax, ay + 0.02, az, nx, 0, nz, 0, 1);
+      const L = hyp(bx - ax, bz - az) || 1, nx = (bz - az) / L, nz = -(bx - ax) / L, b0 = side.p.length / 3, up = k < nE ? 0.02 : -0.04; // (an end stops just under the top: no lip across the road)
+      vtx(side, ax, ay - sp, az, nx, 0, nz, 0, 0); vtx(side, bx, by - sp, bz, nx, 0, nz, L / 2, 0); vtx(side, bx, by + up, bz, nx, 0, nz, L / 2, 1); vtx(side, ax, ay + up, az, nx, 0, nz, 0, 1);
       side.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3, b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); // both faces: the footprint has no fixed winding
     }
     for (const [ax, az, ya0, ya1, bx, bz, yb0, yb1, , nx, nz] of spalleNucleo(dk)) { // the abutments along the PONTE: the face towards the street, the back towards the bank
@@ -1196,11 +1205,12 @@ function drawDecks(T, top, side) {
 // roads' when their tile is first built; each with its collision. (A retaining wall where S rises steeply at the edge of a road was tried
 // for the underpass of via Milano and dropped: the DBGT carriageway there is 4 m flat against 8 m of OSM road, so the wall stood on the
 // drawn asphalt)
-const RAIL_DROP = 1.2, PIL_STEP = 15;
+const RAIL_DROP = 1.2, PIL_STEP = 15, RACCORDO = 8;
 function deckTopAt(dk, x, z) { for (const o of H.deckAt(x, z)) if (o.d === dk) return o; return null; }
 // the edges the parapets follow: the PONTE footprint (nucleo), straight, and the boundary edges of the triangles off it (the spalla cells, the
 // extensions and the approach ramps, in 2 m steps: past the end of the parapet of PONTE 16 a walker fell 3.3 m off them into the Seveso)
 function deckOutline(dk) {
+  if (dk.comeStrada) return deckEdges(dk).map(([ax, az, , bx, bz]) => [ax, az, bx, bz, 0]); // a road deck cut to its roads (altezze3.js deckComeStrada): its own edge, beside the road
   const out = [], o = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null;
   if (o) for (let i = 0; i < o.length; i++) out.push([o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1], 1]);
   const onO = (x, z) => { for (let i = 0; i < o.length; i++) if (segDist(x, z, o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1]) < 0.35) return true; return false; };
@@ -1291,7 +1301,7 @@ function* roadBarriers(T) {
   let n = 0;
   for (const ri of T.d.rp || []) {
     const r = D.roads[ri]; if (r.t || r.c > 5 || r.gp || !(r.c <= 1 || r.x || ON_DECK.has(ri))) continue; if (++n % 12 === 0) yield 'barriers roads'; // r.gp: an expressway whose guardrails come from the build (guardRails, below) // main roads, ramps, and any road on a deck (off the PONTE core, where the parapets are)
-    const hw = r.w / 2;
+    const hw = r.w / 2, att = []; for (const dk of H.DECKS) if (dk.att) for (const a of dk.att) if (a.rs.includes(r)) att.push([a, dk]); // where it comes onto a deck cut to its roads (altezze3.js deckComeStrada)
     for (let k = 1; k < r.g.length; k++) {
       const ia = r.g[k - 1], ib = r.g[k], A = N[ia], B = N[ib], L = hyp(B[0] - A[0], B[1] - A[1]); if (L < 1) continue;
       if (tileOf((A[0] + B[0]) / 2, (A[1] + B[1]) / 2) !== T.t || !H.fineAt((A[0] + B[0]) / 2, (A[1] + B[1]) / 2)) continue;
@@ -1304,11 +1314,14 @@ function* roadBarriers(T) {
         const tm = (A[0] + B[0]) / 2, zm = (A[1] + B[1]) / 2, so = sideOff(tm, zm); let offS = hw + 0.35 + so;
         const ym = H.surface(tm, zm, lerp(ya, yb, 0.5) + 0.5);
         for (let e = 0; e < 16 && (nearAsph(tm + ex * offS, zm + ez * offS, 0.1) || nearDeckCarr(tm + ex * offS, zm + ez * offS, ym, 0.1)); e++) offS += 0.25; // past the edge of the drawn carriageway (AC_VEI, on a bridge SED 02 too), never in it (docs/motore.md 7)
+        // the last RACCORDO m before a deck cut to its roads the rail bends to the line of its parapet (the half width of the deck), so the two meet
+        const offAt = t => { if (!att.length) return offS; const x = A[0] + (B[0] - A[0]) * t, z = A[1] + (B[1] - A[1]) * t; let o = offS, dm = RACCORDO; for (const [a] of att) { const d = hyp(x - a.x, z - a.z); if (d < dm) { dm = d; o = lerp(a.hw, offS, d / RACCORDO); } } return o; };
         for (let q = 0; q < ns; q++) {
-          const t = (q + 0.5) / ns, cx = A[0] + (B[0] - A[0]) * t, cz = A[1] + (B[1] - A[1]) * t, yc = H.surface(cx, cz, lerp(ya, yb, t) + 0.5);
+          const t = (q + 0.5) / ns, cx = A[0] + (B[0] - A[0]) * t, cz = A[1] + (B[1] - A[1]) * t, yc = H.surface(cx, cz, lerp(ya, yb, t) + 0.5), oq = offAt(t);
           let rail = null;
-          if (!nearJ(cx, cz, hw + 8) && !nearAsph(cx + ex * offS, cz + ez * offS, 0.1) && !nearDeckCarr(cx + ex * offS, cz + ez * offS, yc, 0.1)) {
-            const gx = cx + ex * offS, gz = cz + ez * offS, yE = H.surface(gx, gz, yc + 0.3);
+          if (att.some(([, dk]) => { const o = deckTopAt(dk, cx, cz); return o && Math.abs(o.top - yc) < 0.6; })) { flag.push(null); continue; } // on that deck: its parapets hold the edge
+          if (!nearJ(cx, cz, hw + 8) && !nearAsph(cx + ex * oq, cz + ez * oq, 0.1) && !nearDeckCarr(cx + ex * oq, cz + ez * oq, yc, 0.1)) {
+            const gx = cx + ex * oq, gz = cz + ez * oq, yE = H.surface(gx, gz, yc + 0.3);
             const onCore = H.deckAt(gx, gz).some(o => o.d.nucleo && inPoly(gx, gz, o.d.nucleo) && Math.abs(o.top - yc) < 0.6); // the parapets of the deck
             let other = false; ROADSEG.each(gx - 4, gz - 4, gx + 4, gz + 4, o => { if (!other && o.r !== r && o.r.c <= 5 && segDist(gx, gz, o.a[0], o.a[1], o.b[0], o.b[1]) < o.r.w / 2 + 0.3 && Math.abs(lerp(H.node(o.ia), H.node(o.ib), 0.5) - yE) < 1.5) other = true; });
             if (!onCore && !other && !H.inPit(gx, gz, 0.5) && !H.inPit(cx, cz, 0.5) && !H.gallAt(cx, cz)) { /* (in the trench of an underpass its walls hold the car) */
@@ -1327,7 +1340,7 @@ function* roadBarriers(T) {
           if (flag[q] === null) continue;
           let a = q, b = q; while (a > 0 && flag[a - 1] !== null) a--; while (b < ns - 1 && flag[b + 1] !== null) b++;
           if (b - a + 1 < 3 && !(a === 0 && b === ns - 1 && L < 6)) continue;
-          const t0 = q / ns, t1 = (q + 1) / ns, off = offS, x0 = A[0] + (B[0] - A[0]) * t0 + ex * off, z0 = A[1] + (B[1] - A[1]) * t0 + ez * off, x1 = A[0] + (B[0] - A[0]) * t1 + ex * off, z1 = A[1] + (B[1] - A[1]) * t1 + ez * off;
+          const t0 = q / ns, t1 = (q + 1) / ns, o0 = offAt(t0), o1 = offAt(t1), x0 = A[0] + (B[0] - A[0]) * t0 + ex * o0, z0 = A[1] + (B[1] - A[1]) * t0 + ez * o0, x1 = A[0] + (B[0] - A[0]) * t1 + ex * o1, z1 = A[1] + (B[1] - A[1]) * t1 + ez * o1;
           const y0 = q > a ? (flag[q - 1] + flag[q]) / 2 : flag[q], y1 = q < b ? (flag[q + 1] + flag[q]) / 2 : flag[q];
           res.rails.push([x0, z0, y0, x1, z1, y1]); WALLS.add(x0, z0, x1, z1, { ax: x0, az: z0, bx: x1, bz: z1, nx: -ex, nz: -ez, two: true, y0: Math.min(y0, y1) - 0.8, y1: Math.max(y0, y1) + ALTO_VERO.guardrail, yv: Math.max(y0, y1) + ALTO_VERO.auto, deckw: true });
         }

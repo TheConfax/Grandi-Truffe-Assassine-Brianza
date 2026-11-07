@@ -325,10 +325,98 @@ const H = (() => {
     const tri = new Float64Array(d.tri.length); for (let i = 0; i < tri.length; i += 3) { tri[i] = d.tri[i]; tri[i + 1] = d.tri[i + 1]; tri[i + 2] = d.tri[i + 2] - B0; }
     const free = d.tipo !== 'copertura' && !(d.sotto && (d.sotto.strade || d.sotto.ferrovia)); // nothing passes under it but water or field
     o = { id: d.id, ord: d.ord, tiles: d.tiles, refs: 1, reg: [], tipo: d.tipo, fonte: d.fonte, sp: d.sp, luce: d.luce - B0, tri, imp: d.imp, nucleo: d.nucleo || null, spalle: d.spalle || [], ra: d.ra || [], free };
+    deckComeStrada(o);
     DECKS.push(o); DECK_ORD.set(d.ord, o);
-    const rec0 = GRID_REC; GRID_REC = o.reg;
-    for (let i = 0; i < tri.length; i += 9) { const xs = [tri[i], tri[i + 3], tri[i + 6]], zs = [tri[i + 1], tri[i + 4], tri[i + 7]]; DKG.add(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), { d: o, i }); }
+    const rec0 = GRID_REC; GRID_REC = o.reg; const t_ = o.tri;
+    for (let i = 0; i < t_.length; i += 9) { const xs = [t_[i], t_[i + 3], t_[i + 6]], zs = [t_[i + 1], t_[i + 4], t_[i + 7]]; DKG.add(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), { d: o, i }); }
     GRID_REC = rec0; return o;
+  }
+  // a road deck as wide as the road on it (ramo ponti-come-strada, Carlo 7/11, corso Isonzo and via Vignazzola: "frastagliato", "sporco
+  // all'attacco"). The DBGT footprint says where the bridge starts and ends and how high it is; across, its top keeps only the room of its
+  // roads: each road's axis, smoothed, plus half its carriageway and a kerb (DECK_ORLO), and the median between two carriageways closer than
+  // DECK_SPARTI. Where a road leaves the deck at an abutment (a spalla of the DBGT within DECK_CAPO_SP of its axis) the deck ends square to
+  // the road there. The triangles of the TIN are cut on that line (the field f below, linear along each edge), so the edge, the side of the
+  // slab and the parapets on it run straight beside the road; the heights stay those of the TIN
+  const DECK_ORLO = 0.75, DECK_SPARTI = 6.0, DECK_CAPO_SP = 1.5;
+  function deckComeStrada(o) {
+    if (o.tipo !== 'strada' || !o.ra.length || /[?&]pontidbgt/.test(location.search)) return; const T = o.tri; if (!T.length) return; // (?pontidbgt: the decks as the DBGT draws them, to compare)
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (let i = 0; i < T.length; i += 3) { x0 = Math.min(x0, T[i]); x1 = Math.max(x1, T[i]); z0 = Math.min(z0, T[i + 1]); z1 = Math.max(z1, T[i + 1]); }
+    const M = 30, near = (x, z) => x > x0 - M && x < x1 + M && z > z0 - M && z < z1 + M;
+    // each road: its axis near the deck at 1 m steps, smoothed over +-3 m (the ends kept), and its half room. A road that is only the bridge
+    // (the Milano-Meda over corso Isonzo) goes on past its end nodes along the road that continues it most straight (who: whose sample)
+    const ends = new Map(); for (const r of D.roads) if (r.g && r.g.length > 1) for (const n of [r.g[0], r.g[r.g.length - 1]]) { let l = ends.get(n); if (!l) ends.set(n, l = []); l.push(r); }
+    const segue = (r, n, dx, dz) => { let best = null, bc = 0.8; for (const c of ends.get(n) || []) { if (c === r || c.t) continue; const g = c.g[0] === n ? c.g : c.g.slice().reverse(), b = N[g[1]], a = N[n], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, cs = ((b[0] - a[0]) * dx + (b[1] - a[1]) * dz) / l; if (cs > bc) { bc = cs; best = { c, g }; } } return best; };
+    const R = [];
+    for (const ri of o.ra) {
+      const r = D.roads[ri]; if (!r || !r.g || r.g.length < 2) continue;
+      const pts = r.g.map(n => [N[n][0], N[n][1], r]), dir = (p, q) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1; return [(q[0] - p[0]) / l, (q[1] - p[1]) / l]; };
+      { const [dx, dz] = dir(pts[1], pts[0]), s = segue(r, r.g[0], dx, dz); if (s) { let L = 0; for (let k = 1; k < s.g.length && L < M; k++) { const p = N[s.g[k]]; L += Math.hypot(p[0] - pts[0][0], p[1] - pts[0][1]); pts.unshift([p[0], p[1], s.c]); } } }
+      { const n = pts.length, [dx, dz] = dir(pts[n - 2], pts[n - 1]), s = segue(r, r.g[r.g.length - 1], dx, dz); if (s) { let L = 0; for (let k = 1; k < s.g.length && L < M; k++) { const p = N[s.g[k]], e = pts[pts.length - 1]; L += Math.hypot(p[0] - e[0], p[1] - e[1]); pts.push([p[0], p[1], s.c]); } } }
+      let P = [];
+      const flush = () => { if (P.length >= 2) { const S = P.map((p, i) => { if (i < 3 || i > P.length - 4) return [p[0], p[1]]; let sx = 0, sz = 0; for (let j = -3; j <= 3; j++) { sx += P[i + j][0]; sz += P[i + j][1]; } return [sx / 7, sz / 7]; }); R.push({ S, who: P.map(p => p[2]), hw: r.w / 2 + DECK_ORLO, r }); } P = []; };
+      for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]))), w = a[2] === r ? b[2] : a[2]; /* the road this piece of axis belongs to */
+        for (let j = 0; j <= n; j++) { if (j === 0 && P.length) continue; const x = a[0] + (b[0] - a[0]) * j / n, z = a[1] + (b[1] - a[1]) * j / n; if (near(x, z)) P.push([x, z, w]); else flush(); } }
+      flush();
+    }
+    if (!R.length) return;
+    const dist = (S, x, z) => { let m = 1e9; for (let i = 1; i < S.length; i++) { const ax = S[i - 1][0], az = S[i - 1][1], ex = S[i][0] - ax, ez = S[i][1] - az, L2 = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / L2)), dx = x - ax - ex * t, dz = z - az - ez * t, d = dx * dx + dz * dz; if (d < m) m = d; } return Math.sqrt(m); };
+    const onDeck = (x, z) => { for (let i = 0; i < T.length; i += 9) { const ax = T[i], az = T[i + 1], bx = T[i + 3], bz = T[i + 4], cx = T[i + 6], cz = T[i + 7], den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(den) < 1e-12) continue; const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / den, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / den; if (l1 > -1e-6 && l2 > -1e-6 && 1 - l1 - l2 > -1e-6) return true; } return false; };
+    const sp0 = o.spalle, spD = (x, z) => { let m = 1e9; for (const e of sp0) { const ax = e[0], az = e[1], ex = e[2] - ax, ez = e[3] - az, L2 = ex * ex + ez * ez || 1, u = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / L2)); m = Math.min(m, Math.hypot(x - ax - ex * u, z - az - ez * u)); } return m; };
+    // where each road comes onto the deck and leaves it (u: along the road, out of the deck), the half width of the deck there; at an
+    // abutment the deck ends square to the road. The guardrail of the road on the ground turns into the line of the parapet there (world3.js roadBarriers)
+    const att = [];
+    for (const q of R) { let pin = onDeck(q.S[0][0], q.S[0][1]); for (let i = 1; i < q.S.length; i++) { const on = onDeck(q.S[i][0], q.S[i][1]); if (on === pin) continue; let a = q.S[i - 1], b = q.S[i]; for (let k = 0; k < 8; k++) { const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; if (onDeck(m[0], m[1]) === pin) a = m; else b = m; }
+      const x = (a[0] + b[0]) / 2, z = (a[1] + b[1]) / 2, dx = q.S[i][0] - q.S[i - 1][0], dz = q.S[i][1] - q.S[i - 1][1], l = Math.hypot(dx, dz) || 1, sg = pin ? 1 : -1;
+      att.push({ rs: [q.r, q.who[pin ? i : i - 1]], x, z, hw: q.hw, ux: dx / l * sg, uz: dz / l * sg, capo: spD(x, z) < DECK_CAPO_SP, q }); pin = on; } }
+    // two carriageways side by side on the deck: the gap between their rooms, at most DECK_SPARTI, is deck too (the median of the Milano-Meda)
+    const pairs = [];
+    for (let a = 0; a < R.length; a++) for (let b = a + 1; b < R.length; b++) { let g = -1, n = 0; for (const [x, z] of R[a].S) { if (!onDeck(x, z)) continue; const d = dist(R[b].S, x, z) - R[a].hw - R[b].hw; if (d < DECK_SPARTI + 2) { n++; g = Math.max(g, d); } } if (n >= 3 && g > 0) pairs.push([a, b, Math.min(g, DECK_SPARTI) + 0.05]); }
+    const capi = att.filter(a => a.capo); for (const c of capi) { c.lat = c.hw + 0.5; for (const [a, b, g] of pairs) if (R[a] === c.q || R[b] === c.q) c.lat = Math.max(c.lat, c.hw + g + 0.5); } // (lat: how far across the end goes, the median beside it too)
+    // the end runs along the abutment: the line of the DBGT spalle round the point where the road leaves (a staircase of 2 m cells on a skew
+    // bridge, the Milano-Meda over corso Isonzo), through that point; square to the road where they give no line
+    for (const c of capi) {
+      const pts = []; for (const e of sp0) for (const t of [0, 0.5, 1]) { const x = e[0] + (e[2] - e[0]) * t, z = e[1] + (e[3] - e[1]) * t; if (Math.hypot(x - c.x, z - c.z) < c.lat + 3) pts.push([x, z]); }
+      if (pts.length < 4) continue; let mx = 0, mz = 0; for (const [x, z] of pts) { mx += x; mz += z; } mx /= pts.length; mz /= pts.length;
+      let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of pts) { sxx += (x - mx) ** 2; szz += (z - mz) ** 2; sxz += (x - mx) * (z - mz); }
+      const an = 0.5 * Math.atan2(2 * sxz, sxx - szz), tx = Math.cos(an), tz = Math.sin(an); let nx = tz, nz = -tx; const cs = nx * c.ux + nz * c.uz;
+      let lo = 1e9, hi = -1e9, rr = 0; for (const [x, z] of pts) { const a = (x - mx) * tx + (z - mz) * tz, b = (x - mx) * nx + (z - mz) * nz; lo = Math.min(lo, a); hi = Math.max(hi, a); rr += b * b; } if (hi - lo < 1.5 * c.hw || Math.sqrt(rr / pts.length) > 0.8) continue; // (a line only where the spalle run across the road, near straight)
+      if (Math.abs(cs) < 0.6) continue; if (cs < 0) { nx = -nx; nz = -nz; } c.ux = nx; c.uz = nz; c.lat /= Math.abs(cs);
+    }
+    // the median ends on the line between the two ends of its carriageways (n: into the deck)
+    for (const P of pairs) { P[3] = []; for (const ca of capi) for (const cb of capi) { if (ca.q !== R[P[0]] || cb.q !== R[P[1]] || Math.hypot(ca.x - cb.x, ca.z - cb.z) > ca.hw + cb.hw + P[2] + 3) continue; const dx = cb.x - ca.x, dz = cb.z - ca.z, l = Math.hypot(dx, dz) || 1; let nx = -dz / l, nz = dx / l; if (nx * (ca.ux + cb.ux) + nz * (ca.uz + cb.uz) > 0) { nx = -nx; nz = -nz; } P[3].push([ca.x, ca.z, nx, nz]); } }
+    const capoF = (c, x, z, dq) => dq < c.lat && Math.abs((x - c.x) * c.uz - (z - c.z) * c.ux) < c.lat ? -((x - c.x) * c.ux + (z - c.z) * c.uz) : 1e9; // past the end, by the road: out
+    const f = (x, z) => { let v = -1e9; const ds = R.map(q => dist(q.S, x, z)), cp = R.map((q, i) => { let m = 1e9; for (const c of capi) if (c.q === q) m = Math.min(m, capoF(c, x, z, ds[i])); return m; }); R.forEach((q, i) => { v = Math.max(v, Math.min(q.hw - ds[i], cp[i])); }); for (const [a, b, g, E] of pairs) { let m = Math.min(R[a].hw + g - ds[a], R[b].hw + g - ds[b], cp[a], cp[b]); for (const [px, pz, nx, nz] of E) m = Math.min(m, (x - px) * nx + (z - pz) * nz); v = Math.max(v, m); } return v; }; // each road's room up to its ends, the union of them
+    const nv = T.length / 3, fv = new Float64Array(nv); let fuori = 0; for (let v = 0; v < nv; v++) { fv[v] = f(T[v * 3], T[v * 3 + 1]); if (Math.abs(fv[v]) < 1e-3) fv[v] = 1e-3; if (fv[v] < 0) fuori++; }
+    if (!fuori) return;
+    // cut each triangle on f = 0: the point on an edge from its two ends in a fixed order, so both triangles of the edge get the same point
+    const cut = (i, j) => { let p = i, q = j; if (T[p * 3] > T[q * 3] || (T[p * 3] === T[q * 3] && T[p * 3 + 1] > T[q * 3 + 1])) { p = j; q = i; } const t = fv[p] / (fv[p] - fv[q]); return [T[p * 3] + (T[q * 3] - T[p * 3]) * t, T[p * 3 + 1] + (T[q * 3 + 1] - T[p * 3 + 1]) * t, T[p * 3 + 2] + (T[q * 3 + 2] - T[p * 3 + 2]) * t]; };
+    const out = [];
+    for (let t = 0; t < nv; t += 3) {
+      const vs = [t, t + 1, t + 2], poly = [];
+      for (let k = 0; k < 3; k++) { const i = vs[k], j = vs[(k + 1) % 3]; if (fv[i] >= 0) poly.push([T[i * 3], T[i * 3 + 1], T[i * 3 + 2]]); if ((fv[i] >= 0) !== (fv[j] >= 0)) poly.push(cut(i, j)); }
+      for (let k = 1; k + 1 < poly.length; k++) { const a = poly[0], b = poly[k], c = poly[k + 1]; if (Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) < 1e-6) continue; out.push(...a, ...b, ...c); }
+    }
+    if (out.length < 9) return; // nothing of it under its roads: as it is
+    // level across, as a road: each point at the height of the TIN on the axis of its road beside it (in a median, between the two). Where the
+    // DBGT tied the corners of the ends to a shoulder of S that falls away, the edge dipped and the parapet went down in steps (via Vignazzola)
+    const tinH = (x, z) => { for (let i = 0; i < T.length; i += 9) { const ax = T[i], az = T[i + 1], bx = T[i + 3], bz = T[i + 4], cx = T[i + 6], cz = T[i + 7], den = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(den) < 1e-12) continue; const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / den, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / den; if (l1 > -1e-6 && l2 > -1e-6 && 1 - l1 - l2 > -1e-6) return l1 * T[i + 2] + l2 * T[i + 5] + (1 - l1 - l2) * T[i + 8]; } return null; };
+    const proj = (S, x, z) => { let m = 1e9, px = 0, pz = 0; for (let i = 1; i < S.length; i++) { const ax = S[i - 1][0], az = S[i - 1][1], ex = S[i][0] - ax, ez = S[i][1] - az, L2 = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / L2)), qx = ax + ex * t, qz = az + ez * t, d = (x - qx) ** 2 + (z - qz) ** 2; if (d < m) { m = d; px = qx; pz = qz; } } return [Math.sqrt(m), px, pz]; };
+    const HC = new Map();
+    for (let i = 0; i < out.length; i += 3) {
+      const x = out[i], z = out[i + 1], k = x.toFixed(3) + ',' + z.toFixed(3); let y = HC.get(k);
+      if (y === undefined) {
+        const P = R.map(q => { const [d, px, pz] = proj(q.S, x, z); let h = tinH(px, pz); if (h === null) { q.H = q.H || q.S.map(([sx, sz]) => tinH(sx, sz)); let m = 1e9; q.S.forEach(([sx, sz], j) => { const e = Math.hypot(sx - px, sz - pz); if (q.H[j] !== null && e < m && e < 3) { m = e; h = q.H[j]; } }); } /* (at an end the axis beside the corner may be just past it: the nearest point of it on the deck) */ return { d, h, hw: q.hw }; }).filter(p => p.h !== null).sort((a, b) => a.d - b.d);
+        y = out[i + 2]; if (P.length && P[0].d <= P[0].hw + 0.01) y = P[0].h; else if (P.length > 1) y = (P[0].h * P[1].d + P[1].h * P[0].d) / (P[0].d + P[1].d); else if (P.length) y = P[0].h;
+        HC.set(k, y);
+      }
+      out[i + 2] = y;
+    }
+    // the spalle (where the deck rests on S): the pieces of the new outline on the old ones, and the square ends at the abutments
+    const onCapo = (x, z) => capi.some(c => Math.abs((x - c.x) * c.ux + (z - c.z) * c.uz) < 0.02 && Math.abs((x - c.x) * c.uz - (z - c.z) * c.ux) < c.lat + 0.1), onSp = (x, z) => spD(x, z) < 0.02 || onCapo(x, z);
+    const key = (ax, az, bx, bz) => { const a = ax.toFixed(2) + ',' + az.toFixed(2), b = bx.toFixed(2) + ',' + bz.toFixed(2); return a < b ? a + ' ' + b : b + ' ' + a; }, cnt = new Map();
+    for (let i = 0; i < out.length; i += 9) for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) { const k = key(out[i + a], out[i + a + 1], out[i + b], out[i + b + 1]), c = cnt.get(k); if (c) c.n++; else cnt.set(k, { n: 1, e: [out[i + a], out[i + a + 1], out[i + a + 2], out[i + b], out[i + b + 1], out[i + b + 2]] }); }
+    const sp = []; for (const { n, e } of cnt.values()) if (n === 1 && onSp(e[0], e[1]) && onSp(e[3], e[4]) && onSp((e[0] + e[3]) / 2, (e[1] + e[4]) / 2)) sp.push([e[0], e[1], e[3], e[4]]);
+    o.tri = new Float64Array(out); o.spalle = sp; o.comeStrada = true; o.att = att.map(({ rs, x, z, hw }) => ({ rs, x, z, hw }));
   }
   function deckAt(x, z) { // [{id, top, bot, tipo}] of the decks over (x, z)
     const out = [];
