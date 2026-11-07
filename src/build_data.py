@@ -494,6 +494,7 @@ def street_parking(t):  # [left, right] of the way: 0 none, 1 parallel, 2 diagon
         out.append(k)
     return out if any(out) else None
 roads, raw_roads = [], []
+import fondi as _FO  # the materials of surface=* (src/fondi.py)
 rails, rivers, rows, rail_raw, barriers = [], [], [], [], []
 bar_runs, gate_ways = [], []
 for wid, (refs, t) in ways.items():
@@ -512,7 +513,7 @@ for wid, (refs, t) in ways.items():
                               'o': t.get('oneway') in ('yes', '1') or hw in ('motorway', 'motorway_link') or t.get('junction') == 'roundabout',
                               'bridge': bridge, 'layer': layer, 'emb': t.get('embankment') == 'yes', 'tunnel': t.get('tunnel') in ('yes', 'covered') or layer < 0, 'under': t.get('tunnel') in ('yes', 'covered', 'building_passage') or layer < 0,
                               'x': hw in ('motorway', 'trunk', 'motorway_link', 'trunk_link'), 'priv': t.get('access') in ('private', 'no'), 'drv': t.get('service') == 'driveway', 'ms': num(t.get('maxspeed')) if str(t.get('maxspeed', '')).replace('.', '').isdigit() else None, 'pk': street_parking(t),
-                              'ln': [num(t.get(k_)) for k_ in ('lanes', 'lanes:forward', 'lanes:backward')]})  # the lanes OSM maps: the markings (dbgt_righe.py)
+                              'ln': [num(t.get(k_)) for k_ in ('lanes', 'lanes:forward', 'lanes:backward')], 'sf': t.get('surface')})  # the lanes OSM maps: the markings (dbgt_righe.py); sf: surface=*, src/fondi.py
     elif t.get('railway') == 'rail' and (t.get('tunnel') != 'yes' or sum(math.dist(nodes[a], nodes[b]) for a, b in zip(refs, refs[1:]) if a in nodes and b in nodes) < 200) and t.get('service') not in ('yard', 'siding', 'spur'):  # short rail tunnels (underpasses) stay as track at grade
         lay = num(t.get('layer')) or 0
         for run in clip_runs(refs, 300): rails.append([nodes[r] for r in run]); rail_raw.append({'refs': run, 'bridge': t.get('bridge') in ('yes', 'viaduct') or lay >= 1, 'emb': t.get('embankment') == 'yes', 'layer': lay, 'wid': wid, 't': t})
@@ -2114,6 +2115,7 @@ used_nodes = {}
 out_roads = []
 for r in raw_roads:
     rec = {'g': [gnode(n_) for n_ in r['refs']], 'w': r['w'], 'c': r['c'], 'n': r['n'], 'mh': r['mh'], 'wk': r['wk'], 'sp': round(r['ms'] / 3.6 * 0.95, 1) if r['ms'] else SPEED.get(r['hw'], 0)}
+    if _FO.OSM_M.get(r.get('sf')): rec['m'] = _FO.OSM_M[r['sf']]   # the way's own material (world3.js matSotto: a piece of it with no surface polygon under it)
     if r['o']: rec['o'] = 1
     if r['bridge']: rec['b'] = 1
     if r.get('deck'): rec['d'] = 1
@@ -2259,7 +2261,7 @@ SURF = {'as': asph, 'pz': pedz, 'sd': side, 'ft': foot}
 import fondi as _FO
 FONDI = _FO.Fondi(ways, nodes, lambda x_, z_: (lon0 + x_ / KX, lat0 - z_ / KZ), log)
 _ng = lambda L_: unary_union(L_) if L_ else Polygon()
-FONDI.strade(ways, nodes)   # a street's surface=* on its carriageway up to where the next street begins (nearest axis)
+FONDI.strade(ways, nodes, [(g_, a_['zon']) for g_, a_ in STR.D['vei'] if a_.get('sed') in ('01', None)] if STR else ())   # a street's surface=* on its carriageway up to where the next street begins (DBGT cells where it can)
 _vei02 = _ng([g_ for g_, a_ in STR.D['vei'] if a_.get('fon') == '02']) if STR else Polygon()   # AC_VEI_FON 02: "non pavimentato"
 _vms = _ng([g_ for g_, a_ in STR.D['avms']]) if STR else Polygon()                                # AR_VMS: carrarecce
 _pedcic = _ng([g_ for g_, a_ in STR.D['ped']] + [g_ for g_, a_ in STR.D['acic']]) if STR else Polygon()   # AC_PED, AC_CIC: FON 01 "pavimentato"
@@ -2267,7 +2269,7 @@ _ffoto = lambda p_: {'terra': 't', 'pav': 'n'}.get(FONDI.da_foto(p_))
 SURFM = {}
 for k_, g_ in SURF.items():
     if g_.is_empty: continue
-    SURFM[k_] = (FONDI.dividi(g_, [(_vei02, 'g')], ('strada',), base='a') if k_ == 'as' else FONDI.dividi(g_, [], ('piedi', 'area'), vicini=True) if k_ == 'pz' else
+    SURFM[k_] = (FONDI.dividi(g_, [(_vei02, 'g')], ('strada',), base='a', isole=True) if k_ == 'as' else FONDI.dividi(g_, [], ('piedi', 'area'), vicini=True) if k_ == 'pz' else
                  FONDI.dividi(g_, [(_vms, 'g'), (_pedcic, 'n')], ('piedi',), foto=_ffoto, vicini=True) if k_ == 'ft' else {None: g_})
 FONDI.rep['superfici'] = {k_: {str(m_): round(g_.area) for m_, g_ in d_.items()} for k_, d_ in SURFM.items()}
 log('fondi', FONDI.rep['superfici'])

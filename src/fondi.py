@@ -56,7 +56,7 @@ class Fondi:
             s.foto = ef.Foto(to_ll, scarica=False)   # solo le tile gia' in data/esri (le scarica dbgt_edifici.py): senza foto si resta neutri
         s.rep = {}
 
-    def strade(s, ways, nodes, raggio=20.0, passo=2.0):
+    def strade(s, ways, nodes, celle=(), raggio=20.0, passo=2.0):
         """la superficie di una strada vale per la carreggiata fino a dove comincia un'altra strada (Carlo 6/11: la sede sull'asse lasciava
         una striscia di ciottoli in mezzo all'asfalto, piazza Vittorio Veneto; le celle AC_VEI del DBGT sono lunghe e prendono piu' strade).
         Ogni punto della carreggiata entro raggio da una via con surface=* va alla via per auto piu' vicina (Voronoi dei punti degli assi ogni
@@ -86,11 +86,45 @@ class Fondi:
         per = {}
         for g, m in zip(V.geoms, M):
             if m != 'a': per.setdefault(m, []).append(g)
+        ZM = {m: unary_union(gs).intersection(zona) for m, gs in per.items()}
+        # il confine segue il bordo vero dove il DBGT lo ha (Carlo 7/11: in via Garibaldi i ciottoli di via Antona Traversi entravano nell'incrocio
+        # con un taglio obliquo a meta' fra i due assi). Celle: [(poligono AC_VEI, zona)]. Un incrocio, una rotonda, una piazza veicolare (02xx)
+        # prende intero il materiale della via che ci corre per piu' metri; in un'altra cella un materiale entra solo se una sua via ci corre, e se
+        # la copre per il 60% la prende intera; le altre (celle lunghe che prendono piu' strade) restano divise a meta' fra gli assi
+        nc = dict(incroci=0, intere=0, divise=0)
+        if celle:
+            TC = STRtree([g for g, z in celle]); intere = {}; fuori = []
+            AT = STRtree([L for L, m in assi])
+            for i in sorted(set(TC.query(zona, predicate='intersects').tolist())):
+                g, zon = celle[i]; A = g.area
+                if A <= 0: continue
+                lun = {}
+                for j in AT.query(g, predicate='intersects'):
+                    L, m = assi[j]; l = g.intersection(L).length
+                    if l > 0: lun[m] = lun.get(m, 0) + l
+                if str(zon)[:2] == '02':
+                    if lun: intere[i] = max(lun, key=lun.get); nc['incroci'] += 1
+                    continue
+                q = {}
+                for m, Zm in ZM.items():
+                    if not Zm.intersects(g): continue
+                    if lun.get(m, 0) < 2.0: fuori.append((m, g)); continue   # nessuna via di quel materiale corre nella cella: non ci entra
+                    q[m] = Zm.intersection(g).area
+                if not q: continue
+                m = max(q, key=q.get)
+                if q[m] >= 0.6 * A: intere[i] = m; nc['intere'] += 1
+                else: nc['divise'] += 1
+            for m, g in fuori: ZM[m] = ZM[m].difference(g)
+            nc['tolte'] = len(fuori)
+            if intere:
+                tutte = unary_union([celle[i][0] for i in intere])
+                for m in list(ZM): ZM[m] = ZM[m].difference(tutte)
+                for i, m in intere.items():
+                    if m != 'a': ZM[m] = unary_union([ZM.get(m, Polygon()), celle[i][0]])
         n = 0
-        for m, gs in per.items():
-            z = unary_union(gs).intersection(zona)
+        for m, z in ZM.items():
             if not z.is_empty: s.Z.append((z, m, 'strada')); n += 1
-        s.T = STRtree([q[0] for q in s.Z]); s.rep['strade_voronoi'] = dict(assi=len(assi), punti=len(P), materiali=sorted(per))
+        s.T = STRtree([q[0] for q in s.Z]); s.rep['strade_voronoi'] = dict(assi=len(assi), punti=len(P), materiali=sorted(per), celle=nc)
 
     def da_osm(s, g, generi=('area',)):
         """il materiale delle zone OSM (di quei generi) che coprono g per almeno COPRE (quello che copre di piu'), o None"""
@@ -129,7 +163,7 @@ class Fondi:
         f = s.da_foto(g)
         return {'verde': 'p', 'terra': 't', 'pav': 'n'}.get(f), ('foto' if f else None)
 
-    def dividi(s, geom, regole, generi, foto=None, base=None, vicini=False):
+    def dividi(s, geom, regole, generi, foto=None, base=None, vicini=False, isole=False):
         """geom (l'unione di una superficie) in pezzi per materiale: prima le zone OSM dei generi dati, poi regole [(geometria, materiale)] in
         ordine (la prima vince), poi foto(pezzo) per quel che resta, pezzo per pezzo. base: il materiale che la superficie ha gia' (va con
         None). -> {materiale o None: geometria}. Lavora sui pezzi di geom che ogni zona tocca, mai sull'unione intera (le carreggiate di tutta
@@ -192,6 +226,18 @@ class Fondi:
                             if best[m] >= max(0.5, 0.25 * e[0].length): e[1] = m; cambi += 1
                 if not cambi: return
         if vicini: propaga()
+        # isole: un pezzo senza materiale piccolo (fino a 300 m2) e chiuso per almeno meta' del contorno da un materiale prende quello (le chiazze
+        # d'asfalto fra i ciottoli di piazza Vittorio Veneto, Carlo 7/11)
+        if isole and parts and kn:
+            T = STRtree([g for g, m in kn]); rest = []
+            for p in parts:
+                if p.area <= 300:
+                    best = confini(p, T)
+                    if best:
+                        m = max(best, key=best.get)
+                        if best[m] >= 0.5 * p.length: kn.append([p, m]); continue
+                rest.append(p)
+            parts = rest
         if foto is not None:
             altri = []
             for p in parts:

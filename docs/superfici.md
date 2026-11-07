@@ -68,8 +68,13 @@ Il materiale di un pezzo, in quest'ordine, senza coordinate scritte a mano:
    vialetti le pedonali e ciclabili, le piazze le pedonali e le aree. Per le **carreggiate** (dal 6/11 sera) ogni punto va alla via per auto
    più vicina (Voronoi dei punti degli assi ogni 2 m, entro 20 m da una via con surface=*): il confine è a metà fra due assi, dove cambia la
    strada, così una piazza in ciottoli è tutta in ciottoli e la via d'asfalto che la attraversa resta d'asfalto (prima: la sede di 6 m sull'asse,
-   una striscia di ciottoli fra chiazze d'asfalto in piazza Vittorio Veneto). Per vialetti, piazze e cortili la via vale per la sua sede
-   (`width=` o la classe).
+   una striscia di ciottoli fra chiazze d'asfalto in piazza Vittorio Veneto). Dove il DBGT ha le celle della carreggiata (AC_VEI) il confine
+   segue il loro bordo (Carlo 7/11, via Garibaldi: i ciottoli entravano nell'incrocio con un taglio obliquo): un incrocio, una rotonda o una
+   piazza veicolare (02xx) prende intero il materiale della via che ci corre per più metri; in un'altra cella un materiale entra solo se una sua
+   via ci corre, e se la copre per il 60% la prende intera; un pezzetto d'asfalto fino a 300 m² chiuso per metà del contorno da un materiale
+   prende quello. Per vialetti, piazze e cortili la via vale per la sua sede (`width=` o la classe).
+   Le vie disegnate a nastro (le vecchie vie a raso del gioco) prendono il materiale del poligono sotto il loro centro, i capi o i lati; senza
+   poligono il `surface=*` della via stessa (`roads[].m`); senza nemmeno quello il neutro.
    asphalt → asfalto; paved, concrete → pavimentato; paving_stones → masselli; sett → porfido; cobblestone → ciottoli; gravel, fine_gravel,
    compacted, unpaved → ghiaia; ground, dirt, earth, sand → terra; grass, grass_paver → prato.
 2. **DBGT**: AC_VEI_FON 02 (carreggiate e cortili) → ghiaia/sterrato; AR_VMS (carrarecce) → ghiaia/sterrato; AC_PED e AC_CIC (FON 01) →
@@ -88,7 +93,8 @@ Il materiale di un pezzo, in quest'ordine, senza coordinate scritte a mano:
 
 **Strisce** (`world3.js senzaStrisce`, Carlo 6/11: in Italia sui ciottoli, sul porfido, sui masselli, sulla ghiaia e sulla terra non si dipinge):
 righe di bordo e di mezzeria, tratteggi, strisce pedonali, linee di arresto, triangoli, fermate del bus e scritte si tolgono dove la carreggiata, il
-cortile o la piazza sotto non sono d'asfalto (le piazze senza materiale sono in porfido). Un triangolo a cavallo del confine si taglia fino a 0,4 m.
+cortile o la piazza sotto non sono d'asfalto (le piazze senza materiale sono in porfido). Un triangolo a cavallo del confine si taglia fino a 0,4 m
+e il pezzetto sul confine se ne va anche lui.
 
 I materiali nel gioco (`world3.js fondoLook`): asfalto e porfido, masselli, ciottoli, prato con le foto di prima; tre foto nuove Poly Haven CC0:
 `tex/ghiaia.jpg` (gravel_floor_02, ×0,88), `tex/terra.jpg` (brown_mud_dry), `tex/pavimento.jpg` (concrete_floor_02 portato a grigio chiaro,

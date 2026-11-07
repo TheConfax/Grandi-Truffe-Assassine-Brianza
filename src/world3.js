@@ -1437,10 +1437,18 @@ function naAt(T, x, z) {
   for (const q of T.naP) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return true;
   return false;
 }
-function matSotto(T, k, x, z) { /* the material (src/fondi.py) of the polygon of tiles[t][k] under (x, z): its m, 'n' for a path with none, null for a street or square with none (their own look) */
-  const L = (T.matP || (T.matP = {}))[k] || (T.matP[k] = (T.d[k] || []).map(q => { const o = dec(q.p); return { o, k: q.k.map(dec), b: bbox(o), m: q.m || (k === 'ft' ? 'n' : null) }; }));
+function matIn(T, k, x, z) { /* the polygon of tiles[t][k] under (x, z): its material (src/fondi.py), '' with none, undefined where there is no polygon */
+  const L = (T.matP || (T.matP = {}))[k] || (T.matP[k] = (T.d[k] || []).map(q => { const o = dec(q.p); return { o, k: q.k.map(dec), b: bbox(o), m: q.m || '' }; }));
   for (const q of L) if (x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.o) && !q.k.some(h => inPoly(x, z, h))) return q.m;
-  return k === 'ft' ? 'n' : null;
+  return undefined;
+}
+/* the material of the surface a ribbon piece of an old way lies on: the polygon under its middle, else under its ends or its sides (in this tile or the next): a piece
+   whose middle fell just off the path, or on the edge of the tile, took the neutral paving, a light square on the asphalt path along the Milano-Meda (Carlo 7/11).
+   With no polygon anywhere under it the way's own surface=* (roads[].m, build_data.py: the path along the Milano-Meda runs off its polygon at x 121.8 z 47.4), then
+   'n' for a path, null for a street or square (their own look) */
+function matSotto(T, k, pts, rm) {
+  for (const [x, z] of pts) { const U = TILES[tileOf(x, z)], m = U && U.d ? matIn(U, k, x, z) : undefined; if (m !== undefined) return m || rm || (k === 'ft' ? 'n' : null); }
+  return rm || (k === 'ft' ? 'n' : null);
 }
 function senzaStrisce(T, b) {
   naAt(T, 0, 0); if (!T.naP.length || !b.i.length) return;
@@ -1451,7 +1459,7 @@ function senzaStrisce(T, b) {
     const ins = [naAt(T, X(a), Z(a)), naAt(T, X(c), Z(c)), naAt(T, X(e), Z(e)), naAt(T, (X(a) + X(c) + X(e)) / 3, (Z(a) + Z(c) + Z(e)) / 3)];
     if (ins.every(v => v)) return; if (ins.every(v => !v)) { out.push(a, c, e); return; }
     const l1 = hyp(X(a) - X(c), Z(a) - Z(c)), l2 = hyp(X(c) - X(e), Z(c) - Z(e)), l3 = hyp(X(e) - X(a), Z(e) - Z(a)), m = Math.max(l1, l2, l3);
-    if (m < 0.4 || d > 7) { if (!ins[3]) out.push(a, c, e); return; }
+    if (m < 0.4 || d > 7) return; /* (a piece across the edge goes: a line along the kerb of a cobbled street left a thin white sliver, Carlo 7/11) */
     if (m === l1) { const k = mid(a, c); go(a, k, e, d + 1); go(k, c, e, d + 1); } else if (m === l2) { const k = mid(c, e); go(a, c, k, d + 1); go(a, k, e, d + 1); } else { const k = mid(e, a); go(a, c, k, d + 1); go(k, c, e, d + 1); }
   };
   const I = Array.from(b.i); for (let t = 0; t < I.length; t += 3) go(I[t], I[t + 1], I[t + 2], 0);
@@ -1767,7 +1775,7 @@ function* buildTileGen(T) {
             if (p[3] && q[3]) { // an old elevated way that runs on S in a tile of S (no deck of the new engine under it): drawn on the cells of S, like
               // the surfaces of the ways at grade; a flat ribbon at the height of its middle stood over the banks and sank in the slopes (collaudo 4-5)
               /* (in the material of the surface it lies on, src/fondi.py: a path drawn this way stayed beige on the asphalt of its surface, light squares on the path along the Milano-Meda, Carlo 6/11) */
-              const fm = matSotto(T, r.c <= 4 ? 'as' : r.c === 5 ? 'pz' : 'ft', (p[0] + q[0]) / 2, (p[1] + q[1]) / 2), oB = fm ? fbuf(fm, onB.rk || 3, true) : onB, vs_ = fm ? fondoLook(fm).vs : onB === asp ? 9 : 4, col_ = fm ? fondoLook(fm).col : null;
+              const fm = matSotto(T, r.c <= 4 ? 'as' : r.c === 5 ? 'pz' : 'ft', [[(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], [p[0], p[1]], [q[0], q[1]], [(p[0] + q[0]) / 2 + rx * hw * 0.6, (p[1] + q[1]) / 2 + rz * hw * 0.6], [(p[0] + q[0]) / 2 - rx * hw * 0.6, (p[1] + q[1]) / 2 - rz * hw * 0.6]], r.m), oB = fm ? fbuf(fm, onB.rk || 3, true) : onB, vs_ = fm ? fondoLook(fm).vs : onB === asp ? 9 : 4, col_ = fm ? fondoLook(fm).col : null;
               const i0 = oB.p.length / 3; for (const [o, sd] of [[p, -1], [p, 1], [q, -1], [q, 1]]) { const x = o[0] + rx * hw * sd, z = o[1] + rz * hw * sd; vtx(oB, x, 0, z, 0, 1, 0, x / vs_, z / vs_, oB.asf ? asfCol(oB.asf, x, z) : col_); }
               triUp(oB, i0, i0 + 1, i0 + 3); triUp(oB, i0, i0 + 3, i0 + 2); continue;
             }
