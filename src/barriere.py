@@ -446,3 +446,50 @@ def varchi_binari(linee, binari, passaggi_, chiusi):
             else: aperti[mot] = aperti.get(mot, 0) + 1; v['esito'] = mot
             elenco.append(v)
     return chiudi, sorted(togli), dict(limiti=dict(max_m=VARCO_MAX, allineato=VARCO_ALLINEATO, parallelo=VARCO_PARALLELO, da_binario_m=list(VARCO_BINARIO), pezzo_sciolto_m=VARCO_MOZZO), varchi_trovati=len(elenco), chiusi=len(chiudi), metri_chiusi=round(m_chiusi, 1), pezzi_sciolti_spostati=len(togli), aperti_per_motivo=aperti, da_chiudere=0, elenco=elenco)
+
+
+VARCO_MISTO = 6.0   # m: a railway fence that stops this near another barrier (a wall, the fence of a street) leaves a hole to close
+
+
+def varchi_misti(linee, altre, binari, passaggi_, chiusi):
+    """the holes between a railway fence and a different barrier (Carlo 7/11, via delle Grigne under the Milano-Meda): a free end of a railway fence (linee) that
+    stops within VARCO_MISTO m of another barrier (altre, or another railway fence, also in its middle), pointing at it, near the tracks, with nothing to go
+    through it (passaggi_, chiusi as in varchi_binari): closed by a piece of the railway fence, the stronger barrier of the two. Returns ([pts], report)"""
+    from shapely.geometry import LineString as LS, Point as Pt
+    from shapely import STRtree as Tree
+    tutte = [LS(p) for p in list(linee) + list(altre) if len(p) >= 2]; own = list(range(len(linee)))
+    if not tutte: return [], dict(chiusi=0)
+    T = Tree(tutte); tb = Tree(binari) if binari else None; tp = Tree([g for g, _ in passaggi_]) if passaggi_ else None
+    out = []; aperti = {}; elenco = []; visti = set()
+    for i in own:
+        pts = linee[i]
+        if len(pts) < 2: continue
+        for e in (0, 1):
+            P, (dx, dz) = _capo(pts, e); Pp = Pt(P)
+            near = [int(j) for j in T.query(Pp.buffer(VARCO_MISTO))]
+            if any(j != i and tutte[j].distance(Pp) < 0.3 for j in near): continue   # it meets another line: no free end
+            best = None
+            for j in near:
+                if j == i: continue
+                Q = tutte[j].interpolate(tutte[j].project(Pp)); d = Pp.distance(Q)
+                if d < 0.3 or d > VARCO_MISTO: continue
+                if ((Q.x - P[0]) * dx + (Q.y - P[1]) * dz) / d < 0.7: continue   # the fence points at it
+                if best is None or d < best[0]: best = (d, (Q.x, Q.y))
+            if best is None: continue
+            C = LS([P, best[1]]); M = C.interpolate(0.5, normalized=True)
+            kc = tuple(sorted([(round(P[0], 0), round(P[1], 0)), (round(best[1][0], 0), round(best[1][1], 0))]))
+            if kc in visti: continue   # two railway fences facing each other: the hole once
+            visti.add(kc)
+            if tb is None or not len(tb.query(M.buffer(VARCO_BINARIO[1]))) or min(binari[int(j)].distance(M) for j in tb.query(M.buffer(VARCO_BINARIO[1]))) > VARCO_BINARIO[1]: continue
+            mot = None
+            if any(binari[int(j)].distance(C) < VARCO_BINARIO[0] for j in tb.query(C.buffer(VARCO_BINARIO[0] + 0.01))): mot = 'sul binario'
+            if mot is None and tp is not None:
+                for j in tp.query(C.buffer(0.5)):
+                    g, nome = passaggi_[int(j)]
+                    if g.intersects(C): mot = nome; break
+            if mot is None: mot = chiusi(C)
+            v = dict(x=round(M.x, 1), z=round(M.y, 1), m=round(best[0], 1))
+            if mot is None: out.append(list(C.coords)); v['esito'] = 'chiuso'
+            else: aperti[mot] = aperti.get(mot, 0) + 1; v['esito'] = mot
+            elenco.append(v)
+    return out, dict(limite_m=VARCO_MISTO, trovati=len(elenco), chiusi=len(out), aperti_per_motivo=aperti, elenco=elenco)

@@ -1405,6 +1405,9 @@ for a_, b_, h_, k_, src_ in pc_gates:
 _n_gpc = len(gate_out)
 # passi carrai DBGT left without a gate (no divider within PC_D of the point): the gap between the closures on the two sides along the lot boundary
 # (end of a divider or wall of a building, in any combination) is closed with a gate; wider than 8 m: 6 m centred on the driveway; never across an OSM street
+VARCO_PICCOLO = 3.0   # m: a gate this small (a footgate) is not straightened nor dropped for running across the street front
+VARCO_LARGO = 7.5   # m: wider than this, without a yard to drive into behind, an opening is closed by the fence (Carlo, 7/11: "è una cancellata, non un cancello")
+_vorig = {}   # the rule of the varchi: the subtype of each gate it adds (report_varchi.json, src/controllo_varchi.py)
 _gcc = {'porte': {'p': 0}, 'nuovi': 0, 'pedonali': 0, 'senza_strada': 0, 'senza_chiusure': 0, 'carreggiata_o_marciapiede': 0, 'strada_osm': 0, 'troppo_stretti': 0, 'gia_cancello': 0, 'fuori': 0, 'doppione_recinzione': 0, 'capo_nel_vuoto': 0, 'troppo_larghi': 0}
 if dbt_pc:
     _rr = [r_ for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x']]; _rrt = STRtree([r_['line'] for r_ in _rr])
@@ -1444,7 +1447,114 @@ if dbt_pc:
             if dd_ < 0.3: continue
             if any(k_ != j_ and _cl[k_][0].distance(Point(e_)) < 0.5 for k_ in _clt.query(Point(e_).buffer(0.5))): continue
             _cands.append((tuple(e_), 'capo_recinzione', ((e_[0] - f_[0]) / dd_, (e_[1] - f_[1]) / dd_)))
-    for p_, srcname_, dir_ in _cands:
+    # ---- a gate where a person would put it (Carlo, the votes on the sample of 30, 7/11, docs/voti_varchi_7-11.md; src/controllo_varchi.py counts what is left):
+    # (1) never behind a fence or a gate already on the street front; (2) on the line of the street front, never diagonal or set back; (3) over VARCO_LARGO m without
+    # a yard to drive into behind it is a railing, not a gate: the fence closes it; (4) wider than a footgate with nothing to enter behind (only lawn): nothing;
+    # (5) the ramps of the garages: a closed gate as wide as a gate, never a giant open one. The passi carrai of the DBGT stay as they were (3 of 3 right)
+    _clk = [k_ for pts, k_, h_ in bar_out if len(pts) >= 2 and k_ != 6]   # the kind of each divider of _cl (the houses come after them)
+    _vgc = {}   # the gates so far in cells of 8 m by their middle: their lines and their entry of gate_out (None for a railing that closed an opening)
+    def _vg_add(a_, b_, g_=None):
+        _vgc.setdefault((math.floor((a_[0] + b_[0]) / 16), math.floor((a_[1] + b_[1]) / 16)), []).append((LineString([a_, b_]), g_))
+    for g_ in gate_out: _vg_add((g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10), g_)
+    def _vg_vicini(P_, r_):
+        return [x_ for i_ in range(math.floor((P_[0] - r_) / 8) - 2, math.floor((P_[0] + r_) / 8) + 3) for j_ in range(math.floor((P_[1] - r_) / 8) - 2, math.floor((P_[1] + r_) / 8) + 3) for x_ in _vgc.get((i_, j_), ())]
+    def _vg_cross(S_):
+        x0_, y0_, x1_, y1_ = S_.bounds
+        return any(L_.intersects(S_) for i_ in range(math.floor(x0_ / 8) - 2, math.floor(x1_ / 8) + 3) for j_ in range(math.floor(y0_ / 8) - 2, math.floor(y1_ / 8) + 3) for L_, g_ in _vgc.get((i_, j_), ()))
+    _cvG = getattr(STR, 'cv', None) if STR else None
+    _carrab = [g_ for g_ in [_cvG, parking] if g_ is not None and not g_.is_empty]   # what a car drives into behind a gate: the yards AC_VEI, the car parks
+    for g_ in _carrab: prepare(g_)
+    _vcanc = []; _vrep = Counter(); _vdec = []; _vmis = {}; _vlast = {}   # _vdec: every gate of the rule and what became of it (report_varchi.json)
+    def _vrett(a_, b_, nx_, nz_, d0_, d1_, s_=0.5):
+        """the strip from d0_ to d1_ m beside the gate a_-b_ towards (nx_, nz_), s_ m shorter at each end"""
+        L_ = math.dist(a_, b_); ux_, uz_ = (b_[0] - a_[0]) / L_, (b_[1] - a_[1]) / L_; s_ = min(s_, L_ / 3)
+        A_ = (a_[0] + ux_ * s_, a_[1] + uz_ * s_); B_ = (b_[0] - ux_ * s_, b_[1] - uz_ * s_)
+        return Polygon([(A_[0] + nx_ * d0_, A_[1] + nz_ * d0_), (B_[0] + nx_ * d0_, B_[1] + nz_ * d0_), (B_[0] + nx_ * d1_, B_[1] + nz_ * d1_), (A_[0] + nx_ * d1_, A_[1] + nz_ * d1_)])
+    def _vchiusura(c_):
+        """kind and height of the divider at the end c_ of a gate (for the railing that closes a wide opening): the nearest divider within 1 m, or a fence"""
+        P0_ = Point(c_); best_ = None
+        for j_ in _clt.query(P0_.buffer(1.0)):
+            if j_ < len(_clk) and _clk[j_] != 3:
+                d_ = _cl[j_][0].distance(P0_)
+                if d_ < 1.0 and (best_ is None or d_ < best_[0]): best_ = (d_, _clk[j_], _cl[j_][1])
+        return (best_[1], best_[2]) if best_ else (2, 1.5)
+    def _vpersona(a_, b_, dir_, srcname_, st_):
+        """the gate a_-b_ of the rule as a person would place it: (a, b) with the street on the right of a->b (the leaves open inwards), 'cancellata', or the reason it goes"""
+        _vlast.pop('carr', None); _vlast.pop('ab', None)
+        Ls_ = st_['line']; M_ = Point((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2); t0_ = Ls_.project(M_)
+        pa_ = Ls_.interpolate(max(0, t0_ - 2)); pb_ = Ls_.interpolate(min(Ls_.length, t0_ + 2)); tx_, tz_ = tang((pa_.x, pa_.y), (pb_.x, pb_.y))
+        piccolo_ = math.dist(a_, b_) <= VARCO_PICCOLO   # a small gate between two ends of the fence stays where the fence leaves it (3, 15, 19: right)
+        if dir_ and not piccolo_ and abs(dir_[0] * tx_ + dir_[1] * tz_) < 0.866: return 'non_sul_fronte'   # the end of a fence that does not run along the street
+        sa_, sb_ = Ls_.distance(Point(a_)), Ls_.distance(Point(b_))
+        if abs(sa_ - sb_) > 0.8:   # (2) one end set back: the gate goes along the street from the front end to the closure on the same line (or from the back end, if that is where the line is)
+            def _lungo(F_, K_):
+                sg_ = 1 if (K_[0] - F_[0]) * tx_ + (K_[1] - F_[1]) * tz_ > 0 else -1
+                ray_ = LineString([F_, (F_[0] + sg_ * tx_ * 16.5, F_[1] + sg_ * tz_ * 16.5)]).buffer(0.6, cap_style=2); best_ = None
+                for j_ in _clt.query(ray_):
+                    if _cl[j_][0].distance(Point(F_)) < 0.3: continue
+                    x_ = _cl[j_][0].intersection(ray_)
+                    for part_ in getattr(x_, 'geoms', [x_]):
+                        for c_ in getattr(part_, 'coords', []):
+                            d_ = (c_[0] - F_[0]) * tx_ * sg_ + (c_[1] - F_[1]) * tz_ * sg_
+                            if d_ > 0.5 and (best_ is None or d_ < best_): best_ = d_
+                if best_ is None: return None
+                C_ = (F_[0] + sg_ * tx_ * best_, F_[1] + sg_ * tz_ * best_)
+                return C_ if math.dist(C_, K_) <= 3.0 else None
+            F_, K_ = (a_, b_) if sa_ < sb_ else (b_, a_)
+            C_ = _lungo(F_, K_)
+            if C_ is None: F_, K_ = K_, F_; C_ = _lungo(F_, K_)
+            if C_ is None and not piccolo_: return 'storto'
+            if C_ is not None: a_, b_ = F_, C_; M_ = Point((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2)
+        wd_ = math.dist(a_, b_)
+        if wd_ < 1.0: return 'troppo_stretti'
+        ux_, uz_ = (b_[0] - a_[0]) / wd_, (b_[1] - a_[1]) / wd_
+        if not piccolo_ and abs(ux_ * tx_ + uz_ * tz_) < 0.866: return 'non_sul_fronte'   # (2) a gate across the street front is no gate of the front
+        if any(r_['c'] <= 3 and r_['line'].distance(M_) < r_['w'] / 2 for r_ in (_rr[j_] for j_ in _rrt.query(M_.buffer(12)))): return 'in_carreggiata'   # never in the street
+        S_ = Ls_.interpolate(Ls_.project(M_)); dS_ = M_.distance(S_)
+        if (S_.x - M_.x) * -uz_ + (S_.y - M_.y) * ux_ > 0: a_, b_ = b_, a_; ux_, uz_ = -ux_, -uz_   # the left normal (the side the leaves open to, world3.js) away from the street
+        nx_, nz_ = -uz_, ux_
+        if dS_ > st_['w'] / 2 + 0.6:   # (1) what stands between the gate and the street: a fence, a house, a gate on the front close it already
+            Fr_ = _vrett(a_, b_, -nx_, -nz_, 0.3, dS_ - st_['w'] / 2)
+            if any(_cl[j_][0].intersects(Fr_) for j_ in _clt.query(Fr_)): return 'dietro_recinzione'
+            if _vg_cross(Fr_): return 'dietro_cancello'
+        _vlast['ab'] = (a_, b_)
+        R6_ = _vrett(a_, b_, nx_, nz_, 0.5, 10.0)
+        for L_, g_ in _vg_vicini(((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2), wd_ / 2 + 9):   # (6) beside a gate already there, on the same line (7, 30): the gate reaches across the
+            # whole opening if it stays as wide as a gate, otherwise the rest of the opening is the railing
+            if g_ is None or g_[4] != 'g' or L_.length < 0.5: continue
+            ga_, gb_ = L_.coords[0], L_.coords[-1]; gl_ = L_.length
+            if abs(((gb_[0] - ga_[0]) * ux_ + (gb_[1] - ga_[1]) * uz_) / gl_) < 0.94: continue
+            if max(abs((f_[0] - a_[0]) * -uz_ + (f_[1] - a_[1]) * ux_) for f_ in (ga_, gb_)) > 0.8: continue   # not on the same line
+            pr_ = sorted([0.0, wd_] + [(f_[0] - a_[0]) * ux_ + (f_[1] - a_[1]) * uz_ for f_ in (ga_, gb_)])
+            gs_ = sorted((f_[0] - a_[0]) * ux_ + (f_[1] - a_[1]) * uz_ for f_ in (ga_, gb_))
+            if gs_[0] > wd_ + 1.0 or gs_[1] < -1.0: continue   # apart along the line: another gate
+            if pr_[-1] - pr_[0] <= VARCO_LARGO:   # the gate already there reaches across the whole opening
+                A_ = (a_[0] + ux_ * pr_[0], a_[1] + uz_ * pr_[0]); B_ = (a_[0] + ux_ * pr_[-1], a_[1] + uz_ * pr_[-1])
+                if pr_[-1] - pr_[0] < gl_ + 0.5: return 'gia_cancello'
+                g_[0], g_[1], g_[2], g_[3] = q(A_[0]), q(A_[1]), q(B_[0]), q(B_[1]); return 'allargato'
+            if gs_[0] >= wd_ - 0.5 or gs_[1] <= 0.5: return 'cancellata'   # only beside it: the rest of the opening is railing
+        _cr_ = [srcname_] if srcname_ in ('rampa', 'vialetto') else []
+        _cr_ += ['cortile' if g_ is _cvG else 'parcheggio' for g_ in _carrab if g_.intersects(R6_) and g_.intersection(R6_).area > 8]
+        _cr_ += ['via di servizio' for r_ in (_rr[j_] for j_ in _rrt.query(R6_)) if r_['c'] == 4 and r_['line'].intersects(R6_)][:1]
+        carr_ = bool(_cr_); _vlast['carr'] = ','.join(_cr_)
+        if srcname_ == 'rampa' and wd_ > VARCO_LARGO: return 'rampa_larga'   # (5) a ramp wider than a gate stays open
+        if wd_ > VARCO_LARGO and not carr_:   # (3) a railing; unless paths go in behind it: the open entrance of a park (via Cadorna, Carlo 7/11) stays open
+            R10_ = _vrett(a_, b_, nx_, nz_, 0.5, 10.0)
+            R20_ = _vrett(a_, b_, nx_, nz_, 0.5, 20.0)
+            _vmis[(round(M_.x, 1), round(M_.y, 1))] = (round(sum(g_.intersection(R10_).area for g_ in _paved[1:4] if g_.intersects(R10_)), 1), round(sum(g_.intersection(R20_).area for g_ in _paved[1:4] if g_.intersects(R20_)), 1),
+                                                       sum(1 for r_ in (_rr[j_] for j_ in _rrt.query(R20_)) if r_['c'] == 6 and r_['line'].intersects(R20_)), sum(1 for j_ in _bgt.query(R20_) if _bg[j_].intersects(R20_)))
+            if any(g_.intersects(R10_) and g_.intersection(R10_).area > 6 for g_ in _paved[1:4]) or any(r_['c'] == 6 and r_['line'].intersects(R10_) for r_ in (_rr[j_] for j_ in _rrt.query(R10_))): return 'ingresso_aperto'
+            return 'cancellata'
+        if wd_ > 2.5 and not carr_:   # (4) something to enter behind: a house, a way, a paved yard
+            R12_ = _vrett(a_, b_, nx_, nz_, 0.5, 12.0)
+            if not (any(_bg[j_].intersects(R12_) for j_ in _bgt.query(R12_)) or any(r_['line'].intersects(R12_) for r_ in (_rr[j_] for j_ in _rrt.query(R12_)))
+                    or any(g_.intersects(R12_) and g_.intersection(R12_).area > 4 for g_ in _paved[1:])): return 'niente_dietro'
+        return (a_, b_)
+    _VDBG = [tuple(map(float, x_.split(','))) for x_ in os.environ.get('GTA_VARCHI_DEBUG', '').split(';') if x_]; _vdbg = None   # what became of the candidates near these points (x,z;x,z), in the log
+    for p_, srcname_, dir_ in _cands + [((1e9, 1e9), None, None)]:
+        if _vdbg is not None: log('varco debug', _vdbg[0], {k_: _gcc[k_] - v_ for k_, v_ in _vdbg[1].items() if isinstance(v_, int) and _gcc[k_] != v_}, {k_: v_ - _vdbg[2].get(k_, 0) for k_, v_ in _vrep.items() if v_ != _vdbg[2].get(k_, 0)}); _vdbg = None
+        if srcname_ is None: break
+        if _VDBG and any(math.dist(p_, d_) < 8 for d_ in _VDBG): _vdbg = ((round(p_[0], 1), round(p_[1], 1), srcname_), dict(_gcc), dict(_vrep))
         P_ = Point(p_)
         if not inside(p_, 0): _gcc['fuori'] += 1; continue
         if _gov.entro(p_, 1.0 if dir_ else 4) or _gdV.entro(p_, 1.0 if dir_ else 3.6): _gcc['gia_cancello'] += 1; continue
@@ -1461,7 +1571,7 @@ if dbt_pc:
             s0_ = st_['line'].project(P_); pa_ = st_['line'].interpolate(max(0, s0_ - 1)); pb_ = st_['line'].interpolate(min(st_['line'].length, s0_ + 1)); ux_, uz_ = tang((pa_.x, pa_.y), (pb_.x, pb_.y))
         ext_ = []  # on each side the nearest physical closure: its real point, not a projection
         for sg_ in ((1,) if dir_ else (1, -1)):
-            rl_ = LineString([p_, (p_[0] + sg_ * ux_ * 16.5, p_[1] + sg_ * uz_ * 16.5)]); ray_ = rl_.buffer(1.0, cap_style=2); best_ = None
+            rl_ = LineString([p_, (p_[0] + sg_ * ux_ * 16.5, p_[1] + sg_ * uz_ * 16.5)]); ray_ = rl_.buffer(1.5 if dir_ else 1.0, cap_style=2); best_ = None   # the end of a fence: 1,5 m either side (13: the next piece of the railing 1,1 m off its line); the gate goes on the line of the street front after (_vpersona)
             for j_ in _clt.query(ray_):
                 if dir_ and _cl[j_][0].distance(Point(p_)) < 0.5: continue
                 x_ = _cl[j_][0].intersection(ray_)
@@ -1497,10 +1607,21 @@ if dbt_pc:
                 if nx_ * (sp_.x - mid_.x) + nz_ * (sp_.y - mid_.y) < 0: c0_, c1_ = c1_, c0_
             _gd.append(tuple(mid_.coords[0])); doors_out.append([q(c0_[0]), q(c0_[1]), q(c1_[0]), q(c1_[1]), ty_, 2.1]); _gcc['porte'][ty_] += 1; continue
         hh_ = max(1.2, min(2.2, min([h_ for h_ in mhs_ if h_ < 2.0] or [1.6])))
+        if srcname_ != 'passo_carraio':
+            v_ = _vpersona(a_, b_, dir_, srcname_, st_)
+            if v_ == 'cancellata':
+                a_, b_ = _vlast.get('ab', (a_, b_))
+                _vdec.append((round(mid_.x, 1), round(mid_.y, 1), srcname_, v_, round(wd_, 1)))
+                k_, h_ = max((_vchiusura(a_), _vchiusura(b_)), key=lambda x_: x_[1]); _vcanc.append(([tuple(a_), tuple(b_)], k_, h_)); _vrep['cancellata'] += 1
+                _gd.append(tuple(mid_.coords[0])); _vg_add(a_, b_); continue
+            _vdec.append((round(mid_.x, 1), round(mid_.y, 1), srcname_, v_ if isinstance(v_, str) else 'cancello', round(wd_, 1), _vlast.pop('carr', '')))
+            if isinstance(v_, str): _vrep[v_] += 1; continue
+            a_, b_ = v_; mid_ = LineString([a_, b_]).centroid; wd_ = math.dist(a_, b_)
         _gd.append(tuple(mid_.coords[0])); _gcc['nuovi'] += 1; _src[srcname_] += 1
         if wd_ < 2.5: _gcc['pedonali'] += 1
-        gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'o' if srcname_ == 'rampa' else 'g', round(hh_, 1), 0])
-    _gcc['per_origine'] = _src
+        gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', round(hh_, 1), 0]); _vorig[id(gate_out[-1])] = srcname_; _vg_add(a_, b_, gate_out[-1])
+    _gcc['per_origine'] = _src; _gcc['come_una_persona'] = dict(_vrep)
+    bar_out += _vcanc   # (3) the wide openings closed by the railing of their sides
     log('cancelli sui varchi: aggiunti', _gcc)
     if STR: STR.rep['cancelli_passi_carrai'] = dict(_gcc)
 _gsrc['osm'] = _n_gosm; _gsrc['dedotto_varchi'] = len(gate_out) - _n_gpc
@@ -2145,6 +2266,10 @@ for i_, j_, p_ in _vc:
     if i_ < len(_vl6) and j_ < len(_vl6): _vnew6.append((p_, 6, _vl6[i_][2]))
     else: _vnewf.append(p_)
 fences = [f_ for k_, f_ in enumerate(fences) if k_ not in _vtf] + _vnewf; bar_out = [b_ for b_ in bar_out if id(b_) not in _vtb] + _vnew6
+# a hole between a railway fence and a different barrier (the fence of a street, a wall) with nothing to go through it: closed by the railway fence (Carlo 7/11, src/barriere.py varchi_misti)
+from barriere import varchi_misti
+_vmx, _vrep['misti'] = varchi_misti([b_[0] for b_ in bar_out if b_[1] == 6] + list(fences), [b_[0] for b_ in bar_out if b_[1] != 6], _lowrail, _vp, _vchiusi)
+fences = fences + _vmx
 _vl2 = [b_[0] for b_ in bar_out if b_[1] == 6] + list(fences); _vrep['da_chiudere'] = varchi_binari(_vl2, _lowrail, _vp, _vchiusi)[2]['chiusi']  # the same search on the result: nothing left
 log('varchi verso i binari', {k_: v_ for k_, v_ in _vrep.items() if k_ != 'elenco'})
 json.dump(dict(varchi_verso_i_binari=_vrep), open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_barriere.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
@@ -2430,6 +2555,28 @@ if STR:
 from controllo_recinzioni import togli_cancelli_doppi as _togli_gd
 gate_out, _gd_per = _togli_gd(gate_out, lambda g_: _gprio.get(id(g_), 2))
 log('cancelli doppi tolti (stesso varco): OSM', _gd_per[0], 'DBGT', _gd_per[1], 'derivati', _gd_per[2])
+# ---- a gate built open never swings its leaf onto the carriageway (Carlo 7/11, varco 24): the hinge goes to the other post when the leaf would fall in the street there;
+# and the line of a gate stays free of trees (varco 28): a tree on it steps back from the gate, on the side away from the street (src/controllo_varchi.py counts both)
+from controllo_varchi import anta_aperta as _anta, ALBERO_D as _ALB_D
+_vfl = {'ante_girate': 0, 'alberi_spostati': 0}
+def _in_carr(L_): return L_ is not None and L_.intersects(_carr_cl) and _carr_cl.intersection(L_).length > 0.3
+for g_ in gate_out:
+    if g_[4] != 'o': continue
+    a_, b_ = (g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)
+    if _in_carr(_anta(a_, b_)) and not _in_carr(_anta(b_, a_)): g_[0], g_[1], g_[2], g_[3] = g_[2], g_[3], g_[0], g_[1]; _vfl['ante_girate'] += 1
+_gseg = [LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]) for g_ in gate_out if g_[4] != 'l' and (g_[0], g_[1]) != (g_[2], g_[3])]
+if _gseg and trees:
+    _gst = STRtree(_gseg)
+    for k_, t_ in enumerate(trees):
+        P_ = Point(t_[0], t_[1]); js_ = [j_ for j_ in _gst.query(P_.buffer(_ALB_D)) if _gseg[j_].distance(P_) < _ALB_D]
+        if not js_: continue
+        L_ = _gseg[js_[0]]; (x0_, z0_), (x1_, z1_) = L_.coords[0], L_.coords[-1]; ln_ = L_.length; nx_, nz_ = -(z1_ - z0_) / ln_, (x1_ - x0_) / ln_
+        s_ = L_.project(P_); F_ = L_.interpolate(s_); side_ = 1.0 if (P_.x - F_.x) * nx_ + (P_.y - F_.y) * nz_ >= 0 else -1.0
+        if Point(F_.x + nx_ * side_, F_.y + nz_ * side_).distance(_carr_cl) < Point(F_.x - nx_ * side_, F_.y - nz_ * side_).distance(_carr_cl): side_ = -side_   # away from the street
+        x_, z_ = F_.x + nx_ * side_ * (_ALB_D + 0.5), F_.y + nz_ * side_ * (_ALB_D + 0.5)
+        trees[k_] = type(t_)([x_, z_] + list(t_[2:])) if isinstance(t_, (list, tuple)) else (x_, z_); _vfl['alberi_spostati'] += 1
+log('cancelli aperti e alberi', _vfl)
+if STR: STR.rep['cancelli_ante_alberi'] = _vfl
 _nb1 = len(bar_out) + len(fences); _fz_ = fondi_doppi(bar_out + [(f_, 'fe', 0) for f_ in fences], _dstr)
 bar_out = [b_ for b_ in _fz_ if b_[1] != 'fe']; fences = [list(b_[0]) for b_ in _fz_ if b_[1] == 'fe']
 log('divisori doppi fusi alla fine: pezzi', _nb1, '->', len(bar_out) + len(fences))
@@ -2447,6 +2594,17 @@ def _com_pt(x_, z_):
 _rep_rec = _controlla_rec([b_[0] for b_ in bar_out], fences, [(g_[0] / 10, g_[1] / 10, g_[2] / 10, g_[3] / 10) for g_ in gate_out], _osm_g,
                           [(d_[0] / 10, d_[1] / 10, d_[2] / 10, d_[3] / 10) for d_ in doors_out], _iso02_dis, _com_pt, log)
 if STR: STR.rep['recinzioni_controllo'] = _rep_rec
+from controllo_varchi import controlla as _controlla_varchi
+_vorig_l = [_vorig.get(id(g_), ('osm' if _gprio.get(id(g_), 2) == 0 else 'dbgt' if _gprio.get(id(g_), 2) == 1 else 'altro')) for g_ in gate_out]
+_rep_var = _controlla_varchi(gate_out, _vorig_l, bar_out, fences, trees, _carr_cl, btree_geoms,
+                             [(list(r_['line'].coords), r_['w'], r_['c'], bool(r_.get('drv')), bool(flat(r_))) for r_ in raw_roads if r_['line'].length > 0.1], log)
+_rep_var['regola'] = globals().get('_gcc', {}).get('come_una_persona'); _rep_var['ante_alberi'] = _vfl; _rep_var['decisioni'] = globals().get('_vdec', []); _rep_var['larghi_misure'] = [list(k_) + list(v_) for k_, v_ in globals().get('_vmis', {}).items()]
+json.dump(_rep_var, open(os.environ.get('GTA_REPORT_VARCHI') or os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_varchi.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+if os.environ.get('GTA_DUMP_VARCHI'):   # what the check of the varchi reads (src/controllo_varchi.py), for a check outside the build
+    import pickle
+    pickle.dump(dict(gates=gate_out, orig=_vorig_l,
+                     bar=[(b_[0], b_[1], b_[2]) for b_ in bar_out], fences=fences, trees=trees, carr=_carr_cl, buildings=btree_geoms,
+                     roads=[(list(r_['line'].coords), r_['w'], r_['c'], bool(r_.get('drv')), bool(flat(r_))) for r_ in raw_roads if r_['line'].length > 0.1]), open(os.environ['GTA_DUMP_VARCHI'], 'wb'))
 for pts, kind, hgt in bar_out:
     c = LineString(pts).centroid; v_ = None
     if _bvt is not None:
