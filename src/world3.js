@@ -2776,7 +2776,13 @@ function layPompe(f) {
   f.gy = H.ground(f.x, f.z);
   for (const pump of f.pumps) WALLS.add(pump.x - 1.3, pump.z - 1.3, pump.x + 1.3, pump.z + 1.3, pump.wall = { r: 1.0, x: pump.x, z: pump.z, y0: f.gy - 2, y1: f.gy + 2 });
   for (const [a, b] of [[-6.5, -3.8], [6.5, -3.8], [-6.5, 3.8], [6.5, 3.8]]) { const qx = f.x + f.ux * a + f.nx * b, qz = f.z + f.uz * a + f.nz * b; WALLS.add(qx - 0.4, qz - 0.4, qx + 0.4, qz + 0.4, { r: 0.25, x: qx, z: qz, y0: f.gy - 2, y1: f.gy + 4 }); }
+  /* the brand totem with the prices (buildFuel, 1.6 x 0.4 m, 4.4 m high): a wall along its face, solid like a pole or a low wall */
+  const [ax, az] = fuelAt(f, FUEL_TOT[0] - 0.8, FUEL_TOT[1]), [bx, bz] = fuelAt(f, FUEL_TOT[0] + 0.8, FUEL_TOT[1]);
+  WALLS.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), { ax, az, bx, bz, nx: -f.uz, nz: f.ux, two: true, y0: f.gy - 2, y1: f.gy + 4.4 });
 }
+/* world point of a spot in the frame buildFuel draws the station in (root: x along the road, z across it) */
+const FUEL_TOT = [9.5, -6.5];
+function fuelAt(f, lx, lz) { return [f.x + lx * f.ux - lz * f.uz, f.z + lx * f.uz + lz * f.ux]; }
 /* a roof (OSM or DBGT) lying for more than half inside the canopy the game draws on a fuel station is not drawn: it would be a second canopy */
 let FUEL_ROOFS = 0;
 function tettiFuel(T) { for (const B of T.bld) {
@@ -2817,7 +2823,7 @@ function buildFuel(T, G) {
     const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256; const gg = cv.getContext('2d'); gg.fillStyle = bg; gg.fillRect(0, 0, 128, 256); gg.fillStyle = fg; gg.textAlign = 'center'; gg.textBaseline = 'middle'; let fs = 46; const nm = (f.p.n || 'CARBURANTI').toUpperCase(); gg.font = `bold ${fs}px Arial`; while (gg.measureText(nm).width > 118 && fs > 14) { fs -= 2; gg.font = `bold ${fs}px Arial`; } gg.fillText(nm, 64, 60);
     gg.fillStyle = 'rgba(0,0,0,.55)'; gg.fillRect(8, 120, 112, 120); gg.fillStyle = '#7dff9a'; gg.font = 'bold 22px monospace'; gg.textAlign = 'left'; gg.fillText('SELF 1.79', 14, 150); gg.fillText('DIES 1.69', 14, 185); gg.fillText('GPL  0.72', 14, 220);
     const tex = new THREE.CanvasTexture(cv), tm = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(tm);
-    const tot = new THREE.Mesh(boxG(1.6, 4.4, 0.4), [lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), tm, tm]); tot.position.set(9.5, 2.2, -(4.5 + 2)); tot.castShadow = true; root.add(tot);
+    const tot = new THREE.Mesh(boxG(1.6, 4.4, 0.4), [lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), tm, tm]); tot.position.set(FUEL_TOT[0], 2.2, FUEL_TOT[1]); tot.castShadow = true; root.add(tot);
   }
 }
 // a pump goes up, scorches black and catches fire; the blast sets off every other pump nearby, so the fire runs across the forecourt
