@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo cimiteri-migliorati · dopo c6dcc20 · assemblato 07/11 23:56 · porta ' + location.port;
+    const txt = 'locale · ramo cimiteri-migliorati · dopo 7500322 · assemblato 07/11 23:59 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1728,7 +1728,7 @@ function postFree(x, z) {
   }
   POST_N.tolti++; return null;
 }
-Object.assign(window.__POSTF = window.__POSTF || {}, { postIn, postFree, offRoad, onAsph, nearAsph, hardAt, tileOf, onAnyRoad, onFoot }); /* for the checks on the whole map (?tutto) */
+Object.assign(window.__POSTF = window.__POSTF || {}, { postIn, postFree, offRoad, onAsph, nearAsph, hardAt, tileOf, onAnyRoad, onFoot, WALLS, segDist }); /* for the checks on the whole map (?tutto) */
 // the asphalt as drawn (tiles[t].as; in a comune with a DBGT its carriageways and car parks AC_VEI, docs/motore.md 7) is a street for all that
 // keeps off the streets (lamps, posts, signs, benches, guardrails): where a carriageway is wider than its axis says (parking lanes, junction
 // corners) the band of the axis alone let them stand on it. A bit grid at 0.5 m per tile, made the first time a tile is asked
@@ -4676,30 +4676,36 @@ function buildCemetery(T, G) {
        gravel, asphalt, footways, roads; 3 outside, hole or building). Each lawn (cells of 1 m joined together, bounded by paths) takes the rows of one of the two directions of the grid, whichever of
        the two the paths are nearer along, and each grave looks at the nearer path of that axis. A cemetery with no path at all gets a lane every 16 m */
     const CS = 0.5, nw = Math.ceil((bb[2] - bb[0]) / CS) + 1, nh = Math.ceil((bb[3] - bb[1]) / CS) + 1, cm = new Uint8Array(nw * nh); let lanes = false;
-    const cell = (x, z) => { const ci = Math.floor((x - bb[0]) / CS), cj = Math.floor((z - bb[1]) / CS); if (ci < 0 || cj < 0 || ci >= nw || cj >= nh) return 3; const k = cj * nw + ci; if (!cm[k]) { const X = bb[0] + (ci + 0.5) * CS, Z = bb[1] + (cj + 0.5) * CS; const jv = (X - cx) * vx + (Z - cz) * vz; cm[k] = !inPoly(X, Z, outer) || holes.some(h => inPoly(X, Z, h)) || inBuilding(X, Z, 0) ? 3 : lanes && Math.abs(jv - 16 * Math.round(jv / 16)) < 1 || hardAt(X, Z) || onAnyRoad(X, Z, 0) || onFoot(X, Z) ? 2 : 1; } return cm[k]; };
+    const barAt = (x, z) => { let f = false; WALLS.each(x - 2, z - 2, x + 2, z + 2, o => { if (f) return; if (o.ax !== undefined) { if (o.y1 - o.y0 > 0.4 && segDist(x, z, o.ax, o.az, o.bx, o.bz) < 0.6) f = true; } else if (o.tree && hyp(x - o.x, z - o.z) < (o.r || 0.5) + 0.4) f = true; }); return f; }; /* fences, railings, walls, gates and trees (not the graves, which are discs of their own) */
+    const cell = (x, z) => { const ci = Math.floor((x - bb[0]) / CS), cj = Math.floor((z - bb[1]) / CS); if (ci < 0 || cj < 0 || ci >= nw || cj >= nh) return 3; const k = cj * nw + ci; if (!cm[k]) { const X = bb[0] + (ci + 0.5) * CS, Z = bb[1] + (cj + 0.5) * CS; const jv = (X - cx) * vx + (Z - cz) * vz; cm[k] = !inPoly(X, Z, outer) || holes.some(h => inPoly(X, Z, h)) || inBuilding(X, Z, 0) || barAt(X, Z) ? 3 : lanes && Math.abs(jv - 16 * Math.round(jv / 16)) < 1 || hardAt(X, Z) || onAnyRoad(X, Z, 0) || onFoot(X, Z) ? 2 : 1; } return cm[k]; };
     let anyPath = false; for (let x = bb[0]; x <= bb[2] && !anyPath; x += 1) for (let z = bb[1]; z <= bb[3]; z += 1) if (cell(x, z) === 2) { anyPath = true; break; }
     if (!anyPath) { lanes = true; cm.fill(0); }
     const free = (x, z, hx, hz, sx, sz) => { for (let l = -1.35; l <= 1.36; l += 0.45) for (let w = -0.83; w <= 0.84; w += 0.415) if (cell(x + hx * l + sx * w, z + hz * l + sz * w) !== 1) return false; return true; };
-    const dir = [[ux, uz], [-ux, -uz], [vx, vz], [-vx, -vz]];
-    const reach = (x, z, k) => { for (let d = 0.5; d < 90; d += 0.5) { const c = cell(x + dir[k][0] * d, z + dir[k][1] * d); if (c === 2) return d; if (c === 3) return 1e9; } return 1e9; }; /* how far to a path along one of the four directions */
-    const GS = 2, gw = Math.ceil((bb[2] - bb[0]) / GS) + 1, gh = Math.ceil((bb[3] - bb[1]) / GS) + 1, fv = new Int8Array(gw * gh); /* the direction of the rows for each cell of 2 m: 1 the nearer path is along u, 2 along v, 0 none or not a lawn */
-    for (let cj = 0; cj < gh; cj++) for (let ci = 0; ci < gw; ci++) { const X = bb[0] + (ci + 0.5) * GS, Z = bb[1] + (cj + 0.5) * GS; if (cell(X, Z) !== 1) continue; const a0 = Math.min(reach(X, Z, 0), reach(X, Z, 1)), a1 = Math.min(reach(X, Z, 2), reach(X, Z, 3)); if (a0 < 1e8 || a1 < 1e8) fv[cj * gw + ci] = a0 < a1 ? 1 : 2; }
-    const famOf = (x, z) => { const ci = Math.floor((x - bb[0]) / GS), cj = Math.floor((z - bb[1]) / GS); let n1 = 0, n2 = 0; for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const a = ci + di, b = cj + dj; if (a < 0 || b < 0 || a >= gw || b >= gh) continue; const f = fv[b * gw + a]; if (f === 1) n1++; else if (f === 2) n2++; } return n1 > n2 ? 0 : 2; }; /* the rows of a place: the way most of the cells round it go, so that a block keeps one direction */
-    const rect = (x, z, k) => { const al = k < 2 ? 1.0 : 0.475, bl = k < 2 ? 0.475 : 1.0, cu = (x - cx) * ux + (z - cz) * uz, cv = (x - cx) * vx + (z - cz) * vz; return [cu - al - 0.25, cu + al + 0.25, cv - bl - 0.25, cv + bl + 0.25]; }; /* in the frame of the rows, with a gap */
-    const taken = new Map();
-    for (const fam of [2, 0]) {
-      const su = fam === 2 ? 1.6 : 3.2, sv = fam === 2 ? 3.2 : 1.6;
-      for (let i = -R; i <= R; i += su) for (let j = -R; j <= R; j += sv) {
-        const x = cx + ux * i + vx * j, z = cz + uz * i + vz * j; if (x < bb[0] || x > bb[2] || z < bb[1] || z > bb[3]) continue;
-        if (cell(x, z) !== 1 || famOf(x, z) !== fam) continue;
-        const k0 = fam, d0 = reach(x, z, k0), d1 = reach(x, z, k0 + 1), kk = d1 < d0 ? k0 + 1 : k0 === 2 && d0 > 1e8 ? 3 : k0; /* the nearer of the two paths of the axis (none: head to +v, as it was) */
-        const hd = [-dir[kk][0], -dir[kk][1]], a = Math.atan2(-hd[0], hd[1]); /* head away from the path: the headstone looks at it */
-        const hx = hd[0], hz = hd[1], sx = Math.cos(a), sz = Math.sin(a); if (!free(x, z, hx, hz, sx, sz)) continue;
-        const r = rect(x, z, kk); let bad = false; for (let ia = Math.floor(r[0] / 4); ia <= Math.floor(r[1] / 4) && !bad; ia++) for (let ib = Math.floor(r[2] / 4); ib <= Math.floor(r[3] / 4) && !bad; ib++) for (const o of taken.get(ia * 100003 + ib) || []) if (o[0] < r[1] && o[1] > r[0] && o[2] < r[3] && o[3] > r[2]) { bad = true; break; }
-        if (bad) continue;
-        for (let ia = Math.floor(r[0] / 4); ia <= Math.floor(r[1] / 4); ia++) for (let ib = Math.floor(r[2] / 4); ib <= Math.floor(r[3] / 4); ib++) { const hk = ia * 100003 + ib; if (!taken.has(hk)) taken.set(hk, []); taken.get(hk).push(r); }
-        tombs.push([x, z, a]);
+    const reach = (x, z, dx, dz, mx) => { for (let d = 0.5; d < mx; d += 0.5) { const c = cell(x + dx * d, z + dz * d); if (c === 2) return d; if (c === 3) return 1e9; } return 1e9; }; /* how far to a path along a direction */
+    /* the blocks: the lawns, cells of 1 m joined together and bounded by paths (flood fill). One block, one direction (Carlo 7/11): the rows are parallel to the sides of the block (the smallest
+       rectangle round it), the headstones look at its longest path, one grid of rows and columns from one corner; a row that is not whole is shorter, a grave never moves off the grid */
+    const gw = Math.ceil(bb[2] - bb[0]) + 1, gh = Math.ceil(bb[3] - bb[1]) + 1, lb = new Int32Array(gw * gh), blocks = [];
+    for (let cj0 = 0; cj0 < gh; cj0++) for (let ci0 = 0; ci0 < gw; ci0++) {
+      if (lb[cj0 * gw + ci0] || cell(bb[0] + ci0 + 0.5, bb[1] + cj0 + 0.5) !== 1) continue;
+      const id = blocks.length + 1, pts = [], st = [[ci0, cj0]]; lb[cj0 * gw + ci0] = id;
+      while (st.length) { const [ci, cj] = st.pop(); pts.push([bb[0] + ci + 0.5, bb[1] + cj + 0.5]);
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ni = ci + di, nj = cj + dj; if (ni < 0 || nj < 0 || ni >= gw || nj >= gh || lb[nj * gw + ni]) continue; if (cell(bb[0] + ni + 0.5, bb[1] + nj + 0.5) !== 1) continue; lb[nj * gw + ni] = id; st.push([ni, nj]); } }
+      if (pts.length >= 12) blocks.push(pts);
+    }
+    for (const pts of blocks) {
+      const sm = pts.length > 1500 ? pts.filter((_, i) => i % Math.ceil(pts.length / 1500) === 0) : pts; let ph = 0, ba = 1e18;
+      for (let g = 0; g < 90; g += 1) { const c = Math.cos(g * Math.PI / 180), s_ = Math.sin(g * Math.PI / 180); let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; for (const [x, z] of sm) { const pa = x * c + z * s_, pb = -x * s_ + z * c; if (pa < a0) a0 = pa; if (pa > a1) a1 = pa; if (pb < b0) b0 = pb; if (pb > b1) b1 = pb; } const ar = (a1 - a0) * (b1 - b0); if (ar < ba - 1e-6) { ba = ar; ph = g * Math.PI / 180; } }
+      const Ax = Math.cos(ph), Az = Math.sin(ph), Bx = -Az, Bz = Ax, D = [[Ax, Az], [-Ax, -Az], [Bx, Bz], [-Bx, -Bz]], len = [0, 0, 0, 0];
+      for (const [x, z] of sm) for (let k = 0; k < 4; k++) if (reach(x, z, D[k][0], D[k][1], 1.6) < 1e8) len[k]++; /* the length of path on each side */
+      let kk = 0; for (let k = 1; k < 4; k++) if (len[k] > len[kk]) kk = k;
+      if (!(len[kk] > 0)) { let bn = -1; for (let k = 0; k < 4; k++) { let n = 0; for (const [x, z] of sm) if (reach(x, z, D[k][0], D[k][1], 60) < 1e8) n++; if (n > bn) { bn = n; kk = k; } } if (bn <= 0) kk = 2; }
+      const hx = -D[kk][0], hz = -D[kk][1], sx = -hz, sz = hx, a = Math.atan2(-hx, hz), id = tombs.length; /* head away from the path: the headstone looks at it; (sx, sz) across the grave */
+      let p0 = 1e9, p1 = -1e9, q0 = 1e9, q1 = -1e9; for (const [x, z] of pts) { const pa = x * hx + z * hz, pb = x * sx + z * sz; if (pa < p0) p0 = pa; if (pa > p1) p1 = pa; if (pb < q0) q0 = pb; if (pb > q1) q1 = pb; }
+      const grid = new Map(), SH = 3.2, SS = 1.6;
+      for (let pa = p1 - 1.4; pa >= p0 + 1.0 - 1.4; pa -= SH) for (let pb = q0 + 0.6; pb <= q1; pb += SS) { /* from the path side, the rows across the block */
+        const x = hx * pa + sx * pb, z = hz * pa + sz * pb; if (cell(x, z) !== 1 || !free(x, z, hx, hz, sx, sz)) continue; grid.set(Math.round((p1 - 1.4 - pa) / SH) * 4096 + Math.round((pb - q0 - 0.6) / SS), [x, z, a]);
       }
+      for (const [k, t] of grid) { const r = Math.round(k / 4096), c = k - r * 4096; let n = 0; for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (grid.has((r + dr) * 4096 + c + dc)) n++; if (n >= 1) { t.push(blocks.indexOf(pts)); tombs.push(t); } } /* a grave with no neighbour in the grid is left out */
     }
     for (let i = 0; i < outer.length; i++) { const p = outer[i], q = outer[(i + 1) % outer.length], L = hyp(q[0] - p[0], q[1] - p[1]); for (let s = 4; s < L - 2; s += 9) { const t = s / L, x = lerp(p[0], q[0], t), z = lerp(p[1], q[1], t), mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let nx = -(q[1] - p[1]) / L, nz = (q[0] - p[0]) / L; if (!inPoly(x + nx * 2, z + nz * 2, outer)) { nx = -nx; nz = -nz; } const X = x + nx * 2.2, Z = z + nz * 2.2; if (inside(X, Z, 1)) cyps.push([X, Z]); } }
   }
