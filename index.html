@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 4eef304 · assemblato 07/11 16:24 · porta ' + location.port;
+    const txt = 'locale · ramo fisica-piedi · dopo 9901191 · assemblato 07/11 16:54 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -450,12 +450,13 @@ groundTex.repeat.set(1400, 1400); ground.rotation.x = -Math.PI / 2; ground.posit
 function collideStatic(p, r, y, veh, skip) { /* skip: what a car rests on (fisica3.js vehAppoggio) */
   let nx = 0, nz = 0, hit = false, fx = 0, fz = 0, pinch = false; const one = (x, z) => { if (!hit) { fx = x; fz = z; } else if (x * fx + z * fz < -0.2) pinch = true; }; /* pinch: pushed from two opposite sides (between two posts narrower than it) */
   WALLS.each(p.x - r - 1, p.z - r - 1, p.x + r + 1, p.z + r + 1, s => {
-    if (s.off || (skip && skip.has(s)) || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh && s.yv !== undefined ? s.yv : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
+    if (s.off || (skip && skip.has(s)) || s.y0 !== undefined && (y === undefined || y < s.y0 || y > (veh ? (s.yv !== undefined ? s.yv : s.y1) : s.yp ? s.yp.max : s.y1))) return; /* yv: the top a vehicle meets (at least 1.2 m on a low barrier, y1 is the drawn one for the walker); s.off: a barrier piece broken through (sfondabili3.js) */
     if (s.dyn && !s.on) return;
     if (s.r) { const dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz), R = r + s.r; if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; one(dx / d, dz / d); hit = true; } return; }
     if (s.dyn && !s.on) return;
     const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez; if (L2 < 1e-6) return;
     let t = ((p.x - s.ax) * ex + (p.z - s.az) * ez) / L2, cl = false; if (t < 0) { t = 0; cl = true; } else if (t > 1) { t = 1; cl = true; }
+    if (!veh && s.yp && y > wallTopP(s, t)) return; /* on foot a building's wall stands up to its roof, not over it: the walker on a roof walks off its edge (world3.js wallTopP) */
     const cx = s.ax + ex * t, cz = s.az + ez * t, dx = p.x - cx, dz = p.z - cz, d = hyp(dx, dz);
     if (s.two || dx * s.nx + dz * s.nz >= 0 || cl) { if (d < r && d > 1e-6) { const k = (r - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; one(dx / d, dz / d); hit = true; } }
     else if (d < r) { p.x += s.nx * (r + d); p.z += s.nz * (r + d); nx += s.nx; nz += s.nz; one(s.nx, s.nz); hit = true; }
@@ -1802,10 +1803,10 @@ function layMuri(T) {
     T.bld.push(rec);
     if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
       if (COTTURA) BUILDINGS.push(rec); BLDR.add(bb[0], bb[1], bb[2], bb[3], rec); const y1 = B.zt + 3;
-      for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1 }); } }
+      for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1, yp: wallTopProfile(rec, a, c, isHole) }); } } /* yp: its top for the walker, up to the roof (wallTopP) */
       continue;
     }
-    if (B.t === 9) { for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); { const w = { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }; WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, w); (rec.walls || (rec.walls = [])).push(w); } } continue; }
+    if (B.t === 9) { BLDT.add(bb[0], bb[1], bb[2], bb[3], rec); for (const [x, z] of outer.length <= 10 ? outer : []) { const gy = H.ground(x, z); { const w = { r: 0.15, x, z, y0: gy - 3, y1: gy + B.h + 2 }; WALLS.add(x - 0.2, z - 0.2, x + 0.2, z + 0.2, w); (rec.walls || (rec.walls = [])).push(w); } } continue; }
     if (COTTURA) BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
     if (COTTURA && B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
     if (B.g === 4) continue; // a water tower: its plan is the tank up in the air, the solid is its shaft (paesaggio3.js lsTower)
@@ -1815,7 +1816,7 @@ function layMuri(T) {
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue;
         let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; }
-        const w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1 }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
+        const w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1, yp: wallTopProfile(rec, a, c, isHole) }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
       }
     }
   }
@@ -1889,6 +1890,55 @@ function inBuilding(x, z, m = 0) {
   BLD.each(x - m, z - m, x + m, z + m, b => { if (!f && x >= b.bb[0] - m && x <= b.bb[2] + m && z >= b.bb[1] - m && z <= b.bb[3] + m && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) f = true; });
   if (!f && m > 0) WALLS.each(x - m, z - m, x + m, z + m, s => { if (!s.r && !s.two && !s.deckw && segDist(x, z, s.ax, s.az, s.bx, s.bz) < m) f = true; });
   return f;
+}
+// ---- a building as a floor for the walker (Carlo, 7/11: "un tetto è un posto dove si sta in piedi"): its roof as the tile draws it, from the data
+// the tile has (the DBGT top of the walls zt, the roof planes from the DSM rf, flat where there are none, the tile's own pitch where it draws one), and
+// the slab of a tettoia. A ruin with no roof (st 2) has nothing on top. Only the walker stands on these: cars and their physics do not
+const BLDT = new Grid(24); // the tettoie (t 9): a slab on posts, a floor from above only
+function bldPitch(B) { // the pitch the tile draws over a volume with no roof of its own: its height, else 0 (buildTileGen)
+  if (B._ph !== undefined) return B._ph; const P = B.pts, t = B.t, area = Math.abs(sArea(P));
+  const ok = !roofPlanes(B) && B.rk !== 4 && !B.holes.length && P.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(P) || (t === 10 && P.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && B.h >= 5;
+  return (B._ph = ok ? Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12) : 0);
+}
+function bldRoofY(B, x, z) { // the roof over a point of the plan (the point inside it), or null
+  if (B.st === 2 || B.g === 4) return null;
+  if (B.t === 9) return B.ctop !== undefined ? B.ctop : (B.ctop = Math.max(...B.pts.map(p => H.ground(p[0], p[1]))) + Math.max(B.h, 3.8));
+  const top = B.gtop !== undefined ? B.gtop : (B.gtop = bldTop(B));
+  if (roofPlanes(B)) return top + roofAt(B, x, z);
+  const rh = bldPitch(B); if (!rh) return top;
+  const [cx, cz] = B._pc || (B._pc = centroid(B.pts)), P = B.pts; // the pyramid: from the eaves up to the middle of the plan
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], c = P[(i + 1) % P.length], d = (c[0] - a[0]) * (cz - a[1]) - (c[1] - a[1]) * (cx - a[0]); if (Math.abs(d) < 1e-9) continue;
+    const wm = ((c[0] - a[0]) * (z - a[1]) - (c[1] - a[1]) * (x - a[0])) / d, wa = ((c[0] - x) * (cz - z) - (c[1] - z) * (cx - x)) / d, wc = 1 - wm - wa;
+    if (wm >= -1e-6 && wa >= -1e-6 && wc >= -1e-6) return top + rh * wm;
+  }
+  return top;
+}
+const inPlan = (b, x, z, m = 0) => x >= b.bb[0] - m && x <= b.bb[2] + m && z >= b.bb[1] - m && z <= b.bb[3] + m && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h));
+function bldFloorAt(x, z, y) { // the highest roof or slab at (x, z) not above y, else -Infinity
+  let f = -Infinity; const one = b => { if (!inPlan(b, x, z)) return; const r = bldRoofY(b, x, z); if (r !== null && r <= y && r > f) f = r; };
+  BLD.each(x, z, x, z, one); BLDR.each(x, z, x, z, one); BLDT.each(x, z, x, z, one);
+  return f;
+}
+const walkGround = (x, z, y, reach = 0.05) => Math.max(H.surface(x, z, y), bldFloorAt(x, z, y + reach)); // what the walker stands on: the ground, the decks, the roofs
+// in a building at this height: inside its plan under its roof (tol over the feet), or within m of a wall of it that stands over the feet
+function inBuildingAt(x, z, y, m = 0, tol = 0.02) {
+  let f = false;
+  BLD.each(x - m, z - m, x + m, z + m, b => { if (f || !inPlan(b, x, z, m)) return; const r = bldRoofY(b, x, z); if (r === null || r > y + tol) f = true; });
+  if (!f && m > 0) WALLS.each(x - m, z - m, x + m, z + m, s => { if (f || s.r || s.two || s.deckw || s.off) return; const L2 = (s.bx - s.ax) ** 2 + (s.bz - s.az) ** 2 || 1, t = clamp(((x - s.ax) * (s.bx - s.ax) + (z - s.az) * (s.bz - s.az)) / L2, 0, 1); if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < m && (s.y1 === undefined || wallTopP(s, t) > y + tol) && (s.y0 === undefined || s.y0 < y + 1.75)) f = true; });
+  return f;
+}
+// the top of a wall the walker meets at t along it (0 at a, 1 at b): a building's wall goes up to its roof (yp: [t, top] where the roof changes),
+// the rest as drawn (y1). Cars meet their own (collideStatic yv, y1)
+function wallTopP(s, t) {
+  const p = s.yp; if (!p) return s.y1;
+  for (let k = 1; k < p.length; k++) if (t <= p[k][0] || k === p.length - 1) { const [t0, y0] = p[k - 1], [t1, y1] = p[k]; return y0 + (y1 - y0) * clamp((t - t0) / ((t1 - t0) || 1), 0, 1); }
+  return p[0][1];
+}
+function wallTopProfile(B, a, c, isHole) { // [t, top] along the side a to c of a volume, as the tile draws its top; and the highest
+  const top = B.gtop !== undefined ? B.gtop : (B.gtop = bldTop(B)), pl = roofPlanes(B) && !isHole && B.st !== 2;
+  const p = (pl ? roofBreaks(B, a, c) : [0, 1]).map(t => [t, top + (pl ? roofAt(B, a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t) : 0)]);
+  p.max = Math.max(...p.map(q => q[1])); return p;
 }
 function onFoot(x, z) { let f = false; ROADSEG.each(x - 6, z - 6, x + 6, z + 6, s => { if (!f && s.r.c === 6 && segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5) f = true; }); return f; }
 function onPlatform(x, z) { let f = false; PLATG.each(x, z, x, z, s => { if (!f && x >= s.bb[0] && x <= s.bb[2] && z >= s.bb[1] && z <= s.bb[3] && inPoly(x, z, s.o) && !s.k.some(h => inPoly(x, z, h))) f = true; }); return f; }
@@ -3897,8 +3947,8 @@ function* buildTileGen(T) {
       if (B.st) { kind = 'plain'; wallCol = B.st !== 1 ? pcB(['#a39a8b', '#9c9284', '#aaa08e']) : COL('#b9b6ae'); } // a ruin: bare stone and brick; a shell: concrete
       const b = wb[kind], tile = kind === 'old' ? 3.4 : kind === 'mod' ? 4.2 : 4;
       // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
-      const planes = roofPlanes(B), flatDbgt = B.rk === 4;
-      const pitched = planes ? true : !flatDbgt && !holes.length && outer.length <= (t === 10 ? 12 : 8) && area < 650 && area > 25 && (isConvex(outer) || (t === 10 && outer.length <= 6)) && (t === 0 || t === 5 || t === 6 || t === 10 || (t === 4 && area < 450)) && h >= 5;
+      const planes = roofPlanes(B);
+      const pitched = planes ? true : bldPitch(B) > 0; /* the same pitch the walker stands on (bldRoofY) */
       if (!b.ao) { b.ao = []; b.fac = []; }
       // the facades (FAC): the bays along each wall and the ground under each window first, then the floors F0 + FL k the same all round the house.
       // A wall is a run of sides that go on nearly straight (the DBGT draws a facade in many short sides): its bays run along all of it
@@ -3979,7 +4029,7 @@ function* buildTileGen(T) {
       if (B.st === 2) continue;
       if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
       else if (pitched) {
-        const [cx, cz] = centroid(outer), rh = Math.min(3.2, 0.9 + Math.sqrt(area) * 0.12), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
+        const [cx, cz] = centroid(outer), rh = bldPitch(B), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
         for (let i = 0; i < outer.length; i++) {
           const a = outer[i], c = outer[(i + 1) % outer.length];
           const v1 = new THREE.Vector3(a[0], top, a[1]), v2 = new THREE.Vector3(c[0], top, c[1]), v3 = new THREE.Vector3(cx, top + rh, cz);
@@ -8558,18 +8608,19 @@ function fisRig(v, yf, yb, ty, fs) {
   for (let i = 0; i < F.n; i++) { F.x[i] = -F.droop; F.off[i] = lerp(F.off[i], -Math.min(F.droop, 0.2), 0.5); }
   v.fpBusy = true;
 }
-// where he gets out: the side as ever if it is free, else the first free place round the car, on this side of any wall. A car on its roof against a wall lets him out too
+// where he gets out: the side as ever if it is free, else the first free place round the car, on this side of any wall. A car on its roof against a wall lets him out too.
+// [x, z, the height of his feet]: a roof is a place like the ground (Carlo, 7/11: out of the helicopter on a roof he stays on the roof)
 function exitSpot(v) {
   const S = v.spec, sh = Math.sin(v.h), ch = Math.cos(v.h), L = [[1.6, 0], [-1.6, 0]], hl = S.L / 2 + 0.45;
   for (const q of [[1.6, 1.2], [-1.6, 1.2], [1.6, -1.2], [-1.6, -1.2], [0, hl], [0, -hl]]) L.push(q);
   for (let r = Math.max(2.4, hl); r < 14; r += 1) for (let n = 0; n < 16; n++) L.push([Math.cos(n * Math.PI / 8) * r, Math.sin(n * Math.PI / 8) * r]);
   for (let pass = 0; pass < 2; pass++) for (const [lx, lz] of L) {
-    const x = v.x + lx * ch + lz * sh, z = v.z - lx * sh + lz * ch, feet = H.surface(x, z, v.y + 0.5);
+    const x = v.x + lx * ch + lz * sh, z = v.z - lx * sh + lz * ch, feet = walkGround(x, z, v.y, 0.5);
     if (pass === 0 && (Math.abs(feet - v.y) > 2.5 || rayCam(v.x, v.z, x, z, feet + 1) < 1)) continue;
-    if (inBuilding(x, z, 0.4)) continue;
-    const c = capsuleFree(x, z, feet, 0.3, 0.4); if (!c || (pass === 1 && c === 'suolo')) return [x, z];
+    if (inBuildingAt(x, z, feet, 0.4, 0.05)) continue;
+    const c = capsuleFree(x, z, feet, 0.3, 0.4); if (!c || (pass === 1 && c === 'suolo')) return [x, z, feet];
   }
-  return [v.x + ch * 1.6, v.z - sh * 1.6];
+  const x = v.x + ch * 1.6, z = v.z - sh * 1.6; return [x, z, walkGround(x, z, v.y, 0.5)];
 }
 // the whole way of the frame, not only where it ends: at high speed a thin pole or a sign falls between two frames (Carlo, 30/10)
 function vehSweep(v, x0, z0) {
@@ -9476,8 +9527,8 @@ function enterExit() {
   } else {
     const v = P.car, fast = v.speed > 6;
     const fx = Math.sin(v.h), fz = Math.cos(v.h);
-    const [x, z] = exitSpot(v);
-    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false; P.y = H.surface(x, z, v.y); if (v.speed > FARI.minV) v.fariFino = now + FARI.dopo; /* the lights stay on a little (extras.js FARI) */
+    const [x, z, ey_] = exitSpot(v);
+    P.x = x; P.z = z; P.h = v.h; P.mode = 'foot'; P.model.g.visible = true; v.driver = null; v.boost = false; P.y = ey_; if (v.speed > FARI.minV) v.fariFino = now + FARI.dopo; /* the lights stay on a little (extras.js FARI) */ /* on the ground, or on the roof he stopped on (fisica3.js exitSpot) */
     if (fast) { P.y = v.y + 0.5; P.knock = 1.3; P.vx = v.vx * 0.55; P.vz = v.vz * 0.55; P.vy = 2; P.hp -= Math.min(25, v.speed * 0.6); } v.inp = { thr: 0, brk: 0, steer: 0, hand: fast ? 0 : 1 }; P.car = null;
   }
 }
@@ -9666,22 +9717,24 @@ function capsuleFree(x, z, feet, r = SALTO.r, tol = 0.02, head = SALTO.head) {
   let hit = null;
   WALLS.each(x - r - 1, z - r - 1, x + r + 1, z + r + 1, s => {
     if (hit || s.off || (s.dyn && !s.on)) return;
-    if (s.y0 !== undefined && (feet + tol >= s.y1 || feet + head <= s.y0)) return;
+    if (s.y0 !== undefined && (feet + tol >= (s.yp ? s.yp.max : s.y1) || feet + head <= s.y0)) return;
     if (s.r) { if (hyp(x - s.x, z - s.z) < r + s.r) hit = s; return; }
-    if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < r) hit = s;
+    if (segDist(x, z, s.ax, s.az, s.bx, s.bz) < r && (!s.yp || feet + tol < wallTopP(s, saltoT(s, x, z)))) hit = s; // a building's wall: up to its roof there
   });
   if (hit) return hit;
-  if (inBuilding(x, z, 0)) return 'edificio';
+  if (inBuildingAt(x, z, feet, 0, Math.max(tol, 0.02) + 0.02)) return 'edificio'; // under a roof; on it he is free
   if (ceilAbove(x, z, feet - 0.1) < feet + head) return 'soffitto';
   for (const o of H.deckAt(x, z)) if (o.top > feet + Math.max(tol, 0.3) && (o.bot !== undefined ? o.bot : o.top - 0.6) < feet + head) return 'soletta';
   for (const v of VEH) if (Math.abs(v.x - x) < 6 && Math.abs(v.z - z) < 6 && feet + head > v.y && vehBox(v, x, z, feet + tol, r)) return v;
   return null;
 }
 
-// ---- the floor under the feet: the ground and the decks (H.surface), a car, a street object with a top. reach: how far above the feet a top is taken
+const saltoT = (s, x, z) => { const ex = s.bx - s.ax, ez = s.bz - s.az; return clamp(((x - s.ax) * ex + (z - s.az) * ez) / (ex * ex + ez * ez || 1), 0, 1); }; // where along a wall a point is nearest
+
+// ---- the floor under the feet: the ground and the decks (H.surface), a roof (world3.js bldFloorAt), a car, a street object with a top. reach: how far above the feet a top is taken
 let saltoFV = null;
 function footFloor(x, z, feet, reach, inAir) {
-  let y = H.surface(x, z, inAir ? feet - 0.5 : feet); saltoFV = null;
+  let y = Math.max(H.surface(x, z, inAir ? feet - 0.5 : feet), bldFloorAt(x, z, feet + reach)); saltoFV = null;
   WALLS.each(x - 1.5, z - 1.5, x + 1.5, z + 1.5, s => { const q = s.sali; if (q && !s.off && (!s.dyn || s.on) && q.top <= feet + reach && q.top > y && hyp(x - s.x, z - s.z) < q.rs) y = q.top; });
   for (const v of VEH) {
     if (Math.abs(v.x - x) > 4 || Math.abs(v.z - z) > 4 || !vehCan(v)) continue;
@@ -9710,7 +9763,7 @@ function saltoStart(c) {
   const d = hyp(c.sx - P.x, c.sz - P.z); if (d < 0.02) return true; if (P.air && d > 0.9) return false;
   return !saltoAcrossTol(P.x, P.z, c.sx, c.sz, P.y);
 }
-function saltoAcrossTol(ax, az, bx, bz, y) { const L = hyp(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.15)); for (let i = 0; i <= n; i++) { const qx = ax + (bx - ax) * i / n, qz = az + (bz - az) * i / n; if (capsuleFree(qx, qz, Math.max(y, H.surface(qx, qz, y)), SALTO.r, 0.4)) return true; } return false; }
+function saltoAcrossTol(ax, az, bx, bz, y) { const L = hyp(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.15)); for (let i = 0; i <= n; i++) { const qx = ax + (bx - ax) * i / n, qz = az + (bz - az) * i / n; if (capsuleFree(qx, qz, Math.max(y, walkGround(qx, qz, y)), SALTO.r, 0.4)) return true; } return false; }
 
 function planOver(c, g) { // over something and down the far side. c: sx, sz the start, nx, nz the way across, span how far from the start to the far edge, top
   const Sx = c.sx, Sz = c.sz; let top = c.top;
@@ -9722,7 +9775,7 @@ function planOver(c, g) { // over something and down the far side. c: sx, sz the
       const q = saltoRise(Sx, Sz, Math.min(P.y, y), y, SALTO.r) || saltoAcross(Sx, Sz, ex, ez, y, SALTO.r);
       if (!q) {
         const fl = footFloor(ex, ez, y, 0.02, true), drop = saltoRise(ex, ez, fl, y, SALTO.rLand);
-        if (drop || inWater(ex, ez, fl) || inBuilding(ex, ez, SALTO.rLand)) break;
+        if (drop || inWater(ex, ez, fl) || inBuildingAt(ex, ez, fl, SALTO.rLand, 0.05)) break;
         return { sx: Sx, sz: Sz, ex, ez, y, stand: false, gx: c.gx, gz: c.gz, top, h: Math.atan2(c.nx, c.nz), nx: c.nx, nz: c.nz, v: null };
       }
       if (q.ax !== undefined && isBarrier(q) && q.y1 > top && q.y1 - g <= SALTO.maxBar) { top = q.y1; continue; } // the next piece of the same barrier, a little higher
@@ -9741,7 +9794,7 @@ function planOn(c, g) { // up onto something and stay there. c: sx, sz, ex, ez, 
 }
 // what is ahead and could be taken, best first
 function tryClimb() {
-  const S = SALTO, stick = Math.hypot(GP.steer, GP.fwd) > 0.15 && padLat, dh = stick ? padTgt : P.h, dx = Math.sin(dh), dz = Math.cos(dh), sp = hyp(P.vx, P.vz), reach = S.reach + sp * S.reachV, g = H.surface(P.x, P.z, P.y), cs = [], seen = new Set();
+  const S = SALTO, stick = Math.hypot(GP.steer, GP.fwd) > 0.15 && padLat, dh = stick ? padTgt : P.h, dx = Math.sin(dh), dz = Math.cos(dh), sp = hyp(P.vx, P.vz), reach = S.reach + sp * S.reachV, g = walkGround(P.x, P.z, P.y), cs = [], seen = new Set();
   const ahead = (qx, qz, d) => d < 0.15 ? 1 : ((qx - P.x) * dx + (qz - P.z) * dz) / d;
   WALLS.each(P.x - reach - 1, P.z - reach - 1, P.x + reach + 1, P.z + reach + 1, s => {
     if (seen.has(s)) return; seen.add(s);
@@ -9751,6 +9804,14 @@ function tryClimb() {
       const dot = ahead(s.x, s.z, d0); if (dot < S.cone) return;
       const nx = (s.x - P.x) / d0, nz = (s.z - P.z) / d0, st = Math.min(d0, s.r + S.gap), sx = s.x - nx * st, sz = s.z - nz * st;
       cs.push({ d, dot, top, sx, sz, gx: s.x - nx * s.r * 0.6, gz: s.z - nz * s.r * 0.6, ...(s.sali ? { on: true, ex: s.x - nx * s.sali.rs * 0.4, ez: s.z - nz * s.sali.rs * 0.4, endY: top } : { nx, nz, span: st + s.r }) });
+      return;
+    }
+    if (s.yp && !s.two && !s.off) { // a building's wall (Carlo, 7/11): one no higher than a barrier he climbs (a box, a garage) he climbs the same way, up onto its roof
+      const t = saltoT(s, P.x, P.z), cx = s.ax + (s.bx - s.ax) * t, cz = s.az + (s.bz - s.az) * t, d = hyp(cx - P.x, cz - P.z), top = wallTopP(s, t);
+      if ((P.x - cx) * s.nx + (P.z - cz) * s.nz < -0.05 || s.y0 > g + 0.5 || d > reach || top - g > S.maxBar || top <= P.y + 0.1) return; // from outside, under its top
+      const dot = ahead(cx, cz, d); if (dot < S.cone) return;
+      const st = Math.min(d, S.gap), sx = d < S.gap ? P.x : cx + s.nx * st, sz = d < S.gap ? P.z : cz + s.nz * st;
+      for (const k of [0.7, 1.1]) { const qx = cx - s.nx * k, qz = cz - s.nz * k, f = bldFloorAt(qx, qz, top + 1); if (f < top - 1) continue; cs.push({ d, dot, on: true, top: Math.max(top, f), sx, sz, ex: qx, ez: qz, endY: f, gx: cx, gz: cz }); break; }
       return;
     }
     if (!isBarrier(s)) return;
@@ -9794,7 +9855,7 @@ function climbStep(dt) {
   if (c.v) { const [ex, ez] = vehWorld(c.v, c.lv[0], c.lv[1]); c.ex = ex; c.ez = ez; }
   c.t += dt; P.h = wrapA(P.h + wrapA(c.h - P.h) * (1 - Math.exp(-14 * dt)));
   let t = c.t;
-  if (t < c.run) { const k = t / c.run; P.x = c.x0 + (c.sx - c.x0) * k; P.z = c.z0 + (c.sz - c.z0) * k; if (c.y0 < H.surface(P.x, P.z, c.y0) + 0.4) P.y = H.surface(P.x, P.z, P.y); c.y0r = P.y; P.phase += c.sp * dt * 3; c.ph = 0; return; }
+  if (t < c.run) { const k = t / c.run; P.x = c.x0 + (c.sx - c.x0) * k; P.z = c.z0 + (c.sz - c.z0) * k; if (c.y0 < walkGround(P.x, P.z, c.y0) + 0.4) P.y = walkGround(P.x, P.z, P.y); c.y0r = P.y; P.phase += c.sp * dt * 3; c.ph = 0; return; }
   if (c.y0r === undefined) c.y0r = P.y; t -= c.run; P.x = c.sx; P.z = c.sz;
   const y0 = c.y0r, T1 = c.tRise, T2 = T1 + c.tHold, T3 = T2 + c.tPull, T4 = T3 + c.tOver;
   if (t < T1) { c.ph = 1; const q = t / T1; P.y = y0 + ((c.yHang !== null ? c.yHang : c.y) - y0) * (c.low ? 1 - (1 - q) * (1 - q) : smooth01(q)); return; }
@@ -9836,7 +9897,7 @@ function footRide() {
 function footThrow(v) { // too fast to stay on: down on the nearest free ground at the side of the car, falling from where he stood (no fall damage is done in the game)
   const [lx, lz] = vehLocal(v, P.x, P.z), S = v.spec, sd = Math.sign(lx || 1), al = clamp(lz, -S.L / 2, S.L / 2);
   for (let d = S.W / 2 + SALTO.rLand + 0.15; d < S.W / 2 + 3.5; d += 0.35) for (const q of [sd, -sd]) {
-    const [x, z] = vehWorld(v, q * d, al), g = H.surface(x, z, P.y); if (g > P.y + 0.2 || inWater(x, z, g) || inBuilding(x, z, SALTO.rLand) || capsuleFree(x, z, g, SALTO.rLand, 0.05)) continue;
+    const [x, z] = vehWorld(v, q * d, al), g = walkGround(x, z, P.y); if (g > P.y + 0.2 || inWater(x, z, g) || inBuildingAt(x, z, g, SALTO.rLand, 0.05) || capsuleFree(x, z, g, SALTO.rLand, 0.05)) continue;
     P.x = x; P.z = z; P.air = true; P.vy = 0; P.vx = P.vz = 0; P.onV = null; P.onL = null; P.land = 0; P.thrown = (P.thrown || 0) + 1; return true;
   }
   return false;
@@ -9857,10 +9918,10 @@ function saltoCrosses(ax, az, bx, bz, y0, y1) {
   let hit = false; const dx = bx - ax, dz = bz - az; if (Math.abs(dx) + Math.abs(dz) < 1e-6) return false;
   WALLS.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => {
     if (hit || s.r || s.off || (s.dyn && !s.on)) return;
-    if (s.y0 !== undefined && (y1 < s.y0 || y0 > s.y1)) return;
+    if (s.y0 !== undefined && (y1 < s.y0 || y0 > (s.yp ? s.yp.max : s.y1))) return;
     const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
     const t = ((s.ax - ax) * ez - (s.az - az) * ex) / den, u = ((s.ax - ax) * dz - (s.az - az) * dx) / den;
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) hit = true;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && (!s.yp || y0 <= wallTopP(s, u))) hit = true;
   });
   return hit;
 }
@@ -9881,7 +9942,7 @@ function footGuard(x0, y0, z0, mx, mz) { // last word of the step. x0, y0, z0 wh
 function footGuardXZ(x0, z0, mx, mz) {
   const air = P.air || P.knock > 0, y0 = air ? P.y + 0.05 : P.y + 0.4, y1 = air ? P.y + 1.7 : y0, dd = hyp(P.x - mx, P.z - mz);
   if (air && dd > SALTO.airPush) { const k = SALTO.airPush / dd; P.x = mx + (P.x - mx) * k; P.z = mz + (P.z - mz) * k; } // in the air a push is a slide, not a pop
-  const bad = (x, z) => saltoCrosses(x0, z0, x, z, y0, y1) || (inBuilding(x, z, 0) && !inBuilding(x0, z0, 0)) || (air && ceilOver(x, z, P.y) && !ceilOver(x0, z0, P.y)); // in the air also the edge of a deck, which has no wall
+  const ib = (x, z) => inBuildingAt(x, z, P.y, 0, air ? 0.06 : SALTO.stepUp), bad = (x, z) => saltoCrosses(x0, z0, x, z, y0, y1) || (ib(x, z) && !ib(x0, z0)) || (air && ceilOver(x, z, P.y) && !ceilOver(x0, z0, P.y)); // in the air also the edge of a deck, which has no wall
   if (!bad(P.x, P.z)) return;
   P.guardN = (P.guardN || 0) + 1;
   if (!bad(mx, mz)) { P.x = mx; P.z = mz; return; }
@@ -9943,7 +10004,7 @@ const SALITA = {
   maxV: 9,            // m/s, the fastest slide
 };
 const salitaMin = (a, b) => a > 0 && b > 0 ? Math.min(a, b) : a < 0 && b < 0 ? Math.max(a, b) : 0; // the smaller of two rises of the same sign, else 0
-function salitaG(x, z, y) { return H.surface(x, z, y + 0.6); }
+function salitaG(x, z, y) { return walkGround(x, z, y + 0.6, 0); } // the ground, the decks and the roofs
 function footSlope(dt) { // on the ground, before the step: P.vx, P.vz are the walk he wants; this bends them to the slope and adds the slide
   const S = SALITA, p = S.passo, y = P.y, g0 = salitaG(P.x, P.z, y), sp = hyp(P.vx, P.vz), R = Math.PI / 180;
   if (sp > 0.05) { // up the way he walks
@@ -11534,5 +11595,5 @@ window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>
