@@ -3006,7 +3006,7 @@ function updCaserme(dt) { for (const st of CASERME) if (st.root && st.root.paren
 // ---------------------------------------------------------------- cemeteries: rows of graves, crosses and cypresses
 const TOMB_G = new THREE.BoxGeometry(0.95, 0.28, 2.0), STONE_G = new THREE.BoxGeometry(0.8, 1.0, 0.14);
 function buildCemetery(T, G) {
-  const tombs = [], cyps = [];
+  const callId = window.__CEMCALL = (window.__CEMCALL || 0) + 1; let cemIdx = 0; const tombs = [], cyps = [], donePoly = []; /* donePoly: the cemeteries of this tile already laid out (two outlines of the data overlap: the graves are laid out once) */
   for (const a of T.d.a || []) {
     if (a.t !== 14) continue;
     const outer = dec(a.p), holes = (a.k || []).map(dec), bb = bbox(outer);
@@ -3018,42 +3018,46 @@ function buildCemetery(T, G) {
        the two the paths are nearer along, and each grave looks at the nearer path of that axis. A cemetery with no path at all gets a lane every 16 m */
     const CS = 0.5, nw = Math.ceil((bb[2] - bb[0]) / CS) + 1, nh = Math.ceil((bb[3] - bb[1]) / CS) + 1, cm = new Uint8Array(nw * nh); let lanes = false;
     const barAt = (x, z) => { let f = false; WALLS.each(x - 2, z - 2, x + 2, z + 2, o => { if (f) return; if (o.ax !== undefined) { if (o.y1 - o.y0 > 0.4 && segDist(x, z, o.ax, o.az, o.bx, o.bz) < 0.4) f = true; } else if (o.tree && hyp(x - o.x, z - o.z) < (o.r || 0.5) + 0.4) f = true; }); return f; }; /* fences, railings, walls, gates and trees (not the graves, which are discs of their own) */
-    const cell = (x, z) => { const ci = Math.floor((x - bb[0]) / CS), cj = Math.floor((z - bb[1]) / CS); if (ci < 0 || cj < 0 || ci >= nw || cj >= nh) return 3; const k = cj * nw + ci; if (!cm[k]) { const X = bb[0] + (ci + 0.5) * CS, Z = bb[1] + (cj + 0.5) * CS; const jv = (X - cx) * vx + (Z - cz) * vz; cm[k] = !inPoly(X, Z, outer) || holes.some(h => inPoly(X, Z, h)) || inBuilding(X, Z, 0) || barAt(X, Z) ? 3 : lanes && Math.abs(jv - 16 * Math.round(jv / 16)) < 1 || hardAt(X, Z) || onAnyRoad(X, Z, 0) || onFoot(X, Z) ? 2 : 1; } return cm[k]; };
+    const cell = (x, z) => { const ci = Math.floor((x - bb[0]) / CS), cj = Math.floor((z - bb[1]) / CS); if (ci < 0 || cj < 0 || ci >= nw || cj >= nh) return 3; const k = cj * nw + ci; if (!cm[k]) { const X = bb[0] + (ci + 0.5) * CS, Z = bb[1] + (cj + 0.5) * CS; const jv = (X - cx) * vx + (Z - cz) * vz; cm[k] = !inPoly(X, Z, outer) || holes.some(h => inPoly(X, Z, h)) || donePoly.some(o => inPoly(X, Z, o)) || inBuilding(X, Z, 0) || barAt(X, Z) ? 3 : lanes && Math.abs(jv - 16 * Math.round(jv / 16)) < 1 || [[0, 0], [0.22, 0], [-0.22, 0], [0, 0.22], [0, -0.22]].some(([e, f]) => hardAt(X + e, Z + f) || onAnyRoad(X + e, Z + f, 0) || onFoot(X + e, Z + f)) ? 2 : 1; } return cm[k]; };
     let anyPath = false; for (let x = bb[0]; x <= bb[2] && !anyPath; x += 1) for (let z = bb[1]; z <= bb[3]; z += 1) if (cell(x, z) === 2) { anyPath = true; break; }
     if (!anyPath) { lanes = true; cm.fill(0); }
-    const free = (x, z, hx, hz, sx, sz, m) => { const L = 1 + m, W = 0.475 + m; for (let i = 0; i <= 6; i++) for (let j = 0; j <= 3; j++) { const l = -L + 2 * L * i / 6, w = -W + 2 * W * j / 3; if (cell(x + hx * l + sx * w, z + hz * l + sz * w) !== 1) return false; } return true; }; /* the footprint of a grave with a margin m, every 0.4 m */
+    const lbl = (x, z) => { const ci = Math.floor((x - bb[0]) / CS), cj = Math.floor((z - bb[1]) / CS); return ci < 0 || cj < 0 || ci >= nw || cj >= nh ? 0 : lb[cj * nw + ci]; };
+    const free = (x, z, hx, hz, sx, sz, m, id) => { const L = 1 + m, W = 0.475 + m; for (let i = 0; i <= 6; i++) for (let j = 0; j <= 3; j++) { const l = -L + 2 * L * i / 6, w = -W + 2 * W * j / 3; { const X = x + hx * l + sx * w, Z = z + hz * l + sz * w; if (cell(X, Z) !== 1 || lbl(X, Z) !== id) return false; } } return true; }; /* the footprint of a grave with a margin m, every 0.4 m */
     const reach = (x, z, dx, dz, mx) => { for (let d = 0.5; d < mx; d += 0.5) { const c = cell(x + dx * d, z + dz * d); if (c === 2) return d; if (c === 3) return 1e9; } return 1e9; }; /* how far to a path along a direction */
     /* the blocks: the lawns, cells of 1 m joined together and bounded by paths (flood fill). One block, one direction (Carlo 7/11): the rows are parallel to the sides of the block (the smallest
        rectangle round it), the headstones look at its longest path, one grid of rows and columns from one corner; a row that is not whole is shorter, a grave never moves off the grid */
-    const gw = Math.ceil(bb[2] - bb[0]) + 1, gh = Math.ceil(bb[3] - bb[1]) + 1, lb = new Int32Array(gw * gh), blocks = [];
+    const gw = nw, gh = nh, lb = new Int32Array(gw * gh), blocks = []; let nid = 0; /* flood fill on the cells of 0.5 m: a path of 0.5 m still divides two blocks */
     for (let cj0 = 0; cj0 < gh; cj0++) for (let ci0 = 0; ci0 < gw; ci0++) {
-      if (lb[cj0 * gw + ci0] || cell(bb[0] + ci0 + 0.5, bb[1] + cj0 + 0.5) !== 1) continue;
-      const id = blocks.length + 1, pts = [], st = [[ci0, cj0]]; lb[cj0 * gw + ci0] = id;
-      while (st.length) { const [ci, cj] = st.pop(); pts.push([bb[0] + ci + 0.5, bb[1] + cj + 0.5]);
-        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ni = ci + di, nj = cj + dj; if (ni < 0 || nj < 0 || ni >= gw || nj >= gh || lb[nj * gw + ni]) continue; if (cell(bb[0] + ni + 0.5, bb[1] + nj + 0.5) !== 1) continue; lb[nj * gw + ni] = id; st.push([ni, nj]); } }
-      if (pts.length >= 12) blocks.push(pts);
+      if (lb[cj0 * gw + ci0] || cell(bb[0] + (ci0 + 0.5) * CS, bb[1] + (cj0 + 0.5) * CS) !== 1) continue;
+      const id = ++nid, pts = [], st = [[ci0, cj0]]; lb[cj0 * gw + ci0] = id;
+      while (st.length) { const [ci, cj] = st.pop(); pts.push([bb[0] + (ci + 0.5) * CS, bb[1] + (cj + 0.5) * CS]);
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ni = ci + di, nj = cj + dj; if (ni < 0 || nj < 0 || ni >= gw || nj >= gh || lb[nj * gw + ni]) continue; if (cell(bb[0] + (ni + 0.5) * CS, bb[1] + (nj + 0.5) * CS) !== 1) continue; lb[nj * gw + ni] = id; st.push([ni, nj]); } }
+      if (pts.length >= 48) { pts.id = id; blocks.push(pts); }
     }
     let bi = 0;
     for (const pts of blocks) {
       bi = window.__BLK = (window.__BLK || 0) + 1; const sm = pts.length > 1500 ? pts.filter((_, i) => i % Math.ceil(pts.length / 1500) === 0) : pts; let ph = 0, ba = 1e18;
       for (let g = 0; g < 90; g += 1) { const c = Math.cos(g * Math.PI / 180), s_ = Math.sin(g * Math.PI / 180); let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; for (const [x, z] of sm) { const pa = x * c + z * s_, pb = -x * s_ + z * c; if (pa < a0) a0 = pa; if (pa > a1) a1 = pa; if (pb < b0) b0 = pb; if (pb > b1) b1 = pb; } const ar = (a1 - a0) * (b1 - b0); if (ar < ba - 1e-6) { ba = ar; ph = g * Math.PI / 180; } }
       const Ax = Math.cos(ph), Az = Math.sin(ph), Bx = -Az, Bz = Ax, D = [[Ax, Az], [-Ax, -Az], [Bx, Bz], [-Bx, -Bz]], len = [0, 0, 0, 0];
-      for (const [x, z] of sm) for (let k = 0; k < 4; k++) if (reach(x, z, D[k][0], D[k][1], 1.6) < 1e8) len[k]++; /* the length of path on each side */
+      const wid = [0, 0, 0, 0]; for (const [x, z] of sm) for (let k = 0; k < 4; k++) { const d = reach(x, z, D[k][0], D[k][1], 1.6); if (d < 1e8) { len[k]++; let w = 0; while (w < 12 && cell(x + D[k][0] * (d + w), z + D[k][1] * (d + w)) === 2) w += 0.5; wid[k] += w; } } /* the length of path on each side, and its width */
+      for (let k = 0; k < 4; k++) wid[k] = len[k] ? wid[k] / len[k] : 0;
       let cand = [0, 1, 2, 3].filter(k => len[k] > 0); if (!cand.length) { for (let k = 0; k < 4; k++) { let n = 0; for (const [x, z] of sm) if (reach(x, z, D[k][0], D[k][1], 60) < 1e8) n++; len[k] = n; } cand = [0, 1, 2, 3].filter(k => len[k] > 0); if (!cand.length) cand = [2]; }
       /* for each path round the block: the graves with the headstones looking at it, the rows parallel to it (Carlo 7/11); the path that gives the fewest rows one behind the other (the longest rows) wins, then the longer path */
       const place = (k, m, off) => {
         const hx = -D[k][0], hz = -D[k][1], sx = -hz, sz = hx, a = Math.atan2(-hx, hz); let p0 = 1e9, p1 = -1e9, q0 = 1e9, q1 = -1e9;
         for (const [x, z] of pts) { const pa = x * hx + z * hz, pb = x * sx + z * sz; if (pa < p0) p0 = pa; if (pa > p1) p1 = pa; if (pb < q0) q0 = pb; if (pb > q1) q1 = pb; }
         const grid = new Map(), SH = 3.2, SS = 1.6; /* from the path side, the rows across the block, from one corner */
-        for (let pa = p0 + 1 + m + off, r = 0; pa <= p1; pa += SH, r++) for (let pb = q0 + 0.475 + m, c = 0; pb <= q1; pb += SS, c++) { const x = hx * pa + sx * pb, z = hz * pa + sz * pb; if (cell(x, z) === 1 && free(x, z, hx, hz, sx, sz, m)) grid.set(r * 4096 + c, [x, z, a, bi]); }
+        for (let pa = p0 + 1 + m + off, r = 0; pa <= p1; pa += SH, r++) for (let pb = q0 + 0.475 + m, c = 0; pb <= q1; pb += SS, c++) { const x = hx * pa + sx * pb, z = hz * pa + sz * pb; if (cell(x, z) === 1 && free(x, z, hx, hz, sx, sz, m, pts.id)) grid.set(r * 4096 + c, [x, z, a, bi, T.t, callId, cemIdx]); }
         const out = []; const rs = new Set(); for (const [k2, t] of grid) { const r = Math.floor(k2 / 4096), c = k2 - r * 4096; let n = 0; for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (grid.has((r + dr) * 4096 + c + dc)) n++; if (n >= 1) { out.push(t); rs.add(r); } } /* a grave with no neighbour in the grid is left out */
         return { out, rows: rs.size };
       };
       const tryK = k => { let b = null; for (const m of [0.35, 0.15]) { for (const off of [0, 0.4, 0.8, 1.2, 1.6, 2.0, 2.4]) { const r = place(k, m, off); if (!b || r.out.length > b.out.length) b = r; } if (b && b.out.length >= 3) break; } return b; }; /* the margin from the paths (35 cm, 15 in a strip too narrow) and the start of the first row: the most graves */
       const res = cand.map(k => ({ k, ...tryK(k) })), mx = Math.max(...res.map(r => r.out.length)); let best = null;
-      for (const r of res) if (r.out.length > 0 && r.out.length >= 0.6 * mx && (!best || r.rows < best.rows || r.rows === best.rows && len[r.k] > len[best.k])) best = r;
-      if (best) { for (const t of best.out) tombs.push(t); (window.__CEMB = window.__CEMB || []).push({ x: Math.round(pts[0][0]), z: Math.round(pts[0][1]), n: pts.length, rows: best.rows, tombe: best.out.length, k: best.k }); } else (window.__CEMB = window.__CEMB || []).push({ x: Math.round(pts[0][0]), z: Math.round(pts[0][1]), n: pts.length, vuoto: 1, cand: cand.join(), len: len.join(), ph: Math.round(ph * 57.3), ext: [0, 1, 2, 3].map(k => { const hx = -D[k][0], hz = -D[k][1]; let a = 1e9, b = -1e9; for (const [x, z] of pts) { const v = x * hx + z * hz; if (v < a) a = v; if (v > b) b = v; } return Math.round(b - a); }).join() });
+      const ok = res.filter(r => r.out.length > 0 && r.out.length >= 0.6 * mx), mr = ok.length ? Math.min(...ok.map(r => r.rows)) : 0; /* the fewest rows, or one more: then the bigger path (wider, then longer) */
+      for (const r of ok) if (r.rows <= mr + 1 && (!best || Math.round(wid[r.k] * 2) > Math.round(wid[best.k] * 2) || Math.round(wid[r.k] * 2) === Math.round(wid[best.k] * 2) && len[r.k] > len[best.k] || Math.round(wid[r.k] * 2) === Math.round(wid[best.k] * 2) && len[r.k] === len[best.k] && r.rows < best.rows)) best = r;
+      if (best) { for (const t of best.out) tombs.push(t); (window.__CEMB = window.__CEMB || []).push({ x: Math.round(pts[0][0]), z: Math.round(pts[0][1]), n: pts.length, rows: best.rows, tombe: best.out.length, k: best.k, res: res.map(r => [r.k, r.rows, r.out.length, +wid[r.k].toFixed(1), len[r.k]].join('/')).join(' ') }); } else (window.__CEMB = window.__CEMB || []).push({ x: Math.round(pts[0][0]), z: Math.round(pts[0][1]), n: pts.length, vuoto: 1, cand: cand.join(), len: len.join(), ph: Math.round(ph * 57.3), ext: [0, 1, 2, 3].map(k => { const hx = -D[k][0], hz = -D[k][1]; let a = 1e9, b = -1e9; for (const [x, z] of pts) { const v = x * hx + z * hz; if (v < a) a = v; if (v > b) b = v; } return Math.round(b - a); }).join() });
     }
+    donePoly.push(outer); cemIdx++;
     for (let i = 0; i < outer.length; i++) { const p = outer[i], q = outer[(i + 1) % outer.length], L = hyp(q[0] - p[0], q[1] - p[1]); for (let s = 4; s < L - 2; s += 9) { const t = s / L, x = lerp(p[0], q[0], t), z = lerp(p[1], q[1], t), mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2; let nx = -(q[1] - p[1]) / L, nz = (q[0] - p[0]) / L; if (!inPoly(x + nx * 2, z + nz * 2, outer)) { nx = -nx; nz = -nz; } const X = x + nx * 2.2, Z = z + nz * 2.2; if (inside(X, Z, 1)) cyps.push([X, Z]); } }
   }
   if (!tombs.length && !cyps.length) return;
