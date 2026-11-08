@@ -24,6 +24,7 @@ const HELI = {
   flat: 0.55,                        /* highest minus lowest point under the skids (m) past which it slides off */
   maxAlt: 600,                       /* ceiling over terrain.base 0 */
   camK: 10, camS: 30, camPitchK: 0.8, /* camera: how fast it follows (1/s), the pace it goes back behind after the right stick (as a car at camS m/s), how fast the tilt from the right stick goes back (1/s) */
+  camMove0: 0.5, camMove1: 5, camMoveYr: 0.1, /* the view goes back behind only moving, as in a car (Carlo 8/11: still, it stays where you put it): none under camMove0 m/s (the car's own threshold), the full pace camS from camMove1; turning on the spot (L1/R1, over camMoveYr rad/s) is moving too */
   camRoll: 0.3, camZen: 1.52,        /* the share of the bank the view leans with, the highest view (rad over the horizon: 87 degrees, straight over it) */
   camRollV0: 1, camRollV1: 5,        /* the view leans with the bank only moving: none under camRollV0 m/s, in full over camRollV1 (Carlo 8/11: still, the view is still) */
   camW0: 2, camW1: 10,               /* the view turns from the nose to the way it goes between these speeds (m/s) */
@@ -273,6 +274,8 @@ function heliSound(v, t, m) {
 function heliSm(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
 /* how much the air grips it: 0 under gripV0 m/s forward, 1 over gripV1, smooth between */
 function heliGrip(e, fx, fz) { return heliSm((e.vx * fx + e.vz * fz - HELI.gripV0) / (HELI.gripV1 - HELI.gripV0)); }
+/* the pace the view goes back behind the nose after the right stick (as a car at that many m/s): nothing still, camS moving or turning on the spot */
+function heliCamPace(e) { return HELI.camS * Math.max(heliSm((hyp(e.vx, e.vz) - HELI.camMove0) / (HELI.camMove1 - HELI.camMove0)), heliSm((Math.abs(e.yr) - HELI.camMoveYr) / (4 * HELI.camMoveYr))); }
 /* how much the view leans with the bank (rad): a share of it moving, nothing still or nearly */
 function heliCamLean(e) { return e.roll * HELI.camRoll * heliSm((hyp(e.vx, e.vz) - HELI.camRollV0) / (HELI.camRollV1 - HELI.camRollV0)); }
 /* where the camera looks from behind the helicopter: the nose when still, the way it goes when it moves slowly (the stick held diagonally: diagonally),

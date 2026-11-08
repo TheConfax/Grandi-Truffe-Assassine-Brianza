@@ -841,7 +841,7 @@ rep("    if (!inCar && camPitch) {", "    if (inCar && P.car.heli) { const d0_ =
 # the camera of the helicopter (Carlo 7/11): moving it looks the way it goes (the stick held diagonally, it flies diagonally), still or nearly behind the nose; never from the front when it flies backwards
 rep("let hx = fx, hz = fz; if (inCar && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }", "let hx = fx, hz = fz; if (inCar && !P.car.heli && P.car.fwdSpeed < -2) { hx = -fx; hz = -fz; }\n    if (inCar && P.car.heli) { const a_ = heliCamDir(P.car); hx = Math.sin(a_); hz = Math.cos(a_); }")
 rep("rev = P.car.fwdSpeed < -2;", "rev = !P.car.heli && P.car.fwdSpeed < -2;")
-rep("  { const s_ = Math.abs(P.car.speed),", "  { const s_ = P.car.heli ? HELI.camS : Math.abs(P.car.speed),")
+rep("  { const s_ = Math.abs(P.car.speed),", "  { const s_ = P.car.heli ? heliCamPace(P.car) : Math.abs(P.car.speed),")
 rep("camPitch *= Math.exp(-k * dt);", "camPitch *= Math.exp(-(P.car.heli ? HELI.camPitchK : k) * dt);")
 rep("!inCar && camFree ? CAMF.posK : 7.5", "!inCar && camFree ? CAMF.posK : inCar && P.car.heli ? HELI.camK : 7.5")
 rep("(inCar ? camPitch * 6 : 0)", "(inCar && !P.car.heli ? camPitch * 6 : 0)")
