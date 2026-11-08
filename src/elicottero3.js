@@ -11,6 +11,7 @@ const HELI = {
      at full weight, climb 7.6 m/s (1500 ft/min) (airbus.com, H135 technical information; LPR, the Polish air ambulance). The sink is not in the data sheets: 6 m/s */
   tilt: 0.45, tiltK: 3.2,            /* most tilt from the stick (rad, 26 degrees: g tan = 4.7 m/s2 at the start), how fast the body follows it (1/s) */
   hold: 0.06, holdMax: 0.52,         /* stick let go: tilt against the drift (rad per m/s) and its cap: 30 degrees nose up, a quick stop (Carlo 7/11: it slid on for far too long) */
+  stopV0: 1, stopV1: 5, stopK: 3, stopV: 0.03, /* stick let go and slow (Carlo 8/11: still in the air it must stand still, as a car): under stopV1 m/s the tilt hands over to a plain stop (stopK 1/s, in full under stopV0), under stopV it stands */
   drag1: 0.015, drag2: 0.00074,      /* air drag, linear and quadratic: full stick ends at 70.5 m/s, the H135's fast cruise */
   climb: 7.6, sink: 6, vyK: 1.8,     /* climb and sink speed at full R2/L2 (m/s), how fast the vertical speed follows (1/s) */
   yawRate: 1.4, yawK: 4,             /* turn on the spot with L1/R1 (rad/s) and its ease (1/s) */
@@ -23,7 +24,9 @@ const HELI = {
   flat: 0.55,                        /* highest minus lowest point under the skids (m) past which it slides off */
   maxAlt: 600,                       /* ceiling over terrain.base 0 */
   camK: 10, camS: 30, camPitchK: 0.8, /* camera: how fast it follows (1/s), the pace it goes back behind after the right stick (as a car at camS m/s), how fast the tilt from the right stick goes back (1/s) */
+  camMove0: 0.5, camMove1: 5, camMoveYr: 0.1, /* the view goes back behind only moving, as in a car (Carlo 8/11: still, it stays where you put it): none under camMove0 m/s (the car's own threshold), the full pace camS from camMove1; turning on the spot (L1/R1, over camMoveYr rad/s) is moving too */
   camRoll: 0.3, camZen: 1.52,        /* the share of the bank the view leans with, the highest view (rad over the horizon: 87 degrees, straight over it) */
+  camRollV0: 1, camRollV1: 5,        /* the view leans with the bank only moving: none under camRollV0 m/s, in full over camRollV1 (Carlo 8/11: still, the view is still) */
   camW0: 2, camW1: 10,               /* the view turns from the nose to the way it goes between these speeds (m/s) */
   fogAlt: 50,                        /* the fog's reach grows by one time its own every fogAlt metres of the view over the ground (past the first 15) */
   home: [[507.4, -479.2, 0]],        /* unico elicottero, punto scelto da Carlo il 7/11; i punti di spawn veri sono ancora da definire (behind the Medateca, via Gagarin, Meda; heading 0) */
@@ -168,9 +171,11 @@ function heliStep1(e, dt) {
   const kt = 1 - Math.exp(-HELI.tiltK * dt); e.pitch += (pT - e.pitch) * kt; e.roll += (rT - e.roll) * kt;
   /* across: the rotor's thrust tilted with the body, less the drag */
   if (!e.ground) {
-    const g = 9.81 * lift, af = g * Math.tan(e.pitch), as = g * Math.tan(e.roll), dr = HELI.drag1 + HELI.drag2 * sp;
+    /* stick let go and slow: the tilt's push hands over to a plain stop, so that it comes to rest without swinging and then stands (the body still levels by itself, as before) */
+    const hw = alive && Math.abs(sf) < 0.05 && Math.abs(ss) < 0.05 ? 1 - heliSm((sp - HELI.stopV0) / (HELI.stopV1 - HELI.stopV0)) : 0;
+    const g = 9.81 * lift * (1 - hw), af = g * Math.tan(e.pitch), as = g * Math.tan(e.roll), dr = HELI.drag1 + HELI.drag2 * sp;
     e.vx += (fx * af + rx * as - e.vx * dr) * dt; e.vz += (fz * af + rz * as - e.vz * dr) * dt;
-    if (Math.abs(sf) < 0.05 && Math.abs(ss) < 0.05 && sp < 0.4) { const k = Math.exp(-3 * dt); e.vx *= k; e.vz *= k; }
+    if (hw > 0) { const k = Math.exp(-HELI.stopK * hw * dt); e.vx *= k; e.vz *= k; if (hw >= 1 && hyp(e.vx, e.vz) < HELI.stopV) e.vx = e.vz = 0; }
     /* grip on the air: going forward, the speed across the nose turns into speed along it (no sliding as on ice); slow, it slides freely as before */
     const gw = heliGrip(e, fx, fz);
     if (gw > 0) {
@@ -265,8 +270,14 @@ function heliSound(v, t, m) {
   AU.eng.o1.frequency.setTargetAtTime(24 + r * 30 + (v.inp.col || 0) * 4, t, 0.1); AU.eng.o2.frequency.setTargetAtTime(24 + r * 30, t, 0.1);
   AU.eng.lp.frequency.setTargetAtTime(220 + r * 380, t, 0.1); AU.eng.eg.gain.setTargetAtTime(m * (v.health > 0 ? (0.05 + 0.13 * r) * beat : 0), t, 0.012);
 }
+/* 0 under 0, 1 over 1, smooth between */
+function heliSm(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
 /* how much the air grips it: 0 under gripV0 m/s forward, 1 over gripV1, smooth between */
-function heliGrip(e, fx, fz) { const t = clamp((e.vx * fx + e.vz * fz - HELI.gripV0) / (HELI.gripV1 - HELI.gripV0), 0, 1); return t * t * (3 - 2 * t); }
+function heliGrip(e, fx, fz) { return heliSm((e.vx * fx + e.vz * fz - HELI.gripV0) / (HELI.gripV1 - HELI.gripV0)); }
+/* the pace the view goes back behind the nose after the right stick (as a car at that many m/s): nothing still, camS moving or turning on the spot */
+function heliCamPace(e) { return HELI.camS * Math.max(heliSm((hyp(e.vx, e.vz) - HELI.camMove0) / (HELI.camMove1 - HELI.camMove0)), heliSm((Math.abs(e.yr) - HELI.camMoveYr) / (4 * HELI.camMoveYr))); }
+/* how much the view leans with the bank (rad): a share of it moving, nothing still or nearly */
+function heliCamLean(e) { return e.roll * HELI.camRoll * heliSm((hyp(e.vx, e.vz) - HELI.camRollV0) / (HELI.camRollV1 - HELI.camRollV0)); }
 /* where the camera looks from behind the helicopter: the nose when still, the way it goes when it moves slowly (the stick held diagonally: diagonally),
    behind the nose again at speed, where the grip makes the nose and the way it goes one; going backwards it stays behind the nose */
 function heliCamDir(e) {
