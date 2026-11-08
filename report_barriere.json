@@ -11,15 +11,15 @@
    "pezzo_sciolto_m": 8.0
   },
   "varchi_trovati": 101,
-  "chiusi": 36,
-  "metri_chiusi": 151.7,
+  "chiusi": 35,
+  "metri_chiusi": 144.8,
   "pezzi_sciolti_spostati": 1,
   "aperti_per_motivo": {
    "una via che attraversa": 12,
-   "edificio": 21,
-   "banchina": 5,
+   "edificio": 20,
+   "banchina": 6,
    "carreggiata": 1,
-   "cancello": 13,
+   "cancello": 14,
    "passaggio a livello": 11,
    "sul binario": 2
   },
@@ -299,7 +299,7 @@
     "x": 739.5,
     "z": -1113.2,
     "m": 7.0,
-    "esito": "chiuso"
+    "esito": "cancello"
    },
    {
     "x": 3635.9,
@@ -533,7 +533,7 @@
     "x": 368.0,
     "z": -538.2,
     "m": 1.5,
-    "esito": "edificio"
+    "esito": "banchina"
    },
    {
     "x": -984.6,
@@ -634,15 +634,15 @@
   ],
   "misti": {
    "limite_m": 6.0,
-   "trovati": 112,
+   "trovati": 113,
    "chiusi": 43,
    "aperti_per_motivo": {
     "una via che attraversa": 7,
     "edificio": 13,
-    "cancello": 25,
-    "carreggiata": 4,
+    "cancello": 26,
+    "carreggiata": 3,
     "sul binario": 7,
-    "banchina": 8,
+    "banchina": 9,
     "passaggio a livello": 5
    },
    "elenco": [
@@ -692,7 +692,7 @@
      "x": 889.3,
      "z": -1524.1,
      "m": 4.2,
-     "esito": "carreggiata"
+     "esito": "cancello"
     },
     {
      "x": 891.6,
@@ -764,6 +764,12 @@
      "x": 292.5,
      "z": -457.1,
      "m": 3.5,
+     "esito": "edificio"
+    },
+    {
+     "x": 430.3,
+     "z": 274.1,
+     "m": 3.8,
      "esito": "edificio"
     },
     {
@@ -1292,7 +1298,7 @@
      "x": 368.0,
      "z": -538.2,
      "m": 1.5,
-     "esito": "edificio"
+     "esito": "banchina"
     },
     {
      "x": 444.8,

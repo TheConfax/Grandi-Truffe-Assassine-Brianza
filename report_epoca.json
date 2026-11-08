@@ -1,17 +1,17 @@
 {
  "edifici": 29656,
  "aggancio_esatto": 358,
- "dalla_via": 10621,
- "dal_vicinato": 5066,
+ "dalla_via": 10638,
+ "dal_vicinato": 5049,
  "sconosciuti": 13611,
  "per_fascia": [
-  2254,
-  1482,
-  4339,
-  4409,
-  2110,
-  1011,
-  440
+  2260,
+  1485,
+  4328,
+  4407,
+  2114,
+  1010,
+  441
  ],
  "comuni": {
   "MEDA": {
@@ -34,8 +34,8 @@
    "senza_civico": 283,
    "via_non_trovata": 45,
    "esatti": 129,
-   "dalla_via": 5684,
-   "dal_vicinato": 2531,
+   "dalla_via": 5701,
+   "dal_vicinato": 2514,
    "sconosciuti": 587
   }
  }
