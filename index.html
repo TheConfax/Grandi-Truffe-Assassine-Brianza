@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo facciate-fix · dopo c4e38516 · assemblato 08/11 16:42 · porta ' + location.port;
+    const txt = 'locale · ramo facciate-fix · dopo 741b9605 · assemblato 08/11 17:46 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -4112,7 +4112,7 @@ function* buildTileGen(T) {
           if (R.n && R.fw) for (let j = 0; j < R.n; j++) if (ov(j, sc)) noG.add(j); /* every ground-floor window the door and its frame would touch goes, the next bay's too */
           d.sty = S0.door; d.steps = S0.steps; if (S0.door === 'vil') d.col = S0.band === 'D' ? 0x2e3133 : S0.band === 'C' ? 0x6b4a2e : [0x7a5232, 0xece9e2, 0x5b3a26][Math.floor(facHashB(B, 5) * 3) % 3];
           (R.dr || (R.dr = [])).push([sc, 2 * dh]); const mid = R.at(sc), ux = e[4], uz = -e[3]; /* e: [dx, dz, L, nx, nz]; the door faces along the outward normal (-uz, ux) = (nx, nz) */
-          d.ax = mid[0] - ux * d.W / 2; d.az = mid[1] - uz * d.W / 2; d.bx = mid[0] + ux * d.W / 2; d.bz = mid[1] + uz * d.W / 2; d.ux = ux; d.uz = uz; d.gy = Math.min(H.ground(d.ax, d.az), H.ground(d.bx, d.bz));
+          d.ax = mid[0] - ux * d.W / 2; d.az = mid[1] - uz * d.W / 2; d.bx = mid[0] + ux * d.W / 2; d.bz = mid[1] + uz * d.W / 2; d.ux = ux; d.uz = uz; d.gy = Math.min(H.ground(d.ax, d.az), H.ground(d.bx, d.bz)); if (facCoperto(B, mid[0] + e[3] * 0.4, mid[1] + e[4] * 0.4, d.gy + 1.2)) d.skip = true; /* in front of it another volume: no door */
         }
         return { outer, holes, area, h, t, raised, gys, gmin, gmax, top, bot, R, pcB, colOr, sty, wallCol, bare, planes, pitched, S0, fwB, rings };
     }, preps = new Map();
@@ -4161,12 +4161,12 @@ function* buildTileGen(T) {
           const { rp, bw, sp } = R, rlAt = s => { for (let k = 1; k < rp.length; k++) if (s <= rp[k][0] || k === rp.length - 1) { const [p0, y0] = rp[k - 1], [p1, y1] = rp[k]; return y0 + (y1 - y0) * clamp((s - p0) / ((p1 - p0) || 1), 0, 1); } return rp[0][1]; };
           R.rlAt = rlAt; const grp = R.grp = [];
           for (const [s0, s1, g, , bay] of sp) {
-            const kl = kLoAt(g); let f = [999, -999];
+            const kl = kLoAt(g); let f = [999, -999], covK = () => false;
             const rfw = R.fw || fw; if (bay) { const w0 = s0 + rfw[2] * bw, w1 = s0 + rfw[3] * bw; let rl = Math.min(rlAt(w0), rlAt(w1)); for (const [p, y] of rp) if (p > w0 && p < w1) rl = Math.min(rl, y); const kt = Math.floor((rl - FAC.EM - Math.max(rfw[1], 1.2) * sc - F0) / FL + 1e-4); if (kt >= kl) f = [kl, kt]; }
-            if (bay && f[0] <= f[1]) { /* a floor of this bay behind another building (a lower one built onto it, a volume inside another): no window there, painted or 3D */
+            if (bay && f[0] <= f[1]) { /* a floor of this bay behind another building (a lower one built onto it, a volume inside another), or on a wall another volume shares (a house the DBGT has twice, one over the other): no window there, painted or 3D (Carlo 8/11, via Farga) */
               const sm = (s0 + s1) / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + E[R.ed[q]][2]) q++;
-              const e = E[R.ed[q]], yAt = k => F0 + k * FL + 1.6 * sc, pts = [sm, s0 + 0.12 * bw, s1 - 0.12 * bw].map(ss => { const p = R.at(ss); return [p[0] + e[3] * 0.4, p[1] + e[4] * 0.4]; });
-              const cov = k => pts.some(([px, pz]) => facCoperto(B, px, pz, yAt(k)));
+              const e = E[R.ed[q]], yAt = k => F0 + k * FL + 1.6 * sc, pts = [sm, s0 + 0.12 * bw, s1 - 0.12 * bw].map(ss => { const p = R.at(ss); return [p[0] + e[3] * 0.4, p[1] + e[4] * 0.4]; }); const ins = [sm, s0 + 0.12 * bw, s1 - 0.12 * bw].map(ss => { const p = R.at(ss); return [p[0] - e[3] * 0.15, p[1] - e[4] * 0.15]; });
+              const cov = covK = k => pts.some(([px, pz]) => facCoperto(B, px, pz, yAt(k))) || ins.some(([px, pz]) => facDoppio(B, px, pz, yAt(k)));
               while (f[0] <= f[1] && cov(f[0])) f[0]++; while (f[1] >= f[0] && cov(f[1])) f[1]--; if (f[0] > f[1]) f = [999, -999];
             }
             let dropped = 0;
@@ -4181,9 +4181,9 @@ function* buildTileGen(T) {
             if (bay && f[0] < 900) { /* the 3D windows, balconies and details of this bay (facciate3.js): the same floors the texture draws */
               const j = Math.round((s0 - R.pad) / bw), sm = (s0 + s1) / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + E[R.ed[q]][2]) q++;
               const e = E[R.ed[q]], kTop = f[1] - voff;
-              for (let k = f[0] - voff; k <= kTop; k++) facWinRecs(T, R, e, B, sty, R.side, j, k, s0, bw, F0, FL, sc, wallCol, !raised && k === kl);
-              if (S0.ang && R.side === 'f' && R.n >= 3 && (j === 0 || j === R.n - 1)) for (let k = kl + 1; k <= kTop; k++) facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, 'ang');
-              if (S0.bc && R.side === 'f' && j % 2 === 0 && kl + 1 <= kTop) facExtraBal(T, R, e, sty, kl + 1, s0, bw, F0, FL, wallCol, j, 'bc');
+              for (let k = f[0] - voff; k <= kTop; k++) if (!covK(k)) facWinRecs(T, R, e, B, sty, R.side, j, k, s0, bw, F0, FL, sc, wallCol, !raised && k === kl); /* a floor in the middle covered too: no 3D window there */
+              if (S0.ang && R.side === 'f' && R.n >= 3 && (j === 0 || j === R.n - 1)) for (let k = kl + 1; k <= kTop; k++) if (!covK(k)) facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, 'ang');
+              if (S0.bc && R.side === 'f' && j % 2 === 0 && kl + 1 <= kTop && !covK(kl + 1)) facExtraBal(T, R, e, sty, kl + 1, s0, bw, F0, FL, wallCol, j, 'bc');
             }
           }
         }
@@ -12208,7 +12208,7 @@ for (const k in NG_WIN.mat) rifMat(NG_WIN.mat[k], 'shop');
 // Near the player (FAC_R) the windows are 3D: the wall opens where the window is (the shader drops those pixels) and behind it stand the reveal, the
 // frame and the glass; the shutters, the sills, the roller blinds stand on and in it; the balconies are 3D a little further (FAC_RB). Further away the
 // painted cell, as before. The 3D parts are instanced: every few metres the windows round the camera are written into one mesh per part
-const FAC_R = 72, FAC_RB = 150, FAC_FL = 3.1;
+const FAC_R = 150, FAC_RB = 150, FAC_FL = 3.1;
 const FAC_COLS = 8, FAC_ROWS = 16, FAC_CPX = 256, FAC_PAD = 8, FAC_IN = FAC_CPX - 2 * FAC_PAD;
 const FAC_EP_NOMI = ['A', 'B', 'C', 'D'];
 // ---- the windows, the balconies, the materials of the cells. Sizes in metres; u in the bay 0..1 (centre of the window), lo/hi over the floor
@@ -12503,8 +12503,24 @@ const FAC_PUB_LISCI = new Set([0, 1, 13]); /* chapels and churches stay smooth, 
 // is this point (just out of a wall, at height y) inside another building?
 function facCoperto(B, x, z, y) {
   let c = false;
-  BLD.each(x, z, x, z, b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9; if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h))) c = true; });
+  const f = b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9; if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h))) c = true; };
+  BLD.each(x, z, x, z, f); BLDR.each(x, z, x, z, f); /* the raised volumes too (a passage, an overhang): they are not in BLD (Carlo 8/11, via Farga) */
   return c;
+}
+// is this point (just inside a wall, at height y) inside another volume too? Two volumes on the same wall (the DBGT has some houses twice, one over the other,
+// or a body built against the wall from inside): only one of them carries the windows, the taller one (the first one if they are as tall)
+function facDoppio(B, x, z, y) {
+  if (B.gtop === undefined) B.gtop = bldTop(B); let c = false;
+  const f = b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9;
+    if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h)) && (b.gtop > B.gtop + 0.05 || (Math.abs(b.gtop - B.gtop) <= 0.05 && (b.bi || 0) < (B.bi || 0)))) c = true; };
+  BLD.each(x, z, x, z, f); BLDR.each(x, z, x, z, f);
+  return c;
+}
+// is the room a balcony takes free? No volume, not even another wing of its own house, where it stands out of the wall (Carlo 8/11, via Farga: a balcony went through another volume of the house, over the covered passage)
+function facBalLibero(B, x, z, nx, nz, w, d, y) {
+  const ux = nz, uz = -nx;
+  for (const o of [Math.min(0.3, d * 0.5), d * 0.5, d - 0.05]) for (const s of [-0.47, -0.25, 0, 0.25, 0.47]) { const px = x + nx * o + ux * w * s, pz = z + nz * o + uz * w * s; for (const yy of [y + 0.1, y + 0.9]) if (facCoperto(B, px, pz, yy)) return false; }
+  return true;
 }
 // does this wall look onto a street? (front cells); a courtyard (a hole of the plan) never does
 function facFronte(ax, az, cx, cz, nx, nz) {
@@ -12536,8 +12552,9 @@ function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gr
     const ux = nz, uz = -nx;
     if (w.bal && !gro) {
       const b = w.bal, bx0 = s0 + b.u0 * bw, bx1 = s0 + b.u1 * bw, q = at((bx0 + bx1) / 2), nastro = b.u0 <= 0.001 && b.u1 >= 0.999;
-      bal.push({ x: q[0], y: yF, z: q[1], nx, nz, w: bx1 - bx0, d: b.d, rail: b.rail, rc: b.rc ? COL(b.rc) : wallCol.clone().multiplyScalar(0.92), sl: !nastro || j === 0, sr: !nastro || j === R.n - 1 });
-      const hb = hashRnd(h0 * 53 + 1);
+      const libero = facBalLibero(null, q[0], q[1], nx, nz, bx1 - bx0, b.d, yF); /* over another volume: only the railing at the French window, no balcony (Carlo 8/11, via Farga) */
+      bal.push({ x: q[0], y: yF, z: q[1], nx, nz, w: bx1 - bx0, d: libero ? b.d : 0.12, rail: b.rail, rc: b.rc ? COL(b.rc) : wallCol.clone().multiplyScalar(0.92), sl: !nastro || j === 0, sr: !nastro || j === R.n - 1 });
+      const hb = libero ? hashRnd(h0 * 53 + 1) : 0.5; /* no pots, awnings or dishes on a balcony that is not there */
       if (hb < 0.35) det.push({ k: 'pot', x: q[0] + ux * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nx * (b.d - 0.3), y: yF, z: q[1] + uz * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nz * (b.d - 0.3), nx, nz, R: FAC_R });
       if ((fam === 'pal' || fam === 'alto' || fam === 'vil') && sty.S.band !== 'D' && hb > 0.82) det.push({ k: 'awn', x: p[0], y: yF + hi + 0.25, z: p[1], nx, nz, w: Math.min(bx1 - bx0, ww + 1.2), d: Math.min(b.d, 1.2), c: hashRnd(hb * 13), R: FAC_RB });
       if ((fam === 'pal' || fam === 'alto') && hb > 0.7 && hb < 0.76) det.push({ k: 'dish', x: q[0] + ux * (bx1 - bx0) * 0.4 + nx * (b.d - 0.05), y: yF + 1.15, z: q[1] + uz * (bx1 - bx0) * 0.4 + nz * (b.d - 0.05), nx, nz, R: FAC_RB });
@@ -12553,6 +12570,7 @@ function facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, kind) {
   /* the balconies of the corner bays (ang) and the small stone ones of the piano nobile (bc): 3D only */
   const o = kind === 'ang' ? sty.S.ang : sty.S.bc, p = R.at(s0 + bw / 2), bal = T.fbal || (T.fbal = []);
   const w = kind === 'ang' ? bw * 0.86 : Math.min(bw * 0.5, 1.8);
+  if (!facBalLibero(null, p[0], p[1], e[3], e[4], w, o.d, F0 + FL * k)) return; /* over another volume: none */
   bal.push({ x: p[0], y: F0 + FL * k, z: p[1], nx: e[3], nz: e[4], w, d: o.d, rail: o.rail, rc: COL(o.rc || '#e6e0d0'), sl: true, sr: true });
 }
 // ---- the instanced parts
@@ -12666,15 +12684,15 @@ const FAC_PARTS = (() => {
     scene.add(m); P[name] = { m, cap, n: 0, lit: o.lit ? geo.attributes.aLit : null, wo: o.win ? geo.attributes.aWO : null, wn: o.win ? geo.attributes.aWN : null };
   };
   /* recessed parts: no fade (only seen through the hole); the sun in them only through the opening (facRecMat) */
-  mk('reveal', FAC_GEO.reveal, lam({ vertexColors: true }), 6000, { win: true });
-  mk('back', FAC_GEO.back, lam({}), 1500, { win: true });
-  mk('glass', FAC_GEO.glass.clone(), glassMat, 6000, { noCol: true, lit: true, win: true });
-  mk('bar', FAC_GEO.bar, lam({}), 40000, { win: true });
-  mk('tapp', FAC_GEO.tapp, lam({ map: FAC_TAPP }), 6000, { win: true });
+  mk('reveal', FAC_GEO.reveal, lam({ vertexColors: true }), 24000, { win: true });
+  mk('back', FAC_GEO.back, lam({}), 4000, { win: true });
+  mk('glass', FAC_GEO.glass.clone(), glassMat, 24000, { noCol: true, lit: true, win: true });
+  mk('bar', FAC_GEO.bar, lam({}), 160000, { win: true });
+  mk('tapp', FAC_GEO.tapp, lam({ map: FAC_TAPP }), 24000, { win: true });
   /* parts on and out of the wall: they fade with the hole */
-  mk('sill', FAC_GEO.sill, facFadeMat(lam({}), FAC_R), 6000, { cast: true });
-  mk('leaf', FAC_GEO.leaf, facFadeMat(lam({ map: FAC_SLAT }), FAC_R), 12000, { cast: true });
-  mk('fin', FAC_GEO.fin, facFadeMat(lam({}), FAC_R), 3000);
+  mk('sill', FAC_GEO.sill, facFadeMat(lam({}), FAC_R), 24000, { cast: true });
+  mk('leaf', FAC_GEO.leaf, facFadeMat(lam({ map: FAC_SLAT }), FAC_R), 48000, { cast: true });
+  mk('fin', FAC_GEO.fin, facFadeMat(lam({}), FAC_R), 10000);
   mk('bow', FAC_GEO.bow, facFadeMat(lam({ color: 0x27313b }), FAC_R), 1500, { noCol: true });
   mk('bowBox', FAC_GEO.bowBox, facFadeMat(lam({}), FAC_R), 3000);
   mk('slab', FAC_GEO.slab, facFadeMat(lam({ vertexColors: true }), FAC_RB), 8000, { cast: true });
@@ -12684,8 +12702,8 @@ const FAC_PARTS = (() => {
   mk('railVe', FAC_GEO.rail, glassRail, 8000, { noCol: true, ro: 12 });
   mk('railPi', FAC_GEO.wall, facFadeMat(lam({}), FAC_RB), 16000, { cast: true });
   mk('top', FAC_GEO.wall, facFadeMat(lam({}), FAC_RB), 8000);
-  mk('ac', FAC_GEO.ac, facFadeMat(lam({ map: FAC_ACT }), FAC_R), 2000, { noCol: true });
-  mk('pot', FAC_GEO.pot, facFadeMat(lam({ vertexColors: true }), FAC_R), 4000, { noCol: true });
+  mk('ac', FAC_GEO.ac, facFadeMat(lam({ map: FAC_ACT }), FAC_R), 6000, { noCol: true });
+  mk('pot', FAC_GEO.pot, facFadeMat(lam({ vertexColors: true }), FAC_R), 12000, { noCol: true });
   mk('awn', FAC_GEO.awn, facFadeMat(lam({ map: FAC_AWN, side: THREE.DoubleSide }), FAC_RB), 2000, { cast: true });
   mk('dish', FAC_GEO.dish, facFadeMat(lam({ color: 0xdcdcd8 }), FAC_RB), 1000, { noCol: true });
   return P;
@@ -13055,5 +13073,5 @@ window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { facAggiorna, FAC_STATO, FAC_PARTS, HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { facAggiorna, FAC_STATO, FAC_PARTS, facCoperto, facBalLibero, HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>

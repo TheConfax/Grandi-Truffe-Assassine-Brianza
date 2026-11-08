@@ -6,7 +6,7 @@
 // Near the player (FAC_R) the windows are 3D: the wall opens where the window is (the shader drops those pixels) and behind it stand the reveal, the
 // frame and the glass; the shutters, the sills, the roller blinds stand on and in it; the balconies are 3D a little further (FAC_RB). Further away the
 // painted cell, as before. The 3D parts are instanced: every few metres the windows round the camera are written into one mesh per part
-const FAC_R = 72, FAC_RB = 150, FAC_FL = 3.1;
+const FAC_R = 150, FAC_RB = 150, FAC_FL = 3.1;
 const FAC_COLS = 8, FAC_ROWS = 16, FAC_CPX = 256, FAC_PAD = 8, FAC_IN = FAC_CPX - 2 * FAC_PAD;
 const FAC_EP_NOMI = ['A', 'B', 'C', 'D'];
 // ---- the windows, the balconies, the materials of the cells. Sizes in metres; u in the bay 0..1 (centre of the window), lo/hi over the floor
@@ -301,8 +301,24 @@ const FAC_PUB_LISCI = new Set([0, 1, 13]); /* chapels and churches stay smooth, 
 // is this point (just out of a wall, at height y) inside another building?
 function facCoperto(B, x, z, y) {
   let c = false;
-  BLD.each(x, z, x, z, b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9; if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h))) c = true; });
+  const f = b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9; if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h))) c = true; };
+  BLD.each(x, z, x, z, f); BLDR.each(x, z, x, z, f); /* the raised volumes too (a passage, an overhang): they are not in BLD (Carlo 8/11, via Farga) */
   return c;
+}
+// is this point (just inside a wall, at height y) inside another volume too? Two volumes on the same wall (the DBGT has some houses twice, one over the other,
+// or a body built against the wall from inside): only one of them carries the windows, the taller one (the first one if they are as tall)
+function facDoppio(B, x, z, y) {
+  if (B.gtop === undefined) B.gtop = bldTop(B); let c = false;
+  const f = b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9;
+    if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h)) && (b.gtop > B.gtop + 0.05 || (Math.abs(b.gtop - B.gtop) <= 0.05 && (b.bi || 0) < (B.bi || 0)))) c = true; };
+  BLD.each(x, z, x, z, f); BLDR.each(x, z, x, z, f);
+  return c;
+}
+// is the room a balcony takes free? No volume, not even another wing of its own house, where it stands out of the wall (Carlo 8/11, via Farga: a balcony went through another volume of the house, over the covered passage)
+function facBalLibero(B, x, z, nx, nz, w, d, y) {
+  const ux = nz, uz = -nx;
+  for (const o of [Math.min(0.3, d * 0.5), d * 0.5, d - 0.05]) for (const s of [-0.47, -0.25, 0, 0.25, 0.47]) { const px = x + nx * o + ux * w * s, pz = z + nz * o + uz * w * s; for (const yy of [y + 0.1, y + 0.9]) if (facCoperto(B, px, pz, yy)) return false; }
+  return true;
 }
 // does this wall look onto a street? (front cells); a courtyard (a hole of the plan) never does
 function facFronte(ax, az, cx, cz, nx, nz) {
@@ -334,8 +350,9 @@ function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gr
     const ux = nz, uz = -nx;
     if (w.bal && !gro) {
       const b = w.bal, bx0 = s0 + b.u0 * bw, bx1 = s0 + b.u1 * bw, q = at((bx0 + bx1) / 2), nastro = b.u0 <= 0.001 && b.u1 >= 0.999;
-      bal.push({ x: q[0], y: yF, z: q[1], nx, nz, w: bx1 - bx0, d: b.d, rail: b.rail, rc: b.rc ? COL(b.rc) : wallCol.clone().multiplyScalar(0.92), sl: !nastro || j === 0, sr: !nastro || j === R.n - 1 });
-      const hb = hashRnd(h0 * 53 + 1);
+      const libero = facBalLibero(null, q[0], q[1], nx, nz, bx1 - bx0, b.d, yF); /* over another volume: only the railing at the French window, no balcony (Carlo 8/11, via Farga) */
+      bal.push({ x: q[0], y: yF, z: q[1], nx, nz, w: bx1 - bx0, d: libero ? b.d : 0.12, rail: b.rail, rc: b.rc ? COL(b.rc) : wallCol.clone().multiplyScalar(0.92), sl: !nastro || j === 0, sr: !nastro || j === R.n - 1 });
+      const hb = libero ? hashRnd(h0 * 53 + 1) : 0.5; /* no pots, awnings or dishes on a balcony that is not there */
       if (hb < 0.35) det.push({ k: 'pot', x: q[0] + ux * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nx * (b.d - 0.3), y: yF, z: q[1] + uz * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nz * (b.d - 0.3), nx, nz, R: FAC_R });
       if ((fam === 'pal' || fam === 'alto' || fam === 'vil') && sty.S.band !== 'D' && hb > 0.82) det.push({ k: 'awn', x: p[0], y: yF + hi + 0.25, z: p[1], nx, nz, w: Math.min(bx1 - bx0, ww + 1.2), d: Math.min(b.d, 1.2), c: hashRnd(hb * 13), R: FAC_RB });
       if ((fam === 'pal' || fam === 'alto') && hb > 0.7 && hb < 0.76) det.push({ k: 'dish', x: q[0] + ux * (bx1 - bx0) * 0.4 + nx * (b.d - 0.05), y: yF + 1.15, z: q[1] + uz * (bx1 - bx0) * 0.4 + nz * (b.d - 0.05), nx, nz, R: FAC_RB });
@@ -351,6 +368,7 @@ function facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, kind) {
   /* the balconies of the corner bays (ang) and the small stone ones of the piano nobile (bc): 3D only */
   const o = kind === 'ang' ? sty.S.ang : sty.S.bc, p = R.at(s0 + bw / 2), bal = T.fbal || (T.fbal = []);
   const w = kind === 'ang' ? bw * 0.86 : Math.min(bw * 0.5, 1.8);
+  if (!facBalLibero(null, p[0], p[1], e[3], e[4], w, o.d, F0 + FL * k)) return; /* over another volume: none */
   bal.push({ x: p[0], y: F0 + FL * k, z: p[1], nx: e[3], nz: e[4], w, d: o.d, rail: o.rail, rc: COL(o.rc || '#e6e0d0'), sl: true, sr: true });
 }
 // ---- the instanced parts
@@ -464,15 +482,15 @@ const FAC_PARTS = (() => {
     scene.add(m); P[name] = { m, cap, n: 0, lit: o.lit ? geo.attributes.aLit : null, wo: o.win ? geo.attributes.aWO : null, wn: o.win ? geo.attributes.aWN : null };
   };
   /* recessed parts: no fade (only seen through the hole); the sun in them only through the opening (facRecMat) */
-  mk('reveal', FAC_GEO.reveal, lam({ vertexColors: true }), 6000, { win: true });
-  mk('back', FAC_GEO.back, lam({}), 1500, { win: true });
-  mk('glass', FAC_GEO.glass.clone(), glassMat, 6000, { noCol: true, lit: true, win: true });
-  mk('bar', FAC_GEO.bar, lam({}), 40000, { win: true });
-  mk('tapp', FAC_GEO.tapp, lam({ map: FAC_TAPP }), 6000, { win: true });
+  mk('reveal', FAC_GEO.reveal, lam({ vertexColors: true }), 24000, { win: true });
+  mk('back', FAC_GEO.back, lam({}), 4000, { win: true });
+  mk('glass', FAC_GEO.glass.clone(), glassMat, 24000, { noCol: true, lit: true, win: true });
+  mk('bar', FAC_GEO.bar, lam({}), 160000, { win: true });
+  mk('tapp', FAC_GEO.tapp, lam({ map: FAC_TAPP }), 24000, { win: true });
   /* parts on and out of the wall: they fade with the hole */
-  mk('sill', FAC_GEO.sill, facFadeMat(lam({}), FAC_R), 6000, { cast: true });
-  mk('leaf', FAC_GEO.leaf, facFadeMat(lam({ map: FAC_SLAT }), FAC_R), 12000, { cast: true });
-  mk('fin', FAC_GEO.fin, facFadeMat(lam({}), FAC_R), 3000);
+  mk('sill', FAC_GEO.sill, facFadeMat(lam({}), FAC_R), 24000, { cast: true });
+  mk('leaf', FAC_GEO.leaf, facFadeMat(lam({ map: FAC_SLAT }), FAC_R), 48000, { cast: true });
+  mk('fin', FAC_GEO.fin, facFadeMat(lam({}), FAC_R), 10000);
   mk('bow', FAC_GEO.bow, facFadeMat(lam({ color: 0x27313b }), FAC_R), 1500, { noCol: true });
   mk('bowBox', FAC_GEO.bowBox, facFadeMat(lam({}), FAC_R), 3000);
   mk('slab', FAC_GEO.slab, facFadeMat(lam({ vertexColors: true }), FAC_RB), 8000, { cast: true });
@@ -482,8 +500,8 @@ const FAC_PARTS = (() => {
   mk('railVe', FAC_GEO.rail, glassRail, 8000, { noCol: true, ro: 12 });
   mk('railPi', FAC_GEO.wall, facFadeMat(lam({}), FAC_RB), 16000, { cast: true });
   mk('top', FAC_GEO.wall, facFadeMat(lam({}), FAC_RB), 8000);
-  mk('ac', FAC_GEO.ac, facFadeMat(lam({ map: FAC_ACT }), FAC_R), 2000, { noCol: true });
-  mk('pot', FAC_GEO.pot, facFadeMat(lam({ vertexColors: true }), FAC_R), 4000, { noCol: true });
+  mk('ac', FAC_GEO.ac, facFadeMat(lam({ map: FAC_ACT }), FAC_R), 6000, { noCol: true });
+  mk('pot', FAC_GEO.pot, facFadeMat(lam({ vertexColors: true }), FAC_R), 12000, { noCol: true });
   mk('awn', FAC_GEO.awn, facFadeMat(lam({ map: FAC_AWN, side: THREE.DoubleSide }), FAC_RB), 2000, { cast: true });
   mk('dish', FAC_GEO.dish, facFadeMat(lam({ color: 0xdcdcd8 }), FAC_RB), 1000, { noCol: true });
   return P;
