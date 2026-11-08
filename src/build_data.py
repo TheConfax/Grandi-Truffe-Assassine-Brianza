@@ -2773,9 +2773,6 @@ if _gseg and trees:
         trees[k_] = type(t_)([x_, z_] + list(t_[2:])) if isinstance(t_, (list, tuple)) else (x_, z_); _vfl['alberi_spostati'] += 1
 log('cancelli aperti e alberi', _vfl)
 if STR: STR.rep['cancelli_ante_alberi'] = _vfl
-_nb1 = len(bar_out) + len(fences); _fz_ = fondi_doppi(bar_out + [(f_, 'fe', 0) for f_ in fences], _dstr)
-bar_out = [b_ for b_ in _fz_ if b_[1] != 'fe']; fences = [list(b_[0]) for b_ in _fz_ if b_[1] == 'fe']
-log('divisori doppi fusi alla fine: pezzi', _nb1, '->', len(bar_out) + len(fences))
 # ---- chiusure a T (src/chiusure_t.py): the free end of a fence, wall or hedge that stops a few metres from the flank of another one, of a building or of a gate is carried on its line until it touches, and closes there
 from chiusure_t import chiudi_a_t as _chiudi_t
 _gt_ = [(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]) if (g_[0], g_[1]) != (g_[2], g_[3]) else Point(g_[0] / 10, g_[1] / 10), g_[4]) for g_ in gate_out]
@@ -2785,6 +2782,9 @@ _nt_, _rt_ = _chiudi_t([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if le
 bar_out += [(list(p_), k_, h_) for p_, k_, h_ in _nt_]
 log('chiusure a T', dict(_rt_))
 if STR: STR.rep['chiusure_a_t'] = dict(_rt_)
+_nb1 = len(bar_out) + len(fences); _fz_ = fondi_doppi(bar_out + [(f_, 'fe', 0) for f_ in fences], _dstr)
+bar_out = [b_ for b_ in _fz_ if b_[1] != 'fe']; fences = [list(b_[0]) for b_ in _fz_ if b_[1] == 'fe']
+log('divisori doppi fusi alla fine: pezzi', _nb1, '->', len(bar_out) + len(fences))
 if STR: STR.rep['doppioni_tolti_alla_fine'] = dict(cancelli=_gd_per, divisori=_nb1 - len(bar_out) - len(fences))
 # ---- check on fences and gates (src/controllo_recinzioni.py): doubled dividers and gates left, OSM gates not built, isolated DBGT railings drawn (all must be 0)
 from controllo_recinzioni import controlla as _controlla_rec

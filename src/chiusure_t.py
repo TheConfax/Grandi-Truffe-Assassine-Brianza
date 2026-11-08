@@ -17,6 +17,26 @@ LAT = 0.8          # m: tolerance when the extension of the end misses the targe
 COSMIN = 0.92
 LAT_G = 1.5       # m: the same towards a gate, which stands on the line of the street front the short end of a fence may point slightly beside
 VIA_D = 1.0
+TAN_W = 1.5       # m: the direction of the target is read over this much of it each side of the hit (a short hook at the end of a line is no flank)
+PC_D = 1.5        # m: a closure that passes this near a passo carraio of the DBGT closes an access
+PAR_D = 2.3       # m: a closure that runs side by side with another divider nearer than this for PAR_L m or more is a double of it (src/barriere.py DOPPIO_D, DOPPIO_L, DOPPIO_COS)
+PAR_L = 3.0
+PAR_COS = 0.9
+
+def _parallelo(S, altre):
+    """True if S runs side by side (within PAR_D, the same way) with one of the lines altre for PAR_L m or more"""
+    if not altre: return False
+    n = max(2, int(S.length / 0.5)); sx, sz = S.coords[-1][0] - S.coords[0][0], S.coords[-1][1] - S.coords[0][1]; sl = math.hypot(sx, sz) or 1.0; sx, sz = sx / sl, sz / sl
+    for L in altre:
+        marks = 0
+        for k in range(n + 1):
+            P = S.interpolate(k * S.length / n)
+            if L.distance(P) >= PAR_D: continue
+            t = L.project(P); a = L.interpolate(max(0.0, t - 0.3)); b = L.interpolate(min(L.length, t + 0.3)); dx, dz = b.x - a.x, b.y - a.y; dl = math.hypot(dx, dz)
+            if dl > 1e-6 and abs((dx * sx + dz * sz) / dl) > PAR_COS: marks += 1
+        if marks * S.length / n >= PAR_L: return True
+    return False
+
 
 def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None, carr=()):
     """lines [(LineString, kind, h)] (no railway); edifici [Polygon]; gates [(LineString, tipo)]; doors [LineString]; vie [LineString]; pav [Polygon] (surfaces a fence never crosses); carr [Polygon] (the carriageway proper: never crossed; a closure that ends on a gate, along the line of the lot, may cross the rest of pav);
@@ -78,7 +98,7 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
             if not isg and d > GAP_MAX: note(e, 'troppo_largo', d); continue
             if not isg:
                 tg = cl[j]; pos = tg.project(Point(c))
-                p1 = tg.interpolate(max(0, pos - 0.5)); p2 = tg.interpolate(min(tg.length, pos + 0.5))
+                p1 = tg.interpolate(max(0, pos - TAN_W)); p2 = tg.interpolate(min(tg.length, pos + TAN_W))
                 tx, tz = p2.x - p1.x, p2.y - p1.y; tl = math.hypot(tx, tz)
                 if tl < 1e-6: continue
                 sx, sz = (c[0] - e[0]) / d, (c[1] - e[1]) / d
@@ -91,8 +111,9 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
             if VT is not None and any(vie[k].distance(S) < VIA_D for k in VT.query(S.buffer(VIA_D))): note(e, 'via_nel_varco', d); continue
             if CAT is not None and any(carr[k].intersects(S) and carr[k].intersection(S).length > 0.3 for k in CAT.query(S)): note(e, 'carreggiata_nel_varco', d); continue
             if PT is not None and not isg and any(pav[k].intersects(S) and pav[k].intersection(S).length > 0.3 for k in PT.query(S)): note(e, 'pavimentato_nel_varco', d); continue
-            if CT is not None and any(pcs[k].distance(S) < 4.0 for k in CT.query(S.buffer(4.0))): note(e, 'passo_carraio_vicino', d); continue
+            if CT is not None and any(pcs[k].distance(S) < PC_D for k in CT.query(S.buffer(PC_D))): note(e, 'passo_carraio_vicino', d); continue
             if any(S.distance(sd) < 0.2 for sd in seg_done): note(e, 'doppio'); continue
+            if _parallelo(S, [cl[k] for k in T.query(S.buffer(PAR_D)) if k < nl and k != i] + [sd for sd in seg_done if sd.distance(S) < PAR_D]): note(e, 'parallelo_a_un_altro', d); continue
             seg_done.append(S)
             note(e, 'chiuso', d, j >= nl)
             rep['chiusi_' + ('cancello' if isg else 'edificio' if j >= nl else 'recinzione')] += 1
