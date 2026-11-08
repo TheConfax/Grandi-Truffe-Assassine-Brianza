@@ -46,13 +46,13 @@
  "demoliti": {
   "controllati": 1168,
   "non_controllabili": 3,
-  "tolti": 88,
-  "m2": 31464,
-  "soglia": 0.1899,
+  "tolti": 87,
+  "m2": 31055,
+  "soglia": 0.187,
   "errore_stimato_tetti_tolti": 0.012,
-  "terreno_riconosciuto": 0.8124,
+  "terreno_riconosciuto": 0.7973,
   "tetti_sicuri": 2997,
-  "negativi": 1754,
+  "negativi": 1727,
   "esempi": [
    "http://127.0.0.1:8013/?x=-93.5&z=96.9&piedi",
    "http://127.0.0.1:8013/?x=-12.0&z=71.9&piedi",
@@ -67,9 +67,9 @@
   ]
  },
  "osm": {
-  "osm_sostituiti": 8938,
+  "osm_sostituiti": 8939,
   "osm_in_parte_senza_dbgt": 207,
-  "osm_senza_dbgt": 244,
+  "osm_senza_dbgt": 246,
   "doppi_al_confine": 6,
   "tagliati_al_confine": 13,
   "overture_tolti": 1608,
@@ -77,8 +77,8 @@
   "osm_tolti_sulle_carreggiate": 1
  },
  "osm_senza_dbgt": {
-  "n": 460,
-  "m2": 79361,
+  "n": 462,
+  "m2": 79367,
   "dove": [
    [
     230.0,
@@ -306,6 +306,12 @@
     2128.0,
     10,
     "yes"
+   ],
+   [
+    1036.7,
+    -565.2,
+    2,
+    "chapel"
    ],
    [
     523.0,
@@ -643,6 +649,12 @@
     -402.7,
     871.3,
     16,
+    "yes"
+   ],
+   [
+    1500.8,
+    1210.1,
+    4,
     "yes"
    ],
    [
@@ -2662,23 +2674,11 @@
     1806.3,
     18,
     "garage"
-   ],
-   [
-    -2785.1,
-    1821.6,
-    13,
-    "garage"
-   ],
-   [
-    -2663.7,
-    1819.3,
-    7,
-    "roof"
    ]
   ]
  },
  "volumi_disegnati": {
-  "a_terra": 14635,
+  "a_terra": 14637,
   "alti_02": 28,
   "alti_04": 376,
   "sotterranei": 68,
@@ -2688,7 +2688,7 @@
   "yes": 4422,
   "shed": 2276,
   "garage": 2189,
-  "industrial": 757,
+  "industrial": 758,
   "house": 529,
   "roof": 435,
   "residential": 362,
@@ -2717,7 +2717,7 @@
  },
  "attributi_da_osm": 7264,
  "stato_2015": {
-  "ruderi": 38,
+  "ruderi": 37,
   "in_costruzione_senza_osm": 5,
   "diruti": 63,
   "in_costruzione": 12
@@ -3534,13 +3534,13 @@
  "tetti": {
   "dal_dsm": {
    "rudere_con_tetto_dal_dsm": 20,
-   "piano": 4463,
+   "piano": 4468,
    "a_falde": 3039,
-   "a_una_falda": 330,
+   "a_una_falda": 329,
    "in_ali": 898,
    "a_padiglione": 1000,
    "in_costruzione_piano": 5,
-   "rudere_senza_tetto": 21,
+   "rudere_senza_tetto": 20,
    "da_osm_roof_shape": 4,
    "cupole_e_guglie_dal_dsm": 5
   },
@@ -3548,7 +3548,7 @@
    "troppo_ripido": 330,
    "irregolare": 1043,
    "piccolo": 1605,
-   "basso": 582,
+   "basso": 581,
    "chiome": 32,
    "alto": 614,
    "complesso": 454,
@@ -4105,8 +4105,8 @@
   "dove": []
  },
  "su_carreggiata": {
-  "n": 14,
-  "m2": 120.4,
+  "n": 15,
+  "m2": 121.9,
   "dove": [
    [
     834.1,
@@ -4190,6 +4190,12 @@
     -2663.7,
     1819.3,
     2.4,
+    "osm"
+   ],
+   [
+    1036.7,
+    -565.2,
+    1.5,
     "osm"
    ]
   ]

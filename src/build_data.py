@@ -217,7 +217,6 @@ def add_building(outer, holes, t, key):
     c = centroid(outer)
     if not inside(c, 0): return
     a = abs(sarea(outer))
-    if a < 6: return
     bt = t.get('building', 'yes')
     if t.get('amenity') == 'place_of_worship' and a > 120: bt = 'church'
     rec = {'p': outer, 'h': round(bheight(t, a, key), 1), 't': BTYPE.get(bt, 0), 'ht': bool(num(t.get('height')) or num(t.get('building:levels'))), 'lv': num(t.get('building:levels')), 'bt': bt}

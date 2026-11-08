@@ -1,10 +1,10 @@
 {
- "cancelli": 11103,
+ "cancelli": 11102,
  "della_regola": {
   "passo_carraio": 255,
   "rampa": 2,
   "varco": 723,
-  "capo_recinzione": 308
+  "capo_recinzione": 307
  },
  "dietro_cancello": 9,
  "dietro_cancello_regola": 9,
@@ -2017,9 +2017,9 @@
  "regola": {
   "rampa_larga": 2,
   "cancellata": 524,
-  "storto": 152,
-  "dietro_recinzione": 408,
-  "niente_dietro": 371,
+  "storto": 151,
+  "dietro_recinzione": 409,
+  "niente_dietro": 372,
   "dietro_cancello": 53,
   "in_carreggiata": 45,
   "ingresso_aperto": 13,
@@ -20107,7 +20107,7 @@
    1295.7,
    130.8,
    "capo_recinzione",
-   "storto",
+   "dietro_recinzione",
    5.9,
    ""
   ],
@@ -27339,7 +27339,7 @@
    -1396.4,
    1189.4,
    "capo_recinzione",
-   "cancello",
+   "niente_dietro",
    4.6,
    ""
   ],
