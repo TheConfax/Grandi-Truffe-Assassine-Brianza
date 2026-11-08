@@ -33,6 +33,7 @@ DENTRO_BUF, DENTRO_FRAC, DENTRO_DZ = 1.5, 0.6, 1.5   # a deck with this share of
 EDIFICIO_CAPO = 3.0   # m: an end with a building this near beyond it ends at the building (no ramp)
 WIN = max(EXT_MAX, RAMPA_MAX) + 2 * SF
 END_W = 4.0   # m: the end of a PONTE whose width the cells past it keep (Impalcati.striscia)
+END_STEP, END_SIDE = 1.0, 0.9   # the end edge of a PONTE (Impalcati.capo): its outline judged every END_STEP m; a stretch within acos(END_SIDE) (26 degrees) of dir is a side
 SENTIERI = {'footway', 'path', 'cycleway', 'track', 'bridleway', 'steps', 'pedestrian'}   # the ways that make a bridge a footbridge when they are all it links   # m: the window round a PONTE where its ends are looked for
 def tol(tipo, ped=False): return LEVEL_PED if (tipo == 'pedonale' or ped) else LEVEL_TOL
 RC = 10.0         # the pull of the deck top onto the ground at its spalle fades over about this distance
@@ -460,11 +461,39 @@ class Impalcati:
         if not E: E = [e for e in getattr(s.s, 'edifici', []) if e is not None and not e.is_empty]
         s.case = shapely.STRtree(E)
 
-    def striscia(s, core):   # the strip of the PONTE past its ends: at each end the width of the PONTE there (its outline within END_W m of the end), carried on straight along dir
-        # (Carlo 7/11, via Vignazzola: the longest side of a curved PONTE carried on cut a corner off the deck end, a notch with a parapet and walls in the carriageway)
+    def capo(s, P, dv, sg):   # the end edge of the outline P (closed ring) at the end sg along dv: from its farthest vertex both ways, as long as the
+        # outline runs across dir (a side runs within END_SIDE of dir; judged over END_STEP m of outline, not on the slivers of the DBGT). A skewed
+        # end is a whole edge at an angle to dir, not the farthest vertex (Carlo 8/11, the Milano-Meda over via Vignazzola at Baruccana, x 355 z 2017)
+        Q = P[:-1] if len(P) > 1 and np.allclose(P[0], P[-1]) else P; n = len(Q)
+        if n < 3: return Q
+        i0 = int(np.argmax(sg * (Q @ dv))); chain = {0: [Q[i0]]}
+        for st in (1, -1):
+            i, pts = i0, []
+            for _ in range(n):
+                j = i
+                while True:   # the first vertex END_STEP m on along the outline
+                    j = (j + st) % n
+                    if j == i0 or np.hypot(*(Q[j] - Q[i])) >= END_STEP: break
+                d = Q[j] - Q[i]; L = np.hypot(*d)
+                if L < 1e-6 or abs(d @ dv) / L >= END_SIDE: break   # a side: the end stops here
+                k = i
+                while k != j: k = (k + st) % n; pts.append(Q[k])
+                i = j
+                if i == i0: break
+            chain[st] = pts
+        return np.array(chain[-1][::-1] + chain[0] + chain[1])
+
+    def striscia(s, core):   # the strip of the PONTE past its ends: at each end the end edge of the PONTE, carried on straight along dir
+        # (Carlo 7/11, via Vignazzola: the longest side of a curved PONTE carried on cut a corner off the deck end, a notch with a parapet and walls in the carriageway.
+        # Carlo 8/11, x 355 z 2017: on a skewed PONTE the width within END_W m of its farthest vertex was a corner only, and the cells past the rest of the end were cut:
+        # the deck of the Milano-Meda stopped at the PONTE outline with parapets and abutment walls across the carriageway. Each end edge is carried on, as long as it is)
         dv = np.asarray(core['dir'], float); nv = np.array([-dv[1], dv[0]]); P = np.asarray(core['g'].exterior.coords); u, v = P @ dv, P @ nv; out = [core['g']]
         for sg, e in ((-1, u.min()), (1, u.max())):
-            k = np.abs(u - e) < END_W
+            C = s.capo(P, dv, sg)
+            if len(C) >= 2 and np.ptp(C @ nv) > 0.5:
+                for p, q in zip(C[:-1], C[1:]):
+                    out.append(shapely.MultiPoint([p - sg * END_W * dv, q - sg * END_W * dv, q + sg * WIN * dv, p + sg * WIN * dv]).convex_hull)
+            k = np.abs(u - e) < END_W   # and, as before, the width of the outline within END_W m of the farthest vertex
             if k.sum() < 2: k = np.ones(len(u), bool)
             v0, v1 = v[k].min(), v[k].max(); a, b = (e - END_W, e + WIN) if sg > 0 else (e - WIN, e + END_W)
             out.append(Polygon([dv * x + nv * y for x, y in ((a, v0), (b, v0), (b, v1), (a, v1))]))
