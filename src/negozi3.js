@@ -572,6 +572,17 @@ function ngSuperTutti() { for (const e of D.ng || []) { // (the bake: T.d.sup in
   let pal = NG_SUPER_PAL[Math.floor(h0 * NG_SUPER_PAL.length)]; for (const [re, c] of NG_BRANDS) if (re.test(name)) { pal = c; break; }
   host.big = { e, x, z, name, pal, h0, v: Math.floor(h0 * 997) % 4 }; host.h = clamp(host.h, 6.8, 10);
 } }
+/* the gates ('g' and 'w') that stand on a wall, as [from, to] lengths along it */
+let NG_GATES = null;
+function ngGatesOn(W) {
+  if (!NG_GATES) NG_GATES = (D.gates || []).filter(g => g[4] === 'w' || g[4] === 'g').map(g => [g[0] / 10, g[1] / 10, g[2] / 10, g[3] / 10]);
+  const x0 = Math.min(W.a[0], W.c[0]) - 1.5, x1 = Math.max(W.a[0], W.c[0]) + 1.5, z0 = Math.min(W.a[1], W.c[1]) - 1.5, z1 = Math.max(W.a[1], W.c[1]) + 1.5, out = [];
+  for (const g of NG_GATES) {
+    if (Math.max(g[0], g[2]) < x0 || Math.min(g[0], g[2]) > x1 || Math.max(g[1], g[3]) < z0 || Math.min(g[1], g[3]) > z1) continue;
+    const p = ngProj(W, g[0], g[1]), q = ngProj(W, g[2], g[3]); if (p.d > 0.9 || q.d > 0.9) continue; out.push([Math.min(p.s, q.s), Math.max(p.s, q.s)]);
+  }
+  return out;
+}
 function ngList() {
   if (NG_LIST) return NG_LIST; NG_LIST = []; const walls = new Map(), use = new Map(), retry = []; // use: the width the shops already on a DBGT wall take
   /* the shops closest to their wall choose first, so that the ones far from it do not take the room of the near ones */
@@ -619,6 +630,13 @@ function ngList() {
       return [a, b];
     });
     list.forEach((r, i) => { r.t = (span[i][0] + span[i][1]) / 2; r.w = span[i][1] - span[i][0]; });
+    // the door of an androne wins over a shop window (Carlo 8/11): a front that falls on a gate of the wall moves beside it, or goes if there is no room
+    { const gs = ngGatesOn(list[0]);
+      for (const r of list) for (const [s0, s1] of gs) {
+        if (r.t - r.w / 2 >= s1 + 0.15 || r.t + r.w / 2 <= s0 - 0.15) continue;
+        const lo = r.w / 2 + 0.2, hi = r.L - r.w / 2 - 0.2, c = [s1 + 0.3 + r.w / 2, s0 - 0.3 - r.w / 2].filter(t => t >= lo && t <= hi && !list.some(q => q !== r && Math.abs(q.t - t) < (q.w + r.w) / 2 + 0.3));
+        if (c.length) r.t = c.sort((p, q) => Math.abs(p - r.t) - Math.abs(q - r.t))[0]; else r.w = 0;
+      } }
     for (const r of list) {
       if (r.w < 2.2) { if (!r.big) retry.push(r); NG_SKIP.push([r.name, r.x, r.z, 'senza posto sul muro ' + r.L.toFixed(1)]); continue; }
       ngPlace(r, r.t, r.w); r.tile = tileOf(r.cx, r.cz);
