@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 56.1,
+  "tempo_s": 61.0,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -2772,6 +2772,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 15.1
+  "tempo_s": 17.6
  }
 }

@@ -2471,7 +2471,8 @@ import pubblici as _PUB, famiglie as _FAM
 _tutti_b = [b for b in buildings + (ED.alti if ED else []) if id(b) not in _tolti_tribune]
 _campioni['pubblici'] = _PUB.classifica(_tutti_b, ntags, ways, nodes, ring, log)
 for b in _gs_: b['pu'] = _PUB.GRUPPI.index('TRIBUNA')
-_campioni['famiglie'] = _FAM.famiglie(_tutti_b, log)
+_fam_shops = [nodes[r] for r, t in ntags.items() if r in nodes and (any(k in t for k in _FAM.SHOP_K) or t.get('amenity') in _FAM.SHOP_AM)]  # the shops and offices: a big low building with them is no capannone (Carlo 8/11)
+_campioni['famiglie'] = _FAM.famiglie(_tutti_b, log, _fam_shops, [g for at, g in area_geoms if at == 8])  # at 8: landuse=industrial
 for b in _tutti_b:
     c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b.get('t', BTYPE.get(b.get('bt'), 0))}
     for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st', 'fa', 'pu', 'pn'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
