@@ -24,13 +24,19 @@ function addProp(p) { // { x, z, r, obj | inst: { meshes, i, ry, base }, onBreak
   PROPS.push(p); PROPG.add(p.x - 3, p.z - 3, p.x + 3, p.z + 3, p); return p;
 }
 const SFONDA = { slow: 0.86, dmg: 2 }; // what a vehicle loses of its speed and its health breaking a thing (the graves have their own, sfondabili3.js TOMBE)
-function breakProp(p, v) {
+/* The fall of a rigid body (Carlo, 8/11: "sembrano foglie"): it turns about its foot the way the blow went, gravity alone speeding it up as for a
+   rod of its height (angular acceleration 3g/2L times the sine of the tilt), from the turn the blow gave it (FALL.kick times the speed over the
+   height); it hits the ground, bounces a little, damped, and lies still. A blow over its threshold also throws its foot forward, a share of the
+   vehicle's speed growing with the excess (FALL.spinta), the foot sliding to a stop on the ground (FALL.attrito). One way for everything knocked down */
+const FALL = { kick: 0.22, kickMax: 3, spinta: 0.5, attrito: 6, rimbalzo: 0.2, fermo: 0.6, steso: Math.PI / 2 - 0.04 };
+function breakProp(p, v, F) {
   if (p.broken) return; p.broken = true; p.wall.on = false; for (const w of p.pw || []) w.on = false;
   let dx = v ? v.vx : 1, dz = v ? v.vz : 0; const l = hyp(dx, dz) || 1; dx /= l; dz /= l;
   const axis = new THREE.Vector3(dz, 0, -dx); // tips over along the car's way
   let o = p.obj, m0 = null;
   if (!o && p.inst) { o = new THREE.Object3D(); o.position.set(p.x, p.inst.base, p.z); o.updateMatrix(); m0 = propMatrici(p); } // a pivot at its foot: each instance turns about it from the matrix it had
-  if (o) PROP_FALL.push({ o, p, axis, m0, a: 0, w: 0.6 + (v ? Math.min(2.5, v.speed * 0.08) : 0), max: 1.42 + Math.random() * 0.12 });
+  const L = clamp(p.h || 3, 0.8, 9), sp = v ? v.speed : 0, ecc = F ? clamp(F / FORZA[p.forza || 'leggero'] - 1, 0, 1) : 0;
+  if (o) PROP_FALL.push({ o, p, axis, m0, L, a: 0, w: Math.min(FALL.kickMax, FALL.kick * sp / L) + 0.1, vx: dx * sp * FALL.spinta * ecc, vz: dz * sp * FALL.spinta * ecc, x0: o.position.x, y0: o.position.y, z0: o.position.z, giu: false, t: 0 });
   if (p.onBreak) p.onBreak();
   if (v) propUrto(v);
 }
@@ -58,7 +64,7 @@ function propHits(v) {
   const F = propForza(v); if (F < FORZA.leggero) return;
   PROPG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, p => {
     if (p.broken || Math.abs(v.y - p.y) > 3 || F < FORZA[p.forza || 'leggero']) return;
-    for (const c of v.circles()) if (hyp(c[0] - p.x, c[1] - p.z) < v.rad + p.r + 0.15 || (p.pw || []).some(w => hyp(c[0] - w.x, c[1] - w.z) < v.rad + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < v.speed * 0.5) propSpingi(p, v); } else breakProp(p, v); return; }
+    for (const c of v.circles()) if (hyp(c[0] - p.x, c[1] - p.z) < v.rad + p.r + 0.15 || (p.pw || []).some(w => hyp(c[0] - w.x, c[1] - w.z) < v.rad + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < v.speed * 0.5) propSpingi(p, v); } else breakProp(p, v, F); return; }
   });
   // a lowered level-crossing arm across the road snaps off and flies
   for (const g of LX) if (g.bars && Math.abs(g.x - v.x) < 14 && Math.abs(g.z - v.z) < 14) for (const b of g.bars) {
@@ -73,7 +79,7 @@ function propHitsElicottero(e, dischi, ya, yb) {
   const q = { vx: e.vx, vz: e.vz, speed: sp }; let hit = false;
   for (const [cx, cz, r] of dischi) PROPG.each(cx - r - 3, cz - r - 3, cx + r + 3, cz + r + 3, p => {
     if (p.broken || F < FORZA[p.forza || 'leggero'] || yb < p.wall.y0 || ya > p.wall.y1) return;
-    if (hyp(cx - p.x, cz - p.z) < r + p.r + 0.15 || (p.pw || []).some(w => hyp(cx - w.x, cz - w.z) < r + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < sp * 0.5) propSpingi(p, q); } else breakProp(p, q); hit = true; }
+    if (hyp(cx - p.x, cz - p.z) < r + p.r + 0.15 || (p.pw || []).some(w => hyp(cx - w.x, cz - w.z) < r + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < sp * 0.5) propSpingi(p, q); } else breakProp(p, q, F); hit = true; }
   });
   if (hit) { e.vx = q.vx; e.vz = q.vz; if (e === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
 }
@@ -87,10 +93,15 @@ function snapArm(b, v) {
 }
 function updProps(dt) {
   for (let i = PROP_FALL.length - 1; i >= 0; i--) {
-    const f = PROP_FALL[i]; f.w += 7 * Math.sin(Math.max(0.15, f.a)) * dt; const da = Math.min(f.max - f.a, f.w * dt); f.a += da;
-    f.o.rotateOnWorldAxis(f.axis, da);
-    if (f.m0) propScrivi(f.p, f.o, f.m0, f.p.x, f.p.inst.base, f.p.z);
-    if (f.a >= f.max - 1e-4) PROP_FALL.splice(i, 1);
+    const f = PROP_FALL[i]; f.t += dt;
+    const sv = hyp(f.vx, f.vz); if (sv > 0) { const k = Math.max(0, sv - FALL.attrito * dt) / sv; f.vx *= k; f.vz *= k; const o = f.o.position; o.x += f.vx * dt; o.z += f.vz * dt; o.y = f.y0 + H.ground(o.x, o.z) - H.ground(f.x0, f.z0); }
+    if (!f.giu) {
+      f.w += 1.5 * 9.81 / f.L * Math.sin(Math.max(0.02, f.a)) * dt; let da = f.w * dt;
+      if (f.a + da >= FALL.steso) { da = FALL.steso - f.a; if (f.w > FALL.fermo) f.w = -f.w * FALL.rimbalzo; else { f.w = 0; f.giu = true; } } /* the ground: a small bounce, then still */
+      f.a += da; f.o.rotateOnWorldAxis(f.axis, da);
+    }
+    if (f.m0) propScrivi(f.p, f.o, f.m0, f.p.x, f.p.inst.base, f.p.z); else f.o.updateMatrix();
+    if (f.giu && f.vx === 0 && f.vz === 0 || f.giu && hyp(f.vx, f.vz) < 0.01 || f.t > 8) PROP_FALL.splice(i, 1);
   }
   for (let i = PROP_MOVE.length - 1; i >= 0; i--) { // rolling and sliding: friction, the walls round it, its own wall going with it
     const p = PROP_MOVE[i], sp = hyp(p.vx, p.vz), ns = Math.max(0, sp - (p.via === 'rotola' ? 5 : 7) * dt), k = sp > 1e-6 ? ns / sp : 0;

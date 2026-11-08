@@ -23,6 +23,27 @@ Una rotoballa o un blocco spinto parte nella direzione del mezzo, rallenta per l
 
 Le barriere di `sfondabili3.js` (siepi, reti, staccionate) e le tombe tengono le soglie che avevano, solo in velocità: siepi 2,5 m/s, reti e staccionate 3 m/s, tombe 6 m/s. Le colonnine dei distributori esplodono da 3 m/s.
 
+## Come cade quello che si abbatte
+
+È un sistema solo per tutto (`FALL` e `breakProp` in src/props3.js). L'oggetto cade come un corpo rigido:
+
+1. Ruota attorno alla sua base nella direzione dell'urto.
+2. Accelera solo per gravità, come un'asta della sua altezza.
+3. Sbatte a terra con un piccolo rimbalzo smorzato (un quinto della velocità di rotazione) e resta fermo, steso.
+4. Se l'urto supera la soglia, la base viene anche spinta in avanti, con una parte della velocità del mezzo che cresce con l'eccesso sulla soglia (fino a metà), e scivola sul terreno fino a fermarsi.
+
+Da steso non ha collisione: auto e pedoni ci passano sopra.
+
+Prova (headless, fotogramma per fotogramma, solo passi di simulazione). Ecco quanto ci mette ad arrivare a terra:
+
+| Oggetto | Altezza | Urto | A terra dopo | Fermo dopo |
+|---|---|---|---|---|
+| Cartello | 3 m | 40 km/h | 0,97 s | 1,02 s |
+| Lampione di strada | 7 m | 70 km/h | 1,28 s | 1,52 s |
+| Lampione del parcheggio | 7,6 m | 70 km/h | 1,52 s | 1,60 s |
+
+L'inclinazione cresce sempre più in fretta. Per il lampione di 7,6 m, in radianti ogni 0,1 s: 0,01, 0,08, 0,15, 0,22, 0,29, 0,37, 0,46, 0,56, 0,66, 0,78, 0,92, 1,06, 1,23, 1,41, poi steso a 1,53 con il rimbalzo.
+
 ## Ogni oggetto
 
 | Oggetto | Funzione | Gruppo | Piano | Forte |
