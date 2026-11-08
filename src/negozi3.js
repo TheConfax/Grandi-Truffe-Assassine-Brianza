@@ -1404,7 +1404,7 @@ function* buildNegozi(T, G) { // a generator: the tile builder yields between sl
     for (const [i0, c] of C.sq) for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2, u = C.sign.uv[q], v = C.sign.uv[q + 1]; C.sign.uv[q] = (c.x + 0.5 + u * (c.pw - 1)) / 1024; C.sign.uv[q + 1] = 1 - (c.y + 0.5 + (1 - v) * (c.ph - 1)) / Hh; }
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
     const mat = ngSignMat(new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-    SIGN_MATS.push(mat); D.sign = mk(C.sign, mat, 10, 'cast', (g, b) => { g.setAttribute('ngS', F32(b.S, 2)); g.setAttribute('ngOn', F32(b.on, 1)); }); if (D.sign) D.sign.customDepthMaterial = ngDepthMap(tex);
+    SIGN_MATS.push(mat); D.sign = mk(C.sign, mat, 8, 'cast', /* before the plugs too: some signs hang in the opening (the hours, OPEN, the plates on the glass) */ (g, b) => { g.setAttribute('ngS', F32(b.S, 2)); g.setAttribute('ngOn', F32(b.on, 1)); }); if (D.sign) D.sign.customDepthMaterial = ngDepthMap(tex);
     yield 'negozi';
   }
   T.ngShut = D; ngTickTile(T, true);
