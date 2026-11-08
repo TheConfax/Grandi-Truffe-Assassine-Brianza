@@ -34,6 +34,10 @@ AGR_T = {'01': (13, 'frutteto'), '02': (13, 'frutteto'), '03': (13, 'frutteto'),
 # PS_INC (p. 308): 01 pascolo, 04 incolti, 05 radura. Le foto Mapillary degli incolti (via Vignazzola e le rampe della Milano-Meda) sono
 # scarpate e margini d'erba alta con qualche cespuglio: prato, senza alberi inventati
 PS_T = 1
+# classi "morbide" (src/dbgt_boschi.py): giardino e prato (AR_VRD 01/02, anche i sottotipi 01xx), incolto (PS_INC 04). Dove la chioma confermata da LiDAR e
+# WorldCover e il bosco o parco di OSM sono d'accordo diventano bosco; tutte le altre classi del DBGT restano quelle che sono
+SOFT_VRD = ('01', '0101', '0102', '0103', '0104', '0105', '0106', '0107', '02')
+SOFT_L = ('AR_VRD_AR_VRD_SUP', 'PS_INC', 'BOSCO')   # strati del DBGT che non sono "duri": il resto di SURF lo e'
 INC_T = 18        # PS_INC 04, incolti: area type 18 of the game (world3.js MAT.incolto)
 # ATTR_SP_TY (p. 163): 01 piscine; 02xx campi per sport; 08 piste; 95 altro (a Meda 23 su 38: campi da calcio, tennis, basket, pallavolo
 # secondo OSM, e la foto di un campo da tennis in terra rossa a x 1324 z -365). Lo sport e il fondo vengono dal campo OSM che lo copre
@@ -67,6 +71,10 @@ NO_TREE = ['AC_VEI_AC_VEI_SUP_SR', 'AC_PED_AC_PED_SUP_SR', 'AC_CIC_AC_CIC_SUP_SR
            'SD_FER_SD_FER_SUP_SR', 'ALVEO_A_ALVEO_A_SU', 'ALVEO_ALVEO_SUP', 'SP_ACQ', 'INVASO', 'PONTE_PONTE_SEDE', 'ATTR_SP']
 
 
+def dq_data():
+    import dbgt_quote; return dbgt_quote.DATA
+
+
 def _geom(b): f = b[3]; return wkb.loads(bytes(b[8 + [0, 32, 48, 48, 64][(f >> 1) & 7]:]))
 
 
@@ -92,6 +100,10 @@ class Verde:
         self.sport = []        # (ATTR_SP_TY, polygon)
         self.forest = []       # polygons where the DBGT has trees as an area, scattered (BOSCO, AR_VRD 03, CL_AGR 04)
         self.alb, self.fil, self.hedge = [], [], []
+        self.soft = []         # (classe DBGT, tipo d'area, poligono): giardini, prati e incolti, che dove c'e' un bosco vero diventano bosco (aree())
+        self.forest_new = []   # (11, poligono): i boschi nati dalla chioma (src/dbgt_boschi.py), i loro alberi sono le cime del LiDAR
+        self.cime = np.zeros((0, 2))
+        self.duri = []
         surf, notree = [], []
         cnt = Counter()
         for d in (sorted(os.listdir(dbt_dir)) if os.path.isdir(dbt_dir) else []):
@@ -103,7 +115,7 @@ class Verde:
                 except sqlite3.OperationalError: return []
             for g, t in rows('select s.Shape, a.AR_VRD_TY from AR_VRD a join AR_VRD_AR_VRD_SUP s on s.CLASSREF = a.CLASSID'):
                 at = VRD_T.get(t, 1); cnt['AR_VRD ' + str(t)] += 1
-                for p in _polys(g.buffer(0)): self.areas.append((at, p))
+                for p in _polys(g.buffer(0)): (self.soft.append(('AR_VRD ' + str(t), at, p)) if t in SOFT_VRD else self.areas.append((at, p)))
             for g, t in rows('select Shape, BOSCO_TY from BOSCO'):
                 at = BOSCO_T.get(t, 11); cnt['BOSCO ' + str(t)] += 1
                 for p in _polys(g.buffer(0)): self.areas.append((at, p))
@@ -114,7 +126,7 @@ class Verde:
                     if k: self.land.append((k, p))
             for g, t in rows('select Shape, PS_INC_TY from PS_INC'):
                 cnt['PS_INC ' + str(t)] += 1
-                for p in _polys(g.buffer(0)): self.areas.append((INC_T if t == '04' else PS_T, p))  # 04 incolti: their own ground (dry grass and bare earth), not the mown lawn
+                for p in _polys(g.buffer(0)): (self.soft.append(('PS_INC 04', INC_T, p)) if t == '04' else self.areas.append((PS_T, p)))  # 04 incolti: their own ground (dry grass and bare earth), not the mown lawn
             for g, t in rows('select Shape, ATTR_SP_TY from ATTR_SP'):
                 cnt['ATTR_SP ' + str(t)] += 1
                 for p in _polys(g.buffer(0)): self.sport.append((t, p))
@@ -124,7 +136,9 @@ class Verde:
                 for p in _parts(g):
                     if p.geom_type == 'LineString' and p.length > 0.5: (self.hedge if t == '02' else self.fil).append(p)
             for t in SURF:
-                for (g,) in rows('select Shape from "%s"' % t): surf += _polys(g if g.is_valid else g.buffer(0))
+                for (g,) in rows('select Shape from "%s"' % t):
+                    ps = _polys(g if g.is_valid else g.buffer(0)); surf += ps
+                    if t not in SOFT_L: self.duri += ps
             for t in NO_TREE:
                 q = 'select Shape, AC_VEI_ZON from "%s"' % t if t.startswith('AC_VEI') else 'select Shape, NULL from "%s"' % t
                 for g, z in rows(q):
@@ -134,6 +148,7 @@ class Verde:
         cv = cover
         def clip(ps): return [q for p in ps for q in (_polys(p) if cv.contains(p) else _polys(p.intersection(cv)))]
         self.areas = [(t, q) for t, p in self.areas for q in clip([p])]
+        self.soft = [(c, t, q) for c, t, p in self.soft for q in clip([p])]
         self.land = [(k, q) for k, p in self.land for q in clip([p]) if q.area >= 8]
         self.sport = [(t, q) for t, p in self.sport for q in clip([p])]
         A = np.array(self.alb) if self.alb else np.zeros((0, 2)); self.alb = A[shapely.contains_xy(cv, A[:, 0], A[:, 1])] if len(A) else A
@@ -152,15 +167,43 @@ class Verde:
         self.free = cv.difference(su).buffer(-FREE_D) if not cv.is_empty else GeometryCollection(); prepare(self.free)
         self.rep['copertura'] = {'comune_ha': round(cv.area / 1e4, 1), 'dbgt_ha': round(su.intersection(cv).area / 1e4, 1) if surf else 0, 'libero_oltre_3m_ha': round(self.free.area / 1e4, 2)}
         self.notree = notree; self.surf_tree = STRtree(surf) if surf else None
-        self.forest_u = unary_union([q for t, q in self.forest]) if self.forest else GeometryCollection(); prepare(self.forest_u)
+        self._forest_u()
         log('dbgt verde: aree', len(self.areas), 'terreni', len(self.land), 'impianti sportivi', len(self.sport), 'alberi', len(self.alb), 'filari', len(self.fil),
             'siepi', len(self.hedge), 'copertura', self.rep['copertura'], '%.0fs' % (time.time() - t0))
 
+    def _forest_u(self):   # the woods of the DBGT, the new ones from the crown too (their trees are the LiDAR's peaks, not scattered)
+        L = [q for t, q in self.forest] + [q for t, q in self.forest_new]
+        self.forest_u = unary_union(L) if L else GeometryCollection(); prepare(self.forest_u)
+
+    def boschi_da_chioma(self, osm, duri_osm=()):
+        """soft DBGT classes -> wood where the crown (LiDAR and WorldCover) and OSM's wood or park agree (src/dbgt_boschi.py). osm: OSM wood and park
+        polygons; duri_osm: OSM areas that are not green (pitches, water, farmland, cemeteries, paving), off limits as the DBGT's hard classes are"""
+        import dbgt_boschi, dbgt_manufatti
+        cv = self.cover
+        if not self.soft or cv.is_empty or not osm: self.rep['boschi_da_chioma'] = {'nuovi_m2': 0}; return
+        osm = [q for g in osm for q in _polys(g.intersection(cv))]
+        near = unary_union([q for c, t, q in self.soft]).buffer(2.0)
+        duri = [q for q in self.duri if q.intersects(near)] + [q for g in duri_osm if g.intersects(near) for q in _polys(g.intersection(cv))]
+        nuovi, cime, rep = dbgt_boschi.bosco_da_chioma([(c, q) for c, t, q in self.soft], osm, duri, self.alb, cv, os.environ.get('GTA_DATA') or dq_data(),
+                                                       dbgt_manufatti.Grid, dbgt_manufatti.dq.Lidar, self.log)
+        if nuovi:
+            B = unary_union([p for c, p in nuovi]); prepare(B); soft = []
+            for c, t, q in self.soft:
+                if q.intersects(B): soft += [(c, t, r) for r in _polys(q.difference(B), 1.0)]
+                else: soft.append((c, t, q))
+            self.soft = soft
+            self.forest_new = [(11, p) for c, p in nuovi]; self.cime = cime
+        self.rep['boschi_da_chioma'] = rep
+
     # ---------------------------------------------------------------- areas and land
-    def aree(self, area_geoms, land, cons=None):
+    def aree(self, area_geoms, land, cons=None, osm_bosco=None):
         """area_geoms [(type, geom)], land [(kind, pts)] of build_data.py -> the same lists with the DBGT green inside the cover. cons: the
         building sites below, already computed (build_data.py starts that union on a thread)"""
         cv, free = self.cover, self.free
+        # soft green (gardens, lawns, scrub) goes where the crown of a real wood is; osm_bosco: OSM's own woods and parks, before WorldCover's came in
+        if osm_bosco is None: osm_bosco = [g for at, g in area_geoms if at in (11, 2)]
+        self.boschi_da_chioma(osm_bosco, [g for at, g in area_geoms if at in (3, 4, 6, 7, 8, 9, 13, 14) and g.intersects(cv)])
+        self.areas += [(t, q) for c, t, q in self.soft]; self._forest_u()
         if cv.is_empty: return area_geoms, land
         # an OSM building site (landuse=construction) is newer than the survey (Meda 2015): no DBGT green or trees inside it. The site by the
         # Milano-Meda at x 100 z 140 with its crane was lawns and a wood in the DBGT, cut out of the dark soil it looked like a patchwork
@@ -174,12 +217,13 @@ class Verde:
                     if q.intersects(cons): ncut[key] += 1; res += [(t, r) for r in _polys(q.difference(cons), 1.0)]
                     else: res.append((t, q))
                 return res
-            self.areas, self.sport, self.land = nocons(self.areas, 'aree'), nocons(self.sport, 'sport'), nocons(self.land, 'terreni')
-            self.forest = [(t, q) for t, q in self.areas if t in (11, 12)]; self.forest_u = unary_union([q for t, q in self.forest]) if self.forest else GeometryCollection(); prepare(self.forest_u)
+            self.areas, self.sport, self.land = nocons(self.areas, 'aree'), nocons(self.sport, 'sport'), nocons(self.land, 'terreni'); self.forest_new = nocons(self.forest_new, 'boschi_da_chioma')
+            self.cime = self.cime[~shapely.contains_xy(cons, self.cime[:, 0], self.cime[:, 1])] if len(self.cime) else self.cime
+            self.forest = [(t, q) for t, q in self.areas if t in (11, 12)]; self._forest_u()
             self.rep['cantieri_osm'] = {'m2': round(cons.area), 'pezzi_dbgt_ritagliati': dict(ncut)}
         spt = STRtree([q for t, q in self.sport]) if self.sport else None
         def has_sport(g, d=FREE_D): return spt is not None and len(spt.query(g, predicate='dwithin', distance=d)) > 0
-        green_u = unary_union([p for t, p in self.areas] + [p for t, p in self.sport]); gt = STRtree(_polys(green_u))
+        green_u = unary_union([p for t, p in self.areas] + [p for t, p in self.forest_new] + [p for t, p in self.sport]); gt = STRtree(_polys(green_u))
         out, rm, kept = [], Counter(), []
         osm_vince = []  # OSM paving that stays whole over the DBGT green (the DBGT is from 2015: the car park may be newer)
         X0, Z0 = self.origin
@@ -239,11 +283,12 @@ class Verde:
         if vu is not None:  # the green under those car parks goes
             prepare(vu)
             def sotto(L): return [(t, r) for t, q in L for r in (_polys(q.difference(vu), 1.0) if q.intersects(vu) else [q])]
-            self.areas, self.land = sotto(self.areas), sotto(self.land)
-            self.forest = [(t, q) for t, q in self.areas if t in (11, 12)]; self.forest_u = unary_union([q for t, q in self.forest]) if self.forest else GeometryCollection(); prepare(self.forest_u)
+            self.areas, self.land, self.forest_new = sotto(self.areas), sotto(self.land), sotto(self.forest_new)
+            self.forest = [(t, q) for t, q in self.areas if t in (11, 12)]; self._forest_u()
         by_t = defaultdict(list)
         for t, p in self.areas: by_t[t].append(p)
         for t, p in self.sport: by_t[6 if t.startswith('01') else 3].append(p)
+        for t, p in self.forest_new: by_t[11].append(p)
         nadd = Counter(); x0, z0, x1, z1 = cv.bounds
         for t in (1, 18, 12, 11, 13, 3, 6):  # drawn in this order: incolti (18) after the lawns, pitches and pools over them
             ps = by_t.get(t)
@@ -324,7 +369,8 @@ class Verde:
         # scattered in OSM's woods: only where OSM kept its wood; the DBGT woods get their own
         gen = ins & (idx >= n_gen)
         keep_gen = shapely.contains_xy(self.free, T[gen, 0], T[gen, 1]) if gen.any() else np.zeros(0, bool)
-        B = self.bosco(strade if strade is not None else GeometryCollection())
+        B = self.bosco(strade if strade is not None else GeometryCollection()); nB = len(B)
+        if len(self.cime): B = np.vstack([B, self.cime]) if len(B) else self.cime   # the LiDAR peaks of the woods born from the crown: the same places as any wood's tree
         P = np.vstack([D, T[osm][keep_osm], T[gen][keep_gen], B])
         src = np.concatenate([src, np.full(int(keep_osm.sum()), 2), np.full(int(keep_gen.sum()) + len(B), 3)])
         self.rep['osm_senza_dbgt']['alberi'] = [[round(x, 1), round(z, 1)] for x, z in T[osm][keep_osm]]
@@ -373,11 +419,11 @@ class Verde:
         for d in dup: keep[kk[d]] = False
         self.rep['alberi'] = {'albero': int(len(self.alb)), 'filari': int(len(F)), 'osm_dentro': int(osm.sum()), 'osm_tenuti': int(keep_osm.sum()),
                               'osm_tolti_vicini_dbgt': int(((dd < FREE_D) | (df < FREE_D)).sum()), 'osm_tolti_nei_boschi': int((inf & (dd >= FREE_D) & (df >= FREE_D)).sum()),
-                              'sparsi_osm_dentro': int(gen.sum()), 'sparsi_osm_tenuti': int(keep_gen.sum()), 'sparsi_boschi_dbgt': int(len(B)), 'su_superfici_vietate': int(bad.sum()), 'esito': dict(why),
+                              'sparsi_osm_dentro': int(gen.sum()), 'sparsi_osm_tenuti': int(keep_gen.sum()), 'sparsi_boschi_dbgt': int(nB), 'cime_boschi_da_chioma': int(len(self.cime)), 'su_superfici_vietate': int(bad.sum()), 'esito': dict(why),
                               'doppi': len(dup), 'finali_dentro': int(keep.sum()), 'fuori': int((~ins).sum()),
                               'per_fonte': {n: int((keep & (src == k)).sum()) for k, n in enumerate(('albero', 'filare', 'osm', 'bosco'))},
                               'tolti_dbgt': [[round(P[i, 0], 1), round(P[i, 1], 1)] for i in np.where(drop & (src < 2))[0]]}
-        self.log('dbgt verde: alberi ALBERO', len(self.alb), 'filari', len(F), 'OSM dentro', int(osm.sum()), 'tenuti', int(keep_osm.sum()), 'sparsi nei boschi DBGT', len(B), 'nei boschi OSM',
+        self.log('dbgt verde: alberi ALBERO', len(self.alb), 'filari', len(F), 'OSM dentro', int(osm.sum()), 'tenuti', int(keep_osm.sum()), 'sparsi nei boschi DBGT', nB, 'cime da chioma', len(self.cime), 'nei boschi OSM',
                  int(keep_gen.sum()), 'di', int(gen.sum()), '; su superfici vietate', int(bad.sum()), dict(why), 'doppi', len(dup), '; finali dentro', int(keep.sum()), 'fuori', int((~ins).sum()))
         out = [tuple(p) for p in T[~ins]] + [tuple(p) for p in P[keep]]
         return out
