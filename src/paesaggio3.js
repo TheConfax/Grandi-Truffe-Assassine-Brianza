@@ -171,9 +171,19 @@ function* buildPaesaggio(T, G) {
         const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < (filt ? 0.5 : 0.05)) continue;
         for (let t = 0; t < L; t += 2.5) {
           const t1 = Math.min(L, t + 2.5), x0 = a[0] + (c[0] - a[0]) * t / L, z0 = a[1] + (c[1] - a[1]) * t / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-          if (filt && (onAnyRoad(mx, mz, 0.6) || nearAsph(mx, mz, 0.3) || onAsph(x0, z0) || onAsph(x1, z1) || inBuilding(mx, mz, 0.3))) continue; /* the drawn carriageway too (AC_VEI), ends included */
-          const g0 = H.ground(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); // a panel of its own: it goes over when rammed
-          box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8');
+          let px0 = x0, pz0 = z0, px1 = x1, pz1 = z1;
+          if (filt) { /* where the edge lies on or by the carriageway the hoarding stands on the nearest clear ground inside the site (a site that reaches the kerb is fenced off from the street, not left open); it never stands in the carriageway */
+            const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, free = (x, z) => !(onAnyRoad(x, z, 0.6) || nearAsph(x, z, 0.3) || onAsph(x, z) || inBuilding(x, z, 0.3));
+            let sd = inPoly(mx - uz * 0.8, mz + ux * 0.8, P) ? 1 : inPoly(mx + uz * 0.8, mz - ux * 0.8, P) ? -1 : 0, ok = false;
+            if (sd) for (const o of [0, 0.6, 1.2, 1.8, 2.5, 3.3, 4.2]) {
+              const ax = -uz * sd * o, az = ux * sd * o;
+              if (o && !(inPoly(x0 + ax, z0 + az, P) && inPoly(x1 + ax, z1 + az, P))) break;
+              if (free(x0 + ax, z0 + az) && free(x1 + ax, z1 + az) && free(mx + ax, mz + az)) { px0 = x0 + ax; pz0 = z0 + az; px1 = x1 + ax; pz1 = z1 + az; ok = true; break; }
+            }
+            if (!ok) continue;
+          }
+          const g0 = H.ground(px0, pz0); panels.push([px0, pz0, px1, pz1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); // a panel of its own: it goes over when rammed
+          box(0.4, 0.15, 0.25, px0, g0 + 0.07, pz0, '#c9c4b8');
         }
       }
       const spots = [];
