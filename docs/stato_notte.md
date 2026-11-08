@@ -19,7 +19,7 @@ Cartelle: `S=C:/Users/theco/AppData/Local/Temp/claude/645585d1e8c08b81/7a2efc23-
 | Epoca degli edifici dal CENED | `epoca-edifici` | `$S/epoca` | 8089 | a109aa865b73fc4a3 | FATTO 23186bdc + 029ee9fb (server 8089 acceso, resta acceso) |
 | Merge edifici-piccoli in dev | — | principale | 8013 | — | FATTO (1fc245be) |
 | nightly/snap1 = dev + vetrine-2 + epoca, build sola | `nightly` | `$S/nightly` (lavoro), `$S/snap1` (fermo) | 8090 | a73fe46c21b7a4d66 | FATTO: nightly 24416bbd, tag nightly/snap1, server 8090 da `$S/snap1` |
-| Facciate 2.0 (Opus) da snap1 | `facciate-2` | `$S/fac2` | 8093 | a51744e09502d7cce | in corso dalle 5:35 |
+| Facciate 2.0 (Opus) da snap1 | `facciate-2` | `$S/fac2` | 8093 | a51744e09502d7cce | FATTO c5be60c1 (server 8093 acceso); unione in nightly + snap2 (8091) in corso |
 | Vetrine HQ (Opus) da snap1 | `vetrine-hq` | `$S/vhq` | 8094 | ad4d0c068713845b4 | in corso dalle 5:35 |
 | Androni secondo giro (Sonnet) da snap1 | `androni-2` | `$S/andr2` | 8095 | af6e2726257285c2e | in corso dalle 5:35 |
 
