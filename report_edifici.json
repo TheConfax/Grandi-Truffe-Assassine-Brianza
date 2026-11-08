@@ -2724,11 +2724,11 @@
  },
  "altezze_dal_dsm": {
   "n": {
-   "alzati": 20,
+   "alzati": 21,
    "abbassati": 2,
    "tolti": 0,
    "scartati_dsm_al_suolo": 11,
-   "scartati_senza_conferma": 31
+   "scartati_senza_conferma": 30
   },
   "alzati": [
    {
@@ -2925,6 +2925,20 @@
     "conferma": {
      "a": 8.4,
      "d": 0.0
+    }
+   },
+   {
+    "e": 2953,
+    "oid": 7256,
+    "x": 476.4,
+    "z": -327.5,
+    "m2": 530,
+    "da": 7.9,
+    "a": 30.9,
+    "motivo": "dsm_sopra_la_cima",
+    "conferma": {
+     "a": 27.1,
+     "d": 31.2
     }
    },
    {
@@ -3311,20 +3325,6 @@
     "vicino": null
    },
    {
-    "e": 2953,
-    "oid": 7256,
-    "x": 476.4,
-    "z": -327.5,
-    "m2": 530,
-    "da": 7.9,
-    "a": 30.9,
-    "motivo": "senza_conferma",
-    "vicino": {
-     "a": 27.1,
-     "d": 31.2
-    }
-   },
-   {
     "e": 3049,
     "oid": 978,
     "x": 848.9,
@@ -3534,7 +3534,7 @@
  "tetti": {
   "dal_dsm": {
    "rudere_con_tetto_dal_dsm": 20,
-   "piano": 4468,
+   "piano": 4469,
    "a_falde": 3039,
    "a_una_falda": 329,
    "in_ali": 898,
@@ -3548,9 +3548,9 @@
    "troppo_ripido": 330,
    "irregolare": 1043,
    "piccolo": 1605,
-   "basso": 581,
+   "basso": 582,
    "chiome": 32,
-   "alto": 614,
+   "alto": 613,
    "complesso": 454,
    "non_copre": 544,
    "senza_dsm": 443
