@@ -257,19 +257,21 @@ vec3 ngRoom() {
   vec3 h = vec3(p0, 0.0) + dn * t;
   vec3 hm = h * vec3(Wm, Hm, Dm);
   float nrep = max(1.0, floor(Wm / 2.4 + 0.5));
-  vec2 cell = vec2(mod(vNgR.z, 16.0), floor(vNgR.z / 16.0 + 0.001));
+  float ngCi = floor(vNgR.z + 0.5); /* the cell number is a whole number carried by a varying: interpolated it jitters by a hair, and at 80.0 mod() gave 0 or 15.99999 pixel by pixel: the black stipple on the glass (Carlo 8/11) */
+  vec2 cell = vec2(mod(ngCi, 16.0), floor(ngCi / 16.0));
   vec2 gs = vec2(nrep * 0.94 / 16.0, 0.94 / 8.0) * 0.6;
   vec2 gx = dFdx(vUv) * gs, gy = dFdy(vUv) * gs;
   vec3 col;
-  if (t == tz) col = ngAt(cell, vec2(fract(h.x * nrep), h.y), gx, gy).rgb;
-  else if (t == ty && dn.y < 0.0) { vec2 f = fract(hm.xz / 0.6); col = vNgF * mix(0.78, 1.0, step(0.05, f.x) * step(0.05, f.y)); }
-  else if (t == ty) { vec2 f = fract(vec2(hm.x / 1.6, hm.z / 1.3)) - 0.5; float l = 1.0 - smoothstep(0.1, 0.16, length(f * vec2(1.6, 1.3))); col = mix(vec3(0.62, 0.61, 0.58), vec3(2.6, 2.4, 2.0), l * (0.25 + 0.75 * vNgOn)); }
+  bool ngHz = tz <= tx && tz <= ty, ngHy = !ngHz && ty <= tx; /* which wall the ray meets, decided by comparing the three, not by asking min() back for its own value: on some GPUs t == tz fails by a hair and the pixel is drawn as a side wall (the black stipple on the glass, Carlo 8/11) */
+  if (ngHz) col = ngAt(cell, vec2(fract(h.x * nrep), h.y), gx, gy).rgb;
+  else if (ngHy && dn.y < 0.0) { vec2 f = fract(hm.xz / 0.6); col = vNgF * mix(0.78, 1.0, step(0.05, f.x) * step(0.05, f.y)); }
+  else if (ngHy) { vec2 f = fract(vec2(hm.x / 1.6, hm.z / 1.3)) - 0.5; float l = 1.0 - smoothstep(0.1, 0.16, length(f * vec2(1.6, 1.3))); col = mix(vec3(0.62, 0.61, 0.58), vec3(2.6, 2.4, 2.0), l * (0.25 + 0.75 * vNgOn)); }
   else col = vNgW.rgb * (0.6 + 0.2 * h.y);
   if (vNgR.w > -0.5) {
     float tm = 0.38 / dn.z;
     if (tm < t) {
       vec2 pm = p0 + dn.xy * tm;
-      if (pm.x > 0.0 && pm.x < 1.0 && pm.y > 0.0 && pm.y < 1.0) { float mi = 114.0 + vNgR.w; vec4 m = ngAt(vec2(mod(mi, 16.0), floor(mi / 16.0 + 0.001)), vec2(fract(pm.x * nrep + 0.37), pm.y), gx, gy); if (m.a > 0.5) col = m.rgb; }
+      if (pm.x > 0.0 && pm.x < 1.0 && pm.y > 0.0 && pm.y < 1.0) { float mi = 114.0 + floor(vNgR.w + 0.5); vec4 m = ngAt(vec2(mod(mi, 16.0), floor(mi / 16.0 + 0.001)), vec2(fract(pm.x * nrep + 0.37), pm.y), gx, gy); if (m.a > 0.5) col = m.rgb; }
     }
   }
   return col * mix(1.0, 0.68, h.z);
