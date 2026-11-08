@@ -2567,8 +2567,15 @@ const WOOD_MAT = (() => { const c = document.createElement('canvas'); c.width = 
 function layCancelli(T) { T.gates = []; for (const [X0, Z0, X1, Z1, k, h, auto] of T.d.gt || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
-  const key = X0 + ',' + Z0 + ',' + X1, rotto = GATE_ROTTI.has(key), g = { key, ax, az, bx, bz, ux, uz, W, k, h, gy, broken: rotto, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [] };
-  if (k !== 'o' && !g.perm) { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: !rotto, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
+  const key = X0 + ',' + Z0 + ',' + X1, g = { key, ax, az, bx, bz, ux, uz, W, k, h, gy, broken: false, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [], lb: [], segs: [] };
+  const nl = k === 'l' || k === 'o' ? 1 : gateLeaves(g).length, rotto = GATE_ROTTI.has(key); /* the leaves broken (androni-3): one flag and one wall each, as a car rams one leaf at a time */
+  for (let i = 0; i < nl; i++) g.lb.push(rotto || GATE_ROTTI.has(key + '#' + i)); g.broken = g.lb.every(Boolean);
+  if (k !== 'o' && !g.perm) {
+    if (k === 'l') { const sg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: !g.lb[0], y0: gy - 2, y1: gy + h + 0.4 }; g.segs.push(sg); WALLS.add(ax, az, bx, bz, sg); }
+    else for (const [x0, w, dir] of gateLeaves(g)) { const i = g.segs.length, sx = ax + ux * x0, sz = az + uz * x0, ex = sx + ux * dir * w, ez = sz + uz * dir * w;
+      const sg = { ax: sx, az: sz, bx: ex, bz: ez, nx: -uz, nz: ux, two: true, dyn: true, on: !g.lb[i], y0: gy - 2, y1: gy + h + 0.4 }; g.segs.push(sg); WALLS.add(Math.min(sx, ex), Math.min(sz, ez), Math.max(sx, ex), Math.max(sz, ez), sg); }
+    g.seg = g.segs[0];
+  }
   T.gates.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
   for (const [x, z] of k !== 'l' ? [[ax, az], [bx, bz]] : [[ax, az]]) { const r = k !== 'l' ? 0.2 : 0.15, g0 = H.ground(x, z); WALLS.add(x - r - 0.2, z - r - 0.2, x + r + 0.2, z + r + 0.2, { r, x, z, y0: g0 - 3, y1: g0 + (k !== 'l' ? h + 0.25 : 1.15) }); } /* the pillars (buildGates) */
 } }
@@ -2630,7 +2637,42 @@ function buildDoors(T, G) {
 }
 const ARM_MAT = new THREE.MeshLambertMaterial({ map: ARM_TEX });
 function armG(g) { const geo = new THREE.BoxGeometry(g.W, 0.09, 0.09); geo.translate(g.W / 2, 1.0, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * g.W / 1.6); return geo; }
-function leafG(g, w, dir) { const lw = w - (g.k === 'w' ? 0.04 : 0.3); const geo = new THREE.PlaneGeometry(lw, g.h); geo.translate(dir * (w / 2), g.h / 2 + 0.05, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * lw / (g.k === 'w' ? 1.2 : 0.75)); return geo; }
+/* the leaves of the gates in boxes (androni-3, Carlo 8/11): the wooden door of an androne as the doors of the houses of the facades 2.0 (frame, panels, planks, hinges, handle, depth), the iron gate with its frame, bars and spear points. Geometry with colours, hinge at the origin, the leaf towards dir */
+const GATE3_MAT = new THREE.MeshLambertMaterial({ vertexColors: true });
+const _gC = new THREE.Color();
+function gateParts(parts, dir) { /* parts: [w, h, d, cx, cy, cz, colour]; the colours in the vertices */
+  const P = [], N = [], UV = [], C = [], I = [];
+  for (const [w, h, d, cx, cy, cz, col] of parts) {
+    const b = new THREE.BoxGeometry(w, h, d), pa = b.attributes.position, na = b.attributes.normal, ua = b.attributes.uv, k0 = P.length / 3; _gC.set(col);
+    for (let i = 0; i < pa.count; i++) { P.push(dir * (cx + pa.getX(i)), cy + pa.getY(i), cz + pa.getZ(i)); N.push(dir * na.getX(i), na.getY(i), na.getZ(i)); UV.push(ua.getX(i), ua.getY(i)); C.push(_gC.r, _gC.g, _gC.b); }
+    const ix = b.index; for (let i = 0; i < ix.count; i += 3) { if (dir < 0) I.push(k0 + ix.getX(i), k0 + ix.getX(i + 2), k0 + ix.getX(i + 1)); else I.push(k0 + ix.getX(i), k0 + ix.getX(i + 1), k0 + ix.getX(i + 2)); }
+    b.dispose();
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); geo.setIndex(I); return geo;
+}
+const LEAF_CACHE = new Map();
+function leafG(g, w, dir) {
+  const key = g.k + '|' + w.toFixed(2) + '|' + g.h.toFixed(2) + '|' + dir, hit = LEAF_CACHE.get(key); if (hit) return hit; const h = g.h, parts = [];
+  if (g.k === 'w') { /* two leaves of oak, chestnut: slab, frame, two rows of raised panels with the planks, iron straps and a ring handle on the meeting edge */
+    const lw = w - 0.02, st = 0.13, y0 = 0.05, fz = 0.09, rows = h > 3.4 ? 3 : 2, rh = h / rows;
+    parts.push([lw, h, 0.06, lw / 2, y0 + h / 2, 0, 0x5b3a22]);
+    parts.push([st, h, fz, st / 2, y0 + h / 2, 0, 0x4a2f1a], [st, h, fz, lw - st / 2, y0 + h / 2, 0, 0x4a2f1a]);
+    for (let r = 0; r <= rows; r++) parts.push([lw, 0.13, fz, lw / 2, y0 + (r === 0 ? 0.065 : r === rows ? h - 0.065 : r * rh), 0, 0x4a2f1a]);
+    for (let r = 0; r < rows; r++) { const pb = y0 + r * rh + 0.2, pt = y0 + (r + 1) * rh - 0.2, ph = pt - pb, pw = lw - 2 * st - 0.1; if (ph < 0.3 || pw < 0.2) continue;
+      parts.push([pw, ph, 0.082, lw / 2, (pb + pt) / 2, 0, 0x6c4729]);
+      for (let x = 0.17; x < pw; x += 0.19) parts.push([0.012, ph, 0.088, st + 0.05 + x, (pb + pt) / 2, 0, 0x3a2515]); }
+    for (const yy of [0.35, h - 0.5]) parts.push([Math.min(0.9, lw * 0.7), 0.07, 0.1, Math.min(0.9, lw * 0.7) / 2, y0 + yy, 0, 0x26221f]);
+    parts.push([0.07, 0.22, 0.105, lw - 0.1, y0 + Math.min(1.15, h * 0.4), 0, 0x2a2622], [0.13, 0.13, 0.11, lw - 0.1, y0 + Math.min(1.15, h * 0.4) - 0.08, 0, 0x8a6b2c]);
+  } else { /* iron gate: frame of 5 cm, bars of 2,4 cm each 12 cm, a middle rail, spear points, a lock */
+    const lw = w - 0.3, y0 = 0.05, col = 0x2b3530, col2 = 0x1f2623;
+    parts.push([lw, 0.05, 0.05, lw / 2, y0 + 0.1, 0, col], [lw, 0.05, 0.05, lw / 2, y0 + h - 0.06, 0, col], [0.05, h, 0.05, 0.025, y0 + h / 2, 0, col], [0.05, h, 0.05, lw - 0.025, y0 + h / 2, 0, col]);
+    if (h > 1.5) parts.push([lw, 0.04, 0.04, lw / 2, y0 + h * 0.55, 0, col]);
+    const n = Math.max(2, Math.round(lw / 0.12)), gap = lw / n;
+    for (let i = 1; i < n; i++) { const x = i * gap; parts.push([0.024, h - 0.2, 0.024, x, y0 + h / 2 - 0.02, 0, col2]); if (i % 2 === 0) parts.push([0.04, 0.09, 0.04, x, y0 + h + 0.025, 0, col]); }
+    parts.push([0.1, 0.14, 0.07, lw - 0.1, y0 + h * 0.5, 0, 0x6b6e70]);
+  }
+  const geo = gateParts(parts, dir); LEAF_CACHE.set(key, geo); return geo;
+}
 const gateLeaves = g => (g.W > 3.2 || g.k === 'w') && g.k !== 'o' ? [[0, g.W / 2, 1], [g.W, g.W / 2, -1]] : [[0, g.W, 1]];
 // A gate at rest is drawn in the mesh of its tile. When it opens or is rammed it gets its own objects, as long as it moves, with the hinges where they were; its place in the mesh collapses to a point.
 function gateVivo(g) {
@@ -2647,31 +2689,44 @@ function gateDorme(g) { // closed again: back in the mesh
 function gateOggetti(g, G) {
   const th = Math.atan2(-g.uz, g.ux), outer = new THREE.Group(), inner = new THREE.Group(); outer.add(inner); G.add(outer); g.outer = outer; g.inner = inner; g.hinges = [];
   outer.position.set(g.ax, g.gy, g.az); outer.rotation.y = th;
-  if (g.k === 'l') { // lift-gate arm, hinged at a
+  if (g.k === 'l') { /* lift-gate arm, hinged at a */
     const m = new THREE.Mesh(armG(g), ARM_MAT); m.castShadow = true; inner.add(m); if (g.perm) inner.rotation.z = 1.35; /* raised lift gate on a big road */
-  } else for (const [x0, w, dir] of gateLeaves(g)) { // gate leaf (two leaves when wide), hinged at the posts
+    if (g.lb[0]) inner.rotation.set(0, 0, 1.2);
+  } else gateLeaves(g).forEach(([x0, w, dir], i) => { /* gate leaf (two leaves when wide), hinged at the posts */
     const hinge = new THREE.Group(); hinge.position.x = x0; inner.add(hinge); g.hinges.push([hinge, dir]);
-    const m = new THREE.Mesh(leafG(g, w, dir), g.k === 'w' ? WOOD_MAT : GATE_MAT); m.castShadow = true; hinge.add(m);
-    if (g.k === 'o') hinge.rotation.y = -1.35 * dir; // footpath gates stand open
-  }
+    const m = new THREE.Mesh(leafG(g, w, dir), GATE3_MAT); m.castShadow = true; hinge.add(m);
+    if (g.k === 'o') hinge.rotation.y = -1.35 * dir; /* footpath gates stand open */
+    if (g.lb[i] && g.k !== 'o') gateCaduta(g, hinge, g.fl && g.fl[i] || 1, 1);
+  });
+}
+function gateCaduta(g, hinge, fall, k) { /* a leaf down on the ground (k 0..1 of the fall), where the car pushed it */
+  hinge.rotation.x = fall * Math.PI * 0.49 * k; hinge.rotation.y = fall * 0.18 * k; hinge.position.y = 0.02 * k;
 }
 function buildGates(T, G) {
   const F = fuso(G);
   for (const g of T.gates || []) {
     g.outer = g.inner = null; g.hinges = []; g.bk = null;
-    if (g.k === 'w') { /* the jambs are the walls of the passage: no posts */ } else if (g.k !== 'l') for (const [x, z] of [[g.ax, g.az], [g.bx, g.bz]]) addGeo(F.buf(lam(0x8d877c), true).b, boxG(0.32, g.h + 0.25, 0.32), matTRy(x, H.ground(x, z) + (g.h + 0.25) / 2, z, 0));
+    if (g.k === 'w') { /* the jambs are the walls of the passage: a stone frame beside the leaves, a lintel and a step */
+      const th = Math.atan2(-g.uz, g.ux), bf = F.buf(GATE3_MAT, true).b, jb = (lx, ly, lz, w, hh, dp) => { const [k0, k1] = addGeo(bf, boxG(w, hh, dp), matTRy(g.ax + g.ux * lx - g.uz * lz, g.gy + ly, g.az + g.uz * lx + g.ux * lz, th)); while (bf.c.length < k0 * 3) bf.c.push(1, 1, 1); _gC.set(0xd9d2c0); for (let i = k0; i < k1; i++) bf.c.push(_gC.r, _gC.g, _gC.b); };
+      jb(0.09, (g.h + 0.15) / 2, 0.02, 0.18, g.h + 0.15, 0.2); jb(g.W - 0.09, (g.h + 0.15) / 2, 0.02, 0.18, g.h + 0.15, 0.2); jb(g.W / 2, g.h + 0.075, 0.02, g.W, 0.15, 0.2); jb(g.W / 2, 0.05, 0.1, g.W + 0.1, 0.1, 0.34);
+    } else if (g.k !== 'l') for (const [x, z] of [[g.ax, g.az], [g.bx, g.bz]]) addGeo(F.buf(lam(0x8d877c), true).b, boxG(0.32, g.h + 0.25, 0.32), matTRy(x, H.ground(x, z) + (g.h + 0.25) / 2, z, 0));
     else addGeo(F.buf(lam(0xd9d6cf), false).b, boxG(0.25, 1.15, 0.25), matTRy(g.ax, H.ground(g.ax, g.az) + 0.57, g.az, 0));
-    if (g.broken && g.k !== 'o') continue; // already rammed
-    if (GATE_OPEN.has(g)) { gateOggetti(g, G); continue; } // built again while it was moving
-    const th = Math.atan2(-g.uz, g.ux), e = F.buf(g.k === 'l' ? ARM_MAT : g.k === 'w' ? WOOD_MAT : GATE_MAT, true); let v0 = -1, v1 = 0;
+    if (g.broken && g.k !== 'o') continue; /* already rammed */
+    if (GATE_OPEN.has(g) || g.lb.some(Boolean)) { gateOggetti(g, G); continue; } /* built again while it was moving, or with a leaf down */
+    const th = Math.atan2(-g.uz, g.ux); let v0 = -1, v1 = 0;
     if (g.k === 'l') {
-      matTRy(g.ax, g.gy, g.az, th); if (g.perm) _fzm.multiply(_fzm2.makeRotationZ(1.35));
-      [v0, v1] = addGeo(e.b, armG(g), _fzm);
-    } else for (const [x0, w, dir] of gateLeaves(g)) {
-      matTRy(g.ax, g.gy, g.az, th).multiply(_fzm2.makeTranslation(x0, 0, 0)); if (g.k === 'o') _fzm.multiply(_fzm2.makeRotationY(-1.35 * dir));
-      const r = addGeo(e.b, leafG(g, w, dir), _fzm); if (v0 < 0) v0 = r[0]; v1 = r[1];
+      const e = F.buf(ARM_MAT, true); matTRy(g.ax, g.gy, g.az, th); if (g.perm) _fzm.multiply(_fzm2.makeRotationZ(1.35));
+      [v0, v1] = addGeo(e.b, armG(g), _fzm); g.bk = { m: null, G, v0, v1, save: null }; e.chi.push(g);
+    } else {
+      const e = F.buf(GATE3_MAT, true), bf = e.b;
+      for (const [x0, w, dir] of gateLeaves(g)) {
+        matTRy(g.ax, g.gy, g.az, th).multiply(_fzm2.makeTranslation(x0, 0, 0)); if (g.k === 'o') _fzm.multiply(_fzm2.makeRotationY(-1.35 * dir));
+        const geo = leafG(g, w, dir), k0 = bf.p.length / 3, r = addGeo(bf, geo, _fzm), ca = geo.attributes.color;
+        while (bf.c.length < k0 * 3) bf.c.push(1, 1, 1); for (let i = 0; i < ca.count; i++) bf.c.push(ca.getX(i), ca.getY(i), ca.getZ(i));
+        if (v0 < 0) v0 = r[0]; v1 = r[1];
+      }
+      g.bk = { m: null, G, v0, v1, save: null }; e.chi.push(g);
     }
-    g.bk = { m: null, G, v0, v1, save: null }; e.chi.push(g);
   }
   F.fine();
 }
@@ -2680,40 +2735,50 @@ function gateHits(v) {
   GATEG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, g => {
     if (g.broken || g.open || g.k === 'o' || g.perm || Math.abs(v.y - g.gy) > 2.5) return;
     const ai = v.driver === 'ai', reach = ai && g.auto ? v.rad + 4 : v.rad + 0.3;
-    for (const c of v.circles()) if (segDist(c[0], c[1], g.ax, g.az, g.bx, g.bz) < reach) { if (ai && g.auto) openGate(g); else if (v.speed > 3 || ai) breakGate(g, v); return; }
+    if (ai && g.auto) { for (const c of v.circles()) if (segDist(c[0], c[1], g.ax, g.az, g.bx, g.bz) < reach) { openGate(g); return; } return; }
+    if (g.k === 'l') { for (const c of v.circles()) if (segDist(c[0], c[1], g.ax, g.az, g.bx, g.bz) < reach) { if (v.speed > 3 || ai) breakGate(g, v); return; } return; }
+    const hit = []; /* one leaf at a time: those the car touches */
+    g.segs.forEach((sg, i) => { if (g.lb[i]) return; for (const c of v.circles()) if (segDist(c[0], c[1], sg.ax, sg.az, sg.bx, sg.bz) < reach) { hit.push(i); return; } });
+    if (hit.length && (v.speed > 3 || ai)) breakGate(g, v, hit);
   });
 }
-function openGate(g) { gateVivo(g); g.open = true; g.openT = 5; if (g.seg) g.seg.on = false; GATE_OPEN.add(g); }
-function breakGate(g, v) {
-  g.broken = true; GATE_ROTTI.add(g.key); if (g.seg) g.seg.on = false;
+function gateSegs(g, on) { g.segs.forEach((sg, i) => { sg.on = on && !g.lb[i]; }); }
+function openGate(g) { gateVivo(g); g.open = true; g.openT = 5; gateSegs(g, false); GATE_OPEN.add(g); }
+function breakGate(g, v, hit) {
   const sp = v.speed; v.vx *= 0.82; v.vz *= 0.82; v.health = Math.max(0, v.health - 1.5);
   if (v === P.car) { sfxCrash(Math.min(14, sp)); shake = Math.max(shake, 0.35); }
-  gateVivo(g); if (!g.outer) return;
-  const vn = v.vx * -g.uz + v.vz * g.ux; // push side, in the gate's local z
-  g.fall = Math.sign(vn) || 1; g.vx = v.vx * 0.55; g.vz = v.vz * 0.55; g.t = 0; GATE_FLY.push(g);
+  const idx = hit || g.lb.map((_, i) => i).filter(i => !g.lb[i]); g.fl = g.fl || [];
+  const vn = v.vx * -g.uz + v.vz * g.ux; /* push side, in the local z of the gate */
+  g.open = false; g.oa = 0; GATE_OPEN.delete(g);
+  const had = g.outer; gateVivo(g); if (!had && g.outer) for (const [hn] of g.hinges) hn.rotation.y = 0;
+  for (const i of idx) { g.lb[i] = true; GATE_ROTTI.add(g.key + '#' + i); if (g.segs[i]) g.segs[i].on = false; g.fl[i] = Math.sign(vn) || 1; }
+  g.broken = g.lb.every(Boolean); if (g.broken) GATE_ROTTI.add(g.key);
+  for (let i = 0; i < g.segs.length; i++) if (!g.lb[i]) g.segs[i].on = true;
+  if (!g.outer) return;
+  for (const i of idx) GATE_FLY.push({ g, i, t: 0, vx: v.vx * 0.55, vz: v.vz * 0.55, fall: g.fl[i], hn: g.k === 'l' ? null : g.hinges[i] && g.hinges[i][0] });
 }
 function updGates(dt) {
-  // pedestrians open the small gates instead of walking through them
-  for (const p of PEDS) { if (p.state === 'dead') continue; GATEG.each(p.x - 2, p.z - 2, p.x + 2, p.z + 2, g => { if (!g.broken && !g.open && (g.k === 'g' || g.k === 'w') && segDist(p.x, p.z, g.ax, g.az, g.bx, g.bz) < 1.6) openGate(g); }); }
-  // honk in front of a gate on a residential street and it opens for you too
+  /* pedestrians open the small gates instead of walking through them */
+  for (const p of PEDS) { if (p.state === 'dead') continue; GATEG.each(p.x - 2, p.z - 2, p.x + 2, p.z + 2, g => { if (!g.broken && !g.open && (g.k === 'g' || g.k === 'w') && !g.lb.some(Boolean) && segDist(p.x, p.z, g.ax, g.az, g.bx, g.bz) < 1.6) openGate(g); }); }
+  /* honk in front of a gate on a residential street and it opens for you too */
   if (P.car && (K.horn || GP.horn > 0.5)) GATEG.each(P.car.x - 12, P.car.z - 12, P.car.x + 12, P.car.z + 12, g => { if (g.auto && !g.broken && !g.open && segDist(P.car.x, P.car.z, g.ax, g.az, g.bx, g.bz) < 12) openGate(g); });
   for (const g of GATE_OPEN) {
-    if (g.broken) { GATE_OPEN.delete(g); continue; }
+    if (g.broken || g.lb.some(Boolean)) { GATE_OPEN.delete(g); continue; }
     if (g.open && (g.openT -= dt) <= 0) {
       const mx = (g.ax + g.bx) / 2, mz = (g.az + g.bz) / 2; let busy = hyp(P.x - mx, P.z - mz) < 5;
       if (!busy) for (const v of VEH) if (Math.abs(v.x - mx) < 7 && Math.abs(v.z - mz) < 7 && hyp(v.x - mx, v.z - mz) < 6.5) { busy = true; break; }
-      if (busy) g.openT = 1; else { g.open = false; if (g.seg) g.seg.on = true; }
+      if (busy) g.openT = 1; else { g.open = false; gateSegs(g, true); }
     }
     g.oa = lerp(g.oa, g.open ? 1 : 0, 1 - Math.exp(-3 * dt));
     if (g.k === 'l') { if (g.inner) g.inner.rotation.z = 1.35 * g.oa; } else for (const [hn, dir] of g.hinges) hn.rotation.y = -1.45 * dir * g.oa;
     if (!g.open && g.oa < 0.01) { g.oa = 0; GATE_OPEN.delete(g); gateDorme(g); }
   }
   for (let i = GATE_FLY.length - 1; i >= 0; i--) {
-    const g = GATE_FLY[i]; g.t += dt; const o = g.outer, k = Math.exp(-2.5 * dt); if (!o) { GATE_FLY.splice(i, 1); continue; }
-    o.position.x += g.vx * dt; o.position.z += g.vz * dt; g.vx *= k; g.vz *= k;
-    if (g.k === 'l') { g.inner.rotation.z = Math.min(1.2, g.inner.rotation.z + dt * 6); g.inner.rotation.x += g.fall * dt * 4; o.position.y = g.gy + Math.max(-0.95, -g.t * g.t * 6); }
-    else { g.inner.rotation.x = lerp(g.inner.rotation.x, g.fall * Math.PI * 0.49, 1 - Math.exp(-7 * dt)); o.position.y = H.ground(o.position.x, o.position.z) + 0.02; }
-    if (g.t > 2.5) GATE_FLY.splice(i, 1);
+    const f = GATE_FLY[i], g = f.g; f.t += dt; const o = g.outer, k = Math.exp(-2.5 * dt); if (!o) { GATE_FLY.splice(i, 1); continue; }
+    f.vx *= k; f.vz *= k;
+    if (g.k === 'l') { o.position.x += f.vx * dt; o.position.z += f.vz * dt; g.inner.rotation.z = Math.min(1.2, g.inner.rotation.z + dt * 6); g.inner.rotation.x += f.fall * dt * 4; o.position.y = g.gy + Math.max(-0.95, -f.t * f.t * 6); }
+    else if (f.hn) { const lx = f.vx * g.ux + f.vz * g.uz, lz = f.vx * -g.uz + f.vz * g.ux; f.hn.position.x += lx * dt; f.hn.position.z += lz * dt; const u = Math.min(1, f.t / 0.35); gateCaduta(g, f.hn, f.fall, u * (2 - u)); }
+    if (f.t > 2.5) GATE_FLY.splice(i, 1);
   }
 }
 

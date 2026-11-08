@@ -149,7 +149,17 @@ function facDraw(c, m, spec, tile) {
   if (spec.mp) { rect(0, Y(0.22), W, Hh, spec.mp, T0); rect(0, Y(0.22) - 1, W, Y(0.22) + 1, '#bdb6a6', T0); } /* marcapiano */
   if (spec.wood) { const [a, b] = spec.wood; rect(X(a), 0, X(b), Hh, '#9a6b45', T0); for (let x = a * tile; x < b * tile; x += 0.14) rect(Xm(x) - 0.6, 0, Xm(x) + 0.6, Hh, '#6e4a2e', T0); }
   if (spec.arc) { const aw = Math.min(2.4, tile * 0.7), x0 = W / 2 - Xm(aw / 2), x1 = W / 2 + Xm(aw / 2), yb = Y(0), yt = Y(2.3), rr = (x1 - x0) / 2;
-    both('#2a2622', T0, g => { g.beginPath(); g.moveTo(x0, yb); g.lineTo(x0, yt + rr * 0.6); g.ellipse((x0 + x1) / 2, yt + rr * 0.6, rr, rr * 0.6, 0, Math.PI, 0); g.lineTo(x1, yb); g.closePath(); g.fill(); }); }
+    both('#5a3a22', T0, g => { g.beginPath(); g.moveTo(x0, yb); g.lineTo(x0, yt + rr * 0.6); g.ellipse((x0 + x1) / 2, yt + rr * 0.6, rr, rr * 0.6, 0, Math.PI, 0); g.lineTo(x1, yb); g.closePath(); g.fill(); });
+    /* the wooden door in the arch (androni-3, Carlo 8/11): two leaves with planks, rails and raised panels, the shadow of the reveal at the sides and under the arch */
+    c.save(); c.beginPath(); c.moveTo(x0, yb); c.lineTo(x0, yt + rr * 0.6); c.ellipse((x0 + x1) / 2, yt + rr * 0.6, rr, rr * 0.6, 0, Math.PI, 0); c.lineTo(x1, yb); c.closePath(); c.clip();
+    for (let x = x0; x < x1; x += Xm(0.14)) { c.fillStyle = (Math.round((x - x0) / Xm(0.14)) % 2) ? '#68442a' : '#5a3a22'; c.fillRect(x, yt - rr, Xm(0.14), yb - yt + rr); c.fillStyle = '#3a2515'; c.fillRect(x, yt - rr, 1.2, yb - yt + rr); }
+    c.fillStyle = '#46301c'; for (const yy of [0.35, 1.2, 2.0]) c.fillRect(x0, Y(yy) - 3, x1 - x0, 6);
+    c.fillStyle = 'rgba(255,255,255,.07)'; for (const [a0, a1] of [[0.5, 1.1], [1.3, 1.9]]) { c.fillRect(x0 + 5, Y(a1), (x1 - x0) / 2 - 8, Y(a0) - Y(a1)); c.fillRect((x0 + x1) / 2 + 3, Y(a1), (x1 - x0) / 2 - 8, Y(a0) - Y(a1)); }
+    c.fillStyle = '#1e140a'; c.fillRect((x0 + x1) / 2 - 1.5, yt - rr, 3, yb - yt + rr);
+    c.fillStyle = '#8a6b2c'; c.fillRect((x0 + x1) / 2 - 9, Y(1.0), 5, 9); c.fillRect((x0 + x1) / 2 + 4, Y(1.0), 5, 9);
+    const sh = c.createLinearGradient(0, yt - rr, 0, yt + rr * 0.9); sh.addColorStop(0, 'rgba(0,0,0,.55)'); sh.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = sh; c.fillRect(x0, yt - rr, x1 - x0, rr * 1.9);
+    for (const [ga, gb] of [[x0, x0 + 7], [x1 - 7, x1]]) { const sg = c.createLinearGradient(ga, 0, gb, 0); sg.addColorStop(ga === x0 ? 0 : 1, 'rgba(0,0,0,.5)'); sg.addColorStop(ga === x0 ? 1 : 0, 'rgba(0,0,0,0)'); c.fillStyle = sg; c.fillRect(ga, yt - rr, gb - ga, yb - yt + rr); }
+    c.restore(); }
   if (spec.gar) { const { w, h, col } = spec.gar; rect(X(0.5) - Xm(w / 2) - 3, Y(h) - 3, X(0.5) + Xm(w / 2) + 3, Y(0), '#9a958b', T0); rect(X(0.5) - Xm(w / 2), Y(h), X(0.5) + Xm(w / 2), Y(0), col, T0);
     for (let y = 0.25; y < h; y += 0.5) rect(X(0.5) - Xm(w / 2), Y(y) - 1, X(0.5) + Xm(w / 2), Y(y) + 1, 'rgba(0,0,0,.18)', T0); }
   if (spec.lg) { const { w, rail, rc } = spec.lg, x0 = X(0.5) - Xm(w / 2), x1 = X(0.5) + Xm(w / 2);

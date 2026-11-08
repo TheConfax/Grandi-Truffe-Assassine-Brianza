@@ -1,5 +1,5 @@
 {
- "cancelli": 11543,
+ "cancelli": 11580,
  "della_regola": {
   "passo_carraio": 240,
   "rampa": 2,
@@ -1994,7 +1994,7 @@
  },
  "ante_alberi": {
   "ante_girate": 7,
-  "alberi_spostati": 96
+  "alberi_spostati": 95
  },
  "decisioni": [
   [

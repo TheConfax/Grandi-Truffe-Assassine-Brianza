@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 import numpy as np, tifffile
 from pyproj import Transformer
 from shapely.geometry import LineString, Polygon, Point, box, GeometryCollection, MultiLineString, MultiPolygon
-from shapely.ops import unary_union, linemerge
+from shapely.ops import unary_union, linemerge, nearest_points
 from shapely.strtree import STRtree
 from shapely import prepare, segmentize as _segmentize
 
@@ -1664,7 +1664,11 @@ if dbt_pc:
         def _arej(why_):
             _acc[nome_ + ':' + why_] += 1
             if dbg_: log('androne debug', nome_, round(cx_.x, 1), round(cx_.y, 1), 'area', round(Pz_.area, 1), why_)
-        ms_ = _a_bocche(Pz_)
+        ms_ = _a_bocche(Pz_); mg_ = []
+        for m_ in ms_:   # the short pieces of a mouth that bends (a chamfered corner) are one mouth: its door goes from end to end
+            if mg_ and math.dist(mg_[-1][1], m_[0]) < 0.3 and mg_[-1][2] < 3.5 and m_[2] < 3.5 and math.dist(mg_[-1][0], m_[1]) <= 6.0: mg_[-1] = (mg_[-1][0], m_[1], math.dist(mg_[-1][0], m_[1]))
+            else: mg_.append(m_)
+        ms_ = mg_
         if len(ms_) < 2: return _arej('una_bocca')
         sc_ = []
         for a_, b_, L_ in ms_:
@@ -1681,7 +1685,26 @@ if dbt_pc:
         if not covered_:   # an open gap counts only when it leads into a courtyard
             cp_ = _a_cortile_at(far_[-1][6]) if _afree is not None else None
             if cp_ is None or cp_.area > ACORTILE_MAX or cp_.area < 12: return _arej('non_in_un_cortile')
+        mouths_ = [pub_]   # (Carlo 8/11, androni-3) every other mouth that leads out to the public side, not into a courtyard, is closed too: a covered passage keeps its innermost mouth open
+        inner_ = [x_ for x_ in sc_ if _afree is not None and _a_cortile_at(x_[6]) is not None]
+        if not inner_ and covered_: inner_ = [sc_[-1]]
+        for x_ in sc_[1:]:
+            if x_[0] > 20 or x_[3] < 1.2 or any(x_ is y_ for y_ in inner_): continue
+            if any(math.dist(e_, f_) < 0.5 for y_ in inner_ for e_ in (y_[1], y_[2]) for f_ in (x_[1], x_[2])): continue   # the piece of an open mouth that bends stays open with it
+            mouths_.append(x_)
+        for k_m_, mo_ in enumerate(mouths_): _a_chiudi(mo_, Pz_, nome_, covered_, dbg_, cx_, k_m_ > 0)
+    def _a_chiudi(pub_, Pz_, nome_, covered_, dbg_, cx_, extra_):
+        def _arej(why_):
+            _acc[nome_ + ':' + why_ + ('_extra' if extra_ else '')] += 1
+            if dbg_: log('androne debug', nome_, round(cx_.x, 1), round(cx_.y, 1), 'area', round(Pz_.area, 1), why_)
         _, a_, b_, wd_, (ox_, oz_), mid0_, _p = pub_
+        Wn_ = unary_union([_gnd[j_] for j_ in _gndt.query(Pz_.buffer(4.0))])   # the ends of the mouth go onto the walls of the buildings that bound it: no gap beside the door, its line from corner to corner
+        def _snap(p_):
+            if Wn_.is_empty: return p_
+            q_ = nearest_points(Point(p_), Wn_)[1]; d_ = math.dist(p_, (q_.x, q_.y))
+            return (q_.x, q_.y) if 0.03 < d_ <= 2.6 else p_
+        a_, b_ = _snap(a_), _snap(b_); wd_ = math.dist(a_, b_)
+        if wd_ < 0.8: return _arej('stretta')
         ux_, uz_ = (b_[0] - a_[0]) / wd_, (b_[1] - a_[1]) / wd_
         a_ = (a_[0] - ux_ * 0.1, a_[1] - uz_ * 0.1); b_ = (b_[0] + ux_ * 0.1, b_[1] + uz_ * 0.1); wd_ += 0.2
         if (-uz_) * ox_ + ux_ * oz_ > 0: a_, b_ = b_, a_; ux_, uz_ = -ux_, -uz_   # the left normal (the side the leaves open to) away from the street
@@ -1691,7 +1714,7 @@ if dbt_pc:
         if (_asph_in.intersects(G2_) and _asph_in.intersection(G2_).length > 0.3) or (_ucarr_in is not None and _ucarr_in.intersects(G2_) and _ucarr_in.intersection(G2_).length > 0.3): return _arej('in_carreggiata')
         old_ = []; blocked_ = False   # a gate of the rule inside the passage or up to 10 m behind its mouth was set in the wrong place: it goes; any other one near the mouth is already the gate
         for L2_, g2_ in _vg_vicini((mid_.x, mid_.y), 14):
-            if g2_ is None or id(g2_) in _arem: continue
+            if g2_ is None or id(g2_) in _arem or id(g2_) in _amine: continue
             gm_ = Point((g2_[0] + g2_[2]) / 20, (g2_[1] + g2_[3]) / 20); inw_ = (gm_.x - mid_.x) * nx_ + (gm_.y - mid_.y) * nz_
             if _gprio.get(id(g2_), 2) > 0 and g2_[4] == 'g' and (Pz_.buffer(1.0).contains(gm_) or (G2_.distance(gm_) < 10.0 and inw_ > -0.5)): old_.append(g2_)
             elif L2_.distance(mid_) < 3.0 and inw_ > -3.0: blocked_ = True
@@ -1705,10 +1728,10 @@ if dbt_pc:
         if wd_ > VARCO_LARGO:   # a wide front (a portico towards a garden): the railing of the sides closes it
             k_, h_ = max((_vchiusura(a_), _vchiusura(b_)), key=lambda x_: x_[1]); _vcanc.append(([tuple(a_), tuple(b_)], k_, h_)); _vg_add(a_, b_); _gd.append((mid_.x, mid_.y)); _acc[nome_ + ':cancellata'] += 1
             _gand.append((None, round(mid_.x, 1), round(mid_.y, 1), round(wd_, 1), covered_, hw_)); return
-        gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', 2.0 if zb_ is None else 2.2, 0]); _gprio[id(gate_out[-1])] = 1; _gpavset.add(id(gate_out[-1])); _vg_add(a_, b_, gate_out[-1]); _gd.append((mid_.x, mid_.y)); _acc[nome_ + ':cancello'] += 1
+        gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', 2.0 if zb_ is None else 2.2, 0]); _gprio[id(gate_out[-1])] = 1; _amine.add(id(gate_out[-1])); _gpavset.add(id(gate_out[-1])); _vg_add(a_, b_, gate_out[-1]); _gd.append((mid_.x, mid_.y)); _acc[nome_ + ':cancello'] += 1
         _gand.append((gate_out[-1], round(mid_.x, 1), round(mid_.y, 1), round(wd_, 1), covered_, hw_))
         if dbg_: log('androne debug', nome_, round(cx_.x, 1), round(cx_.y, 1), 'CHIUSO', round(wd_, 1), covered_)
-    _gand = []; _arem = set()
+    _gand = []; _arem = set(); _amine = set()
     if _gndt is not None:
         _Ug = unary_union(_gnd); _Ua = unary_union([g_ for b_, g_ in _alti]) if _alti else Polygon()
         _Us = unary_union([r_['line'].buffer(r_['w'] / 2, cap_style=2) for r_ in _astr] + [g_ for g_ in (asph, side) if g_ is not None and not g_.is_empty])   # the streets themselves are no gap: a narrow street would be closed up by the 3 m and swallow the passages that open on it
