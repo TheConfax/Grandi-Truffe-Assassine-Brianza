@@ -60,8 +60,9 @@ TETTI_PROC = max(1, min(12, (os.cpu_count() or 4) - 2))
 # of 14 m2 and 19.6 m at x 283 z -608 where there is a house of two floors), Edifici.altezze_dal_dsm:
 ALTO_DZ, ALTO_LISCIO = 6.0, 1.5   # a part of a ground volume where the DSM stands this far over its top and is smooth (max - min in 3x3 under this)
 ALTO_MIN, ALTO_SH, ALTO_LISCI = 40.0, 0.15, 0.3   # ... a block this big (m2 and share of the volume, this share of it smooth) is a taller part
-CONF_DZ, CONF_D = 2.0, 40.0   # ... drawn at the DSM's height only where another volume of the same building within CONF_D m stands as high (within
-                   # CONF_DZ): the DBGT has that body, it drew this part low. Without it the volume stays (edificio 525 at x 210 z -605, Carlo:
+CONF_DZ, CONF_D = 3.0, 40.0   # ... drawn at the DSM's height only where another volume of the same building within CONF_D m stands at least as high,
+                   # less CONF_DZ: the DBGT has a body that tall, it drew this part low (Carlo 8/11: x 498 z -319, a block 24.3 m high by a tower
+                   # of 27.1 m; at first within 2 m either way). Without it the volume stays (edificio 525 at x 210 z -605, Carlo:
                    # a block 19 m high under the DSM of 2008 and a volume as high 55 m away in the same big complex, chance; the farthest
                    # confirmation taken at Meda and Seveso is 30 m, x 477 z -328)
 BASSO_A, BASSO_DZ, BASSO_SH, BASSO_MIN = 60.0, 8.0, 0.9, 2.0   # a ground volume this small (m2) whose top the DSM is BASSO_DZ m under on
@@ -717,7 +718,7 @@ class Edifici:
         """The heights of the ground volumes (UN_VOL_POR 01) where the DSM says the DBGT's UN_VOL_AV is plainly wrong, before the roofs:
           - too low: a block the DSM sees smooth and ALTO_DZ m over the top of the walls (blocchi_alti) becomes a volume of its own of the same
             building, at the eaves of the roof the DSM fits on it (fit_tetto: the median of the DSM for a flat roof), when another volume of
-            the same building within CONF_D m stands that high (within CONF_DZ); the rest of the volume stays at its height, cut 5 cm off the
+            the same building within CONF_D m stands at least that high less CONF_DZ; the rest of the volume stays at its height, cut 5 cm off the
             block (no flicker on the shared wall), and its strips too small or thin to stand alone go with the block
           - too high: a volume of at most BASSO_A m2 whose top the DSM is BASSO_DZ m under on BASSO_SH of it comes down to the median of the DSM
             there; it goes when it lies on volumes of other buildings for more than half of it (the DSM over it is theirs)
@@ -775,7 +776,7 @@ class Edifici:
             ztn = md + f['eave'] if f.get('k') in ('gable', 'hip', 'shed') and -4.0 <= f.get('eave', 1) <= 0 else md   # the eaves, as UN_VOL_AV
             ztn -= B
             ss = [(w['zt'], w_p.distance(q)) for i_, w in sib[r['e']] if i_ != id(r) and i_ not in tolti for w_p in [Polygon(w['p']).buffer(0)]]
-            ok = [s for s in ss if abs(s[0] - ztn) <= CONF_DZ and s[1] <= CONF_D]
+            ok = [s for s in ss if s[0] >= ztn - CONF_DZ and s[1] <= CONF_D]
             if ok: conf[key[0]].append((q, round(ztn, 2), min(ok, key=lambda s: s[1])))
             else:
                 near = min(ss, key=lambda s: (abs(s[0] - ztn), s[1])) if ss else None

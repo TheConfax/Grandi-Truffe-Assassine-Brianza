@@ -2724,11 +2724,11 @@
  },
  "altezze_dal_dsm": {
   "n": {
-   "alzati": 14,
+   "alzati": 20,
    "abbassati": 2,
    "tolti": 0,
    "scartati_dsm_al_suolo": 11,
-   "scartati_senza_conferma": 37
+   "scartati_senza_conferma": 31
   },
   "alzati": [
    {
@@ -2760,6 +2760,20 @@
     }
    },
    {
+    "e": 1176,
+    "oid": 4637,
+    "x": -138.7,
+    "z": -429.4,
+    "m2": 70,
+    "da": 6.5,
+    "a": 13.8,
+    "motivo": "dsm_sopra_la_cima",
+    "conferma": {
+     "a": 11.2,
+     "d": 0.0
+    }
+   },
+   {
     "e": 1181,
     "oid": 5759,
     "x": 437.9,
@@ -2783,8 +2797,8 @@
     "a": 33.2,
     "motivo": "dsm_sopra_la_cima",
     "conferma": {
-     "a": 33.8,
-     "d": 13.1
+     "a": 36.4,
+     "d": 0.0
     }
    },
    {
@@ -2799,6 +2813,20 @@
     "conferma": {
      "a": 10.4,
      "d": 0.0
+    }
+   },
+   {
+    "e": 1558,
+    "oid": 6669,
+    "x": 1197.9,
+    "z": -993.1,
+    "m2": 739,
+    "da": 4.7,
+    "a": 11.7,
+    "motivo": "dsm_sopra_la_cima",
+    "conferma": {
+     "a": 9.2,
+     "d": 3.8
     }
    },
    {
@@ -2867,8 +2895,8 @@
     "a": 11.8,
     "motivo": "dsm_sopra_la_cima",
     "conferma": {
-     "a": 10.9,
-     "d": 3.1
+     "a": 9.5,
+     "d": 0.0
     }
    },
    {
@@ -2882,6 +2910,34 @@
     "motivo": "dsm_sopra_la_cima",
     "conferma": {
      "a": 13.4,
+     "d": 0.0
+    }
+   },
+   {
+    "e": 2672,
+    "oid": 2686,
+    "x": -34.8,
+    "z": -693.7,
+    "m2": 146,
+    "da": 5.6,
+    "a": 10.9,
+    "motivo": "dsm_sopra_la_cima",
+    "conferma": {
+     "a": 8.4,
+     "d": 0.0
+    }
+   },
+   {
+    "e": 2953,
+    "oid": 7256,
+    "x": 521.3,
+    "z": -306.4,
+    "m2": 495,
+    "da": 7.9,
+    "a": 24.3,
+    "motivo": "dsm_sopra_la_cima",
+    "conferma": {
+     "a": 27.1,
      "d": 0.0
     }
    },
@@ -2914,6 +2970,20 @@
     }
    },
    {
+    "e": 6939,
+    "oid": 5241,
+    "x": -1301.1,
+    "z": 1089.8,
+    "m2": 350,
+    "da": 9.2,
+    "a": 19.4,
+    "motivo": "dsm_sopra_la_cima",
+    "conferma": {
+     "a": 16.4,
+     "d": 10.6
+    }
+   },
+   {
     "e": 7599,
     "oid": 3453,
     "x": -1106.2,
@@ -2924,6 +2994,20 @@
     "motivo": "dsm_sopra_la_cima",
     "conferma": {
      "a": 11.8,
+     "d": 0.0
+    }
+   },
+   {
+    "e": 8823,
+    "oid": 3044,
+    "x": -1139.6,
+    "z": 1050.1,
+    "m2": 133,
+    "da": 8.3,
+    "a": 13.4,
+    "motivo": "dsm_sopra_la_cima",
+    "conferma": {
+     "a": 28.1,
      "d": 0.0
     }
    }
@@ -3149,34 +3233,6 @@
     "vicino": null
    },
    {
-    "e": 1176,
-    "oid": 4637,
-    "x": -138.4,
-    "z": -429.8,
-    "m2": 64,
-    "da": 6.5,
-    "a": 13.8,
-    "motivo": "senza_conferma",
-    "vicino": {
-     "a": 11.2,
-     "d": 0.0
-    }
-   },
-   {
-    "e": 1558,
-    "oid": 6669,
-    "x": 1197.9,
-    "z": -993.1,
-    "m2": 739,
-    "da": 4.7,
-    "a": 11.7,
-    "motivo": "senza_conferma",
-    "vicino": {
-     "a": 9.2,
-     "d": 3.8
-    }
-   },
-   {
     "e": 2176,
     "oid": 1841,
     "x": 1320.0,
@@ -3212,20 +3268,6 @@
     "motivo": "senza_conferma",
     "vicino": {
      "a": 10.4,
-     "d": 0.0
-    }
-   },
-   {
-    "e": 2672,
-    "oid": 2686,
-    "x": -35.0,
-    "z": -693.6,
-    "m2": 129,
-    "da": 5.6,
-    "a": 10.8,
-    "motivo": "senza_conferma",
-    "vicino": {
-     "a": 8.4,
      "d": 0.0
     }
    },
@@ -3280,20 +3322,6 @@
     "vicino": {
      "a": 27.1,
      "d": 31.2
-    }
-   },
-   {
-    "e": 2953,
-    "oid": 7256,
-    "x": 521.3,
-    "z": -306.4,
-    "m2": 495,
-    "da": 7.9,
-    "a": 24.3,
-    "motivo": "senza_conferma",
-    "vicino": {
-     "a": 27.1,
-     "d": 0.0
     }
    },
    {
@@ -3402,20 +3430,6 @@
     "vicino": null
    },
    {
-    "e": 6939,
-    "oid": 5241,
-    "x": -1300.9,
-    "z": 1089.8,
-    "m2": 341,
-    "da": 9.2,
-    "a": 19.4,
-    "motivo": "senza_conferma",
-    "vicino": {
-     "a": 16.4,
-     "d": 10.6
-    }
-   },
-   {
     "e": 7701,
     "oid": 3961,
     "x": -2956.9,
@@ -3494,20 +3508,6 @@
     }
    },
    {
-    "e": 8823,
-    "oid": 3044,
-    "x": -1139.6,
-    "z": 1050.1,
-    "m2": 133,
-    "da": 8.3,
-    "a": 13.4,
-    "motivo": "senza_conferma",
-    "vicino": {
-     "a": 7.9,
-     "d": 12.9
-    }
-   },
-   {
     "e": 9130,
     "oid": 2259,
     "x": 444.5,
@@ -3534,8 +3534,8 @@
  "tetti": {
   "dal_dsm": {
    "rudere_con_tetto_dal_dsm": 20,
-   "piano": 4461,
-   "a_falde": 3038,
+   "piano": 4463,
+   "a_falde": 3039,
    "a_una_falda": 330,
    "in_ali": 898,
    "a_padiglione": 1000,
@@ -3546,12 +3546,12 @@
   },
   "non_dal_dsm": {
    "troppo_ripido": 330,
-   "irregolare": 1041,
-   "piccolo": 1604,
+   "irregolare": 1043,
+   "piccolo": 1605,
    "basso": 582,
-   "chiome": 33,
-   "alto": 617,
-   "complesso": 453,
+   "chiome": 32,
+   "alto": 614,
+   "complesso": 454,
    "non_copre": 544,
    "senza_dsm": 443
   },
@@ -3561,7 +3561,7 @@
    "ali_piane_senza_dsm": 350,
    "ala_piana": 764,
    "ala_a_falde": 908,
-   "ali_senza_falde": 428,
+   "ali_senza_falde": 430,
    "ala_a_padiglione": 127,
    "ala_a_una_falda": 246
   },

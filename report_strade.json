@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 3.7,
+  "tempo_s": 5.4,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1176,12 +1176,12 @@
  "superfici": {
   "osm_tenute_vie": 229,
   "asfalto_m2": 1686654,
-  "cortili_m2": 1739274,
+  "cortili_m2": 1739275,
   "marciapiedi_m2": 150242,
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 43.7,
+  "tempo_s": 43.8,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -1524,8 +1524,8 @@
   "dbgt": 39937,
   "metri_dbgt": 502311,
   "metri_tenuti": 454376,
-  "spostati": 1438,
-  "metri_spostati": 8010,
+  "spostati": 1437,
+  "metri_spostati": 8008,
   "spostamento_m": {
    "p50": 0.5,
    "p90": 0.54,
@@ -2751,6 +2751,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 9.0
+  "tempo_s": 23.2
  }
 }
