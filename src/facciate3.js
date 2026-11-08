@@ -6,7 +6,7 @@
 // Near the player (FAC_R) the windows are 3D: the wall opens where the window is (the shader drops those pixels) and behind it stand the reveal, the
 // frame and the glass; the shutters, the sills, the roller blinds stand on and in it; the balconies are 3D a little further (FAC_RB). Further away the
 // painted cell, as before. The 3D parts are instanced: every few metres the windows round the camera are written into one mesh per part
-const FAC_R = 72, FAC_RB = 150, FAC_FL = 3.1;
+const FAC_R = 150, FAC_RB = 150, FAC_FL = 3.1;
 const FAC_COLS = 8, FAC_ROWS = 16, FAC_CPX = 256, FAC_PAD = 8, FAC_IN = FAC_CPX - 2 * FAC_PAD;
 const FAC_EP_NOMI = ['A', 'B', 'C', 'D'];
 // ---- the windows, the balconies, the materials of the cells. Sizes in metres; u in the bay 0..1 (centre of the window), lo/hi over the floor
@@ -211,17 +211,20 @@ const FAC_ATLAS = (() => {
 })();
 if (FAC_ATLAS.n > FAC_COLS * FAC_ROWS) console.warn('facciate: celle oltre l\'atlante', FAC_ATLAS.n);
 // ---- the material of all facades
+/* three.js r128 gives cameraPosition only to Phong, Standard and Shader materials (or with an envMap): in a Lambert one it stays (0, 0, 0), so the wall
+   never opened and every part that fades with the hole was thrown away (Carlo 8/11: "non ci sono proprio"). The camera from the view matrix, which every material gets */
+const FAC_CAMGL = 'vec3 facCamW() { vec3 t = viewMatrix[3].xyz; return -vec3( dot( viewMatrix[0].xyz, t ), dot( viewMatrix[1].xyz, t ), dot( viewMatrix[2].xyz, t ) ); }\n';
 const FAC_U = { uNearR: { value: FAC_R }, uBalR: { value: FAC_RB }, uMeta: { value: FAC_ATLAS.meta }, uLit: WIN_LIT };
 MAT.fac = new THREE.MeshLambertMaterial({ map: FAC_ATLAS.tex, emissiveMap: FAC_ATLAS.msk, emissive: new THREE.Color(0xffc870), emissiveIntensity: 0, vertexColors: true });
 MAT.fac.onBeforeCompile = s => {
   Object.assign(s.uniforms, FOTO_FAC, FAC_U);
   AO_WALL(s);
-  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 facD;\nvarying vec4 vFac;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFac = facD;')
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 facD;\nattribute float facX;\nvarying vec4 vFac;\nvarying float vFacX;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFac = facD; vFacX = facX;')
     .replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz; vWNrm = normalize( mat3( modelMatrix ) * objectNormal );');
   s.fragmentShader = `uniform sampler2D uPlaster;\nuniform vec3 uSkyH;\nuniform vec3 uSkyZ;\nuniform vec3 uSunD;\nuniform vec3 uSunC;\nuniform float uNearR;\nuniform float uBalR;\nuniform float uLit;\nuniform highp sampler2D uMeta;
-varying vec4 vFac;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;
-const vec2 FAC_CS = vec2(${(1 / FAC_COLS).toFixed(6)}, ${(1 / FAC_ROWS).toFixed(6)}); const float FAC_PF = ${(FAC_PAD / FAC_CPX).toFixed(6)};
+varying vec4 vFac;\nvarying float vFacX;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;
+${FAC_CAMGL}const vec2 FAC_CS = vec2(${(1 / FAC_COLS).toFixed(6)}, ${(1 / FAC_ROWS).toFixed(6)}); const float FAC_PF = ${(FAC_PAD / FAC_CPX).toFixed(6)};
 vec2 facAt(float c, vec2 f) { return (vec2(mod(c, ${FAC_COLS}.0), floor(c / ${FAC_COLS}.0)) + FAC_PF + f * (1.0 - 2.0 * FAC_PF)) * FAC_CS; }
 float facIgn(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
 bool facIn(vec2 f, int c, int k) {
@@ -235,10 +238,11 @@ bool facIn(vec2 f, int c, int k) {
     .replace('#include <map_fragment>', `
   float facF = floor( vUv.y );
   float facW = step( vFac.x - 0.5, facF ) * step( facF, vFac.y + 0.5 ) * step( vFac.z, vUv.y );
+  { float facXr = facF - floor( vFac.x + 0.5 ); if ( facXr >= 0.0 && facXr < 23.0 && mod( floor( floor( vFacX + 0.5 ) / exp2( facXr ) ), 2.0 ) > 0.5 ) facW = 0.0; } /* a floor whose window was taken away (covered by another volume): plain wall, no hole */
   float facCode = vFac.w + 0.5, facCP = floor( facCode / 16384.0 ), facR0 = facCode - facCP * 16384.0, facCG = floor( facR0 / 128.0 ), facCU = floor( facR0 - facCG * 128.0 );
   float facCell = facW < 0.5 ? facCP : ( facF < floor( vFac.z ) + 0.5 ? facCG : facCU );
   vec2 facFr = fract( vUv );
-  float facD = distance( vWPos, cameraPosition ), facDi = facIgn( gl_FragCoord.xy );
+  float facD = distance( vWPos, facCamW() ), facDi = facIgn( gl_FragCoord.xy );
   if ( facW > 0.5 ) {
     int ci = int( facCell + 0.5 );
     bool nW = facDi < clamp( ( uNearR - facD ) / 6.0, 0.0, 1.0 ), nB = facDi < clamp( ( uBalR - facD ) / 8.0, 0.0, 1.0 );
@@ -266,7 +270,7 @@ bool facIn(vec2 f, int c, int k) {
     .replace('vec3 outgoingLight =', `
   if ( paneM > 0.01 ) {
     float paneH = fract( sin( dot( floor( vUv ) + 0.37, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
-    vec3 Vd = normalize( vWPos - cameraPosition ), Np = normalize( vWNrm + vec3( 0.0, ( paneH - 0.5 ) * 0.14, ( fract( paneH * 7.1 ) - 0.5 ) * 0.1 ) ), Rd = reflect( Vd, Np );
+    vec3 Vd = normalize( vWPos - facCamW() ), Np = normalize( vWNrm + vec3( 0.0, ( paneH - 0.5 ) * 0.14, ( fract( paneH * 7.1 ) - 0.5 ) * 0.1 ) ), Rd = reflect( Vd, Np );
     float fres = 0.04 + 0.96 * pow( 1.0 - clamp( dot( -Vd, Np ), 0.0, 1.0 ), 5.0 );
     vec3 seen = Rd.y > 0.0 ? mix( uSkyH, uSkyZ, smoothstep( 0.0, 0.5, Rd.y ) ) : uSkyH * 0.3;
     totalEmissiveRadiance += paneM * ( seen * ( 0.3 + 0.7 * fres ) + uSunC * pow( max( dot( Rd, uSunD ), 0.0 ), 600.0 ) * 8.0 );
@@ -298,8 +302,24 @@ const FAC_PUB_LISCI = new Set([0, 1, 13]); /* chapels and churches stay smooth, 
 // is this point (just out of a wall, at height y) inside another building?
 function facCoperto(B, x, z, y) {
   let c = false;
-  BLD.each(x, z, x, z, b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9; if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h))) c = true; });
+  const f = b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9; if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h))) c = true; };
+  BLD.each(x, z, x, z, f); BLDR.each(x, z, x, z, f); /* the raised volumes too (a passage, an overhang): they are not in BLD (Carlo 8/11, via Farga) */
   return c;
+}
+// is this point (just inside a wall, at height y) inside another volume too? Two volumes on the same wall (the DBGT has some houses twice, one over the other,
+// or a body built against the wall from inside): only one of them carries the windows, the taller one (the first one if they are as tall)
+function facDoppio(B, x, z, y) {
+  if (B.gtop === undefined) B.gtop = bldTop(B); let c = false;
+  const f = b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9;
+    if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h)) && (b.gtop > B.gtop + 0.05 || (Math.abs(b.gtop - B.gtop) <= 0.05 && (b.bi || 0) < (B.bi || 0)))) c = true; };
+  BLD.each(x, z, x, z, f); BLDR.each(x, z, x, z, f);
+  return c;
+}
+// is the room a balcony takes free? No volume, not even another wing of its own house, where it stands out of the wall (Carlo 8/11, via Farga: a balcony went through another volume of the house, over the covered passage)
+function facBalLibero(B, x, z, nx, nz, w, d, y) {
+  const ux = nz, uz = -nx;
+  for (const o of [Math.min(0.3, d * 0.5), d * 0.5, d - 0.05]) for (const s of [-0.47, -0.25, 0, 0.25, 0.47]) { const px = x + nx * o + ux * w * s, pz = z + nz * o + uz * w * s; for (const yy of [y + 0.1, y + 0.9]) if (facCoperto(B, px, pz, yy)) return false; }
+  return true;
 }
 // does this wall look onto a street? (front cells); a courtyard (a hole of the plan) never does
 function facFronte(ax, az, cx, cz, nx, nz) {
@@ -307,6 +327,9 @@ function facFronte(ax, az, cx, cz, nx, nz) {
   return false;
 }
 // ---- the 3D records of a tile, filled by the building loop of world3.js
+/* how deep the window stands in the wall, by the age of the house: the thick brick walls of the old courtyard houses, thinner and thinner after the war, the
+   ribbon windows and the curtain walls of offices nearly flush */
+function facDepth(S, w) { if (w.cw) return 0.05; if (w.rib) return 0.12; return { A: 0.32, B: 0.26, C: 0.22, D: 0.18, W: 0.22 }[S.band] || 0.16; }
 function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gro) {
   /* one bay (j) on one floor (k) of run R; e: its side [dx, dz, L, nx, nz]; s0: the bay's start along the run */
   const cells = sty.S[side + 'c'], spec = gro ? cells.spG : cells.spU; if (!spec) return;
@@ -316,20 +339,21 @@ function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gr
   const fam = sty.S.fam, fr = (c, d) => c || d;
   if (spec.lg) {
     const lg = spec.lg, w = lg.w * bw / sty.S.tile, p = at(s0 + bw / 2);
-    out.push({ x: p[0], y: yF, z: p[1], nx, nz, w, h: 2.6 * sc, D: lg.d, lg: 1, fr: COL(ANTR), wc: wallCol, rail: lg.rail, rc: lg.rc ? COL(lg.rc) : wallCol.clone().multiplyScalar(0.85), lit: h0 });
+    out.push({ x: p[0], y: yF, z: p[1], nx, nz, w, h: 2.6 * sc, D: lg.d, lg: 1, fr: COL(ANTR), wc: wallCol, rail: lg.rail, rc: lg.rc ? COL(lg.rc) : wallCol.clone().multiplyScalar(0.92), lit: h0 });
     if (h0 < 0.3) det.push({ k: 'pot', x: p[0] + nz * (w * 0.3) + nx * (-0.4), y: yF, z: p[1] - nx * (w * 0.3) + nz * (-0.4), nx, nz, R: FAC_R });
     return;
   }
   for (const w of spec.w || []) {
     const ww = (w.rib ? sty.S.tile : w.w) * bw / sty.S.tile, p = at(s0 + w.u * bw), lo = w.lo * sc, hi = w.hi * sc;
     const st = w.sh === 'pe' ? (h0 < 0.12 ? 1 : h0 < 0.2 ? 2 : 0) : 0;
-    out.push({ x: p[0], y: yF + lo, z: p[1], nx, nz, w: ww, h: hi - lo, D: w.cw ? 0.07 : 0.18, fr: COL(w.fr), wc: wallCol, sh: w.sh, shc: COL(w.shc || '#888'), st, tl: 0.15 + hashRnd(h0 * 91) * 0.55,
+    out.push({ x: p[0], y: yF + lo, z: p[1], nx, nz, w: ww, h: hi - lo, D: facDepth(sty.S, w), old: sty.S.band === 'A', fr: COL(w.fr), wc: wallCol, sh: w.sh, shc: COL(w.shc || '#888'), st, tl: 0.15 + hashRnd(h0 * 91) * 0.55,
       sill: w.sill ? COL(w.sill) : null, mul: !w.rib && w.w > 0.75, rib: !!w.rib, fins: !!w.fins, bow: !!w.bow, lit: hashRnd(h0 * 17 + 3) });
     const ux = nz, uz = -nx;
     if (w.bal && !gro) {
       const b = w.bal, bx0 = s0 + b.u0 * bw, bx1 = s0 + b.u1 * bw, q = at((bx0 + bx1) / 2), nastro = b.u0 <= 0.001 && b.u1 >= 0.999;
-      bal.push({ x: q[0], y: yF, z: q[1], nx, nz, w: bx1 - bx0, d: b.d, rail: b.rail, rc: b.rc ? COL(b.rc) : wallCol.clone().multiplyScalar(0.85), sl: !nastro || j === 0, sr: !nastro || j === R.n - 1 });
-      const hb = hashRnd(h0 * 53 + 1);
+      const libero = facBalLibero(null, q[0], q[1], nx, nz, bx1 - bx0, b.d, yF); /* over another volume: only the railing at the French window, no balcony (Carlo 8/11, via Farga) */
+      bal.push({ x: q[0], y: yF, z: q[1], nx, nz, w: bx1 - bx0, d: libero ? b.d : 0.12, rail: b.rail, rc: b.rc ? COL(b.rc) : wallCol.clone().multiplyScalar(0.92), sl: !nastro || j === 0, sr: !nastro || j === R.n - 1 });
+      const hb = libero ? hashRnd(h0 * 53 + 1) : 0.5; /* no pots, awnings or dishes on a balcony that is not there */
       if (hb < 0.35) det.push({ k: 'pot', x: q[0] + ux * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nx * (b.d - 0.3), y: yF, z: q[1] + uz * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nz * (b.d - 0.3), nx, nz, R: FAC_R });
       if ((fam === 'pal' || fam === 'alto' || fam === 'vil') && sty.S.band !== 'D' && hb > 0.82) det.push({ k: 'awn', x: p[0], y: yF + hi + 0.25, z: p[1], nx, nz, w: Math.min(bx1 - bx0, ww + 1.2), d: Math.min(b.d, 1.2), c: hashRnd(hb * 13), R: FAC_RB });
       if ((fam === 'pal' || fam === 'alto') && hb > 0.7 && hb < 0.76) det.push({ k: 'dish', x: q[0] + ux * (bx1 - bx0) * 0.4 + nx * (b.d - 0.05), y: yF + 1.15, z: q[1] + uz * (bx1 - bx0) * 0.4 + nz * (b.d - 0.05), nx, nz, R: FAC_RB });
@@ -345,6 +369,7 @@ function facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, kind) {
   /* the balconies of the corner bays (ang) and the small stone ones of the piano nobile (bc): 3D only */
   const o = kind === 'ang' ? sty.S.ang : sty.S.bc, p = R.at(s0 + bw / 2), bal = T.fbal || (T.fbal = []);
   const w = kind === 'ang' ? bw * 0.86 : Math.min(bw * 0.5, 1.8);
+  if (!facBalLibero(null, p[0], p[1], e[3], e[4], w, o.d, F0 + FL * k)) return; /* over another volume: none */
   bal.push({ x: p[0], y: F0 + FL * k, z: p[1], nx: e[3], nz: e[4], w, d: o.d, rail: o.rail, rc: COL(o.rc || '#e6e0d0'), sl: true, sr: true });
 }
 // ---- the instanced parts
@@ -354,9 +379,40 @@ function facFadeMat(mat, R, extraV = '', extraF = '') { /* the parts that stand 
   mat.onBeforeCompile = s => {
     s.uniforms.uFR = U.uFR;
     s.vertexShader = 'varying vec3 vFWP;\n' + s.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n{ vec4 fwp = vec4( transformed, 1.0 );\n#ifdef USE_INSTANCING\n fwp = instanceMatrix * fwp;\n#endif\n vFWP = ( modelMatrix * fwp ).xyz; }' + extraV);
-    s.fragmentShader = 'varying vec3 vFWP;\nuniform float uFR;\n' + FAC_IGN + s.fragmentShader.replace('void main() {', 'void main() {\n  if ( uFR > 0.0 && facIgn2( gl_FragCoord.xy ) >= clamp( ( uFR - distance( vFWP, cameraPosition ) ) / 6.0, 0.0, 1.0 ) ) discard;' + extraF);
+    s.fragmentShader = 'varying vec3 vFWP;\nuniform float uFR;\n' + FAC_IGN + FAC_CAMGL + s.fragmentShader.replace('void main() {', 'void main() {\n  if ( uFR > 0.0 && facIgn2( gl_FragCoord.xy ) >= clamp( ( uFR - distance( vFWP, facCamW() ) ) / 6.0, 0.0, 1.0 ) ) discard;' + extraF);
   };
   mat.customProgramCacheKey = () => 'facfade' + (R > 0 ? 1 : 0) + extraV.length + extraF.length;
+  return mat;
+}
+/* the parts in the hole of the wall (reveal, frame, glass, roller blind): the wall's own depth in the sun's shadow map hides all that is behind its face, so
+   in the map they were always in the dark, flat. Here the sun reaches a point of them only if its ray goes out through the opening (worked out per pixel
+   from the window's rectangle: aWO its bottom centre on the face and width, aWN the normal, height and depth), so the head and the sides of the reveal throw
+   their shadow on the frame and the glass; the shadow of the others (trees, houses) is read on the face of the wall in front of the point; and the light of
+   the sky goes down the deeper in and the nearer the edges */
+function facRecMat(mat) {
+  const before = mat.onBeforeCompile;
+  mat.onBeforeCompile = s => {
+    if (before) before.call(mat, s);
+    s.uniforms.uSunW = { value: SUN_DIR };
+    s.vertexShader = 'attribute vec4 aWO;\nattribute vec4 aWN;\nuniform vec3 uSunW;\nvarying vec3 vRL;\nvarying vec3 vRS;\nvarying vec2 vRWH;\n' + s.vertexShader
+      .replace('#include <project_vertex>', `#include <project_vertex>
+{ vec4 rw = vec4( transformed, 1.0 );
+#ifdef USE_INSTANCING
+  rw = instanceMatrix * rw;
+#endif
+  rw = modelMatrix * rw; vec3 rN = vec3( aWN.x, 0.0, aWN.y ), rX = vec3( rN.z, 0.0, -rN.x ), rp = rw.xyz - aWO.xyz, rS = normalize( uSunW );
+  vRL = vec3( dot( rp, rX ), rp.y, dot( rp, rN ) ); vRS = vec3( dot( rS, rX ), rS.y, dot( rS, rN ) ); vRWH = vec2( aWO.w, aWN.z ); }`)
+      .replace('#include <shadowmap_vertex>', `#ifdef USE_SHADOWMAP
+{ vec4 wp0 = worldPosition; vec3 rN = vec3( aWN.x, 0.0, aWN.y ); worldPosition.xyz += rN * ( 0.05 - dot( worldPosition.xyz - aWO.xyz, rN ) );
+#include <shadowmap_vertex>
+  worldPosition = wp0; }
+#endif`);
+    s.fragmentShader = 'varying vec3 vRL;\nvarying vec3 vRS;\nvarying vec2 vRWH;\n' + s.fragmentShader.replace('#include <aomap_fragment>', `#include <aomap_fragment>
+{ float inS = 0.0; if ( vRS.z > 0.01 ) { vec2 h = vRL.xy - vRL.z / vRS.z * vRS.xy; inS = step( abs( h.x ), 0.5 * vRWH.x + 0.004 ) * step( -0.004, h.y ) * step( h.y, vRWH.y + 0.004 ); }
+  float dep = clamp( -vRL.z / 0.45, 0.0, 1.0 ), ed = min( 0.5 * vRWH.x - abs( vRL.x ), min( vRL.y, vRWH.y - vRL.y ) );
+  reflectedLight.directDiffuse *= inS; reflectedLight.indirectDiffuse *= mix( 1.0, 0.45, dep ) * mix( 0.78, 1.0, smoothstep( 0.0, 0.2, ed ) ); }`);
+  };
+  const k0 = mat.customProgramCacheKey.bind(mat); mat.customProgramCacheKey = () => k0() + '|facrec';
   return mat;
 }
 const FAC_SLAT = canvasTex(64, 256, (g, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 10) { g.fillStyle = 'rgba(0,0,0,.32)'; g.fillRect(0, y, w, 2.5); g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(0, y + 3, w, 1); } g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, 3, h); g.fillRect(w - 3, 0, 3, h); });
@@ -372,17 +428,20 @@ const FAC_GEO = (() => {
   /* the reveal: unit opening (x -0.5..0.5, y 0..1), depth 1 into the wall (z 0..-1) */
   G.reveal = quads([[[-0.5, 0, 0], [-0.5, 0, -1], [-0.5, 1, -1], [-0.5, 1, 0], [1, 0, 0]], [[0.5, 0, -1], [0.5, 0, 0], [0.5, 1, 0], [0.5, 1, -1], [-1, 0, 0]],
     [[-0.5, 1, 0], [-0.5, 1, -1], [0.5, 1, -1], [0.5, 1, 0], [0, -1, 0]], [[-0.5, 0, -1], [-0.5, 0, 0], [0.5, 0, 0], [0.5, 0, -1], [0, 1, 0]]]);
+  { /* the head of the reveal: plaster in the shade lit by the street and the sky, not the brown of the ground light (its third face) */
+    const c = new Float32Array(G.reveal.attributes.position.count * 3).fill(1); for (let i = 12; i < 18; i++) c.set([1.25, 1.3, 1.42], i * 3); G.reveal.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
   G.back = quads([[[-0.5, 0, 0], [0.5, 0, 0], [0.5, 1, 0], [-0.5, 1, 0], [0, 0, 1]]]);
   G.glass = G.back;
-  /* the frame: a ring 7% / 5% of the opening, 5 cm deep, with the middle post (frameM) or without (frame) */
-  const ring = (bx, by, mul) => { const L = [], f = (x0, x1, y0, y1) => { L.push([[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0], [0, 0, 1]]); L.push([[x1, y0, 0], [x1, y0, -0.05], [x1, y1, -0.05], [x1, y1, 0], [1, 0, 0]]); L.push([[x0, y0, -0.05], [x0, y0, 0], [x0, y1, 0], [x0, y1, -0.05], [-1, 0, 0]]); L.push([[x0, y1, 0], [x1, y1, 0], [x1, y1, -0.05], [x0, y1, -0.05], [0, 1, 0]]); L.push([[x0, y0, -0.05], [x1, y0, -0.05], [x1, y0, 0], [x0, y0, 0], [0, -1, 0]]); };
-    f(-0.5, -0.5 + bx, 0, 1); f(0.5 - bx, 0.5, 0, 1); f(-0.5 + bx, 0.5 - bx, 1 - by, 1); f(-0.5 + bx, 0.5 - bx, 0, by); if (mul) f(-bx * 0.4, bx * 0.4, by, 1 - by); return quads(L); };
-  G.frameM = ring(0.07, 0.05, true); G.frame = ring(0.05, 0.04, false);
   const box = (x0, x1, y0, y1, z0, z1) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return g; };
+  /* one bar of a frame, a sash, a glazing bar, a guide of the roller blind: scaled (width, height, depth), its front face at z 0, going into the wall. Sizes in
+     metres whatever the window (a ring scaled with the opening made a 3 m window's frame 21 cm wide) */
+  G.bar = box(-0.5, 0.5, 0, 1, -1, 0);
   G.sill = box(-0.5, 0.5, -1, 0, -1, 0); /* scaled: (w + 0.12, 0.05, D + 0.05) */
-  G.leaf = box(0, 1, 0, 1, 0, 0.035); /* a shutter leaf, hinged at x 0 */
+  G.leaf = box(0, 1, 0, 1, 0, 0.045); /* a shutter leaf 4.5 cm thick, hinged at x 0 */
   G.tapp = quads([[[-0.5, -1, 0], [0.5, -1, 0], [0.5, 0, 0], [-0.5, 0, 0], [0, 0, 1]]]);
   G.slab = box(-0.5, 0.5, -1, 0, 0, 1); /* scaled: (w, 0.16, d) */
+  { /* the underside of a balcony: plaster in the shade lit by the street and the sky, not the brown of the ground light (the -y face of the box) */
+    const c = new Float32Array(G.slab.attributes.position.count * 3).fill(1); for (let i = 12; i < 16; i++) c.set([1.25, 1.3, 1.42], i * 3); G.slab.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
   G.rail = quads([[[-0.5, 0, 0], [0.5, 0, 0], [0.5, 1, 0], [-0.5, 1, 0], [0, 0, 1]]]);
   G.wall = box(-0.5, 0.5, 0, 1, -0.5, 0.5); /* a solid parapet, scaled (w, 1.05, 0.1) */
   G.fin = box(-0.5, 0.5, 0, 1, 0, 1);
@@ -404,12 +463,13 @@ const FAC_PARTS = (() => {
   glassMat.onBeforeCompile = s => {
     Object.assign(s.uniforms, FOTO_FAC, { uLit: WIN_LIT });
     s.vertexShader = 'attribute float aLit;\nvarying float vLit;\nvarying vec3 vGW;\nvarying vec3 vGN;\n' + s.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvLit = aLit; { vec4 gw = vec4( transformed, 1.0 ); vec3 gn = objectNormal;\n#ifdef USE_INSTANCING\n gw = instanceMatrix * gw; gn = mat3( instanceMatrix ) * gn;\n#endif\n vGW = ( modelMatrix * gw ).xyz; vGN = normalize( mat3( modelMatrix ) * gn ); }');
-    s.fragmentShader = 'uniform vec3 uSkyH;\nuniform vec3 uSkyZ;\nuniform vec3 uSunD;\nuniform vec3 uSunC;\nuniform float uLit;\nvarying float vLit;\nvarying vec3 vGW;\nvarying vec3 vGN;\n' + s.fragmentShader
+    s.fragmentShader = 'uniform vec3 uSkyH;\nuniform vec3 uSkyZ;\nuniform vec3 uSunD;\nuniform vec3 uSunC;\nuniform float uLit;\nvarying float vLit;\nvarying vec3 vGW;\nvarying vec3 vGN;\n' + FAC_CAMGL + s.fragmentShader
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= step( vLit, uLit ) * ( 0.7 + 0.6 * fract( vLit * 7.13 ) );')
-      .replace('vec3 outgoingLight =', `{ vec3 Vd = normalize( vGW - cameraPosition ), Np = normalize( vGN + vec3( 0.0, ( vLit - 0.5 ) * 0.1, 0.0 ) ), Rd = reflect( Vd, Np );
+      .replace('vec3 outgoingLight =', `{ vec3 Vd = normalize( vGW - facCamW() ), Np = normalize( vGN + vec3( 0.0, ( vLit - 0.5 ) * 0.1, 0.0 ) ), Rd = reflect( Vd, Np );
     float fres = 0.04 + 0.96 * pow( 1.0 - clamp( dot( -Vd, Np ), 0.0, 1.0 ), 5.0 );
     vec3 seen = Rd.y > 0.0 ? mix( uSkyH, uSkyZ, smoothstep( 0.0, 0.5, Rd.y ) ) : uSkyH * 0.3;
-    totalEmissiveRadiance += seen * ( 0.3 + 0.7 * fres ) + uSunC * pow( max( dot( Rd, uSunD ), 0.0 ), 600.0 ) * 8.0; }
+    seen = mix( seen, vec3( dot( seen, vec3( 0.333 ) ) ), 0.45 ); /* set back in the wall the pane sees less sky, and the houses across the street: greyer, weaker */
+    totalEmissiveRadiance += seen * ( 0.14 + 0.56 * fres ) + uSunC * pow( max( dot( Rd, uSunD ), 0.0 ), 600.0 ) * 6.0; }
   vec3 outgoingLight =`);
   };
   glassMat.customProgramCacheKey = () => 'facvetro';
@@ -418,31 +478,31 @@ const FAC_PARTS = (() => {
     const m = new THREE.InstancedMesh(geo, mat, cap); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.count = 0; m.frustumCulled = false; m.castShadow = !!o.cast; m.receiveShadow = true;
     if (!o.noCol) m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
     if (o.lit) { geo.setAttribute('aLit', new THREE.InstancedBufferAttribute(new Float32Array(cap), 1)); }
+    if (o.win) { for (const a of ['aWO', 'aWN']) geo.setAttribute(a, new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4)); facRecMat(mat); }
     if (o.ro !== undefined) m.renderOrder = o.ro;
-    scene.add(m); P[name] = { m, cap, n: 0, lit: o.lit ? geo.attributes.aLit : null };
+    scene.add(m); P[name] = { m, cap, n: 0, lit: o.lit ? geo.attributes.aLit : null, wo: o.win ? geo.attributes.aWO : null, wn: o.win ? geo.attributes.aWN : null };
   };
-  /* recessed parts: no fade (only seen through the hole) */
-  mk('reveal', FAC_GEO.reveal, lam({}), 6000);
-  mk('back', FAC_GEO.back, lam({}), 1500);
-  mk('glass', FAC_GEO.glass.clone(), glassMat, 6000, { noCol: true, lit: true });
-  mk('frameM', FAC_GEO.frameM, lam({}), 6000);
-  mk('frame', FAC_GEO.frame, lam({}), 3000);
-  mk('tapp', FAC_GEO.tapp, lam({ map: FAC_TAPP }), 6000);
+  /* recessed parts: no fade (only seen through the hole); the sun in them only through the opening (facRecMat) */
+  mk('reveal', FAC_GEO.reveal, lam({ vertexColors: true }), 24000, { win: true });
+  mk('back', FAC_GEO.back, lam({}), 4000, { win: true });
+  mk('glass', FAC_GEO.glass.clone(), glassMat, 24000, { noCol: true, lit: true, win: true });
+  mk('bar', FAC_GEO.bar, lam({}), 160000, { win: true });
+  mk('tapp', FAC_GEO.tapp, lam({ map: FAC_TAPP }), 24000, { win: true });
   /* parts on and out of the wall: they fade with the hole */
-  mk('sill', FAC_GEO.sill, facFadeMat(lam({}), FAC_R), 6000);
-  mk('leaf', FAC_GEO.leaf, facFadeMat(lam({ map: FAC_SLAT }), FAC_R), 12000);
-  mk('fin', FAC_GEO.fin, facFadeMat(lam({}), FAC_R), 3000);
+  mk('sill', FAC_GEO.sill, facFadeMat(lam({}), FAC_R), 24000, { cast: true });
+  mk('leaf', FAC_GEO.leaf, facFadeMat(lam({ map: FAC_SLAT }), FAC_R), 48000, { cast: true });
+  mk('fin', FAC_GEO.fin, facFadeMat(lam({}), FAC_R), 10000);
   mk('bow', FAC_GEO.bow, facFadeMat(lam({ color: 0x27313b }), FAC_R), 1500, { noCol: true });
   mk('bowBox', FAC_GEO.bowBox, facFadeMat(lam({}), FAC_R), 3000);
-  mk('slab', FAC_GEO.slab, facFadeMat(lam({}), FAC_RB), 8000, { cast: true });
+  mk('slab', FAC_GEO.slab, facFadeMat(lam({ vertexColors: true }), FAC_RB), 8000, { cast: true });
   mk('railFe', FAC_GEO.rail, facFadeMat(lam({ map: FAC_BARS, alphaTest: 0.5, side: THREE.DoubleSide }), FAC_RB), 16000, { cast: true });
   mk('railMe', FAC_GEO.rail, facFadeMat(lam({ map: FAC_BARS2, alphaTest: 0.5, side: THREE.DoubleSide }), FAC_RB), 8000, { cast: true });
   mk('railLe', FAC_GEO.rail, facFadeMat(lam({ map: FAC_WOOD, alphaTest: 0.5, side: THREE.DoubleSide }), FAC_RB), 4000, { cast: true });
   mk('railVe', FAC_GEO.rail, glassRail, 8000, { noCol: true, ro: 12 });
   mk('railPi', FAC_GEO.wall, facFadeMat(lam({}), FAC_RB), 16000, { cast: true });
   mk('top', FAC_GEO.wall, facFadeMat(lam({}), FAC_RB), 8000);
-  mk('ac', FAC_GEO.ac, facFadeMat(lam({ map: FAC_ACT }), FAC_R), 2000, { noCol: true });
-  mk('pot', FAC_GEO.pot, facFadeMat(lam({ vertexColors: true }), FAC_R), 4000, { noCol: true });
+  mk('ac', FAC_GEO.ac, facFadeMat(lam({ map: FAC_ACT }), FAC_R), 6000, { noCol: true });
+  mk('pot', FAC_GEO.pot, facFadeMat(lam({ vertexColors: true }), FAC_R), 12000, { noCol: true });
   mk('awn', FAC_GEO.awn, facFadeMat(lam({ map: FAC_AWN, side: THREE.DoubleSide }), FAC_RB), 2000, { cast: true });
   mk('dish', FAC_GEO.dish, facFadeMat(lam({ color: 0xdcdcd8 }), FAC_RB), 1000, { noCol: true });
   return P;
@@ -450,6 +510,7 @@ const FAC_PARTS = (() => {
 const FAC_PRE = Object.values(FAC_PARTS).map(p => p.m);
 // ---- writing the instances round the camera
 const _facC = new THREE.Color();
+let FAC_W = null; /* the opening the recessed parts written now stand in: [x, y, z, w, nx, nz, h, D] (facRecMat) */
 function facPut(name, x, y, z, Xx, Xz, Zx, Zz, sx, sy, sz, col, lit) {
   Zx = -Xz; Zz = Xx; /* always right-handed: Z = X x up */
   const P = FAC_PARTS[name]; if (P.n >= P.cap) return; const i = P.n++, a = P.m.instanceMatrix.array, o = i * 16;
@@ -457,33 +518,56 @@ function facPut(name, x, y, z, Xx, Xz, Zx, Zz, sx, sy, sz, col, lit) {
   a[o + 8] = Zx * sz; a[o + 9] = 0; a[o + 10] = Zz * sz; a[o + 11] = 0; a[o + 12] = x; a[o + 13] = y; a[o + 14] = z; a[o + 15] = 1;
   if (col && P.m.instanceColor) { const c = P.m.instanceColor.array; c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b; }
   if (P.lit) P.lit.array[i] = lit;
+  if (P.wo && FAC_W) { const W = FAC_W, a = P.wo.array, b = P.wn.array, q = i * 4; a[q] = W[0]; a[q + 1] = W[1]; a[q + 2] = W[2]; a[q + 3] = W[3]; b[q] = W[4]; b[q + 1] = W[5]; b[q + 2] = W[6]; b[q + 3] = W[7]; }
 }
 const FAC_STATO = { x: 1e9, y: 0, z: 1e9, t: 0, nT: -1, wins: 0, bals: 0 };
-const FAC_SHUT_C = new THREE.Color();
+const FAC_SHUT_C = new THREE.Color(), FAC_STONE = new THREE.Color('#d6d1c4');
 function facWin(r) {
+  /* a window as it is in a wall of Brianza: the hole in the wall (the reveal, as deep as the wall in front of the frame), the frame and the sashes set back in it
+     with their bars, the glass behind them, the roller blind running in its guides in front of the frame, the stone sill standing out of the wall under it,
+     the shutters open flat on the wall beside it. zf: how far in the front of the frame stands */
   const nx = r.nx, nz = r.nz, Xx = nz, Xz = -nx, w = r.w, h = r.h, D = r.D, x = r.x, y = r.y, z = r.z;
-  const wd = _facC.copy(r.wc).multiplyScalar(0.86);
+  const wd = _facC.copy(r.wc).multiplyScalar(0.93);
+  const bar = (u, y0, bw, bh, zd, dd, col) => facPut('bar', x + Xx * u - nx * zd, y0, z + Xz * u - nz * zd, Xx, Xz, nx, nz, bw, bh, dd, col);
   if (r.lg) { /* a loggia: deep reveal, the back wall with its French window, the parapet at the front */
+    FAC_W = [x, y, z, w, nx, nz, h, D];
     facPut('reveal', x, y, z, Xx, Xz, nx, nz, w, h, D, wd);
     facPut('back', x - nx * D, y, z - nz * D, Xx, Xz, nx, nz, w, h, 1, wd);
-    const gw = Math.min(w * 0.5, 1.6), bx = x - nx * (D - 0.02), bz = z - nz * (D - 0.02);
-    facPut('glass', bx, y + 0.05, bz, Xx, Xz, nx, nz, gw, 2.3, 1, null, r.lit); facPut('frameM', bx + nx * 0.01, y + 0.05, bz + nz * 0.01, Xx, Xz, nx, nz, gw, 2.3, 1, r.fr);
+    const gw = Math.min(w * 0.5, 1.6), gh = Math.min(2.3, h - 0.1), zb = D - 0.02, fb = 0.07;
+    facPut('glass', x - nx * zb, y + 0.05, z - nz * zb, Xx, Xz, nx, nz, gw, gh, 1, null, r.lit); /* 2 cm in front of the back wall, the frame 5 cm more */
+    bar(-gw / 2 + fb / 2, y + 0.05, fb, gh, zb - 0.05, 0.05, r.fr); bar(gw / 2 - fb / 2, y + 0.05, fb, gh, zb - 0.05, 0.05, r.fr); bar(0, y + 0.05 + gh - fb, gw, fb, zb - 0.05, 0.05, r.fr); bar(0, y + 0.05, gw, fb, zb - 0.05, 0.05, r.fr); bar(0, y + 0.05, 0.1, gh, zb - 0.05, 0.05, r.fr);
+    FAC_W = null;
     facRail(r.rail, r.rc, x, y, z, Xx, Xz, nx, nz, w, -0.02); return;
   }
+  FAC_W = [x, y, z, w, nx, nz, h, D];
   facPut('reveal', x, y, z, Xx, Xz, nx, nz, w, h, D, wd);
-  const gz = D - 0.05, gx = x - nx * gz, gzz = z - nz * gz;
-  facPut('glass', gx, y, gzz, Xx, Xz, nx, nz, w, h, 1, null, r.lit);
-  facPut(r.mul ? 'frameM' : 'frame', gx + nx * 0.05, y, gzz + nz * 0.05, Xx, Xz, nx, nz, w, h, 1, r.fr);
-  if (r.sill) facPut('sill', x + nx * 0.05, y, z + nz * 0.05, Xx, Xz, nx, nz, w + 0.12, 0.05, D + 0.05, r.sill);
-  else facPut('sill', x + nx * 0.02, y, z + nz * 0.02, Xx, Xz, nx, nz, w, 0.03, D + 0.02, r.fr);
-  if (r.sh === 'ta' || r.sh === 've') facPut('tapp', x - nx * 0.06, y + h, z - nz * 0.06, Xx, Xz, nx, nz, w - 0.02, h * (r.sh === 've' ? 0.3 : r.tl), 1, r.shc);
+  const zf = Math.max(0.02, D - 0.1), fb = r.rib || r.cw ? 0.06 : r.old ? 0.1 : 0.085, fd = 0.07;
+  facPut('glass', x - nx * (zf + 0.045), y, z - nz * (zf + 0.045), Xx, Xz, nx, nz, w, h, 1, null, r.lit);
+  /* the frame with the sashes: sides, head, bottom rail (a little higher), the meeting of the two sashes */
+  bar(-w / 2 + fb / 2, y, fb, h, zf, fd, r.fr); bar(w / 2 - fb / 2, y, fb, h, zf, fd, r.fr); bar(0, y + h - fb, w - 2 * fb, fb, zf, fd, r.fr); bar(0, y, w - 2 * fb, fb + 0.02, zf, fd, r.fr);
+  if (r.rib) { const n = Math.max(1, Math.round(w / 1.2)); for (let i = 1; i < n; i++) bar(-w / 2 + w * i / n, y, 0.06, h, zf, fd, r.fr); if (r.cw) bar(0, y + 1.0, w, 0.06, zf, fd, r.fr); }
+  else if (r.mul) bar(0, y + fb, fb * 1.25, h - 2 * fb, zf - 0.005, fd, r.fr);
+  if (r.old && !r.rib && h > 1.2) { /* the old wooden windows: each sash in three panes */
+    const gw = r.mul ? (w - 3.25 * fb) / 2 : w - 2 * fb, cx = r.mul ? (w / 2 - fb - gw / 2) : 0;
+    for (const f of [1 / 3, 2 / 3]) for (const sx of r.mul ? [-1, 1] : [0]) bar(sx * cx, y + fb + (h - 2 * fb) * f - 0.0175, gw, 0.035, zf + 0.015, 0.03, r.fr);
+  }
+  if (r.sh === 'ta' || r.sh === 've') { /* the roller blind in front of the frame, in its two guides, let down some way */
+    const th = h * (r.sh === 've' ? 0.3 : r.tl), zt = zf - 0.03, gc = FAC_SHUT_C.copy(r.shc).multiplyScalar(0.8);
+    facPut('tapp', x - nx * zt, y + h, z - nz * zt, Xx, Xz, nx, nz, w - 0.04, th, 1, r.shc);
+    bar(0, y + h - th - 0.045, w - 0.04, 0.045, zt - 0.005, 0.03, gc);
+    bar(-w / 2 + 0.018, y, 0.036, h, zf - 0.055, 0.055, gc); bar(w / 2 - 0.018, y, 0.036, h, zf - 0.055, 0.055, gc);
+  }
+  FAC_W = null;
+  /* the sill: stone, 5 cm thick, 6 cm out of the wall and 5 cm past the opening on either side, from the frame out; without one a thin metal flashing */
+  if (r.sill) facPut('sill', x + nx * 0.06, y + 0.012, z + nz * 0.06, Xx, Xz, nx, nz, w + 0.1, 0.05, 0.06 + zf, r.sill);
+  else facPut('sill', x + nx * 0.025, y + 0.008, z + nz * 0.025, Xx, Xz, nx, nz, w, 0.02, 0.025 + zf, r.fr);
   if (r.sh === 'pe') {
     const lw = w / 2;
-    if (r.st === 0) { /* open against the wall: the right leaf from the right edge on, the left one turned round (its back to the wall) */
+    if (r.st === 0) { /* open flat on the wall: the right leaf from the right edge on, the left one turned round (its back to the wall) */
       facPut('leaf', x + Xx * lw + nx * 0.004, y, z + Xz * lw + nz * 0.004, Xx, Xz, nx, nz, lw, h, 1, r.shc);
-      facPut('leaf', x - Xx * lw + nx * 0.039, y, z - Xz * lw + nz * 0.039, -Xx, -Xz, -nx, -nz, lw, h, 1, r.shc);
-    } else if (r.st === 1) { /* closed */
-      facPut('leaf', x - Xx * lw - nx * 0.05, y, z - Xz * lw - nz * 0.05, Xx, Xz, nx, nz, lw, h, 1, r.shc);
+      facPut('leaf', x - Xx * lw + nx * 0.049, y, z - Xz * lw + nz * 0.049, -Xx, -Xz, -nx, -nz, lw, h, 1, r.shc);
+    } else if (r.st === 1) { /* closed, in the front of the reveal */
+      facPut('leaf', x - Xx * lw - nx * 0.06, y, z - Xz * lw - nz * 0.06, Xx, Xz, nx, nz, lw, h, 1, r.shc);
       facPut('leaf', x + Xx * lw - nx * 0.015, y, z + Xz * lw - nz * 0.015, -Xx, -Xz, -nx, -nz, lw, h, 1, r.shc);
     } else { /* one open, one half shut */
       facPut('leaf', x + Xx * lw + nx * 0.004, y, z + Xz * lw + nz * 0.004, Xx, Xz, nx, nz, lw, h, 1, r.shc);
@@ -503,9 +587,9 @@ function facRail(kind, rc, x, y, z, Xx, Xz, nx, nz, w, d, sl = false, sr = false
   if (sl) pieces.push([x - Xx * w / 2 + nx * d / 2, z - Xz * w / 2 + nz * d / 2, nx, nz, hd]);
   if (sr) pieces.push([x + Xx * w / 2 + nx * d / 2, z + Xz * w / 2 + nz * d / 2, nx, nz, hd]);
   for (const [px, pz, ax, az, L] of pieces) {
-    if (kind === 'pi') facPut('railPi', px, y, pz, ax, az, az, -ax, L, 1.05, 0.12, rc);
+    if (kind === 'pi') { facPut('railPi', px, y, pz, ax, az, az, -ax, L, 1.0, 0.12, rc); facPut('top', px, y + 1.0, pz, ax, az, az, -ax, L + 0.04, 0.05, 0.2, FAC_STONE); } /* a solid parapet with its stone coping */
     else if (kind === 've') { facPut('railVe', px, y + 0.05, pz, ax, az, az, -ax, L, 0.95, 1); facPut('top', px, y + 1.0, pz, ax, az, az, -ax, L, 0.05, 0.06, FAC_SHUT_C.setRGB(0.6, 0.62, 0.63)); }
-    else facPut(kind === 'me' ? 'railMe' : kind === 'le' ? 'railLe' : 'railFe', px, y, pz, ax, az, az, -ax, L, 1.02, 1, rc);
+    else { facPut(kind === 'me' ? 'railMe' : kind === 'le' ? 'railLe' : 'railFe', px, y, pz, ax, az, az, -ax, L, 1.02, 1, rc); if (kind !== 'le') facPut('top', px, y + 0.99, pz, ax, az, az, -ax, L, 0.045, 0.05, rc); } /* the handrail */
   }
 }
 function facBal(r) {
@@ -527,12 +611,12 @@ function facAggiorna(force) {
   for (const k in FAC_PARTS) FAC_PARTS[k].n = 0;
   const RW = FAC_R + 8, RB = FAC_RB + 10; let nw = 0, nb = 0;
   for (const T of VIVI) {
-    if (!T.fwin && !T.fbal && !T.fdet) continue; if (T.dist > RB + 150 || !T.group || !T.ready) continue;
+    if (!T.fwin && !T.fbal && !T.fdet) continue; if (T.dist > Math.max(RW, RB) + TS + 20 || !T.group || !T.ready) continue; /* a tile whose centre is further than that may still hold a window in reach: its hole would open with nothing in it */
     for (const r of T.fwin || []) { const d = Math.hypot(r.x - cp.x, r.y + r.h / 2 - cp.y, r.z - cp.z); if (d < RW) { facWin(r); nw++; } }
     for (const r of T.fbal || []) { const d = Math.hypot(r.x - cp.x, r.y - cp.y, r.z - cp.z); if (d < RB) { facBal(r); nb++; } }
     for (const r of T.fdet || []) { const d = Math.hypot(r.x - cp.x, r.y - cp.y, r.z - cp.z); if (d < (r.R || FAC_R) + 8) facDet(r); }
   }
-  for (const k in FAC_PARTS) { const P = FAC_PARTS[k]; P.m.count = P.n; P.m.visible = P.n > 0; P.m.instanceMatrix.needsUpdate = true; if (P.m.instanceColor) P.m.instanceColor.needsUpdate = true; if (P.lit) P.lit.needsUpdate = true; }
+  for (const k in FAC_PARTS) { const P = FAC_PARTS[k]; P.m.count = P.n; P.m.visible = P.n > 0; P.m.instanceMatrix.needsUpdate = true; if (P.m.instanceColor) P.m.instanceColor.needsUpdate = true; if (P.lit) P.lit.needsUpdate = true; if (P.wo) { P.wo.needsUpdate = true; P.wn.needsUpdate = true; } }
   S.wins = nw; S.bals = nb;
 }
 function facTick() {
@@ -542,6 +626,14 @@ function facTick() {
 // ---- the doors of the houses by epoch (Carlo 8/11): wood in two leaves in a stone frame (old houses), aluminium and glass with the entry phone
 // (blocks of flats), a single door with its step (villette); the brass knob and the plaques stay to the offices (negozi3.js)
 const FAC_DOOR_MAT = new THREE.MeshLambertMaterial({ vertexColors: true }), FAC_DOOR_COL = {};
+/* how far the door of a kind takes the wall: half its width with the frame, the steps and the entry phone, and its top over the threshold (the same sizes as facDoor) */
+function facDoorBox(k, W, h) {
+  if (k === 'leg') return [W / 2 + 0.36, Math.max(h, 2.6) + 0.28];
+  if (k === 'all') return [W / 2 + 0.37, Math.max(h, 2.3) + 0.08];
+  if (k === 'vil') return [Math.min(W, 1.0) / 2 + 0.25, Math.max(h, 2.15) + 0.06];
+  if (k === 'met') return [W / 2 + 0.05, Math.max(h, 2.1) + 0.05];
+  return [W / 2, h];
+}
 function facDoor(F, d) {
   const n = { x: -d.uz, z: d.ux }, cx = (d.ax + d.bx) / 2, cz = (d.az + d.bz) / 2, th = Math.atan2(-d.uz, d.ux), y0 = d.gy;
   const bx = (w, h, dp, lx, ly, lz, col, cast = false) => { /* one vertex-coloured buffer for all the doors of the tile: one draw call, not one per colour */
