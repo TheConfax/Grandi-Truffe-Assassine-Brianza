@@ -7,8 +7,8 @@
  "fuori_soglia": 5,
  "gradino": {
   "n": 86,
-  "p50": 0.01,
-  "p90": 0.085,
+  "p50": 0,
+  "p90": 0.055,
   "p99": 2.146,
   "max": 3.71
  },
@@ -407,14 +407,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10",
    "capo": "fine",
-   "punti": 13,
+   "punti": 19,
    "continua": 0,
    "edificio": 0,
-   "x": 74.5,
+   "x": 76,
    "z": 195.6,
    "gradino": 0.01,
    "vuoto": -0.9,
-   "link": "?x=74.5&z=195.6",
+   "link": "?x=76.0&z=195.6",
    "stato": "ok"
   },
   {
@@ -452,14 +452,14 @@
    "tipo": "strada",
    "fonte": "PONTE 12",
    "capo": "inizio",
-   "punti": 4,
+   "punti": 8,
    "continua": 0,
    "edificio": 0,
-   "x": -556.8,
-   "z": 148.6,
-   "gradino": 0.15,
-   "vuoto": -0.44,
-   "link": "?x=-556.8&z=148.6",
+   "x": -555.8,
+   "z": 147.6,
+   "gradino": 0,
+   "vuoto": 0,
+   "link": "?x=-555.8&z=147.6",
    "stato": "ok"
   },
   {
@@ -512,14 +512,14 @@
    "tipo": "ferro",
    "fonte": "PONTE 13",
    "capo": "inizio",
-   "punti": 8,
+   "punti": 9,
    "continua": 0,
    "edificio": 0,
-   "x": -505.8,
-   "z": 85.6,
+   "x": -504.8,
+   "z": 85.4,
    "gradino": 0,
-   "vuoto": -0.91,
-   "link": "?x=-505.8&z=85.6",
+   "vuoto": -0.9,
+   "link": "?x=-504.8&z=85.4",
    "stato": "ok"
   },
   {
@@ -907,14 +907,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000013",
    "capo": "fine",
-   "punti": 12,
+   "punti": 15,
    "continua": 0,
    "edificio": 0,
    "x": -476.8,
-   "z": 1250.6,
+   "z": 1251.3,
    "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=-476.8&z=1250.6",
+   "link": "?x=-476.8&z=1251.3",
    "stato": "ok"
   },
   {
@@ -967,14 +967,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000015",
    "capo": "fine",
-   "punti": 13,
+   "punti": 19,
    "continua": 0,
    "edificio": 0,
-   "x": -761.5,
-   "z": 2261.6,
-   "gradino": 0.01,
+   "x": -760.8,
+   "z": 2262.3,
+   "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=-761.5&z=2261.6",
+   "link": "?x=-760.8&z=2262.3",
    "stato": "ok"
   },
   {
@@ -1072,14 +1072,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000019",
    "capo": "inizio",
-   "punti": 10,
+   "punti": 11,
    "continua": 0,
    "edificio": 6,
    "x": -352.8,
-   "z": 896.7,
+   "z": 896.5,
    "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=-352.8&z=896.7",
+   "link": "?x=-352.8&z=896.5",
    "stato": "ok"
   },
   {
@@ -1177,14 +1177,14 @@
    "tipo": "strada",
    "fonte": "PONTE 10000022",
    "capo": "fine",
-   "punti": 8,
+   "punti": 12,
    "continua": 0,
    "edificio": 0,
-   "x": 363.2,
+   "x": 362.2,
    "z": 2017.6,
-   "gradino": 0.02,
+   "gradino": 0,
    "vuoto": -0.9,
-   "link": "?x=363.2&z=2017.6",
+   "link": "?x=362.2&z=2017.6",
    "stato": "ok"
   },
   {
@@ -1430,14 +1430,15 @@
  ],
  "soglia": "0 capi fuori",
  "ok": false,
- "tempo_s": 6.8,
+ "tempo_s": 1.9,
  "barriere": {
   "decks": 45,
-  "parapetti_m": 1953.3,
-  "muri": 875,
+  "parapetti_m": 1881.3,
+  "muri": 1033,
   "accavallati_m": 0,
-  "scatti": 102,
+  "scatti": 108,
   "in_strada": 8,
+  "di_traverso": 12,
   "posti_accavallati": [],
   "posti_scatti": [
    {
@@ -1532,6 +1533,20 @@
     "n": 3
    },
    {
+    "fonte": "PONTE 10000022",
+    "x": 333.9,
+    "z": 2007.6,
+    "link": "?x=333.9&z=2007.6",
+    "n": 3
+   },
+   {
+    "fonte": "PONTE 10000022",
+    "x": 354.9,
+    "z": 1987.6,
+    "link": "?x=354.9&z=1987.6",
+    "n": 3
+   },
+   {
     "fonte": "PONTE 10000014",
     "x": 412.8,
     "z": 2270.1,
@@ -1540,16 +1555,23 @@
    },
    {
     "fonte": "PONTE 12",
-    "x": -506.4,
-    "z": 128.1,
-    "link": "?x=-506.4&z=128.1",
+    "x": -502.8,
+    "z": 131.6,
+    "link": "?x=-502.8&z=131.6",
     "n": 2
    },
    {
     "fonte": "PONTE 12",
-    "x": -539.9,
-    "z": 135.6,
-    "link": "?x=-539.9&z=135.6",
+    "x": -527.9,
+    "z": 155.4,
+    "link": "?x=-527.9&z=155.4",
+    "n": 2
+   },
+   {
+    "fonte": "PONTE 8",
+    "x": 69.2,
+    "z": 364.8,
+    "link": "?x=69.2&z=364.8",
     "n": 2
    },
    {
@@ -1623,31 +1645,10 @@
     "n": 2
    },
    {
-    "fonte": "PONTE 12",
-    "x": -553.4,
-    "z": 148.1,
-    "link": "?x=-553.4&z=148.1",
-    "n": 1
-   },
-   {
-    "fonte": "PONTE 12",
-    "x": -527.9,
-    "z": 155.4,
-    "link": "?x=-527.9&z=155.4",
-    "n": 1
-   },
-   {
     "fonte": "PONTE 9 (pezzo staccato)",
     "x": 93.2,
     "z": 182.6,
     "link": "?x=93.2&z=182.6",
-    "n": 1
-   },
-   {
-    "fonte": "PONTE 9 (pezzo staccato)",
-    "x": 95.8,
-    "z": 192.6,
-    "link": "?x=95.8&z=192.6",
     "n": 1
    }
   ],
@@ -1688,8 +1689,59 @@
     "n": 1
    }
   ],
-  "definizione": "parapetti e muri dei ponti nel gioco: accavallati = m di parapetto paralleli a un altro a 0,05-0,8 m; scatti = angoli fra due tratti dritti sotto 3 m; in_strada = muri sotto i ponti con asfalto da tutti e due i lati",
-  "soglia": "accavallati 0, scatti 0, in_strada 0",
+  "posti_di_traverso": [
+   {
+    "fonte": "PONTE 10000020",
+    "x": -1327.8,
+    "z": 671.6,
+    "n": 3,
+    "link": "?x=-1327.8&z=671.6"
+   },
+   {
+    "fonte": "PONTE 2",
+    "x": 444.6,
+    "z": -692.3,
+    "n": 2,
+    "link": "?x=444.6&z=-692.3"
+   },
+   {
+    "fonte": "PONTE 6 (pezzo staccato)",
+    "x": 1422.4,
+    "z": 461.6,
+    "n": 2,
+    "link": "?x=1422.4&z=461.6"
+   },
+   {
+    "fonte": "PONTE 10000027",
+    "x": -2593.3,
+    "z": 1479.1,
+    "n": 2,
+    "link": "?x=-2593.3&z=1479.1"
+   },
+   {
+    "fonte": "PONTE 16",
+    "x": 79.3,
+    "z": -205.3,
+    "n": 1,
+    "link": "?x=79.3&z=-205.3"
+   },
+   {
+    "fonte": "PONTE 8",
+    "x": 53.7,
+    "z": 355.6,
+    "n": 1,
+    "link": "?x=53.7&z=355.6"
+   },
+   {
+    "fonte": "ponte non segnato",
+    "x": 261,
+    "z": 1794.2,
+    "n": 1,
+    "link": "?x=261&z=1794.2"
+   }
+  ],
+  "definizione": "parapetti e muri dei ponti nel gioco: accavallati = m di parapetto paralleli a un altro a 0,05-0,8 m; scatti = angoli fra due tratti dritti sotto 3 m; in_strada = muri sotto i ponti con asfalto da tutti e due i lati; di_traverso = tratti di parapetto che tagliano l asse di una strada alla loro quota (entro 1 m)",
+  "soglia": "accavallati 0, scatti 0, in_strada 0, di_traverso 0",
   "ok": false,
   "errori": []
  }
