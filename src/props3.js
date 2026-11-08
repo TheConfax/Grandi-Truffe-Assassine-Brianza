@@ -3,7 +3,7 @@
 // or one instance of a per-tile InstancedMesh. Ram it hard enough and it tips over away from you, the car loses a little speed, a lamp goes dark.
 // One collision per object, the same for the walker, every vehicle and the helicopter: its posts in WALLS. What a vehicle does to it depends on
 // the blow (speed times the vehicle's mass, propForza) and on the group of the object (Carlo, 8/11): FORZA.leggero (signs, bollards, meters,
-// bins, benches, columns, the fuel totem) goes at a gentle knock, FORZA.medio (lamp posts, small trees, bus shelters, bales, concrete blocks)
+// bins, benches, columns, the fuel totem) goes at a gentle knock, FORZA.medio (lamp posts, bus shelters, bales, concrete blocks)
 // needs speed and mass; what is never broken has no prop, only its wall. A weaker blow stops the vehicle; on foot nothing breaks.
 // via: the object is not knocked over but moves (bales roll away, blocks slide) and stands again where it stops, still solid.
 const PROPS = [], PROPG = new Grid(16), PROP_FALL = [], PROP_MOVE = [];

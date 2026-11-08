@@ -63,11 +63,10 @@ L'inclinazione cresce sempre più in fretta. Per il lampione di 7,6 m, in radian
 | **Lampioni dei parcheggi** (prima attraversabili) | `buildParkingLines`, `propIstanze` | medio | ferma | si abbatte |
 | **Lampioni dei parchi** (prima attraversabili) | `buildParkFurniture`, `propIstanze` | medio | ferma | si abbatte |
 | **Lampioni dei binari** (prima attraversabili) | `buildPlatforms`, `propIstanze` | medio | ferma | si abbatte |
-| **Alberi piccoli** (sotto i 7 m del DSM, il modello piccolo; prima fissi) | world3.js, `TREE_PROPS` | medio | ferma | si abbatte |
 | **Pensiline del bus** (prima si abbattevano da 12,6 km/h e i pali alle estremità erano attraversabili) | `buildSignals` | medio | ferma | si abbatte con i suoi pali |
 | **Rotoballe** (prima fisse) | `paesaggio3.js` | medio | ferma | rotola via, poi torna solida dove si ferma |
 | **Blocchi di cemento** (prima fissi) | `buildOggetti` | medio | ferma | scivola via, poi torna solido |
-| Alberi grandi (dal DSM 7 m o più, e quelli senza altezza) | world3.js | indistruttibile | ferma | ferma |
+| **Alberi, tutti** (Carlo 8/11: mai abbattibili, anche i piccoli) | world3.js | indistruttibile | ferma | ferma |
 | Edifici, muri, muretti con ringhiera, muri di contenimento, recinzioni della ferrovia | world3.js, barriere | indistruttibile | ferma | ferma |
 | Tralicci, antenne, torri dell'acqua, giochi, armadietti, pannelli, attrezzi fitness | `buildOggetti` | indistruttibile | ferma | ferma |
 | Silos, cisterne, vasche; **le scale dei silos** ora attaccate al silo (prima 25 cm fuori) | `buildManufatti` | indistruttibile | ferma | ferma |
@@ -90,6 +89,7 @@ L'inclinazione cresce sempre più in fretta. Per il lampione di 7,6 m, in radian
 | Auto a 70 km/h contro lo stesso lampione | -241.2 1887.1 | lo abbatte e passa |
 | Auto a 50 km/h contro una rotoballa | 2202.6 1568.3 | si ferma, la rotoballa resta lì |
 | Auto a 70 km/h contro la stessa rotoballa | 2202.6 1568.3 | la rotoballa rotola via di 24 m |
+| Auto lanciata a 90 km/h contro un albero piccolo (tutti gli alberi indistruttibili, Carlo 8/11) | 573 -300.5 | si ferma, l'albero resta |
 | Elicottero a 20 km/h contro un lampione del parco (sotto i 26 km/h della soglia) | 2228.5 -323.8 | si ferma, il lampione resta in piedi |
 | Elicottero a 35 km/h contro lo stesso lampione | 2228.5 -323.8 | lo abbatte |
 
@@ -109,7 +109,6 @@ Pedone che cammina contro l'oggetto. Auto compatta piano (frenata a 2,5 m/s) e f
 | Lampione del parcheggio (medio) | -241.2 1887.1 | fermo | ferma | abbattuto a 20,6 m/s |
 | Lampione del parco (medio) | 2228.5 -323.8 | fermo | ferma | abbattuto a 24,8 m/s |
 | Lampione di strada (medio) | -8.9 -581.3 | fermo | ferma | abbattuto a 15,9 m/s |
-| Albero piccolo (medio) | 573 -300.5 | fermo | ferma | abbattuto a 11,2 m/s |
 | Pensilina del bus (medio) | 421.22 -392.38 | fermo | ferma | abbattuta a 16,9 m/s |
 | Rotoballa (medio, rotola) | 2239.9 1509.1 | fermo | ferma | rotolata via di 18 m |
 | Fontana (indistruttibile) | 1102.7 -2031.3 | fermo | ferma | ferma |

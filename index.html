@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo collisioni · dopo 613e0bd · assemblato 08/11 01:38 · porta ' + location.port;
+    const txt = 'locale · ramo collisioni · dopo 87810dc · assemblato 08/11 01:43 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1096,7 +1096,7 @@ function interpEnd(done) { for (const o of done) { const c = o._c, keys = o._pk;
 // or one instance of a per-tile InstancedMesh. Ram it hard enough and it tips over away from you, the car loses a little speed, a lamp goes dark.
 // One collision per object, the same for the walker, every vehicle and the helicopter: its posts in WALLS. What a vehicle does to it depends on
 // the blow (speed times the vehicle's mass, propForza) and on the group of the object (Carlo, 8/11): FORZA.leggero (signs, bollards, meters,
-// bins, benches, columns, the fuel totem) goes at a gentle knock, FORZA.medio (lamp posts, small trees, bus shelters, bales, concrete blocks)
+// bins, benches, columns, the fuel totem) goes at a gentle knock, FORZA.medio (lamp posts, bus shelters, bales, concrete blocks)
 // needs speed and mass; what is never broken has no prop, only its wall. A weaker blow stops the vehicle; on foot nothing breaks.
 // via: the object is not knocked over but moves (bales roll away, blocks slide) and stands again where it stops, still solid.
 const PROPS = [], PROPG = new Grid(16), PROP_FALL = [], PROP_MOVE = [];
@@ -1896,7 +1896,7 @@ function layMuri(T) {
   }
   for (const q of T.feQ) T.fe.push(q); T.feQ = null; // fences follow the ground every 3 m (walls and collisions are built later)
   const noTree = (d.ls || []).filter(q => q.s.startsWith('sport') || q.s.startsWith('pista')).map(q => { const P_ = dec(q.p); return { P: P_, b: bbox(P_) }; }); /* no tree on a pitch or a track (Carlo, 2/11, the bocce court of x 2345 z 18) */
-  T.trW = new Map(); for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; if (noTree.some(q => x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.P))) { window.__ALBERI_TOLTI = (window.__ALBERI_TOLTI || 0) + 1; continue; } const small = TH && TH / 10 < TREE_SMALL, tk = x.toFixed(1) + ',' + z.toFixed(1); if (small && TREE_PROPS.has(tk) && TREE_PROPS.get(tk).broken) continue; T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); const tw_ = { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1, ...(small ? { dyn: true, on: true } : {}) }; WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, tw_); if (small) (T.trW || (T.trW = new Map())).set(tk, tw_); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
+  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; if (noTree.some(q => x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.P))) { window.__ALBERI_TOLTI = (window.__ALBERI_TOLTI || 0) + 1; continue; } T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } /* every tree stops whatever hits it, never knocked down (Carlo, 8/11) */ // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const [br, pts] of T.baQ) {
     const sp = BAR_PANEL[br.t], rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + br.h, yv: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
@@ -2801,7 +2801,6 @@ function kerbRing(b, ring, h, yf, flip, top) {
 }
 const streetY = (x, z) => H.overFree(x, z, H.base(x, z)); // where the street surfaces and the step covers stand in a tile of S
 const TREE_SMALL = 7; /* m: a tree the DSM sees lower than this has the small model */
-const TREE_PROPS = new Map(); /* the small trees as props, by place: one knocked down stays down */
 const trHash = (x, z) => { const t = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return t - Math.floor(t); };
 const GREENS = ['#4f7a35', '#5d8a3b', '#6b8f3e', '#47703a', '#7f9a45', '#a08d3c'];
 function addBox(b, x, y, z, w, h, d, col, ry = 0) { // axis box rotated about y, into a buffer
@@ -4164,9 +4163,6 @@ function* buildTileGen(T) {
         const yb = Math.max(0.8, 0.28 * th), hc = th - yb, D = clamp(td, 0.75 * hc, 1.6 * hc), sx = D / 5.4 * (0.94 + tRnd() * 0.12), sy = hc / 4.5 * (0.95 + tRnd() * 0.1), yc = th - 2.5 * sy, tw = clamp(0.35 + 0.06 * th, 0.5, 0.8);
         q.identity(); m.compose(p.set(x, gy, z), q, s.set(tw, yb + 0.65 * hc, tw)); trunks.setMatrixAt(j, m); /* the stem ends at 65% of the crown: inside it */
         q.setFromEuler(e.set((tRnd() - 0.5) * 0.15, tRnd() * TAU, 0)); m.compose(p.set(x, gy + yc, z), q, s.set(sx, sy, sx * (0.94 + tRnd() * 0.12))); crowns.setMatrixAt(j, m);
-        const tk = x.toFixed(1) + ',' + z.toFixed(1), tw_ = T.trW && T.trW.get(tk), tp = TREE_PROPS.get(tk); /* a small tree goes down under a hard blow (props3.js FORZA.medio) */
-        if (tw_ && !tp) TREE_PROPS.set(tk, addProp({ x, z, y: gy, r: 0.4, h: th, forza: 'medio', wall: tw_, inst: { meshes: [trunks, crowns], i: j, ry: 0, base: gy } }));
-        else if (tw_) { tp.wall = tw_; propRifai(tp, [trunks, crowns], j); }
       } else if (th) { // height th and crown diameter td from the DSM (dbgt_manufatti.py): the crown model is about 5.4 m across and 4.5 m high, its bottom 2 m under its origin and its top 2.5 m over it
         // the crown takes 65% of the height on a broad tree (td at least 0.55 th), 85% on a narrow one (a cypress, a spruce: td at most 0.35 th), on a broad one at least 2 m off the ground
         // and lower where it is much wider than tall. The trunk (4.4 m, its three branches from 2.6 to 4.3 m) grows so that the branches start a fifth of the way up the crown and stay inside it:
