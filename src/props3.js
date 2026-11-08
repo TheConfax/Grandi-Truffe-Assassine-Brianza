@@ -10,7 +10,10 @@ const PROPS = [], PROPG = new Grid(16), PROP_FALL = [], PROP_MOVE = [];
 const FORZA = { leggero: 8.3, medio: 16.7 }; // m/s of a car of mass 1 (a hatchback): 30 and 60 km/h (Carlo, 8/11); a two-wheeler weighs a quarter of it (as in the crashes between vehicles)
 const propMassa = v => isTwo(v) ? 0.25 : clamp(v.spec.L * v.spec.W / 7.39, 0.5, 3);
 const propForza = v => v.speed * propMassa(v);
-const heliMassa = () => MODELS.van.L * MODELS.van.W / 7.39; /* the helicopter, some 2.5 tonnes: a van on this scale */
+/* MASSA DELL'ELICOTTERO, in compatte (1 = un'auto compatta di circa 1,1 t): 2,5 t (Carlo, 8/11), piu di un furgone (1,4). Il solo posto dove sta:
+   i pesi di tutti i veicoli si rifanno col rifacimento dei veicoli */
+const HELI_MASSA = 2.3;
+const heliMassa = () => HELI_MASSA;
 function addProp(p) { // { x, z, r, obj | inst: { meshes, i, ry, base }, onBreak, forza, via, parts: [[x, z, r]], wall (already in WALLS) }
   if (!p.wall) {
     p.wall = { r: p.r, x: p.x, z: p.z, dyn: true, on: true, y0: p.y - 3, y1: p.y + (p.h || 6) };

@@ -4,7 +4,7 @@
 
 - Tutto ciò che si vede collide. Ogni oggetto ha una collisione sola, i suoi pali o il suo ingombro nella griglia `WALLS`, e la stessa vale per il pedone, l'auto, la moto, la bici e l'elicottero.
 - Quello che succede dipende dalla forza dell'urto, cioè la velocità per la massa del mezzo (`propForza`, src/props3.js). Un urto piano ferma. Un urto forte rompe l'oggetto, se è rompibile.
-- A piedi non si sfonda niente. L'elicottero segue la stessa regola dei mezzi, con la massa di un furgone (circa 2,5 t): sopra soglia abbatte o sposta, sotto soglia si ferma (`propHitsElicottero`, chiamata da `heliStep1` prima di `heliPush`). I suoi danni non sono cambiati.
+- A piedi non si sfonda niente. L'elicottero segue la stessa regola dei mezzi, con la sua massa di 2,5 t (2,3 compatte, costante `HELI_MASSA` in src/props3.js): sopra soglia abbatte o sposta, sotto soglia si ferma (`propHitsElicottero`, chiamata da `heliStep1` prima di `heliPush`). I suoi danni non sono cambiati.
 - Tre gruppi (`FORZA` in src/props3.js):
 
 | Gruppo | Soglia per un'auto compatta | Cosa fa |
@@ -13,10 +13,10 @@
 | **medio** | 16,7 m/s (60 km/h) | serve velocità e massa: si abbatte, oppure si sposta (le rotoballe rotolano, i blocchi di cemento scivolano) |
 | **indistruttibile** | mai | ferma a qualunque velocità |
 
-La massa è quella che il gioco usa già negli urti tra mezzi: un mezzo a due ruote pesa un quarto di un'auto. Per le auto la massa va con l'ingombro (lunghezza per larghezza, rispetto alla compatta che vale 1), tra 0,5 e 3. Il furgone vale 1,4, come l'elicottero. Quindi:
+La massa è quella che il gioco usa già negli urti tra mezzi: un mezzo a due ruote pesa un quarto di un'auto. Per le auto la massa va con l'ingombro (lunghezza per larghezza, rispetto alla compatta che vale 1), tra 0,5 e 3. Il furgone vale 1,4, l'elicottero 2,3 (2,5 t). Quindi:
 
 - il furgone abbatte un oggetto leggero da 21 km/h e un medio da 43 km/h;
-- l'elicottero ha le stesse soglie del furgone;
+- l'elicottero abbatte un oggetto leggero da 13 km/h e un medio da 26 km/h;
 - uno scooter o una bici non abbattono niente (servirebbero 120 km/h).
 
 Una rotoballa o un blocco spinto parte nella direzione del mezzo, rallenta per l'attrito, si ferma contro i muri e torna solido dove si ferma. Se il tile viene ricostruito resta lì. Gli oggetti abbattuti restano giù, come i lampioni di prima.
@@ -69,8 +69,8 @@ Le barriere di `sfondabili3.js` (siepi, reti, staccionate) e le tombe tengono le
 | Auto a 70 km/h contro lo stesso lampione | -241.2 1887.1 | lo abbatte e passa |
 | Auto a 50 km/h contro una rotoballa | 2202.6 1568.3 | si ferma, la rotoballa resta lì |
 | Auto a 70 km/h contro la stessa rotoballa | 2202.6 1568.3 | la rotoballa rotola via di 24 m |
-| Elicottero a 30 km/h contro un lampione del parco | 2228.5 -323.8 | si ferma, il lampione resta in piedi |
-| Elicottero a 80 km/h contro lo stesso lampione | 2228.5 -323.8 | lo abbatte |
+| Elicottero a 20 km/h contro un lampione del parco (sotto i 26 km/h della soglia) | 2228.5 -323.8 | si ferma, il lampione resta in piedi |
+| Elicottero a 35 km/h contro lo stesso lampione | 2228.5 -323.8 | lo abbatte |
 
 Avvio senza errori in console.
 
