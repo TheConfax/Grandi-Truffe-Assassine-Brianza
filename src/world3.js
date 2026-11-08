@@ -3017,8 +3017,9 @@ function buildCemetery(T, G) {
        gravel, asphalt, footways, roads; 3 outside, hole or building). Each lawn (cells of 1 m joined together, bounded by paths) takes the rows of one of the two directions of the grid, whichever of
        the two the paths are nearer along, and each grave looks at the nearer path of that axis. A cemetery with no path at all gets a lane every 16 m */
     const CS = 0.5, nw = Math.ceil((bb[2] - bb[0]) / CS) + 1, nh = Math.ceil((bb[3] - bb[1]) / CS) + 1, cm = new Uint8Array(nw * nh); let lanes = false;
+    const footReal = (x, z) => { let f = false; ROADSEG.each(x - 4, z - 4, x + 4, z + 4, sg => { if (!f && sg.r.c === 6 && segDist(x, z, sg.a[0], sg.a[1], sg.b[0], sg.b[1]) < sg.r.w / 2) f = true; }); return f; }; /* the paths of the minimap (the footway axes of the road graph) with their real width: the paved areas of the data (pz, ft, as, cv: the porphyry) are not read, here or for the blocks */
     const barAt = (x, z) => { let f = false; WALLS.each(x - 2, z - 2, x + 2, z + 2, o => { if (f) return; if (o.ax !== undefined) { if (o.y1 - o.y0 > 0.4 && segDist(x, z, o.ax, o.az, o.bx, o.bz) < 0.4) f = true; } else if (o.tree && hyp(x - o.x, z - o.z) < (o.r || 0.5) + 0.4) f = true; }); return f; }; /* fences, railings, walls, gates and trees (not the graves, which are discs of their own) */
-    const cell = (x, z) => { const ci = Math.floor((x - bb[0]) / CS), cj = Math.floor((z - bb[1]) / CS); if (ci < 0 || cj < 0 || ci >= nw || cj >= nh) return 3; const k = cj * nw + ci; if (!cm[k]) { const X = bb[0] + (ci + 0.5) * CS, Z = bb[1] + (cj + 0.5) * CS; const jv = (X - cx) * vx + (Z - cz) * vz; cm[k] = !inPoly(X, Z, outer) || holes.some(h => inPoly(X, Z, h)) || donePoly.some(o => inPoly(X, Z, o)) || inBuilding(X, Z, 0) || barAt(X, Z) ? 3 : lanes && Math.abs(jv - 16 * Math.round(jv / 16)) < 1 || [[0, 0], [0.22, 0], [-0.22, 0], [0, 0.22], [0, -0.22]].some(([e, f]) => hardAt(X + e, Z + f) || onAnyRoad(X + e, Z + f, 0) || onFoot(X + e, Z + f)) ? 2 : 1; } return cm[k]; };
+    const cell = (x, z) => { const ci = Math.floor((x - bb[0]) / CS), cj = Math.floor((z - bb[1]) / CS); if (ci < 0 || cj < 0 || ci >= nw || cj >= nh) return 3; const k = cj * nw + ci; if (!cm[k]) { const X = bb[0] + (ci + 0.5) * CS, Z = bb[1] + (cj + 0.5) * CS; const jv = (X - cx) * vx + (Z - cz) * vz; cm[k] = !inPoly(X, Z, outer) || holes.some(h => inPoly(X, Z, h)) || donePoly.some(o => inPoly(X, Z, o)) || inBuilding(X, Z, 0) || barAt(X, Z) ? 3 : lanes && Math.abs(jv - 16 * Math.round(jv / 16)) < 1 || [[0, 0], [0.22, 0], [-0.22, 0], [0, 0.22], [0, -0.22]].some(([e, f]) => footReal(X + e, Z + f) || onAnyRoad(X + e, Z + f, 0)) ? 2 : 1; } return cm[k]; };
     let anyPath = false; for (let x = bb[0]; x <= bb[2] && !anyPath; x += 1) for (let z = bb[1]; z <= bb[3]; z += 1) if (cell(x, z) === 2) { anyPath = true; break; }
     if (!anyPath) { lanes = true; cm.fill(0); }
     const lbl = (x, z) => { const ci = Math.floor((x - bb[0]) / CS), cj = Math.floor((z - bb[1]) / CS); return ci < 0 || cj < 0 || ci >= nw || cj >= nh ? 0 : lb[cj * nw + ci]; };
@@ -3031,21 +3032,6 @@ function buildCemetery(T, G) {
     /* a narrow path that enters a lawn and stops divides it all the same: its line, straight on in its direction up to the opposite edge of the lawn, only divides the blocks (nothing is drawn, graves may stand on it) */
     const cx0 = ci => bb[0] + (ci + 0.5) * CS, cz0 = cj => bb[1] + (cj + 0.5) * CS;
     for (let cj = 0; cj < gh; cj++) for (let ci = 0; ci < gw; ci++) cell(cx0(ci), cz0(cj));
-    const tips = [], seenT = new Set(), tl = [];
-    for (let x = bb[0]; x <= bb[2] + 20; x += 20) for (let z = bb[1]; z <= bb[3] + 20; z += 20) { const t_ = TILES[tileOf(x, z)]; if (t_ && t_.d && !seenT.has(t_)) { seenT.add(t_); tl.push(t_); } }
-    for (const t_ of tl) for (const q of [...(t_.d.ft || []), ...(t_.d.as || []), ...(t_.d.pz || []), ...(t_.d.cv || [])]) { /* the narrow paths of the data are quads: a free end in the lawn has its line go on */
-      if (!q.p || q.m === 'p') continue; const P = dec(q.p); if (P.length < 4 || P.length > 5) continue;
-      const bx = bbox(P); if (bx[2] < bb[0] || bx[0] > bb[2] || bx[3] < bb[1] || bx[1] > bb[3]) continue;
-      let L = 0, W = 1e9, ux_ = 0, uz_ = 0; for (let i = 0; i < 4; i++) { const p0 = P[i], p1 = P[(i + 1) % 4], l = hyp(p1[0] - p0[0], p1[1] - p0[1]); if (l > L) { L = l; ux_ = (p1[0] - p0[0]) / l; uz_ = (p1[1] - p0[1]) / l; } if (l < W) W = l; }
-      if (W > 2.2 || L < 5 || L < 3 * W) continue; let ccx = 0, ccz = 0; for (let i = 0; i < 4; i++) { ccx += P[i][0] / 4; ccz += P[i][1] / 4; }
-      for (const sg of [1, -1]) {
-        const vx = ux_ * sg, vz = uz_ * sg, X = ccx + vx * L / 2, Z = ccz + vz * L / 2;
-        if (!(cell(X + vx * 0.8, Z + vz * 0.8) === 1 && cell(X + vx * 1.5, Z + vz * 1.5) === 1)) continue; /* its end is in the lawn */
-        const line = []; let hit = false; for (let d = 0.5; d < 150; d += 0.25) { const c = cell(X + vx * d, Z + vz * d); if (c === 2 || c === 3) { hit = true; break; } line.push(d); }
-        if (!hit || !line.length) continue; (window.__DIV = window.__DIV || []).push([X, Z, X + vx * line[line.length - 1], Z + vz * line[line.length - 1]]);
-        for (const d of line) { const ci2 = Math.floor((X + vx * d - bb[0]) / CS), cj2 = Math.floor((Z + vz * d - bb[1]) / CS); if (ci2 >= 0 && cj2 >= 0 && ci2 < gw && cj2 < gh) dv[cj2 * gw + ci2] = 1; }
-      }
-    }
     /* flood fill on the cells of 0.5 m: a path of 0.5 m still divides two blocks */
     for (let cj0 = 0; cj0 < gh; cj0++) for (let ci0 = 0; ci0 < gw; ci0++) {
       if (lb[cj0 * gw + ci0] || dv[cj0 * gw + ci0] || cm[cj0 * gw + ci0] !== 1) continue;
