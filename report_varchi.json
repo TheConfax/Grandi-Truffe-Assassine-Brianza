@@ -1,9 +1,9 @@
 {
- "cancelli": 11507,
+ "cancelli": 11547,
  "della_regola": {
-  "passo_carraio": 244,
+  "passo_carraio": 240,
   "rampa": 2,
-  "varco": 679,
+  "varco": 671,
   "capo_recinzione": 308
  },
  "dietro_cancello": 9,
@@ -1211,20 +1211,14 @@
    9.2
   ]
  ],
- "storti": 112,
- "storti_regola": 112,
+ "storti": 111,
+ "storti_regola": 111,
  "dove_storti": [
   [
    82.8,
    -789.8,
    "passo_carraio",
    2.0
-  ],
-  [
-   674.4,
-   -722.5,
-   "passo_carraio",
-   1.0
   ],
   [
    808.2,
