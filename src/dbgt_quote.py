@@ -201,8 +201,9 @@ class Axes:  # clean EL_STR segments for the "nearest axis within 3 m" rule
             a, b = L['off'][i], L['off'][i + 1]; z = L['z'][a:b]; xy = L['xy'][a:b]
             ok = ~np.isnan(z[:-1]) & ~np.isnan(z[1:])
             A.append(xy[:-1][ok]); B.append(xy[1:][ok]); za.append(z[:-1][ok]); zb.append(z[1:][ok]); dk.append(np.full(ok.sum(), deck[i]))
+        if not A: A, B, za, zb, dk = [np.zeros((0, 2))], [np.zeros((0, 2))], [np.zeros(0)], [np.zeros(0)], [np.zeros(0, bool)]   # a comune without street elements in the data (a zone build cut round a point: --zona)
         self.A, self.B = np.vstack(A), np.vstack(B); self.za, self.zb = np.concatenate(za), np.concatenate(zb); self.deck = np.concatenate(dk)
-        self.half = np.hypot(*(self.B - self.A).T) / 2; self.tree = cKDTree((self.A + self.B) / 2); self.R = self.half.max() + RSUB
+        self.half = np.hypot(*(self.B - self.A).T) / 2; self.tree = cKDTree((self.A + self.B) / 2); self.R = (self.half.max() if len(self.half) else 0.0) + RSUB
 
     def near(self, p, deck, zref=None, outl=OUTL):  # Z on the nearest compatible segment within RSUB, or None
         js = np.array(self.tree.query_ball_point(p, self.R), int)

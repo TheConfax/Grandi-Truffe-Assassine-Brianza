@@ -1263,7 +1263,9 @@ for bi_, (pts, kind, hgt) in enumerate(barriers):
         else: cuts_ += [_osm_rb[j] for j in _osm_rt.query(L)]
         c = (L.difference(unary_union(cuts_)) if cuts_ else L).intersection(RECT)
         for part in (list(c.geoms) if hasattr(c, 'geoms') else [c]):
-            if isinstance(part, LineString) and part.length > 1.0: bar_out.append((list(part.simplify(0.1).coords), kind, hgt)); _bar_prio.append(1 if dbgt_ else 0); kept_ += part.length
+            if isinstance(part, LineString) and (part.length > 1.0 or (part.length > 0.3 and min(math.dist(part.coords[0], c_) for c_ in (L.coords[0], L.coords[-1])) > 0.05 and min(math.dist(part.coords[-1], c_) for c_ in (L.coords[0], L.coords[-1])) > 0.05)):   # a piece between two cuts stays down to 0.3 m (a post's worth of wall between two gates or streets): it closes the gap
+                if part.length <= 1.0: _mrep['pezzi_corti_tenuti'] += 1
+                bar_out.append((list(part.simplify(0.1).coords), kind, hgt)); _bar_prio.append(1 if dbgt_ else 0); kept_ += part.length
     if dbgt_: _mrep['dbgt'] += 1; _mrep['metri_dbgt'] += L0.length; _mrep['metri_tenuti'] += kept_
 _mrep = {k_: round(v_) for k_, v_ in _mrep.items()}
 if SPOSTAMENTI: _sp = np.array([a_[0] for a_ in SPOSTAMENTI]); _mrep['spostamento_m'] = dict(p50=round(float(np.percentile(_sp, 50)), 2), p90=round(float(np.percentile(_sp, 90)), 2), max=round(float(_sp.max()), 2))
@@ -1540,6 +1542,7 @@ if dbt_pc:
             L_ = r_['line']; pts_ = [L_.interpolate(i_ * 2.0) for i_ in range(int(L_.length // 2) + 1)]
             if sum(1 for p0_ in pts_ if (p0_.x - M0_.x) * nx_ + (p0_.y - M0_.y) * nz_ > 14 and math.dist((p0_.x, p0_.y), (M0_.x, M0_.y)) < 70) >= 3: return True
         return False
+    _carr_cl_a = unary_union([g_ for g_ in (asph, side) if g_ is not None and not g_.is_empty]); prepare(_carr_cl_a)   # the carriageways and pavements as drawn
     _VDBG = [tuple(map(float, x_.split(','))) for x_ in os.environ.get('GTA_VARCHI_DEBUG', '').split(';') if x_]; _vdbg = None   # what became of the candidates near these points (x,z;x,z), in the log
     for p_, srcname_, dir_ in _cands + [((1e9, 1e9), None, None)]:
         if _vdbg is not None: log('varco debug', _vdbg[0], {k_: _gcc[k_] - v_ for k_, v_ in _vdbg[1].items() if isinstance(v_, int) and _gcc[k_] != v_}, {k_: v_ - _vdbg[2].get(k_, 0) for k_, v_ in _vrep.items() if v_ != _vdbg[2].get(k_, 0)}); _vdbg = None
@@ -1584,7 +1587,10 @@ if dbt_pc:
         if any(g_.contains(G_.interpolate(t_, normalized=True)) for t_ in (0.1, 0.3, 0.5, 0.7, 0.9) for g_ in _paved_in): _gcc['carreggiata_o_marciapiede'] += 1; continue
         # a gate never stands on any paved surface (street, square, pavement, footpath, car park); the 0.5 m along the edge of the surface do not count (the gate stands on the lot boundary, which the surface polygons overshoot by a few dm)
         if _gov.entro((mid_.x, mid_.y), 1.5) or _gdV.entro((mid_.x, mid_.y), 1.5): _gcc['gia_cancello'] += 1; continue
-        if dir_ and not any(r_['c'] <= 3 and r_['line'].distance(mid_) <= r_['w'] / 2 + 4.5 for r_ in (_rr[j_] for j_ in _rrt.query(mid_.buffer(12)))): _gcc['senza_strada'] += 1; continue  # a fence end only counts on the boundary of a street
+        if dir_ and not any(r_['c'] <= 3 and r_['line'].distance(mid_) <= r_['w'] / 2 + 4.5 for r_ in (_rr[j_] for j_ in _rrt.query(mid_.buffer(12)))):  # a fence end only counts on the boundary of a street
+            # (rule A of the survey of 8/11) measured from the edge the game draws, not from the axis of the way minus half its nominal width: an opening of 2,5 m or more up to 7 m from the carriageway of a street, or 3 m from a service road, is on the street front too
+            if not (wd_ >= 2.5 and any(r_['c'] <= 4 for r_ in (_rr[j_] for j_ in _rrt.query(mid_.buffer(14)))) and _carr_cl_a.dwithin(mid_, 7.0 if any(r_['c'] <= 3 and r_['line'].distance(mid_) <= r_['w'] / 2 + 9 for r_ in (_rr[j_] for j_ in _rrt.query(mid_.buffer(14)))) else 3.0)): _gcc['senza_strada'] += 1; continue
+            _gcc['fronte_dal_bordo'] = _gcc.get('fronte_dal_bordo', 0) + 1
         if (_ucarr_in is not None and _ucarr_in.intersects(G_) and _ucarr_in.intersection(G_).length > 0.3) or (_asph_in.intersects(G_) and _asph_in.intersection(G_).length > 0.3) or (_side_in.intersects(G_) and _side_in.intersection(G_).length > 0.3): _gcc['carreggiata_o_marciapiede'] += 1; continue
         if any(r_['c'] <= 5 and r_['line'].distance(G_) < r_['w'] / 2 - 0.2 for r_ in (_rr[j_] for j_ in _rrt.query(G_.buffer(12)))): _gcc['strada_osm'] += 1; continue  # any street the game draws, private or service ones too
         if any(_cl[j_][2] < 0 and _cl[j_][0].intersection(G_.buffer(1.0)).length > 1.0 and _cl[j_][0].distance(Point(a_)) > 0.5 and _cl[j_][0].distance(Point(b_)) > 0.5 for j_ in _clt.query(G_.buffer(1.0))): _gcc['doppione_recinzione'] += 1; continue
@@ -1878,7 +1884,28 @@ def _gate_in_strada(g_):
     return _frac_carr(G_) >= 0.7   # the gate in the middle of a carriageway whose own polygon has a sliver round the wall (via delle Grigne, x 687.8 z 2159)
 _rawt = STRtree([r_['line'] for r_ in raw_roads])
 _gtol = [(round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) for g_ in gate_out if g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and id(g_) not in _osm_gid and id(g_) not in _gpavset and _gate_in_strada(g_)]   # a passage between two walls closed over its pavement (androni) stands at the edge of the street by the rule: it stays
-gate_out = [g_ for g_ in gate_out if id(g_) in _osm_gid or id(g_) in _gpavset or not (g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and (round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) in _gtol)]
+# a gate that falls on the carriageway goes to the edge of the street, open, instead of going (varchi 2, rule B of the survey of 8/11: the driveway of the DBGT is certain, the hole was left where its gate had been)
+_gsp_n = {'spostati': 0, 'tolti': 0}
+def _gate_sposta(g_):
+    a_, b_ = (g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10); L_ = math.dist(a_, b_)
+    if L_ < 0.8: return None
+    ux_, uz_ = (b_[0] - a_[0]) / L_, (b_[1] - a_[1]) / L_; nx_, nz_ = -uz_, ux_; mx_, mz_ = (a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2
+    s_ = 1.0 if Point(mx_ + nx_ * 1.5, mz_ + nz_ * 1.5).distance(_carr_cl) >= Point(mx_ - nx_ * 1.5, mz_ - nz_ * 1.5).distance(_carr_cl) else -1.0   # away from the street
+    for t_ in (0.3, 0.6, 0.9, 1.2, 1.6, 2.0, 2.5):
+        a2_, b2_ = (a_[0] + nx_ * s_ * t_, a_[1] + nz_ * s_ * t_), (b_[0] + nx_ * s_ * t_, b_[1] + nz_ * s_ * t_); G2_ = LineString([a2_, b2_])
+        if _frac_carr(G2_, 0.05) > 0: continue
+        g2_ = [q(a2_[0]), q(a2_[1]), q(b2_[0]), q(b2_[1])] + list(g_[4:])
+        if not _gate_in_strada(g2_): return g2_
+    return None
+_gnew = []
+for g_ in gate_out:
+    if id(g_) in _osm_gid or id(g_) in _gpavset or not (g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and (round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) in _gtol): _gnew.append(g_); continue
+    g2_ = _gate_sposta(g_)
+    if g2_ is None: _gsp_n['tolti'] += 1; continue
+    g2_[4] = 'o'; g2_[5] = 1.0; _gprio[id(g2_)] = _gprio.get(id(g_), 2); _gnew.append(g2_); _gsp_n['spostati'] += 1
+gate_out = _gnew
+log('cancelli in carreggiata: spostati sul bordo, aperti', _gsp_n['spostati'], 'tolti', _gsp_n['tolti'])
+if STR: STR.rep['cancelli_in_carreggiata_spostati'] = dict(_gsp_n)
 _campioni['in_carreggiata_tolti'] = _gtol
 # a stub of wall or railing left alone in the carriageway (what remains of the gate's wall): a divider of at most 20 m (not a railway one) whose whole
 # length has the carriageway on both sides is not a boundary, it goes (the dividers at the edge of a street stay: only half the strip is carriageway there)
@@ -2749,6 +2776,15 @@ if STR: STR.rep['cancelli_ante_alberi'] = _vfl
 _nb1 = len(bar_out) + len(fences); _fz_ = fondi_doppi(bar_out + [(f_, 'fe', 0) for f_ in fences], _dstr)
 bar_out = [b_ for b_ in _fz_ if b_[1] != 'fe']; fences = [list(b_[0]) for b_ in _fz_ if b_[1] == 'fe']
 log('divisori doppi fusi alla fine: pezzi', _nb1, '->', len(bar_out) + len(fences))
+# ---- chiusure a T (src/chiusure_t.py): the free end of a fence, wall or hedge that stops a few metres from the flank of another one, of a building or of a gate is carried on its line until it touches, and closes there
+from chiusure_t import chiudi_a_t as _chiudi_t
+_gt_ = [(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]) if (g_[0], g_[1]) != (g_[2], g_[3]) else Point(g_[0] / 10, g_[1] / 10), g_[4]) for g_ in gate_out]
+_dr_ = [LineString([(d_[0] / 10, d_[1] / 10), (d_[2] / 10, d_[3] / 10)]) for d_ in doors_out if (d_[0], d_[1]) != (d_[2], d_[3])]
+_nt_, _rt_ = _chiudi_t([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if len(p_) >= 2 and k_ != 6], list(btree_geoms), _gt_, _dr_,
+                       [r_['line'] for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x'] and r_['c'] <= 6], list(_paved_in) + ([_ucarr_in] if _ucarr_in is not None else []), pc=list(dbt_pc))
+bar_out += [(list(p_), k_, h_) for p_, k_, h_ in _nt_]
+log('chiusure a T', dict(_rt_))
+if STR: STR.rep['chiusure_a_t'] = dict(_rt_)
 if STR: STR.rep['doppioni_tolti_alla_fine'] = dict(cancelli=_gd_per, divisori=_nb1 - len(bar_out) - len(fences))
 # ---- check on fences and gates (src/controllo_recinzioni.py): doubled dividers and gates left, OSM gates not built, isolated DBGT railings drawn (all must be 0)
 from controllo_recinzioni import controlla as _controlla_rec

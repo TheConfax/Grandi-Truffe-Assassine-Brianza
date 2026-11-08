@@ -120,7 +120,7 @@ class Ferrovia:
     # ---- 1. the axes
     def assi(s, rail_raw, nodes, raw_roads, ntags):
         """moves the OSM rail ways inside the cover onto EL_FER, in place; appends the EL_FER stretches no OSM way runs on to rail_raw ('x')"""
-        t0 = time.time(); rep = {}; rt = s.rete
+        t0 = time.time(); rep = {}; rt = s.rete; s.lx = []   # (no EL_FER in the zone: no level crossings either)
         if rt is None: return rep
         cnt = [0]
         def new_id(): cnt[0] += 1; return 'fer%d' % cnt[0]
