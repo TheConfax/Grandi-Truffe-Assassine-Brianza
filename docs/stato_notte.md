@@ -20,7 +20,7 @@ Cartelle: `S=C:/Users/theco/AppData/Local/Temp/claude/645585d1e8c08b81/7a2efc23-
 | Merge edifici-piccoli in dev | — | principale | 8013 | — | FATTO (1fc245be) |
 | nightly/snap1 = dev + vetrine-2 + epoca, build sola | `nightly` | `$S/nightly` (lavoro), `$S/snap1` (fermo) | 8090 | a73fe46c21b7a4d66 | FATTO: nightly 24416bbd, tag nightly/snap1, server 8090 da `$S/snap1` |
 | Facciate 2.0 (Opus) da snap1 | `facciate-2` | `$S/fac2` | 8093 | a51744e09502d7cce | FATTO c5be60c1 (server 8093 acceso); unito in nightly c71b268c = snap2 |
-| Vetrine HQ (Opus) da snap1 | `vetrine-hq` | `$S/vhq` | 8094 | ad4d0c068713845b4 | in corso dalle 5:35 |
+| Vetrine HQ (Opus) da snap1 | `vetrine-hq` | `$S/vhq` | 8094 | ad4d0c068713845b4 | FATTO ec1bc78e (server 8094 acceso); unione in nightly + snap3 (8092) in corso |
 | Androni secondo giro (Sonnet) da snap1 | `androni-2` | `$S/andr2` | 8095 | af6e2726257285c2e | in corso dalle 5:35 |
 
 Snapshot (fermi, giocabili, non si toccano finché Carlo non li ha giocati): snap1 8090, poi 8091, 8092, … nell'ordine in cui i lavori si uniscono in `nightly`.
