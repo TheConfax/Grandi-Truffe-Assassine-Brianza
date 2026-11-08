@@ -11,7 +11,7 @@ addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && ['Equal', 'Mi
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@500;600;700;800&family=Rozha+One&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@500;600;700;800&display=swap">
 <style>
 /* Layout: full-bleed WebGL city, HUD pinned to the four corners like a car dashboard; one commitment: Brianza late-afternoon palette (ocra, terracotta, cielo) */
 :root {
@@ -95,9 +95,9 @@ body:has(#start:not([hidden])) :is(.hud, #osm, #touch, #fx, #dbghud, #pause) { d
 #start { background: linear-gradient(205deg, rgba(255,150,64,.17) 0%, rgba(255,150,64,0) 48%), radial-gradient(ellipse 75% 70% at 50% 52%, rgba(16,10,14,.42) 0%, rgba(16,10,14,.16) 55%, rgba(16,10,14,0) 100%), linear-gradient(180deg, rgba(16,10,14,.35) 0%, rgba(16,10,14,0) 22%, rgba(16,10,14,0) 70%, rgba(16,10,14,.55) 100%); display: grid; place-items: center; overflow: hidden; padding: 0; }
 #start .wrap { max-width: none; width: 100%; justify-items: center; align-content: center; gap: clamp(22px, 5vh, 56px); }
 #start .wrap > :not(.tit):not(.menu) { display: none !important; }
-#start .tit { font-family: 'Rozha One', 'Playfair Display', Georgia, 'Times New Roman', serif; font-weight: 400; text-align: center; text-transform: uppercase; font-size: clamp(50px, min(15.5vw, 17.5vh), 190px); line-height: .94; letter-spacing: .035em; color: var(--ink); margin: 0; text-shadow: 0 .02em 0 rgba(0,0,0,.28), 0 .08em .22em rgba(0,0,0,.5), 0 .2em .7em rgba(0,0,0,.45); }
+#start .tit { font-family: var(--display); font-weight: 400; text-align: left; text-transform: uppercase; font-size: clamp(34px, min(10.5vw, 14vh), 140px); line-height: .95; letter-spacing: .01em; color: var(--ocra); margin: 0; text-shadow: 0 6px 0 var(--cotto), 0 10px 30px rgba(0,0,0,.5); }
 #start .tit span { display: block; white-space: nowrap; }
-#start .tit b { font-weight: 400; color: var(--ocra); font-size: 1.1em; line-height: .8; text-shadow: 0 .02em 0 rgba(90,36,8,.55), 0 .08em .22em rgba(0,0,0,.5), 0 0 .5em rgba(240,150,40,.38); }
+#start .tit b { font-weight: 400; color: #e4001b; }
 #start .menu { display: grid; gap: 12px; justify-items: stretch; width: min(320px, 78vw); }
 #start .menu button { font-family: var(--body); font-weight: 700; font-size: clamp(22px, 2.6vw, 30px); letter-spacing: .38em; text-indent: .38em; text-transform: uppercase; padding: 12px 20px 11px; border-radius: 2px; border: 1px solid transparent; background: none; color: var(--ink); cursor: pointer; box-shadow: none; transform: none; transition: background .15s, color .15s, opacity .2s; justify-self: stretch; }
 #start .menu #go { background: var(--ocra); color: var(--shade); box-shadow: 0 6px 22px rgba(0,0,0,.4); }
