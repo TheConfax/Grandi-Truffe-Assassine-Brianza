@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo nightly · dopo f11a9a8e · assemblato 08/11 22:59 · porta ' + location.port;
+    const txt = 'locale · ramo nightly · dopo 38b1d0e6 · assemblato 09/11 00:06 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -7567,6 +7567,11 @@ function lsSpans(Q, v) { // where the line across at v runs inside the polygon (
   xs.sort((p, q) => p - q); const out = []; for (let i = 0; i + 1 < xs.length; i += 2) out.push([xs[i], xs[i + 1]]); return out;
 }
 // a flat strip laid on the ground (draped, so y is the height above it), from (s0,v) to (s1,v) in the frame A, w wide, in pieces of 6 m
+function lsFlat(A, s0, s1, v, w) { /* a furrow is only laid where the ground is a field's: gentle along it and level across it, on a steep bank the flat quads stand off the slope like a fan */
+  let lo = 1e9, hi = -1e9, c0 = 1e9, c1 = -1e9; const n = Math.max(2, Math.ceil((s1 - s0) / 3));
+  for (let k = 0; k <= n; k++) { const s = s0 + (s1 - s0) * k / n, [xa, za] = A.at(s, v - w / 2), [xb, zb] = A.at(s, v + w / 2), [xm, zm] = A.at(s, v), ya = H.ground(xa, za), yb = H.ground(xb, zb), ym = H.ground(xm, zm); if (Math.abs(ya - yb) > 0.3) return false; lo = Math.min(lo, ym); hi = Math.max(hi, ym); if (k === 0) c0 = ym; if (k === n) c1 = ym; }
+  return Math.abs(c1 - c0) / Math.max(1, s1 - s0) < 0.12 && hi - lo < 1.2;
+}
 function lsStrip(b, A, s0, s1, v, w, col, dy = 0.05) {
   const n = Math.max(1, Math.ceil((s1 - s0) / 6)), cuts = [];
   for (let k = 0; k < n; k++) cuts.push([s0 + (s1 - s0) * k / n, s0 + (s1 - s0) * (k + 1) / n]);
@@ -7671,7 +7676,7 @@ function* buildPaesaggio(T, G) {
     if (kind === 'campo' || kind === 'prato') {
       if (kind === 'campo') { // furrows the long way: ploughed, green, ripe or stubble, the hash decides
         const pal = [['#8f6e4e', '#7d5f42'], ['#8fae5a', '#7c9a4b'], ['#d6bf72', '#c8b064'], ['#d9cf9e', '#cbbf8c']][Math.floor(h * 4)];
-        for (let v = A.v0 + 1.4, k = 0; v < A.v1 - 0.7; v += 1.4, k++) for (const [a, b] of lsSpans(A.Q, v)) if (b - a > 1) lsStrip(drape, A, a + 0.4, b - 0.4, v, 1.42, COL(pal[k % 2]), 0.04);
+        for (let v = A.v0 + 1.4, k = 0; v < A.v1 - 0.7; v += 1.4, k++) for (const [a, b] of lsSpans(A.Q, v)) if (b - a > 1 && lsFlat(A, a + 0.4, b - 0.4, v, 1.42)) lsStrip(drape, A, a + 0.4, b - 0.4, v, 1.42, COL(pal[k % 2]), 0.04);
       }
       if (h > (kind === 'campo' ? 0.6 : 0.75) && area > 1500) { // round bales left in the field
         const n = Math.min(10, Math.floor(area / 2500) + 2); let got = 0;
@@ -7688,13 +7693,40 @@ function* buildPaesaggio(T, G) {
       // L0.w: the walls and fences of the map along its edge, which the hoarding replaces on their own line (the build took them out, src/barriere.py
       // cantieri): drawn as they are, they already keep off the carriageway; L0.h: the rest of the edge, which gets the hoarding as before
       const runs = L0.w ? [...(L0.h || []).map(q => [dec(q), 1]), ...L0.w.map(q => [dec(q), 0])] : [[[...P, P[0]], 1]];
-      for (const [R, filt] of runs) for (let i = 0; i + 1 < R.length; i++) {
-        const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < (filt ? 0.5 : 0.05)) continue;
-        for (let t = 0; t < L; t += 2.5) {
-          const t1 = Math.min(L, t + 2.5), x0 = a[0] + (c[0] - a[0]) * t / L, z0 = a[1] + (c[1] - a[1]) * t / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-          if (filt && (onAnyRoad(mx, mz, 0.6) || nearAsph(mx, mz, 0.3) || onAsph(x0, z0) || onAsph(x1, z1) || inBuilding(mx, mz, 0.3))) continue; /* the drawn carriageway too (AC_VEI), ends included */
-          const g0 = H.ground(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); // a panel of its own: it goes over when rammed
-          box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8');
+      const WR = (L0.w || []).map(q => dec(q)), nearW = (x, z, d) => WR.some(r => { for (let i = 0; i + 1 < r.length; i++) if (segDist(x, z, r[i][0], r[i][1], r[i + 1][0], r[i + 1][1]) < d) return true; return false; });
+      const hoard = (x0, z0, x1, z1) => { const g0 = H.ground(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); /* a panel of its own: it goes over when rammed */ box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8'); };
+      const free = (x, z) => !(onAnyRoad(x, z, 0.6) || nearAsph(x, z, 0.3) || onAsph(x, z) || inBuilding(x, z, 0.3));
+      for (const [R, filt] of runs) {
+        if (!filt) { /* the dividers of the map taken as they are: drawn on their own line */
+          for (let i = 0; i + 1 < R.length; i++) { const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; for (let t = 0; t < L; t += 2.5) { const t1 = Math.min(L, t + 2.5); hoard(a[0] + (c[0] - a[0]) * t / L, a[1] + (c[1] - a[1]) * t / L, a[0] + (c[0] - a[0]) * t1 / L, a[1] + (c[1] - a[1]) * t1 / L); } }
+          continue;
+        }
+        /* the rest of the edge: ONE line. Samples every 2.5 m along it; where the edge lies on or by the carriageway the line moves inward by what each sample needs to be clear (up to 4.2 m, inside
+           the site), the move spread over 5 m either side and smoothed, so the hoarding runs straight and unbroken; the panels follow that line. Not where a divider of the map already runs (no double row) */
+        const S = [];
+        for (let i = 0; i + 1 < R.length; i++) {
+          const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5) continue;
+          const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, sd = inPoly(mx - uz * 0.8, mz + ux * 0.8, P) ? 1 : inPoly(mx + uz * 0.8, mz - ux * 0.8, P) ? -1 : 0, nn = Math.max(1, Math.ceil(L / 2.5));
+          for (let k = 0; k <= nn; k++) S.push({ x: a[0] + ux * L * k / nn, z: a[1] + uz * L * k / nn, nx: -uz * sd, nz: ux * sd, sd, seg: i, o: 0 });
+        }
+        for (const q of S) { q.req = Infinity; for (const o of [0, 0.6, 1.2, 1.8, 2.5, 3.3, 4.2]) { if (o && !q.sd) break; const x = q.x + q.nx * o, z = q.z + q.nz * o; if (o && !inPoly(x, z, P)) break; if (free(x, z)) { q.req = o; break; } } }
+        const n = S.length, dil = S.map((q, i) => { if (q.req === Infinity) return Infinity; let m = 0; for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) if (S[j].req !== Infinity) m = Math.max(m, S[j].req); return m; });
+        S.forEach((q, i) => { if (dil[i] === Infinity) { q.o = Infinity; return; } let t = 0, c = 0; for (let j = Math.max(0, i - 1); j <= Math.min(n - 1, i + 1); j++) if (dil[j] !== Infinity) { t += dil[j]; c++; } q.o = Math.max(q.req, t / c); });
+        /* a sample with no clear place keeps the move of the nearest one that has: the line goes on, it has no hole */
+        S.forEach((q, i) => { if (q.o !== Infinity) return; for (let d = 1; d < n; d++) { const j = [i - d, i + d].find(j => j >= 0 && j < n && S[j].o !== Infinity && S[j].req !== Infinity); if (j !== undefined) { q.o = S[j].o; return; } } });
+        S.forEach(q => { if (q.o !== Infinity) { q.px = q.x + q.nx * q.o; q.pz = q.z + q.nz * q.o; } });
+        /* the dividers of the map along the same edge draw their own panels: a stretch is left out only where it lies along one for its whole length (ends and middle within 1.5 m of it) */
+        const alongW = (x0, z0, x1, z1) => nearW(x0, z0, 1.5) && nearW(x1, z1, 1.5) && nearW((x0 + x1) / 2, (z0 + z1) / 2, 1.5);
+        for (let i = 0; i + 1 < n; i++) {
+          const p = S[i], q = S[i + 1]; if (p.o === Infinity || q.o === Infinity) continue; if (hyp(q.px - p.px, q.pz - p.pz) < 0.05) continue;
+          if (alongW(p.px, p.pz, q.px, q.pz)) continue;
+          hoard(p.px, p.pz, q.px, q.pz);
+        }
+        /* where the line ends (at a divider of the map or a gate) it runs on to the nearest post or end of one within 7 m, touching it */
+        const anchors = []; for (const r of WR) { anchors.push(r[0], r[r.length - 1]); } for (const g of T.gates || []) { anchors.push([g.ax, g.az]); if (g.W) anchors.push([g.ax + g.ux * g.W, g.az + g.uz * g.W]); }
+        for (const q of [S[0], S[n - 1]]) {
+          if (!q || q.o === Infinity) continue; let best = null, bd = 7; for (const an of anchors) { const d = hyp(an[0] - q.px, an[1] - q.pz); if (d > 0.3 && d < bd) { bd = d; best = an; } }
+          if (best && !onAsph((q.px + best[0]) / 2, (q.pz + best[1]) / 2)) hoard(q.px, q.pz, best[0], best[1]);
         }
       }
       const spots = [];
