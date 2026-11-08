@@ -854,12 +854,19 @@ function updNegozi(dt) {
   for (const T of VIVI) if (T.ngShut && T.group) ngTickTile(T, false);
 }
 // ---- modelling in a wall's own frame: x along the wall, y up from the pavement, z out of the wall
+// a box straight into the buffer, its six faces turned outwards (a BoxGeometry for each of the hundreds of boxes of a street of shops cost a third of the time)
+const NG_BOXF = [[1, 0, 0, [[1, -1, 1], [1, -1, -1], [1, 1, -1], [1, 1, 1]]], [-1, 0, 0, [[-1, -1, -1], [-1, -1, 1], [-1, 1, 1], [-1, 1, -1]]], [0, 1, 0, [[-1, 1, 1], [1, 1, 1], [1, 1, -1], [-1, 1, -1]]],
+  [0, -1, 0, [[-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1]]], [0, 0, 1, [[-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]], [0, 0, -1, [[1, -1, -1], [-1, -1, -1], [-1, 1, -1], [1, 1, -1]]]], NG_UV4 = [[0, 0], [1, 0], [1, 1], [0, 1]];
+function ngBoxV(F, b, w, h, d, x, y, z, col) {
+  const hx = w / 2, hy = h / 2, hz = d / 2;
+  for (const [nx, ny, nz, P] of NG_BOXF) { const i0 = b.p.length / 3; for (let k = 0; k < 4; k++) { const c = P[k]; F.v(b, x + c[0] * hx, y + c[1] * hy, z + c[2] * hz, nx, ny, nz, NG_UV4[k][0], NG_UV4[k][1], col); } b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
+}
 function ngKit(C, cx, gy, cz, nx, nz) {
   const F = lmFrame(new THREE.Matrix4().makeRotationY(Math.atan2(nx, nz)).setPosition(cx, gy, cz));
   const lx = (x, z) => [cx + nz * x + nx * z, cz - nx * x + nz * z]; // local (x, z) -> world
   /* on a curved wall the front is cut in pieces of C.chunk metres, so that the bend (ngBend) can follow the wall */
   const nCh = w => Math.min(60, Math.max(1, Math.ceil(w / (C.chunk || 1e9))));
-  const box = (w, h, d, x, y, z, col, b = C.solid) => { const n = nCh(w); for (let j = 0; j < n; j++) F.geo(b, lmBox(w / n, h, d, x - w / 2 + (j + 0.5) * w / n, y, z), null, col === null ? null : COL(col)); };
+  const box = (w, h, d, x, y, z, col, b = C.solid) => { const n = nCh(w), cc = col === null ? null : COL(col); for (let j = 0; j < n; j++) ngBoxV(F, b, w / n, h, d, x - w / 2 + (j + 0.5) * w / n, y, z, cc); };
   const faceX = (b, P, S, col) => { const n = nCh(Math.abs(P[1][0] - P[0][0])); for (let j = 0; j < n; j++) { const xa = P[0][0] + (P[1][0] - P[0][0]) * j / n, xb = P[0][0] + (P[1][0] - P[0][0]) * (j + 1) / n; F.face(b, [[xa, P[0][1], P[0][2]], [xb, P[1][1], P[1][2]], [xb, P[2][1], P[2][2]], [xa, P[3][1], P[3][2]]], S, col); } };
   let qzn = 1; /* how many quads the last qz made */
   const neon = (k, w, h, d, x, y, z) => F.geo(C.neon[k] || (C.neon[k] = Buf()), lmBox(w, h, d, x, y, z), null, null);
@@ -1199,10 +1206,10 @@ function ngFront0(s, C) {
   // the light of an open shop on the pavement at night (NG_POOL): from the wall out to 3 m, as wide as the front and a bit more
   if (m.d !== 'p' && cls !== 'sfitto') {
     const dz = clamp(depth - 0.15, 0.8, 3.2), xa = -hw - 0.4, xb = hw + 0.4, n = Math.max(1, Math.ceil((xb - xa) / 1.5)), pb = C.pool;
-    const yAt = (x, z) => { const [wx, wz] = lx(x, z); return H.surface(wx, wz) - gy + 0.035; };
-    for (let j = 0; j < n; j++) for (const [za, zc] of [[0.05, dz / 2], [dz / 2, dz]]) {
-      const p = xa + (xb - xa) * j / n, q = xa + (xb - xa) * (j + 1) / n, i0 = pb.p.length / 3;
-      for (const [x, z] of [[p, za], [q, za], [q, zc], [p, zc]]) F.v(pb, x, yAt(x, z), z, 0, 1, 0, (x - xa) / (xb - xa), 1 - z / dz);
+    const zs = [0.05, dz / 2, dz], Y = []; for (let j = 0; j <= n; j++) { const x = xa + (xb - xa) * j / n; Y.push(zs.map(z => { const [wx, wz] = lx(x, z); return H.surface(wx, wz) - gy + 0.035; })); }
+    for (let j = 0; j < n; j++) for (let r = 0; r < 2; r++) {
+      const p = xa + (xb - xa) * j / n, q = xa + (xb - xa) * (j + 1) / n, za = zs[r], zc = zs[r + 1], i0 = pb.p.length / 3;
+      for (const [x, z, y] of [[p, za, Y[j][r]], [q, za, Y[j + 1][r]], [q, zc, Y[j + 1][r + 1]], [p, zc, Y[j][r + 1]]]) F.v(pb, x, y, z, 0, 1, 0, (x - xa) / (xb - xa), 1 - z / dz);
       pb.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2);
     }
   }
@@ -1372,7 +1379,7 @@ function* buildNegozi(T, G) { // a generator: the tile builder yields between sl
   if (C.panel) mkMesh(C.panel, NG_PANEL, 10, 'cast', G);
   if (C.roof) mkMesh(C.roof, MAT.roof, 10, 'cast', G);
   let n = 0;
-  for (const s of list) { try { ngFront(s, C); } catch (e) { console.warn('negozio', s.name, e); } if (++n % 3 === 0) yield 'negozi'; }
+  for (const s of list) { try { ngFront(s, C); } catch (e) { console.warn('negozio', s.name, e); } n++; yield 'negozi'; } /* a front a slice: the fronts HQ are three times what they were */
   ngFill(C);
   yield 'negozi';
   // the meshes: each with its front and version per vertex (ngC, ngL); the inside of the openings before the plugs, the plugs before the walls (renderOrder 8, 9, 10)
@@ -1385,6 +1392,7 @@ function* buildNegozi(T, G) { // a generator: the tile builder yields between sl
   D.shut = mk(C.shut, NG_SHUT_MAT, 8, false); if (D.shut) D.shut.frustumCulled = false; /* its curtains move: the box of the mesh was measured once */
   D.pool = mk(C.pool, NG_POOL, 11, false, (g, b) => g.setAttribute('ngOn', F32(b.on, 1)));
   for (const k in C.neon) mk(C.neon[k], NG_NEON[k], 8, false);
+  yield 'negozi';
   // the signs: one texture per tile, cells packed in shelves 1024 px wide
   if (C.cells.length) {
     /* the cells fill shelves of one texture 4096 px high; if they do not fit, all of them shrink a little (before, the last ones, the wide low signs, stayed blank) */
