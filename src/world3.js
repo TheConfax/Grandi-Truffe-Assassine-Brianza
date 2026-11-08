@@ -2403,7 +2403,7 @@ function* buildTileGen(T) {
         if (outer.length <= 10) for (const [x, z] of outer) { const gy = H.ground(x, z); addBox(postB, x, (gy + ch) / 2, z, 0.18, ch - gy, 0.18, COL('#6a6c70')); }
         continue;
       }
-      const b = wb.fac; if (!b.ao) { b.ao = []; b.fac = []; }
+      const b = wb.fac; if (!b.ao) { b.ao = []; b.fac = []; b.facX = []; }
       /* a door laid by the tile next door against this house's wall (each tile lays the doors on its ground, the house is drawn by the tile it belongs to): or a door of this tile fitted to another volume standing on the same wall (the DBGT has some houses twice, one over the other): it stays where it is, the ground-floor windows it touches go */
       const bb = B.bb || (B.bb = outer.reduce((q, p) => [Math.min(q[0], p[0]), Math.min(q[1], p[1]), Math.max(q[2], p[0]), Math.max(q[3], p[1])], [1e9, 1e9, -1e9, -1e9]));
       for (const U of vicini(T)) {
@@ -2434,8 +2434,8 @@ function* buildTileGen(T) {
             const rfw = R.fw || fw; if (bay) { const w0 = s0 + rfw[2] * bw, w1 = s0 + rfw[3] * bw; let rl = Math.min(rlAt(w0), rlAt(w1)); for (const [p, y] of rp) if (p > w0 && p < w1) rl = Math.min(rl, y); const kt = Math.floor((rl - FAC.EM - Math.max(rfw[1], 1.2) * sc - F0) / FL + 1e-4); if (kt >= kl) f = [kl, kt]; }
             if (bay && f[0] <= f[1]) { /* a floor of this bay behind another building (a lower one built onto it, a volume inside another), or on a wall another volume shares (a house the DBGT has twice, one over the other): no window there, painted or 3D (Carlo 8/11, via Farga) */
               const sm = (s0 + s1) / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + E[R.ed[q]][2]) q++;
-              const e = E[R.ed[q]], yAt = k => F0 + k * FL + 1.6 * sc, pts = [sm, s0 + 0.12 * bw, s1 - 0.12 * bw].map(ss => { const p = R.at(ss); return [p[0] + e[3] * 0.4, p[1] + e[4] * 0.4]; }); const ins = [sm, s0 + 0.12 * bw, s1 - 0.12 * bw].map(ss => { const p = R.at(ss); return [p[0] - e[3] * 0.15, p[1] - e[4] * 0.15]; });
-              const cov = covK = k => pts.some(([px, pz]) => facCoperto(B, px, pz, yAt(k))) || ins.some(([px, pz]) => facDoppio(B, px, pz, yAt(k)));
+              const e = E[R.ed[q]], yAt = k => [rfw[0] * sc + 0.15, (rfw[0] + rfw[1]) / 2 * sc, rfw[1] * sc - 0.1].map(y => F0 + k * FL + y), /* the bottom, the middle and the top of the window: a window cut by a volume goes whole (Carlo 8/11, via Farga) */ pts = [sm, s0 + 0.12 * bw, s1 - 0.12 * bw].map(ss => { const p = R.at(ss); return [p[0] + e[3] * 0.4, p[1] + e[4] * 0.4]; }); const ins = [sm, s0 + 0.12 * bw, s1 - 0.12 * bw].map(ss => { const p = R.at(ss); return [p[0] - e[3] * 0.15, p[1] - e[4] * 0.15]; });
+              const cov = covK = k => yAt(k).some(y => pts.some(([px, pz]) => facCoperto(B, px, pz, y)) || ins.some(([px, pz]) => facDoppio(B, px, pz, y)));
               while (f[0] <= f[1] && cov(f[0])) f[0]++; while (f[1] >= f[0] && cov(f[1])) f[1]--; if (f[0] > f[1]) f = [999, -999];
             }
             let dropped = 0;
@@ -2444,13 +2444,15 @@ function* buildTileGen(T) {
               if (R.ovl && R.ovl.has(j)) PC.sopra_prima++; R.dr = R.dr || [];
               if (R.noG && R.noG.has(j) && F0 + f[0] * FL + rfw[0] * sc < g + 3.1) { /* the lowest window of the bay, if a door stands under it (its floor may be above kl where a volume in front covers the one below) */ dropped = 1; f = f[0] + 1 <= f[1] ? [f[0] + 1, f[1]] : [999, -999]; } else if (R.dr.some(([c, W]) => c + W / 2 > w0 && c - W / 2 < w1)) PC.sopra_dopo++;
             }
-            f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : vOf(F0 + kl * FL + FAC.ZH)];
+            /* the covered floors between the first and the last window: their bits (from the first) go to the wall, which draws no window and opens no hole there (Carlo 8/11: "restano i buchi") */
+            let mask = 0; if (f[0] < 900) for (let k = f[0]; k <= Math.min(f[1], f[0] + 22); k++) if (covK(k)) mask += 2 ** (k - f[0]);
+            f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : vOf(F0 + kl * FL + FAC.ZH), mask];
             const last = grp[grp.length - 1];
-            if (last && last[2][0] === f[0] && last[2][1] === f[1] && Math.abs(last[2][2] - f[2]) < 1e-6) last[1] = s1; else grp.push([s0, s1, f]);
+            if (last && last[2][0] === f[0] && last[2][1] === f[1] && Math.abs(last[2][2] - f[2]) < 1e-6 && last[2][3] === f[3]) last[1] = s1; else grp.push([s0, s1, f]);
             if (bay && f[0] < 900) { /* the 3D windows, balconies and details of this bay (facciate3.js): the same floors the texture draws */
               const j = Math.round((s0 - R.pad) / bw), sm = (s0 + s1) / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + E[R.ed[q]][2]) q++;
               const e = E[R.ed[q]], kTop = f[1] - voff;
-              for (let k = f[0] - voff; k <= kTop; k++) if (!covK(k)) facWinRecs(T, R, e, B, sty, R.side, j, k, s0, bw, F0, FL, sc, wallCol, !raised && k === kl); /* a floor in the middle covered too: no 3D window there */
+              for (let k = f[0] - voff; k <= kTop; k++) if (!(k - (f[0] - voff) <= 22 && covK(k))) facWinRecs(T, R, e, B, sty, R.side, j, k, s0, bw, F0, FL, sc, wallCol, !raised && k === kl); /* the same floors the wall draws (mask) */
               if (S0.ang && R.side === 'f' && R.n >= 3 && (j === 0 || j === R.n - 1)) for (let k = kl + 1; k <= kTop; k++) if (!covK(k)) facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, 'ang');
               if (S0.bc && R.side === 'f' && j % 2 === 0 && kl + 1 <= kTop && !covK(kl + 1)) facExtraBal(T, R, e, sty, kl + 1, s0, bw, F0, FL, wallCol, j, 'bc');
             }
@@ -2471,13 +2473,13 @@ function* buildTileGen(T) {
             // occlusion: height over the ground, depth under the eaves, distance from the inside corners at either end (linear along the wall, so exact per pixel)
             const ga = raised ? wbot - 3 : H.ground(ax, az), gc = raised ? wbot - 3 : H.ground(cx, cz);
             b.ao.push(wbot - ga, pitched ? ya - wbot : 99, ia + e0, ic + L - e0, wbot - gc, pitched ? yc - wbot : 99, ia + e1, ic + L - e1, yc - gc, pitched ? 0 : 99, ia + e1, ic + L - e1, ya - ga, pitched ? 0 : 99, ia + e0, ic + L - e0);
-            for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], R.code);
+            for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
             if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
             if (B.st === 2) { // a ruin has no roof: the inside of its walls shows from above
               const bi = b.p.length / 3;
               vtx(b, ax, wbot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, wbot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, vOf(yc), wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, vOf(ya), wallCol);
               b.ao.push(wbot - ga, 99, 99, 99, wbot - gc, 99, 99, 99, yc - gc, 99, 99, 99, ya - ga, 99, 99, 99);
-              for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], R.code);
+              for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
               if (nx * (-dz) + nz * dx > 0) b.i.push(bi, bi + 2, bi + 1, bi, bi + 3, bi + 2); else b.i.push(bi, bi + 1, bi + 2, bi, bi + 2, bi + 3);
             }
           }
@@ -2502,7 +2504,7 @@ function* buildTileGen(T) {
       } else { try { polyFill(roofB, outer, holes, top, 10, B.st === 1 ? COL('#a9a6a0') : colOr(B.rcol, () => pcB(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT, 1))); } catch (e) { } }
     }
     T.porteFatte = (T.doors || []).filter(d => !d.skip).map(d => ({ ax: d.ax, az: d.az, bx: d.bx, bz: d.bz, ux: d.ux, uz: d.uz, W: d.W, h: d.h, gy: d.gy, sty: d.sty, fit: d.fit })); /* the doors as this build drew them, for the checks (T.doors can be laid again by the time one counts) */
-    if (wb.fac.i.length) { const g = mkMesh(wb.fac, MAT.fac, 10, 'cast', G).geometry; g.setAttribute('aoD', new THREE.Float32BufferAttribute(wb.fac.ao, 4)); g.setAttribute('facD', new THREE.Float32BufferAttribute(wb.fac.fac, 4)); }
+    if (wb.fac.i.length) { const g = mkMesh(wb.fac, MAT.fac, 10, 'cast', G).geometry; g.setAttribute('aoD', new THREE.Float32BufferAttribute(wb.fac.ao, 4)); g.setAttribute('facD', new THREE.Float32BufferAttribute(wb.fac.fac, 4)); g.setAttribute('facX', new THREE.Float32BufferAttribute(wb.fac.facX, 1)); }
     if (T.pinkB) { for (const [m, pb] of T.pinkB) if (pb.i.length) mkMesh(pb, m, 11, false, G); T.pinkB = null; }
     if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');

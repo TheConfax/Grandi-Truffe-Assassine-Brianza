@@ -219,11 +219,11 @@ MAT.fac = new THREE.MeshLambertMaterial({ map: FAC_ATLAS.tex, emissiveMap: FAC_A
 MAT.fac.onBeforeCompile = s => {
   Object.assign(s.uniforms, FOTO_FAC, FAC_U);
   AO_WALL(s);
-  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 facD;\nvarying vec4 vFac;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFac = facD;')
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 facD;\nattribute float facX;\nvarying vec4 vFac;\nvarying float vFacX;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFac = facD; vFacX = facX;')
     .replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz; vWNrm = normalize( mat3( modelMatrix ) * objectNormal );');
   s.fragmentShader = `uniform sampler2D uPlaster;\nuniform vec3 uSkyH;\nuniform vec3 uSkyZ;\nuniform vec3 uSunD;\nuniform vec3 uSunC;\nuniform float uNearR;\nuniform float uBalR;\nuniform float uLit;\nuniform highp sampler2D uMeta;
-varying vec4 vFac;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;
+varying vec4 vFac;\nvarying float vFacX;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;
 ${FAC_CAMGL}const vec2 FAC_CS = vec2(${(1 / FAC_COLS).toFixed(6)}, ${(1 / FAC_ROWS).toFixed(6)}); const float FAC_PF = ${(FAC_PAD / FAC_CPX).toFixed(6)};
 vec2 facAt(float c, vec2 f) { return (vec2(mod(c, ${FAC_COLS}.0), floor(c / ${FAC_COLS}.0)) + FAC_PF + f * (1.0 - 2.0 * FAC_PF)) * FAC_CS; }
 float facIgn(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
@@ -238,6 +238,7 @@ bool facIn(vec2 f, int c, int k) {
     .replace('#include <map_fragment>', `
   float facF = floor( vUv.y );
   float facW = step( vFac.x - 0.5, facF ) * step( facF, vFac.y + 0.5 ) * step( vFac.z, vUv.y );
+  { float facXr = facF - floor( vFac.x + 0.5 ); if ( facXr >= 0.0 && facXr < 23.0 && mod( floor( floor( vFacX + 0.5 ) / exp2( facXr ) ), 2.0 ) > 0.5 ) facW = 0.0; } /* a floor whose window was taken away (covered by another volume): plain wall, no hole */
   float facCode = vFac.w + 0.5, facCP = floor( facCode / 16384.0 ), facR0 = facCode - facCP * 16384.0, facCG = floor( facR0 / 128.0 ), facCU = floor( facR0 - facCG * 128.0 );
   float facCell = facW < 0.5 ? facCP : ( facF < floor( vFac.z ) + 0.5 ? facCG : facCU );
   vec2 facFr = fract( vUv );
@@ -610,7 +611,7 @@ function facAggiorna(force) {
   for (const k in FAC_PARTS) FAC_PARTS[k].n = 0;
   const RW = FAC_R + 8, RB = FAC_RB + 10; let nw = 0, nb = 0;
   for (const T of VIVI) {
-    if (!T.fwin && !T.fbal && !T.fdet) continue; if (T.dist > RB + 150 || !T.group || !T.ready) continue;
+    if (!T.fwin && !T.fbal && !T.fdet) continue; if (T.dist > Math.max(RW, RB) + TS + 20 || !T.group || !T.ready) continue; /* a tile whose centre is further than that may still hold a window in reach: its hole would open with nothing in it */
     for (const r of T.fwin || []) { const d = Math.hypot(r.x - cp.x, r.y + r.h / 2 - cp.y, r.z - cp.z); if (d < RW) { facWin(r); nw++; } }
     for (const r of T.fbal || []) { const d = Math.hypot(r.x - cp.x, r.y - cp.y, r.z - cp.z); if (d < RB) { facBal(r); nb++; } }
     for (const r of T.fdet || []) { const d = Math.hypot(r.x - cp.x, r.y - cp.y, r.z - cp.z); if (d < (r.R || FAC_R) + 8) facDet(r); }
