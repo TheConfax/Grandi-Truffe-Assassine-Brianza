@@ -190,11 +190,22 @@ function* buildPaesaggio(T, G) {
         }
         for (const q of S) { q.req = Infinity; for (const o of [0, 0.6, 1.2, 1.8, 2.5, 3.3, 4.2]) { if (o && !q.sd) break; const x = q.x + q.nx * o, z = q.z + q.nz * o; if (o && !inPoly(x, z, P)) break; if (free(x, z)) { q.req = o; break; } } }
         const n = S.length, dil = S.map((q, i) => { if (q.req === Infinity) return Infinity; let m = 0; for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) if (S[j].req !== Infinity) m = Math.max(m, S[j].req); return m; });
-        S.forEach((q, i) => { if (dil[i] === Infinity) { q.o = Infinity; return; } let t = 0, c = 0; for (let j = Math.max(0, i - 1); j <= Math.min(n - 1, i + 1); j++) if (dil[j] !== Infinity) { t += dil[j]; c++; } q.o = Math.max(q.req, t / c); q.px = q.x + q.nx * q.o; q.pz = q.z + q.nz * q.o; });
+        S.forEach((q, i) => { if (dil[i] === Infinity) { q.o = Infinity; return; } let t = 0, c = 0; for (let j = Math.max(0, i - 1); j <= Math.min(n - 1, i + 1); j++) if (dil[j] !== Infinity) { t += dil[j]; c++; } q.o = Math.max(q.req, t / c); });
+        /* a sample with no clear place keeps the move of the nearest one that has: the line goes on, it has no hole */
+        S.forEach((q, i) => { if (q.o !== Infinity) return; for (let d = 1; d < n; d++) { const j = [i - d, i + d].find(j => j >= 0 && j < n && S[j].o !== Infinity && S[j].req !== Infinity); if (j !== undefined) { q.o = S[j].o; return; } } });
+        S.forEach(q => { if (q.o !== Infinity) { q.px = q.x + q.nx * q.o; q.pz = q.z + q.nz * q.o; } });
+        /* the dividers of the map along the same edge draw their own panels: a stretch is left out only where it lies along one for its whole length (ends and middle within 1.5 m of it) */
+        const alongW = (x0, z0, x1, z1) => nearW(x0, z0, 1.5) && nearW(x1, z1, 1.5) && nearW((x0 + x1) / 2, (z0 + z1) / 2, 1.5);
         for (let i = 0; i + 1 < n; i++) {
           const p = S[i], q = S[i + 1]; if (p.o === Infinity || q.o === Infinity) continue; if (hyp(q.px - p.px, q.pz - p.pz) < 0.05) continue;
-          const mx = (p.px + q.px) / 2, mz = (p.pz + q.pz) / 2; if (!free(mx, mz) || nearW(mx, mz, 3)) continue;
+          if (alongW(p.px, p.pz, q.px, q.pz)) continue;
           hoard(p.px, p.pz, q.px, q.pz);
+        }
+        /* where the line ends (at a divider of the map or a gate) it runs on to the nearest post or end of one within 7 m, touching it */
+        const anchors = []; for (const r of WR) { anchors.push(r[0], r[r.length - 1]); } for (const g of T.gates || []) { anchors.push([g.ax, g.az]); if (g.W) anchors.push([g.ax + g.ux * g.W, g.az + g.uz * g.W]); }
+        for (const q of [S[0], S[n - 1]]) {
+          if (!q || q.o === Infinity) continue; let best = null, bd = 7; for (const an of anchors) { const d = hyp(an[0] - q.px, an[1] - q.pz); if (d > 0.3 && d < bd) { bd = d; best = an; } }
+          if (best && !onAsph((q.px + best[0]) / 2, (q.pz + best[1]) / 2)) hoard(q.px, q.pz, best[0], best[1]);
         }
       }
       const spots = [];
