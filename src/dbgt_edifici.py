@@ -528,6 +528,7 @@ class Edifici:
                                        lv=_num(tg.get('building:levels')), zt=round(v['z0'] + v['av'] - self.base, 2))
                 ho = [list(map(tuple, np.asarray(h.coords)[:-1])) for h in p.interiors if len(h.coords) >= 4]
                 if ho: rec['k'] = ho
+                rec['du'] = e['uso']; rec['dk'] = e['kind']; rec['dty'] = e['ty']; rec['tg'] = tg   # what the building is used for, for the public ones (src/pubblici.py)
                 if tg.get('building:colour'): rec['wc'] = tg['building:colour'][:20]
                 if tg.get('roof:colour'): rec['rcol'] = tg['roof:colour'][:20]
                 if tg.get('roof:shape'): rec['rs'] = tg['roof:shape']

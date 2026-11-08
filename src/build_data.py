@@ -223,7 +223,7 @@ def add_building(outer, holes, t, key):
     if t.get('man_made') == 'water_tower': rec['wt'] = True; rec['h'] = num(t.get('height')) or max(rec['h'], 25)
     if a < 40 and (t.get('power') in ('substation', 'transformer') or bt == 'transformer_tower'): rec['mn'] = '01'  # a small OSM substation: the electric cabin model of the DBGT ones (g 5, paesaggio3.js lsCabina, default look)
     if holes: rec['k'] = [h for h in holes if len(h) >= 3]
-    rec['tg'] = {k_: t[k_] for k_ in ('building', 'building:levels', 'roof:shape', 'roof:colour', 'building:colour', 'name', 'amenity', 'man_made') if k_ in t}  # what a DBGT building takes from OSM (dbgt_edifici.py)
+    rec['tg'] = {k_: t[k_] for k_ in ('building', 'building:levels', 'roof:shape', 'roof:colour', 'building:colour', 'name', 'amenity', 'man_made', 'leisure', 'healthcare', 'office', 'government', 'emergency', 'railway', 'public_transport', 'tourism', 'historic') if k_ in t}  # what a DBGT building takes from OSM (dbgt_edifici.py)
     buildings.append(rec)
 mp_ways = set()
 for members, t in rels:
@@ -1185,30 +1185,9 @@ if STR and STR.cortili and _dbt_i1 > _dbt_i0:
         _campioni['cancelli_cortile'].append((round(m_.x, 1), round(m_.y, 1), round(L_.length, 1)))
 log('bocche dei cortili -> cancelli', dict(_ccv))
 if STR: STR.rep['cancelli_cortile'] = dict(_ccv, dove=_campioni['cancelli_cortile'][:60])
-# police stations (amenity=police): the door looks onto the street, so the barrier between them opens there, as wide as the door and its canopy
-# (src/barriere.py facciata_su_strada; the game finds the same front, and takes it from the POI: pois[].fr). Where no front looks onto a street
-# nothing is opened
-from barriere import facciata_su_strada, apertura_ingresso
+# the police stations had an opening in the barrier in front of their door (4/11): gone with the stations themselves (Carlo 8/11, facciate-2:
+# the caserme are to be made again by hand); the code is in the git history (barriere.py facciata_su_strada, apertura_ingresso)
 pol_fronts = {}
-_polp = [nodes[r_] for r_, t_ in ntags.items() if t_.get('amenity') == 'police'] + [centroid(ring(refs_)) for wid_, (refs_, t_) in ways.items() if t_.get('amenity') == 'police' and refs_[0] == refs_[-1] and len(ring(refs_)) >= 3]
-if _polp:
-    _bt2 = STRtree([g for b_, g in _bl]); _st2 = [(r['line'], r['w']) for r in raw_roads if r['c'] <= 5 and flat(r) and r['line'].length > 0.1]
-    for p_ in _polp:
-        if not inside(p_, -15): continue
-        P_ = Point(p_); best_ = None
-        for j_ in _bt2.query(P_.buffer(40)):
-            b_, g_ = _bl[j_]
-            if b_['h'] < 3 or g_.geom_type != 'Polygon': continue
-            ins_ = g_.contains(P_); d_ = 0 if ins_ else g_.exterior.distance(P_)
-            sc_ = d_ - min(g_.area ** 0.5, 30) * 0.3
-            if (ins_ or d_ < 35) and (best_ is None or sc_ < best_[0]): best_ = (sc_, g_)
-        if best_ is None: continue
-        g_ = best_[1]; near_ = [o_ for o_ in (_bl[k_][1] for k_ in _bt2.query(g_.buffer(46))) if o_ is not g_]
-        f_ = facciata_su_strada(g_, near_, [(l_, w_) for l_, w_ in _st2 if l_.distance(g_) < 50])
-        if f_ is None: log('caserma senza facciata su una strada', p_); continue
-        a_, c_, mx_, mz_, nx_, nz_, t_ = f_
-        pc_cuts.append(apertura_ingresso(mx_, mz_, nx_, nz_, t_)); pol_fronts[(round(p_[0], 1), round(p_[1], 1))] = [a_[0], a_[1], c_[0], c_[1]]
-    log('caserme: aperture nelle recinzioni davanti alla porta', len(pol_fronts), 'su', len(_polp))
 _bc_parts_f = presto(lambda: ([r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1], [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + ([g_ for g_ in (g.buffer(-0.3, join_style=2) for g in STR.carr_ponti) if not g_.is_empty] if STR else []) + ([g_.buffer(0.5) for g_ in (_Pp(b['p'], b.get('k', [])) for b in buildings if b.get('dbgt')) if g_ is not None] if ED else [])))  # the pieces the barriers are cut against (below), on a thread from here: all final
 # railway fill-in: along every track, wherever no fence or wall stands within 12 m on that side, a fence 4.2 m out from the outer track; open at
 # level crossings, platforms, buildings and the ends of the line (the corridor fences above only exist where OSM maps the railway land)
@@ -2342,23 +2321,33 @@ for k_, pts in land:
         except Exception: pass
 _sport_t = STRtree([g_[2] for g_ in _sport_c]) if _sport_c else None
 _gs_ = [b for b in buildings if b.get('bt') == 'grandstand']
-if _gs_:  # le tribune automatiche non si disegnano piu (Carlo, 2/11): gli stadi saranno edifici fatti a mano; sul loro posto resta il terreno
+_tolti_tribune = set()
+if _gs_:  # the stands of OSM (building=grandstand): a solid block on their footprint, OSM height or 6 m, pink with TRIBUNA (Carlo 8/11, facciate-2) until they are
+    # made by hand; the generic DBGT volumes standing on them go (more than half of the volume on the stand, or its middle in it)
     _gso_ = [Polygon(b['p']).buffer(0) for b in _gs_]
-    _ov_ = [(round(centroid(b['p'])[0]), round(centroid(b['p'])[1])) for b in buildings + (ED.alti if ED else []) if b.get('bt') != 'grandstand' and any(g_.intersects(Polygon(b['p']).buffer(0)) for g_ in _gso_)]
-    log('tribune tolte', len(_gs_), 'edifici che le toccano (non toccati)', _ov_); _campioni['tribune_tolte'] = [(round(centroid(b['p'])[0]), round(centroid(b['p'])[1])) for b in _gs_]
-for b in buildings + (ED.alti if ED else []):
-    if b.get('bt') == 'grandstand': continue
+    for b in _gs_:
+        b['t'] = 0; b.pop('g', None)
+        if not b.get('ht'): b['h'] = 6.0
+    for b in buildings + (ED.alti if ED else []):
+        if b.get('bt') == 'grandstand': continue
+        try: g_ = Polygon(b['p']).buffer(0)
+        except Exception: continue
+        if g_.is_empty: continue
+        if any(s_.intersection(g_).area > 0.5 * g_.area or s_.contains(g_.representative_point()) for s_ in _gso_ if s_.intersects(g_)): _tolti_tribune.add(id(b))
+    log('tribune come blocchi rosa', len(_gs_), 'volumi tolti sotto/sopra', len(_tolti_tribune)); _campioni['tribune'] = [(round(centroid(b['p'])[0]), round(centroid(b['p'])[1])) for b in _gs_]
+import pubblici as _PUB, famiglie as _FAM
+_tutti_b = [b for b in buildings + (ED.alti if ED else []) if id(b) not in _tolti_tribune]
+_campioni['pubblici'] = _PUB.classifica(_tutti_b, ntags, ways, nodes, ring, log)
+for b in _gs_: b['pu'] = _PUB.GRUPPI.index('TRIBUNA')
+_campioni['famiglie'] = _FAM.famiglie(_tutti_b, log)
+for b in _tutti_b:
     c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b.get('t', BTYPE.get(b.get('bt'), 0))}
-    for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
+    for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st', 'fa', 'pu', 'pn'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
         if b.get(k_) is not None: rec[k_] = b[k_]
     if b.get('k'): rec['k'] = [enc(h) for h in b['k']]
     if b.get('bt') in ('garage', 'garages'): rec['g'] = 1  # rows of up-and-over doors
     elif b.get('bt') == 'greenhouse': rec['g'] = 2  # glass
-    elif b.get('bt') == 'grandstand':  # stepped seats under a roof, looking at the nearest pitch of the whole map (pt, decimetres)
-        rec['g'] = 3
-        if _sport_c:
-            gb_ = Polygon(b['p']).buffer(0); j_ = min((int(i_) for i_ in _sport_t.query(gb_.buffer(150))), key=lambda i_: _sport_c[i_][2].distance(gb_), default=None)
-            if j_ is not None: rec['pt'] = [round(_sport_c[j_][0] * 10), round(_sport_c[j_][1] * 10)]
+    elif b.get('bt') == 'grandstand': pass  # a solid pink block for now (Carlo 8/11; the stepped seats of 1/11 looked at the nearest pitch, git history)
     elif b.get('wt'): rec['g'] = 4  # a water tower mapped as a building
     elif b.get('mn') in ('01', '02', '03'): rec['g'] = 5  # a cabin of the DBGT (dbgt_manufatti.py): its own model in paesaggio3.js
     if b.get('mm'): rec['mm'] = b['mm']  # the model of a manufatto and what the photos say of it (src/manufatti_foto.json)

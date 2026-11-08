@@ -8,7 +8,7 @@ const R_MESH = 760, R_FREE = 1150, R_STESO = 1150, R_TOGLI = 1550, R_PEZZO = 153
 const PZ = { vola: 0, MAX: 12, arrivi: [], vx: 0, vz: 0, lx: null, lz: 0, lt: 0, presi: 0, byte: 0, falliti: 0, usa: { arrivo: 0, stesura: 0, mesh: 0 }, fette: {} };
 const RLT = new Map(), RVT = new Map(); for (const [t, r] of D.rl) { let l = RLT.get(t); if (!l) RLT.set(t, l = []); l.push(r); } for (const [t, r] of D.rv) { let l = RVT.get(t); if (!l) RVT.set(t, l = []); l.push(r); }
 const FOUNT_T = new Map(), FUEL_T = new Map(); for (const f of FOUNT) { const t = tileOf(f.x, f.z); let l = FOUNT_T.get(t); if (!l) FOUNT_T.set(t, l = []); l.push(f); } for (const f of FUEL) { const t = tileOf(f.x, f.z); let l = FUEL_T.get(t); if (!l) FUEL_T.set(t, l = []); l.push(f); }
-const CAS_T = new Map(); if (COT && COT.cas) for (const [i, t] of COT.cas) { let l = CAS_T.get(t); if (!l) CAS_T.set(t, l = []); l.push(D.pois[i]); }
+
 const vicini = T => T.vic || (T.vic = (() => { const i = T.t % NTX, j = Math.floor(T.t / NTX), o = []; for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const I = i + a, J = j + b; if (I >= 0 && J >= 0 && I < NTX && J < NTZ) o.push(TILES[I + NTX * J]); } return o; })());
 
 // ---- step l0
@@ -204,7 +204,8 @@ function vetrinaShader() {
     if (has('i')) { q = new THREE.InstancedMesh(geo, m, 1); if (has('c')) q.setColorAt(0, new THREE.Color()); } else q = new THREE.Mesh(geo, m);
     oggetti.push(q); VETRINA_TIENI.push(m);
   }
-  for (const k of ['old', 'mod', 'plain']) if (MAT[k]) oggetti.push(new THREE.Mesh(geo, MAT[k]));
+  for (const k of ['old', 'mod', 'plain', 'fac']) if (MAT[k]) oggetti.push(new THREE.Mesh(geo, MAT[k]));
+  try { for (const m of FAC_PRE) { const q = new THREE.InstancedMesh(geo, m.material, 1); if (m.instanceColor) q.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(3), 3); oggetti.push(q); } } catch (e) { } /* the 3D windows (facciate3.js) */
   for (const [m, ins] of RIF.pre) oggetti.push(ins ? new THREE.InstancedMesh(geo, m, 1) : new THREE.Mesh(geo, m)); /* the reflections of riflessi3.js: their shaders too, and those of the fused cars (fusi3.js: the paint and the panes read the colour of each part) */
   for (const m of [M_GLASS, rifPaint('#ffffff')]) { const s = fusiSlot(m); if (s > 0 && FUSI_COL[s]) { const q = new THREE.InstancedMesh(geo, FUSI_MAT[s], 1); q.setColorAt(0, new THREE.Color()); oggetti.push(q); } }
   const g = new THREE.Group(); g.visible = false; g.add(...oggetti); scene.add(g); renderer.compile(scene, camera); scene.remove(g);
@@ -236,14 +237,13 @@ async function cuoci() {
   if (COTTURA) {
     // the big supermarkets, the shop fronts and the plain signs need all the buildings: their choices go in the tile of each
     ngSuperTutti(); const ref = b => [b.ti, b.bi];
-    for (const r of ngList()) { const { b, m, big, ...q } = r; (ogni(r.tile).ngf || (ogni(r.tile).ngf = [])).push({ ...q, b: ref(b) }); }
+    for (const r of ngList()) { const { b, m, big, ...q } = r; (ogni(r.tile).ngf || (ogni(r.tile).ngf = [])).push({ ...q, b: ref(b) }); (ogni(b.ti).ngw || (ogni(b.ti).ngw = [])).push([b.bi, Math.round(r.cx * 100) / 100, Math.round(r.cz * 100) / 100, Math.round(r.w * 100) / 100]); } /* ngw: the fronts on the buildings of each tile, for the facades (facciate 2.0: no window or door under a front) */
     for (const T of TILES) T.bld.forEach((B, i) => { if (!B.big) return; const { e, front, ...big } = B.big; let fr; if (front) { const { b, big: _b, ...f } = front; fr = { ...f, b: ref(b) }; } (ogni(T.t).sup || (ogni(T.t).sup = [])).push([i, { ...big, front: fr }, B.h]); });
     for (const s of signList()) { if (s.b.lm) continue; const t = tileOf(s.p.x, s.p.z); (ogni(t).sgf || (ogni(t).sgf = [])).push({ ...s, p: D.pois.indexOf(s.p), b: ref(s.b) }); }
-    casermeDi(D.pois); glob.cas = CASERME.map(st => [D.pois.indexOf(st.p), tileOf(st.x, st.z)]);
     window.__COTTA = JSON.stringify({ pezzi: pz, globale: glob }); // the numbers as they are: a shop draws its look from h0
     window.__COTTA_GRANDE = bigCanvas().toDataURL('image/webp', 0.92);
     goBtn.textContent = 'COTTURA FINITA';
     await new Promise(() => { }); // the game stops here: src/cuoci.mjs takes the results
   }
-  casermeDi(D.pois); confineMuri();
+  confineMuri();
 }

@@ -1,10 +1,10 @@
 {
- "cancelli": 11102,
+ "cancelli": 11098,
  "della_regola": {
   "passo_carraio": 255,
   "rampa": 2,
-  "varco": 723,
-  "capo_recinzione": 307
+  "varco": 721,
+  "capo_recinzione": 305
  },
  "dietro_cancello": 9,
  "dietro_cancello_regola": 9,
@@ -5124,14 +5124,6 @@
    ""
   ],
   [
-   -3428.6,
-   2259.9,
-   "varco",
-   "cancello",
-   4.0,
-   ""
-  ],
-  [
    -3419.8,
    2248.6,
    "varco",
@@ -8128,14 +8120,6 @@
    "varco",
    "dietro_recinzione",
    10.9,
-   ""
-  ],
-  [
-   530.0,
-   -191.8,
-   "varco",
-   "cancello",
-   4.0,
    ""
   ],
   [
@@ -21269,14 +21253,6 @@
    ""
   ],
   [
-   899.5,
-   -441.8,
-   "capo_recinzione",
-   "cancello",
-   4.0,
-   ""
-  ],
-  [
    384.9,
    -970.6,
    "capo_recinzione",
@@ -27160,14 +27136,6 @@
    "capo_recinzione",
    "allargato",
    7.0,
-   ""
-  ],
-  [
-   -682.7,
-   1453.7,
-   "capo_recinzione",
-   "cancello",
-   4.0,
    ""
   ],
   [

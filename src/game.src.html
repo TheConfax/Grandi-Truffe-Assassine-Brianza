@@ -897,7 +897,7 @@ function makeCar(model, color) {
       if (cc) add(boxG(cw + 0.05, 0.075, cl - 0.1), lam(0xf2f2ee), 0, cy + ch / 2 + 0.035, cz, false);
       else add(boxG(cw + 0.06, 0.1, 0.5), lam(0x1d4fb8), 0, cy + ch / 2 + 0.09, cz + 0.2, false);
       add(boxG(0.5, 0.16, 0.34), M_SIR_A, -0.3, cy + ch / 2 + 0.2, cz, false); add(boxG(0.5, 0.16, 0.34), M_SIR_B, 0.3, cy + ch / 2 + 0.2, cz, false);
-      crew = [-1, 1].map(sd => { const c = cc ? makeAgent(true) : makeCop(); body.add(c.g); copSeat(c, sd * 0.38, bot + S.bh * 0.45, cz + 0.1); return c; }); // two officers up front, shown while the AI drives
+      crew = [-1, 1].map(sd => { const c = makeCop(); body.add(c.g); copSeat(c, sd * 0.38, bot + S.bh * 0.45, cz + 0.1); return c; }); // two officers up front, shown while the AI drives
     }
     wheelPos = [[-S.W / 2 + 0.05, hl - 0.78, 1], [S.W / 2 - 0.05, hl - 0.78, 1], [-S.W / 2 + 0.05, -hl + 0.78, 0], [S.W / 2 - 0.05, -hl + 0.78, 0]];
     lightY = bot + S.bh * 0.68;

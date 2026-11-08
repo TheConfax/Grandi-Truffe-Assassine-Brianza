@@ -68,7 +68,7 @@ function riverFlow(segs, x, z) {
 // ---- the ground does not draw where a pool is: a mask in the stencil, laid first; the ground materials (the whole MAT) do not draw where the mask is
 const ACQ_BUCO = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false, stencilWrite: true, stencilFunc: THREE.AlwaysStencilFunc, stencilRef: 1, stencilZPass: THREE.ReplaceStencilOp, stencilFail: THREE.ReplaceStencilOp, stencilZFail: THREE.ReplaceStencilOp, side: THREE.DoubleSide });
 function acquaSuoloMasch(m) { Object.assign(m, { stencilWrite: true, stencilFunc: THREE.NotEqualStencilFunc, stencilRef: 1, stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp, stencilZPass: THREE.KeepStencilOp }); }
-const ACQ_SKIP = new Set(['crown', 'trunk', 'net', 'railing', 'hedge', 'lamp', 'lampHead', 'old', 'mod', 'plain', 'roof', 'canopy', 'wall', 'post', 'steel', 'rail']);
+const ACQ_SKIP = new Set(['crown', 'trunk', 'net', 'railing', 'hedge', 'lamp', 'lampHead', 'old', 'mod', 'plain', 'fac', 'roof', 'canopy', 'wall', 'post', 'steel', 'rail']);
 function acquaMascheraSuolo() { for (const k in MAT) if (!ACQ_SKIP.has(k) && MAT[k] && MAT[k].isMaterial) acquaSuoloMasch(MAT[k]); }
 acquaMascheraSuolo();
 
