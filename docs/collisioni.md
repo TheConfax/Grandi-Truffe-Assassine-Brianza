@@ -4,16 +4,20 @@
 
 - Tutto ciò che si vede collide. Ogni oggetto ha una collisione sola, i suoi pali o il suo ingombro nella griglia `WALLS`, e la stessa vale per il pedone, l'auto, la moto, la bici e l'elicottero.
 - Quello che succede dipende dalla forza dell'urto, cioè la velocità per la massa del mezzo (`propForza`, src/props3.js). Un urto piano ferma. Un urto forte rompe l'oggetto, se è rompibile.
-- A piedi non si sfonda niente. Anche l'elicottero si ferma contro tutto e non abbatte niente.
+- A piedi non si sfonda niente. L'elicottero segue la stessa regola dei mezzi, con la massa di un furgone (circa 2,5 t): sopra soglia abbatte o sposta, sotto soglia si ferma (`propHitsElicottero`, chiamata da `heliStep1` prima di `heliPush`). I suoi danni non sono cambiati.
 - Tre gruppi (`FORZA` in src/props3.js):
 
 | Gruppo | Soglia per un'auto compatta | Cosa fa |
 |---|---|---|
-| **leggero** | 3,5 m/s (12,6 km/h) | si abbatte o si rompe anche piano |
-| **medio** | 9 m/s (32 km/h) | serve velocità e massa: si abbatte, oppure si sposta (le rotoballe rotolano, i blocchi di cemento scivolano) |
+| **leggero** | 8,3 m/s (30 km/h) | si abbatte o si rompe |
+| **medio** | 16,7 m/s (60 km/h) | serve velocità e massa: si abbatte, oppure si sposta (le rotoballe rotolano, i blocchi di cemento scivolano) |
 | **indistruttibile** | mai | ferma a qualunque velocità |
 
-La massa è quella che il gioco usa già negli urti tra mezzi: un mezzo a due ruote pesa un quarto di un'auto. Per le auto la massa va con l'ingombro (lunghezza per larghezza, rispetto alla compatta che vale 1), tra 0,5 e 3. Quindi uno scooter abbatte un oggetto leggero solo da 14 m/s e uno medio mai; un furgone, che pesa di più, ci riesce più piano di un'auto.
+La massa è quella che il gioco usa già negli urti tra mezzi: un mezzo a due ruote pesa un quarto di un'auto. Per le auto la massa va con l'ingombro (lunghezza per larghezza, rispetto alla compatta che vale 1), tra 0,5 e 3. Il furgone vale 1,4, come l'elicottero. Quindi:
+
+- il furgone abbatte un oggetto leggero da 21 km/h e un medio da 43 km/h;
+- l'elicottero ha le stesse soglie del furgone;
+- uno scooter o una bici non abbattono niente (servirebbero 120 km/h).
 
 Una rotoballa o un blocco spinto parte nella direzione del mezzo, rallenta per l'attrito, si ferma contro i muri e torna solido dove si ferma. Se il tile viene ricostruito resta lì. Gli oggetti abbattuti restano giù, come i lampioni di prima.
 
@@ -34,12 +38,12 @@ Le barriere di `sfondabili3.js` (siepi, reti, staccionate) e le tombe tengono le
 | Pannelli dei cantieri | `paesaggio3.js` | leggero | ferma | si abbatte |
 | Siepi, reti, staccionate | `sfondabili3.js` | leggero (soglie loro) | ferma | si apre o si rompe il pezzo colpito |
 | Tombe | `sfondabili3.js` | (soglia loro, 6 m/s) | ferma | si abbatte |
-| **Lampioni di strada** (prima si abbattevano a 3,5 m/s) | world3.js, `LPS` | medio | ferma | si abbatte e si spegne |
+| **Lampioni di strada** (prima si abbattevano da 12,6 km/h) | world3.js, `LPS` | medio | ferma | si abbatte e si spegne |
 | **Lampioni dei parcheggi** (prima attraversabili) | `buildParkingLines`, `propIstanze` | medio | ferma | si abbatte |
 | **Lampioni dei parchi** (prima attraversabili) | `buildParkFurniture`, `propIstanze` | medio | ferma | si abbatte |
 | **Lampioni dei binari** (prima attraversabili) | `buildPlatforms`, `propIstanze` | medio | ferma | si abbatte |
 | **Alberi piccoli** (sotto i 7 m del DSM, il modello piccolo; prima fissi) | world3.js, `TREE_PROPS` | medio | ferma | si abbatte |
-| **Pensiline del bus** (prima si abbattevano a 3,5 m/s e i pali alle estremità erano attraversabili) | `buildSignals` | medio | ferma | si abbatte con i suoi pali |
+| **Pensiline del bus** (prima si abbattevano da 12,6 km/h e i pali alle estremità erano attraversabili) | `buildSignals` | medio | ferma | si abbatte con i suoi pali |
 | **Rotoballe** (prima fisse) | `paesaggio3.js` | medio | ferma | rotola via, poi torna solida dove si ferma |
 | **Blocchi di cemento** (prima fissi) | `buildOggetti` | medio | ferma | scivola via, poi torna solido |
 | Alberi grandi (dal DSM 7 m o più, e quelli senza altezza) | world3.js | indistruttibile | ferma | ferma |
@@ -54,6 +58,23 @@ Le barriere di `sfondabili3.js` (siepi, reti, staccionate) e le tombe tengono le
 | Ante dei cancelli | `gateHits` | (si sfondano da 3 m/s) | ferma | si sfonda |
 | **Pali della pensilina dei binari** (prima attraversabili; reggono il tetto) | `buildPlatforms` | indistruttibile | ferma | ferma |
 | **Ringhiera e pali della tettoia della scala del sottopasso** (prima attraversabili) | `buildPlatforms` | indistruttibile | ferma | ferma |
+
+## Prove delle soglie (headless, 8/11 sera)
+
+| Prova | Punto x z | Esito |
+|---|---|---|
+| Auto a 25 km/h contro un parchimetro (leggero) | 1622.05 209.6 | si ferma, il parchimetro resta in piedi |
+| Auto a 40 km/h contro lo stesso parchimetro | 1622.05 209.6 | lo abbatte e passa |
+| Auto a 50 km/h contro un lampione del parcheggio (medio) | -241.2 1887.1 | si ferma, il lampione resta in piedi |
+| Auto a 70 km/h contro lo stesso lampione | -241.2 1887.1 | lo abbatte e passa |
+| Auto a 50 km/h contro una rotoballa | 2202.6 1568.3 | si ferma, la rotoballa resta lì |
+| Auto a 70 km/h contro la stessa rotoballa | 2202.6 1568.3 | la rotoballa rotola via di 24 m |
+| Elicottero a 30 km/h contro un lampione del parco | 2228.5 -323.8 | si ferma, il lampione resta in piedi |
+| Elicottero a 80 km/h contro lo stesso lampione | 2228.5 -323.8 | lo abbatte |
+
+Avvio senza errori in console.
+
+Le prove qui sotto sono del giro con le soglie vecchie (3,5 e 9 m/s). Valgono ancora gli esiti del pedone e dell'auto piano. Le colonne "auto forte" sono superate dalla tabella sopra.
 
 ## Prove (headless, 8/11)
 

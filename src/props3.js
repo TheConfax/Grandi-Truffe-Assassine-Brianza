@@ -7,9 +7,10 @@
 // needs speed and mass; what is never broken has no prop, only its wall. A weaker blow stops the vehicle; on foot nothing breaks.
 // via: the object is not knocked over but moves (bales roll away, blocks slide) and stands again where it stops, still solid.
 const PROPS = [], PROPG = new Grid(16), PROP_FALL = [], PROP_MOVE = [];
-const FORZA = { leggero: 3.5, medio: 9 }; // m/s of a car of mass 1 (a hatchback); a two-wheeler weighs a quarter of it (as in the crashes between vehicles)
+const FORZA = { leggero: 8.3, medio: 16.7 }; // m/s of a car of mass 1 (a hatchback): 30 and 60 km/h (Carlo, 8/11); a two-wheeler weighs a quarter of it (as in the crashes between vehicles)
 const propMassa = v => isTwo(v) ? 0.25 : clamp(v.spec.L * v.spec.W / 7.39, 0.5, 3);
 const propForza = v => v.speed * propMassa(v);
+const heliMassa = () => MODELS.van.L * MODELS.van.W / 7.39; /* the helicopter, some 2.5 tonnes: a van on this scale */
 function addProp(p) { // { x, z, r, obj | inst: { meshes, i, ry, base }, onBreak, forza, via, parts: [[x, z, r]], wall (already in WALLS) }
   if (!p.wall) {
     p.wall = { r: p.r, x: p.x, z: p.z, dyn: true, on: true, y0: p.y - 3, y1: p.y + (p.h || 6) };
@@ -61,6 +62,17 @@ function propHits(v) {
     if (b.broken || b.armGone || !b.seg.on) continue;
     for (const c of v.circles()) if (segDist(c[0], c[1], b.seg.ax, b.seg.az, b.seg.bx, b.seg.bz) < v.rad + 0.2) { snapArm(b, v); break; }
   }
+}
+/* the helicopter against the props: the same rule as the vehicles. Discs [x, z, r] between heights ya and yb; over the threshold it knocks them
+   down or pushes them (and loses some speed), under it heliPush stops it on their walls. Its damage is not touched here */
+function propHitsElicottero(e, dischi, ya, yb) {
+  const sp = hyp(e.vx, e.vz), F = sp * heliMassa(); if (F < FORZA.leggero) return;
+  const q = { vx: e.vx, vz: e.vz, speed: sp }; let hit = false;
+  for (const [cx, cz, r] of dischi) PROPG.each(cx - r - 3, cz - r - 3, cx + r + 3, cz + r + 3, p => {
+    if (p.broken || F < FORZA[p.forza || 'leggero'] || yb < p.wall.y0 || ya > p.wall.y1) return;
+    if (hyp(cx - p.x, cz - p.z) < r + p.r + 0.15 || (p.pw || []).some(w => hyp(cx - w.x, cz - w.z) < r + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < sp * 0.5) propSpingi(p, q); } else breakProp(p, q); hit = true; }
+  });
+  if (hit) { e.vx = q.vx; e.vz = q.vz; if (e === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
 }
 const PROP_DEBRIS = [];
 function snapArm(b, v) {
