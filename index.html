@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo nightly · dopo 474bfa99 · assemblato 08/11 20:57 · porta ' + location.port;
+    const txt = 'locale · ramo camera-quota · dopo 966feb11 · assemblato 08/11 23:02 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -11162,13 +11162,13 @@ function endRun(kind) {
 // ---------------------------------------------------------------- camera & visuals
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _camD = new THREE.Vector3();
 let camInit = false;
-function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */
-  const lo_ = P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity; /* from the helicopter: the walls whose top is under both ends do not count */
+function rayCam(ax, az, bx, bz, cy, ay) { /* like rayWalls, but a wall counts only where the ray from height ay (the subject end) to cy (the camera) is between its foot and its top; without ay a level line at cy, the walls that start above it do not count */
+  const lo_ = ay === undefined && P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity, ya_ = ay === undefined ? cy : ay, yh_ = Math.max(cy, ya_); /* lo_: getting out of the helicopter, the walls whose top is under both ends do not count (exitSpot) */
   let best = 1; const dx = bx - ax, dz = bz - az;
   WALLS.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => {
-    if (s.r || s.dyn || s.y0 > cy || s.off || (s.y0 !== undefined && (s.bt ? s.y1 - 3 : s.y1) < lo_) || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
+    if (s.r || s.dyn || s.y0 > yh_ || s.off || (s.y0 !== undefined && (s.bt ? s.y1 - 3 : s.y1) < lo_) || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
     const t = ((s.ax - ax) * ez - (s.az - az) * ex) / den, u = ((s.ax - ax) * dz - (s.az - az) * dx) / den;
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < best) best = t;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < best) { if (ay !== undefined && s.y0 !== undefined) { const ry_ = ya_ + (cy - ya_) * t; if (ry_ < s.y0 || ry_ > wallTopP(s, u)) return; } best = t; } /* the height of the ray where it crosses the wall: under its foot or over its top it passes */
   });
   return best;
 }
@@ -11247,7 +11247,7 @@ function updCamera(dt) {
     if (cl < 1) { cx = px + (cx - px) * Math.max(cl, 0.4); cz = pz + (cz - pz) * Math.max(cl, 0.4); ht = Math.max(0.9, ht * cl); }
     let wy = H.camCap(cx, cz, fy, Math.max(fy, H.camG(cx, cz, fy)) + ht);
     if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */
-    const f = rayCam(px, pz, cx, cz, wy); let lift = 0; if (f < 1) { const dd = hyp(cx - px, cz - pz) || 1, k = Math.max(0.08, f - 0.5 / dd); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3 * cl; }
+    const f = rayCam(px, pz, cx, cz, wy, fy + (inCar ? 1.3 : 1.5)); let lift = 0; if (f < 1) { const dd = hyp(cx - px, cz - pz) || 1, k = Math.max(0.08, f - 0.5 / dd); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3 * cl; }
     const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, H.camCap(cx, cz, gy, Math.max(gy, H.camG(cx, cz, gy)) + Math.max(0.6, ht + lift + (inCar && !P.car.heli ? camPitch * 6 : 0))), cz); const ld_ = inCar ? (P.car.heli ? 5 * clamp(1 - camPitch / 1.2, 0, 1) : 5) : 2; look = new THREE.Vector3(px + hx * ld_, gy + (inCar ? 1.3 : 1.5), pz + hz * ld_);
   }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
@@ -11261,7 +11261,7 @@ function updCamera(dt) {
   /* going into first person is a soft zoom in, as coming out is a zoom out; once the camera is at the eyes it is locked on with no delay */
   if (camMode !== 2) fpDone = false; else if (!fpDone && camPos.distanceTo(want) < 0.12 && camLook.distanceTo(look) < 0.3) fpDone = true;
   if (camMode !== 1) { /* never inside a wall: the glide may cut a corner, so pull the camera back in front of the first wall between subject and camera */
-    const g = rayCam(px, pz, camPos.x, camPos.z, camPos.y);
+    const g = rayCam(px, pz, camPos.x, camPos.z, camPos.y, suby + (inCar ? 1.3 : 1.5));
     if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd), tx_ = px + (camPos.x - px) * kk, tz_ = pz + (camPos.z - pz) * kk, sl_ = hyp(tx_ - camPos.x, tz_ - camPos.z) > 0.4 ? 1 - Math.exp(-CAM_WALL * dt) : 1; /* a small correction is exact; a big one (the walker jumped past a wall edge) is a quick glide, not a jump */ camPos.x += (tx_ - camPos.x) * sl_; camPos.z += (tz_ - camPos.z) * sl_; }
   }
   if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */
