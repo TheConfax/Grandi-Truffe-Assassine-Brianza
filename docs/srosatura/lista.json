@@ -1,0 +1,7753 @@
+[
+ {
+  "n": 0,
+  "gruppo": "SANITÀ",
+  "nome": "Clinica Nova Lux",
+  "x": 768.9,
+  "z": -1547.6,
+  "piani": 2,
+  "superficie": 1241,
+  "classe": "c",
+  "perche": "Incerto: ambulatorio / clinica da punto OSM dentro. uso DBGT solo 08; building OSM industrial",
+  "link": "http://127.0.0.1:8100/?x=769.7&z=-1504.7&debug=1",
+  "etichetta": "ambulatorio / clinica",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "08"
+  ],
+  "building_osm": [
+   "industrial"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 2,
+  "altezza_m": 5.0,
+  "id_dbgt": [
+   349
+  ],
+  "foto": "mont/0.jpg"
+ },
+ {
+  "n": 1,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Istituto Professionale di Stato per i servizi commerciali, t",
+  "x": 494.8,
+  "z": -1104.8,
+  "piani": 5,
+  "superficie": 2308,
+  "classe": "a",
+  "perche": "Intero: scuola superiore / formazione da punto OSM dentro. building OSM school; uso DBGT solo 01; palazzo: 5 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=441.3&z=-1038.0&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes",
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 3,
+  "altezza_m": 14.6,
+  "id_dbgt": [
+   601
+  ],
+  "foto": "mont/1.jpg"
+ },
+ {
+  "n": 2,
+  "gruppo": "COMUNE",
+  "nome": "Volontari di Protezione Civile",
+  "x": 425.8,
+  "z": -1051.3,
+  "piani": 3,
+  "superficie": 153,
+  "classe": "a",
+  "perche": "Intero: protezione civile da edificio OSM (building=civic). building OSM civic; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=436.3&z=-1032.1&debug=1",
+  "etichetta": "protezione civile",
+  "fonte": "edificio OSM (building=civic)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "civic"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 8.1,
+  "id_dbgt": [
+   3335
+  ],
+  "foto": "mont/2.jpg"
+ },
+ {
+  "n": 3,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": 465.8,
+  "z": -1078.1,
+  "piani": 1,
+  "superficie": 33,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da etichetta OSM vaga. building OSM school",
+  "link": "http://127.0.0.1:8100/?x=438.4&z=-1062.0&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "M01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   4090
+  ],
+  "foto": "mont/3.jpg"
+ },
+ {
+  "n": 4,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Armando Diaz\"",
+  "x": -642.7,
+  "z": -799.6,
+  "piani": 2,
+  "superficie": 4009,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-713.6&z=-845.3&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 7.2,
+  "id_dbgt": [
+   1744
+  ],
+  "foto": "mont/4.jpg"
+ },
+ {
+  "n": 5,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola secondaria di primo grado \"Anna Frank\"",
+  "x": -548.8,
+  "z": -824.0,
+  "piani": 3,
+  "superficie": 415,
+  "classe": "a",
+  "perche": "Intero: scuola media da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-548.8&z=-793.9&debug=1",
+  "etichetta": "scuola media",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 8.2,
+  "id_dbgt": [
+   311
+  ],
+  "foto": "mont/5.jpg"
+ },
+ {
+  "n": 6,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola secondaria di primo grado \"Anna Frank\"",
+  "x": -505.7,
+  "z": -815.3,
+  "piani": 3,
+  "superficie": 2614,
+  "classe": "a",
+  "perche": "Intero: scuola media da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-504.6&z=-742.1&debug=1",
+  "etichetta": "scuola media",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 8.3,
+  "id_dbgt": [
+   989
+  ],
+  "foto": "mont/6.jpg"
+ },
+ {
+  "n": 7,
+  "gruppo": "ASILO",
+  "nome": "Scuola dell'infanzia \"Giovanni XXIII\"",
+  "x": -310.7,
+  "z": -793.6,
+  "piani": 3,
+  "superficie": 1316,
+  "classe": "a",
+  "perche": "Intero: scuola dell'infanzia da edificio OSM (building=kindergarten). uso DBGT pubblico 030301; building OSM kindergarten",
+  "link": "http://127.0.0.1:8100/?x=-352.2&z=-817.4&debug=1",
+  "etichetta": "scuola dell'infanzia",
+  "fonte": "edificio OSM (building=kindergarten)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "kindergarten"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 8.3,
+  "id_dbgt": [
+   579
+  ],
+  "foto": "mont/7.jpg"
+ },
+ {
+  "n": 8,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Istituto Grimoldi",
+  "x": -285.9,
+  "z": -1016.8,
+  "piani": 3,
+  "superficie": 400,
+  "classe": "c",
+  "perche": "Incerto: scuola superiore / formazione da punto OSM dentro. uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=-249.3&z=-1006.8&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 8.8,
+  "id_dbgt": [
+   917
+  ],
+  "foto": "mont/8.jpg"
+ },
+ {
+  "n": 9,
+  "gruppo": "CHIESA",
+  "nome": "(santuario)",
+  "x": 97.1,
+  "z": -823.1,
+  "piani": 2,
+  "superficie": 1114,
+  "classe": "a",
+  "perche": "Intero: santuario da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church",
+  "link": "http://127.0.0.1:8100/?x=138.2&z=-811.2&debug=1",
+  "etichetta": "santuario",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church",
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 7.6,
+  "id_dbgt": [
+   2042
+  ],
+  "foto": "mont/9.jpg"
+ },
+ {
+  "n": 10,
+  "gruppo": "CHIESA",
+  "nome": "Santuario del Santo Crocefisso",
+  "x": 95.6,
+  "z": -836.8,
+  "piani": 11,
+  "superficie": 25,
+  "classe": "a",
+  "perche": "Intero: campanile da uso/tipo DBGT. uso DBGT pubblico 05; tipo DBGT chiesa/campanile; palazzo: 11 piani, famiglia 4",
+  "link": "http://127.0.0.1:8100/?x=121.3&z=-851.6&debug=1",
+  "etichetta": "campanile",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E07"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 2,
+  "altezza_m": 33.0,
+  "id_dbgt": [
+   3285
+  ],
+  "foto": "mont/10.jpg"
+ },
+ {
+  "n": 11,
+  "gruppo": "CAPPELLA",
+  "nome": "Monumento Ossario ai Caduti Medesi",
+  "x": 28.2,
+  "z": -830.3,
+  "piani": 1,
+  "superficie": 44,
+  "classe": "a",
+  "perche": "Intero: edicola funeraria da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=35.7&z=-817.1&debug=1",
+  "etichetta": "edicola funeraria",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M04"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 2.9,
+  "id_dbgt": [
+   4397
+  ],
+  "foto": "mont/11.jpg"
+ },
+ {
+  "n": 12,
+  "gruppo": "ALTRO",
+  "nome": "Villa Antona Traversi",
+  "x": 123.6,
+  "z": -776.1,
+  "piani": 5,
+  "superficie": 2557,
+  "classe": "a",
+  "perche": "Intero: altro da non ricostruita (relazione OSM). relazione OSM dell edificio con il tag del servizio; uso DBGT solo 01; palazzo: 5 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=61.5&z=-807.3&debug=1",
+  "etichetta": "altro",
+  "fonte": "non ricostruita (relazione OSM)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 3,
+  "altezza_m": 15.2,
+  "id_dbgt": [
+   2562
+  ],
+  "foto": "mont/12.jpg"
+ },
+ {
+  "n": 13,
+  "gruppo": "CAPPELLA",
+  "nome": "Chiesina del Redentore",
+  "x": 472.5,
+  "z": -958.2,
+  "piani": 2,
+  "superficie": 172,
+  "classe": "c",
+  "perche": "Incerto: cappella da punto OSM dentro. uso DBGT solo 01; building OSM residential",
+  "link": "http://127.0.0.1:8100/?x=479.5&z=-980.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "residential"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 2,
+  "altezza_m": 6.3,
+  "id_dbgt": [
+   2686
+  ],
+  "foto": "mont/13.jpg"
+ },
+ {
+  "n": 14,
+  "gruppo": "SANITÀ",
+  "nome": "Fondazione Giuseppe Besana O.N.L.U.S.",
+  "x": 652.6,
+  "z": -1035.0,
+  "piani": 4,
+  "superficie": 2347,
+  "classe": "c",
+  "perche": "Incerto: servizi sociali / RSA / centro diurno da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 01; building OSM apartments; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=694.6&z=-1111.6&debug=1",
+  "etichetta": "servizi sociali / RSA / centro diurno",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes",
+   "apartments",
+   "apartments"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 4,
+  "altezza_m": 11.5,
+  "id_dbgt": [
+   242
+  ],
+  "foto": "mont/14.jpg"
+ },
+ {
+  "n": 15,
+  "gruppo": "SPORT",
+  "nome": "(piscina coperta)",
+  "x": 1554.0,
+  "z": -967.5,
+  "piani": 4,
+  "superficie": 950,
+  "classe": "a",
+  "perche": "Intero: piscina coperta da uso/tipo DBGT. uso DBGT pubblico 100201; il poligono OSM dell edificio porta il tag del servizio; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=1594.9&z=-991.1&debug=1",
+  "etichetta": "piscina coperta",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "100201"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 2,
+  "altezza_m": 12.0,
+  "id_dbgt": [
+   3224
+  ],
+  "foto": "mont/15.jpg"
+ },
+ {
+  "n": 16,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria paritaria \"San Giuseppe\"",
+  "x": 40.6,
+  "z": -482.3,
+  "piani": 4,
+  "superficie": 6751,
+  "classe": "c",
+  "perche": "Incerto: scuola primaria da punto OSM dentro. building OSM school; uso DBGT solo 01; 4 altre attività private dentro Altre attività: A. M., Atti's, Reviva, Studio Legale Associato B&V Basilico Venturini.",
+  "link": "http://127.0.0.1:8100/?x=29.5&z=-356.8&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Atti's",
+   "A. M.",
+   "Studio Legale Associato B&V Basilico Venturini",
+   "Reviva"
+  ],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "school",
+   "yes",
+   "yes",
+   "yes",
+   "garage",
+   "garage",
+   "yes",
+   "yes",
+   "yes",
+   "garage",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 4,
+  "altezza_m": 11.3,
+  "id_dbgt": [
+   777
+  ],
+  "foto": "mont/16.jpg"
+ },
+ {
+  "n": 17,
+  "gruppo": "CHIESA",
+  "nome": "Chiesa di San Vittore",
+  "x": 104.6,
+  "z": -746.0,
+  "piani": 5,
+  "superficie": 915,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church; palazzo: 5 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=61.6&z=-789.1&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 16.8,
+  "id_dbgt": [
+   1569
+  ],
+  "foto": "mont/17.jpg"
+ },
+ {
+  "n": 18,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": 310.5,
+  "z": -791.2,
+  "piani": 3,
+  "superficie": 109,
+  "classe": "c",
+  "perche": "Incerto: scuola (non precisata) da etichetta OSM vaga. ",
+  "link": "http://127.0.0.1:8100/?x=296.7&z=-805.5&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 0,
+  "altezza_m": 8.4,
+  "id_dbgt": [],
+  "foto": "mont/18.jpg"
+ },
+ {
+  "n": 19,
+  "gruppo": "COMUNE",
+  "nome": "Municipio di Meda",
+  "x": 189.8,
+  "z": -521.5,
+  "piani": 5,
+  "superficie": 1700,
+  "classe": "a",
+  "perche": "Intero: municipio da punto OSM vicino (<12 m). uso DBGT pubblico 0201; building OSM public; palazzo: 5 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=244.4&z=-553.4&debug=1",
+  "etichetta": "municipio",
+  "fonte": "punto OSM vicino (<12 m)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "0201"
+  ],
+  "building_osm": [
+   "public",
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 2,
+  "altezza_m": 15.5,
+  "id_dbgt": [
+   76
+  ],
+  "foto": "mont/19.jpg"
+ },
+ {
+  "n": 20,
+  "gruppo": "ASILO",
+  "nome": "Scuola dell'infanzia \"Garibaldi\"",
+  "x": 298.6,
+  "z": -757.9,
+  "piani": 3,
+  "superficie": 706,
+  "classe": "a",
+  "perche": "Intero: scuola dell'infanzia da edificio OSM (building=kindergarten). uso DBGT pubblico 030301; building OSM kindergarten",
+  "link": "http://127.0.0.1:8100/?x=332.1&z=-728.2&debug=1",
+  "etichetta": "scuola dell'infanzia",
+  "fonte": "edificio OSM (building=kindergarten)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "kindergarten"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 8.4,
+  "id_dbgt": [
+   712
+  ],
+  "foto": "mont/20.jpg"
+ },
+ {
+  "n": 21,
+  "gruppo": "CULTURA",
+  "nome": "Sala Civica \"Radio\"",
+  "x": 143.1,
+  "z": -545.0,
+  "piani": 3,
+  "superficie": 1472,
+  "classe": "b",
+  "perche": "Vetrina: sala civica / centro culturale da etichetta OSM vaga. uso DBGT solo 01; 2 altre attività private dentro Altre attività: Al ghiottone, Coto e letta.",
+  "link": "http://127.0.0.1:8100/?x=199.4&z=-559.3&debug=1",
+  "etichetta": "sala civica / centro culturale",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [
+   "Coto e letta",
+   "Al ghiottone"
+  ],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes",
+   "yes",
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 4,
+  "altezza_m": 9.4,
+  "id_dbgt": [
+   1773
+  ],
+  "foto": "mont/21.jpg"
+ },
+ {
+  "n": 22,
+  "gruppo": "SANITÀ",
+  "nome": "Studio osteopatico",
+  "x": 367.8,
+  "z": -658.0,
+  "piani": 5,
+  "superficie": 3659,
+  "classe": "b",
+  "perche": "Vetrina: ambulatorio / clinica da punto OSM vicino (<12 m). uso DBGT solo 01; building OSM apartments/residential; 3 altre attività private dentro; palazzo: 5 piani, famiglia 3 Altre attività: Dott. Davide Wild, ElectrONIK Lab, Studio medico Solferino.",
+  "link": "http://127.0.0.1:8100/?x=344.4&z=-738.2&debug=1",
+  "etichetta": "ambulatorio / clinica",
+  "fonte": "punto OSM vicino (<12 m)",
+  "altre_attivita": [
+   "Studio medico Solferino",
+   "Dott. Davide Wild",
+   "ElectrONIK Lab"
+  ],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "apartments",
+   "yes",
+   "yes",
+   "residential",
+   "residential",
+   "residential",
+   "residential"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 7,
+  "altezza_m": 14.6,
+  "id_dbgt": [
+   1782
+  ],
+  "foto": "mont/22.jpg"
+ },
+ {
+  "n": 23,
+  "gruppo": "SANITÀ",
+  "nome": "Auxologico Meda",
+  "x": 567.2,
+  "z": -590.8,
+  "piani": 3,
+  "superficie": 3130,
+  "classe": "a",
+  "perche": "Intero: ambulatorio / clinica da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; 1 altra attività privata dentro Altre attività: .",
+  "link": "http://127.0.0.1:8100/?x=626.8&z=-556.5&debug=1",
+  "etichetta": "ambulatorio / clinica",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [
+   "?"
+  ],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 2,
+  "altezza_m": 9.2,
+  "id_dbgt": [],
+  "foto": "mont/23.jpg"
+ },
+ {
+  "n": 24,
+  "gruppo": "SPORT",
+  "nome": "Life",
+  "x": 832.4,
+  "z": -742.5,
+  "piani": 4,
+  "superficie": 529,
+  "classe": "b",
+  "perche": "Vetrina: palestra privata / fitness da punto OSM dentro. uso DBGT solo 01; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=864.1&z=-723.1&debug=1",
+  "etichetta": "palestra privata / fitness",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 3,
+  "altezza_m": 11.9,
+  "id_dbgt": [
+   925
+  ],
+  "foto": "mont/24.jpg"
+ },
+ {
+  "n": 25,
+  "gruppo": "SPORT",
+  "nome": "IN.ME.LAB",
+  "x": 761.9,
+  "z": -690.8,
+  "piani": 4,
+  "superficie": 232,
+  "classe": "b",
+  "perche": "Vetrina: palestra privata / fitness da punto OSM dentro. uso DBGT solo 01; 1 altra attività privata dentro Altre attività: Shoes Town.",
+  "link": "http://127.0.0.1:8100/?x=762.2&z=-667.9&debug=1",
+  "etichetta": "palestra privata / fitness",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Shoes Town"
+  ],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 3,
+  "altezza_m": 10.7,
+  "id_dbgt": [
+   2292
+  ],
+  "foto": "mont/25.jpg"
+ },
+ {
+  "n": 26,
+  "gruppo": "CAPPELLA",
+  "nome": "Grotta della Madonna",
+  "x": 1036.6,
+  "z": -565.2,
+  "piani": 1,
+  "superficie": 2,
+  "classe": "a",
+  "perche": "Intero: cappella da edificio OSM (building=chapel). building OSM chapel",
+  "link": "http://127.0.0.1:8100/?x=1036.5&z=-555.4&debug=1",
+  "etichetta": "cappella",
+  "fonte": "edificio OSM (building=chapel)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "chapel"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.7,
+  "id_dbgt": [],
+  "foto": "mont/26.jpg"
+ },
+ {
+  "n": 27,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Liceo Scientifico e Classico \"Marie Curie\"",
+  "x": 1286.8,
+  "z": -595.9,
+  "piani": 4,
+  "superficie": 380,
+  "classe": "a",
+  "perche": "Intero: scuola superiore / formazione da area OSM. area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1331.6&z=-584.1&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 11.3,
+  "id_dbgt": [],
+  "foto": "mont/27.jpg"
+ },
+ {
+  "n": 28,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Liceo Scientifico e Classico \"Marie Curie\"",
+  "x": 1301.2,
+  "z": -555.2,
+  "piani": 3,
+  "superficie": 1367,
+  "classe": "a",
+  "perche": "Intero: scuola superiore / formazione da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1339.9&z=-578.0&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 8.9,
+  "id_dbgt": [
+   1222
+  ],
+  "foto": "mont/28.jpg"
+ },
+ {
+  "n": 29,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": 24.4,
+  "z": -432.2,
+  "piani": 1,
+  "superficie": 100,
+  "classe": "c",
+  "perche": "Incerto: scuola (non precisata) da etichetta OSM vaga. uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=43.2&z=-400.0&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 3.0,
+  "id_dbgt": [
+   938
+  ],
+  "foto": "mont/29.jpg"
+ },
+ {
+  "n": 30,
+  "gruppo": "CHIESA",
+  "nome": "(chiesa)",
+  "x": 9.8,
+  "z": -327.4,
+  "piani": 4,
+  "superficie": 61,
+  "classe": "a",
+  "perche": "Intero: chiesa da uso/tipo DBGT. uso DBGT pubblico 05; tipo DBGT chiesa/campanile; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=13.9&z=-343.4&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 2,
+  "altezza_m": 12.7,
+  "id_dbgt": [
+   2192
+  ],
+  "foto": "mont/30.jpg"
+ },
+ {
+  "n": 31,
+  "gruppo": "CHIESA",
+  "nome": "Chiesa di Santa Maria Nascente",
+  "x": 42.3,
+  "z": -340.1,
+  "piani": 8,
+  "superficie": 2258,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church; palazzo: 8 piani, famiglia 4",
+  "link": "http://127.0.0.1:8100/?x=60.8&z=-283.3&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 26.4,
+  "id_dbgt": [
+   3057
+  ],
+  "foto": "mont/31.jpg"
+ },
+ {
+  "n": 32,
+  "gruppo": "ASILO",
+  "nome": "La tana dei cuccioli",
+  "x": -24.2,
+  "z": -530.6,
+  "piani": 3,
+  "superficie": 493,
+  "classe": "c",
+  "perche": "Incerto: asilo nido da punto OSM dentro. uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=-2.9&z=-497.7&debug=1",
+  "etichetta": "asilo nido",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 9.0,
+  "id_dbgt": [
+   3235
+  ],
+  "foto": "mont/32.jpg"
+ },
+ {
+  "n": 33,
+  "gruppo": "CHIESA",
+  "nome": "Oratorio Santo Crocifisso",
+  "x": 230.0,
+  "z": -295.2,
+  "piani": 4,
+  "superficie": 784,
+  "classe": "a",
+  "perche": "Intero: chiesa da non ricostruita (relazione OSM). relazione OSM dell edificio con il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=230&z=-251.9&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "non ricostruita (relazione OSM)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 11.1,
+  "id_dbgt": [],
+  "foto": "mont/33.jpg"
+ },
+ {
+  "n": 34,
+  "gruppo": "CHIESA",
+  "nome": "Oratorio Santo Crocifisso",
+  "x": 250.3,
+  "z": -326.7,
+  "piani": 4,
+  "superficie": 53,
+  "classe": "a",
+  "perche": "Intero: chiesa da non ricostruita (relazione OSM). relazione OSM dell edificio con il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=231.8&z=-316.6&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "non ricostruita (relazione OSM)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 11.1,
+  "id_dbgt": [],
+  "foto": "mont/34.jpg"
+ },
+ {
+  "n": 35,
+  "gruppo": "CHIESA",
+  "nome": "Oratorio Santo Crocifisso",
+  "x": 231.0,
+  "z": -325.9,
+  "piani": 4,
+  "superficie": 48,
+  "classe": "a",
+  "perche": "Intero: chiesa da non ricostruita (relazione OSM). relazione OSM dell edificio con il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=236.9&z=-303.5&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "non ricostruita (relazione OSM)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 11.1,
+  "id_dbgt": [],
+  "foto": "mont/35.jpg"
+ },
+ {
+  "n": 36,
+  "gruppo": "CHIESA",
+  "nome": "Oratorio Santo Crocifisso",
+  "x": 267.2,
+  "z": -312.9,
+  "piani": 4,
+  "superficie": 19,
+  "classe": "a",
+  "perche": "Intero: chiesa da non ricostruita (relazione OSM). relazione OSM dell edificio con il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=281.1&z=-326.0&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "non ricostruita (relazione OSM)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 11.1,
+  "id_dbgt": [],
+  "foto": "mont/36.jpg"
+ },
+ {
+  "n": 37,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Istituto professionale di Stato \"L. Milani\" - sede succursal",
+  "x": 260.0,
+  "z": -329.2,
+  "piani": 3,
+  "superficie": 434,
+  "classe": "c",
+  "perche": "Incerto: scuola superiore / formazione da punto OSM dentro. uso DBGT solo 95",
+  "link": "http://127.0.0.1:8100/?x=293.4&z=-329.2&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "95"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 9.2,
+  "id_dbgt": [
+   358
+  ],
+  "foto": "mont/37.jpg"
+ },
+ {
+  "n": 38,
+  "gruppo": "ASILO",
+  "nome": "Scuola dell'infanzia paritaria \"Maria Bambina\"",
+  "x": 261.8,
+  "z": -492.7,
+  "piani": 3,
+  "superficie": 782,
+  "classe": "a",
+  "perche": "Intero: scuola dell'infanzia da edificio OSM (building=kindergarten). building OSM kindergarten; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=273.4&z=-529.5&debug=1",
+  "etichetta": "scuola dell'infanzia",
+  "fonte": "edificio OSM (building=kindergarten)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "kindergarten",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 8.6,
+  "id_dbgt": [
+   1155
+  ],
+  "foto": "mont/38.jpg"
+ },
+ {
+  "n": 39,
+  "gruppo": "SANITÀ",
+  "nome": "Auxologico Meda Riabilitazione",
+  "x": 478.8,
+  "z": -439.4,
+  "piani": 8,
+  "superficie": 1845,
+  "classe": "c",
+  "perche": "Incerto: biblioteca da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 01; 11 altre attività private dentro; palazzo: 8 piani, famiglia 4 Altre attività: Alessandro Maria Ottolina, Ars Medica, Banca Popolare di Sondrio, Brucoli A. & Brucoli G., D.ssa Rag. Rossella Radice, Intesa Sanpaolo, Nova luce e gas / Sprint energy, Revtax.",
+  "link": "http://127.0.0.1:8100/?x=534.9&z=-437.9&debug=1",
+  "etichetta": "biblioteca",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [
+   "Intesa Sanpaolo",
+   "Ars Medica",
+   "Banca Popolare di Sondrio",
+   "Revtax",
+   "Nova luce e gas / Sprint energy",
+   "Sprinx technologies",
+   "Tespi mediagroup",
+   "D.ssa Rag. Rossella Radice",
+   "Brucoli A. & Brucoli G.",
+   "Alessandro Maria Ottolina",
+   "Studio Tributario Castellan"
+  ],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 6,
+  "altezza_m": 26.2,
+  "id_dbgt": [
+   186
+  ],
+  "foto": "mont/39.jpg"
+ },
+ {
+  "n": 40,
+  "gruppo": "POSTE",
+  "nome": "Poste Italiane",
+  "x": 428.1,
+  "z": -484.2,
+  "piani": 12,
+  "superficie": 2714,
+  "classe": "b",
+  "perche": "Vetrina: poste da punto OSM dentro. uso DBGT solo 01; building OSM apartments; 14 altre attività private dentro; palazzo: 12 piani, famiglia 4 Altre attività: Analisi Alfa, Caffè dei Portici, Dr. Colombo, Frey & Lau Italia, G'ala, L'Oasi, Mani nella terra, Medaplast.",
+  "link": "http://127.0.0.1:8100/?x=446.1&z=-419.3&debug=1",
+  "etichetta": "poste",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Pasticceria Centrale",
+   "Medaplast",
+   "Mori Sistemi",
+   "Analisi Alfa",
+   "Mani nella terra",
+   "Dr. Colombo",
+   "SMI Aurora",
+   "L'Oasi",
+   "Unipolsai",
+   "Parafarmacia Dr. Branca",
+   "Caffè dei Portici",
+   "G'ala",
+   "Frey & Lau Italia",
+   "No way"
+  ],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "apartments"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 7,
+  "altezza_m": 36.5,
+  "id_dbgt": [
+   1212
+  ],
+  "foto": "mont/40.jpg"
+ },
+ {
+  "n": 41,
+  "gruppo": "SCUOLA",
+  "nome": "Secondaria I grado “Traversi”",
+  "x": 532.4,
+  "z": -388.7,
+  "piani": 4,
+  "superficie": 1910,
+  "classe": "a",
+  "perche": "Intero: scuola media da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=535.2&z=-314.5&debug=1",
+  "etichetta": "scuola media",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 13.6,
+  "id_dbgt": [
+   1598
+  ],
+  "foto": "mont/41.jpg"
+ },
+ {
+  "n": 42,
+  "gruppo": "STAZIONE",
+  "nome": "Meda",
+  "x": 377.7,
+  "z": -541.6,
+  "piani": 2,
+  "superficie": 156,
+  "classe": "a",
+  "perche": "Intero: stazione da edificio OSM (building=train_station). building OSM train_station; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=400.2&z=-547.6&debug=1",
+  "etichetta": "stazione",
+  "fonte": "edificio OSM (building=train_station)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "train_station"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 6.6,
+  "id_dbgt": [
+   3059
+  ],
+  "foto": "mont/42.jpg"
+ },
+ {
+  "n": 43,
+  "gruppo": "CARABINIERI",
+  "nome": "Carabinieri",
+  "x": 901.3,
+  "z": -455.2,
+  "piani": 3,
+  "superficie": 374,
+  "classe": "a",
+  "perche": "Intero: caserma carabinieri da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=908.4&z=-427.3&debug=1",
+  "etichetta": "caserma carabinieri",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 8.6,
+  "id_dbgt": [
+   1594
+  ],
+  "foto": "mont/43.jpg"
+ },
+ {
+  "n": 44,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": 1305.0,
+  "z": -527.9,
+  "piani": 2,
+  "superficie": 40,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da uso/tipo DBGT (vago). uso DBGT pubblico 030301",
+  "link": "http://127.0.0.1:8100/?x=1316.8&z=-516.0&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 7.6,
+  "id_dbgt": [
+   967
+  ],
+  "foto": "mont/44.jpg"
+ },
+ {
+  "n": 45,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": 1275.5,
+  "z": -541.3,
+  "piani": 2,
+  "superficie": 40,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da uso/tipo DBGT (vago). uso DBGT pubblico 030301",
+  "link": "http://127.0.0.1:8100/?x=1283.8&z=-526.9&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 7.7,
+  "id_dbgt": [
+   976
+  ],
+  "foto": "mont/45.jpg"
+ },
+ {
+  "n": 46,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Liceo Scientifico e Classico \"Marie Curie\"",
+  "x": 1276.6,
+  "z": -504.9,
+  "piani": 4,
+  "superficie": 2367,
+  "classe": "a",
+  "perche": "Intero: scuola superiore / formazione da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=1292.4&z=-442.8&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 11.7,
+  "id_dbgt": [
+   1070
+  ],
+  "foto": "mont/46.jpg"
+ },
+ {
+  "n": 47,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola Statale Primaria San Giorgio",
+  "x": 1265.1,
+  "z": -383.8,
+  "piani": 3,
+  "superficie": 2992,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1329.8&z=-340.5&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 8.6,
+  "id_dbgt": [
+   1423
+  ],
+  "foto": "mont/47.jpg"
+ },
+ {
+  "n": 48,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Liceo Scientifico e Classico \"Marie Curie\"",
+  "x": 1347.3,
+  "z": -543.1,
+  "piani": 3,
+  "superficie": 384,
+  "classe": "a",
+  "perche": "Intero: scuola superiore / formazione da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1361.2&z=-567.6&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 8.0,
+  "id_dbgt": [
+   1659
+  ],
+  "foto": "mont/48.jpg"
+ },
+ {
+  "n": 49,
+  "gruppo": "SANITÀ",
+  "nome": "CPA di Meda",
+  "x": 1353.2,
+  "z": -336.9,
+  "piani": 2,
+  "superficie": 468,
+  "classe": "a",
+  "perche": "Intero: servizi sociali / RSA / centro diurno da area OSM. uso DBGT pubblico 0301; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1380.3&z=-353.0&debug=1",
+  "etichetta": "servizi sociali / RSA / centro diurno",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "0301"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 7.3,
+  "id_dbgt": [
+   2090
+  ],
+  "foto": "mont/49.jpg"
+ },
+ {
+  "n": 50,
+  "gruppo": "CHIESA",
+  "nome": "Chiesa di San Giacomo",
+  "x": 1182.3,
+  "z": -451.8,
+  "piani": 2,
+  "superficie": 692,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church",
+  "link": "http://127.0.0.1:8100/?x=1216.0&z=-460.8&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 6.7,
+  "id_dbgt": [
+   2714
+  ],
+  "foto": "mont/50.jpg"
+ },
+ {
+  "n": 51,
+  "gruppo": "CHIESA",
+  "nome": "Oratorio San Giacomo",
+  "x": 1195.0,
+  "z": -415.9,
+  "piani": 4,
+  "superficie": 321,
+  "classe": "a",
+  "perche": "Intero: oratorio da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 95; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=1154.3&z=-437.3&debug=1",
+  "etichetta": "oratorio",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "95"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 3,
+  "altezza_m": 11.5,
+  "id_dbgt": [
+   2739
+  ],
+  "foto": "mont/51.jpg"
+ },
+ {
+  "n": 52,
+  "gruppo": "CULTURA",
+  "nome": "Unitre Meda",
+  "x": 1205.0,
+  "z": -440.2,
+  "piani": 3,
+  "superficie": 354,
+  "classe": "a",
+  "perche": "Intero: sala civica / centro culturale da etichetta OSM vaga. uso DBGT pubblico 1001; il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=1224.6&z=-459.9&debug=1",
+  "etichetta": "sala civica / centro culturale",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1001"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 9.6,
+  "id_dbgt": [
+   2821
+  ],
+  "foto": "mont/52.jpg"
+ },
+ {
+  "n": 53,
+  "gruppo": "SPORT",
+  "nome": "20 hours club meda",
+  "x": 1841.5,
+  "z": -501.0,
+  "piani": 3,
+  "superficie": 1142,
+  "classe": "b",
+  "perche": "Vetrina: palestra privata / fitness da punto OSM dentro. uso DBGT solo 07; building OSM industrial; 1 altra attività privata dentro Altre attività: Nobili Ferramenta.",
+  "link": "http://127.0.0.1:8100/?x=1841.6&z=-453.5&debug=1",
+  "etichetta": "palestra privata / fitness",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Nobili Ferramenta"
+  ],
+  "uso_dbgt": [
+   "07"
+  ],
+  "building_osm": [
+   "industrial"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 4,
+  "altezza_m": 9.8,
+  "id_dbgt": [
+   1804
+  ],
+  "foto": "mont/53.jpg"
+ },
+ {
+  "n": 54,
+  "gruppo": "ALTRO",
+  "nome": "(cabina / centrale elettrica)",
+  "x": -555.6,
+  "z": -49.1,
+  "piani": 2,
+  "superficie": 207,
+  "classe": "c",
+  "perche": "Incerto: cabina / centrale elettrica da uso/tipo DBGT. uso DBGT solo 080201",
+  "link": "http://127.0.0.1:8100/?x=-575.0&z=-60.3&debug=1",
+  "etichetta": "cabina / centrale elettrica",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "080201"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 6.2,
+  "id_dbgt": [
+   1351
+  ],
+  "foto": "mont/54.jpg"
+ },
+ {
+  "n": 55,
+  "gruppo": "POLIZIA LOCALE",
+  "nome": "Polizia locale",
+  "x": 522.1,
+  "z": -241.1,
+  "piani": 8,
+  "superficie": 2079,
+  "classe": "b",
+  "perche": "Vetrina: polizia locale da punto OSM dentro. uso DBGT solo 01; building OSM apartments; 8 altre attività private dentro; palazzo: 8 piani, famiglia 4 Altre attività: Acconciature Sam, Buffetti, Crazy Wash, I Mariani assicuratori - Groupama, Il baretto, Mamma marsupio, Muzic planet, Novara dimensione bagno.",
+  "link": "http://127.0.0.1:8100/?x=593.6&z=-277.2&debug=1",
+  "etichetta": "polizia locale",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Crazy Wash",
+   "Buffetti",
+   "I Mariani assicuratori - Groupama",
+   "Muzic planet",
+   "Novara dimensione bagno",
+   "Acconciature Sam",
+   "Il baretto",
+   "Mamma marsupio"
+  ],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "apartments",
+   "apartments",
+   "apartments"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 7,
+  "altezza_m": 23.9,
+  "id_dbgt": [
+   1029
+  ],
+  "foto": "mont/55.jpg"
+ },
+ {
+  "n": 56,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Istituto Brianteo",
+  "x": 629.2,
+  "z": -194.7,
+  "piani": 4,
+  "superficie": 1862,
+  "classe": "b",
+  "perche": "Vetrina: scuola superiore / formazione da punto OSM dentro. uso DBGT solo 01; 10 altre attività private dentro; palazzo: 4 piani, famiglia 3 Altre attività: Automobile club d'Italia - Delegazione di Meda, Bianco Perla, CC-Engineering, Delta machines Italia, Dott.ssa Laura Porta psicologa-psicoterapeuta, Erboristeria Aquafontum, Habana sol club, Orocash.",
+  "link": "http://127.0.0.1:8100/?x=629.9&z=-129.2&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Bianco Perla",
+   "Orocash",
+   "Dott.ssa Laura Porta psicologa-psicoterapeuta",
+   "Studio d'architettura OV_AK",
+   "Delta machines Italia",
+   "CC-Engineering",
+   "Habana sol club",
+   "Erboristeria Aquafontum",
+   "Studio legale Avv. Federica Alberti - Avv. Paolo Re",
+   "Automobile club d'Italia - Delegazione di Meda"
+  ],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 6,
+  "altezza_m": 13.7,
+  "id_dbgt": [
+   1706
+  ],
+  "foto": "mont/56.jpg"
+ },
+ {
+  "n": 57,
+  "gruppo": "SPORT",
+  "nome": "Dynamic Village",
+  "x": 1959.7,
+  "z": -265.1,
+  "piani": 3,
+  "superficie": 1489,
+  "classe": "a",
+  "perche": "Intero: palestra privata / fitness da edificio OSM (building=yes). uso DBGT pubblico 100202; il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=1983.0&z=-225.4&debug=1",
+  "etichetta": "palestra privata / fitness",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "100202"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 9.8,
+  "id_dbgt": [
+   2160
+  ],
+  "foto": "mont/57.jpg"
+ },
+ {
+  "n": 58,
+  "gruppo": "CHIESA",
+  "nome": "Santi Nazaro e Celso",
+  "x": -757.1,
+  "z": 199.4,
+  "piani": 1,
+  "superficie": 51,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church",
+  "link": "http://127.0.0.1:8100/?x=-756.9&z=213.8&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 3.4,
+  "id_dbgt": [
+   1321
+  ],
+  "foto": "mont/58.jpg"
+ },
+ {
+  "n": 59,
+  "gruppo": "ALTRO",
+  "nome": "(cabina / centrale elettrica)",
+  "x": -543.0,
+  "z": -26.1,
+  "piani": 1,
+  "superficie": 119,
+  "classe": "c",
+  "perche": "Incerto: cabina / centrale elettrica da uso/tipo DBGT. uso DBGT solo 080201",
+  "link": "http://127.0.0.1:8100/?x=-543&z=-9.5&debug=1",
+  "etichetta": "cabina / centrale elettrica",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "080201"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   1897
+  ],
+  "foto": "mont/59.jpg"
+ },
+ {
+  "n": 60,
+  "gruppo": "CHIESA",
+  "nome": "Sala del regno dei Testimoni di Geova",
+  "x": -536.0,
+  "z": 8.9,
+  "piani": 2,
+  "superficie": 778,
+  "classe": "a",
+  "perche": "Intero: altro luogo di culto da etichetta OSM vaga. uso DBGT pubblico 05; building OSM religious",
+  "link": "http://127.0.0.1:8100/?x=-505.2&z=27.3&debug=1",
+  "etichetta": "altro luogo di culto",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "religious"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 7.3,
+  "id_dbgt": [
+   2942
+  ],
+  "foto": "mont/60.jpg"
+ },
+ {
+  "n": 61,
+  "gruppo": "TRIBUNA",
+  "nome": "(tribuna campo sportivo)",
+  "x": -313.2,
+  "z": 102.2,
+  "piani": 2,
+  "superficie": 203,
+  "classe": "a",
+  "perche": "Intero: tribuna campo sportivo da edificio OSM (building=grandstand). building OSM grandstand",
+  "link": "http://127.0.0.1:8100/?x=-290.2&z=125.2&debug=1",
+  "etichetta": "tribuna campo sportivo",
+  "fonte": "edificio OSM (building=grandstand)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "grandstand"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.0,
+  "id_dbgt": [],
+  "foto": "mont/61.jpg"
+ },
+ {
+  "n": 62,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": -362.3,
+  "z": 24.5,
+  "piani": 2,
+  "superficie": 285,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002",
+  "link": "http://127.0.0.1:8100/?x=-368.5&z=-1.3&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.8,
+  "id_dbgt": [
+   2019
+  ],
+  "foto": "mont/62.jpg"
+ },
+ {
+  "n": 63,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": -339.5,
+  "z": 87.5,
+  "piani": 1,
+  "superficie": 106,
+  "classe": "c",
+  "perche": "Incerto: impianto sportivo da etichetta OSM vaga. ",
+  "link": "http://127.0.0.1:8100/?x=-329.8&z=104.4&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 0,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   3405
+  ],
+  "foto": "mont/63.jpg"
+ },
+ {
+  "n": 64,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": -374.0,
+  "z": 52.5,
+  "piani": 1,
+  "superficie": 89,
+  "classe": "c",
+  "perche": "Incerto: impianto sportivo da etichetta OSM vaga. ",
+  "link": "http://127.0.0.1:8100/?x=-373.9&z=82.9&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "shed"
+  ],
+  "tipo_dbgt": [
+   "M01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 0,
+  "altezza_m": 2.7,
+  "id_dbgt": [
+   4504
+  ],
+  "foto": "mont/64.jpg"
+ },
+ {
+  "n": 65,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 246.3,
+  "z": 119.0,
+  "piani": 2,
+  "superficie": 177,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=246.3&z=90.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.6,
+  "id_dbgt": [
+   3599
+  ],
+  "foto": "mont/65.jpg"
+ },
+ {
+  "n": 66,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 304.3,
+  "z": 154.8,
+  "piani": 1,
+  "superficie": 27,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=308.0&z=140.9&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.5,
+  "id_dbgt": [
+   3784
+  ],
+  "foto": "mont/66.jpg"
+ },
+ {
+  "n": 67,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 153.7,
+  "z": 138.0,
+  "piani": 2,
+  "superficie": 14,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=165.3&z=141.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.3,
+  "id_dbgt": [
+   3841
+  ],
+  "foto": "mont/67.jpg"
+ },
+ {
+  "n": 68,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 338.0,
+  "z": 111.3,
+  "piani": 1,
+  "superficie": 39,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=334.1&z=96.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.1,
+  "id_dbgt": [
+   3974
+  ],
+  "foto": "mont/68.jpg"
+ },
+ {
+  "n": 69,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 313.8,
+  "z": 142.5,
+  "piani": 1,
+  "superficie": 40,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=300.6&z=134.9&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.2,
+  "id_dbgt": [
+   4037
+  ],
+  "foto": "mont/69.jpg"
+ },
+ {
+  "n": 70,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 321.8,
+  "z": 132.0,
+  "piani": 1,
+  "superficie": 40,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=314.2&z=118.8&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.1,
+  "id_dbgt": [
+   4112
+  ],
+  "foto": "mont/70.jpg"
+ },
+ {
+  "n": 71,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 147.8,
+  "z": 150.6,
+  "piani": 2,
+  "superficie": 58,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=168.3&z=145.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.6,
+  "id_dbgt": [
+   4179
+  ],
+  "foto": "mont/71.jpg"
+ },
+ {
+  "n": 72,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 331.1,
+  "z": 120.0,
+  "piani": 1,
+  "superficie": 40,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=315.8&z=120.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.0,
+  "id_dbgt": [
+   4202
+  ],
+  "foto": "mont/72.jpg"
+ },
+ {
+  "n": 73,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 143.7,
+  "z": 161.3,
+  "piani": 2,
+  "superficie": 289,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=136.1&z=121.2&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 7.0,
+  "id_dbgt": [
+   4204
+  ],
+  "foto": "mont/73.jpg"
+ },
+ {
+  "n": 74,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 355.6,
+  "z": 88.4,
+  "piani": 1,
+  "superficie": 40,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=351.6&z=73.6&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.1,
+  "id_dbgt": [
+   4356
+  ],
+  "foto": "mont/74.jpg"
+ },
+ {
+  "n": 75,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 348.9,
+  "z": 97.0,
+  "piani": 1,
+  "superficie": 39,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=333.7&z=97&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.1,
+  "id_dbgt": [
+   4377
+  ],
+  "foto": "mont/75.jpg"
+ },
+ {
+  "n": 76,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 293.5,
+  "z": 138.4,
+  "piani": 1,
+  "superficie": 64,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=298.5&z=156.9&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.1,
+  "id_dbgt": [
+   4545
+  ],
+  "foto": "mont/76.jpg"
+ },
+ {
+  "n": 77,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 282.2,
+  "z": 184.2,
+  "piani": 1,
+  "superficie": 33,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=292.9&z=165.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.3,
+  "id_dbgt": [
+   4548
+  ],
+  "foto": "mont/77.jpg"
+ },
+ {
+  "n": 78,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 234.8,
+  "z": 27.4,
+  "piani": 2,
+  "superficie": 13,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=245.1&z=33.4&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.6,
+  "id_dbgt": [
+   4731
+  ],
+  "foto": "mont/78.jpg"
+ },
+ {
+  "n": 79,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 366.6,
+  "z": 74.1,
+  "piani": 1,
+  "superficie": 40,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=351.3&z=74.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.1,
+  "id_dbgt": [
+   4794
+  ],
+  "foto": "mont/79.jpg"
+ },
+ {
+  "n": 80,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 213.1,
+  "z": 55.8,
+  "piani": 2,
+  "superficie": 21,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=224.4&z=49.2&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.9,
+  "id_dbgt": [
+   5020
+  ],
+  "foto": "mont/80.jpg"
+ },
+ {
+  "n": 81,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 217.5,
+  "z": 96.6,
+  "piani": 2,
+  "superficie": 177,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=217.5&z=125.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 7.0,
+  "id_dbgt": [
+   5207
+  ],
+  "foto": "mont/81.jpg"
+ },
+ {
+  "n": 82,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 308.7,
+  "z": 83.9,
+  "piani": 2,
+  "superficie": 17,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=308.7&z=96.5&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.0,
+  "id_dbgt": [
+   5216
+  ],
+  "foto": "mont/82.jpg"
+ },
+ {
+  "n": 83,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 212.4,
+  "z": 200.0,
+  "piani": 2,
+  "superficie": 60,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=227.3&z=185.0&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.8,
+  "id_dbgt": [
+   5265
+  ],
+  "foto": "mont/83.jpg"
+ },
+ {
+  "n": 84,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 273.3,
+  "z": -22.9,
+  "piani": 2,
+  "superficie": 12,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=283.5&z=-17.0&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.4,
+  "id_dbgt": [
+   5340
+  ],
+  "foto": "mont/84.jpg"
+ },
+ {
+  "n": 85,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 373.3,
+  "z": 65.4,
+  "piani": 1,
+  "superficie": 37,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=369.4&z=51.0&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.1,
+  "id_dbgt": [
+   3800
+  ],
+  "foto": "mont/85.jpg"
+ },
+ {
+  "n": 86,
+  "gruppo": "SPORT",
+  "nome": "Crossfit Meda",
+  "x": 903.0,
+  "z": 41.8,
+  "piani": 2,
+  "superficie": 1928,
+  "classe": "b",
+  "perche": "Vetrina: palestra privata / fitness da punto OSM dentro. uso DBGT solo 08; building OSM industrial; 3 altre attività private dentro Altre attività: Autofficina Due Gi, Beneggi, E.g.c.utensili.",
+  "link": "http://127.0.0.1:8100/?x=929.0&z=-5.6&debug=1",
+  "etichetta": "palestra privata / fitness",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Autofficina Due Gi",
+   "Beneggi",
+   "E.g.c.utensili"
+  ],
+  "uso_dbgt": [
+   "08"
+  ],
+  "building_osm": [
+   "industrial",
+   "industrial",
+   "industrial",
+   "industrial"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 5,
+  "altezza_m": 6.6,
+  "id_dbgt": [
+   2700
+  ],
+  "foto": "mont/86.jpg"
+ },
+ {
+  "n": 87,
+  "gruppo": "ASILO",
+  "nome": "Asilo Nido famiglia \"La banda bassotti\"",
+  "x": -658.5,
+  "z": 416.9,
+  "piani": 5,
+  "superficie": 215,
+  "classe": "b",
+  "perche": "Vetrina: asilo nido da punto OSM vicino (<12 m). uso DBGT solo 01; palazzo: 5 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-658.3&z=437.4&debug=1",
+  "etichetta": "asilo nido",
+  "fonte": "punto OSM vicino (<12 m)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 3,
+  "altezza_m": 14.6,
+  "id_dbgt": [
+   1536
+  ],
+  "foto": "mont/87.jpg"
+ },
+ {
+  "n": 88,
+  "gruppo": "STAZIONE",
+  "nome": "(casello ferroviario)",
+  "x": -770.8,
+  "z": 357.6,
+  "piani": 1,
+  "superficie": 15,
+  "classe": "a",
+  "perche": "Intero: casello ferroviario da uso/tipo DBGT. uso DBGT pubblico 060303",
+  "link": "http://127.0.0.1:8100/?x=-770.9&z=370.0&debug=1",
+  "etichetta": "casello ferroviario",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "060303"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.1,
+  "id_dbgt": [
+   6820
+  ],
+  "foto": "mont/88.jpg"
+ },
+ {
+  "n": 89,
+  "gruppo": "TRIBUNA",
+  "nome": "Stadio Mino Favini",
+  "x": -399.4,
+  "z": 421.2,
+  "piani": 1,
+  "superficie": 322,
+  "classe": "a",
+  "perche": "Intero: tribuna campo sportivo da edificio OSM (building=grandstand). building OSM grandstand",
+  "link": "http://127.0.0.1:8100/?x=-379.9&z=439.2&debug=1",
+  "etichetta": "tribuna campo sportivo",
+  "fonte": "edificio OSM (building=grandstand)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "grandstand"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.7,
+  "id_dbgt": [],
+  "foto": "mont/89.jpg"
+ },
+ {
+  "n": 90,
+  "gruppo": "TRIBUNA",
+  "nome": "Stadio Mino Favini",
+  "x": -414.7,
+  "z": 336.1,
+  "piani": 1,
+  "superficie": 368,
+  "classe": "a",
+  "perche": "Intero: tribuna campo sportivo da edificio OSM (building=grandstand). building OSM grandstand",
+  "link": "http://127.0.0.1:8100/?x=-396.2&z=354.7&debug=1",
+  "etichetta": "tribuna campo sportivo",
+  "fonte": "edificio OSM (building=grandstand)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "grandstand"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.7,
+  "id_dbgt": [],
+  "foto": "mont/90.jpg"
+ },
+ {
+  "n": 91,
+  "gruppo": "TRIBUNA",
+  "nome": "Stadio Mino Favini",
+  "x": -408.1,
+  "z": 378.3,
+  "piani": 3,
+  "superficie": 767,
+  "classe": "a",
+  "perche": "Intero: tribuna campo sportivo da edificio OSM (building=grandstand). building OSM grandstand",
+  "link": "http://127.0.0.1:8100/?x=-389.6&z=410.4&debug=1",
+  "etichetta": "tribuna campo sportivo",
+  "fonte": "edificio OSM (building=grandstand)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "grandstand"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 9.9,
+  "id_dbgt": [],
+  "foto": "mont/91.jpg"
+ },
+ {
+  "n": 92,
+  "gruppo": "SPORT",
+  "nome": "Stadio Mino Favini",
+  "x": -419.7,
+  "z": 311.5,
+  "piani": 1,
+  "superficie": 142,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002",
+  "link": "http://127.0.0.1:8100/?x=-406.3&z=324.9&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.2,
+  "id_dbgt": [
+   36
+  ],
+  "foto": "mont/92.jpg"
+ },
+ {
+  "n": 93,
+  "gruppo": "SPORT",
+  "nome": "Stadio Mino Favini",
+  "x": -396.0,
+  "z": 449.3,
+  "piani": 1,
+  "superficie": 145,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002",
+  "link": "http://127.0.0.1:8100/?x=-396.0&z=468.4&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.5,
+  "id_dbgt": [
+   432
+  ],
+  "foto": "mont/93.jpg"
+ },
+ {
+  "n": 94,
+  "gruppo": "SPORT",
+  "nome": "Stadio Mino Favini",
+  "x": -504.8,
+  "z": 429.7,
+  "piani": 2,
+  "superficie": 139,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002",
+  "link": "http://127.0.0.1:8100/?x=-504.8&z=447.7&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.2,
+  "id_dbgt": [
+   915
+  ],
+  "foto": "mont/94.jpg"
+ },
+ {
+  "n": 95,
+  "gruppo": "SPORT",
+  "nome": "Stadio Mino Favini",
+  "x": -446.4,
+  "z": 316.5,
+  "piani": 1,
+  "superficie": 401,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002",
+  "link": "http://127.0.0.1:8100/?x=-446.4&z=344.6&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   1382
+  ],
+  "foto": "mont/95.jpg"
+ },
+ {
+  "n": 96,
+  "gruppo": "SPORT",
+  "nome": "Stadio Mino Favini",
+  "x": -403.3,
+  "z": 424.0,
+  "piani": 1,
+  "superficie": 176,
+  "classe": "a",
+  "perche": "Intero: tribuna campo sportivo da edificio OSM (building=grandstand). uso DBGT pubblico 1002; building OSM grandstand",
+  "link": "http://127.0.0.1:8100/?x=-386.7&z=447.4&debug=1",
+  "etichetta": "tribuna campo sportivo",
+  "fonte": "edificio OSM (building=grandstand)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "grandstand"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 3.3,
+  "id_dbgt": [
+   1745
+  ],
+  "foto": "mont/96.jpg"
+ },
+ {
+  "n": 97,
+  "gruppo": "SPORT",
+  "nome": "Stadio Mino Favini",
+  "x": -417.6,
+  "z": 345.9,
+  "piani": 1,
+  "superficie": 125,
+  "classe": "a",
+  "perche": "Intero: tribuna campo sportivo da edificio OSM (building=grandstand). uso DBGT pubblico 1002; building OSM grandstand",
+  "link": "http://127.0.0.1:8100/?x=-396.2&z=360.3&debug=1",
+  "etichetta": "tribuna campo sportivo",
+  "fonte": "edificio OSM (building=grandstand)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "grandstand"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   2961
+  ],
+  "foto": "mont/97.jpg"
+ },
+ {
+  "n": 98,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 201.8,
+  "z": 206.7,
+  "piani": 2,
+  "superficie": 268,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=189.6&z=162.2&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.6,
+  "id_dbgt": [
+   3642
+  ],
+  "foto": "mont/98.jpg"
+ },
+ {
+  "n": 99,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": 255.8,
+  "z": 216.3,
+  "piani": 1,
+  "superficie": 25,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=262.8&z=204.3&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   4909
+  ],
+  "foto": "mont/99.jpg"
+ },
+ {
+  "n": 100,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria e dell'infanzia \"Plesso Polo\"",
+  "x": 842.5,
+  "z": 461.3,
+  "piani": 2,
+  "superficie": 1547,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da etichetta OSM vaga. uso DBGT pubblico 030301; building OSM school",
+  "link": "http://127.0.0.1:8100/?x=812.3&z=508.2&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 7.3,
+  "id_dbgt": [
+   1605
+  ],
+  "foto": "mont/100.jpg"
+ },
+ {
+  "n": 101,
+  "gruppo": "CHIESA",
+  "nome": "Madonna di Fatima",
+  "x": 660.2,
+  "z": 425.1,
+  "piani": 4,
+  "superficie": 985,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=661&z=469.5&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 13.1,
+  "id_dbgt": [
+   3197
+  ],
+  "foto": "mont/101.jpg"
+ },
+ {
+  "n": 102,
+  "gruppo": "SPORT",
+  "nome": "Palestra Luigi Cimnaghi",
+  "x": 1243.1,
+  "z": 338.1,
+  "piani": 2,
+  "superficie": 4958,
+  "classe": "a",
+  "perche": "Intero: palazzetto / palestra pubblica da punto OSM dentro. uso DBGT pubblico 1002; tipo DBGT 19 pubblico",
+  "link": "http://127.0.0.1:8100/?x=1295.0&z=389.7&debug=1",
+  "etichetta": "palazzetto / palestra pubblica",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 4,
+  "punteggio_misto": 0,
+  "altezza_m": 5.6,
+  "id_dbgt": [
+   1728
+  ],
+  "foto": "mont/102.jpg"
+ },
+ {
+  "n": 103,
+  "gruppo": "SANITÀ",
+  "nome": "AVIS",
+  "x": 1277.2,
+  "z": 279.1,
+  "piani": 2,
+  "superficie": 2324,
+  "classe": "c",
+  "perche": "Incerto: AVIS / ambulanze da punto OSM dentro. uso DBGT solo 07; building OSM retail",
+  "link": "http://127.0.0.1:8100/?x=1316.0&z=230.9&debug=1",
+  "etichetta": "AVIS / ambulanze",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "07"
+  ],
+  "building_osm": [
+   "yes",
+   "retail"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 2,
+  "altezza_m": 5.0,
+  "id_dbgt": [
+   2587
+  ],
+  "foto": "mont/103.jpg"
+ },
+ {
+  "n": 104,
+  "gruppo": "SPORT",
+  "nome": "eMotion",
+  "x": 1363.5,
+  "z": 361.6,
+  "piani": 2,
+  "superficie": 6080,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002; il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=1427.4&z=425.5&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 6.7,
+  "id_dbgt": [
+   3238
+  ],
+  "foto": "mont/104.jpg"
+ },
+ {
+  "n": 105,
+  "gruppo": "CAPPELLA",
+  "nome": "Cappella di San Pietro da Verona Martire",
+  "x": -1707.0,
+  "z": 680.5,
+  "piani": 1,
+  "superficie": 32,
+  "classe": "a",
+  "perche": "Intero: cappella da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=-1695.5&z=687.2&debug=1",
+  "etichetta": "cappella",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.6,
+  "id_dbgt": [],
+  "foto": "mont/105.jpg"
+ },
+ {
+  "n": 106,
+  "gruppo": "SANITÀ",
+  "nome": "Guardia Medica di Seveso",
+  "x": -1463.5,
+  "z": 651.3,
+  "piani": 3,
+  "superficie": 802,
+  "classe": "a",
+  "perche": "Intero: ambulatorio / clinica da punto OSM dentro. uso DBGT pubblico 030104",
+  "link": "http://127.0.0.1:8100/?x=-1424.0&z=661.0&debug=1",
+  "etichetta": "ambulatorio / clinica",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030104"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 8.5,
+  "id_dbgt": [
+   7932
+  ],
+  "foto": "mont/106.jpg"
+ },
+ {
+  "n": 107,
+  "gruppo": "STAZIONE",
+  "nome": "(stazione)",
+  "x": -1077.2,
+  "z": 674.7,
+  "piani": 2,
+  "superficie": 323,
+  "classe": "a",
+  "perche": "Intero: stazione da uso/tipo DBGT. uso DBGT pubblico 060301",
+  "link": "http://127.0.0.1:8100/?x=-1097.7&z=662.9&debug=1",
+  "etichetta": "stazione",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "060301"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.5,
+  "id_dbgt": [
+   8480
+  ],
+  "foto": "mont/107.jpg"
+ },
+ {
+  "n": 108,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria parificata \"San Pietro Martire\"",
+  "x": -738.1,
+  "z": 530.6,
+  "piani": 3,
+  "superficie": 2610,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da punto OSM dentro. uso DBGT pubblico 030301",
+  "link": "http://127.0.0.1:8100/?x=-718.4&z=593.2&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 9.6,
+  "id_dbgt": [
+   2317
+  ],
+  "foto": "mont/108.jpg"
+ },
+ {
+  "n": 109,
+  "gruppo": "CHIESA",
+  "nome": "Chiesa di San Pietro Martire",
+  "x": -746.1,
+  "z": 466.8,
+  "piani": 9,
+  "superficie": 44,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church; palazzo: 9 piani, famiglia 4",
+  "link": "http://127.0.0.1:8100/?x=-772.6&z=451.5&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "roof",
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E07"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 27.4,
+  "id_dbgt": [
+   3158
+  ],
+  "foto": "mont/109.jpg"
+ },
+ {
+  "n": 110,
+  "gruppo": "CHIESA",
+  "nome": "Chiesa di San Pietro Martire",
+  "x": -723.6,
+  "z": 467.7,
+  "piani": 4,
+  "superficie": 1147,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-688.3&z=487.8&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 13.3,
+  "id_dbgt": [
+   3297
+  ],
+  "foto": "mont/110.jpg"
+ },
+ {
+  "n": 111,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria e secondaria di primo grado \"Pier Giorgio Fr",
+  "x": -720.1,
+  "z": 681.1,
+  "piani": 4,
+  "superficie": 1012,
+  "classe": "a",
+  "perche": "Intero: scuola primaria e media da punto OSM dentro. uso DBGT pubblico 030301; building OSM school; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-700.6&z=715.8&debug=1",
+  "etichetta": "scuola primaria e media",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 2,
+  "altezza_m": 12.2,
+  "id_dbgt": [
+   7232
+  ],
+  "foto": "mont/111.jpg"
+ },
+ {
+  "n": 112,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": -781.6,
+  "z": 519.2,
+  "piani": 2,
+  "superficie": 17,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da uso/tipo DBGT (vago). uso DBGT pubblico 030301",
+  "link": "http://127.0.0.1:8100/?x=-785.5&z=504.4&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 7.6,
+  "id_dbgt": [
+   7835
+  ],
+  "foto": "mont/112.jpg"
+ },
+ {
+  "n": 113,
+  "gruppo": "COMUNE",
+  "nome": "Protezione civile di Seveso",
+  "x": -309.7,
+  "z": 555.9,
+  "piani": 3,
+  "superficie": 1986,
+  "classe": "c",
+  "perche": "Incerto: ufficio pubblico da punto OSM dentro. uso DBGT solo 08; building OSM industrial",
+  "link": "http://127.0.0.1:8100/?x=-254.4&z=616.0&debug=1",
+  "etichetta": "ufficio pubblico",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "08"
+  ],
+  "building_osm": [
+   "industrial",
+   "industrial",
+   "industrial",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 2,
+  "altezza_m": 8.0,
+  "id_dbgt": [
+   271
+  ],
+  "foto": "mont/113.jpg"
+ },
+ {
+  "n": 114,
+  "gruppo": "SPORT",
+  "nome": "Stadio Mino Favini",
+  "x": -277.6,
+  "z": 467.2,
+  "piani": 1,
+  "superficie": 301,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002",
+  "link": "http://127.0.0.1:8100/?x=-277.6&z=494.0&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.6,
+  "id_dbgt": [
+   1551
+  ],
+  "foto": "mont/114.jpg"
+ },
+ {
+  "n": 115,
+  "gruppo": "SPORT",
+  "nome": "Stadio Mino Favini",
+  "x": -303.3,
+  "z": 481.0,
+  "piani": 1,
+  "superficie": 660,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002",
+  "link": "http://127.0.0.1:8100/?x=-304&z=517.0&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   2283
+  ],
+  "foto": "mont/115.jpg"
+ },
+ {
+  "n": 116,
+  "gruppo": "SPORT",
+  "nome": "Stadio Mino Favini",
+  "x": -359.7,
+  "z": 477.3,
+  "piani": 1,
+  "superficie": 1585,
+  "classe": "c",
+  "perche": "Incerto: impianto sportivo da etichetta OSM vaga. ",
+  "link": "http://127.0.0.1:8100/?x=-348.6&z=518.9&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M14"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 0,
+  "altezza_m": 2.4,
+  "id_dbgt": [
+   4899
+  ],
+  "foto": "mont/116.jpg"
+ },
+ {
+  "n": 117,
+  "gruppo": "COMUNE",
+  "nome": "Agenzia Formazione Orientamento Lavoro Monza e Brianza",
+  "x": 735.3,
+  "z": 522.5,
+  "piani": 3,
+  "superficie": 1993,
+  "classe": "a",
+  "perche": "Intero: ufficio pubblico da punto OSM dentro. uso DBGT pubblico 030301; building OSM school",
+  "link": "http://127.0.0.1:8100/?x=730.8&z=577.4&debug=1",
+  "etichetta": "ufficio pubblico",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 8.3,
+  "id_dbgt": [
+   163
+  ],
+  "foto": "mont/117.jpg"
+ },
+ {
+  "n": 118,
+  "gruppo": "SCUOLA",
+  "nome": "Centro di formazione professionale \"Giuseppe Terragni\"",
+  "x": 764.6,
+  "z": 534.4,
+  "piani": 2,
+  "superficie": 443,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da etichetta OSM vaga. uso DBGT pubblico 030301; building OSM school",
+  "link": "http://127.0.0.1:8100/?x=797.8&z=554.8&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 6.1,
+  "id_dbgt": [
+   175
+  ],
+  "foto": "mont/118.jpg"
+ },
+ {
+  "n": 119,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria e dell'infanzia \"Plesso Polo\"",
+  "x": 835.6,
+  "z": 512.8,
+  "piani": 2,
+  "superficie": 273,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da etichetta OSM vaga. uso DBGT pubblico 030301; building OSM school",
+  "link": "http://127.0.0.1:8100/?x=815.7&z=501.3&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 4.7,
+  "id_dbgt": [
+   576
+  ],
+  "foto": "mont/119.jpg"
+ },
+ {
+  "n": 120,
+  "gruppo": "SCUOLA",
+  "nome": "Centro di formazione professionale \"Giuseppe Terragni\"",
+  "x": 770.3,
+  "z": 498.8,
+  "piani": 2,
+  "superficie": 1143,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da etichetta OSM vaga. uso DBGT pubblico 030301; building OSM school",
+  "link": "http://127.0.0.1:8100/?x=807.8&z=520.9&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 6.2,
+  "id_dbgt": [
+   1359
+  ],
+  "foto": "mont/120.jpg"
+ },
+ {
+  "n": 121,
+  "gruppo": "SCUOLA",
+  "nome": "Centro di formazione professionale \"Giuseppe Terragni\"",
+  "x": 761.7,
+  "z": 556.5,
+  "piani": 2,
+  "superficie": 131,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da etichetta OSM vaga. uso DBGT pubblico 030301; building OSM school",
+  "link": "http://127.0.0.1:8100/?x=757.8&z=575.5&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 6.5,
+  "id_dbgt": [
+   3002
+  ],
+  "foto": "mont/121.jpg"
+ },
+ {
+  "n": 122,
+  "gruppo": "SPORT",
+  "nome": "Palazzetto dello sport \"Palameda\"",
+  "x": 666.4,
+  "z": 490.9,
+  "piani": 2,
+  "superficie": 326,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002; il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=690.3&z=484.5&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 7.2,
+  "id_dbgt": [
+   3199
+  ],
+  "foto": "mont/122.jpg"
+ },
+ {
+  "n": 123,
+  "gruppo": "COMUNE",
+  "nome": "Città di Meda - Punto servizio al cittadino",
+  "x": 655.0,
+  "z": 520.9,
+  "piani": 3,
+  "superficie": 2384,
+  "classe": "a",
+  "perche": "Intero: ufficio pubblico da punto OSM dentro. uso DBGT pubblico 1002; tipo DBGT 19 pubblico; il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=668.9&z=571.6&debug=1",
+  "etichetta": "ufficio pubblico",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 7,
+  "punteggio_misto": 0,
+  "altezza_m": 8.4,
+  "id_dbgt": [
+   3236
+  ],
+  "foto": "mont/123.jpg"
+ },
+ {
+  "n": 124,
+  "gruppo": "SCUOLA",
+  "nome": "Centro di formazione professionale \"Giuseppe Terragni\"",
+  "x": 780.9,
+  "z": 527.1,
+  "piani": 1,
+  "superficie": 58,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da etichetta OSM vaga. building OSM school",
+  "link": "http://127.0.0.1:8100/?x=802.7&z=533.0&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "M01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 2.6,
+  "id_dbgt": [
+   3608
+  ],
+  "foto": "mont/124.jpg"
+ },
+ {
+  "n": 125,
+  "gruppo": "SPORT",
+  "nome": "Palazzetto dello sport \"Palameda\"",
+  "x": 656.5,
+  "z": 544.4,
+  "piani": 1,
+  "superficie": 21,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=659.9&z=557.0&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.4,
+  "id_dbgt": [
+   4457
+  ],
+  "foto": "mont/125.jpg"
+ },
+ {
+  "n": 126,
+  "gruppo": "ASILO",
+  "nome": "Gli amici del bosco",
+  "x": 1071.9,
+  "z": 700.2,
+  "piani": 2,
+  "superficie": 396,
+  "classe": "a",
+  "perche": "Intero: asilo nido da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=1087.5&z=729.0&debug=1",
+  "etichetta": "asilo nido",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 5.9,
+  "id_dbgt": [
+   736
+  ],
+  "foto": "mont/126.jpg"
+ },
+ {
+  "n": 127,
+  "gruppo": "POSTE",
+  "nome": "Meda 1",
+  "x": 990.5,
+  "z": 654.8,
+  "piani": 9,
+  "superficie": 1152,
+  "classe": "b",
+  "perche": "Vetrina: poste da punto OSM dentro. uso DBGT solo 01; 7 altre attività private dentro; palazzo: 9 piani, famiglia 4 Altre attività: Bar Mary, D.B. Motors, Fratelli Ancora, Il camino, Lafarmacia. Ticino, QuintaEssenza, Simon Line.",
+  "link": "http://127.0.0.1:8100/?x=1011.3&z=708.8&debug=1",
+  "etichetta": "poste",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Bar Mary",
+   "Simon Line",
+   "Fratelli Ancora",
+   "Lafarmacia. Ticino",
+   "D.B. Motors",
+   "Il camino",
+   "QuintaEssenza"
+  ],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes",
+   "yes",
+   "yes",
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 6,
+  "altezza_m": 28.7,
+  "id_dbgt": [
+   1823
+  ],
+  "foto": "mont/127.jpg"
+ },
+ {
+  "n": 128,
+  "gruppo": "ASILO",
+  "nome": "Asilo Nido CiccioRiccio",
+  "x": -1645.5,
+  "z": 904.5,
+  "piani": 4,
+  "superficie": 1080,
+  "classe": "b",
+  "perche": "Vetrina: asilo nido da punto OSM dentro. uso DBGT solo 07; building OSM commercial; 5 altre attività private dentro; palazzo: 4 piani, famiglia 6 Altre attività: Equipe Giuliani, Etoile, Mercatino Usato Seveso - Second Life, Piemonti Giocattoli, Piemonti baby.",
+  "link": "http://127.0.0.1:8100/?x=-1602.9&z=896.4&debug=1",
+  "etichetta": "asilo nido",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Mercatino Usato Seveso - Second Life",
+   "Etoile",
+   "Equipe Giuliani",
+   "Piemonti baby",
+   "Piemonti Giocattoli"
+  ],
+  "uso_dbgt": [
+   "07"
+  ],
+  "building_osm": [
+   "commercial"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 7,
+  "altezza_m": 13.0,
+  "id_dbgt": [
+   7039
+  ],
+  "foto": "mont/128.jpg"
+ },
+ {
+  "n": 129,
+  "gruppo": "CHIESA",
+  "nome": "(altro luogo di culto)",
+  "x": -1797.2,
+  "z": 711.2,
+  "piani": 1,
+  "superficie": 70,
+  "classe": "a",
+  "perche": "Intero: altro luogo di culto da uso/tipo DBGT (vago). uso DBGT pubblico 05",
+  "link": "http://127.0.0.1:8100/?x=-1797.3&z=728.4&debug=1",
+  "etichetta": "altro luogo di culto",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.5,
+  "id_dbgt": [
+   8768
+  ],
+  "foto": "mont/129.jpg"
+ },
+ {
+  "n": 130,
+  "gruppo": "STAZIONE",
+  "nome": "(stazione)",
+  "x": -1052.2,
+  "z": 927.1,
+  "piani": 2,
+  "superficie": 291,
+  "classe": "a",
+  "perche": "Intero: stazione da uso/tipo DBGT. uso DBGT pubblico 060301",
+  "link": "http://127.0.0.1:8100/?x=-1037.2&z=953.2&debug=1",
+  "etichetta": "stazione",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "060301"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 7.0,
+  "id_dbgt": [
+   6176
+  ],
+  "foto": "mont/130.jpg"
+ },
+ {
+  "n": 131,
+  "gruppo": "SANITÀ",
+  "nome": "Casa di riposo Padre Giovanni Masciadri",
+  "x": -943.4,
+  "z": 927.7,
+  "piani": 8,
+  "superficie": 1858,
+  "classe": "a",
+  "perche": "Intero: ospedale da edificio OSM (building=hospital). uso DBGT pubblico 030102; building OSM hospital; palazzo: 8 piani, famiglia 4",
+  "link": "http://127.0.0.1:8100/?x=-959.0&z=982.8&debug=1",
+  "etichetta": "ospedale",
+  "fonte": "edificio OSM (building=hospital)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030102"
+  ],
+  "building_osm": [
+   "hospital",
+   "hospital",
+   "hospital"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 2,
+  "altezza_m": 25.3,
+  "id_dbgt": [
+   7100
+  ],
+  "foto": "mont/131.jpg"
+ },
+ {
+  "n": 132,
+  "gruppo": "SANITÀ",
+  "nome": "Centro diagnostico San Giorgio",
+  "x": -1113.8,
+  "z": 838.1,
+  "piani": 3,
+  "superficie": 1189,
+  "classe": "b",
+  "perche": "Vetrina: ambulatorio / clinica da punto OSM dentro. uso DBGT solo 08; building OSM industrial; 3 altre attività private dentro Altre attività: Corrado Tessuti, EsteticAlice, Studio dentistico Colombo.",
+  "link": "http://127.0.0.1:8100/?x=-1091.0&z=886.2&debug=1",
+  "etichetta": "ambulatorio / clinica",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Corrado Tessuti",
+   "Studio dentistico Colombo",
+   "EsteticAlice"
+  ],
+  "uso_dbgt": [
+   "08"
+  ],
+  "building_osm": [
+   "industrial"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 5,
+  "altezza_m": 9.0,
+  "id_dbgt": [
+   8574
+  ],
+  "foto": "mont/132.jpg"
+ },
+ {
+  "n": 133,
+  "gruppo": "CHIESA",
+  "nome": "Chiesa di San Pietro Martire",
+  "x": -759.3,
+  "z": 749.3,
+  "piani": 12,
+  "superficie": 31,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church; palazzo: 12 piani, famiglia 4",
+  "link": "http://127.0.0.1:8100/?x=-783.8&z=724.8&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E07"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 38.6,
+  "id_dbgt": [
+   6864
+  ],
+  "foto": "mont/133.jpg"
+ },
+ {
+  "n": 134,
+  "gruppo": "CHIESA",
+  "nome": "Chiesa di San Pietro Martire",
+  "x": -722.1,
+  "z": 808.2,
+  "piani": 10,
+  "superficie": 6753,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church; palazzo: 10 piani, famiglia 4",
+  "link": "http://127.0.0.1:8100/?x=-636.4&z=902.1&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 31.4,
+  "id_dbgt": [
+   8152
+  ],
+  "foto": "mont/134.jpg"
+ },
+ {
+  "n": 135,
+  "gruppo": "CHIESA",
+  "nome": "Seminario arcivescovile di Milano - sede di Seveso",
+  "x": -738.1,
+  "z": 878.7,
+  "piani": 4,
+  "superficie": 934,
+  "classe": "a",
+  "perche": "Intero: chiesa da uso/tipo DBGT. uso DBGT pubblico 05; tipo DBGT chiesa/campanile",
+  "link": "http://127.0.0.1:8100/?x=-706.7&z=905.7&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 10.8,
+  "id_dbgt": [
+   8215
+  ],
+  "foto": "mont/135.jpg"
+ },
+ {
+  "n": 136,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": -725.2,
+  "z": 710.8,
+  "piani": 1,
+  "superficie": 241,
+  "classe": "c",
+  "perche": "Incerto: scuola (non precisata) da etichetta OSM vaga. ",
+  "link": "http://127.0.0.1:8100/?x=-725.1&z=734.9&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M14"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 0,
+  "altezza_m": 2.1,
+  "id_dbgt": [
+   11015
+  ],
+  "foto": "mont/136.jpg"
+ },
+ {
+  "n": 137,
+  "gruppo": "COMUNE",
+  "nome": "Il Bosco delle Querce di Seveso e Meda patrimonio della Comu",
+  "x": -287.9,
+  "z": 939.5,
+  "piani": 1,
+  "superficie": 642,
+  "classe": "a",
+  "perche": "Intero: edificio pubblico (non precisato) da etichetta OSM vaga. building OSM public; uso DBGT solo 08; 1 altra attività privata dentro Altre attività: Gelsia Ambiente.",
+  "link": "http://127.0.0.1:8100/?x=-279.0&z=905.0&debug=1",
+  "etichetta": "edificio pubblico (non precisato)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [
+   "Gelsia Ambiente"
+  ],
+  "uso_dbgt": [
+   "08"
+  ],
+  "building_osm": [
+   "public"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 3,
+  "altezza_m": 1.9,
+  "id_dbgt": [
+   7965
+  ],
+  "foto": "mont/137.jpg"
+ },
+ {
+  "n": 138,
+  "gruppo": "SANITÀ",
+  "nome": "Il focolare",
+  "x": 842.9,
+  "z": 938.6,
+  "piani": 2,
+  "superficie": 1290,
+  "classe": "b",
+  "perche": "Vetrina: servizi sociali / RSA / centro diurno da punto OSM dentro. uso DBGT solo 08; building OSM industrial; 1 altra attività privata dentro Altre attività: A. & G..",
+  "link": "http://127.0.0.1:8100/?x=815.5&z=985.9&debug=1",
+  "etichetta": "servizi sociali / RSA / centro diurno",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "A. & G."
+  ],
+  "uso_dbgt": [
+   "08"
+  ],
+  "building_osm": [
+   "industrial",
+   "industrial"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 4,
+  "altezza_m": 6.9,
+  "id_dbgt": [
+   1642
+  ],
+  "foto": "mont/138.jpg"
+ },
+ {
+  "n": 139,
+  "gruppo": "TRIBUNA",
+  "nome": "(tribuna campo sportivo)",
+  "x": -1825.7,
+  "z": 1196.4,
+  "piani": 2,
+  "superficie": 901,
+  "classe": "a",
+  "perche": "Intero: tribuna campo sportivo da edificio OSM (building=grandstand). building OSM grandstand",
+  "link": "http://127.0.0.1:8100/?x=-1824.4&z=1254.9&debug=1",
+  "etichetta": "tribuna campo sportivo",
+  "fonte": "edificio OSM (building=grandstand)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "grandstand"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.8,
+  "id_dbgt": [],
+  "foto": "mont/139.jpg"
+ },
+ {
+  "n": 140,
+  "gruppo": "CHIESA",
+  "nome": "Oratorio Paolo VI",
+  "x": -1402.2,
+  "z": 1077.5,
+  "piani": 1,
+  "superficie": 426,
+  "classe": "a",
+  "perche": "Intero: oratorio da area OSM. tipo DBGT 19 pubblico; area OSM del servizio; uso DBGT solo 95",
+  "link": "http://127.0.0.1:8100/?x=-1412.6&z=1038.7&debug=1",
+  "etichetta": "oratorio",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "95"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 4,
+  "punteggio_misto": 1,
+  "altezza_m": 4.4,
+  "id_dbgt": [
+   5767
+  ],
+  "foto": "mont/140.jpg"
+ },
+ {
+  "n": 141,
+  "gruppo": "COMUNE",
+  "nome": "Centro diurno per persone disabili adolescenti e adulti",
+  "x": -1618.5,
+  "z": 1097.0,
+  "piani": 1,
+  "superficie": 691,
+  "classe": "a",
+  "perche": "Intero: centro civico / sala polifunzionale da etichetta OSM vaga. il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 95",
+  "link": "http://127.0.0.1:8100/?x=-1609.7&z=1061.8&debug=1",
+  "etichetta": "centro civico / sala polifunzionale",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "95"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   6839
+  ],
+  "foto": "mont/141.jpg"
+ },
+ {
+  "n": 142,
+  "gruppo": "COMUNE",
+  "nome": "Centro diurno per persone disabili adolescenti e adulti",
+  "x": -1622.9,
+  "z": 1083.5,
+  "piani": 1,
+  "superficie": 87,
+  "classe": "a",
+  "perche": "Intero: centro civico / sala polifunzionale da etichetta OSM vaga. il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=-1616.3&z=1064.1&debug=1",
+  "etichetta": "centro civico / sala polifunzionale",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M17"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.6,
+  "id_dbgt": [
+   9104
+  ],
+  "foto": "mont/142.jpg"
+ },
+ {
+  "n": 143,
+  "gruppo": "POLIZIA LOCALE",
+  "nome": "Polizia Locale Seveso",
+  "x": -1215.2,
+  "z": 1085.0,
+  "piani": 3,
+  "superficie": 221,
+  "classe": "c",
+  "perche": "Incerto: polizia locale da punto OSM dentro. uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=-1215.2&z=1108.3&debug=1",
+  "etichetta": "polizia locale",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 9.2,
+  "id_dbgt": [
+   5788
+  ],
+  "foto": "mont/143.jpg"
+ },
+ {
+  "n": 144,
+  "gruppo": "CHIESA",
+  "nome": "Oratorio Paolo VI",
+  "x": -1336.4,
+  "z": 1085.6,
+  "piani": 3,
+  "superficie": 1004,
+  "classe": "a",
+  "perche": "Intero: oratorio da area OSM. area OSM del servizio; uso DBGT solo 95",
+  "link": "http://127.0.0.1:8100/?x=-1324.8&z=1039.5&debug=1",
+  "etichetta": "oratorio",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "95"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 8.7,
+  "id_dbgt": [
+   6332
+  ],
+  "foto": "mont/144.jpg"
+ },
+ {
+  "n": 145,
+  "gruppo": "COMUNE",
+  "nome": "Municipio di Seveso",
+  "x": -1205.4,
+  "z": 1127.1,
+  "piani": 5,
+  "superficie": 194,
+  "classe": "a",
+  "perche": "Intero: municipio da punto OSM dentro. uso DBGT pubblico 0201; palazzo: 5 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-1184.6&z=1121.3&debug=1",
+  "etichetta": "municipio",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "0201"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 2,
+  "altezza_m": 16.1,
+  "id_dbgt": [
+   7518
+  ],
+  "foto": "mont/145.jpg"
+ },
+ {
+  "n": 146,
+  "gruppo": "ASILO",
+  "nome": "Scuola dell'infanzia di Corso Marconi",
+  "x": -1193.4,
+  "z": 1162.1,
+  "piani": 4,
+  "superficie": 1903,
+  "classe": "a",
+  "perche": "Intero: scuola dell'infanzia da punto OSM dentro. building OSM school; uso DBGT solo 01; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-1183.3&z=1236.7&debug=1",
+  "etichetta": "scuola dell'infanzia",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes",
+   "yes",
+   "yes",
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 3,
+  "altezza_m": 13.3,
+  "id_dbgt": [
+   8220
+  ],
+  "foto": "mont/146.jpg"
+ },
+ {
+  "n": 147,
+  "gruppo": "CHIESA",
+  "nome": "Oratorio Paolo VI",
+  "x": -1356.9,
+  "z": 1117.5,
+  "piani": 1,
+  "superficie": 125,
+  "classe": "a",
+  "perche": "Intero: oratorio da area OSM. area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-1373.5&z=1127.4&debug=1",
+  "etichetta": "oratorio",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.1,
+  "id_dbgt": [
+   9466
+  ],
+  "foto": "mont/147.jpg"
+ },
+ {
+  "n": 148,
+  "gruppo": "STAZIONE",
+  "nome": "Seveso",
+  "x": -1074.1,
+  "z": 1016.8,
+  "piani": 3,
+  "superficie": 331,
+  "classe": "a",
+  "perche": "Intero: stazione da edificio OSM (building=train_station). uso DBGT pubblico 060301; building OSM train_station",
+  "link": "http://127.0.0.1:8100/?x=-1051.0&z=1029.9&debug=1",
+  "etichetta": "stazione",
+  "fonte": "edificio OSM (building=train_station)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "060301"
+  ],
+  "building_osm": [
+   "train_station"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 8.9,
+  "id_dbgt": [
+   8533
+  ],
+  "foto": "mont/148.jpg"
+ },
+ {
+  "n": 149,
+  "gruppo": "SANITÀ",
+  "nome": "Studio Medico Polispecialistico BASE MEDICA",
+  "x": -983.4,
+  "z": 1143.9,
+  "piani": 6,
+  "superficie": 514,
+  "classe": "b",
+  "perche": "Vetrina: ambulatorio / clinica da punto OSM dentro. uso DBGT solo 01; building OSM apartments; palazzo: 6 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-960.7&z=1164.9&debug=1",
+  "etichetta": "ambulatorio / clinica",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "apartments"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 4,
+  "altezza_m": 18.8,
+  "id_dbgt": [
+   8678
+  ],
+  "foto": "mont/149.jpg"
+ },
+ {
+  "n": 150,
+  "gruppo": "ASILO",
+  "nome": "Scuola dell’infanzia Gianni Rodari",
+  "x": -1919.4,
+  "z": 1432.6,
+  "piani": 1,
+  "superficie": 1438,
+  "classe": "a",
+  "perche": "Intero: scuola dell'infanzia da edificio OSM (building=kindergarten). uso DBGT pubblico 030301; building OSM kindergarten",
+  "link": "http://127.0.0.1:8100/?x=-1898.4&z=1391.8&debug=1",
+  "etichetta": "scuola dell'infanzia",
+  "fonte": "edificio OSM (building=kindergarten)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "kindergarten"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 3.9,
+  "id_dbgt": [
+   8469
+  ],
+  "foto": "mont/150.jpg"
+ },
+ {
+  "n": 151,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": -1814.0,
+  "z": 1280.5,
+  "piani": 1,
+  "superficie": 102,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da uso/tipo DBGT (vago). uso DBGT pubblico 1002; tipo DBGT 19 pubblico",
+  "link": "http://127.0.0.1:8100/?x=-1814.2&z=1299.1&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 4,
+  "punteggio_misto": 0,
+  "altezza_m": 3.2,
+  "id_dbgt": [
+   6452
+  ],
+  "foto": "mont/151.jpg"
+ },
+ {
+  "n": 152,
+  "gruppo": "CARABINIERI",
+  "nome": "Compagnia di Seveso",
+  "x": -1741.4,
+  "z": 1458.2,
+  "piani": 2,
+  "superficie": 315,
+  "classe": "a",
+  "perche": "Intero: caserma carabinieri da edificio OSM (building=yes). uso DBGT pubblico 0306; il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=-1741.4&z=1485.4&debug=1",
+  "etichetta": "caserma carabinieri",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "0306"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 7.7,
+  "id_dbgt": [
+   6734
+  ],
+  "foto": "mont/152.jpg"
+ },
+ {
+  "n": 153,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": -1863.8,
+  "z": 1418.4,
+  "piani": 1,
+  "superficie": 552,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da uso/tipo DBGT (vago). uso DBGT pubblico 030301",
+  "link": "http://127.0.0.1:8100/?x=-1864.2&z=1448.2&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.4,
+  "id_dbgt": [
+   7504
+  ],
+  "foto": "mont/153.jpg"
+ },
+ {
+  "n": 154,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola Primaria Bruno Munari",
+  "x": -1874.7,
+  "z": 1455.4,
+  "piani": 9,
+  "superficie": 60,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. area OSM del servizio; palazzo: 9 piani, famiglia 4",
+  "link": "http://127.0.0.1:8100/?x=-1862.5&z=1476.7&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 2,
+  "altezza_m": 27.3,
+  "id_dbgt": [],
+  "foto": "mont/154.jpg"
+ },
+ {
+  "n": 155,
+  "gruppo": "CULTURA",
+  "nome": "Politeama",
+  "x": -1342.7,
+  "z": 1255.9,
+  "piani": 4,
+  "superficie": 972,
+  "classe": "a",
+  "perche": "Intero: cinema / teatro da edificio OSM (building=yes). uso DBGT pubblico 100102; il poligono OSM dell edificio porta il tag del servizio; palazzo: 4 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-1320.4&z=1292.8&debug=1",
+  "etichetta": "cinema / teatro",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "100102"
+  ],
+  "building_osm": [
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 2,
+  "altezza_m": 13.5,
+  "id_dbgt": [
+   5920
+  ],
+  "foto": "mont/155.jpg"
+ },
+ {
+  "n": 156,
+  "gruppo": "POSTE",
+  "nome": "Seveso",
+  "x": -1255.1,
+  "z": 1409.2,
+  "piani": 6,
+  "superficie": 1430,
+  "classe": "b",
+  "perche": "Vetrina: poste da punto OSM dentro. uso DBGT solo 01; building OSM apartments/residential; palazzo: 6 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-1214.4&z=1448.3&debug=1",
+  "etichetta": "poste",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "residential",
+   "apartments",
+   "residential"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 4,
+  "altezza_m": 17.0,
+  "id_dbgt": [
+   6469
+  ],
+  "foto": "mont/156.jpg"
+ },
+ {
+  "n": 157,
+  "gruppo": "SANITÀ",
+  "nome": "(ospedale)",
+  "x": -978.6,
+  "z": 1228.9,
+  "piani": 3,
+  "superficie": 179,
+  "classe": "a",
+  "perche": "Intero: ospedale da edificio OSM (building=hospital). uso DBGT pubblico 030102; building OSM hospital",
+  "link": "http://127.0.0.1:8100/?x=-996.5&z=1218.4&debug=1",
+  "etichetta": "ospedale",
+  "fonte": "edificio OSM (building=hospital)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030102"
+  ],
+  "building_osm": [
+   "hospital"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 8.7,
+  "id_dbgt": [
+   7484
+  ],
+  "foto": "mont/157.jpg"
+ },
+ {
+  "n": 158,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Carlo Collodi\"",
+  "x": -827.8,
+  "z": 1222.8,
+  "piani": 2,
+  "superficie": 1112,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-852.8&z=1187.2&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 7.0,
+  "id_dbgt": [],
+  "foto": "mont/158.jpg"
+ },
+ {
+  "n": 159,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola secondaria di primo grado Leonardo Da Vinci e Istitut",
+  "x": -763.8,
+  "z": 1276.0,
+  "piani": 1,
+  "superficie": 114,
+  "classe": "a",
+  "perche": "Intero: scuola media da area OSM. area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-764.8&z=1297.6&debug=1",
+  "etichetta": "scuola media",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "roof"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 2.9,
+  "id_dbgt": [],
+  "foto": "mont/159.jpg"
+ },
+ {
+  "n": 160,
+  "gruppo": "CARABINIERI",
+  "nome": "Stazione Carabinieri di Seveso",
+  "x": -702.6,
+  "z": 1454.7,
+  "piani": 4,
+  "superficie": 804,
+  "classe": "a",
+  "perche": "Intero: caserma carabinieri da punto OSM dentro. building OSM public; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=-693.1&z=1494.6&debug=1",
+  "etichetta": "caserma carabinieri",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "public"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 11.0,
+  "id_dbgt": [
+   6222
+  ],
+  "foto": "mont/160.jpg"
+ },
+ {
+  "n": 161,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Istituto Professionale di Stato Lorenzo Milani",
+  "x": -782.2,
+  "z": 1262.7,
+  "piani": 5,
+  "superficie": 2286,
+  "classe": "a",
+  "perche": "Intero: scuola superiore / formazione da punto OSM dentro. uso DBGT pubblico 030301; building OSM school; palazzo: 5 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-780.2&z=1331.4&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 2,
+  "altezza_m": 15.5,
+  "id_dbgt": [
+   6303
+  ],
+  "foto": "mont/161.jpg"
+ },
+ {
+  "n": 162,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Carlo Collodi\"",
+  "x": -863.5,
+  "z": 1263.6,
+  "piani": 2,
+  "superficie": 76,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. uso DBGT pubblico 030301; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-863.5&z=1280.5&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 4.7,
+  "id_dbgt": [
+   6370
+  ],
+  "foto": "mont/162.jpg"
+ },
+ {
+  "n": 163,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Carlo Collodi\"",
+  "x": -835.2,
+  "z": 1243.1,
+  "piani": 2,
+  "superficie": 324,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-872.6&z=1233.5&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 5.9,
+  "id_dbgt": [
+   6396
+  ],
+  "foto": "mont/163.jpg"
+ },
+ {
+  "n": 164,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Carlo Collodi\"",
+  "x": -859.4,
+  "z": 1253.1,
+  "piani": 2,
+  "superficie": 149,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. uso DBGT pubblico 030301; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-869.7&z=1235.2&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 4.8,
+  "id_dbgt": [
+   7803
+  ],
+  "foto": "mont/164.jpg"
+ },
+ {
+  "n": 165,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Carlo Collodi\"",
+  "x": -835.6,
+  "z": 1282.2,
+  "piani": 3,
+  "superficie": 711,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-835.7&z=1324.4&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 9.8,
+  "id_dbgt": [
+   8236
+  ],
+  "foto": "mont/165.jpg"
+ },
+ {
+  "n": 166,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Carlo Collodi\"",
+  "x": -843.3,
+  "z": 1277.3,
+  "piani": 1,
+  "superficie": 229,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-881.9&z=1267.0&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "M17"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 4.4,
+  "id_dbgt": [
+   11637
+  ],
+  "foto": "mont/166.jpg"
+ },
+ {
+  "n": 167,
+  "gruppo": "CHIESA",
+  "nome": "(chiesa)",
+  "x": -409.4,
+  "z": 1351.9,
+  "piani": 2,
+  "superficie": 98,
+  "classe": "a",
+  "perche": "Intero: chiesa da uso/tipo DBGT. uso DBGT pubblico 05; tipo DBGT chiesa/campanile",
+  "link": "http://127.0.0.1:8100/?x=-404.4&z=1335.1&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 4.8,
+  "id_dbgt": [
+   6979
+  ],
+  "foto": "mont/167.jpg"
+ },
+ {
+  "n": 168,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -478.7,
+  "z": 1419.5,
+  "piani": 2,
+  "superficie": 19,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-478.6&z=1431.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.4,
+  "id_dbgt": [
+   8849
+  ],
+  "foto": "mont/168.jpg"
+ },
+ {
+  "n": 169,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -389.0,
+  "z": 1358.8,
+  "piani": 2,
+  "superficie": 402,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-381.4&z=1389.4&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.7,
+  "id_dbgt": [
+   8981
+  ],
+  "foto": "mont/169.jpg"
+ },
+ {
+  "n": 170,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -474.5,
+  "z": 1308.4,
+  "piani": 2,
+  "superficie": 48,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-487.3&z=1315.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.2,
+  "id_dbgt": [
+   9282
+  ],
+  "foto": "mont/170.jpg"
+ },
+ {
+  "n": 171,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -457.8,
+  "z": 1325.4,
+  "piani": 2,
+  "superficie": 27,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-448.6&z=1334.6&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.2,
+  "id_dbgt": [
+   9415
+  ],
+  "foto": "mont/171.jpg"
+ },
+ {
+  "n": 172,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -460.6,
+  "z": 1298.1,
+  "piani": 2,
+  "superficie": 426,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-432.7&z=1314.2&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.7,
+  "id_dbgt": [
+   9596
+  ],
+  "foto": "mont/172.jpg"
+ },
+ {
+  "n": 173,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -473.2,
+  "z": 1401.5,
+  "piani": 2,
+  "superficie": 23,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-473.1&z=1414.2&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.1,
+  "id_dbgt": [
+   9622
+  ],
+  "foto": "mont/173.jpg"
+ },
+ {
+  "n": 174,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -477.6,
+  "z": 1319.5,
+  "piani": 2,
+  "superficie": 25,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-483.9&z=1308.6&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.3,
+  "id_dbgt": [
+   9866
+  ],
+  "foto": "mont/174.jpg"
+ },
+ {
+  "n": 175,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -479.8,
+  "z": 1345.4,
+  "piani": 2,
+  "superficie": 34,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-476.4&z=1358.3&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.2,
+  "id_dbgt": [
+   9904
+  ],
+  "foto": "mont/175.jpg"
+ },
+ {
+  "n": 176,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -466.7,
+  "z": 1333.9,
+  "piani": 2,
+  "superficie": 35,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-459.8&z=1345.6&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.1,
+  "id_dbgt": [
+   9930
+  ],
+  "foto": "mont/176.jpg"
+ },
+ {
+  "n": 177,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -454.5,
+  "z": 1313.5,
+  "piani": 1,
+  "superficie": 21,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-445.7&z=1322.3&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.4,
+  "id_dbgt": [
+   10057
+  ],
+  "foto": "mont/177.jpg"
+ },
+ {
+  "n": 178,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -481.8,
+  "z": 1352.5,
+  "piani": 2,
+  "superficie": 21,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-469.0&z=1365.4&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.6,
+  "id_dbgt": [
+   10186
+  ],
+  "foto": "mont/178.jpg"
+ },
+ {
+  "n": 179,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -431.7,
+  "z": 1346.6,
+  "piani": 2,
+  "superficie": 432,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-415.9&z=1374.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.1,
+  "id_dbgt": [
+   10522
+  ],
+  "foto": "mont/179.jpg"
+ },
+ {
+  "n": 180,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -483.9,
+  "z": 1438.3,
+  "piani": 2,
+  "superficie": 16,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-484.0&z=1450.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.2,
+  "id_dbgt": [
+   10543
+  ],
+  "foto": "mont/180.jpg"
+ },
+ {
+  "n": 181,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -485.4,
+  "z": 1328.6,
+  "piani": 2,
+  "superficie": 31,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-478.8&z=1340.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.6,
+  "id_dbgt": [
+   10552
+  ],
+  "foto": "mont/181.jpg"
+ },
+ {
+  "n": 182,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -482.7,
+  "z": 1285.0,
+  "piani": 1,
+  "superficie": 72,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-483&z=1302.9&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.0,
+  "id_dbgt": [
+   10870
+  ],
+  "foto": "mont/182.jpg"
+ },
+ {
+  "n": 183,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -399.9,
+  "z": 1315.2,
+  "piani": 2,
+  "superficie": 925,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-400&z=1259.6&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.9,
+  "id_dbgt": [
+   10910
+  ],
+  "foto": "mont/183.jpg"
+ },
+ {
+  "n": 184,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -493.2,
+  "z": 1336.9,
+  "piani": 2,
+  "superficie": 584,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-476.2&z=1382.5&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.7,
+  "id_dbgt": [
+   11000
+  ],
+  "foto": "mont/184.jpg"
+ },
+ {
+  "n": 185,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -463.2,
+  "z": 1365.9,
+  "piani": 2,
+  "superficie": 18,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-463.2&z=1378.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.6,
+  "id_dbgt": [
+   11014
+  ],
+  "foto": "mont/185.jpg"
+ },
+ {
+  "n": 186,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -379.1,
+  "z": 1410.4,
+  "piani": 2,
+  "superficie": 13,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-379.1&z=1398.9&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 7.0,
+  "id_dbgt": [
+   11092
+  ],
+  "foto": "mont/186.jpg"
+ },
+ {
+  "n": 187,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -388.9,
+  "z": 1445.3,
+  "piani": 2,
+  "superficie": 10,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-388.9&z=1434.3&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.9,
+  "id_dbgt": [
+   11781
+  ],
+  "foto": "mont/187.jpg"
+ },
+ {
+  "n": 188,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -356.2,
+  "z": 1353.5,
+  "piani": 1,
+  "superficie": 25,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-362.5&z=1342.6&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   9689
+  ],
+  "foto": "mont/188.jpg"
+ },
+ {
+  "n": 189,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -332.0,
+  "z": 1382.3,
+  "piani": 2,
+  "superficie": 605,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-311.1&z=1327.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.7,
+  "id_dbgt": [
+   9749
+  ],
+  "foto": "mont/189.jpg"
+ },
+ {
+  "n": 190,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -336.4,
+  "z": 1359.9,
+  "piani": 2,
+  "superficie": 21,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-327.8&z=1368.6&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.9,
+  "id_dbgt": [
+   9936
+  ],
+  "foto": "mont/190.jpg"
+ },
+ {
+  "n": 191,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -339.1,
+  "z": 1385.8,
+  "piani": 2,
+  "superficie": 35,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-348.7&z=1395.4&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.5,
+  "id_dbgt": [
+   9975
+  ],
+  "foto": "mont/191.jpg"
+ },
+ {
+  "n": 192,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -334.3,
+  "z": 1370.8,
+  "piani": 2,
+  "superficie": 21,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-325.6&z=1362.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.1,
+  "id_dbgt": [
+   10065
+  ],
+  "foto": "mont/192.jpg"
+ },
+ {
+  "n": 193,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -333.0,
+  "z": 1348.1,
+  "piani": 2,
+  "superficie": 24,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-320.6&z=1344.8&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.8,
+  "id_dbgt": [
+   10250
+  ],
+  "foto": "mont/193.jpg"
+ },
+ {
+  "n": 194,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -344.1,
+  "z": 1331.1,
+  "piani": 2,
+  "superficie": 320,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-340.6&z=1362.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.2,
+  "id_dbgt": [
+   10391
+  ],
+  "foto": "mont/194.jpg"
+ },
+ {
+  "n": 195,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -353.2,
+  "z": 1366.2,
+  "piani": 3,
+  "superficie": 29,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-340.5&z=1362.8&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 8.0,
+  "id_dbgt": [
+   10572
+  ],
+  "foto": "mont/195.jpg"
+ },
+ {
+  "n": 196,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -345.5,
+  "z": 1374.7,
+  "piani": 2,
+  "superficie": 22,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-358.1&z=1374.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.3,
+  "id_dbgt": [
+   10714
+  ],
+  "foto": "mont/196.jpg"
+ },
+ {
+  "n": 197,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -350.2,
+  "z": 1389.9,
+  "piani": 2,
+  "superficie": 18,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-359.3&z=1374.2&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.2,
+  "id_dbgt": [
+   10895
+  ],
+  "foto": "mont/197.jpg"
+ },
+ {
+  "n": 198,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -358.7,
+  "z": 1388.3,
+  "piani": 2,
+  "superficie": 15,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-348.6&z=1394.1&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.6,
+  "id_dbgt": [
+   10973
+  ],
+  "foto": "mont/198.jpg"
+ },
+ {
+  "n": 199,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -341.0,
+  "z": 1392.7,
+  "piani": 2,
+  "superficie": 21,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-353.3&z=1392.7&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.5,
+  "id_dbgt": [
+   11238
+  ],
+  "foto": "mont/199.jpg"
+ },
+ {
+  "n": 200,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -336.3,
+  "z": 1377.2,
+  "piani": 2,
+  "superficie": 30,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-339.6&z=1364.4&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.2,
+  "id_dbgt": [
+   11288
+  ],
+  "foto": "mont/200.jpg"
+ },
+ {
+  "n": 201,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -343.8,
+  "z": 1369.0,
+  "piani": 1,
+  "superficie": 32,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-330.8&z=1365.5&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.8,
+  "id_dbgt": [
+   11319
+  ],
+  "foto": "mont/201.jpg"
+ },
+ {
+  "n": 202,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -373.4,
+  "z": 1391.6,
+  "piani": 2,
+  "superficie": 25,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-360.5&z=1391.6&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.8,
+  "id_dbgt": [
+   11341
+  ],
+  "foto": "mont/202.jpg"
+ },
+ {
+  "n": 203,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -348.1,
+  "z": 1383.1,
+  "piani": 2,
+  "superficie": 25,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-344.8&z=1395.6&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 5.6,
+  "id_dbgt": [
+   11488
+  ],
+  "foto": "mont/203.jpg"
+ },
+ {
+  "n": 204,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -352.9,
+  "z": 1342.6,
+  "piani": 2,
+  "superficie": 18,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-341.2&z=1339.4&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.5,
+  "id_dbgt": [
+   11641
+  ],
+  "foto": "mont/204.jpg"
+ },
+ {
+  "n": 205,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": 762.3,
+  "z": 1253.9,
+  "piani": 3,
+  "superficie": 344,
+  "classe": "c",
+  "perche": "Incerto: impianto sportivo da etichetta OSM vaga. ",
+  "link": "http://127.0.0.1:8100/?x=748.5&z=1277.8&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 0,
+  "altezza_m": 8.6,
+  "id_dbgt": [],
+  "foto": "mont/205.jpg"
+ },
+ {
+  "n": 206,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": 761.0,
+  "z": 1265.2,
+  "piani": 1,
+  "superficie": 326,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002; tipo DBGT 19 pubblico",
+  "link": "http://127.0.0.1:8100/?x=782.7&z=1286.9&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 4,
+  "punteggio_misto": 0,
+  "altezza_m": 3.2,
+  "id_dbgt": [
+   8180
+  ],
+  "foto": "mont/206.jpg"
+ },
+ {
+  "n": 207,
+  "gruppo": "ASILO",
+  "nome": "Biribimbo",
+  "x": 838.7,
+  "z": 1367.1,
+  "piani": 3,
+  "superficie": 438,
+  "classe": "c",
+  "perche": "Incerto: asilo nido da punto OSM dentro. uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=840.0&z=1395.3&debug=1",
+  "etichetta": "asilo nido",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 8.5,
+  "id_dbgt": [
+   8457
+  ],
+  "foto": "mont/207.jpg"
+ },
+ {
+  "n": 208,
+  "gruppo": "CHIESA",
+  "nome": "(chiesa)",
+  "x": 1587.5,
+  "z": 1239.6,
+  "piani": 2,
+  "superficie": 40,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church",
+  "link": "http://127.0.0.1:8100/?x=1597.4&z=1229.6&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 4.7,
+  "id_dbgt": [
+   6515
+  ],
+  "foto": "mont/208.jpg"
+ },
+ {
+  "n": 209,
+  "gruppo": "CHIESA",
+  "nome": "Chiesa di San Carlo Borromeo",
+  "x": -1974.1,
+  "z": 1549.6,
+  "piani": 2,
+  "superficie": 433,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church",
+  "link": "http://127.0.0.1:8100/?x=-1960.2&z=1574.7&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 7.2,
+  "id_dbgt": [
+   6042
+  ],
+  "foto": "mont/209.jpg"
+ },
+ {
+  "n": 210,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola Primaria Bruno Munari",
+  "x": -1892.3,
+  "z": 1483.9,
+  "piani": 4,
+  "superficie": 626,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=-1894.1&z=1514.9&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 11.3,
+  "id_dbgt": [
+   6526
+  ],
+  "foto": "mont/210.jpg"
+ },
+ {
+  "n": 211,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": -2039.9,
+  "z": 1525.8,
+  "piani": 2,
+  "superficie": 959,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002",
+  "link": "http://127.0.0.1:8100/?x=-2065.3&z=1500.4&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 7.5,
+  "id_dbgt": [
+   7516
+  ],
+  "foto": "mont/211.jpg"
+ },
+ {
+  "n": 212,
+  "gruppo": "CULTURA",
+  "nome": "(sala civica / centro culturale)",
+  "x": -1990.9,
+  "z": 1564.4,
+  "piani": 2,
+  "superficie": 278,
+  "classe": "a",
+  "perche": "Intero: sala civica / centro culturale da etichetta OSM vaga. uso DBGT pubblico 1001; il poligono OSM dell edificio porta il tag del servizio",
+  "link": "http://127.0.0.1:8100/?x=-1990.8&z=1589.2&debug=1",
+  "etichetta": "sala civica / centro culturale",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1001"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 6.3,
+  "id_dbgt": [
+   8436
+  ],
+  "foto": "mont/212.jpg"
+ },
+ {
+  "n": 213,
+  "gruppo": "CULTURA",
+  "nome": "Villa del Sole - Biblioteca comunale di Seveso",
+  "x": -1410.9,
+  "z": 1539.4,
+  "piani": 3,
+  "superficie": 370,
+  "classe": "a",
+  "perche": "Intero: biblioteca da edificio OSM (building=public). uso DBGT pubblico 100101; building OSM public",
+  "link": "http://127.0.0.1:8100/?x=-1403.8&z=1565.6&debug=1",
+  "etichetta": "biblioteca",
+  "fonte": "edificio OSM (building=public)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "100101"
+  ],
+  "building_osm": [
+   "public"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 8.4,
+  "id_dbgt": [
+   5893
+  ],
+  "foto": "mont/213.jpg"
+ },
+ {
+  "n": 214,
+  "gruppo": "ALTRO",
+  "nome": "Villa Dho",
+  "x": -1618.8,
+  "z": 1639.7,
+  "piani": 2,
+  "superficie": 676,
+  "classe": "a",
+  "perche": "Intero: villa storica da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=-1581.0&z=1615.0&debug=1",
+  "etichetta": "villa storica",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 5.2,
+  "id_dbgt": [
+   6813
+  ],
+  "foto": "mont/214.jpg"
+ },
+ {
+  "n": 215,
+  "gruppo": "ALTRO",
+  "nome": "Hotel Lombardia",
+  "x": -1370.8,
+  "z": 1698.8,
+  "piani": 5,
+  "superficie": 196,
+  "classe": "a",
+  "perche": "Intero: albergo da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 08; palazzo: 5 piani, famiglia 5",
+  "link": "http://127.0.0.1:8100/?x=-1355.8&z=1713.6&debug=1",
+  "etichetta": "albergo",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "08"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 3,
+  "altezza_m": 15.5,
+  "id_dbgt": [
+   6375
+  ],
+  "foto": "mont/215.jpg"
+ },
+ {
+  "n": 216,
+  "gruppo": "ALTRO",
+  "nome": "Hotel Lombardia",
+  "x": -1371.9,
+  "z": 1687.5,
+  "piani": 3,
+  "superficie": 83,
+  "classe": "a",
+  "perche": "Intero: albergo da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 08",
+  "link": "http://127.0.0.1:8100/?x=-1355.9&z=1692.1&debug=1",
+  "etichetta": "albergo",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "08"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 8.1,
+  "id_dbgt": [
+   7181
+  ],
+  "foto": "mont/216.jpg"
+ },
+ {
+  "n": 217,
+  "gruppo": "CHIESA",
+  "nome": "(chiesa)",
+  "x": -1203.4,
+  "z": 1559.9,
+  "piani": 2,
+  "superficie": 169,
+  "classe": "a",
+  "perche": "Intero: chiesa da uso/tipo DBGT. uso DBGT pubblico 05; tipo DBGT chiesa/campanile",
+  "link": "http://127.0.0.1:8100/?x=-1189.7&z=1572.9&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 0,
+  "altezza_m": 7.9,
+  "id_dbgt": [
+   7431
+  ],
+  "foto": "mont/217.jpg"
+ },
+ {
+  "n": 218,
+  "gruppo": "CHIESA",
+  "nome": "(chiesa)",
+  "x": -1249.1,
+  "z": 1545.5,
+  "piani": 5,
+  "superficie": 1575,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church; palazzo: 5 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-1282.4&z=1508.3&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "yes",
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 14.3,
+  "id_dbgt": [
+   7511
+  ],
+  "foto": "mont/218.jpg"
+ },
+ {
+  "n": 219,
+  "gruppo": "COMUNE",
+  "nome": "Ex Biblioteca",
+  "x": -1361.8,
+  "z": 1570.7,
+  "piani": 3,
+  "superficie": 303,
+  "classe": "c",
+  "perche": "Incerto: ufficio pubblico da punto OSM dentro. uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=-1340.5&z=1558.2&debug=1",
+  "etichetta": "ufficio pubblico",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 9.1,
+  "id_dbgt": [
+   8290
+  ],
+  "foto": "mont/219.jpg"
+ },
+ {
+  "n": 220,
+  "gruppo": "ALTRO",
+  "nome": "Hotel Lombardia",
+  "x": -1378.7,
+  "z": 1672.4,
+  "piani": 2,
+  "superficie": 284,
+  "classe": "a",
+  "perche": "Intero: albergo da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 08",
+  "link": "http://127.0.0.1:8100/?x=-1361.3&z=1689.7&debug=1",
+  "etichetta": "albergo",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "08"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 7.2,
+  "id_dbgt": [
+   8730
+  ],
+  "foto": "mont/220.jpg"
+ },
+ {
+  "n": 221,
+  "gruppo": "COMUNE",
+  "nome": "Aci Seveso - Atlantide",
+  "x": -989.0,
+  "z": 1631.2,
+  "piani": 3,
+  "superficie": 179,
+  "classe": "b",
+  "perche": "Vetrina: ufficio pubblico da punto OSM dentro. uso DBGT solo 01; building OSM apartments; palazzo: 3 piani, famiglia 3",
+  "link": "http://127.0.0.1:8100/?x=-974.2&z=1646.0&debug=1",
+  "etichetta": "ufficio pubblico",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "apartments"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 4,
+  "altezza_m": 8.5,
+  "id_dbgt": [
+   8675
+  ],
+  "foto": "mont/221.jpg"
+ },
+ {
+  "n": 222,
+  "gruppo": "CHIESA",
+  "nome": "(altro luogo di culto)",
+  "x": -447.2,
+  "z": 1479.7,
+  "piani": 2,
+  "superficie": 139,
+  "classe": "a",
+  "perche": "Intero: altro luogo di culto da uso/tipo DBGT (vago). uso DBGT pubblico 05",
+  "link": "http://127.0.0.1:8100/?x=-441.9&z=1499.4&debug=1",
+  "etichetta": "altro luogo di culto",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.8,
+  "id_dbgt": [
+   6632
+  ],
+  "foto": "mont/222.jpg"
+ },
+ {
+  "n": 223,
+  "gruppo": "SPORT",
+  "nome": "Bocciodromo Comunale",
+  "x": -397.6,
+  "z": 1604.1,
+  "piani": 2,
+  "superficie": 589,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da uso/tipo DBGT (vago). uso DBGT pubblico 1002; tipo DBGT 19 pubblico",
+  "link": "http://127.0.0.1:8100/?x=-374.8&z=1564.7&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 4,
+  "punteggio_misto": 0,
+  "altezza_m": 4.9,
+  "id_dbgt": [
+   8441
+  ],
+  "foto": "mont/223.jpg"
+ },
+ {
+  "n": 224,
+  "gruppo": "CAPPELLA",
+  "nome": "(cappella)",
+  "x": -394.4,
+  "z": 1464.3,
+  "piani": 2,
+  "superficie": 15,
+  "classe": "a",
+  "perche": "Intero: cappella da uso/tipo DBGT. volume minore DBGT cappella/edicola funeraria",
+  "link": "http://127.0.0.1:8100/?x=-394.4&z=1452.5&debug=1",
+  "etichetta": "cappella",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "M18"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.5,
+  "id_dbgt": [
+   11437
+  ],
+  "foto": "mont/224.jpg"
+ },
+ {
+  "n": 225,
+  "gruppo": "COMUNE",
+  "nome": "Centro Polifunzionale",
+  "x": -366.6,
+  "z": 1634.9,
+  "piani": 2,
+  "superficie": 1317,
+  "classe": "a",
+  "perche": "Intero: edificio pubblico (non precisato) da etichetta OSM vaga. building OSM public; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=-322.5&z=1679.0&debug=1",
+  "etichetta": "edificio pubblico (non precisato)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "public"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 7.6,
+  "id_dbgt": [
+   6945
+  ],
+  "foto": "mont/225.jpg"
+ },
+ {
+  "n": 226,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": -112.9,
+  "z": 1670.4,
+  "piani": 2,
+  "superficie": 1797,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da uso/tipo DBGT (vago). uso DBGT pubblico 1002; tipo DBGT 19 pubblico",
+  "link": "http://127.0.0.1:8100/?x=-78.6&z=1704.6&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 4,
+  "punteggio_misto": 0,
+  "altezza_m": 5.3,
+  "id_dbgt": [
+   7311
+  ],
+  "foto": "mont/226.jpg"
+ },
+ {
+  "n": 227,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola secondaria di primo grado Don Aurelio Giussani",
+  "x": 869.8,
+  "z": 1631.9,
+  "piani": 3,
+  "superficie": 2501,
+  "classe": "a",
+  "perche": "Intero: scuola media da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=922.1&z=1663.0&debug=1",
+  "etichetta": "scuola media",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 8.1,
+  "id_dbgt": [
+   7669
+  ],
+  "foto": "mont/227.jpg"
+ },
+ {
+  "n": 228,
+  "gruppo": "CHIESA",
+  "nome": "Beata Vergine Immacolata",
+  "x": 1054.2,
+  "z": 1564.4,
+  "piani": 7,
+  "superficie": 827,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church; palazzo: 7 piani, famiglia 4",
+  "link": "http://127.0.0.1:8100/?x=1054.2&z=1600.8&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 2,
+  "altezza_m": 22.4,
+  "id_dbgt": [
+   6299
+  ],
+  "foto": "mont/228.jpg"
+ },
+ {
+  "n": 229,
+  "gruppo": "SPORT",
+  "nome": "(palazzetto / palestra pubblica)",
+  "x": 991.0,
+  "z": 1535.9,
+  "piani": 1,
+  "superficie": 391,
+  "classe": "c",
+  "perche": "Incerto: palazzetto / palestra pubblica da uso/tipo DBGT. tipo DBGT 19 pubblico; uso DBGT solo 95",
+  "link": "http://127.0.0.1:8100/?x=1017.9&z=1528.7&debug=1",
+  "etichetta": "palazzetto / palestra pubblica",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "95"
+  ],
+  "building_osm": [],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 1,
+  "punteggio_misto": 1,
+  "altezza_m": 2.9,
+  "id_dbgt": [
+   8376
+  ],
+  "foto": "mont/229.jpg"
+ },
+ {
+  "n": 230,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Enrico Toti\"",
+  "x": 1137.2,
+  "z": 1648.2,
+  "piani": 2,
+  "superficie": 1809,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. uso DBGT pubblico 030301; tipo DBGT 19 pubblico; il poligono OSM dell edificio porta il tag del servizio; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1165.6&z=1600.3&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 10,
+  "punteggio_misto": 0,
+  "altezza_m": 7.6,
+  "id_dbgt": [
+   5563
+  ],
+  "foto": "mont/230.jpg"
+ },
+ {
+  "n": 231,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Enrico Toti\"",
+  "x": 1192.3,
+  "z": 1695.3,
+  "piani": 3,
+  "superficie": 2169,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1193.7&z=1752.1&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 9.0,
+  "id_dbgt": [
+   7501
+  ],
+  "foto": "mont/231.jpg"
+ },
+ {
+  "n": 232,
+  "gruppo": "SCUOLA",
+  "nome": "Scuola primaria \"Enrico Toti\"",
+  "x": 1146.1,
+  "z": 1621.8,
+  "piani": 1,
+  "superficie": 110,
+  "classe": "a",
+  "perche": "Intero: scuola primaria da area OSM. area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1164.8&z=1626.9&debug=1",
+  "etichetta": "scuola primaria",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "M01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.9,
+  "id_dbgt": [
+   9867
+  ],
+  "foto": "mont/232.jpg"
+ },
+ {
+  "n": 233,
+  "gruppo": "TRIBUNA",
+  "nome": "(tribuna campo sportivo)",
+  "x": -1812.0,
+  "z": 1786.8,
+  "piani": 2,
+  "superficie": 81,
+  "classe": "a",
+  "perche": "Intero: tribuna campo sportivo da edificio OSM (building=grandstand). building OSM grandstand",
+  "link": "http://127.0.0.1:8100/?x=-1828.6&z=1776.3&debug=1",
+  "etichetta": "tribuna campo sportivo",
+  "fonte": "edificio OSM (building=grandstand)",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "grandstand"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 6.0,
+  "id_dbgt": [],
+  "foto": "mont/233.jpg"
+ },
+ {
+  "n": 234,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": -1771.1,
+  "z": 1794.8,
+  "piani": 1,
+  "superficie": 124,
+  "classe": "a",
+  "perche": "Intero: impianto sportivo da etichetta OSM vaga. uso DBGT pubblico 1002",
+  "link": "http://127.0.0.1:8100/?x=-1771.1&z=1813.0&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "1002"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.4,
+  "id_dbgt": [
+   8410
+  ],
+  "foto": "mont/234.jpg"
+ },
+ {
+  "n": 235,
+  "gruppo": "SPORT",
+  "nome": "(impianto sportivo)",
+  "x": -1750.0,
+  "z": 1775.4,
+  "piani": 1,
+  "superficie": 82,
+  "classe": "c",
+  "perche": "Incerto: impianto sportivo da etichetta OSM vaga. ",
+  "link": "http://127.0.0.1:8100/?x=-1744.7&z=1795.2&debug=1",
+  "etichetta": "impianto sportivo",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 0,
+  "altezza_m": 2.8,
+  "id_dbgt": [],
+  "foto": "mont/235.jpg"
+ },
+ {
+  "n": 236,
+  "gruppo": "CHIESA",
+  "nome": "Madonna di Fatima",
+  "x": -56.3,
+  "z": 1896.8,
+  "piani": 3,
+  "superficie": 510,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church",
+  "link": "http://127.0.0.1:8100/?x=-27.0&z=1888.9&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 10.4,
+  "id_dbgt": [
+   8109
+  ],
+  "foto": "mont/236.jpg"
+ },
+ {
+  "n": 237,
+  "gruppo": "CHIESA",
+  "nome": "(campanile)",
+  "x": 867.7,
+  "z": 1948.6,
+  "piani": 8,
+  "superficie": 23,
+  "classe": "a",
+  "perche": "Intero: campanile da uso/tipo DBGT. uso DBGT pubblico 05; tipo DBGT chiesa/campanile; palazzo: 8 piani, famiglia 4",
+  "link": "http://127.0.0.1:8100/?x=867.6&z=1969.7&debug=1",
+  "etichetta": "campanile",
+  "fonte": "uso/tipo DBGT",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E07"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 6,
+  "punteggio_misto": 2,
+  "altezza_m": 23.4,
+  "id_dbgt": [
+   6521
+  ],
+  "foto": "mont/237.jpg"
+ },
+ {
+  "n": 238,
+  "gruppo": "CHIESA",
+  "nome": "Chiesa della Beata Vergine Immacolata",
+  "x": 879.0,
+  "z": 1962.5,
+  "piani": 4,
+  "superficie": 348,
+  "classe": "a",
+  "perche": "Intero: chiesa da edificio OSM (building=church). uso DBGT pubblico 05; tipo DBGT chiesa/campanile; building OSM church",
+  "link": "http://127.0.0.1:8100/?x=892.7&z=1986.6&debug=1",
+  "etichetta": "chiesa",
+  "fonte": "edificio OSM (building=church)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "05"
+  ],
+  "building_osm": [
+   "church"
+  ],
+  "tipo_dbgt": [
+   "E11"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 10.7,
+  "id_dbgt": [
+   6311
+  ],
+  "foto": "mont/238.jpg"
+ },
+ {
+  "n": 239,
+  "gruppo": "CHIESA",
+  "nome": "(oratorio / centro parrocchiale)",
+  "x": 897.0,
+  "z": 1949.8,
+  "piani": 2,
+  "superficie": 168,
+  "classe": "a",
+  "perche": "Intero: oratorio / centro parrocchiale da edificio OSM (building=parish). building OSM parish; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=887.1&z=1932.6&debug=1",
+  "etichetta": "oratorio / centro parrocchiale",
+  "fonte": "edificio OSM (building=parish)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "parish"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 6.8,
+  "id_dbgt": [
+   6434
+  ],
+  "foto": "mont/239.jpg"
+ },
+ {
+  "n": 240,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": 889.3,
+  "z": 1899.4,
+  "piani": 3,
+  "superficie": 748,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da uso/tipo DBGT (vago). uso DBGT pubblico 030301",
+  "link": "http://127.0.0.1:8100/?x=915.4&z=1863.6&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "uso/tipo DBGT (vago)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "yes",
+   "yes",
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 9.1,
+  "id_dbgt": [
+   8145
+  ],
+  "foto": "mont/240.jpg"
+ },
+ {
+  "n": 241,
+  "gruppo": "STAZIONE",
+  "nome": "Seveso-Baruccana",
+  "x": 690.2,
+  "z": 2147.3,
+  "piani": 1,
+  "superficie": 291,
+  "classe": "c",
+  "perche": "Incerto: stazione da punto OSM dentro. ",
+  "link": "http://127.0.0.1:8100/?x=692.8&z=2191.8&debug=1",
+  "etichetta": "stazione",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "roof"
+  ],
+  "tipo_dbgt": [],
+  "residenziale": false,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 0,
+  "altezza_m": 3.1,
+  "id_dbgt": [],
+  "foto": "mont/241.jpg"
+ },
+ {
+  "n": 242,
+  "gruppo": "POSTE",
+  "nome": "Poste Italiane",
+  "x": 871.9,
+  "z": 2014.7,
+  "piani": 3,
+  "superficie": 301,
+  "classe": "c",
+  "perche": "Incerto: poste da punto OSM dentro. uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=893.2&z=2002.9&debug=1",
+  "etichetta": "poste",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 0,
+  "punteggio_misto": 1,
+  "altezza_m": 8.5,
+  "id_dbgt": [
+   6446
+  ],
+  "foto": "mont/242.jpg"
+ },
+ {
+  "n": 243,
+  "gruppo": "ASILO",
+  "nome": "Asilo Nido Santa Bernadetta",
+  "x": 844.7,
+  "z": 1960.7,
+  "piani": 2,
+  "superficie": 298,
+  "classe": "a",
+  "perche": "Intero: asilo nido da edificio OSM (building=yes). il poligono OSM dell edificio porta il tag del servizio; uso DBGT solo 01",
+  "link": "http://127.0.0.1:8100/?x=818.0&z=1962.0&debug=1",
+  "etichetta": "asilo nido",
+  "fonte": "edificio OSM (building=yes)",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "01"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": true,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 1,
+  "altezza_m": 6.4,
+  "id_dbgt": [
+   7409
+  ],
+  "foto": "mont/243.jpg"
+ },
+ {
+  "n": 244,
+  "gruppo": "SCUOLA",
+  "nome": "(scuola (non precisata))",
+  "x": 858.1,
+  "z": 1967.2,
+  "piani": 1,
+  "superficie": 256,
+  "classe": "a",
+  "perche": "Intero: scuola (non precisata) da etichetta OSM vaga. uso DBGT pubblico 030301",
+  "link": "http://127.0.0.1:8100/?x=831.5&z=1967&debug=1",
+  "etichetta": "scuola (non precisata)",
+  "fonte": "etichetta OSM vaga",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 3.2,
+  "id_dbgt": [
+   8094
+  ],
+  "foto": "mont/244.jpg"
+ },
+ {
+  "n": 245,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Liceo paritario \"Pier Giorgio Frassati\"",
+  "x": 1151.5,
+  "z": 2092.6,
+  "piani": 3,
+  "superficie": 689,
+  "classe": "a",
+  "perche": "Intero: scuola superiore / formazione da area OSM. uso DBGT pubblico 030301; building OSM school; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1178.3&z=2106.2&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "school"
+  ],
+  "tipo_dbgt": [
+   "E01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 9,
+  "punteggio_misto": 0,
+  "altezza_m": 10.6,
+  "id_dbgt": [
+   7229
+  ],
+  "foto": "mont/245.jpg"
+ },
+ {
+  "n": 246,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Liceo paritario \"Pier Giorgio Frassati\"",
+  "x": 1155.5,
+  "z": 2053.1,
+  "piani": 2,
+  "superficie": 247,
+  "classe": "a",
+  "perche": "Intero: scuola superiore / formazione da area OSM. uso DBGT pubblico 030301; tipo DBGT 19 pubblico; area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1173.7&z=2063.5&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [
+   "030301"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E19"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 7,
+  "punteggio_misto": 0,
+  "altezza_m": 6.0,
+  "id_dbgt": [
+   7301
+  ],
+  "foto": "mont/246.jpg"
+ },
+ {
+  "n": 247,
+  "gruppo": "SCUOLA SUPERIORE",
+  "nome": "Liceo paritario \"Pier Giorgio Frassati\"",
+  "x": 1156.2,
+  "z": 2064.5,
+  "piani": 1,
+  "superficie": 71,
+  "classe": "a",
+  "perche": "Intero: scuola superiore / formazione da area OSM. area OSM del servizio",
+  "link": "http://127.0.0.1:8100/?x=1141.0&z=2060.5&debug=1",
+  "etichetta": "scuola superiore / formazione",
+  "fonte": "area OSM",
+  "altre_attivita": [],
+  "uso_dbgt": [],
+  "building_osm": [
+   "garage"
+  ],
+  "tipo_dbgt": [
+   "M01"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 0,
+  "altezza_m": 4.0,
+  "id_dbgt": [
+   10708
+  ],
+  "foto": "mont/247.jpg"
+ },
+ {
+  "n": 248,
+  "gruppo": "SPORT",
+  "nome": "Fitactive",
+  "x": -850.8,
+  "z": 2265.7,
+  "piani": 3,
+  "superficie": 595,
+  "classe": "a",
+  "perche": "Intero: palestra privata / fitness da punto OSM dentro. uso DBGT pubblico 100202; 1 altra attività privata dentro Altre attività: Evolution Beauty.",
+  "link": "http://127.0.0.1:8100/?x=-824.6&z=2282.9&debug=1",
+  "etichetta": "palestra privata / fitness",
+  "fonte": "punto OSM dentro",
+  "altre_attivita": [
+   "Evolution Beauty"
+  ],
+  "uso_dbgt": [
+   "100202"
+  ],
+  "building_osm": [
+   "yes"
+  ],
+  "tipo_dbgt": [
+   "E08"
+  ],
+  "residenziale": false,
+  "punteggio_pubblico": 3,
+  "punteggio_misto": 2,
+  "altezza_m": 9.2,
+  "id_dbgt": [
+   8736
+  ],
+  "foto": "mont/248.jpg"
+ }
+]
