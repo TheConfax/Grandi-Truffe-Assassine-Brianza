@@ -345,6 +345,7 @@ if _cov and not os.environ.get('GTA_EDIFICI_OSM'):  # where a comune has its DBG
     ED = dbgt_edifici.Edifici([(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'), _comuni[d_.lower()]) for d_ in sorted(os.listdir(DBT_DIR)) if d_.lower() in _comuni and os.path.exists(os.path.join(DBT_DIR, d_, 'dbgt.gpkg'))],
                               log, lambda lon_, lat_: ((lon_ - lon0) * KX, -(lat_ - lat0) * KZ), round(TBASE, 1))
     buildings[:] = ED.unisci(buildings, _Pp); buildings += ED.tetti()  # (the wings of the volumes cut for their roofs come back as new pieces)
+    buildings[:] = [b for b in buildings if not b.get('tolto')]  # (a volume the DSM says is not there, dbgt_edifici.py altezze_dal_dsm)
     for b in buildings + ED.alti: b.setdefault('t', BTYPE.get(b['bt'], 0))
 elif dbt_vols:  # (GTA_EDIFICI_OSM: the OSM buildings with the DBGT's heights, as before) where the Comune's map covers: its heights, no footprints only the ML model saw, its buildings OSM lacks
     _vg = [_Pp(p_) for p_, h_ in dbt_vols]; _vok = [i for i, g_ in enumerate(_vg) if g_ is not None]; _vt = STRtree([_vg[i] for i in _vok])

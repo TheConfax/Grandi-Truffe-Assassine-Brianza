@@ -11,16 +11,16 @@
    "pezzo_sciolto_m": 8.0
   },
   "varchi_trovati": 101,
-  "chiusi": 37,
-  "metri_chiusi": 153.1,
+  "chiusi": 36,
+  "metri_chiusi": 151.7,
   "pezzi_sciolti_spostati": 1,
   "aperti_per_motivo": {
-   "una via che attraversa": 11,
+   "una via che attraversa": 12,
    "edificio": 20,
    "banchina": 6,
    "carreggiata": 1,
-   "cancello": 12,
-   "passaggio a livello": 12,
+   "cancello": 13,
+   "passaggio a livello": 11,
    "sul binario": 2
   },
   "da_chiudere": 0,
@@ -242,6 +242,12 @@
     "esito": "cancello"
    },
    {
+    "x": 863.9,
+    "z": -1470.8,
+    "m": 4.6,
+    "esito": "cancello"
+   },
+   {
     "x": -630.6,
     "z": 221.2,
     "m": 4.9,
@@ -377,7 +383,7 @@
     "x": 586.4,
     "z": -763.4,
     "m": 9.5,
-    "esito": "passaggio a livello"
+    "esito": "una via che attraversa"
    },
    {
     "x": 827.1,
@@ -524,12 +530,6 @@
     "esito": "chiuso"
    },
    {
-    "x": 961.8,
-    "z": 2038.8,
-    "m": 1.3,
-    "esito": "chiuso"
-   },
-   {
     "x": 368.0,
     "z": -538.2,
     "m": 1.5,
@@ -572,9 +572,9 @@
     "esito": "cancello"
    },
    {
-    "x": 863.9,
-    "z": -1470.8,
-    "m": 4.6,
+    "x": -1001.2,
+    "z": 1468.9,
+    "m": 5.6,
     "esito": "cancello"
    },
    {
@@ -631,6 +631,694 @@
     "m": 12.3,
     "esito": "edificio"
    }
-  ]
+  ],
+  "misti": {
+   "limite_m": 6.0,
+   "trovati": 112,
+   "chiusi": 43,
+   "aperti_per_motivo": {
+    "una via che attraversa": 7,
+    "edificio": 12,
+    "cancello": 25,
+    "carreggiata": 4,
+    "sul binario": 7,
+    "banchina": 9,
+    "passaggio a livello": 5
+   },
+   "elenco": [
+    {
+     "x": 528.8,
+     "z": -650.8,
+     "m": 4.1,
+     "esito": "una via che attraversa"
+    },
+    {
+     "x": -712.9,
+     "z": 293.9,
+     "m": 5.6,
+     "esito": "edificio"
+    },
+    {
+     "x": -196.7,
+     "z": -131.4,
+     "m": 0.9,
+     "esito": "chiuso"
+    },
+    {
+     "x": -189.3,
+     "z": -136.1,
+     "m": 3.3,
+     "esito": "edificio"
+    },
+    {
+     "x": 315.8,
+     "z": 254.9,
+     "m": 4.0,
+     "esito": "edificio"
+    },
+    {
+     "x": -678.0,
+     "z": 266.1,
+     "m": 5.8,
+     "esito": "edificio"
+    },
+    {
+     "x": 892.2,
+     "z": -1530.6,
+     "m": 1.4,
+     "esito": "cancello"
+    },
+    {
+     "x": 889.3,
+     "z": -1524.1,
+     "m": 4.2,
+     "esito": "carreggiata"
+    },
+    {
+     "x": 891.6,
+     "z": -1530.1,
+     "m": 0.6,
+     "esito": "cancello"
+    },
+    {
+     "x": 884.6,
+     "z": -1515.9,
+     "m": 3.3,
+     "esito": "cancello"
+    },
+    {
+     "x": 132.9,
+     "z": -323.9,
+     "m": 4.1,
+     "esito": "cancello"
+    },
+    {
+     "x": 863.8,
+     "z": -1471.1,
+     "m": 4.1,
+     "esito": "cancello"
+    },
+    {
+     "x": 750.1,
+     "z": -1192.1,
+     "m": 0.3,
+     "esito": "chiuso"
+    },
+    {
+     "x": 348.0,
+     "z": 262.4,
+     "m": 2.9,
+     "esito": "edificio"
+    },
+    {
+     "x": 857.2,
+     "z": -1455.5,
+     "m": 4.1,
+     "esito": "cancello"
+    },
+    {
+     "x": 862.9,
+     "z": -1469.0,
+     "m": 0.8,
+     "esito": "cancello"
+    },
+    {
+     "x": 46.6,
+     "z": -269.5,
+     "m": 4.1,
+     "esito": "cancello"
+    },
+    {
+     "x": 746.7,
+     "z": -1128.7,
+     "m": 0.6,
+     "esito": "cancello"
+    },
+    {
+     "x": 768.1,
+     "z": -1237.4,
+     "m": 0.8,
+     "esito": "chiuso"
+    },
+    {
+     "x": 292.5,
+     "z": -457.1,
+     "m": 3.5,
+     "esito": "edificio"
+    },
+    {
+     "x": 70.7,
+     "z": 206.7,
+     "m": 3.7,
+     "esito": "carreggiata"
+    },
+    {
+     "x": 767.0,
+     "z": -1230.8,
+     "m": 0.7,
+     "esito": "carreggiata"
+    },
+    {
+     "x": 153.0,
+     "z": -358.4,
+     "m": 1.6,
+     "esito": "chiuso"
+    },
+    {
+     "x": 858.2,
+     "z": -1407.2,
+     "m": 2.8,
+     "esito": "chiuso"
+    },
+    {
+     "x": -708.5,
+     "z": 294.4,
+     "m": 5.7,
+     "esito": "edificio"
+    },
+    {
+     "x": 846.2,
+     "z": -1397.1,
+     "m": 3.4,
+     "esito": "sul binario"
+    },
+    {
+     "x": 321.2,
+     "z": 257.2,
+     "m": 3.5,
+     "esito": "chiuso"
+    },
+    {
+     "x": 685.0,
+     "z": -1025.1,
+     "m": 5.6,
+     "esito": "edificio"
+    },
+    {
+     "x": 99.6,
+     "z": 212.3,
+     "m": 3.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": 668.8,
+     "z": -968.5,
+     "m": 5.7,
+     "esito": "sul binario"
+    },
+    {
+     "x": 766.1,
+     "z": -1232.1,
+     "m": 1.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": 769.7,
+     "z": -1229.6,
+     "m": 5.9,
+     "esito": "una via che attraversa"
+    },
+    {
+     "x": 89.0,
+     "z": 231.3,
+     "m": 0.9,
+     "esito": "chiuso"
+    },
+    {
+     "x": -341.7,
+     "z": -16.1,
+     "m": 1.2,
+     "esito": "chiuso"
+    },
+    {
+     "x": -345.9,
+     "z": -9.4,
+     "m": 4.3,
+     "esito": "chiuso"
+    },
+    {
+     "x": 747.6,
+     "z": -1130.8,
+     "m": 4.1,
+     "esito": "cancello"
+    },
+    {
+     "x": 265.9,
+     "z": 265.8,
+     "m": 4.5,
+     "esito": "chiuso"
+    },
+    {
+     "x": -821.1,
+     "z": 428.4,
+     "m": 3.5,
+     "esito": "cancello"
+    },
+    {
+     "x": 420.5,
+     "z": 2247.4,
+     "m": 4.6,
+     "esito": "sul binario"
+    },
+    {
+     "x": 1074.4,
+     "z": 1966.1,
+     "m": 3.1,
+     "esito": "chiuso"
+    },
+    {
+     "x": 557.1,
+     "z": 2209.4,
+     "m": 4.4,
+     "esito": "chiuso"
+    },
+    {
+     "x": 1294.4,
+     "z": 1866.9,
+     "m": 3.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": 541.9,
+     "z": 2213.0,
+     "m": 3.6,
+     "esito": "chiuso"
+    },
+    {
+     "x": -1107.7,
+     "z": 410.6,
+     "m": 5.7,
+     "esito": "cancello"
+    },
+    {
+     "x": -1108.6,
+     "z": 337.9,
+     "m": 3.5,
+     "esito": "una via che attraversa"
+    },
+    {
+     "x": 1105.7,
+     "z": 1971.1,
+     "m": 4.4,
+     "esito": "cancello"
+    },
+    {
+     "x": 1153.5,
+     "z": 1951.8,
+     "m": 4.3,
+     "esito": "cancello"
+    },
+    {
+     "x": 527.1,
+     "z": 2213.6,
+     "m": 3.7,
+     "esito": "banchina"
+    },
+    {
+     "x": -1105.6,
+     "z": 597.6,
+     "m": 2.8,
+     "esito": "cancello"
+    },
+    {
+     "x": -1020.4,
+     "z": 1315.0,
+     "m": 0.5,
+     "esito": "chiuso"
+    },
+    {
+     "x": -1101.1,
+     "z": 168.3,
+     "m": 3.6,
+     "esito": "sul binario"
+    },
+    {
+     "x": 960.3,
+     "z": 2026.2,
+     "m": 0.7,
+     "esito": "cancello"
+    },
+    {
+     "x": -1022.8,
+     "z": 609.8,
+     "m": 5.4,
+     "esito": "una via che attraversa"
+    },
+    {
+     "x": 1087.8,
+     "z": 1977.7,
+     "m": 3.8,
+     "esito": "edificio"
+    },
+    {
+     "x": 786.0,
+     "z": 2100.5,
+     "m": 1.8,
+     "esito": "una via che attraversa"
+    },
+    {
+     "x": -1093.4,
+     "z": 374.5,
+     "m": 2.6,
+     "esito": "chiuso"
+    },
+    {
+     "x": 859.9,
+     "z": 2086.0,
+     "m": 2.0,
+     "esito": "edificio"
+    },
+    {
+     "x": -1040.0,
+     "z": 1014.4,
+     "m": 5.7,
+     "esito": "banchina"
+    },
+    {
+     "x": -1048.7,
+     "z": 978.0,
+     "m": 3.0,
+     "esito": "banchina"
+    },
+    {
+     "x": 1102.7,
+     "z": 1952.1,
+     "m": 0.7,
+     "esito": "chiuso"
+    },
+    {
+     "x": 959.9,
+     "z": 2039.9,
+     "m": 5.8,
+     "esito": "cancello"
+    },
+    {
+     "x": -1105.9,
+     "z": 660.5,
+     "m": 5.4,
+     "esito": "cancello"
+    },
+    {
+     "x": -773.2,
+     "z": 363.2,
+     "m": 1.2,
+     "esito": "chiuso"
+    },
+    {
+     "x": -1108.1,
+     "z": 380.3,
+     "m": 3.6,
+     "esito": "cancello"
+    },
+    {
+     "x": 1388.9,
+     "z": 1810.1,
+     "m": 3.6,
+     "esito": "cancello"
+    },
+    {
+     "x": -1009.6,
+     "z": 1400.4,
+     "m": 5.4,
+     "esito": "chiuso"
+    },
+    {
+     "x": 432.3,
+     "z": 2239.4,
+     "m": 3.8,
+     "esito": "carreggiata"
+    },
+    {
+     "x": 807.6,
+     "z": 2114.6,
+     "m": 2.5,
+     "esito": "chiuso"
+    },
+    {
+     "x": 1123.6,
+     "z": 1962.1,
+     "m": 4.0,
+     "esito": "cancello"
+    },
+    {
+     "x": 1344.0,
+     "z": 1841.9,
+     "m": 2.5,
+     "esito": "chiuso"
+    },
+    {
+     "x": -1024.6,
+     "z": 1314.1,
+     "m": 2.4,
+     "esito": "chiuso"
+    },
+    {
+     "x": -1001.1,
+     "z": 1469.9,
+     "m": 3.6,
+     "esito": "cancello"
+    },
+    {
+     "x": -997.6,
+     "z": 1500.3,
+     "m": 4.0,
+     "esito": "cancello"
+    },
+    {
+     "x": -915.1,
+     "z": 507.4,
+     "m": 3.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": 1316.5,
+     "z": 1867.7,
+     "m": 1.8,
+     "esito": "edificio"
+    },
+    {
+     "x": -962.4,
+     "z": 569.1,
+     "m": 4.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": 1298.7,
+     "z": 1883.8,
+     "m": 4.7,
+     "esito": "chiuso"
+    },
+    {
+     "x": 851.7,
+     "z": 2091.6,
+     "m": 5.8,
+     "esito": "cancello"
+    },
+    {
+     "x": -1102.7,
+     "z": 156.9,
+     "m": 4.9,
+     "esito": "sul binario"
+    },
+    {
+     "x": 728.0,
+     "z": 2134.5,
+     "m": 2.9,
+     "esito": "una via che attraversa"
+    },
+    {
+     "x": 971.1,
+     "z": 2041.2,
+     "m": 4.2,
+     "esito": "edificio"
+    },
+    {
+     "x": 943.5,
+     "z": 2054.8,
+     "m": 3.2,
+     "esito": "chiuso"
+    },
+    {
+     "x": 1133.0,
+     "z": 1952.1,
+     "m": 5.5,
+     "esito": "chiuso"
+    },
+    {
+     "x": -772.6,
+     "z": 366.7,
+     "m": 4.6,
+     "esito": "sul binario"
+    },
+    {
+     "x": 1547.8,
+     "z": 1746.1,
+     "m": 3.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": -1105.5,
+     "z": 685.9,
+     "m": 0.6,
+     "esito": "chiuso"
+    },
+    {
+     "x": -1107.6,
+     "z": 422.8,
+     "m": 4.1,
+     "esito": "cancello"
+    },
+    {
+     "x": -1109.2,
+     "z": 456.3,
+     "m": 0.3,
+     "esito": "chiuso"
+    },
+    {
+     "x": 426.6,
+     "z": 2259.4,
+     "m": 5.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": 422.7,
+     "z": 2246.6,
+     "m": 4.6,
+     "esito": "sul binario"
+    },
+    {
+     "x": -963.1,
+     "z": 2137.6,
+     "m": 2.2,
+     "esito": "chiuso"
+    },
+    {
+     "x": -1040.7,
+     "z": 1201.3,
+     "m": 3.0,
+     "esito": "banchina"
+    },
+    {
+     "x": -1099.2,
+     "z": 156.4,
+     "m": 1.0,
+     "esito": "passaggio a livello"
+    },
+    {
+     "x": -1104.1,
+     "z": 169.6,
+     "m": 0.8,
+     "esito": "passaggio a livello"
+    },
+    {
+     "x": -1036.0,
+     "z": 1224.4,
+     "m": 5.5,
+     "esito": "banchina"
+    },
+    {
+     "x": -1034.3,
+     "z": 1026.4,
+     "m": 2.6,
+     "esito": "una via che attraversa"
+    },
+    {
+     "x": -1036.9,
+     "z": 1017.0,
+     "m": 2.8,
+     "esito": "banchina"
+    },
+    {
+     "x": -1033.6,
+     "z": 1029.4,
+     "m": 3.0,
+     "esito": "banchina"
+    },
+    {
+     "x": -914.3,
+     "z": 496.8,
+     "m": 3.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": -966.2,
+     "z": 557.1,
+     "m": 3.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": -945.8,
+     "z": 2387.0,
+     "m": 2.9,
+     "esito": "chiuso"
+    },
+    {
+     "x": -945.9,
+     "z": 2459.8,
+     "m": 5.2,
+     "esito": "passaggio a livello"
+    },
+    {
+     "x": -628.2,
+     "z": 222.0,
+     "m": 3.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": -709.4,
+     "z": 300.1,
+     "m": 2.8,
+     "esito": "chiuso"
+    },
+    {
+     "x": 216.1,
+     "z": -401.6,
+     "m": 2.9,
+     "esito": "chiuso"
+    },
+    {
+     "x": 179.4,
+     "z": -377.8,
+     "m": 3.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": 353.8,
+     "z": -514.6,
+     "m": 3.0,
+     "esito": "banchina"
+    },
+    {
+     "x": 368.0,
+     "z": -538.2,
+     "m": 1.5,
+     "esito": "banchina"
+    },
+    {
+     "x": 444.8,
+     "z": 2242.8,
+     "m": 3.0,
+     "esito": "chiuso"
+    },
+    {
+     "x": 666.4,
+     "z": -970.0,
+     "m": 1.2,
+     "esito": "passaggio a livello"
+    },
+    {
+     "x": 853.2,
+     "z": -1404.9,
+     "m": 2.0,
+     "esito": "passaggio a livello"
+    },
+    {
+     "x": 883.3,
+     "z": -1476.4,
+     "m": 3.0,
+     "esito": "chiuso"
+    }
+   ]
+  }
  }
 }

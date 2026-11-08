@@ -56,6 +56,17 @@ PUSH_MAX = 2.5     # a stretch never deeper than this inside the walls moves out
 CU_MIN, CU_STD, CU_DROP = 4.0, 1.0, 2.5   # a dome or a spire from the DSM: this far over the highest wall, this round, this drop at its rim (m)
 CU_TOWER = 80.0    # ... a spire stands on a volume this small (m2): a bell tower
 TETTI_PROC = max(1, min(12, (os.cpu_count() or 4) - 2))
+# heights from the DSM where UN_VOL_AV is plainly wrong (Carlo, 8/11: via Gagarin x 427 z -472 drawn 9 m under a tower of 33 m, a "turret"
+# of 14 m2 and 19.6 m at x 283 z -608 where there is a house of two floors), Edifici.altezze_dal_dsm:
+ALTO_DZ, ALTO_LISCIO = 6.0, 1.5   # a part of a ground volume where the DSM stands this far over its top and is smooth (max - min in 3x3 under this)
+ALTO_MIN, ALTO_SH, ALTO_LISCI = 40.0, 0.15, 0.3   # ... a block this big (m2 and share of the volume, this share of it smooth) is a taller part
+CONF_DZ, CONF_D = 3.0, 40.0   # ... drawn at the DSM's height only where another volume of the same building within CONF_D m stands at least as high,
+                   # less CONF_DZ: the DBGT has a body that tall, it drew this part low (Carlo 8/11: x 498 z -319, a block 24.3 m high by a tower
+                   # of 27.1 m; at first within 2 m either way). Without it the volume stays (edificio 525 at x 210 z -605, Carlo:
+                   # a block 19 m high under the DSM of 2008 and a volume as high 55 m away in the same big complex, chance; the farthest
+                   # confirmation taken at Meda and Seveso is 30 m, x 477 z -328)
+BASSO_A, BASSO_DZ, BASSO_SH, BASSO_MIN = 60.0, 8.0, 0.9, 2.0   # a ground volume this small (m2) whose top the DSM is BASSO_DZ m under on
+                   # BASSO_SH of it comes down to the DSM, when the DSM sees a structure there (BASSO_MIN m over the ground; only ground: newer than 2008)
 
 # what a building is when OSM does not say: DBGT use (EDIFC_USO, Specifiche p. 137) and type (EDIFC_TY p. 135, EDI_MIN_TY p. 151) as an OSM
 # building value (the game's types in build_data.py BTYPE)
@@ -151,6 +162,33 @@ def _tls(A, h, it=3, cut=0.8):
         m = m2
     r = h - A @ c
     return c, float(np.sqrt(np.mean(r[m] ** 2))), float(m.mean()), float(np.mean(r > 2.0))
+
+
+def blocchi_alti(poly, top, dsm):
+    """the blocks of a ground volume the DSM sees at least ALTO_DZ m over its top (m a.s.l.): [(polygon of the block grown to the walls,
+    median of the DSM on its smooth cells)]. On a 1 m grid inside the walls (0.3 m in) along the axes of the volume's minimum rectangle (its
+    cut runs parallel to the walls: on a grid along x and z it came in steps, via Gagarin), the smoothness among the cells of the volume only"""
+    from scipy import ndimage
+    c0, u, v, a, b = rect_frame(poly)
+    gs, gt = np.meshgrid(np.arange(-a - 1, a + 1, 1.0) + 0.5, np.arange(-b - 1, b + 1, 1.0) + 0.5)
+    gx, gz = c0[0] + gs * u[0] + gt * v[0], c0[1] + gs * u[1] + gt * v[1]
+    ins = shapely.contains_xy(poly.buffer(-0.3), gx, gz)
+    if ins.sum() < ALTO_MIN: return []
+    D = dsm.at(gx, gz); ok = ins & np.isfinite(D)
+    rng = ndimage.maximum_filter(np.where(ok, D, -1e9), 3) - ndimage.minimum_filter(np.where(ok, D, 1e9), 3)
+    hi = ok & (D - top >= ALTO_DZ); sm = hi & (rng < ALTO_LISCIO)
+    lab, n = ndimage.label(hi, structure=np.ones((3, 3)))
+    out = []
+    for k in range(1, n + 1):
+        m = lab == k; a = int(m.sum()); s = int((m & sm).sum())
+        if a < ALTO_MIN or a < ALTO_SH * poly.area or s < ALTO_LISCI * a: continue
+        r, c = np.nonzero(m)   # the cells as squares in the volume's frame, closed, grown to the walls, back to the game's frame
+        g = unary_union(shapely.box(gs[r, c] - 0.5, gt[r, c] - 0.5, gs[r, c] + 0.5, gt[r, c] + 0.5))
+        g = g.buffer(1.5, join_style='mitre').buffer(-1.5, join_style='mitre').buffer(1.0, join_style='mitre')
+        g = shapely.affinity.affine_transform(g, [u[0], v[0], u[1], v[1], c0[0], c0[1]]).intersection(poly)
+        g = g.simplify(0.3).intersection(poly)
+        if not g.is_empty: out.append((g, float(np.median(D[m & sm]))))
+    return out
 
 
 _DSM = None
@@ -676,11 +714,113 @@ class Edifici:
             n += 1; self.log('dbgt edifici: cupola o guglia a x %.0f z %.0f, %.1f m sopra il muro piu alto, raggio %.1f m' % (cx, cz, pk - tmax, rr[-1]))
         return n
 
+    def altezze_dal_dsm(self):
+        """The heights of the ground volumes (UN_VOL_POR 01) where the DSM says the DBGT's UN_VOL_AV is plainly wrong, before the roofs:
+          - too low: a block the DSM sees smooth and ALTO_DZ m over the top of the walls (blocchi_alti) becomes a volume of its own of the same
+            building, at the eaves of the roof the DSM fits on it (fit_tetto: the median of the DSM for a flat roof), when another volume of
+            the same building within CONF_D m stands at least that high less CONF_DZ; the rest of the volume stays at its height, cut 5 cm off the
+            block (no flicker on the shared wall), and its strips too small or thin to stand alone go with the block
+          - too high: a volume of at most BASSO_A m2 whose top the DSM is BASSO_DZ m under on BASSO_SH of it comes down to the median of the DSM
+            there; it goes when it lies on volumes of other buildings for more than half of it (the DSM over it is theirs)
+        Not churches (domes and spires, cupole), water towers, ruins and shells. Returns the new pieces; every change and every block left
+        without confirmation in the report (altezze_dal_dsm)"""
+        if not os.path.isdir(self.dsm_dir): return []
+        t0 = time.time(); dsm = dq.Lidar(self.dsm_dir); B = self.base
+        def pol(r):
+            p = Polygon(r['p'], r.get('k') or []).buffer(0)
+            return p if p.geom_type == 'Polygon' and not p.is_empty else None
+        def riga(r, p, a, motivo, **kw):
+            c = p.centroid; g0 = r['zt'] - r['h']
+            return dict(e=r['e'], oid=self.vol[r['vid']]['oid'], x=round(c.x, 1), z=round(c.y, 1), m2=round(p.area), da=round(r['h'], 1), a=None if a is None else round(a - g0, 1), motivo=motivo, **kw)
+        cand = [r for r in self.terra if self.vol[r['vid']]['por'] == '01' and not r.get('st') and not r.get('wt') and r['bt'] not in ('church', 'cathedral', 'chapel')]
+        polys = in_parallelo(pol, cand)
+        # the other volumes of each building, as they are in the DBGT: (polygon, top)
+        sib = defaultdict(list)
+        for r in self.terra + self.alti:
+            if r.get('dbgt'): sib[r['e']].append((id(r), r))
+        rep = dict(alzati=[], abbassati=[], tolti=[], scartati=[])
+        # too high
+        def basso(k):
+            r, p = cand[k], polys[k]
+            if p is None or p.area > BASSO_A: return None
+            q = p.buffer(-0.3); q = p if q.is_empty else q
+            x0, z0, x1, z1 = q.bounds
+            gx, gz = np.meshgrid(np.arange(x0, x1, 0.5) + 0.25, np.arange(z0, z1, 0.5) + 0.25)
+            m = shapely.contains_xy(q, gx, gz)
+            if m.sum() < 4: gx, gz = np.array([q.centroid.x]), np.array([q.centroid.y]); m = np.ones(1, bool)
+            D = dsm.at(gx[m], gz[m]); D = D[np.isfinite(D)]
+            if not len(D) or np.mean(D <= r['zt'] + B - BASSO_DZ) < BASSO_SH: return None
+            return float(np.median(D)) - B
+        bassi = in_parallelo(basso, range(len(cand)))
+        tolti = set()
+        tt = STRtree([pol(r) or Polygon() for r in self.terra])
+        for k, md in enumerate(bassi):
+            if md is None: continue
+            r, p = cand[k], polys[k]; g0 = r['zt'] - r['h']
+            if md - g0 < BASSO_MIN: rep['scartati'].append(riga(r, p, md, 'dsm_al_suolo')); continue   # the DSM (2008) sees the ground: built after it
+            ov = sum(tt.geometries[j].intersection(p).area for j in tt.query(p) if self.terra[j] is not r and self.terra[j].get('e') != r['e'])
+            if ov > 0.5 * p.area: rep['tolti'].append(riga(r, p, None, 'sopra_un_altro_edificio')); r['tolto'] = True; tolti.add(id(r)); continue
+            rep['abbassati'].append(riga(r, p, md, 'dsm_sotto_la_cima')); r['zt'] = round(md, 2); r['h'] = round(md - g0, 1)
+        # too low: the blocks, their eaves from the DSM, the confirmation
+        alti = in_parallelo(lambda k: blocchi_alti(polys[k], cand[k]['zt'] + B, dsm) if polys[k] is not None and polys[k].area >= ALTO_MIN else [], range(len(cand)))
+        jobs, pezzi = [], {}
+        for k, bl in enumerate(alti):
+            r = cand[k]
+            for n, (g, md) in enumerate(bl):
+                for m_, q in enumerate(q for q in _parts(g) if q.area >= ALA_MIN):
+                    pezzi[(k, n, m_)] = (q, md); jobs.append(((k, n, m_), np.asarray(q.exterior.coords)[:-1], len(q.interiors) > 0, md, r['zt'] - r['h'] + B, False))
+        fit = self._dsm(jobs)
+        conf = defaultdict(list)
+        for key, (q, md) in pezzi.items():
+            r = cand[key[0]]; f = fit.get(key) or {}
+            ztn = md + f['eave'] if f.get('k') in ('gable', 'hip', 'shed') and -4.0 <= f.get('eave', 1) <= 0 else md   # the eaves, as UN_VOL_AV
+            ztn -= B
+            ss = [(w['zt'], w_p.distance(q)) for i_, w in sib[r['e']] if i_ != id(r) and i_ not in tolti for w_p in [Polygon(w['p']).buffer(0)]]
+            ok = [s for s in ss if s[0] >= ztn - CONF_DZ and s[1] <= CONF_D]
+            if ok: conf[key[0]].append((q, round(ztn, 2), min(ok, key=lambda s: s[1])))
+            else:
+                near = min(ss, key=lambda s: (abs(s[0] - ztn), s[1])) if ss else None
+                rep['scartati'].append(riga(r, q, ztn, 'senza_conferma', vicino=None if near is None else dict(a=round(near[0] - (r['zt'] - r['h']), 1), d=round(near[1], 1))))
+        nuovi = []
+        for k, H in conf.items():
+            r, p = cand[k], polys[k]; g0 = r['zt'] - r['h']
+            H = sorted(H, key=lambda t: -t[1]); hs = []
+            for q, ztn, w in H:   # a higher block keeps its walls, a lower one is cut 5 cm off it
+                if hs: q = q.difference(unary_union([h[0] for h in hs]).buffer(0.05))
+                hs += [[x, ztn, w] for x in _parts(q) if x.area >= MIN_VOL]
+            if not hs: continue
+            rest = []
+            for x in _parts(p.difference(unary_union([h[0] for h in hs]).buffer(0.05))):
+                if x.area >= ALA_MIN and not x.buffer(-1.0).is_empty: rest.append(x); continue
+                if x.area < MIN_VOL: continue
+                j = max(range(len(hs)), key=lambda i_: hs[i_][0].buffer(0.1).intersection(x).area)   # a strip goes with the block it lies along
+                hs[j][0] = unary_union([hs[j][0], x]).buffer(0.06, join_style='mitre').buffer(-0.06, join_style='mitre').intersection(p)
+            out = [(x, ztn, w) for h, ztn, w in hs for x in _parts(h) if x.area >= MIN_VOL]
+            out += [(x.difference(unary_union([o[0] for o in out]).buffer(0.05)), r['zt'], None) for x in rest]
+            out = [(x, z_, w) for g, z_, w in out for x in _parts(g) if x.area >= MIN_VOL]
+            out.sort(key=lambda t: t[2] is None)
+            rep['alzati'] += [riga(r, x, z_, 'dsm_sopra_la_cima', conferma=dict(a=round(w[0] - g0, 1), d=round(w[1], 1))) for x, z_, w in out if w is not None]
+            for n, (x, z_, w) in enumerate(out):
+                rec = r if n == 0 else dict(r)
+                rec['p'] = [tuple(c) for c in np.asarray(x.exterior.coords)[:-1]]
+                ho = [list(map(tuple, np.asarray(h.coords)[:-1])) for h in x.interiors if len(h.coords) >= 4]
+                if ho: rec['k'] = ho
+                else: rec.pop('k', None)
+                rec['zt'] = round(z_, 2); rec['h'] = round(z_ - g0, 1)
+                if n: nuovi.append(rec)
+        self.terra = [r for r in self.terra if not r.get('tolto')] + nuovi
+        sc = Counter(x['motivo'] for x in rep['scartati'])
+        self.rep['altezze_dal_dsm'] = dict(n=dict(alzati=len(rep['alzati']), abbassati=len(rep['abbassati']), tolti=len(rep['tolti']), **{'scartati_' + m: v for m, v in sc.items()}), **{k: v[:400] for k, v in rep.items()})
+        self.log('dbgt edifici: altezze dal DSM, alzati', len(rep['alzati']), 'abbassati', len(rep['abbassati']), 'tolti', len(rep['tolti']), 'scartati', dict(sc), '%.0fs' % (time.time() - t0))
+        return nuovi
+
     def tetti(self):
         """the roof of every DBGT volume from the DSM (in its own processes), or from OSM roof:shape; the reasons in the report.
         A volume shaped like an L, a T or a U is cut into its wings (ali), each with its roof from the DSM: the wings are drawn as volumes of
-        their own (same building, same height). Returns the new ground pieces (the raised ones go in self.alti)"""
+        their own (same building, same height). Before them the heights the DSM corrects (altezze_dal_dsm). Returns the new ground pieces
+        (the raised ones go in self.alti); a volume altezze_dal_dsm took away has 'tolto' (build_data.py drops it)"""
         t0 = time.time()
+        pezzi = self.altezze_dal_dsm()   # (the heights the DSM corrects, before the roofs)
         recs = self.terra + self.alti
         job = lambda k, r, ring: (k, np.asarray(ring), bool(r.get('k')), r['zt'] + self.base, r['zt'] + self.base - r['h'], r['bt'] in ('church', 'cathedral', 'chapel'))
         res = self._dsm([job(k, r, r['p']) for k, r in enumerate(recs) if r['bt'] not in ('roof',) and r.get('st') != 1])
@@ -752,7 +892,7 @@ class Edifici:
         cnt['cupole_e_guglie_dal_dsm'] = self.cupole(self.terra + self.alti)
         self.rep['tetti'] = dict(dal_dsm=dict(cnt), non_dal_dsm=dict(mot), ali=dict(nw), colmo_sulla_gronda=dict(p50=round(float(np.median(rhs)), 2), p90=round(float(np.percentile(rhs, 90)), 2), max=round(float(max(rhs)), 2)) if rhs else None)
         self.log('dbgt edifici: tetti dal DSM', dict(cnt), 'no', dict(mot), 'ali', dict(nw), '%.0fs' % (time.time() - t0))
-        return new_t
+        return pezzi + new_t
 
     # ---------------------------------------------------------------- the OSM ways against the DBGT buildings
     def vie(self, raw_roads, nodes, buildings=None, P=None):
