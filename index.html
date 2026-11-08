@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo facciate-2 · dopo 6bc90524 · assemblato 08/11 06:20 · porta ' + location.port;
+    const txt = 'locale · ramo facciate-2 · dopo 0d06b10b · assemblato 08/11 06:26 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -12368,7 +12368,7 @@ function facAggiorna(force) {
     for (const r of T.fbal || []) { const d = Math.hypot(r.x - cp.x, r.y - cp.y, r.z - cp.z); if (d < RB) { facBal(r); nb++; } }
     for (const r of T.fdet || []) { const d = Math.hypot(r.x - cp.x, r.y - cp.y, r.z - cp.z); if (d < (r.R || FAC_R) + 8) facDet(r); }
   }
-  for (const k in FAC_PARTS) { const P = FAC_PARTS[k]; P.m.count = P.n; P.m.instanceMatrix.needsUpdate = true; if (P.m.instanceColor) P.m.instanceColor.needsUpdate = true; if (P.lit) P.lit.needsUpdate = true; }
+  for (const k in FAC_PARTS) { const P = FAC_PARTS[k]; P.m.count = P.n; P.m.visible = P.n > 0; P.m.instanceMatrix.needsUpdate = true; if (P.m.instanceColor) P.m.instanceColor.needsUpdate = true; if (P.lit) P.lit.needsUpdate = true; }
   S.wins = nw; S.bals = nb;
 }
 function facTick() {
@@ -12377,9 +12377,12 @@ function facTick() {
 }
 // ---- the doors of the houses by epoch (Carlo 8/11): wood in two leaves in a stone frame (old houses), aluminium and glass with the entry phone
 // (blocks of flats), a single door with its step (villette); the brass knob and the plaques stay to the offices (negozi3.js)
+const FAC_DOOR_MAT = new THREE.MeshLambertMaterial({ vertexColors: true }), FAC_DOOR_COL = {};
 function facDoor(F, d) {
   const n = { x: -d.uz, z: d.ux }, cx = (d.ax + d.bx) / 2, cz = (d.az + d.bz) / 2, th = Math.atan2(-d.uz, d.ux), y0 = d.gy;
-  const bx = (w, h, dp, lx, ly, lz, col, cast = false) => addGeo(F.buf(lam(col), cast).b, boxG(w, h, dp), matTRy(cx + d.ux * lx + n.x * lz, y0 + ly, cz + d.uz * lx + n.z * lz, th));
+  const bx = (w, h, dp, lx, ly, lz, col, cast = false) => { /* one vertex-coloured buffer for all the doors of the tile: one draw call, not one per colour */
+    const B = F.buf(FAC_DOOR_MAT, cast).b, [k0, k1] = addGeo(B, boxG(w, h, dp), matTRy(cx + d.ux * lx + n.x * lz, y0 + ly, cz + d.uz * lx + n.z * lz, th)), c = FAC_DOOR_COL[col] || (FAC_DOOR_COL[col] = new THREE.Color(col));
+    while (B.c.length < k0 * 3) B.c.push(1, 1, 1); for (let i = k0; i < k1; i++) B.c.push(c.r, c.g, c.b); };
   const k = d.sty || 'gen', W = d.W, h = d.h;
   if (k === 'leg') {
     const hh = Math.max(h, 2.6), lw = W / 2 - 0.02;
