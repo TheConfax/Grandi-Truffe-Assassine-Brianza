@@ -143,7 +143,7 @@ function layMuri(T) {
     // construction: a bare concrete shell; no shop signs on any of them)
     for (const k of ['zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st']) if (B[k] !== undefined) rec[k] = B[k];
     if (rec.st) rec.noSign = true;
-    T.bld.push(rec);
+    T.bld.push(rec); if (rec.cu) domeWalls(rec);
     if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
       if (COTTURA) BUILDINGS.push(rec); BLDR.add(bb[0], bb[1], bb[2], bb[3], rec); const y1 = B.zt + 3;
       for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) { const A = sArea(ring); for (let i = 0; i < ring.length; i++) { const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } WALLS.add(a[0], a[1], c[0], c[1], { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: B.zb, y1, yp: wallTopProfile(rec, a, c, isHole) }); } } /* yp: its top for the walker, up to the roof (wallTopP) */
@@ -153,13 +153,15 @@ function layMuri(T) {
     if (COTTURA) BUILDINGS.push(rec); BLD.add(bb[0], bb[1], bb[2], bb[3], rec);
     if (COTTURA && B.e !== undefined) { if (!EDIF.has(B.e)) EDIF.set(B.e, []); EDIF.get(B.e).push(rec); } // the volumes of one DBGT building on the ground
     if (B.g === 4) continue; // a water tower: its plan is the tank up in the air, the solid is its shaft (paesaggio3.js lsTower)
-    const gys = outer.map(p => H.ground(p[0], p[1])), by0 = Math.min(...gys) - 3, by1 = Math.max(Math.max(...gys) + B.h, B.zt !== undefined ? B.zt + roofTop(rec) : -1e9) + 3;
+    // each wall up to its own top as the tile draws it (yp, the roof along that side), 3 m over it in y1: no longer the highest point of the
+    // whole volume (its dome or its ridge), which stood as a wall nobody sees over the eaves (Carlo 8/11, the helicopter by the dome of Meda)
+    const by0 = Math.min(...outer.map(p => H.ground(p[0], p[1]))) - 3;
     for (const [ring, isHole] of [[outer, false], ...holes.map(h => [h, true])]) {
       const A = sArea(ring);
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i], c = ring[(i + 1) % ring.length], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz); if (L < 0.05) continue;
         let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; }
-        const w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: by1, yp: wallTopProfile(rec, a, c, isHole) }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
+        const yp = wallTopProfile(rec, a, c, isHole), w = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx, nz, y0: by0, y1: yp.max + 3, yp }; WALLS.add(a[0], a[1], c[0], c[1], w); (rec.walls || (rec.walls = [])).push(w);
       }
     }
   }
@@ -175,7 +177,21 @@ function layMuri(T) {
 // the roof of a DBGT volume (src/dbgt_edifici.py): over the top of its walls max(0, min_k f_k), f_k = A + Bx (x - cx) + Bz (z - cz)
 function roofPlanes(B) { if (B._pl !== undefined) return B._pl; let pl = null; if (B.rf && B.rc) { pl = []; for (let i = 0; i + 2 < B.rf.length; i += 3) pl.push([B.rf[i], B.rf[i + 1], B.rf[i + 2]]); } return (B._pl = pl); }
 function roofAt(B, x, z) { const pl = roofPlanes(B); if (!pl) return 0; let m = Infinity; for (const p of pl) m = Math.min(m, p[0] + p[1] * (x - B.rc[0]) + p[2] * (z - B.rc[1])); return Math.max(0, m); }
-function roofTop(B) { const d = B.cu ? Math.max(...B.cu.y) - (B.zt || 0) : 0; if (!roofPlanes(B)) return Math.max(0, d); let m = 0; for (const p of B.pts) m = Math.max(m, roofAt(B, p[0], p[1])); return Math.max(d, m + Math.max(0, ...B._pl.map(q => q[0]))); }
+// a dome or a spire (cu, domeFaces) is a solid of its own, as drawn: where its profile is steep (the drum, a spire) a round wall from the ring
+// under to the ring over, where it is shallow (the cap) a floor (domeY in bldFloorAt), for everybody
+function domeWalls(B) {
+  const cu = B.cu, [cx, cz] = cu.c, R = cu.r, Y = cu.y; B.domeW = [];
+  for (let i = 0; i + 1 < R.length; i++) {
+    const r = Math.max(R[i], R[i + 1]), lo = Math.min(Y[i], Y[i + 1]), hi = Math.max(Y[i], Y[i + 1]);
+    if (r < 0.05 || hi - lo < 1.5 * Math.abs(R[i] - R[i + 1])) continue; /* shallow: a floor, not a wall */
+    const w = { r, x: cx, z: cz, y0: lo - 0.3, y1: hi, dome: 1 }; WALLS.add(cx - r, cz - r, cx + r, cz + r, w); B.domeW.push(w);
+  }
+}
+function domeY(cu, x, z) { // the top of a dome or a spire over a point, -Infinity off it
+  const d = hyp(x - cu.c[0], z - cu.c[1]), R = cu.r, Y = cu.y; let y = -Infinity;
+  for (let i = 0; i + 1 < R.length; i++) { const r0 = R[i], r1 = R[i + 1]; if (d < Math.min(r0, r1) - 1e-6 || d > Math.max(r0, r1) + 1e-6) continue; y = Math.max(y, Math.abs(r1 - r0) < 1e-6 ? Math.max(Y[i], Y[i + 1]) : Y[i] + (Y[i + 1] - Y[i]) * (d - r0) / (r1 - r0)); }
+  return y;
+}
 // where along the wall a to c the roof changes plane or meets the eaves: the wall's top is straight between these
 function roofBreaks(B, a, c) {
   const pl = roofPlanes(B), ts = [0, 1]; if (!pl) return ts;
@@ -259,7 +275,7 @@ function bldRoofY(B, x, z) { // the roof over a point of the plan (the point ins
 }
 const inPlan = (b, x, z, m = 0) => x >= b.bb[0] - m && x <= b.bb[2] + m && z >= b.bb[1] - m && z <= b.bb[3] + m && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h));
 function bldFloorAt(x, z, y) { // the highest roof or slab at (x, z) not above y, else -Infinity
-  let f = -Infinity; const one = b => { if (!inPlan(b, x, z)) return; const r = bldRoofY(b, x, z); if (r !== null && r <= y && r > f) f = r; };
+  let f = -Infinity; const one = b => { if (b.cu && b.domeW && !b.skipDraw) { const d = domeY(b.cu, x, z); if (d <= y && d > f) f = d; } if (!inPlan(b, x, z)) return; const r = bldRoofY(b, x, z); if (r !== null && r <= y && r > f) f = r; }; /* a dome or a spire on it (domeWalls) */
   BLD.each(x, z, x, z, one); BLDR.each(x, z, x, z, one); BLDT.each(x, z, x, z, one);
   return f;
 }
@@ -2831,7 +2847,8 @@ function tettiFuel(T) { for (const B of T.bld) {
     if ((m && n * 2 > m) || cn * 2 > 64) {
       B.skipDraw = true; FUEL_ROOFS++; /* no collision either: nothing to bump into that is not drawn */
       for (const w of B.walls || []) w.r !== undefined ? WALLS.del(w.x - 0.2, w.z - 0.2, w.x + 0.2, w.z + 0.2, w) : WALLS.del(w.ax, w.az, w.bx, w.bz, w);
-      B.walls = null; BLD.del(B.bb[0], B.bb[1], B.bb[2], B.bb[3], B); const bi = BUILDINGS.indexOf(B); if (bi >= 0) BUILDINGS.splice(bi, 1); break;
+      for (const w of B.domeW || []) WALLS.del(w.x - w.r, w.z - w.r, w.x + w.r, w.z + w.r, w);
+      B.walls = null; B.domeW = null; BLD.del(B.bb[0], B.bb[1], B.bb[2], B.bb[3], B); const bi = BUILDINGS.indexOf(B); if (bi >= 0) BUILDINGS.splice(bi, 1); break;
     }
   }
 } }
