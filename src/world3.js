@@ -2310,100 +2310,112 @@ function* buildTileGen(T) {
        marked as fitted once took no bay the second time, so the window under it came back (Carlo 8/11, via Lombardia, via Giotto) */
     T.fitN = (T.fitN || 0) + 1;
     for (const d of T.doors || []) { if (!d.o) d.o = [d.ax, d.az, d.bx, d.bz, d.ux, d.uz, d.gy]; else [d.ax, d.az, d.bx, d.bz, d.ux, d.uz, d.gy] = d.o; d.skip = false; d.sty = undefined; d.fit = 0; }
+    /* every house of the tile first lays out its walls and bays and takes its doors and shop fronts, then the facades are drawn: a door fitted to one volume of the DBGT
+       sits on the same wall as another volume drawn before it (some houses are there twice, one over the other), and that one has to know where the door went */
+    const facPrep = B => {
+        const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t, raised = B.zb !== undefined;
+        // a DBGT volume: the top of its walls is its own (zt), never under the ground round it; a raised one starts at its base (zb)
+        const gys = outer.map(p => gCasa(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys);
+        const top = B.zt !== undefined ? Math.max(B.zt, raised ? B.zb + 1 : gmax + Math.min(h, 2.2)) : gmax + h, bot = raised ? B.zb : gmin - 0.6;
+        const R = B.e !== undefined ? (k => hashRnd(B.e * 7 + k)) : (() => tRnd()), pcB = (a, k = 0) => COL(a[Math.floor(R(k) * a.length)]);
+        const colOr = (c, f) => { if (c) { try { return new THREE.Color(c); } catch (e) { } } return f(); };
+        if (t === 9) return { t, outer, holes, h, gmax };
+        /* facciate 2.0 (facciate3.js): the family (b.fa), the epoch (b.ep) and one of three variants give the cells of each wall; the colour from the palette of the family and epoch */
+        const sty = facStyleOf(B, area, top - bot), wallCol = EPOCA_DBG && B.wc ? COL(B.wc) : sty.col;
+        const bare = (top - bot < (sty.fam === 'vil' || sty.fam === 'corte' || sty.pink ? 3.0 : 4.8) && !raised) || !!B.st; /* too low for a whole floor of windows, or a ruin */
+        // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
+        const planes = roofPlanes(B);
+        const pitched = planes ? true : bldPitch(B) > 0; /* the same pitch the walker stands on (bldRoofY) */
+        const S0 = sty.S;
+        // the facades (FAC): the bays along each wall and the ground under each window first, then the floors F0 + FL k the same all round the house.
+        // A wall is a run of sides that go on nearly straight (the DBGT draws a facade in many short sides): its bays run along all of it
+        const fwB = bare ? null : (S0.fc.fw || S0.bc.fw), rings = [[outer, false], ...holes.map(hh => [hh, true])].map(([ring, isHole]) => {
+          const A = sArea(ring), nr = ring.length;
+          const E = ring.map((a, i) => { const c = ring[(i + 1) % nr], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1e-6; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } return [dx, dz, L, nx, nz]; });
+          const st = []; for (let i = 0; i < nr; i++) { const p = E[(i - 1 + nr) % nr], e = E[i]; if ((p[0] * e[0] + p[1] * e[1]) / (p[2] * e[2]) < FAC.BEND) st.push(i); } if (!st.length) st.push(0);
+          const W = [];
+          const runs = st.map((i0, k) => {
+            const i1 = st[(k + 1) % st.length], ed = [], off = []; let j = i0, Lr = 0;
+            do { ed.push(j); off.push(Lr); W[j] = null; Lr += E[j][2]; j = (j + 1) % nr; } while (j !== i1);
+            const at = s => { let q = 0; while (q < ed.length - 1 && s > off[q] + E[ed[q]][2]) q++; const e = E[ed[q]], a = ring[ed[q]], f = clamp((s - off[q]) / e[2], 0, 1); return [a[0] + e[0] * f, a[1] + e[1] * f]; };
+            const rp = []; // the top of the wall along the run: straight between these (the roof's breaks over each side, src roofBreaks)
+            ed.forEach((i, q) => { const a = ring[i], c = ring[(i + 1) % nr], e = E[i]; for (const t of planes && !isHole ? roofBreaks(B, a, c) : [0, 1]) { const s = off[q] + t * e[2]; if (rp.length && Math.abs(rp[rp.length - 1][0] - s) < 1e-4) continue; rp.push([s, top + (planes ? roofAt(B, a[0] + e[0] * t, a[1] + e[1] * t) : 0)]); } });
+            let qL = ed[0]; for (const i of ed) if (E[i][2] > E[qL][2]) qL = i;
+            const a0 = ring[i0], c0 = at(Lr), side = !isHole && facFronte(a0[0], a0[1], c0[0], c0[1], E[qL][3], E[qL][4]) ? 'f' : 'b', cells = S0[side + 'c'], fw = bare ? null : cells.fw, tile = S0.tile;
+            const x = Lr / tile, gAt = s => { const p = at(s); return gCasa(p[0], p[1]); }, sp = []; let n = fw ? Math.round(x) : 0; if (n && x / n < FAC.MIN) n--;
+            const bw = n ? Math.min(x / n, FAC.MAX) * tile : Lr, pad = n ? (Lr - n * bw) / 2 : 0, span = (s0, s1, ss, bay) => { const g = ss.map(gAt); sp.push([s0, s1, Math.max(...g), Math.min(...g), bay]); };
+            if (!n) span(0, Lr, [0, Lr / 2, Lr], false);
+            else { if (pad > 0.01) span(0, pad, [0, pad], false); for (let j = 0; j < n; j++) { const s0 = pad + j * bw; span(s0, s0 + bw, [s0 + fw[2] * bw, s0 + bw / 2, s0 + fw[3] * bw], true); } if (pad > 0.01) span(Lr - pad, Lr, [Lr - pad, Lr], false); }
+            const R = { ed, off, Lr, at, rp, n, bw, pad, sp, fw, side, tile, code: bare || !fw ? cells.P + 128 * cells.P + 16384 * cells.P : cells.code, uoff: Math.floor(hashRnd(Math.round(ring[i0][0] * 31 + ring[i0][1] * 17)) * 32) };
+            ed.forEach((i, q) => { W[i] = [R, off[q]]; }); return R;
+          });
+          return { ring, nr, E, W, runs };
+        });
+        /* the doors on this house (Carlo 7/11, via Adua): a door takes the place of the ground-floor window of a bay, never sits over a window. It goes to the centre of the nearest free bay of its wall, flush on the wall, facing out; that bay draws no window on its lowest floor (R.noG). Where the wall has no bays the door stays where it is, put on the wall. PORTE_CNT counts the doors over a ground-floor window before and after (debug) */
+        /* the shop fronts on this building (negozi3.js, decided by the bake: T.d.ngw) win over windows and doors (Carlo 8/11): no window in the bay of a front on the ground floor, no door under it */
+        for (const [bi, fx, fz, fwid] of T.d && T.d.ngw ? T.d.ngw.filter(q => q[0] === B.bi) : []) {
+          let best = null; for (const rg of rings) for (let i = 0; i < rg.nr; i++) { const w = rg.W[i]; if (!w) continue; const a = rg.ring[i], [dx, dz, L] = rg.E[i], tt = clamp(((fx - a[0]) * dx + (fz - a[1]) * dz) / (L * L), 0, 1), dd = hyp(fx - a[0] - dx * tt, fz - a[1] - dz * tt); if (dd < 1.2 && (!best || dd < best.dd)) best = { dd, R: w[0], s: w[1] + tt * L }; }
+          if (!best) continue; const R = best.R, v0 = best.s - fwid / 2 - 0.15, v1 = best.s + fwid / 2 + 0.15; (R.vt || (R.vt = [])).push([v0, v1]);
+          const VC = window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0 }); VC.vetrine++;
+          if (R.n) { const noG = R.noG || (R.noG = new Set()); for (let j = 0; j < R.n; j++) { const b0 = R.pad + j * R.bw, b1 = b0 + R.bw; if (b1 > v0 && b0 < v1) { noG.add(j); VC.campate++; } } }
+        }
+        for (const d of T.doors || []) {
+          if (d.fit === T.fitN) continue; const mx = (d.ax + d.bx) / 2, mz = (d.az + d.bz) / 2; let best = null;
+          for (const rg of rings) for (let i = 0; i < rg.nr; i++) {
+            const w = rg.W[i]; if (!w) continue; const a = rg.ring[i], [dx, dz, L] = rg.E[i], t = clamp(((mx - a[0]) * dx + (mz - a[1]) * dz) / (L * L), 0, 1), dd = hyp(mx - a[0] - dx * t, mz - a[1] - dz * t);
+            if (dd < 1.0 && (!best || dd < best.dd)) best = { dd, rg, i, R: w[0], s: w[1] + t * L };
+          }
+          if (!best) continue; d.fit = T.fitN; const { R, rg } = best, e = rg.E[best.i], PC = window.PORTE_CNT || (window.PORTE_CNT = { porte: 0, sopra_prima: 0, sopra_dopo: 0, spostate: 0 });
+          const dh = facDoorBox(S0.door, d.W, d.h)[0]; /* half the door with its frame (the stone frame of an old door is 0.72 m wider than the door, the entry phone of a block of flats stands beside it) */
+          const fw = R.fw, win = j => { const s0 = R.pad + j * R.bw; return [s0 + fw[2] * R.bw, s0 + fw[3] * R.bw]; }, ov = (j, s) => { const [w0, w1] = win(j); return s + dh > w0 && s - dh < w1; };
+          const underV = s => (R.vt || []).some(([v0, v1]) => s + dh > v0 && s - dh < v1), VC = window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0 }), wasV = underV(best.s);
+          const noG = R.noG || (R.noG = new Set()); let sc = best.s; PC.porte++;
+          if (R.n && R.fw) {
+            const O = R.ovl || (R.ovl = new Set()); for (let j = 0; j < R.n; j++) if (ov(j, best.s)) O.add(j);
+            const c = j => R.pad + (j + 0.5) * R.bw; let bj = -1;
+            for (let j = 0; j < R.n; j++) if (!noG.has(j) && Math.abs(c(j) - best.s) < 2 * R.bw && (bj < 0 || Math.abs(c(j) - best.s) < Math.abs(c(bj) - best.s))) bj = j;
+            if (bj < 0 && wasV) for (let j = 0; j < R.n; j++) if (!noG.has(j) && !underV(c(j)) && (bj < 0 || Math.abs(c(j) - best.s) < Math.abs(c(bj) - best.s))) bj = j; /* under a shop front: any free bay of the wall */
+            if (bj >= 0) { sc = c(bj); noG.add(bj); PC.spostate++; if (wasV) VC.porte_spostate++; }
+          }
+          if (underV(sc)) { d.skip = true; VC.porte_tolte++; continue; } /* no door under a shop front: it goes */
+          if (R.n && R.fw) for (let j = 0; j < R.n; j++) if (ov(j, sc)) noG.add(j); /* every ground-floor window the door and its frame would touch goes, the next bay's too */
+          d.sty = S0.door; d.steps = S0.steps; if (S0.door === 'vil') d.col = S0.band === 'D' ? 0x2e3133 : S0.band === 'C' ? 0x6b4a2e : [0x7a5232, 0xece9e2, 0x5b3a26][Math.floor(facHashB(B, 5) * 3) % 3];
+          (R.dr || (R.dr = [])).push([sc, 2 * dh]); const mid = R.at(sc), ux = e[4], uz = -e[3]; /* e: [dx, dz, L, nx, nz]; the door faces along the outward normal (-uz, ux) = (nx, nz) */
+          d.ax = mid[0] - ux * d.W / 2; d.az = mid[1] - uz * d.W / 2; d.bx = mid[0] + ux * d.W / 2; d.bz = mid[1] + uz * d.W / 2; d.ux = ux; d.uz = uz; d.gy = Math.min(H.ground(d.ax, d.az), H.ground(d.bx, d.bz));
+        }
+        return { outer, holes, area, h, t, raised, gys, gmin, gmax, top, bot, R, pcB, colOr, sty, wallCol, bare, planes, pitched, S0, fwB, rings };
+    }, preps = new Map();
+    for (const B of T.bld) {
+      if (B.skipDraw) continue;
+      if (EPOCA_DBG) { const c = B.ep === undefined ? '#cdcdcd' : EPOCA_COL[B.ep]; B.wc = B.rcol = c; } /* ?debug=1&epoca: the buildings in the colour of their epoch, as the approved map (src/epoca.py) */
+      if (B.lm || B.big || B.g >= 2) continue;
+      if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } /* spread over the frames like the drawing */
+      preps.set(B, facPrep(B));
+    }
     for (const B of T.bld) {
       if (B.skipDraw) continue; /* under a fuel station's own canopy */
-      if (EPOCA_DBG) { const c = B.ep === undefined ? '#cdcdcd' : EPOCA_COL[B.ep]; B.wc = B.rcol = c; } /* ?debug=1&epoca: the buildings in the colour of their epoch, as the approved map (src/epoca.py) */
       if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower, cabin (paesaggio3.js)
       if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
-      const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t, raised = B.zb !== undefined;
-      // a DBGT volume: the top of its walls is its own (zt), never under the ground round it; a raised one starts at its base (zb)
-      const gys = outer.map(p => gCasa(p[0], p[1])), gmin = Math.min(...gys), gmax = Math.max(...gys);
-      const top = B.zt !== undefined ? Math.max(B.zt, raised ? B.zb + 1 : gmax + Math.min(h, 2.2)) : gmax + h, bot = raised ? B.zb : gmin - 0.6;
-      const R = B.e !== undefined ? (k => hashRnd(B.e * 7 + k)) : (() => tRnd()), pcB = (a, k = 0) => COL(a[Math.floor(R(k) * a.length)]);
-      const colOr = (c, f) => { if (c) { try { return new THREE.Color(c); } catch (e) { } } return f(); };
+      const { outer, holes, area, h, t, raised, gys, gmin, gmax, top, bot, R, pcB, colOr, sty, wallCol, bare, planes, pitched, S0, fwB, rings } = preps.get(B);
       if (t === 9) {
         const ch = gmax + Math.max(h, 3.8);
         try { polyFill(canopyB, outer, holes, ch, 10, COL('#8d8a84')); } catch (e) { }
         if (outer.length <= 10) for (const [x, z] of outer) { const gy = H.ground(x, z); addBox(postB, x, (gy + ch) / 2, z, 0.18, ch - gy, 0.18, COL('#6a6c70')); }
         continue;
       }
-      /* facciate 2.0 (facciate3.js): the family (b.fa), the epoch (b.ep) and one of three variants give the cells of each wall; the colour from the palette of the family and epoch */
-      const sty = facStyleOf(B, area, top - bot), wallCol = EPOCA_DBG && B.wc ? COL(B.wc) : sty.col;
-      const bare = (top - bot < (sty.fam === 'vil' || sty.fam === 'corte' || sty.pink ? 3.0 : 4.8) && !raised) || !!B.st; /* too low for a whole floor of windows, or a ruin */
-      const b = wb.fac;
-      // the roof: the DBGT's own (planes from the DSM or from OSM roof:shape), flat where the DSM says so, otherwise the game's rule
-      const planes = roofPlanes(B);
-      const pitched = planes ? true : bldPitch(B) > 0; /* the same pitch the walker stands on (bldRoofY) */
-      if (!b.ao) { b.ao = []; b.fac = []; }
-      const S0 = sty.S;
-      // the facades (FAC): the bays along each wall and the ground under each window first, then the floors F0 + FL k the same all round the house.
-      // A wall is a run of sides that go on nearly straight (the DBGT draws a facade in many short sides): its bays run along all of it
-      const fwB = bare ? null : (S0.fc.fw || S0.bc.fw), rings = [[outer, false], ...holes.map(hh => [hh, true])].map(([ring, isHole]) => {
-        const A = sArea(ring), nr = ring.length;
-        const E = ring.map((a, i) => { const c = ring[(i + 1) % nr], dx = c[0] - a[0], dz = c[1] - a[1], L = hyp(dx, dz) || 1e-6; let nx = dz / L, nz = -dx / L; if ((A < 0) !== isHole) { nx = -nx; nz = -nz; } return [dx, dz, L, nx, nz]; });
-        const st = []; for (let i = 0; i < nr; i++) { const p = E[(i - 1 + nr) % nr], e = E[i]; if ((p[0] * e[0] + p[1] * e[1]) / (p[2] * e[2]) < FAC.BEND) st.push(i); } if (!st.length) st.push(0);
-        const W = [];
-        const runs = st.map((i0, k) => {
-          const i1 = st[(k + 1) % st.length], ed = [], off = []; let j = i0, Lr = 0;
-          do { ed.push(j); off.push(Lr); W[j] = null; Lr += E[j][2]; j = (j + 1) % nr; } while (j !== i1);
-          const at = s => { let q = 0; while (q < ed.length - 1 && s > off[q] + E[ed[q]][2]) q++; const e = E[ed[q]], a = ring[ed[q]], f = clamp((s - off[q]) / e[2], 0, 1); return [a[0] + e[0] * f, a[1] + e[1] * f]; };
-          const rp = []; // the top of the wall along the run: straight between these (the roof's breaks over each side, src roofBreaks)
-          ed.forEach((i, q) => { const a = ring[i], c = ring[(i + 1) % nr], e = E[i]; for (const t of planes && !isHole ? roofBreaks(B, a, c) : [0, 1]) { const s = off[q] + t * e[2]; if (rp.length && Math.abs(rp[rp.length - 1][0] - s) < 1e-4) continue; rp.push([s, top + (planes ? roofAt(B, a[0] + e[0] * t, a[1] + e[1] * t) : 0)]); } });
-          let qL = ed[0]; for (const i of ed) if (E[i][2] > E[qL][2]) qL = i;
-          const a0 = ring[i0], c0 = at(Lr), side = !isHole && facFronte(a0[0], a0[1], c0[0], c0[1], E[qL][3], E[qL][4]) ? 'f' : 'b', cells = S0[side + 'c'], fw = bare ? null : cells.fw, tile = S0.tile;
-          const x = Lr / tile, gAt = s => { const p = at(s); return gCasa(p[0], p[1]); }, sp = []; let n = fw ? Math.round(x) : 0; if (n && x / n < FAC.MIN) n--;
-          const bw = n ? Math.min(x / n, FAC.MAX) * tile : Lr, pad = n ? (Lr - n * bw) / 2 : 0, span = (s0, s1, ss, bay) => { const g = ss.map(gAt); sp.push([s0, s1, Math.max(...g), Math.min(...g), bay]); };
-          if (!n) span(0, Lr, [0, Lr / 2, Lr], false);
-          else { if (pad > 0.01) span(0, pad, [0, pad], false); for (let j = 0; j < n; j++) { const s0 = pad + j * bw; span(s0, s0 + bw, [s0 + fw[2] * bw, s0 + bw / 2, s0 + fw[3] * bw], true); } if (pad > 0.01) span(Lr - pad, Lr, [Lr - pad, Lr], false); }
-          const R = { ed, off, Lr, at, rp, n, bw, pad, sp, fw, side, tile, code: bare || !fw ? cells.P + 128 * cells.P + 16384 * cells.P : cells.code, uoff: Math.floor(hashRnd(Math.round(ring[i0][0] * 31 + ring[i0][1] * 17)) * 32) };
-          ed.forEach((i, q) => { W[i] = [R, off[q]]; }); return R;
-        });
-        return { ring, nr, E, W, runs };
-      });
-      /* the doors on this house (Carlo 7/11, via Adua): a door takes the place of the ground-floor window of a bay, never sits over a window. It goes to the centre of the nearest free bay of its wall, flush on the wall, facing out; that bay draws no window on its lowest floor (R.noG). Where the wall has no bays the door stays where it is, put on the wall. PORTE_CNT counts the doors over a ground-floor window before and after (debug) */
-      /* the shop fronts on this building (negozi3.js, decided by the bake: T.d.ngw) win over windows and doors (Carlo 8/11): no window in the bay of a front on the ground floor, no door under it */
-      for (const [bi, fx, fz, fwid] of T.d && T.d.ngw ? T.d.ngw.filter(q => q[0] === B.bi) : []) {
-        let best = null; for (const rg of rings) for (let i = 0; i < rg.nr; i++) { const w = rg.W[i]; if (!w) continue; const a = rg.ring[i], [dx, dz, L] = rg.E[i], tt = clamp(((fx - a[0]) * dx + (fz - a[1]) * dz) / (L * L), 0, 1), dd = hyp(fx - a[0] - dx * tt, fz - a[1] - dz * tt); if (dd < 1.2 && (!best || dd < best.dd)) best = { dd, R: w[0], s: w[1] + tt * L }; }
-        if (!best) continue; const R = best.R, v0 = best.s - fwid / 2 - 0.15, v1 = best.s + fwid / 2 + 0.15; (R.vt || (R.vt = [])).push([v0, v1]);
-        const VC = window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0 }); VC.vetrine++;
-        if (R.n) { const noG = R.noG || (R.noG = new Set()); for (let j = 0; j < R.n; j++) { const b0 = R.pad + j * R.bw, b1 = b0 + R.bw; if (b1 > v0 && b0 < v1) { noG.add(j); VC.campate++; } } }
-      }
-      for (const d of T.doors || []) {
-        if (d.fit === T.fitN) continue; const mx = (d.ax + d.bx) / 2, mz = (d.az + d.bz) / 2; let best = null;
-        for (const rg of rings) for (let i = 0; i < rg.nr; i++) {
-          const w = rg.W[i]; if (!w) continue; const a = rg.ring[i], [dx, dz, L] = rg.E[i], t = clamp(((mx - a[0]) * dx + (mz - a[1]) * dz) / (L * L), 0, 1), dd = hyp(mx - a[0] - dx * t, mz - a[1] - dz * t);
-          if (dd < 1.0 && (!best || dd < best.dd)) best = { dd, rg, i, R: w[0], s: w[1] + t * L };
-        }
-        if (!best) continue; d.fit = T.fitN; const { R, rg } = best, e = rg.E[best.i], PC = window.PORTE_CNT || (window.PORTE_CNT = { porte: 0, sopra_prima: 0, sopra_dopo: 0, spostate: 0 });
-        const dh = facDoorBox(S0.door, d.W, d.h)[0]; /* half the door with its frame (the stone frame of an old door is 0.72 m wider than the door, the entry phone of a block of flats stands beside it) */
-        const fw = R.fw, win = j => { const s0 = R.pad + j * R.bw; return [s0 + fw[2] * R.bw, s0 + fw[3] * R.bw]; }, ov = (j, s) => { const [w0, w1] = win(j); return s + dh > w0 && s - dh < w1; };
-        const underV = s => (R.vt || []).some(([v0, v1]) => s + dh > v0 && s - dh < v1), VC = window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0 }), wasV = underV(best.s);
-        const noG = R.noG || (R.noG = new Set()); let sc = best.s; PC.porte++;
-        if (R.n && R.fw) {
-          const O = R.ovl || (R.ovl = new Set()); for (let j = 0; j < R.n; j++) if (ov(j, best.s)) O.add(j);
-          const c = j => R.pad + (j + 0.5) * R.bw; let bj = -1;
-          for (let j = 0; j < R.n; j++) if (!noG.has(j) && Math.abs(c(j) - best.s) < 2 * R.bw && (bj < 0 || Math.abs(c(j) - best.s) < Math.abs(c(bj) - best.s))) bj = j;
-          if (bj < 0 && wasV) for (let j = 0; j < R.n; j++) if (!noG.has(j) && !underV(c(j)) && (bj < 0 || Math.abs(c(j) - best.s) < Math.abs(c(bj) - best.s))) bj = j; /* under a shop front: any free bay of the wall */
-          if (bj >= 0) { sc = c(bj); noG.add(bj); PC.spostate++; if (wasV) VC.porte_spostate++; }
-        }
-        if (underV(sc)) { d.skip = true; VC.porte_tolte++; continue; } /* no door under a shop front: it goes */
-        if (R.n && R.fw) for (let j = 0; j < R.n; j++) if (ov(j, sc)) noG.add(j); /* every ground-floor window the door and its frame would touch goes, the next bay's too */
-        d.sty = S0.door; d.steps = S0.steps; if (S0.door === 'vil') d.col = S0.band === 'D' ? 0x2e3133 : S0.band === 'C' ? 0x6b4a2e : [0x7a5232, 0xece9e2, 0x5b3a26][Math.floor(facHashB(B, 5) * 3) % 3];
-        (R.dr || (R.dr = [])).push([sc, 2 * dh]); const mid = R.at(sc), ux = e[4], uz = -e[3]; /* e: [dx, dz, L, nx, nz]; the door faces along the outward normal (-uz, ux) = (nx, nz) */
-        d.ax = mid[0] - ux * d.W / 2; d.az = mid[1] - uz * d.W / 2; d.bx = mid[0] + ux * d.W / 2; d.bz = mid[1] + uz * d.W / 2; d.ux = ux; d.uz = uz; d.gy = Math.min(H.ground(d.ax, d.az), H.ground(d.bx, d.bz));
-      }
-      /* a door laid by the tile next door against this house's wall (each tile lays the doors on its ground, the house is drawn by the tile it belongs to): it stays where it is, the ground-floor windows it touches go */
+      const b = wb.fac; if (!b.ao) { b.ao = []; b.fac = []; }
+      /* a door laid by the tile next door against this house's wall (each tile lays the doors on its ground, the house is drawn by the tile it belongs to): or a door of this tile fitted to another volume standing on the same wall (the DBGT has some houses twice, one over the other): it stays where it is, the ground-floor windows it touches go */
       const bb = B.bb || (B.bb = outer.reduce((q, p) => [Math.min(q[0], p[0]), Math.min(q[1], p[1]), Math.max(q[2], p[0]), Math.max(q[3], p[1])], [1e9, 1e9, -1e9, -1e9]));
       for (const U of vicini(T)) {
-        if (U === T || !U.doors || U.cx + TS < bb[0] || U.cx - TS > bb[2] || U.cz + TS < bb[1] || U.cz - TS > bb[3]) continue;
+        if (!U.doors || U.cx + TS < bb[0] || U.cx - TS > bb[2] || U.cz + TS < bb[1] || U.cz - TS > bb[3]) continue;
         for (const d of U.doors) {
-          if (d.skip) continue; const mx = (d.ax + d.bx) / 2, mz = (d.az + d.bz) / 2; if (mx < bb[0] - 1 || mx > bb[2] + 1 || mz < bb[1] - 1 || mz > bb[3] + 1) continue; let best = null;
-          for (const rg of rings) for (let i = 0; i < rg.nr; i++) {
+          if (d.skip || (U === T && d.fit !== T.fitN)) continue; const mx = (d.ax + d.bx) / 2, mz = (d.az + d.bz) / 2; if (mx < bb[0] - 1 || mx > bb[2] + 1 || mz < bb[1] - 1 || mz > bb[3] + 1) continue;
+          const dh = facDoorBox(d.sty, d.W, d.h)[0];
+          for (const rg of rings) for (let i = 0; i < rg.nr; i++) { /* every wall it stands on or next to, parallel to it: a wall stepped back a few cm beside the door is another run with its own bays */
             const w = rg.W[i]; if (!w) continue; const a = rg.ring[i], [dx, dz, L] = rg.E[i], t = clamp(((mx - a[0]) * dx + (mz - a[1]) * dz) / (L * L), 0, 1), dd = hyp(mx - a[0] - dx * t, mz - a[1] - dz * t);
-            if (dd < 0.6 && (!best || dd < best.dd)) best = { dd, R: w[0], s: w[1] + t * L };
+            if (dd >= 0.6 || Math.abs(dx * d.ux + dz * d.uz) < 0.9 * L) continue; const R = w[0], s = w[1] + t * L; if (!R.n || !R.fw) continue; const noG = R.noG || (R.noG = new Set());
+            for (let j = 0; j < R.n; j++) { const s0 = R.pad + j * R.bw, w0 = s0 + R.fw[2] * R.bw, w1 = s0 + R.fw[3] * R.bw; if (s + dh > w0 && s - dh < w1) noG.add(j); }
           }
-          if (!best || !best.R.n || !best.R.fw) continue; const R = best.R, dh = facDoorBox(d.sty, d.W, d.h)[0], noG = R.noG || (R.noG = new Set());
-          for (let j = 0; j < R.n; j++) { const s0 = R.pad + j * R.bw, w0 = s0 + R.fw[2] * R.bw, w1 = s0 + R.fw[3] * R.bw; if (best.s + dh > w0 && best.s - dh < w1) noG.add(j); }
         }
       }
       let gHi = gmax, gLo = gmin; for (const r of rings) for (const R of r.runs) for (const p of R.sp) { gHi = Math.max(gHi, p[2]); gLo = Math.min(gLo, p[3]); }
@@ -2430,7 +2442,7 @@ function* buildTileGen(T) {
             if (bay && f[0] < 900 && (R.dr || R.noG)) { /* a door in this bay: no window on the lowest floor (PORTE_CNT: the bays a door was over before, and the ones with a window under a door after) */
               const j = Math.round((s0 - R.pad) / bw), PC = window.PORTE_CNT || (window.PORTE_CNT = { porte: 0, sopra_prima: 0, sopra_dopo: 0, spostate: 0 }), w0 = s0 + rfw[2] * bw, w1 = s0 + rfw[3] * bw;
               if (R.ovl && R.ovl.has(j)) PC.sopra_prima++; R.dr = R.dr || [];
-              if (R.noG && R.noG.has(j) && f[0] === kl) { dropped = 1; f = f[0] + 1 <= f[1] ? [f[0] + 1, f[1]] : [999, -999]; } else if (R.dr.some(([c, W]) => c + W / 2 > w0 && c - W / 2 < w1)) PC.sopra_dopo++;
+              if (R.noG && R.noG.has(j) && F0 + f[0] * FL + rfw[0] * sc < g + 3.1) { /* the lowest window of the bay, if a door stands under it (its floor may be above kl where a volume in front covers the one below) */ dropped = 1; f = f[0] + 1 <= f[1] ? [f[0] + 1, f[1]] : [999, -999]; } else if (R.dr.some(([c, W]) => c + W / 2 > w0 && c - W / 2 < w1)) PC.sopra_dopo++;
             }
             f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : vOf(F0 + kl * FL + FAC.ZH)];
             const last = grp[grp.length - 1];
