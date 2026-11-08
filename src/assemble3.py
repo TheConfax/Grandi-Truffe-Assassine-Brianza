@@ -846,7 +846,7 @@ rep("camPitch *= Math.exp(-k * dt);", "camPitch *= Math.exp(-(P.car.heli ? HELI.
 rep("!inCar && camFree ? CAMF.posK : 7.5", "!inCar && camFree ? CAMF.posK : inCar && P.car.heli ? HELI.camK : 7.5")
 rep("(inCar ? camPitch * 6 : 0)", "(inCar && !P.car.heli ? camPitch * 6 : 0)")
 rep("look = new THREE.Vector3(px + hx * (inCar ? 5 : 2), gy + (inCar ? 1.3 : 1.5), pz + hz * (inCar ? 5 : 2));", "const ld_ = inCar ? (P.car.heli ? 5 * clamp(1 - camPitch / 1.2, 0, 1) : 5) : 2; look = new THREE.Vector3(px + hx * ld_, gy + (inCar ? 1.3 : 1.5), pz + hz * ld_);")
-rep("  camera.lookAt(camLook);", "  camera.lookAt(camLook);\n  if (inCar && P.car.heli && camMode === 0) camera.rotateZ(-P.car.roll * HELI.camRoll); /* banking, the view leans a little with it */")
+rep("  camera.lookAt(camLook);", "  camera.lookAt(camLook);\n  if (inCar && P.car.heli && camMode === 0) camera.rotateZ(-heliCamLean(P.car)); /* banking, the view leans a little with it; still, it does not (elicottero3.js heliCamLean) */")
 # fog thins out with the height of the view (Carlo 7/11: from the helicopter everything went dark past a kilometre while the lights showed through)
 rep("scene.fog.near = lerp(lerp(160, 40, WX.rain), 2, WX.fog);", "scene.fog.near = lerp(lerp(160, 40, WX.rain), 2, WX.fog);\n  { const k_ = nebbiaQuota(); scene.fog.far *= k_; scene.fog.near *= k_; }")
 rep("  snapOf(P, INTERP_KEYS);\n}", "  snapOf(P, INTERP_KEYS);\n  for (const e of HELIS) snapOf(e, INTERP_HELI);\n}")
