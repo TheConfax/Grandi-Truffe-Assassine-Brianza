@@ -759,7 +759,7 @@ function ngFront(s, C) {
   for (let i = 0; i <= n; i++) { dev = Math.max(dev, Math.abs(prof[i] - a0 - da * i / n)); big = Math.max(big, Math.abs(prof[i])); }
   const bend = big > 0.012; C.chunk = dev > 0.02 ? 0.8 : 0; C.nBend = (C.nBend || 0) + (dev > 0.02 ? 1 : 0);
   const from = new Map(ngBufs(C).map(b => [b, b.p.length / 3]));
-  ngFront0(s, C);
+  const c0 = C.cells.length; ngFront0(s, C); for (let i = c0; i < C.cells.length; i++) C.cells[i].nm = !!s.name;
   if (!bend) return;
   for (const b of ngBufs(C)) for (let v = from.get(b) || 0, N = b.p.length / 3; v < N; v++) {
     const X = b.p[v * 3], Z = b.p[v * 3 + 2], xl = (X - s.cx) * s.nz - (Z - s.cz) * s.nx, d = ngOffAt(prof, s.w, xl) + 0.01;
@@ -1086,10 +1086,12 @@ function* buildNegozi(T, G) { // a generator: the tile builder yields between sl
   for (const k in C.neon) if (C.neon[k].i.length) mkMesh(C.neon[k], NG_NEON[k], 10, false, G);
   // the signs: one texture per tile, cells packed in shelves 1024 px wide
   if (C.cells.length) {
-    const order = C.cells.slice().sort((a, b) => b.ph - a.ph); let x = 0, y = 0, rh = 0;
-    for (const c of order) { if (x + c.pw > 1024) { x = 0; y += rh + 2; rh = 0; } c.x = x; c.y = y; x += c.pw + 2; rh = Math.max(rh, c.ph); }
-    const Hh = Math.min(4096, y + rh), cv = document.createElement('canvas'); cv.width = 1024; cv.height = Hh; const g = cv.getContext('2d');
-    for (const c of C.cells) { if (c.y + c.ph > Hh) continue; g.save(); g.translate(c.x, c.y); g.beginPath(); g.rect(0, 0, c.pw, c.ph); g.clip(); c.draw(g, c.pw, c.ph); g.restore(); }
+    /* the cells fill shelves of one texture 4096 px high; if they do not fit, all of them shrink a little (before, the last ones, the wide low signs, stayed blank) */
+    const pack = () => { const order = C.cells.slice().sort((a, b) => b.ph - a.ph); let x = 0, y = 0, rh = 0; for (const c of order) { if (x + c.pw > 1024) { x = 0; y += rh + 2; rh = 0; } c.x = x; c.y = y; x += c.pw + 2; rh = Math.max(rh, c.ph); } return y + rh; };
+    let need = pack(); for (let k = 0; need > 4096 && k < 12 && !window.NG_NOSHRINK; k++) { for (const c of C.cells) { c.pw = Math.max(16, Math.floor(c.pw * 0.88)); c.ph = Math.max(8, Math.floor(c.ph * 0.88)); } need = pack(); }
+    const Hh = Math.min(4096, need), cv = document.createElement('canvas'); cv.width = 1024; cv.height = Hh; const g = cv.getContext('2d');
+    const vu = { celle: 0, con_nome: 0 }; for (const c of C.cells) { if (c.y + c.ph > Hh) { vu.celle++; if (c.nm) vu.con_nome++; continue; } g.save(); g.translate(c.x, c.y); g.beginPath(); g.rect(0, 0, c.pw, c.ph); g.clip(); c.draw(g, c.pw, c.ph); g.restore(); }
+    (window.NG_VUOTE || (window.NG_VUOTE = {}))[T.t] = vu;
     for (const [i0, c] of C.sq) for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2, u = C.sign.uv[q], v = C.sign.uv[q + 1]; C.sign.uv[q] = (c.x + 0.5 + u * (c.pw - 1)) / 1024; C.sign.uv[q + 1] = 1 - (c.y + 0.5 + (1 - v) * (c.ph - 1)) / Hh; }
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
     const mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
