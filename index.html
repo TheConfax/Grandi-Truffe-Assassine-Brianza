@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 1dacdd54 · assemblato 08/11 03:35 · porta ' + location.port;
+    const txt = 'locale · ramo epoca-edifici · dopo c2a3c991 · assemblato 08/11 04:57 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1862,6 +1862,7 @@ function tileLinee(T) { // the lines of a tile, cut at the ramps; their feet fro
   for (const f of d.fe || []) for (const q of pitSplit(resample(dec(f.p), 3))) { T.feQ.push(q); piedi(q); }
   for (const br of d.ba || []) for (const q of pitSplit(resample(dec(br.p), BAR_PANEL[br.t] ? BAR_PANEL[br.t].len : 4))) { T.baQ.push([br, q]); piedi(q); }
 }
+const EPOCA_DBG = /[?&]epoca/.test(location.search), EPOCA_COL = ['#c02020', '#b05010', '#f08c28', '#f5d728', '#46aa46', '#3cb9d7', '#283cc8']; /* prima del 1930, 1930-45, 1946-60, 1961-76, 1977-92, 1993-2006, dopo il 2006 */
 function layMuri(T) {
   const d = T.d;
   for (const B of d.b || []) {
@@ -1872,7 +1873,7 @@ function layMuri(T) {
     // terrain.base, e its building, rk/rf/rc its roof (planes over the top of the walls), wc/rcol the colours OSM gives, st its state in the
     // 2015 survey when OSM does not say otherwise (2 a ruin with no roof over it in the DSM: bare walls only; 3 a ruin with its roof; 1 under
     // construction: a bare concrete shell; no shop signs on any of them)
-    for (const k of ['zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st']) if (B[k] !== undefined) rec[k] = B[k];
+    for (const k of ['zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st', 'ep']) if (B[k] !== undefined) rec[k] = B[k]; /* ep: the epoch of construction, 0 before 1930 ... 6 after 2006, absent = unknown (src/epoca.py) */
     if (rec.st) rec.noSign = true;
     T.bld.push(rec); if (rec.cu) domeWalls(rec);
     if (B.zb !== undefined) { // raised: nothing on the ground (people and cars pass under it), walls from its base up
@@ -4038,6 +4039,7 @@ function* buildTileGen(T) {
     let nb = 0;
     for (const B of T.bld) {
       if (B.skipDraw) continue; /* under a fuel station's own canopy */
+      if (EPOCA_DBG) { const c = B.ep === undefined ? '#cdcdcd' : EPOCA_COL[B.ep]; B.wc = B.rcol = c; } /* ?debug=1&epoca: the buildings in the colour of their epoch, as the approved map (src/epoca.py) */
       if (B.lm || B.big || B.g >= 2) continue; // modelled by hand in landmarks3.js, a whole supermarket (negozi3.js), greenhouse, stand, water tower, cabin (paesaggio3.js)
       if ((++nb & 31) === 0) { const s = srndT; yield 'buildings'; srndT = s; } // other code may draw random numbers meanwhile
       const outer = B.pts, holes = B.holes, area = Math.abs(sArea(outer)), h = B.h, t = B.t, raised = B.zb !== undefined;

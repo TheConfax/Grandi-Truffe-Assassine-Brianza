@@ -2797,6 +2797,15 @@ for _k_, _v_ in _ctl['prove_fisse'].items(): log('PROVA FISSA', _k_, 'OK' if _v_
 _ctl['prove_fisse_mapillary_ok'] = all(v_['ok'] for k_, v_ in _ctl['prove_fisse'].items() if k_.startswith('mapillary'))
 out.setdefault('report', {})['controlli_28_10'] = _ctl
 
+# the epoch of construction of each building ('ep' 0-6, absent = unknown) from the CENED energy certificates in data/cened/ (src/epoca.py, docs/dati.md); the rule Carlo approved on 8/11
+import epoca as _EP
+_ind_ep = [(nodes[r_][0], nodes[r_][1], t.get('addr:street') or t.get('addr:place') or '', t['addr:housenumber']) for r_, t in ntags.items() if 'addr:housenumber' in t and r_ in nodes]
+for w_, (nd_, t) in ways.items():
+    if 'addr:housenumber' in t:
+        pp_ = [nodes[n_] for n_ in nd_ if n_ in nodes]
+        if pp_: _ind_ep.append((sum(p_[0] for p_ in pp_) / len(pp_), sum(p_[1] for p_ in pp_) / len(pp_), t.get('addr:street') or t.get('addr:place') or '', t['addr:housenumber']))
+out.setdefault('report', {})['epoca'] = _EP.calcola(out, _ind_ep, os.path.join(DATA, 'cened'), CONF, proj, log)
+json.dump(out['report']['epoca'], open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_epoca.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 out.setdefault('report', {})['cantieri'] = _crep  # the dividers the building sites' hoarding replaces (src/barriere.py cantieri)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252
