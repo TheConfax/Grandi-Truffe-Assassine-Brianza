@@ -112,12 +112,12 @@
    }
   ],
   "n_luoghi": 1,
-  "punti_controllati": 11362,
-  "bordo_punti": 83,
-  "bordo_luoghi": 23
+  "punti_controllati": 11356,
+  "bordo_punti": 80,
+  "bordo_luoghi": 21
  },
  "A3": {
-  "celle_sotto_impalcati_con_strada_disegnata": 176,
+  "celle_sotto_impalcati_con_strada_disegnata": 202,
   "dipinte": 0,
   "m2": 0.0,
   "impalcati": [],
@@ -136,7 +136,7 @@
    39,
    40
   ],
-  "celle_segnate_sotto_impalcato": 1096,
+  "celle_segnate_sotto_impalcato": 1135,
   "luoghi": []
  },
  "A4": {
@@ -614,23 +614,23 @@
    },
    {
     "comune": "Meda",
-    "x": -36.8,
+    "x": -37.2,
     "z": -640.8,
     "m": 11.1,
     "strada": 223.22,
     "S_min": 222.92,
     "sfondato": false,
-    "link": "?x=-36.8&z=-640.8"
+    "link": "?x=-37.2&z=-640.8"
    },
    {
     "comune": "Meda",
-    "x": -35.2,
+    "x": -34.8,
     "z": -634.8,
     "m": 2.2,
     "strada": 222.95,
     "S_min": 222.89,
     "sfondato": false,
-    "link": "?x=-35.2&z=-634.8"
+    "link": "?x=-34.8&z=-634.8"
    },
    {
     "comune": "Meda",
@@ -845,7 +845,7 @@
   "acqua_sulle_strade_luoghi": 3,
   "strade_sfondate_punti": 2,
   "strade_sfondate_luoghi": 1,
-  "strade_sfondate_bordo_punti": 83,
+  "strade_sfondate_bordo_punti": 80,
   "dipinte_sotto_impalcati_celle": 0,
   "dipinte_sotto_impalcati_ponti": 0,
   "ringhiere_m": 0,
@@ -856,6 +856,6 @@
   "tombini_sotto_strade": 48,
   "tombini_sotto_strade_sfondati": 1,
   "prove_fisse_ok": "4 su 4",
-  "tempo_s": 53.3
+  "tempo_s": 24.8
  }
 }

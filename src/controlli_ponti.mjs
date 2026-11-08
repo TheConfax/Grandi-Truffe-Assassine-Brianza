@@ -3,7 +3,8 @@
 //   accavallati  m di parapetto che corrono paralleli a un altro parapetto a 0,05-0,8 m (due file una sull'altra)
 //   scatti       angoli di un parapetto fra due tratti dritti piu corti di SCATTO m (la scaletta delle celle del reticolo)
 //   in_strada    muri sotto i ponti in mezzo a una carreggiata (asfalto da tutti e due i lati, a meno di 1 m dal piede)
-// Soglia 0 per tutti e tre. Scrive la chiave "barriere" in report_ponti.json (accanto al controllo dei capi di src/controlli_ponti.py).
+//   di_traverso  tratti di parapetto in mezzo alla carreggiata di una strada alla loro quota, di traverso (Carlo 8/11: il capo storto della Milano-Meda a x 355 z 2017)
+// Soglia 0 per tutti e quattro. Scrive la chiave "barriere" in report_ponti.json (accanto al controllo dei capi di src/controlli_ponti.py).
 //   node src/controlli_ponti.mjs [http://127.0.0.1:8013/] [report_ponti.json]      pezzi.py lo chiama dopo la cottura
 //   PLAYWRIGHT=<path of playwright/index.mjs> se non è installato qui; CHROME=<path of chrome.exe>
 import fs from 'fs';
@@ -66,14 +67,30 @@ const r = await page.evaluate(() => {
       if (run(l[0], k) < SCATTO && run(l[1], k) < SCATTO) { const [x, z] = k.split(',').map(Number); sc.push({ fonte: dk.fonte, x, z, link: link(x, z) }); }
     }
   }
+  // across a road at its own level (Carlo 8/11, the Milano-Meda at x 355 z 2017: the parapets of the end of its deck cut the carriageways): a piece of
+  // parapet whose middle lies on the carriageway of a road for cars (within w/2 of its axis), across it (over 30 degrees), the road there within
+  // TRAVERSO_DY m of the parapet's foot (the roads under the deck stay out)
+  const D = __G.D, ND = D.nodes, nx_ = i => ND[3 * i] / 10, nz_ = i => ND[3 * i + 1] / 10, TRAVERSO_DY = 1.0, tra = [], SG = new Map(), KS = (x, z) => Math.floor(x / 20) + ',' + Math.floor(z / 20);
+  D.roads.forEach(r => { if (r.t || r.c > 6) return; for (let k = 1; k < r.g.length; k++) { const ia = r.g[k - 1], ib = r.g[k], s = { r, ia, ib, ax: nx_(ia), az: nz_(ia), bx: nx_(ib), bz: nz_(ib) };
+    const L = Math.hypot(s.bx - s.ax, s.bz - s.az); if (L < 0.1) continue; for (let t = 0; t <= L; t += 10) { const x = s.ax + (s.bx - s.ax) * t / L, z = s.az + (s.bz - s.az) * t / L, k_ = KS(x, z); const l = SG.get(k_) || SG.set(k_, []).get(k_); if (!l.includes(s)) l.push(s); } } });
+  for (const q of rails) {
+    const mx = (q.ax + q.bx) / 2, mz = (q.az + q.bz) / 2, ql = Math.hypot(q.bx - q.ax, q.bz - q.az); if (ql < 0.05) continue; const cand = new Set();
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (const s of SG.get((Math.floor(mx / 20) + dx) + ',' + (Math.floor(mz / 20) + dz)) || []) cand.add(s);
+    for (const s of cand) {
+      const fx = s.bx - s.ax, fz = s.bz - s.az, fl = Math.hypot(fx, fz), u = Math.max(0, Math.min(1, ((mx - s.ax) * fx + (mz - s.az) * fz) / (fl * fl))), px = s.ax + fx * u, pz = s.az + fz * u;
+      if (Math.hypot(mx - px, mz - pz) > s.r.w / 2 || Math.abs(((q.bx - q.ax) * fx + (q.bz - q.az) * fz) / (ql * fl)) > 0.87) continue;
+      const yr = H.node(s.ia) + (H.node(s.ib) - H.node(s.ia)) * u; if (Math.abs(yr - (q.ay + q.by) / 2) > TRAVERSO_DY) continue;
+      tra.push({ fonte: q.dk.fonte, x: R(mx), z: R(mz) }); break;
+    }
+  }
   const luoghi = (A, r = 6) => { const out = []; for (const a of A) { const o = out.find(q => Math.hypot(q.x - a.x, q.z - a.z) < r && q.fonte === a.fonte); if (o) o.n++; else out.push({ ...a, n: 1, link: link(a.x, a.z) }); } return out.sort((p, q) => q.n - p.n); };
-  return { ...tot, parapetti_m: R(tot.parapetti_m), accavallati_m: R(acc.reduce((s, a) => s + a.m, 0)), scatti: sc.length, in_strada: ins.length,
-           posti_accavallati: luoghi(acc).slice(0, 30), posti_scatti: luoghi(sc).slice(0, 30), posti_in_strada: luoghi(ins).slice(0, 30) };
+  return { ...tot, parapetti_m: R(tot.parapetti_m), accavallati_m: R(acc.reduce((s, a) => s + a.m, 0)), scatti: sc.length, in_strada: ins.length, di_traverso: tra.length,
+           posti_accavallati: luoghi(acc).slice(0, 30), posti_scatti: luoghi(sc).slice(0, 30), posti_in_strada: luoghi(ins).slice(0, 30), posti_di_traverso: luoghi(tra, 15).slice(0, 30) };
 });
-r.definizione = 'parapetti e muri dei ponti nel gioco: accavallati = m di parapetto paralleli a un altro a 0,05-0,8 m; scatti = angoli fra due tratti dritti sotto 3 m; in_strada = muri sotto i ponti con asfalto da tutti e due i lati';
-r.soglia = 'accavallati 0, scatti 0, in_strada 0'; r.ok = !r.accavallati_m && !r.scatti && !r.in_strada; r.errori = errs.slice(0, 5);
+r.definizione = 'parapetti e muri dei ponti nel gioco: accavallati = m di parapetto paralleli a un altro a 0,05-0,8 m; scatti = angoli fra due tratti dritti sotto 3 m; in_strada = muri sotto i ponti con asfalto da tutti e due i lati; di_traverso = tratti di parapetto che tagliano l asse di una strada alla loro quota (entro 1 m)';
+r.soglia = 'accavallati 0, scatti 0, in_strada 0, di_traverso 0'; r.ok = !r.accavallati_m && !r.scatti && !r.in_strada && !r.di_traverso; r.errori = errs.slice(0, 5);
 let rep = {}; try { rep = JSON.parse(fs.readFileSync(out, 'utf8')); } catch (e) {}
 rep.barriere = r; fs.writeFileSync(out, JSON.stringify(rep, null, 1));
-console.log('barriere dei ponti: %d impalcati, parapetti %d m, accavallati %d m, scatti %d, muri in carreggiata %d %s', r.decks, r.parapetti_m, r.accavallati_m, r.scatti, r.in_strada,
-  [...r.posti_accavallati.slice(0, 4), ...r.posti_scatti.slice(0, 4), ...r.posti_in_strada.slice(0, 4)].map(p => p.fonte + ' ' + p.link).join(', '));
+console.log('barriere dei ponti: %d impalcati, parapetti %d m, accavallati %d m, scatti %d, muri in carreggiata %d, parapetti di traverso a una strada %d (%d ponti) %s', r.decks, r.parapetti_m, r.accavallati_m, r.scatti, r.in_strada, r.di_traverso, new Set(r.posti_di_traverso.map(p => p.fonte)).size,
+  [...r.posti_accavallati.slice(0, 4), ...r.posti_scatti.slice(0, 4), ...r.posti_in_strada.slice(0, 4), ...r.posti_di_traverso.slice(0, 8)].map(p => p.fonte + ' ' + p.link).join(', '));
 await browser.close();
