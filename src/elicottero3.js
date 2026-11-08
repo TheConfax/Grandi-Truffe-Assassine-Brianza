@@ -102,17 +102,18 @@ function heliSetup() {
     const a = e.h + Math.PI * 0.75; P.x = e.x + Math.sin(a) * 7; P.z = e.z + Math.cos(a) * 7; P.y = H.surface(P.x, P.z); P.h = Math.atan2(e.x - P.x, e.z - P.z); START.piedi = true; break;
   }
 }
-/* the walls of the buildings near: their top is the roof (the walls stand 3 m over it so that nobody on foot climbs a roof), the helicopter meets the roof */
+/* the walls of the buildings near, for the camera (rayCam in assemble3.py): their top is the roof, 3 m under y1 */
 function heliTagBld(x, z, r) { BLD.each(x - r, z - r, x + r, z + r, b => { if (b.walls && !b._hw) { b._hw = true; for (const w of b.walls) w.bt = true; } }); }
-/* a disc of radius r between heights ya and yb against the walls (as collideStatic, with each wall's real top), the trees with their crown */
+/* a disc of radius r between heights ya and yb against the walls (as collideStatic, with each wall's real top: a building's wall up to its roof there, wallTopP, as for the walker), the trees with their crown */
 function heliPush(p, r, ya, yb, skip) {
   let nx = 0, nz = 0, hit = false;
   WALLS.each(p.x - r - 2.5, p.z - r - 2.5, p.x + r + 2.5, p.z + r + 2.5, s => {
     if (s.off || (s.dyn && !s.on) || skip.has(s)) return;
-    const top = s.y0 === undefined ? Infinity : s.bt ? s.y1 - 3 : s.y1, bot = s.y0 === undefined ? -Infinity : s.y0; if (yb < bot || ya > top) return;
+    const top = s.y0 === undefined ? Infinity : s.yp ? s.yp.max : s.y1, bot = s.y0 === undefined ? -Infinity : s.y0; if (yb < bot || ya > top) return;
     if (s.r) { const R = r + (s.tree ? 1.8 : s.r), dx = p.x - s.x, dz = p.z - s.z, d = hyp(dx, dz); if (d < R && d > 1e-6) { const k = (R - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; hit = true; } return; }
     const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez; if (L2 < 1e-6) return;
     let t = ((p.x - s.ax) * ex + (p.z - s.az) * ez) / L2, cl = false; if (t < 0) { t = 0; cl = true; } else if (t > 1) { t = 1; cl = true; }
+    if (s.yp && ya > wallTopP(s, t)) return;
     const cx = s.ax + ex * t, cz = s.az + ez * t, dx = p.x - cx, dz = p.z - cz, d = hyp(dx, dz);
     if (s.two || dx * s.nx + dz * s.nz >= 0 || cl) { if (d < r && d > 1e-6) { const k = (r - d) / d; p.x += dx * k; p.z += dz * k; nx += dx / d; nz += dz / d; hit = true; } }
     else if (d < r) { p.x += s.nx * (r + d); p.z += s.nz * (r + d); nx += s.nx; nz += s.nz; hit = true; }
