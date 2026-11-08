@@ -125,3 +125,12 @@ cosa. Il terreno nudo fuori dal riquadro (265.000 m² a nord) non cambia: lì no
 `python src/censo_superfici.py brianza.json confine_dbgt.json
 <uscita>` rasterizza a 1 m gli strati dei tile nell'ordine dei ranghi dentro Meda+Seveso e conta i m² per aspetto; la build scrive anche
 `report.fondi` in `brianza.json` (m² per materiale di ogni superficie).
+
+## Il pavimento dalla foto (ramo pavimenti-foto, 8/11)
+Piazze (AC_PED 09, `pz`) e cortili AC_VEI 0307 (`cv`) senza materiale da OSM/DBGT prendono il materiale dalla foto Esri (`fondi.py pavimento`): media su
+pixel senza ombre (luce < 45) e verde. Taratura su pezzi di materiale noto (`GTA_DUMP_FONDI=<file>` scrive i numeri): la foto separa bene solo il porfido
+(G-R -22, R-B 43 contro -3 e 24 di asfalto e cemento); asfalto e cemento si sovrappongono (luce mediana 96 e 128), quindi su 400 pezzi noti la regola
+indovina circa il 60%. Piazze: rossastro = porfido, luce < 105 = asfalto, verde (> 60% dei pixel) = prato, altrimenti pavimentato neutro `n`.
+Cortili (giudicati a celle di 12 m): asfalto salvo G-R <= -20 e R-B >= 40 (porfido) o luce >= 145 (pavimentato chiaro).
+Piazza Cavour (x 451 z -901, 98 m2): esce `n`, non porfido (la foto e' in ombra). Poligoni (pezzi tagliati per tile) prima -> dopo:
+pz: porfido 735 -> 33 (+305 f), n 20 -> 174, a 9 -> 115, p 0 -> 137; cv: n 12 -> 3056, f 1 -> 1506.

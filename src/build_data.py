@@ -2477,11 +2477,18 @@ _vei02 = _ng([g_ for g_, a_ in STR.D['vei'] if a_.get('fon') == '02']) if STR el
 _vms = _ng([g_ for g_, a_ in STR.D['avms']]) if STR else Polygon()                                # AR_VMS: carrarecce
 _pedcic = _ng([g_ for g_, a_ in STR.D['ped']] + [g_ for g_, a_ in STR.D['acic']]) if STR else Polygon()   # AC_PED, AC_CIC: FON 01 "pavimentato"
 _ffoto = lambda p_: {'terra': 't', 'pav': 'n'}.get(FONDI.da_foto(p_))
+_fpav = lambda p_: FONDI.pavimento(p_)   # piazze e cortili senza materiale dai dati: dalla foto aerea (src/fondi.py pavimento)
 SURFM = {}
 for k_, g_ in SURF.items():
     if g_.is_empty: continue
-    SURFM[k_] = (FONDI.dividi(g_, [(_vei02, 'g')], ('strada',), base='a', isole=True) if k_ == 'as' else FONDI.dividi(g_, [], ('piedi', 'area'), vicini=True) if k_ == 'pz' else
+    SURFM[k_] = (FONDI.dividi(g_, [(_vei02, 'g')], ('strada',), base='a', isole=True) if k_ == 'as' else FONDI.dividi(g_, [], ('piedi', 'area'), foto=_fpav, vicini=True) if k_ == 'pz' else
                  FONDI.dividi(g_, [(_vms, 'g'), (_pedcic, 'n')], ('piedi',), foto=_ffoto, vicini=True) if k_ == 'ft' else {None: g_})
+if FONDI.dump is not None:
+    for k_, d_ in SURFM.items():
+        for m_, g_ in d_.items():
+            if m_ and k_ in ('pz', 'ft', 'as'):
+                ps_ = [p0_ for p0_ in (list(g_.geoms) if hasattr(g_, 'geoms') else [g_]) if not p0_.is_empty]
+                for p_ in ps_[::max(1, len(ps_) // 300)]: FONDI.registra(p_, k_, m_)
 FONDI.rep['superfici'] = {k_: {str(m_): round(g_.area) for m_, g_ in d_.items()} for k_, d_ in SURFM.items()}
 log('fondi', FONDI.rep['superfici'])
 parts_of = lambda g: [p for p in (list(g.geoms) if hasattr(g, 'geoms') else [g]) if not p.is_empty]
@@ -2621,7 +2628,7 @@ ROT = rotonde.Rotonde(STR.isole, log) if STR else None
 if ROT: STR.md_dbgt = ROT.riempi(STR.md_dbgt); ROT.push_tiles(tid, polys_of, push, q)
 if STR:
     STR.togli_cortili(VERDE.cons, _cv_f.result())
-    STR.cv_m = FONDI.dividi(STR.cv, [(_vei02, 'g')], ('auto', 'area'), base='a') if not STR.cv.is_empty else {}   # the yards AC_VEI 0307: unpaved where FON 02 or OSM says so
+    STR.cv_m = FONDI.dividi(STR.cv, [(_vei02, 'g')], ('auto', 'area'), foto=lambda p_: FONDI.pavimento(p_, True), base='a', celle=True) if not STR.cv.is_empty else {}   # the yards AC_VEI 0307: unpaved where FON 02 or OSM says so
     FONDI.rep['cortili_ac_vei'] = {str(m_): round(g_.area) for m_, g_ in STR.cv_m.items()}; log('fondi: cortili AC_VEI', FONDI.rep['cortili_ac_vei'])
     STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)  # yards (cv) and the DBGT islands (md, g: 1)
 if _md_ponte is not None and not _md_ponte.is_empty:   # (dk: on the deck of the bridge, at its height: src/opere.py senza_strada_di_sopra, world3.js medianDeck)
@@ -2763,6 +2770,7 @@ out = {'meta': {'lat0': lat0, 'lon0': lon0, 'hw': round(HW, 1), 'hh': round(HH, 
        'bus': [[q(nodes[r_][0]), q(nodes[r_][1]), (t.get('name') or '')[:40], node_index.get(r_, -1)] for r_, t in ntags.items() if (t.get('highway') == 'bus_stop' or t.get('public_transport') == 'platform' and t.get('bus') == 'yes') and inside(nodes[r_], 0) and r_ not in _fermate_tolte]}
 if ROT: out.setdefault('report', {})['rotonde'] = ROT.rep
 out.setdefault('report', {})['fondi'] = FONDI.rep  # src/fondi.py: m2 per material
+if FONDI.dump is not None: open(os.environ['GTA_DUMP_FONDI'], 'w', encoding='utf-8').write(chr(10).join(json.dumps(r_) for r_ in FONDI.dump))
 if ED:  # the buildings of the DBGT: entrances, checks, report
     for x_, z_ in ED.acc:
         if inside((x_, z_), 0): push(tid(x_, z_), 'ai', [q(x_), q(z_)])

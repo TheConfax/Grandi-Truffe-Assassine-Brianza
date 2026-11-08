@@ -23,6 +23,7 @@ SERVIZIO = ("service", "track")   # vie di servizio: corsie dei parcheggi, acces
 COPRE = 0.5        # un'area OSM (o la sede di una via) da' il suo materiale a un pezzo che copre almeno per tanto
 OMBRA = 45         # pixel piu' scuri di cosi' (luce media 0-255) sono ombra: non contano
 MIN_PIX = 40       # pixel buoni minimi per decidere dalla foto
+CELLA = 12.0       # un pezzo di pavimento piu' grande di 2 celle per lato si giudica a celle di tanti m (il cortile e' una rete di accessi, non un pezzo)
 
 
 PIEDI = ('footway', 'path', 'cycleway', 'steps', 'bridleway', 'pedestrian', 'track', 'corridor')
@@ -48,10 +49,26 @@ def zone_osm(ways, nodes):
     return out
 
 
+# le soglie sono tarate sui pezzi di cui i dati dicono il materiale (docs/superfici.md, "Il pavimento dalla foto"): la foto separa bene solo il
+# porfido (verde sul rosso a -22, rosso sul blu a 43, contro -3 e 24 di asfalto e cemento); asfalto e cemento si sovrappongono (luce 96 e 128)
+SOGLIE = dict(f_gr=-12.0, f_rb=28.0, a_L=105.0, n_L=125.0)
+SOGLIE_FORTI = dict(f_gr=-20.0, f_rb=40.0, n_L=145.0)   # per i cortili AC_VEI, che sono d'asfalto salvo prova chiara
+def decidi(t, cortile=False):
+    """t: i numeri di Fondi.tratti. Piazze: 'f' rossastro (porfido), 'a' scuro, 'n' chiaro o dubbio (neutro). Cortili: asfalto salvo 'f' o 'n' chiari"""
+    if t['fv'] > 0.6: return None if cortile else 'p'
+    if cortile:
+        S = SOGLIE_FORTI
+        if t['gr'] <= S['f_gr'] and t['rb'] >= S['f_rb']: return 'f'
+        return 'n' if t['L'] >= S['n_L'] else 'a'
+    S = SOGLIE
+    if t['gr'] <= S['f_gr'] and t['rb'] >= S['f_rb']: return 'f'
+    if t['L'] < S['a_L']: return 'a'
+    return 'n'
+
 class Fondi:
     def __init__(s, ways, nodes, to_ll, log=print):
         s.log = log; s.Z = zone_osm(ways, nodes); s.T = STRtree([z[0] for z in s.Z]) if s.Z else None
-        s.foto = None
+        s.foto = None; s.dump = [] if os.environ.get('GTA_DUMP_FONDI') else None
         if not os.environ.get('GTA_SENZA_ESRI'):
             import esri_foto as ef
             s.foto = ef.Foto(to_ll, scarica=False)   # solo le tile gia' in data/esri (le scarica dbgt_edifici.py): senza foto si resta neutri
@@ -164,6 +181,39 @@ class Fondi:
         if v >= 80: return 'pav'
         return None
 
+
+    def tratti(s, g):
+        """i numeri della foto aerea sotto g per giudicare il pavimento: pixel senza ombre, auto scure e alberi (verdi). -> dict o None"""
+        if s.foto is None: return None
+        q = g.buffer(-0.4)
+        if q.is_empty: q = g
+        try: r = s.foto.pixel(q)
+        except Exception: return None
+        if r is None: return None
+        P = r[0].astype(np.float32)
+        if len(P) < MIN_PIX: return None
+        L = P.mean(1); verde = (P[:, 1] > P[:, 0] + 4) & (P[:, 1] > P[:, 2] + 4); fv = float(verde.mean())
+        B = P[(L >= OMBRA) & ~verde]
+        if len(B) < MIN_PIX: return {'n': len(B), 'fv': fv}
+        L = B.mean(1); m = np.median(B, 0)
+        return {'n': int(len(B)), 'fv': fv, 'L': float(np.median(L)), 'q1': float(np.percentile(L, 25)), 'q3': float(np.percentile(L, 75)), 'sd': float(L.std()),
+                'rb': float(m[0] - m[2]), 'gr': float(m[1] - m[0]), 'R': float(m[0]), 'G': float(m[1]), 'B': float(m[2])}
+
+    def pavimento(s, g, cortile=False):
+        """il materiale di un pezzo di piazza o di cortile dalla foto aerea (Carlo 8/11): 'p' verde, 'f' rossastro o a cubetti (porfido), 'n' chiaro e
+        uniforme (cemento, lastre, masselli chiari), 'a' scuro e liscio (asfalto), altrimenti 'n' (pavimento neutro). None = la foto non c'e' o non basta"""
+        t = s.tratti(g)
+        if t is None: return None
+        if s.dump is not None: s.dump.append(dict(t, k='ignoto', x=round(g.centroid.x, 1), z=round(g.centroid.y, 1), a=round(g.area)))
+        if 'L' not in t: return None if cortile or t['fv'] <= 0.6 else 'p'
+        return decidi(t, cortile)
+
+    def registra(s, g, kind, m):
+        """per tarare la regola: i numeri della foto di un pezzo di cui i dati dicono il materiale"""
+        if s.dump is None or g.area < 25 or g.area > 4000: return
+        t = s.tratti(g)
+        if t and 'L' in t: s.dump.append(dict(t, k=kind, m=m, x=round(g.centroid.x, 1), z=round(g.centroid.y, 1), a=round(g.area)))
+
     def cortile(s, g):
         """un cortile AATT del DBGT (il DBGT non dice di che cosa e' fatto): OSM, poi la foto. None = neutro"""
         m = s.da_osm(g)
@@ -171,7 +221,7 @@ class Fondi:
         f = s.da_foto(g)
         return {'verde': 'p', 'terra': 't', 'pav': 'n'}.get(f), ('foto' if f else None)
 
-    def dividi(s, geom, regole, generi, foto=None, base=None, vicini=False, isole=False):
+    def dividi(s, geom, regole, generi, foto=None, base=None, vicini=False, isole=False, celle=False):
         """geom (l'unione di una superficie) in pezzi per materiale: prima le zone OSM dei generi dati, poi regole [(geometria, materiale)] in
         ordine (la prima vince), poi foto(pezzo) per quel che resta, pezzo per pezzo. base: il materiale che la superficie ha gia' (va con
         None). -> {materiale o None: geometria}. Lavora sui pezzi di geom che ogni zona tocca, mai sull'unione intera (le carreggiate di tutta
@@ -249,6 +299,16 @@ class Fondi:
         if foto is not None:
             altri = []
             for p in parts:
+                if celle and p.area > 2 * CELLA * CELLA:   # una rete di accessi: la foto si giudica a celle, non sul pezzo intero
+                    x0, z0, x1, z1 = p.bounds; tag = []
+                    for i in range(int((x1 - x0) // CELLA) + 1):
+                        for j in range(int((z1 - z0) // CELLA) + 1):
+                            c = p.intersection(Polygon([(x0 + i * CELLA, z0 + j * CELLA), (x0 + (i + 1) * CELLA, z0 + j * CELLA), (x0 + (i + 1) * CELLA, z0 + (j + 1) * CELLA), (x0 + i * CELLA, z0 + (j + 1) * CELLA)]))
+                            for q in _pz(c):
+                                m = foto(q) if q.area >= 4 else None
+                                if m: kn.append([q, m])
+                                else: altri.append(q)
+                    continue
                 m = foto(p) if p.area >= 4 else None
                 if m: kn.append([p, m])
                 else: altri.append(p)
