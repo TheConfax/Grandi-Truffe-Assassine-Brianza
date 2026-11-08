@@ -520,7 +520,6 @@ function ngWall(x, z, only, street, need = 0, use = null, skip = null, want = 0)
         if (L < 4) score += 3;
       }
       if (L < need) score += 20; /* too short for the front */
-      if (need > 0 && use) { const u = use.get(ngKey({ a, c })); if (u && (u.n >= 3 || u.w + want > 0.7 * L)) score += 1000; } /* taken: at most 3 fronts, and together not over 70% of the wall */
       let blk = 0; if (b !== host && host && !(host.e !== undefined && b.e === host.e)) score += 2; // the wall of a volume built onto the shop's building (an annex along its facade)
       { // nothing right in front of the wall (a garden wall, the next volume, an annex along the facade), or the shop is lost (Flou in via Cadorna: a DBGT strip 1 m deep along its OSM building)
         let nb = 0, ns = 0; for (const f of [-0.4, -0.2, 0, 0.2, 0.4]) for (const dd of [0.6, 1.1, 1.45]) { const px = mx + ux * Le * f + nx * dd, pz = mz + uz * Le * f + nz * dd; let bl = inBuilding(px, pz); if (!bl) WALLS.each(px - 0.3, pz - 0.3, px + 0.3, pz + 0.3, q => { if (!bl && q.two && segDist(px, pz, q.ax, q.az, q.bx, q.bz) < 0.25) bl = true; }); ns++; if (bl) nb++; }
