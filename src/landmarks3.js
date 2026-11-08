@@ -11,6 +11,35 @@ const LMAT = {
   warm: new THREE.MeshLambertMaterial({ color: 0x2f3036, emissive: 0xffc77a, emissiveIntensity: 0, side: THREE.DoubleSide }), // windows lit from inside at night
 };
 LM_GLOW.push({ m: LMAT.warm, a: 0, b: 0.8 });
+/* one geometry from boxes [w, h, d, x, y, z, colour or null] in a local frame whose origin is the foot of the object (for the instances of propIstanze) */
+function propGeo(boxes) {
+  const P = [], Nn = [], C = [], I = []; let colori = false;
+  for (const [w, h, d, x, y, z, col] of boxes) {
+    const g = new THREE.BoxGeometry(w, h, d).translate(x, y, z), o = P.length / 3, c = col ? new THREE.Color(col) : null; if (c) colori = true;
+    P.push(...g.attributes.position.array); Nn.push(...g.attributes.normal.array); for (let k = 0; k < g.attributes.position.count; k++) C.push(c ? c.r : 1, c ? c.g : 1, c ? c.b : 1);
+    for (const k of g.index.array) I.push(o + k);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(Nn, 3));
+  if (colori) g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I); return g;
+}
+/* things of one kind standing in a tile, each knocked down on its own (props3.js): list [x, z, gy, ry], parti [[geometry, material, cast]],
+   S { r, h, forza }; built again, what was knocked down stays down */
+const ISTA_PROPS = new Map();
+function propIstanze(G, kind, list, parti, S) {
+  if (!list.length) return;
+  const ims = parti.map(([g, m, c]) => { const im = new THREE.InstancedMesh(g, m, list.length); im.castShadow = !!c; im.renderOrder = 10; return im; }), o3 = new THREE.Object3D();
+  list.forEach(([x, z, gy, ry], i) => {
+    o3.position.set(x, gy, z); o3.rotation.set(0, ry || 0, 0); o3.updateMatrix(); for (const im of ims) im.setMatrixAt(i, o3.matrix);
+    const key = kind + ':' + x.toFixed(1) + ',' + z.toFixed(1), q = ISTA_PROPS.get(key);
+    if (!q) ISTA_PROPS.set(key, addProp({ x, z, y: gy, r: S.r, h: S.h, forza: S.forza, inst: { meshes: ims, i, ry: ry || 0, base: gy } })); else propRifai(q, ims, i);
+  });
+  for (const im of ims) G.add(im);
+}
+const LAMP_PARCO_G = [propGeo([[0.11, 4.0, 0.11, 0, 2.0, 0, null]]), propGeo([[0.42, 0.22, 0.42, 0, 4.05, 0, null]])];
+const LAMP_PARK_G = [propGeo([[0.15, 7.6, 0.15, 0, 3.8, 0, null]]), propGeo([[1.2, 0.18, 0.35, 0.5, 7.55, 0, null], [1.2, 0.18, 0.35, -0.5, 7.55, 0, null]])];
+const LAMP_BIN_G = [propGeo([[0.14, 4.6, 0.14, 0, 2.3, 0, '#5d646b']]), propGeo([[0.6, 0.12, 0.25, 0, 4.55, 0, null]])];
+const METER_G = propGeo([[0.3, 1.5, 0.25, 0, 0.75, 0, '#3c4650'], [0.32, 0.25, 0.27, 0, 1.5, 0, '#e2b436']]);
+const BOARD_POST_M = new THREE.MeshLambertMaterial({ color: 0x5d646b });
 
 // local frame helpers: everything is modelled in metres around (0,0,0) and moved into place by M while it goes into the buffers
 function lmFrame(M) {
@@ -62,7 +91,7 @@ function lmSection(poly, cx, cz, ux, uz, s) {
 }
 function buildPlatforms(T, G) {
   if (!T.pf) return;
-  const top = FBuf(), side = Buf(), line = FBuf(), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf(), warm: Buf() }, boards = new Map();
+  const top = FBuf(), side = Buf(), line = FBuf(), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf(), warm: Buf() }, benches = [], lampade = [];
   const WHITE = COL('#f2f0ea'), YELLOW = COL('#f2c230'), METAL = COL('#7d858d'), POST = COL('#5d646b'), DARK = COL('#1f2022'), WOOD = COL('#8a6a48');
   for (const P of T.pf) {
     try { polyFill(top, P.o, P.k, PLAT_H, 4); } catch (e) { }
@@ -83,30 +112,34 @@ function buildPlatforms(T, G) {
     const ang = alignRowAxis(P, 0.5 * Math.atan2(2 * sxz, sxx - szz)), ux = Math.cos(ang), uz = Math.sin(ang), proj = P.o.map(([x, z]) => (x - cx) * ux + (z - cz) * uz), s0 = Math.min(...proj) + 2, s1 = Math.max(...proj) - 2;
     const name = (st.n || '').replace(/^Stazione di /, '').toUpperCase(), ry = Math.atan2(-uz, ux);
     const at = (s, v) => [cx + ux * s - uz * v, cz + uz * s + ux * v];
-    let lastPost = null, stairs = false;
+    let lastPost = null, stairs = false; const solidi = !T.pfMuri;
     for (let s = s0; s <= s1; s += 1) {
       const sec = lmSection(P.o, cx, cz, ux, uz, s); if (!sec) continue; const wd = sec[1] - sec[0]; if (wd < 2.6) continue;
       const vm = (sec[0] + sec[1]) / 2, [x, z] = at(s, vm), gy = H.ground(x, z), dst = hyp(x - st.x, z - st.z), si = Math.round(s - s0);
       const covered = dst < 60;
       if (covered && si % 7 === 0) { // canopy: posts down the middle, a metal roof between them, lights underneath
-        F.geo(Bs.trim, lmBox(0.22, 3.4, 0.22, x, gy + 1.7, z), null, POST);
+        F.geo(Bs.trim, lmBox(0.22, 3.4, 0.22, x, gy + 1.7, z), null, POST); if (solidi) WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.16, x, z, y0: gy - 3, y1: gy + 3.4 }); /* it holds the roof: never knocked down */
         if (lastPost && s - lastPost.s <= 7.5) { const cw = Math.min(wd - 0.6, 4.4), mx = (x + lastPost.x) / 2, mz = (z + lastPost.z) / 2, my = (gy + lastPost.gy) / 2 + 3.5; F.geo(Bs.trim, lmBox(s - lastPost.s + 0.1, 0.16, cw, mx, my, mz, ry), null, METAL); F.geo(Bs.warm, lmBox(s - lastPost.s - 0.6, 0.05, 0.25, mx, my - 0.11, mz, ry)); F.geo(Bs.trim, lmBox(s - lastPost.s + 0.1, 0.3, 0.12, mx, my - 0.2, mz, ry), null, POST); }
         lastPost = { s, x, z, gy };
       }
-      if (covered && si % 14 === 3 && wd > 3.4) { // bench
-        F.geo(Bs.trim, lmBox(1.8, 0.08, 0.45, x, gy + 0.45, z, ry), null, WOOD); F.geo(Bs.trim, lmBox(1.8, 0.4, 0.06, 0, 0, 0, 0).translate(0, gy + 0.75, -0.22).rotateY(ry).translate(x, 0, z), null, WOOD);
-        for (const e of [-0.75, 0.75]) F.geo(Bs.trim, lmBox(0.08, 0.45, 0.4, 0, gy + 0.22, 0).translate(e, 0, 0).rotateY(ry).translate(x, 0, z), null, POST);
-      }
-      if (!covered && si % 15 === 7) { F.geo(Bs.trim, lmBox(0.14, 4.6, 0.14, x, gy + 2.3, z), null, POST); F.geo(Bs.warm, lmBox(0.6, 0.12, 0.25, x, gy + 4.55, z, ry)); } // platform lamp
-      if (si % 40 === 20 && name) { // name board on two posts, readable from the trains
-        for (const e of [-1.4, 1.4]) { const [px, pz] = [x + ux * e, z + uz * e]; F.geo(Bs.trim, lmBox(0.1, 3.0, 0.1, px, gy + 1.5, pz), null, POST); }
-        const b = boards.get(name) || Buf(); boards.set(name, b); const i0 = b.p.length / 3, nx2 = -uz, nz2 = ux;
-        for (const [e, yy, u, v] of [[-1.5, 2.2, 0, 0], [1.5, 2.2, 1, 0], [1.5, 2.85, 1, 1], [-1.5, 2.85, 0, 1]]) vtx(b, x + ux * e + nx2 * 0.06, gy + yy, z + uz * e + nz2 * 0.06, nx2, 0, nz2, u, v);
-        b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
+      if (covered && si % 14 === 3 && wd > 3.4) benches.push([x, z, ry, gy]); // bench: the one of the parks, knocked down like it
+      if (!covered && si % 15 === 7) lampade.push([x, z, gy, ry]); // platform lamp
+      if (si % 40 === 20 && name) { // name board on two posts, readable from the trains: a sign, knocked down whole
+        const root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = Math.atan2(-uz, ux); G.add(root);
+        for (const e of [-1.4, 1.4]) { const m = new THREE.Mesh(boxG(0.1, 3.0, 0.1), BOARD_POST_M); m.position.set(e, 1.5, 0); m.castShadow = true; root.add(m); }
+        const bd = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.65), stationSignMat(name)); bd.position.set(0, 2.525, 0.06); bd.renderOrder = 10; root.add(bd);
+        const key = 'tabella:' + x.toFixed(1) + ',' + z.toFixed(1), q = ISTA_PROPS.get(key);
+        if (!q) ISTA_PROPS.set(key, addProp({ x: x - ux * 1.4, z: z - uz * 1.4, y: gy, r: 0.1, h: 3, obj: root, parts: [[x + ux * 1.4, z + uz * 1.4, 0.1]] }));
+        else { q.obj = root; if (q.broken) root.visible = false; }
       }
       if (!stairs && dst < 25 && wd > 4.2 && si > 8 && s < s1 - 8) { // stairs down to the underpass: railed opening, a little glass roof
         stairs = true; const L2 = 6.5, W2 = 0.9;
         F.geo(Bs.trim, lmBox(L2, 0.04, 2 * W2, x, gy + 0.03, z, ry), null, DARK);
+        if (solidi) { /* the railing round the opening and the posts of its roof: solid, never broken */
+          const at2 = (a, b) => [x + ux * a - uz * b, z + uz * a + ux * b], seg = (A, B) => { const L = hyp(B[0] - A[0], B[1] - A[1]) || 1; WALLS.add(Math.min(A[0], B[0]), Math.min(A[1], B[1]), Math.max(A[0], B[0]), Math.max(A[1], B[1]), { ax: A[0], az: A[1], bx: B[0], bz: B[1], nx: (B[1] - A[1]) / L, nz: -(B[0] - A[0]) / L, two: true, y0: gy - 3, y1: gy + 1.1 }); };
+          for (const e of [-1, 1]) seg(at2(-L2 / 2, e * (W2 + 0.05)), at2(L2 / 2, e * (W2 + 0.05))); seg(at2(L2 / 2, -(W2 + 0.05)), at2(L2 / 2, W2 + 0.05));
+          for (const e of [-1, 1]) { const [qx, qz] = at2(e * L2 / 2, W2 + 0.3); WALLS.add(qx - 0.3, qz - 0.3, qx + 0.3, qz + 0.3, { r: 0.08, x: qx, z: qz, y0: gy - 3, y1: gy + 2.6 }); }
+        }
         for (const e of [-1, 1]) F.geo(Bs.trim, lmBox(L2, 0.06, 0.06, 0, gy + 1.05, e * (W2 + 0.05)).rotateY(ry).translate(x, 0, z), null, COL('#9aa1a8'));
         for (let k = 0; k <= 4; k++) for (const e of [-1, 1]) F.geo(Bs.trim, lmBox(0.05, 1.05, 0.05, 0, gy + 0.52, 0).translate(-L2 / 2 + k * L2 / 4, 0, e * (W2 + 0.05)).rotateY(ry).translate(x, 0, z), null, COL('#9aa1a8'));
         F.geo(Bs.trim, lmBox(0.06, 1.05, 2 * W2, 0, gy + 0.52, 0).translate(L2 / 2, 0, 0).rotateY(ry).translate(x, 0, z), null, COL('#9aa1a8'));
@@ -117,7 +150,8 @@ function buildPlatforms(T, G) {
   }
   mkMesh(top, PLAT_MAT.top, 9, false, G); mkMesh(side, PLAT_MAT.side, 9, false, G); mkMesh(line, PLAT_MAT.line, 10, false, G);
   mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G); if (Bs.warm.i.length) mkMesh(Bs.warm, LMAT.warm, 10, false, G);
-  for (const [n, b] of boards) mkMesh(b, stationSignMat(n), 10, false, G);
+  parkProps(G, 'panchina', benches); propIstanze(G, 'lampione binario', lampade, [[LAMP_BIN_G[0], LMAT.trim, true], [LAMP_BIN_G[1], LMAT.warm, false]], { r: 0.12, h: 4.6, forza: 'medio' });
+  T.pfMuri = true;
 }
 
 // parking stalls: white lines across the long side of every car park, one or two rows depending on its width, never over the aisles (OSM service
@@ -242,7 +276,7 @@ function mergeLotPolys(A, B) {
   return out.length === rest.length && out.length >= 3 ? out : null; /* a single loop, else they stay two */
 }
 function buildParkingLines(T, G) {
-  const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf();
+  const b = FBuf(), W = COL('#e9e7df'), Y = COL('#f2c230'), BLUE = COL('#2c5aa8'), F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lampade = [], metri = [];
   T.stalls = []; T.streetStalls = [];
   const quad = (x, z, ux, uz, a0, a1, w0, w1, col) => { const nx = -uz, nz = ux;
     if (H.fineAt(x, z)) { // a tile of S: thin paint on a flat car park, in pieces of at most 2.5 m along it, each corner 5 cm over S (b.noclip: cut on the cells it would cost four times the triangles)
@@ -333,7 +367,7 @@ function buildParkingLines(T, G) {
     if (inLot.length >= 10) lot.push(...inLot); // the furniture below goes on the lots mapped space by space too
     if (lot.length >= 10 && !handLot) { // furniture on the bigger lots: lamps along the middle, the meter and the P sign at one end
       const mid = (S0 + S1) / 2, sec = lmSection(P, cx, cz, ux, uz, mid);
-      for (let s = S0 + 6; s < S1 - 3; s += 22) { const sc = lmSection(P, cx, cz, ux, uz, s); if (!sc) continue; const v = (sc[0] + sc[1]) / 2, x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; if (onAnyRoad(x, z, 0.5) && !onFoot(x, z) || inBuilding(x, z, 0.5)) continue; const gy = H.ground(x, z); addBox(lamps, x, gy + 3.8, z, 0.15, 7.6, 0.15, null); addBox(heads, x + ux * 0.5, gy + 7.55, z + uz * 0.5, 1.2, 0.18, 0.35, null); addBox(heads, x - ux * 0.5, gy + 7.55, z - uz * 0.5, 1.2, 0.18, 0.35, null); }
+      for (let s = S0 + 6; s < S1 - 3; s += 22) { const sc = lmSection(P, cx, cz, ux, uz, s); if (!sc) continue; const v = (sc[0] + sc[1]) / 2, x = cx + ux * s + nx * v, z = cz + uz * s + nz * v; if (onAnyRoad(x, z, 0.5) && !onFoot(x, z) || inBuilding(x, z, 0.5)) continue; lampade.push([x, z, H.ground(x, z), Math.atan2(-uz, ux)]); }
       const e = lmSection(P, cx, cz, ux, uz, S0 + 0.5);
       if (e) { const x = cx + ux * (S0 + 0.3) + nx * e[0] - nx * -0.6, z = cz + uz * (S0 + 0.3) + nz * e[0] + nz * 0.6, gy = H.ground(x, z), ry = Math.atan2(-uz, ux);
         { const [pw, ph] = segDims('parcheggio'), [front, rear] = segTexOf('parcheggio'), top = 2.3, root = new THREE.Group(); /* the real plate (Fig. II 76) of segnali3.js, the post behind it, the face to those driving in (along u) */
@@ -343,12 +377,13 @@ function buildParkingLines(T, G) {
           const back = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), rear); back.position.set(0, top, -0.06); back.rotation.y = Math.PI; back.scale.x = -1; root.add(back);
           const key = T.t + '_' + Math.round(x * 10) + '_' + Math.round(z * 10), old = PSIGN_PROP.get(key);
           if (!old) PSIGN_PROP.set(key, addProp({ x, z, y: gy, r: 0.1, h: 3, obj: root })); else { old.obj = root; if (old.broken) root.rotation.x = -1.45; } }
-        const mx = x + nx * 1.5, mz = z + nz * 1.5; F.geo(Bs.trim, lmBox(0.3, 1.5, 0.25, 0, 0, 0).rotateY(ry).translate(mx, gy + 0.75, mz), null, COL('#3c4650')); F.geo(Bs.trim, lmBox(0.32, 0.25, 0.27, 0, 0, 0).rotateY(ry).translate(mx, gy + 1.5, mz), null, COL('#e2b436')); } // parking meter
+        const mx = x + nx * 1.5, mz = z + nz * 1.5; metri.push([mx, mz, gy, ry]); } // parking meter
     }
   }
   if (b.i.length) mkMesh(b, PLAT_MAT.line, 5, false, G);
   if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
-  if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
+  propIstanze(G, 'lampione parcheggio', lampade, [[LAMP_PARK_G[0], MAT.lamp, true], [LAMP_PARK_G[1], MAT.lampHead, false]], { r: 0.15, h: 7.6, forza: 'medio' });
+  propIstanze(G, 'parchimetro', metri, [[METER_G, LMAT.trim, true]], { r: 0.2, h: 1.6, forza: 'leggero' });
 }
 // the benches and bins of the parks: one instance each, the models of oggetti3.js, knocked down like the street lamps; built again, a fallen one
 // stays down (as the lamps)
@@ -372,7 +407,7 @@ function buildParkFurniture(T, G) {
   const inPark = (x, z, m = 8) => parks.some(p => { // inside a park or garden, or along its edge
     if (x < p.bb[0] - m || x > p.bb[2] + m || z < p.bb[1] - m || z > p.bb[3] + m) return false; if (inPoly(x, z, p.o)) return true;
     for (let i = 0; i < p.o.length; i++) { const A = p.o[i], C = p.o[(i + 1) % p.o.length]; if (segDist(x, z, A[0], A[1], C[0], C[1]) < m) return true; } return false; });
-  const F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lamps = Buf(), heads = Buf(), benches = [], bins = [];
+  const F = lmFrame(new THREE.Matrix4()), Bs = { trim: Buf() }, lampade = [], benches = [], bins = [];
   const x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
   for (const r of D.roads) {
     if (r.c !== 6 || r.d || r.t) continue;
@@ -388,7 +423,7 @@ function buildParkFurniture(T, G) {
         if (k % 3) { // bench facing the path, a bin beside it: both knocked down like the street lamps (parkProps)
           const R = ry + (sd > 0 ? Math.PI : 0), qx = bx + Math.cos(R) * 1.4, qz = bz - Math.sin(R) * 1.4;
           benches.push([bx, bz, R, gy]); bins.push([qx, qz, R, H.ground(qx, qz)]);
-        } else { addBox(lamps, bx, gy + 2.0, bz, 0.11, 4.0, 0.11, null); addBox(heads, bx, gy + 4.05, bz, 0.42, 0.22, 0.42, null); } // park lamp
+        } else lampade.push([bx, bz, gy, 0]); // park lamp
       }
       acc += Ln;
     }
@@ -404,5 +439,5 @@ function buildParkFurniture(T, G) {
   }
   parkProps(G, 'panchina', benches); parkProps(G, 'cestino', bins);
   if (Bs.trim.i.length) mkMesh(Bs.trim, LMAT.trim, 10, 'cast', G);
-  if (lamps.i.length) { mkMesh(lamps, MAT.lamp, 10, 'cast', G); mkMesh(heads, MAT.lampHead, 10, false, G); }
+  propIstanze(G, 'lampione parco', lampade, [[LAMP_PARCO_G[0], MAT.lamp, true], [LAMP_PARCO_G[1], MAT.lampHead, false]], { r: 0.12, h: 4, forza: 'medio' });
 }

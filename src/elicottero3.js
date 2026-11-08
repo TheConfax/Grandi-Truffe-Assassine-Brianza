@@ -193,6 +193,7 @@ function heliStep1(e, dt) {
   e.x = clamp(e.x, ZONA[0] + 5, ZONA[2] - 5); e.z = clamp(e.z, ZONA[1] + 5, ZONA[3] - 5); if (e.y > HELI.maxAlt) { e.y = HELI.maxAlt; e.vy = Math.min(e.vy, 0); }
   heliTagBld(e.x, e.z, 40); /* the roofs round it and between it and the camera (rayCam) */
   let hb = null, hr = null;
+  propHitsElicottero(e, [[e.x + fx * 0.3, e.z + fz * 0.3, 1.3], [e.x - fx * 4.4, e.z - fz * 4.4, 0.6]], e.y + 0.15, e.y + 2.1); propHitsElicottero(e, [[e.x, e.z, HELI.rotorR]], e.y + HELI.rotorY, e.y + HELI.rotorY + 0.3); /* what it knocks down it does not bump into (props3.js) */
   for (const [lz, r] of [[0.3, 1.3], [-4.4, 0.6]]) { const cx = e.x + fx * lz, cz = e.z + fz * lz, p = { x: cx, z: cz }, n = heliPush(p, r, e.y + 0.15, e.y + 2.1, e.wset); if (n) { e.x += p.x - cx; e.z += p.z - cz; hb = n; } }
   { const p = { x: e.x, z: e.z }, n = heliPush(p, HELI.rotorR, e.y + HELI.rotorY, e.y + HELI.rotorY + 0.3, e.wset); if (n) { e.x = p.x; e.z = p.z; hr = n; } }
   for (const [n, rot] of [[hb, false], [hr, true]]) {

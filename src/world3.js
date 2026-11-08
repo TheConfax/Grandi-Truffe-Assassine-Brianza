@@ -167,7 +167,7 @@ function layMuri(T) {
   }
   for (const q of T.feQ) T.fe.push(q); T.feQ = null; // fences follow the ground every 3 m (walls and collisions are built later)
   const noTree = (d.ls || []).filter(q => q.s.startsWith('sport') || q.s.startsWith('pista')).map(q => { const P_ = dec(q.p); return { P: P_, b: bbox(P_) }; }); /* no tree on a pitch or a track (Carlo, 2/11, the bocce court of x 2345 z 18) */
-  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; if (noTree.some(q => x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.P))) { window.__ALBERI_TOLTI = (window.__ALBERI_TOLTI || 0) + 1; continue; } T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
+  for (const [X, Z, TH, TD] of d.tr || []) { const x = X / 10, z = Z / 10, gy = H.ground(x, z); if (inWater(x, z, gy) || H.inPit(x, z, 0.8)) continue; if (noTree.some(q => x >= q.b[0] && x <= q.b[2] && z >= q.b[1] && z <= q.b[3] && inPoly(x, z, q.P))) { window.__ALBERI_TOLTI = (window.__ALBERI_TOLTI || 0) + 1; continue; } T.tr.push(TH ? [x, z, TH / 10, TD / 10] : [x, z]); WALLS.add(x - 0.4, z - 0.4, x + 0.4, z + 0.4, { r: 0.4, x, z, y0: gy - 3, y1: gy + (TH ? TH / 10 : 5), tree: 1 }); } /* every tree stops whatever hits it, never knocked down (Carlo, 8/11) */ // TH, TD: height and crown of the DBGT trees, from the DSM (dbgt_manufatti.py)
   for (const [br, pts] of T.baQ) {
     const sp = BAR_PANEL[br.t], rec = { pts, t: br.t, h: br.h, v: br.v }, segs = []; (T.ba || (T.ba = [])).push(rec); // follow the ground, not long chords; the ones a car breaks through in panels of 2-3 m (sfondabili3.js)
     for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], c = pts[k], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) { segs.push(null); continue; } const gy = (a.fy + c.fy) / 2, s = { ax: a[0], az: a[1], bx: c[0], bz: c[1], nx: (c[1] - a[1]) / L, nz: -(c[0] - a[0]) / L, two: true, y0: Math.min(barLo(a), barLo(c)) - 3, y1: gy + br.h, yv: gy + Math.max(1.2, br.h) }; WALLS.add(a[0], a[1], c[0], c[1], s); segs.push(s); }
@@ -2503,7 +2503,7 @@ function* buildTileGen(T) {
       const py = H.surface(hx, hz, 1e4) + 0.14, k = pool.p.length / 3, R = 7, cy = (x, z) => T.fine && py - 0.14 <= streetY(hx, hz) + 0.2 ? streetY(x, z) + 0.14 : py; // warm light pool on the street at night; in a tile of S its corners on S, so the ground (which writes its depth) does not cut it on a slope
       vtx(pool, hx - R, cy(hx - R, hz - R), hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, cy(hx + R, hz - R), hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, cy(hx + R, hz + R), hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, cy(hx - R, hz + R), hz + R, 0, 1, 0, 0, 1); triUp(pool, k, k + 1, k + 2); triUp(pool, k, k + 2, k + 3);
       gp.push(hx, gy + 6.82, hz); // glare under the lamp head
-      if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
+      if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, forza: 'medio', inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
       else for (const p of PROPS) if (p.tile === T && p.li === i) { p.inst.meshes = [pm, hm]; if (p.broken) { o.scale.set(0, 0, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix); o.scale.set(1, 1, 1); } } // built again: the lamps knocked down stay down
     });
     G.add(pm, hm); const poolM = pool.i.length ? mkMesh(pool, LAMPPOOL_MAT, 12, false, G) : null;
@@ -2547,6 +2547,7 @@ function layCancelli(T) { T.gates = []; for (const [X0, Z0, X1, Z1, k, h, auto] 
   const key = X0 + ',' + Z0 + ',' + X1, rotto = GATE_ROTTI.has(key), g = { key, ax, az, bx, bz, ux, uz, W, k, h, gy, broken: rotto, auto: auto === 1, perm: auto === 2, open: false, oa: 0, hinges: [] };
   if (k !== 'o' && !g.perm) { g.seg = { ax, az, bx, bz, nx: -uz, nz: ux, two: true, dyn: true, on: !rotto, y0: gy - 2, y1: gy + h + 0.4 }; WALLS.add(ax, az, bx, bz, g.seg); }
   T.gates.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
+  for (const [x, z] of k !== 'l' ? [[ax, az], [bx, bz]] : [[ax, az]]) { const r = k !== 'l' ? 0.2 : 0.15, g0 = H.ground(x, z); WALLS.add(x - r - 0.2, z - r - 0.2, x + r + 0.2, z + r + 0.2, { r, x, z, y0: g0 - 3, y1: g0 + (k !== 'l' ? h + 0.25 : 1.15) }); } /* the pillars (buildGates) */
 } }
 /* doors drawn flush on a facade (gaps along a house wall): p front door, n large door, b garage door; solid like the wall */
 function layPorte(T) { T.doors = []; for (const [X0, Z0, X1, Z1, k, h] of T.d.dr || []) {
@@ -2829,6 +2830,9 @@ function layPompe(f) {
   for (const pump of f.pumps) WALLS.add(pump.x - 1.3, pump.z - 1.3, pump.x + 1.3, pump.z + 1.3, pump.wall = { r: 1.0, x: pump.x, z: pump.z, y0: f.gy - 2, y1: f.gy + 2 });
   for (const [a, b] of [[-6.5, -3.8], [6.5, -3.8], [-6.5, 3.8], [6.5, 3.8]]) { const qx = f.x + f.ux * a + f.nx * b, qz = f.z + f.uz * a + f.nz * b; WALLS.add(qx - 0.4, qz - 0.4, qx + 0.4, qz + 0.4, { r: 0.25, x: qx, z: qz, y0: f.gy - 2, y1: f.gy + 4 }); }
 }
+/* world point of a spot in the frame buildFuel draws the station in (root: x along the road, z across it) */
+const FUEL_TOT = [9.5, -6.5], FUEL_TOT_PROPS = new Map(); /* the brand totem (1.6 x 0.4 m, 4.4 m high): a sign, knocked down like one (props3.js FORZA.leggero) */
+function fuelAt(f, lx, lz) { return [f.x + lx * f.ux - lz * f.uz, f.z + lx * f.uz + lz * f.ux]; }
 /* a roof (OSM or DBGT) lying for more than half inside the canopy the game draws on a fuel station is not drawn: it would be a second canopy */
 let FUEL_ROOFS = 0;
 function tettiFuel(T) { for (const B of T.bld) {
@@ -2870,7 +2874,11 @@ function buildFuel(T, G) {
     const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256; const gg = cv.getContext('2d'); gg.fillStyle = bg; gg.fillRect(0, 0, 128, 256); gg.fillStyle = fg; gg.textAlign = 'center'; gg.textBaseline = 'middle'; let fs = 46; const nm = (f.p.n || 'CARBURANTI').toUpperCase(); gg.font = `bold ${fs}px Arial`; while (gg.measureText(nm).width > 118 && fs > 14) { fs -= 2; gg.font = `bold ${fs}px Arial`; } gg.fillText(nm, 64, 60);
     gg.fillStyle = 'rgba(0,0,0,.55)'; gg.fillRect(8, 120, 112, 120); gg.fillStyle = '#7dff9a'; gg.font = 'bold 22px monospace'; gg.textAlign = 'left'; gg.fillText('SELF 1.79', 14, 150); gg.fillText('DIES 1.69', 14, 185); gg.fillText('GPL  0.72', 14, 220);
     const tex = new THREE.CanvasTexture(cv), tm = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05 }); SIGN_MATS.push(tm);
-    const tot = new THREE.Mesh(boxG(1.6, 4.4, 0.4), [lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), tm, tm]); tot.position.set(9.5, 2.2, -(4.5 + 2)); tot.castShadow = true; root.add(tot);
+    const tot = new THREE.Mesh(boxG(1.6, 4.4, 0.4), [lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), lam(0x3a3d42), tm, tm]); tot.position.set(0, 2.2, 0); tot.castShadow = true;
+    const [tx, tz] = fuelAt(f, FUEL_TOT[0], FUEL_TOT[1]), tg = new THREE.Group(); tg.position.set(tx, f.gy, tz); tg.rotation.y = root.rotation.y; tg.add(tot); G.add(tg);
+    const tkey = f.x.toFixed(1) + ',' + f.z.toFixed(1), tp = FUEL_TOT_PROPS.get(tkey);
+    if (!tp) FUEL_TOT_PROPS.set(tkey, addProp({ x: tx, z: tz, y: f.gy, r: 0.25, h: 4.4, obj: tg, parts: [fuelAt(f, FUEL_TOT[0] - 0.6, FUEL_TOT[1]).concat(0.25), fuelAt(f, FUEL_TOT[0] + 0.6, FUEL_TOT[1]).concat(0.25)] }));
+    else { tp.obj = tg; if (tp.broken) tg.visible = false; }
   }
 }
 // a pump goes up, scorches black and catches fire; the blast sets off every other pump nearby, so the fire runs across the forecourt
@@ -3123,7 +3131,8 @@ function buildSignals(T, G) {
     const sp = new THREE.Mesh(boxG(0.06, 2.7, 0.06), lam(0x5a6068)); sp.position.set(0.7, 1.35, 1.9); root.add(sp);
     // the shelter goes over when rammed, like the street lamps; built again, a fallen one stays down
     const key = X + ',' + Z, old = BUS_PROPS.get(key);
-    if (!old) BUS_PROPS.set(key, addProp({ x: x - Math.cos(root.rotation.y) * 0.3, z: z + Math.sin(root.rotation.y) * 0.3, y: gy, r: 1.1, h: 2.5, obj: root, sali: { rs: 0.7, dy: 2.49 } }));
+    const cy = Math.cos(yaw), sy_ = Math.sin(yaw), at = (lx, lz) => [x + lx * cy + lz * sy_, z - lx * sy_ + lz * cy];
+    if (!old) BUS_PROPS.set(key, addProp({ x: x - cy * 0.3, z: z + sy_ * 0.3, y: gy, r: 1.1, h: 2.5, obj: root, sali: { rs: 0.7, dy: 2.49 }, forza: 'medio', parts: [[...at(-0.75, -1.6), 0.1], [...at(-0.75, 1.6), 0.1], [...at(0.7, 1.9), 0.08]] }));
     else { old.obj = root; if (old.broken) root.visible = false; }
   }
 }
