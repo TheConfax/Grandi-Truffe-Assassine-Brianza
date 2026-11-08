@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 2e079cf · assemblato 08/11 01:53 · porta ' + location.port;
+    const txt = 'locale · ramo vetrine-attaccate · dopo e28b2b9 · assemblato 08/11 02:16 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -6385,17 +6385,24 @@ function updNegozi(dt) {
 function ngKit(C, cx, gy, cz, nx, nz) {
   const F = lmFrame(new THREE.Matrix4().makeRotationY(Math.atan2(nx, nz)).setPosition(cx, gy, cz));
   const lx = (x, z) => [cx + nz * x + nx * z, cz - nx * x + nz * z]; // local (x, z) -> world
-  const box = (w, h, d, x, y, z, col) => F.geo(C.solid, lmBox(w, h, d, x, y, z), null, COL(col));
+  /* on a curved wall the front is cut in pieces of C.chunk metres, so that the bend (ngBend) can follow the wall */
+  const nCh = w => Math.min(60, Math.max(1, Math.ceil(w / (C.chunk || 1e9))));
+  const box = (w, h, d, x, y, z, col) => { const n = nCh(w); for (let j = 0; j < n; j++) F.geo(C.solid, lmBox(w / n, h, d, x - w / 2 + (j + 0.5) * w / n, y, z), null, COL(col)); };
+  const faceX = (b, P, S, col) => { const n = nCh(Math.abs(P[1][0] - P[0][0])); for (let j = 0; j < n; j++) { const xa = P[0][0] + (P[1][0] - P[0][0]) * j / n, xb = P[0][0] + (P[1][0] - P[0][0]) * (j + 1) / n; F.face(b, [[xa, P[0][1], P[0][2]], [xb, P[1][1], P[1][2]], [xb, P[2][1], P[2][2]], [xa, P[3][1], P[3][2]]], S, col); } };
+  let qzn = 1; /* how many quads the last qz made */
   const neon = (k, w, h, d, x, y, z) => F.geo(C.neon[k] || (C.neon[k] = Buf()), lmBox(w, h, d, x, y, z), null, null);
   // a quad facing +z (or +x / -x for signs sticking out), uv 0..1 in its cell; cells are packed into the tile's sign texture afterwards
-  const quad = (b, P, n, uvs = [[0, 0], [1, 0], [1, 1], [0, 1]]) => { const i0 = b.p.length / 3; P.forEach((p, i) => F.v(b, p[0], p[1], p[2], n[0], n[1], n[2], uvs[i][0], uvs[i][1])); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); return i0; };
-  const qz = (b, x0, y0, x1, y1, z) => quad(b, [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], [0, 0, 1]);
+  const quad = (b, P, n, uvs = [[0, 0], [1, 0], [1, 1], [0, 1]]) => { qzn = 1; const i0 = b.p.length / 3; P.forEach((p, i) => F.v(b, p[0], p[1], p[2], n[0], n[1], n[2], uvs[i][0], uvs[i][1])); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); return i0; };
+  const qz = (b, x0, y0, x1, y1, z) => { const n = nCh(x1 - x0); let first = -1;
+    for (let j = 0; j < n; j++) { const a0 = j / n, a1 = (j + 1) / n, xa = x0 + (x1 - x0) * a0, xb = x0 + (x1 - x0) * a1, i0 = quad(b, [[xa, y0, z], [xb, y0, z], [xb, y1, z], [xa, y1, z]], [0, 0, 1], [[a0, 0], [a1, 0], [a1, 1], [a0, 1]]); if (!j) first = i0; }
+    qzn = n; return first; };
+  const winUV = (b, i0, wc) => { for (let k = 0; k < 4 * qzn; k++) { const q = (i0 + k) * 2, u = b.uv[q], v = b.uv[q + 1]; b.uv[q] = wc[0] + (wc[2] - wc[0]) * u; b.uv[q + 1] = wc[1] + (wc[3] - wc[1]) * v; } };
   const qx = (b, z0, y0, z1, y1, x, sgn) => sgn > 0 ? quad(b, [[x, y0, z1], [x, y0, z0], [x, y1, z0], [x, y1, z1]], [1, 0, 0]) : quad(b, [[x, y0, z0], [x, y0, z1], [x, y1, z1], [x, y1, z0]], [-1, 0, 0]);
   const cell = (wm, hm, draw) => { const pw = Math.min(1000, Math.max(48, Math.round(wm * 180))), ph = Math.min(512, Math.max(16, Math.round(hm * pw / wm))); const c = { pw, ph, draw }; C.cells.push(c); return c; };
-  const sign = (c, i0) => C.sq.push([i0, c]);
+  const sign = (c, i0) => { const n = qzn; for (let j = 0; j < n; j++) C.sq.push([i0 + 4 * j, c]); };
   // a pane of shop window showing theme th of its class
-  const pane = (cls, th, x0, y0, x1, y1, z) => { const b = C.glass[cls] || (C.glass[cls] = Buf()), wc = NG_WIN.cell(th), i0 = qz(b, x0, y0, x1, y1, z); for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2; b.uv[q] = b.uv[q] ? wc[2] : wc[0]; b.uv[q + 1] = b.uv[q + 1] ? wc[3] : wc[1]; } };
-  return { F, lx, box, neon, quad, qz, qx, cell, sign, pane };
+  const pane = (cls, th, x0, y0, x1, y1, z) => { const b = C.glass[cls] || (C.glass[cls] = Buf()), wc = NG_WIN.cell(th), i0 = qz(b, x0, y0, x1, y1, z); winUV(b, i0, wc); };
+  return { F, lx, box, neon, quad, qz, qx, cell, sign, pane, winUV, faceX, nq: () => qzn };
 }
 // ---- one front
 function ngText(g, txt, cx, cy, maxW, maxH, font, col) {
@@ -6403,22 +6410,38 @@ function ngText(g, txt, cx, cy, maxW, maxH, font, col) {
   while (g.measureText(txt).width > maxW && fs > 6) { fs = Math.floor(fs * 0.92); g.font = f(fs); }
   g.fillStyle = col; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, cx, cy);
 }
-// the front is drawn on a straight line between the ends of the facade, but the real wall can bulge out of it (a facade that bends a little: via Salvo D'Acquisto, the
-// ice-cream shop's glass and sign were inside the wall): the plane moves out to where the wall is, over the width of the front (at most half a metre)
-function ngProtrusion(s) {
-  let pr = 0;
-  for (let f = -0.45; f <= 0.451; f += 0.15) {
-    const px = s.cx + s.ux * s.w * f, pz = s.cz + s.uz * s.w * f; if (!inBuilding(px - s.nx * 0.1, pz - s.nz * 0.1)) continue;
-    let k = 0; while (k < 0.5 && inBuilding(px + s.nx * k, pz + s.nz * k)) k += 0.04; pr = Math.max(pr, k);
+// the front is drawn flat on the chord between the ends of the facade, but the real wall bends (an arcade, a curved corner, a run of short edges).
+// ngProfile measures how far the wall is from that plane (out = positive) every 10 cm along the front; ngBend then moves everything the front drew
+// along the wall, piece by piece, so glass, sign and frame stay on the wall with no gap and none of it sinks into it
+function ngProfile(s) {
+  const n = Math.max(2, Math.ceil(s.w / 0.1)), hw = s.w / 2, out = [];
+  for (let i = 0; i <= n; i++) {
+    const x = -hw + s.w * i / n, px = s.cx + s.ux * x, pz = s.cz + s.uz * x; let off = 0;
+    if (inBuilding(px, pz)) { let k = 0.02; while (k <= 0.8 && inBuilding(px + s.nx * k, pz + s.nz * k)) k += 0.02; off = k > 0.8 ? 0 : k - 0.01; }
+    else { let k = 0.02; while (k <= 0.8 && !inBuilding(px - s.nx * k, pz - s.nz * k)) k += 0.02; off = k > 0.8 ? 0 : -(k - 0.01); }
+    out.push(Math.max(-0.6, Math.min(0.6, off)));
   }
-  return pr > 0.03 ? Math.min(pr, 0.5) : 0;
+  return out;
 }
+const ngOffAt = (prof, w, x) => { const n = prof.length - 1, f = Math.max(0, Math.min(n, (x + w / 2) / w * n)), i = Math.min(n - 1, Math.floor(f)); return prof[i] + (prof[i + 1] - prof[i]) * (f - i); };
+function ngBufs(C) { return [C.solid, C.sign, C.shut, C.dark, ...Object.values(C.glass), ...Object.values(C.neon)]; }
 function ngFront(s, C) {
-  const pr0 = ngProtrusion(s); if (pr0 > 0) { s.cx += s.nx * (pr0 + 0.02); s.cz += s.nz * (pr0 + 0.02); }
+  const prof = ngProfile(s), n = prof.length - 1, a0 = prof[0], da = prof[n] - a0; let dev = 0, big = 0;
+  for (let i = 0; i <= n; i++) { dev = Math.max(dev, Math.abs(prof[i] - a0 - da * i / n)); big = Math.max(big, Math.abs(prof[i])); }
+  const bend = big > 0.012; C.chunk = dev > 0.02 ? 0.8 : 0; C.nBend = (C.nBend || 0) + (dev > 0.02 ? 1 : 0);
+  const from = new Map(ngBufs(C).map(b => [b, b.p.length / 3]));
+  ngFront0(s, C);
+  if (!bend) return;
+  for (const b of ngBufs(C)) for (let v = from.get(b) || 0, N = b.p.length / 3; v < N; v++) {
+    const X = b.p[v * 3], Z = b.p[v * 3 + 2], xl = (X - s.cx) * s.nz - (Z - s.cz) * s.nx, d = ngOffAt(prof, s.w, xl) + 0.01;
+    b.p[v * 3] = X + s.nx * d; b.p[v * 3 + 2] = Z + s.nz * d;
+  }
+}
+function ngFront0(s, C) {
   const m = s.m, cls = s.cls, W = s.w, hw = W / 2, gy = H.ground(s.cx + s.nx * 0.6, s.cz + s.nz * 0.6), top = s.b.gtop - gy;
   if (top < 2.7) return;
   const gl = Math.min(H.ground(s.cx - s.ux * hw, s.cz - s.uz * hw), H.ground(s.cx + s.ux * hw, s.cz + s.uz * hw)) - gy - 0.35;
-  const { F, lx, box, neon, qz, qx, cell, sign } = ngKit(C, s.cx, gy, s.cz, s.nx, s.nz);
+  const { F, lx, box, neon, qz, qx, cell, sign, winUV, faceX, nq } = ngKit(C, s.cx, gy, s.cz, s.nx, s.nz);
   const pal = s.pal || ['#25303f', '#f2f2ee'], bg = pal[0], fg = pal[1], kc = m.k, font = NG_FONT[m.f || 'sans'];
   const caseOf = t => (m.f === 'script' || m.f === 'serif') && s.name ? t : t.toUpperCase();
   const main = caseOf(s.name || s.label), sub = s.name && m.sub ? s.label : '';
@@ -6456,7 +6479,7 @@ function ngFront(s, C) {
     if (t === 'glass') {
       box(w, y0 - gl, 0.1, c, (y0 + gl) / 2, 0.05, stone);
       const n = Math.max(1, Math.round(w / 1.9)), pw = w / n;
-      for (let i = 0; i < n; i++) { const i0 = qz(gb, a + i * pw + 0.03, y0, a + (i + 1) * pw - 0.03, Hv - 0.06, 0.035); for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2; gb.uv[q] = gb.uv[q] ? wc[2] : wc[0]; gb.uv[q + 1] = gb.uv[q + 1] ? wc[3] : wc[1]; } if (i) box(0.06, Hv - y0, 0.08, a + i * pw, (Hv + y0) / 2, 0.05, kc); }
+      for (let i = 0; i < n; i++) { const i0 = qz(gb, a + i * pw + 0.03, y0, a + (i + 1) * pw - 0.03, Hv - 0.06, 0.035); winUV(gb, i0, wc); if (i) box(0.06, Hv - y0, 0.08, a + i * pw, (Hv + y0) / 2, 0.05, kc); }
       box(w, 0.05, 0.14, c, y0 + 0.02, 0.07, kc);
     } else if (t === 'door' || t === 'slide') {
       const dh = Math.min(t === 'slide' ? 2.5 : 2.35, Hv - 0.12);
@@ -6466,7 +6489,7 @@ function ngFront(s, C) {
       box(w + 0.2, 0.12 - gl, 0.4, c, 0.06 + gl / 2, 0.2, '#b8b3a8'); box(w, 0.03 - gl, 0.11, c, (0.03 + gl) / 2, 0.05, '#28303a');
       doors.push([a, b]);
     } else if (t === 'bay') {
-      const i0 = qz(gb, a, 0.0, b, Hv - 0.45, 0.02); for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2; gb.uv[q] = gb.uv[q] ? wc[2] : wc[0]; gb.uv[q + 1] = gb.uv[q + 1] ? wc[3] : wc[1]; }
+      const i0 = qz(gb, a, 0.0, b, Hv - 0.45, 0.02); winUV(gb, i0, wc);
       box(w + 0.1, 0.34, 0.34, c, Hv - 0.2, 0.17, '#8f949a');
       for (let y = Hv - 0.37, k = 0; k < 6; y -= 0.07, k++) box(w, 0.07, 0.03, c, y - 0.035, 0.05, k % 2 ? '#a9adb2' : '#bfc3c8');
       box(w, 0.04, 0.06, c, Hv - 0.81, 0.06, '#6b6e72'); box(w + 0.1, 0.02 - gl, 0.6, c, (0.02 + gl) / 2, 0.3, '#8a857c');
@@ -6495,10 +6518,10 @@ function ngFront(s, C) {
   if (s.oh && m.d !== 'x' && m.d !== 'p') for (const [t, a, b] of segs) {
     if (!['glass', 'door', 'slide', 'bay'].includes(t)) continue;
     const yT = t === 'bay' ? Hv - 0.37 : Hv - 0.06;
-    if (s.noShut) { if (t === 'bay') continue; const i0 = qz(C.dark, a, 0.02, b, yT, 0.1); C.darks.push({ s, i0, dark: true, y0: C.dark.p[i0 * 3 + 1], y1: C.dark.p[(i0 + 3) * 3 + 1] }); continue; }
-    const i0 = qz(C.shut, a, 0, b, yT, 0.12), U = C.shut.uv;
-    U[i0 * 2] = 0; U[i0 * 2 + 1] = 0; U[i0 * 2 + 2] = b - a; U[i0 * 2 + 3] = 0; U[i0 * 2 + 4] = b - a; U[i0 * 2 + 5] = yT; U[i0 * 2 + 6] = 0; U[i0 * 2 + 7] = yT;
-    C.shuts.push({ s, i0, y0: C.shut.p[i0 * 3 + 1], y1: C.shut.p[(i0 + 3) * 3 + 1] });
+    if (s.noShut) { if (t === 'bay') continue; const i0 = qz(C.dark, a, 0.02, b, yT, 0.1); for (let j = 0, n = nq(); j < n; j++) { const i = i0 + 4 * j; C.darks.push({ s, i0: i, dark: true, y0: C.dark.p[i * 3 + 1], y1: C.dark.p[(i + 3) * 3 + 1] }); } continue; }
+    const i0 = qz(C.shut, a, 0, b, yT, 0.12), U = C.shut.uv, nqs = nq();
+    for (let k = 0; k < 4 * nqs; k++) { const q = (i0 + k) * 2; U[q] *= b - a; U[q + 1] *= yT; }
+    for (let j = 0; j < nqs; j++) { const i = i0 + 4 * j; C.shuts.push({ s, i0: i, y0: C.shut.p[i * 3 + 1], y1: C.shut.p[(i + 3) * 3 + 1] }); }
     if (t !== 'bay') box(b - a, 0.18, 0.16, (a + b) / 2, Hv - 0.13, 0.1, '#9da1a6');
   }
   // the frame (a street door has its own stone surround)
@@ -6537,7 +6560,7 @@ function ngFront(s, C) {
     } else {
       const c1 = aw[1], c2 = aw[0] === 'strip' ? aw[2] : shade2(aw[1]), prof = aw[0] === 'cap' ? [0, 0.25, 0.5, 0.75, 1].map(f => [D_ * Math.sin(f * Math.PI / 2), yT - drop + (drop + 0.35) * Math.cos(f * Math.PI / 2)]) : [[0.05, yT], [D_, yT - drop]];
       const n = aw[0] === 'strip' ? Math.max(2, Math.round((xb - xa) / 0.32)) : 1, sw2 = (xb - xa) / n;
-      for (let i = 0; i < n; i++) { const xA = xa + i * sw2, xB = xA + sw2, col = i % 2 ? c2 : c1; for (let k = 1; k < prof.length; k++) { const [zA, yA] = prof[k - 1], [zB, yB] = prof[k]; F.face(C.solid, [[xA, yA, zA], [xB, yA, zA], [xB, yB, zB], [xA, yB, zB]], 2, COL(col)); } }
+      for (let i = 0; i < n; i++) { const xA = xa + i * sw2, xB = xA + sw2, col = i % 2 ? c2 : c1; for (let k = 1; k < prof.length; k++) { const [zA, yA] = prof[k - 1], [zB, yB] = prof[k]; faceX(C.solid, [[xA, yA, zA], [xB, yA, zA], [xB, yB, zB], [xA, yB, zB]], 2, COL(col)); } }
       const [zE, yE] = prof[prof.length - 1];
       for (const xs of [xa, xb]) F.face(C.solid, [...prof.map(([z, y]) => [xs, y, z]), [xs, yE - val, zE]], 2, COL(c1));
       if (stype === 'ten') { const c = cell(W - 0.1, val, (g, w, h) => drawSign(g, w, h, c1, fg, { main })); sign(c, qz(C.sign, xa, yE - val, xb, yE, zE + 0.005)); box(W - 0.08, val, 0.015, 0, yE - val / 2, zE - 0.004, c1); }
