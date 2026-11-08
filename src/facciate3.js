@@ -295,6 +295,12 @@ function facStyleOf(B, area, hw) {
 }
 const FAC_PUB_GRUPPI = ['CAPPELLA', 'CHIESA', 'SCUOLA', 'SCUOLA SUPERIORE', 'ASILO', 'SPORT', 'SANITÀ', 'COMUNE', 'CARABINIERI', 'POLIZIA LOCALE', 'POSTE', 'STAZIONE', 'CULTURA', 'TRIBUNA', 'ALTRO'];
 const FAC_PUB_LISCI = new Set([0, 1, 13]); /* chapels and churches stay smooth, no windows (Carlo 8/11); the stands are a solid block */
+// is this point (just out of a wall, at height y) inside another building?
+function facCoperto(B, x, z, y) {
+  let c = false;
+  BLD.each(x, z, x, z, b => { if (c || b === B || b.t === 9 || b.g >= 2) return; if (b.gtop === undefined) b.gtop = bldTop(b); const lo = b.zb !== undefined ? b.zb : -1e9; if (y < b.gtop - 0.3 && y > lo && inPoly(x, z, b.pts) && !(b.holes || []).some(h => inPoly(x, z, h))) c = true; });
+  return c;
+}
 // does this wall look onto a street? (front cells); a courtyard (a hole of the plan) never does
 function facFronte(ax, az, cx, cz, nx, nz) {
   for (const f of [0.25, 0.5, 0.75]) { const mx = ax + (cx - ax) * f, mz = az + (cz - az) * f; for (const d of [3, 7, 11, 15]) if (onAnyRoad(mx + nx * d, mz + nz * d, 1.0)) return true; }
@@ -585,7 +591,7 @@ function facPinkBand(T, B, rings, top, F0) {
   const L = T.pinkB || (T.pinkB = new Map()); let b = L.get(tx.m); if (!b) L.set(tx.m, b = Buf());
   const ring = rings[0]; if (!ring) return; const { ring: P, E } = ring; let acc = 0;
   for (let i = 0; i < P.length; i++) {
-    const a = P[i], [dx, dz, Le, nx, nz] = E[i]; if (Le < 2.5) { acc += Le; continue; }
+    const a = P[i], [dx, dz, Le, nx, nz] = E[i]; if (Le < 0.05) continue;
     const c = [a[0] + dx, a[1] + dz], o = 0.03, base = b.p.length / 3, u0 = acc / rep, u1 = (acc + Le) / rep;
     vtx(b, a[0] + nx * o, yBot, a[1] + nz * o, nx, 0, nz, u0, 0); vtx(b, c[0] + nx * o, yBot, c[1] + nz * o, nx, 0, nz, u1, 0);
     vtx(b, c[0] + nx * o, yTop, c[1] + nz * o, nx, 0, nz, u1, 1); vtx(b, a[0] + nx * o, yTop, a[1] + nz * o, nx, 0, nz, u0, 1);
