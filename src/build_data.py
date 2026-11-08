@@ -1732,7 +1732,8 @@ if dbt_pc:
     _gand = []; _arem = set()
     if _gndt is not None:
         _Ug = unary_union(_gnd); _Ua = unary_union([g_ for b_, g_ in _alti]) if _alti else Polygon()
-        _gp = _Ug.buffer(3.0, join_style=2).buffer(-3.0, join_style=2).difference(_Ug).buffer(-0.1, join_style=2).buffer(0.1, join_style=2)
+        _Us = unary_union([r_['line'].buffer(r_['w'] / 2, cap_style=2) for r_ in _astr] + [g_ for g_ in (asph, side) if g_ is not None and not g_.is_empty])   # the streets themselves are no gap: a narrow street would be closed up by the 3 m and swallow the passages that open on it
+        _gp = _Ug.buffer(3.0, join_style=2).buffer(-3.0, join_style=2).difference(_Ug).difference(_Us.buffer(0.1)).buffer(-0.1, join_style=2).buffer(0.1, join_style=2)
         _gaps = [p_ for p_ in getattr(_gp, 'geoms', [_gp]) if isinstance(p_, Polygon) and 1.5 <= p_.area <= 600]
         _bb = unary_union([_Ug, _Ua] + _gaps).buffer(0.02); _dom = box(*[v_ + s_ for v_, s_ in zip(_bb.bounds, (-50, -50, 50, 50))])
         _fr = _dom.difference(_bb); _afree = [p_ for p_ in getattr(_fr, 'geoms', [_fr]) if isinstance(p_, Polygon)]

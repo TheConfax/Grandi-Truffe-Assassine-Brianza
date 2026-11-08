@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 10.4,
+  "tempo_s": 14.6,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 54.6,
+  "tempo_s": 75.2,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -1561,6 +1561,26 @@
   "doppione_recinzione": 143,
   "capo_nel_vuoto": 970,
   "troppo_larghi": 625,
+  "androni": {
+   "passaggio:collega_due_vie": 351,
+   "passaggio:lontano_dalla_strada": 2941,
+   "passaggio:una_bocca": 3845,
+   "passaggio:cancello": 420,
+   "passaggio:non_in_un_cortile": 1838,
+   "passaggio:gia_cancello": 21,
+   "passaggio:in_carreggiata": 11,
+   "passaggio:via_pubblica": 8,
+   "passaggio:cancellata": 1,
+   "porticato:collega_due_vie": 83,
+   "porticato:gia_passaggio": 128,
+   "porticato:cancello": 85,
+   "porticato:lontano_dalla_strada": 29,
+   "porticato:cancellata": 36,
+   "porticato:gia_cancello": 6,
+   "porticato:una_bocca": 12,
+   "porticato:troppo_larga": 3
+  },
+  "androni_tolti_vecchi": 108,
   "per_origine": {
    "passo_carraio": 277,
    "rampa": 2,
@@ -1588,25 +1608,25 @@
   "dbgt_cancellata_02": 1743,
   "dedotto_cortile": 1081,
   "osm": 293,
-  "dedotto_varchi": 1531
+  "dedotto_varchi": 1928
  },
- "divisori_tagliati_da_cancelli": 500,
+ "divisori_tagliati_da_cancelli": 503,
  "monconi_in_carreggiata_tolti": 200,
- "cancelli_in_carreggiata_tolti": 771,
+ "cancelli_in_carreggiata_tolti": 765,
  "barriere_in_carreggiata": {
   "linee": 87,
   "metri": 1155
  },
  "corsie_ia": {
   "vie": 3014,
-  "corsie_spostate_nodi": 3848,
+  "corsie_spostate_nodi": 3849,
   "vie_con_corsie": 1027,
   "tagli": 189,
   "metri_tagliati": 1806,
   "nodi_aggiunti": 200,
   "punti_per_motivo": {
    "fuori asfalto": 513,
-   "muro o edificio": 1843,
+   "muro o edificio": 1847,
    "stretta fra i muri": 309
   },
   "sensi_unici_tolti_metri": 952,
@@ -1699,15 +1719,15 @@
  },
  "cancelli_ante_alberi": {
   "ante_girate": 7,
-  "alberi_spostati": 93
+  "alberi_spostati": 96
  },
  "doppioni_tolti_alla_fine": {
   "cancelli": {
    "0": 2,
-   "1": 58,
-   "2": 235
+   "1": 57,
+   "2": 234
   },
-  "divisori": 213
+  "divisori": 214
  },
  "recinzioni_controllo": {
   "coppie_doppie_rimaste": 0,
@@ -2014,12 +2034,12 @@
   },
   "corsie_dentro_ac_vei": {
    "campioni": 92745,
-   "fuori": 2658,
-   "quota": 0.0287,
+   "fuori": 2657,
+   "quota": 0.0286,
    "fuori_per_motivo": {
     "altro": 1549,
     "incrocio": 382,
-    "strettoia": 727
+    "strettoia": 726
    },
    "auto_fuori": 673,
    "nota_auto": "la linea della corsia a meno di 0,9 m (mezza auto) dal bordo o fuori",
@@ -2752,6 +2772,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 15.9
+  "tempo_s": 23.5
  }
 }
