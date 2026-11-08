@@ -11,7 +11,7 @@ addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && ['Equal', 'Mi
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@500;600;700;800&family=Rozha+One&display=swap">
 <style>
 /* Layout: full-bleed WebGL city, HUD pinned to the four corners like a car dashboard; one commitment: Brianza late-afternoon palette (ocra, terracotta, cielo) */
 :root {
@@ -93,6 +93,26 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 #start .credit { font-size: 15px; color: var(--ink-dim); margin: 0; }
 .ver { font: 13px ui-monospace, monospace !important; color: var(--ink-dim); margin: 0; opacity: .75; } #pause .ver { margin-top: 14px; }
 #start a, #osm a { color: var(--ocra); pointer-events: auto; }
+
+/* Schermata del titolo (Carlo, 8/11): il mondo vivo dietro (sorvolo()), il nome su tre righe con le iniziali in evidenza, GIOCA e OPZIONI. Tutto il resto del vecchio titolo (sottotitolo, tasti, crediti, versione) resta nel codice ma non si vede */
+body:has(#start:not([hidden])) :is(.hud, #osm, #touch, #fx, #dbghud, #pause) { display: none !important; }
+#start { background: linear-gradient(205deg, rgba(255,150,64,.17) 0%, rgba(255,150,64,0) 48%), radial-gradient(ellipse 75% 70% at 50% 52%, rgba(16,10,14,.42) 0%, rgba(16,10,14,.16) 55%, rgba(16,10,14,0) 100%), linear-gradient(180deg, rgba(16,10,14,.35) 0%, rgba(16,10,14,0) 22%, rgba(16,10,14,0) 70%, rgba(16,10,14,.55) 100%); display: grid; place-items: center; overflow: hidden; padding: 0; }
+#start .wrap { max-width: none; width: 100%; justify-items: center; align-content: center; gap: clamp(22px, 5vh, 56px); }
+#start .wrap > :not(.tit):not(.menu) { display: none !important; }
+#start .tit { font-family: 'Rozha One', 'Playfair Display', Georgia, 'Times New Roman', serif; font-weight: 400; text-align: center; text-transform: uppercase; font-size: clamp(50px, min(15.5vw, 17.5vh), 190px); line-height: .94; letter-spacing: .035em; color: var(--ink); margin: 0; text-shadow: 0 .02em 0 rgba(0,0,0,.28), 0 .08em .22em rgba(0,0,0,.5), 0 .2em .7em rgba(0,0,0,.45); }
+#start .tit span { display: block; white-space: nowrap; }
+#start .tit b { font-weight: 400; color: var(--ocra); font-size: 1.1em; line-height: .8; text-shadow: 0 .02em 0 rgba(90,36,8,.55), 0 .08em .22em rgba(0,0,0,.5), 0 0 .5em rgba(240,150,40,.38); }
+#start .menu { display: grid; gap: 12px; justify-items: stretch; width: min(320px, 78vw); }
+#start .menu button { font-family: var(--body); font-weight: 700; font-size: clamp(22px, 2.6vw, 30px); letter-spacing: .38em; text-indent: .38em; text-transform: uppercase; padding: 12px 20px 11px; border-radius: 2px; border: 1px solid transparent; background: none; color: var(--ink); cursor: pointer; box-shadow: none; transform: none; transition: background .15s, color .15s, opacity .2s; justify-self: stretch; }
+#start .menu #go { background: var(--ocra); color: var(--shade); box-shadow: 0 6px 22px rgba(0,0,0,.4); }
+#start .menu #go:hover:not(:disabled) { background: #ffc85a; transform: none; box-shadow: 0 6px 22px rgba(0,0,0,.4); }
+#start .menu #go:active { transform: translateY(1px); box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+#start .menu #go:disabled { background: rgba(251,245,230,.16); color: rgba(251,245,230,.72); cursor: progress; box-shadow: none; font-size: clamp(16px, 1.9vw, 21px); letter-spacing: .22em; text-indent: .22em; }
+#start .menu #opz { color: rgba(251,245,230,.4); border-color: rgba(251,245,230,.16); background: rgba(14,10,14,.42); cursor: default; }
+/* la riga della versione (#ver sul titolo, #pver in pausa) e' nascosta, non tolta: il codice che la scrive resta (Carlo, 8/11) */
+.ver, #ver, #pver { display: none !important; }
+#fade { position: fixed; inset: 0; z-index: 30; background: #0c0a0d; opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
+#fade.on { opacity: 1; transition-duration: .32s; transition-timing-function: ease-in; }
 #pause { position: fixed; inset: 0; z-index: 9; background: rgba(14,15,20,.8); display: grid; place-items: center; text-align: center; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 #pause h2 { font-family: var(--display); font-size: clamp(36px, 7vw, 64px); margin: 0 0 10px; color: var(--ocra); }
 #pause p { font-size: 19px; margin: 6px 0; }
@@ -130,8 +150,11 @@ body:not(.debug) .dbg { display: none !important; }
 <div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span id="bighint">Rotella o due dita: zoom · trascina: sposta · clic: segnaposto · M: torna in strada</span></div><button id="bigx" aria-label="Chiudi la mappa">×</button></div>
 <div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p><p class="ver" id="pver" hidden></p></div></div>
 
+<div id="fade"></div>
 <div id="start">
   <div class="wrap">
+    <div class="tit" role="heading" aria-level="1"><span><b>G</b>RANDI</span><span><b>T</b>RUFFE</span><span><b>B</b>RIANZA</span></div>
+    <div class="menu"><button id="go" type="button" disabled>CARICO LA BRIANZA…</button><button id="opz" type="button" disabled aria-disabled="true" tabindex="-1">OPZIONI</button></div>
     <h1><b>G</b>RANDI <b>T</b>RUFFE<span><b>A</b>SSASSINE</span><em>BRIANZA</em></h1>
     <p class="sub">Meda, Seveso, Barlassina, Baruccana e Cabiate con le loro strade vere, i dislivelli veri e la Milano-Meda sopraelevata. Ruba un'auto, fai le consegne per i locali e semina la Polizia Locale.</p>
     <div class="keys">
@@ -148,7 +171,6 @@ body:not(.debug) .dbg { display: none !important; }
       <div><kbd>Q</kbd> / <kbd>E</kbd> in moto: peso indietro (impennata col gas) / avanti (stoppie in frenata)</div>
       <div class="dbg"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>
     </div>
-    <button id="go" type="button">ACCENDI IL MOTORE</button>
     <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale; <a href="https://www.radiomaria.it" target="_blank" rel="noopener">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href="https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy" target="_blank" rel="noopener">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href="https://www.mapillary.com" target="_blank" rel="noopener">Mapillary</a> e i suoi contributori, CC BY-SA 4.0. Foto delle superfici (asfalto, prato, pavimenti, ghiaia, terra, ciottoli, intonaco): <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a> e <a href="https://ambientcg.com" target="_blank" rel="noopener">ambientCG</a>, CC0.</p>
     <p class="ver" id="ver" hidden></p>
   </div>
@@ -157,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo nightly · dopo 474bfa99 · assemblato 08/11 20:57 · porta ' + location.port;
+    const txt = 'locale · ramo titolo · dopo 966feb11 · assemblato 08/11 22:32 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -11162,6 +11184,39 @@ function endRun(kind) {
 // ---------------------------------------------------------------- camera & visuals
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _camD = new THREE.Vector3();
 let camInit = false;
+/* ---- titolo: il sorvolo di Meda al tramonto, mentre il mondo si carica (Carlo, 8/11). La camera segue una linea chiusa di punti (posizione, altezza sul suolo, punto guardato) con una curva morbida; il mondo gira (traffico, passanti) ma il giocatore sta fermo; l'ora e' ferma al tramonto e a GIOCA torna quella di sempre.
+   Resta entro ~450 m dal punto di partenza: li' i pezzi del mondo ci sono gia' e il traffico vive (si toglie oltre 330 m dal giocatore se non e' in vista) */
+let titolo = true, tFade = 0;
+const TIT = { t: 0, gy: null, TOD: 17.75, TODGIOCO: 17.2, SEG: 15, FOV: 48,
+  K: [ /* x, z, altezza sul suolo, x guardata, z guardata, altezza guardata: si guarda sempre piu' in basso di 33 gradi, cosi' l'orizzonte spoglio resta fuori dall'inquadratura */
+    [520, -490, 88, 405, -545, 4], [430, -430, 92, 335, -520, 4], [320, -420, 95, 250, -535, 6], [215, -450, 92, 215, -550, 8],
+    [130, -560, 92, 215, -560, 8], [160, -670, 95, 245, -585, 6], [280, -690, 92, 340, -585, 4], [400, -680, 88, 400, -575, 4], [520, -640, 86, 450, -545, 4]] };
+const _titP = new THREE.Vector3(), _titL = new THREE.Vector3();
+function titCR(a, b, c, d, t) { const t2 = t * t, t3 = t2 * t; return 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3); }
+function titPose(u, P_, L_) {
+  const K = TIT.K, n = K.length, i = Math.floor(u) % n, t = u - Math.floor(u), k = j => K[(i + j + n) % n], a = k(-1), b = k(0), c = k(1), d = k(2), f = q => titCR(a[q], b[q], c[q], d[q], t);
+  P_.set(f(0), f(2), f(1)); L_.set(f(3), f(5), f(4));
+}
+function titoloIniz() { /* the sun low over the roofs, the lights of the title: after boot, before the first frame */
+  TIT.t = 0; window.__TIT = TIT; window.__setTOD(TIT.TOD);
+  Object.assign(sun.shadow.camera, { left: -230, right: 230, top: 230, bottom: -230 }); sun.shadow.camera.updateProjectionMatrix();
+}
+function titoloTick() { window.__setTOD(TIT.TOD); MS.cool = Math.max(MS.cool, 3); if (MS.marker) MS.marker.visible = false; } /* no mission begins under the title, and no marker beam shows */ /* the hour stays where the title put it while the world goes on */
+function titoloFine() {
+  titolo = false; window.__setTOD(TIT.TODGIOCO); if (MS.marker) MS.marker.visible = true;
+  Object.assign(sun.shadow.camera, { left: -95, right: 95, top: 95, bottom: -95 }); sun.shadow.camera.updateProjectionMatrix();
+  camInit = false; setTimeout(() => $('fade').classList.remove('on'), 450); /* the first frames of the game are the heavy ones (the pieces round the player take their turn): they pass under the black */
+}
+function sorvolo(dt) {
+  dt = Math.min(dt, 0.05); TIT.t += dt / TIT.SEG; titPose(TIT.t, _titP, _titL);
+  const gp = H.ground(_titP.x, _titP.z); TIT.gy = TIT.gy === null ? gp : TIT.gy + (gp - TIT.gy) * (1 - Math.exp(-1.5 * dt)); /* the ground under the camera, smoothed: the height does not follow every bump */
+  const gl = H.ground(_titL.x, _titL.z), w = TIT.t * 0.9;
+  camera.position.set(_titP.x + Math.sin(w * 1.7) * 1.2, TIT.gy + _titP.y + Math.sin(w * 1.1) * 0.8, _titP.z + Math.cos(w * 1.3) * 1.2);
+  camera.lookAt(_titL.x, gl + _titL.y, _titL.z);
+  if (Math.abs(camera.fov - TIT.FOV) > 0.05) { camera.fov = lerp(camera.fov, TIT.FOV, 0.1); camera.updateProjectionMatrix(); }
+  sun.target.position.set(_titL.x, gl, _titL.z); sun.position.set(_titL.x + SUN_DIR.x * 260, gl + SUN_DIR.y * 260, _titL.z + SUN_DIR.z * 260);
+  _far.position.x = camera.position.x * 0.9; _near.position.x = camera.position.x * 0.8;
+}
 function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */
   const lo_ = P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity; /* from the helicopter: the walls whose top is under both ends do not count */
   let best = 1; const dx = bx - ax, dz = bz - az;
@@ -11219,6 +11274,7 @@ function camEase(dt, hb, k, minW, tau) { /* angular speed proportional to the er
   camW += (want - camW) * (1 - Math.exp(-dt / tau)); let st = camW * dt; if (Math.abs(st) > Math.abs(d)) st = d; camA = wrapA(camA + st);
 }
 function updCamera(dt) {
+  if (!running) { sorvolo(dt); return; }
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
   const fx = Math.sin(h), fz = Math.cos(h); let want, look;
   if (!inCar) P.model.g.visible = !((camMode === 2 && fpDone) || (hyp(camPos.x - px, camPos.z - pz) < 0.9 && camPos.y - P.y < 2.2)); /* the body is hidden only once the camera is close to the eyes */
@@ -13189,14 +13245,14 @@ function frame(t) {
   const m_ = DEBUG ? dbgBegin(t) : null;
   let dt = Math.min(0.1, (t - last) / 1000); last = t;
   pollPad();
-  if (running && !paused && !TELE) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); if (DEBUG) for (const v of [...VEH, ...HELIS]) if (v.health < 100 && !v.exploded) v.health = 100; acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
-  else if (!running) { now += dt; P.h += dt * 0.08; } // slow orbit behind the title
+  if ((running || titolo) && !paused && !TELE) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); if (DEBUG) for (const v of [...VEH, ...HELIS]) if (v.health < 100 && !v.exploded) v.health = 100; acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
+  if (titolo) titoloTick();
   if (m_) dbgMk(m_, 'sim');
   { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (m_) dbgMk(m_, 'tile'); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   if (m_) dbgMk(m_, 'sim');
-  const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;
-  updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);
-  updCamera(running ? dt : dt * 0.4); updGlow(); updSkyFx(running && !paused ? dt : 0);
+  const ipol = (running || titolo) && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;
+  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt); updDebugHud((running || titolo) && !paused ? dt : 0);
+  updCamera(dt); updGlow(); updSkyFx((running || titolo) && !paused ? dt : 0);
   if (running) { updHud(dt); updAudio(); updSfx(dt); }
   if (m_) dbgMk(m_, 'vis');
   const g_ = m_ ? dbgGpuBegin() : 0;
@@ -13206,11 +13262,12 @@ function frame(t) {
   if (m_) dbgEnd(m_);
 }
 function startGame() {
-  if (running) return; running = true; if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
+  if (!running && tFade !== 2) { if (!tFade) { tFade = 1; $('fade').classList.add('on'); audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume(); /* the sound is made while the click still counts as a gesture */ setTimeout(() => { tFade = 2; startGame(); }, 340); } return; } /* GIOCA: the screen goes dark first, the camera cut happens under it */
+  if (running) return; running = true; titoloFine(); if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
   camInit = false; banner(META.partenza.via, META.partenza.comune); setTimeout(() => { if (P.mode === 'foot') toast('Entra nella Ferari! (' + (GP.seen ? (GP.ps ? '△' : 'Y') : 'F') + ')'); }, 1600);
 }
 $('go').addEventListener('click', startGame);
-function boot(saved) { setupWorld(saved || {}); vetrinaShader(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
+function boot(saved) { setupWorld(saved || {}); vetrinaShader(); titoloIniz(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'GIOCA'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
