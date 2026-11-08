@@ -23,6 +23,9 @@ PC_D = 1.5        # m: a closure that passes this near a passo carraio of the DB
 PAR_D = 2.3       # m: a closure that runs side by side with another divider nearer than this for PAR_L m or more is a double of it (src/barriere.py DOPPIO_D, DOPPIO_L, DOPPIO_COS)
 PAR_L = 3.0
 PAR_COS = 0.9
+GAP_I = 2.5        # m: (varchi 3, Carlo 9/11, via Vespucci x -311 z -900: "manca una cancellata, non un varco") two pieces of a boundary in line with a hole up to this wide between them,
+                   # and nothing that enters there (the same accesses as for a T), are one boundary: the hole closes
+COS_I = 0.94       # in line: the two ends point at each other within 20 degrees
 
 def _parallelo(S, altre):
     """True if S runs side by side (within PAR_D, the same way) with one of the lines altre for PAR_L m or more"""
@@ -109,7 +112,15 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
                 if tl < 1e-6: continue
                 sx, sz = (c[0] - e[0]) / d, (c[1] - e[1]) / d
                 ang = math.degrees(math.asin(min(1.0, abs(sx * tz - sz * tx) / tl)))
-                if ang < ANG_MIN: note(e, 'angolo_stretto', d, j >= nl); continue
+                if ang < ANG_MIN:
+                    inl = False
+                    if j < nl and d <= GAP_I:   # not a T: the end of another piece in line with this one, across a short hole
+                        for ce in (tg.coords[0], tg.coords[-1]):
+                            if math.dist(ce, c) > 0.6: continue
+                            s2 = 0.0 if ce == tg.coords[0] else tg.length; f2 = tg.interpolate(min(tg.length, 3.0) if s2 == 0.0 else max(0.0, tg.length - 3.0)).coords[0]; d2 = math.dist(ce, f2)
+                            if d2 > 0.3 and ((ce[0] - f2[0]) * -ux + (ce[1] - f2[1]) * -uz) / d2 >= COS_I: inl = True
+                    if not inl: note(e, 'angolo_stretto', d, j >= nl); continue
+                    rep['in_linea'] += 1
             else: ang = 0.0
             S = LineString([e, c])
             # a gate or a door stands in the opening (its own gate, not the one the end is next to): an access
@@ -122,6 +133,6 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
             if _parallelo(S, [cl[k] for k in T.query(S.buffer(PAR_D)) if k < nl and k != i] + [sd for sd in seg_done if sd.distance(S) < PAR_D]): note(e, 'parallelo_a_un_altro', d); continue
             seg_done.append(S)
             note(e, 'chiuso', d, j >= nl)
-            rep['chiusi_' + ('cancello' if isg else 'edificio' if j >= nl else 'recinzione')] += 1
+            rep['chiusi_' + ('cancello' if isg else 'edificio' if j >= nl else 'in_linea' if ang < ANG_MIN else 'recinzione')] += 1
             out.append(([e, c], kind, h))
     return out, rep

@@ -1090,16 +1090,70 @@ PC_D, PC_W = 6.0, 3.6
 _osm_bar_all_f = presto(lambda b_: unary_union([LineString(pts).buffer(1.5) for pts, k, h in b_ if len(pts) >= 2]) if b_ else GeometryCollection(), list(barriers))
 _have_f = subito(lambda f_, b_: unary_union([LineString(x_).buffer(12) for x_ in f_] + [LineString(p_).buffer(12) for p_, k_, h_ in b_ if len(p_) >= 2]), list(fences), list(barriers)) if railL else None   # the 12 m round every fence and barrier for the railway fill-in below (fences final since the railway fences), on a thread of its own from here
 pc_cuts, pc_gates = [], []
+_pc_carr = unary_union([asph] + ([STR.U_carr] if STR else [])); prepare(_pc_carr); _pcn = Counter()   # the carriageways (varchi 3: the passi carrai across the street, the drives into the yards)
 _pcgV = PuntiVicini(pc_gates, lambda g_: ((g_[0][0] + g_[1][0]) / 2, (g_[0][1] + g_[1][1]) / 2))   # "a gate of these closer than r?" without going through the whole list (src/vicini.py)
 if dbt_pc:
     _dbi = [i_ for i_, (p_, k_, h_) in enumerate(barriers) if len(p_) >= 2 and k_ != 6]
     _dbl = [LineString(barriers[i_][0]) for i_ in _dbi]; _dbt_ = STRtree(_dbl)
     _main_r = [r['line'] for r in raw_roads if r['c'] <= 3 and flat(r) and r['line'].length > 0.1]; _mrt = STRtree(_main_r)
     _done = []; _pcmv = []; _pcfr = []; _doneV = PuntiVicini(_done)
+    # (varchi 3, Carlo 9/11, vicolo del Jolly Pub) a passo carraio serves the dividers on its own side of the street: one whose way to the divider crosses the carriageway
+    # (PC_OLTRE m or more of it) is the driveway of the lot across the street, not a gate in this wall
+    PC_OLTRE = 2.0
+    def _pc_oltre(P_, L_):
+        Q_ = nearest_points(L_, P_)[0]
+        if Q_.distance(P_) < PC_OLTRE: return False
+        S_ = LineString([(P_.x, P_.y), (Q_.x, Q_.y)]); dq_ = Q_.distance(P_)
+        if _pc_carr.contains(Point(Q_.x + (Q_.x - P_.x) / dq_ * 0.6, Q_.y + (Q_.y - P_.y) / dq_ * 0.6)): return False   # a divider in the street itself (it goes onto its edge, src/barriere.py sul_confine), not across it
+        return _pc_carr.intersects(S_) and _pc_carr.intersection(S_).length >= PC_OLTRE
+    # (varchi 3) the DBGT often draws the gate itself as a short piece of the boundary (one piece or two in line, each shorter than PC_W + 0.6, both ends on other dividers);
+    # a passo carraio within PC_PEZZO_D of such a piece has its gate there, as long as the piece (via Colombara x -221 z -969, via Garibaldi x 271 z -750)
+    PC_PEZZO_D, PC_PEZZO_MAX = 1.5, GATE02_MAX
+    _dbx = [i_ for i_ in _dbi if _dbt_i0 <= i_ < _dbt_i1]; _dbxl = [LineString(barriers[i_][0]) for i_ in _dbx]; _dbxt = STRtree(_dbxl) if _dbxl else None
+    def _pc_attaccato(e_, k0_):
+        P0_ = Point(e_); return any(k_ != k0_ and _dbxl[k_].distance(P0_) < 0.5 for k_ in _dbxt.query(P0_.buffer(0.5)))
+    def _pc_pezzo(P_):
+        if _dbxt is None: return None
+        best_ = None
+        for k_ in _dbxt.query(P_.buffer(PC_PEZZO_D)):
+            Lk_ = _dbxl[k_]
+            if not 1.0 <= Lk_.length < PC_W + 0.6 or Lk_.distance(P_) > PC_PEZZO_D: continue
+            if not (_pc_attaccato(Lk_.coords[0], k_) and _pc_attaccato(Lk_.coords[-1], k_)): continue
+            if _pc_oltre(P_, Lk_): continue
+            if best_ is None or Lk_.distance(P_) < best_[0]: best_ = (Lk_.distance(P_), k_)
+        if best_ is None: return None
+        ch_ = [best_[1]]; a_, b_ = _dbxl[best_[1]].coords[0], _dbxl[best_[1]].coords[-1]; tot_ = _dbxl[best_[1]].length
+        for _ in range(2):   # a second short piece in line at either end joins it (the DBGT splits a gate at its middle post)
+            for k_ in _dbxt.query(LineString([a_, b_]).buffer(0.3)):
+                if k_ in ch_: continue
+                Lk_ = _dbxl[k_]
+                if not Lk_.length < PC_W + 0.6 or tot_ + Lk_.length > PC_PEZZO_MAX or Lk_.distance(P_) > PC_PEZZO_D or barriers[_dbx[k_]][1] != barriers[_dbx[best_[1]]][1]: continue   # of the same kind and at the passo carraio too (via Colombara: the railing beside the gate stays)
+                c0_, c1_ = Lk_.coords[0], Lk_.coords[-1]; nw_ = None
+                if math.dist(c0_, b_) < 0.3: nw_ = (a_, c1_)
+                elif math.dist(c1_, b_) < 0.3: nw_ = (a_, c0_)
+                elif math.dist(c0_, a_) < 0.3: nw_ = (c1_, b_)
+                elif math.dist(c1_, a_) < 0.3: nw_ = (c0_, b_)
+                if nw_ is None: continue
+                u0_ = tang(a_, b_); u1_ = tang(c0_, c1_)
+                if abs(u0_[0] * u1_[0] + u0_[1] * u1_[1]) < 0.75: continue   # in line, not round a corner
+                ch_.append(k_); a_, b_ = nw_; tot_ += Lk_.length; break
+        return a_, b_, ch_
     for p_ in dbt_pc:
         P_ = Point(p_)
         if not inside(p_, 0) or _doneV.entro(p_, PC_W): continue
+        pz_ = _pc_pezzo(P_)
+        if pz_ is not None:
+            a_, b_, ch_ = pz_; _done.append(p_); G_ = LineString([a_, b_]); _pcn['sul_pezzo_dbgt'] += 1
+            for k_ in ch_: pc_cuts.append(_dbxl[k_].buffer(0.3, cap_style=2))
+            pc_cuts.append(G_.buffer(0.3, cap_style=2))
+            hb_ = max([barriers[_dbx[k_]][2] for e_ in (a_, b_) for k_ in _dbxt.query(Point(e_).buffer(0.5)) if k_ not in ch_ and _dbxl[k_].distance(Point(e_)) < 0.5] or [barriers[_dbx[ch_[0]]][2]])   # as tall as the boundary it stands in
+            pc_gates.append((tuple(a_), tuple(b_), round(min(2.2, max(1.2, hb_)), 1), barriers[_dbx[ch_[0]]][1], 'dbgt_pezzo')); continue
         j_ = _dbt_.nearest(P_); L_ = _dbl[j_]
+        if _pc_oltre(P_, L_):   # the nearest is across the street: the nearest one on this side, if within PC_D
+            _alt_ = sorted((k_ for k_ in _dbt_.query(P_.buffer(PC_D)) if _dbl[k_].distance(P_) <= PC_D and not _pc_oltre(P_, _dbl[k_])), key=lambda k_: _dbl[k_].distance(P_))
+            _pcn['oltre_la_strada'] += 1
+            if not _alt_: continue
+            j_ = _alt_[0]; L_ = _dbl[j_]
         if L_.distance(P_) > PC_D or L_.length < PC_W + 0.6: continue
         # near a corner or between several dividers the nearest one may be a diagonal; the gate goes on the one that faces the street (the one that runs most nearly along the nearest street),
         # among those not farther than 2 m more than the nearest (Carlo, 2/11, via Gagarin x 546 z -490)
@@ -1109,7 +1163,7 @@ if dbt_pc:
             _d0_ = L_.distance(P_); _best_ = None
             for k_ in _dbt_.query(P_.buffer(_d0_ + 2.0)):
                 Lk_ = _dbl[k_]
-                if Lk_.distance(P_) > _d0_ + 2.0 or Lk_.length < PC_W + 0.6: continue
+                if Lk_.distance(P_) > _d0_ + 2.0 or Lk_.length < PC_W + 0.6 or _pc_oltre(P_, Lk_): continue
                 sk_ = Lk_.project(P_); ta_, tb_ = Lk_.interpolate(max(0, sk_ - 1)), Lk_.interpolate(min(Lk_.length, sk_ + 1)); td_ = (tb_.x - ta_.x, tb_.y - ta_.y); tn_ = math.hypot(*td_) or 1
                 al_ = abs((td_[0] * _rd_[0] + td_[1] * _rd_[1]) / (tn_ * _rn_)); sc_ = (al_, -Lk_.distance(P_))
                 if _best_ is None or sc_ > _best_[0]: _best_ = (sc_, k_)
@@ -1132,11 +1186,14 @@ if dbt_pc:
                 else: a_, b_ = _E_, Point(_E_.x + _sg_ * _ux_ * PC_W, _E_.y + _sg_ * _uz_ * PC_W)
                 _fr_ = True; _pcfr.append((round(P_.x, 1), round(P_.y, 1), round(a_.distance(b_), 1)))
         _done.append(p_)
-        if _fr_: _gm_ = LineString([(a_.x, a_.y), (b_.x, b_.y)]); pc_cuts.append(_gm_.buffer(0.5)); _mid_ = _gm_.interpolate(0.5, normalized=True)
-        else: pc_cuts.append(L_.interpolate(s_).buffer(PC_W / 2)); _mid_ = L_.interpolate(s_)
-        if any(_main_r[k].distance(_mid_) < 2 for k in _mrt.query(_mid_.buffer(2))): continue
+        if _fr_: _gm_ = LineString([(a_.x, a_.y), (b_.x, b_.y)]); _cut_ = _gm_.buffer(0.5); _mid_ = _gm_.interpolate(0.5, normalized=True)
+        else: _cut_ = L_.interpolate(s_).buffer(PC_W / 2); _mid_ = L_.interpolate(s_)
+        # a street that goes across the divider there opens it itself: no gate. Neither a cut without its gate (varchi 3: a street running along the wall within 2 m of the point
+        # left a hole of 3 m in it with nothing in it, vicolo del Jolly Pub)
+        if any(_main_r[k].intersects(L_) and _main_r[k].intersection(L_).distance(_mid_) < PC_W for k in _mrt.query(_mid_.buffer(PC_W))): _pcn['strada_che_attraversa'] += 1; continue
+        pc_cuts.append(_cut_)
         hb_ = barriers[_dbi[j_]][2]; pc_gates.append(((a_.x, a_.y), (b_.x, b_.y), round(min(2.2, max(1.2, hb_)), 1), barriers[_dbi[j_]][1], 'dbgt_passo_carraio'))
-    log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates), 'agganciati al tratto verso la strada invece del piu vicino', len(_pcmv), 'sul fronte strada (era su un divisore di traverso)', len(_pcfr)); _campioni['cancelli_spostati'] = _pcmv; _campioni['cancelli_fronte'] = _pcfr
+    log('passi carrai', len(dbt_pc), 'su un muro', len(pc_cuts), 'cancelli', len(pc_gates), 'agganciati al tratto verso la strada invece del piu vicino', len(_pcmv), 'sul fronte strada (era su un divisore di traverso)', len(_pcfr), dict(_pcn)); STR and STR.rep.__setitem__('passi_carrai_varchi3', dict(_pcn)); _campioni['cancelli_spostati'] = _pcmv; _campioni['cancelli_fronte'] = _pcfr
 # cancellate DBGT (EL_DIV_TY 02) fino a GATE02_MAX m che danno su strada o cortile sono cancelli, anche senza un passo carraio (Carlo, 1/11)
 _c02 = Counter(); _prep_paved = [g_ for g_ in (asph, side, pedz, parking) if g_ is not None and not g_.is_empty]
 _lotti = [g_ for g_ in ([parking] + (list(STR.cortili) if STR else [])) if g_ is not None and not g_.is_empty]; _lotti_t = STRtree(_lotti) if _lotti else None
@@ -1229,6 +1286,7 @@ _cut_f_f = presto(lambda a_, b_: unary_union([a_.result(), b_.result(), _bunb[0.
                   _rb.pop('cut06'), _rb.pop('cut02'))  # the street buffers rbuf(c <= 5 and flat, 0.6) and rbuf(c == 6 and flat, 0.2) started with the others
 _rb.update(roadsU=presto(rbuf, lambda r: True, 1.0), flat0=presto(rbuf, flat, 0), deck0=presto(rbuf, lambda r: r.get("deck"), 0))
 bar_out = []; _bar_prio = []   # the source of each: 0 OSM, 1 DBGT (src/barriere.py fondi_doppi)
+_kept_dbgt = []   # each DBGT divider with the pieces of it that stay (the drives into the yards below)
 # a divider never disappears (Carlo, 25/10; src/barriere.py sul_confine). A divider of the DBGT that falls in a street at grade (AC_VEI 01,
 # 02) moves onto the edge of the street, its face on it; it opens only where the street goes across it, or where a way crosses it
 # (passaggi: a way running along it leaves it where the DBGT has it). The buffers of the OSM ways (w/2 + 0.5 from the axis) used to cut them
@@ -1256,7 +1314,7 @@ for bi_, (pts, kind, hgt) in enumerate(barriers):
         if len(j_):
             parts_, m_ = sul_confine(L0, unary_union([_mv[k_] for k_ in j_]), margine(kind), _fermi)
             if m_: _mrep['spostati'] += 1; _mrep['metri_spostati'] += m_
-    kept_ = 0.0
+    kept_ = 0.0; _kp_ = []
     for L in parts_:
         cuts_ = [_bc_parts[j] for j in _bc_tree.query(L)]
         if dbgt_: cuts_ += passaggi(L, [_vie[k_] for k_ in _viet.query(L)]) if _viet is not None else []
@@ -1265,8 +1323,8 @@ for bi_, (pts, kind, hgt) in enumerate(barriers):
         for part in (list(c.geoms) if hasattr(c, 'geoms') else [c]):
             if isinstance(part, LineString) and (part.length > 1.0 or (part.length > 0.3 and min(math.dist(part.coords[0], c_) for c_ in (L.coords[0], L.coords[-1])) > 0.05 and min(math.dist(part.coords[-1], c_) for c_ in (L.coords[0], L.coords[-1])) > 0.05)):   # a piece between two cuts stays down to 0.3 m (a post's worth of wall between two gates or streets): it closes the gap
                 if part.length <= 1.0: _mrep['pezzi_corti_tenuti'] += 1
-                bar_out.append((list(part.simplify(0.1).coords), kind, hgt)); _bar_prio.append(1 if dbgt_ else 0); kept_ += part.length
-    if dbgt_: _mrep['dbgt'] += 1; _mrep['metri_dbgt'] += L0.length; _mrep['metri_tenuti'] += kept_
+                bar_out.append((list(part.simplify(0.1).coords), kind, hgt)); _bar_prio.append(1 if dbgt_ else 0); kept_ += part.length; _kp_.append(part)
+    if dbgt_: _mrep['dbgt'] += 1; _mrep['metri_dbgt'] += L0.length; _mrep['metri_tenuti'] += kept_; _kept_dbgt.append((L0, kind, hgt, _kp_))
 _mrep = {k_: round(v_) for k_, v_ in _mrep.items()}
 if SPOSTAMENTI: _sp = np.array([a_[0] for a_ in SPOSTAMENTI]); _mrep['spostamento_m'] = dict(p50=round(float(np.percentile(_sp, 50)), 2), p90=round(float(np.percentile(_sp, 90)), 2), max=round(float(_sp.max()), 2))
 # two dividers side by side are one boundary: one stays (src/barriere.py fondi_doppi)
@@ -1381,8 +1439,44 @@ for a_, b_, h_, k_, src_ in pc_gates:
             g_, m_ = sul_confine(G_, unary_union([_mv[k] for k in j_]), margine(k_), _fermi)
             if m_ is not None and len(g_) == 1 and g_[0].length > 0.5: a_, b_ = g_[0].coords[0], g_[0].coords[-1]
     m_ = ((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2)
-    if _gov.entro(m_, 3): continue  # OSM has its gate there already
+    if _gov.entro(m_, 3):  # OSM has its gate there already
+        if src_ == 'dbgt_pezzo':   # (varchi 3) the shape of the gate from the DBGT piece, the rest from OSM: the gate of OSM takes the place of the piece
+            _go_ = min(range(_n_gosm), key=lambda i_: math.dist(m_, ((gate_out[i_][0] + gate_out[i_][2]) / 20, (gate_out[i_][1] + gate_out[i_][3]) / 20)))
+            if math.dist(m_, ((gate_out[_go_][0] + gate_out[_go_][2]) / 20, (gate_out[_go_][1] + gate_out[_go_][3]) / 20)) < 3 and gate_out[_go_][4] in ('g', 'o'):
+                gate_out[_go_][0:4] = [q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1])]; gate_out[_go_][5] = max(gate_out[_go_][5], h_) if gate_out[_go_][4] == 'g' else gate_out[_go_][5]; _gsrc['osm_sul_pezzo_dbgt'] += 1
+        continue
     _g_ = [q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', h_, 0]; gate_out.append(_g_); _gsrc[src_] += 1; _gprio[id(_g_)] = 1 if src_.startswith('dbgt') else 2
+_n_gpc = len(gate_out)
+# (varchi 3, Carlo 9/11, scuola Armando Diaz x -606 z -705) the drive of the DBGT that goes through a divider into a yard: where a carriageway of the DBGT crosses a divider
+# and opens it (src/barriere.py sul_confine), with a yard of a private area (AC_VEI 0307) on the other side, the opening is the gate of the yard, as wide as the opening
+# (a footgate below 2,5 m). Not where a street of the town (class 3 or less) or a pedestrian street goes through, nor where a gate is already
+DRIVE_MIN, DRIVE_MAX = 1.0, 7.5
+_dvn = Counter()
+if STR and STR.cortili and _kept_dbgt:
+    _cvU = unary_union(list(STR.cortili)); prepare(_cvU)
+    _pubr = [r_['line'] for r_ in raw_roads if (r_['c'] <= 3 or r_['c'] == 5) and flat(r_) and r_['line'].length > 0.1]; _pubt = STRtree(_pubr) if _pubr else None
+    _bgt_d = STRtree(btree_geoms) if btree_geoms else None
+    for L0_, k_, h_, kp_ in _kept_dbgt:
+        if k_ == 6 or not kp_: continue
+        sp_ = sorted(((L0_.project(Point(p_.coords[0])), L0_.project(Point(p_.coords[-1])), p_) for p_ in kp_), key=lambda x_: min(x_[0], x_[1]))
+        for (s0a_, s0b_, p0_), (s1a_, s1b_, p1_) in zip(sp_[:-1], sp_[1:]):
+            e0_ = p0_.coords[-1] if s0b_ >= s0a_ else p0_.coords[0]; e1_ = p1_.coords[0] if s1a_ <= s1b_ else p1_.coords[-1]
+            sa_, sb_ = max(s0a_, s0b_), min(s1a_, s1b_); wd_ = math.dist(e0_, e1_)
+            if not (DRIVE_MIN <= wd_ <= DRIVE_MAX) or sb_ - sa_ < 0.5: continue
+            M_ = L0_.interpolate((sa_ + sb_) / 2)
+            if not _pc_carr.contains(M_): continue   # opened by something else than a carriageway
+            t0_ = L0_.interpolate(max(0, (sa_ + sb_) / 2 - 0.5)); t1_ = L0_.interpolate(min(L0_.length, (sa_ + sb_) / 2 + 0.5)); ux_, uz_ = tang((t0_.x, t0_.y), (t1_.x, t1_.y))
+            sides_ = [Point(M_.x - uz_ * d_ * sg_, M_.y + ux_ * d_ * sg_) for sg_ in (1, -1) for d_ in (1.5, 2.5)]
+            cv_ = [_cvU.contains(p_) for p_ in sides_]; cr_ = [_pc_carr.contains(p_) for p_ in sides_]
+            if not ((cv_[0] or cv_[1]) and (cr_[2] or cr_[3]) and not (cr_[0] and cr_[1])) and not ((cv_[2] or cv_[3]) and (cr_[0] or cr_[1]) and not (cr_[2] and cr_[3])): _dvn['non_porta_in_un_cortile'] += 1; continue
+            S_ = LineString([e0_, e1_])
+            if _pubt is not None and any(_pubr[j_].intersects(S_.buffer(0.5)) for j_ in _pubt.query(S_.buffer(0.5))): _dvn['via_pubblica'] += 1; continue
+            if _bgt_d is not None and any(btree_geoms[j_].distance(M_) < 0.3 for j_ in _bgt_d.query(M_.buffer(0.3))): _dvn['edificio'] += 1; continue
+            mm_ = ((e0_[0] + e1_[0]) / 2, (e0_[1] + e1_[1]) / 2)
+            if _gov.entro(mm_, 2.5): _dvn['gia_cancello'] += 1; continue
+            _g_ = [q(e0_[0]), q(e0_[1]), q(e1_[0]), q(e1_[1]), 'g', round(min(2.2, max(1.2, h_)), 1), 0]; gate_out.append(_g_); _gprio[id(_g_)] = 1; _gsrc['dbgt_vialetto_nel_cortile'] += 1; _dvn['cancelli'] += 1
+            if wd_ < 2.5: _dvn['pedonali'] += 1
+log('vialetti DBGT che entrano in un cortile attraverso un divisore', dict(_dvn)); STR and STR.rep.__setitem__('cancelli_vialetti_nei_cortili', dict(_dvn))
 _n_gpc = len(gate_out)
 # passi carrai DBGT left without a gate (no divider within PC_D of the point): the gap between the closures on the two sides along the lot boundary
 # (end of a divider or wall of a building, in any combination) is closed with a gate; wider than 8 m: 6 m centred on the driveway; never across an OSM street
@@ -1594,6 +1688,8 @@ if dbt_pc:
         if (_ucarr_in is not None and _ucarr_in.intersects(G_) and _ucarr_in.intersection(G_).length > 0.3) or (_asph_in.intersects(G_) and _asph_in.intersection(G_).length > 0.3) or (_side_in.intersects(G_) and _side_in.intersection(G_).length > 0.3): _gcc['carreggiata_o_marciapiede'] += 1; continue
         if any(r_['c'] <= 5 and r_['line'].distance(G_) < r_['w'] / 2 - 0.2 for r_ in (_rr[j_] for j_ in _rrt.query(G_.buffer(12)))): _gcc['strada_osm'] += 1; continue  # any street the game draws, private or service ones too
         if any(_cl[j_][2] < 0 and _cl[j_][0].intersection(G_.buffer(1.0)).length > 1.0 and _cl[j_][0].distance(Point(a_)) > 0.5 and _cl[j_][0].distance(Point(b_)) > 0.5 for j_ in _clt.query(G_.buffer(1.0))): _gcc['doppione_recinzione'] += 1; continue
+        # (varchi 3, via Garibaldi x 274 z -743: an 8 m gate over the wall) a gate whose line runs along a divider already there for most of its length closes no opening
+        if any(_cl[j_][2] < 0 and _cl[j_][0].intersection(G_.buffer(0.6, cap_style=2)).length >= 0.6 * wd_ for j_ in _clt.query(G_.buffer(0.6, cap_style=2))): _gcc['su_recinzione'] = _gcc.get('su_recinzione', 0) + 1; continue
         ids_ = [e_[2] for e_ in ext_ if e_ and e_[2] >= 0]; ux_, uz_ = (b_[0] - a_[0]) / wd_, (b_[1] - a_[1]) / wd_
         if any(_bg[j_].distance(mid_) < 0.8 for j_ in _bgt.query(mid_.buffer(0.8))) or (len(ids_) == 2 and ids_[0] == ids_[1] and _cl[_clt.query_nearest(mid_)[0]][0].distance(mid_) <= 1.5):  # the gate falls on a house: a small door in its wall, not a gate
             dw_ = min(1.2, wd_); ty_ = 'p'
@@ -1614,6 +1710,8 @@ if dbt_pc:
             _vdec.append((round(mid_.x, 1), round(mid_.y, 1), srcname_, v_ if isinstance(v_, str) else 'cancello', round(wd_, 1), _vlast.pop('carr', '')))
             if isinstance(v_, str): _vrep[v_] += 1; continue
             a_, b_ = v_; mid_ = LineString([a_, b_]).centroid; wd_ = math.dist(a_, b_)
+            G2_ = LineString([a_, b_])
+            if any(_cl[j_][2] < 0 and _cl[j_][0].intersection(G2_.buffer(0.6, cap_style=2)).length >= 0.6 * wd_ for j_ in _clt.query(G2_.buffer(0.6, cap_style=2))): _gcc['su_recinzione'] = _gcc.get('su_recinzione', 0) + 1; continue
         _gd.append(tuple(mid_.coords[0])); _gcc['nuovi'] += 1; _src[srcname_] += 1
         if wd_ < 2.5: _gcc['pedonali'] += 1
         gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', round(hh_, 1), 0]); _vorig[id(gate_out[-1])] = srcname_; _vg_add(a_, b_, gate_out[-1])
@@ -1883,7 +1981,19 @@ def _gate_in_strada(g_):
     if any(r_['c'] <= 5 and r_['line'].distance(G_) < r_['w'] / 2 - 0.2 for r_ in (raw_roads[j_] for j_ in _rawt.query(box(x0_ - 12.001, z0_ - 12.001, x1_ + 12.001, z1_ + 12.001))) if flat(r_) and not r_['x'] and r_['line'].distance(G_) < 12): return True   # the ways within 12 m from the tree, not all of them
     return _frac_carr(G_) >= 0.7   # the gate in the middle of a carriageway whose own polygon has a sliver round the wall (via delle Grigne, x 687.8 z 2159)
 _rawt = STRtree([r_['line'] for r_ in raw_roads])
-_gtol = [(round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) for g_ in gate_out if g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and id(g_) not in _osm_gid and id(g_) not in _gpavset and _gate_in_strada(g_)]   # a passage between two walls closed over its pavement (androni) stands at the edge of the street by the rule: it stays
+def _gate_tra_due_carreggiate(g_):
+    """(varchi 3, Carlo 9/11, scuola Anna Frank x -498 z -751) a gate stands in the street only with the carriageway on both sides of it, or with a street of the town (class 3 or
+    less) going through it; with the carriageway on one side only it stands on the edge of the street, across the drive into the lot, where gates stand"""
+    a_, b_ = (g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10); L_ = math.dist(a_, b_)
+    if L_ < 0.5: return True
+    G_ = LineString([a_, b_]); x0_, z0_, x1_, z1_ = G_.bounds
+    if any(r_['c'] <= 3 and r_['line'].distance(G_) < r_['w'] / 2 - 0.2 for r_ in (raw_roads[j_] for j_ in _rawt.query(box(x0_ - 12.001, z0_ - 12.001, x1_ + 12.001, z1_ + 12.001))) if flat(r_) and not r_['x']): return True
+    ux_, uz_ = (b_[0] - a_[0]) / L_, (b_[1] - a_[1]) / L_; nx_, nz_ = -uz_, ux_; f_ = r_ = 0
+    for t_ in (0.25, 0.5, 0.75):
+        mx_, mz_ = a_[0] + (b_[0] - a_[0]) * t_, a_[1] + (b_[1] - a_[1]) * t_
+        f_ += _carr_ok(mx_ + nx_ * 1.5, mz_ + nz_ * 1.5); r_ += _carr_ok(mx_ - nx_ * 1.5, mz_ - nz_ * 1.5)
+    return f_ >= 2 and r_ >= 2
+_gtol = [(round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) for g_ in gate_out if g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and id(g_) not in _osm_gid and id(g_) not in _gpavset and _gate_in_strada(g_) and _gate_tra_due_carreggiate(g_)]   # a passage between two walls closed over its pavement (androni) stands at the edge of the street by the rule: it stays
 # a gate that falls on the carriageway goes to the edge of the street, open, instead of going (varchi 2, rule B of the survey of 8/11: the driveway of the DBGT is certain, the hole was left where its gate had been)
 _gsp_n = {'spostati': 0, 'tolti': 0}
 def _gate_sposta(g_):
