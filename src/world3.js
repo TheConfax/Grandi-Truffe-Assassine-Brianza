@@ -2559,6 +2559,11 @@ const GATE_ROTTI = new Set(), GATEG = new Grid(16), GATE_FLY = [], GATE_OPEN = n
 const GATE_TEX = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d'); x.fillStyle = '#fff'; for (let i = 0; i < 4; i++) x.fillRect(i * 16 + 6, 0, 4, 128); x.fillRect(0, 0, 64, 9); x.fillRect(0, 119, 64, 9); x.fillRect(0, 54, 64, 6); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; })();
 const ARM_TEX = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 8; const x = c.getContext('2d'); for (let i = 0; i < 4; i++) { x.fillStyle = i % 2 ? '#f2f2ee' : '#d22a1e'; x.fillRect(i * 16, 0, 16, 8); } const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; })();
 const GATE_MAT = new THREE.MeshLambertMaterial({ color: 0x33413a, map: GATE_TEX, alphaTest: 0.5, side: THREE.DoubleSide });
+/* the double wooden door of an androne (kind 'w', Carlo 8/11): opaque vertical planks, dark brown, a rail across the middle */
+const WOOD_MAT = (() => { const c = document.createElement('canvas'); c.width = 128; c.height = 128; const x = c.getContext('2d');
+  for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#6e4a2c' : '#654329'; x.fillRect(i * 16, 0, 16, 128); x.fillStyle = '#3d2716'; x.fillRect(i * 16, 0, 1.5, 128); }
+  x.fillStyle = '#4b3220'; x.fillRect(0, 22, 128, 7); x.fillRect(0, 98, 128, 7); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding;
+  return new THREE.MeshLambertMaterial({ map: t, side: THREE.DoubleSide }); })();
 function layCancelli(T) { T.gates = []; for (const [X0, Z0, X1, Z1, k, h, auto] of T.d.gt || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
@@ -2625,8 +2630,8 @@ function buildDoors(T, G) {
 }
 const ARM_MAT = new THREE.MeshLambertMaterial({ map: ARM_TEX });
 function armG(g) { const geo = new THREE.BoxGeometry(g.W, 0.09, 0.09); geo.translate(g.W / 2, 1.0, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * g.W / 1.6); return geo; }
-function leafG(g, w, dir) { const geo = new THREE.PlaneGeometry(w - 0.3, g.h); geo.translate(dir * (w / 2), g.h / 2 + 0.05, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (w - 0.3) / 0.75); return geo; }
-const gateLeaves = g => g.W > 3.2 && g.k !== 'o' ? [[0, g.W / 2, 1], [g.W, g.W / 2, -1]] : [[0, g.W, 1]];
+function leafG(g, w, dir) { const lw = w - (g.k === 'w' ? 0.04 : 0.3); const geo = new THREE.PlaneGeometry(lw, g.h); geo.translate(dir * (w / 2), g.h / 2 + 0.05, 0); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * lw / (g.k === 'w' ? 1.2 : 0.75)); return geo; }
+const gateLeaves = g => (g.W > 3.2 || g.k === 'w') && g.k !== 'o' ? [[0, g.W / 2, 1], [g.W, g.W / 2, -1]] : [[0, g.W, 1]];
 // A gate at rest is drawn in the mesh of its tile. When it opens or is rammed it gets its own objects, as long as it moves, with the hinges where they were; its place in the mesh collapses to a point.
 function gateVivo(g) {
   if (g.outer || !g.bk) return; const b = g.bk, a = b.m.geometry.attributes.position; if (!a) return;
@@ -2646,7 +2651,7 @@ function gateOggetti(g, G) {
     const m = new THREE.Mesh(armG(g), ARM_MAT); m.castShadow = true; inner.add(m); if (g.perm) inner.rotation.z = 1.35; /* raised lift gate on a big road */
   } else for (const [x0, w, dir] of gateLeaves(g)) { // gate leaf (two leaves when wide), hinged at the posts
     const hinge = new THREE.Group(); hinge.position.x = x0; inner.add(hinge); g.hinges.push([hinge, dir]);
-    const m = new THREE.Mesh(leafG(g, w, dir), GATE_MAT); m.castShadow = true; hinge.add(m);
+    const m = new THREE.Mesh(leafG(g, w, dir), g.k === 'w' ? WOOD_MAT : GATE_MAT); m.castShadow = true; hinge.add(m);
     if (g.k === 'o') hinge.rotation.y = -1.35 * dir; // footpath gates stand open
   }
 }
@@ -2654,11 +2659,11 @@ function buildGates(T, G) {
   const F = fuso(G);
   for (const g of T.gates || []) {
     g.outer = g.inner = null; g.hinges = []; g.bk = null;
-    if (g.k !== 'l') for (const [x, z] of [[g.ax, g.az], [g.bx, g.bz]]) addGeo(F.buf(lam(0x8d877c), true).b, boxG(0.32, g.h + 0.25, 0.32), matTRy(x, H.ground(x, z) + (g.h + 0.25) / 2, z, 0));
+    if (g.k === 'w') { /* the jambs are the walls of the passage: no posts */ } else if (g.k !== 'l') for (const [x, z] of [[g.ax, g.az], [g.bx, g.bz]]) addGeo(F.buf(lam(0x8d877c), true).b, boxG(0.32, g.h + 0.25, 0.32), matTRy(x, H.ground(x, z) + (g.h + 0.25) / 2, z, 0));
     else addGeo(F.buf(lam(0xd9d6cf), false).b, boxG(0.25, 1.15, 0.25), matTRy(g.ax, H.ground(g.ax, g.az) + 0.57, g.az, 0));
     if (g.broken && g.k !== 'o') continue; // already rammed
     if (GATE_OPEN.has(g)) { gateOggetti(g, G); continue; } // built again while it was moving
-    const th = Math.atan2(-g.uz, g.ux), e = F.buf(g.k === 'l' ? ARM_MAT : GATE_MAT, true); let v0 = -1, v1 = 0;
+    const th = Math.atan2(-g.uz, g.ux), e = F.buf(g.k === 'l' ? ARM_MAT : g.k === 'w' ? WOOD_MAT : GATE_MAT, true); let v0 = -1, v1 = 0;
     if (g.k === 'l') {
       matTRy(g.ax, g.gy, g.az, th); if (g.perm) _fzm.multiply(_fzm2.makeRotationZ(1.35));
       [v0, v1] = addGeo(e.b, armG(g), _fzm);
@@ -2689,7 +2694,7 @@ function breakGate(g, v) {
 }
 function updGates(dt) {
   // pedestrians open the small gates instead of walking through them
-  for (const p of PEDS) { if (p.state === 'dead') continue; GATEG.each(p.x - 2, p.z - 2, p.x + 2, p.z + 2, g => { if (!g.broken && !g.open && g.k === 'g' && segDist(p.x, p.z, g.ax, g.az, g.bx, g.bz) < 1.6) openGate(g); }); }
+  for (const p of PEDS) { if (p.state === 'dead') continue; GATEG.each(p.x - 2, p.z - 2, p.x + 2, p.z + 2, g => { if (!g.broken && !g.open && (g.k === 'g' || g.k === 'w') && segDist(p.x, p.z, g.ax, g.az, g.bx, g.bz) < 1.6) openGate(g); }); }
   // honk in front of a gate on a residential street and it opens for you too
   if (P.car && (K.horn || GP.horn > 0.5)) GATEG.each(P.car.x - 12, P.car.z - 12, P.car.x + 12, P.car.z + 12, g => { if (g.auto && !g.broken && !g.open && segDist(P.car.x, P.car.z, g.ax, g.az, g.bx, g.bz) < 12) openGate(g); });
   for (const g of GATE_OPEN) {

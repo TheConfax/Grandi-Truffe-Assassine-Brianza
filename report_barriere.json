@@ -335,7 +335,7 @@
     "x": 38.2,
     "z": -272.8,
     "m": 7.5,
-    "esito": "una via che attraversa"
+    "esito": "passaggio a livello"
    },
    {
     "x": 669.9,
@@ -383,7 +383,7 @@
     "x": 586.4,
     "z": -763.4,
     "m": 9.5,
-    "esito": "una via che attraversa"
+    "esito": "passaggio a livello"
    },
    {
     "x": 827.1,
@@ -437,7 +437,7 @@
     "x": -142.0,
     "z": -155.0,
     "m": 11.0,
-    "esito": "passaggio a livello"
+    "esito": "una via che attraversa"
    },
    {
     "x": -2115.5,
@@ -509,7 +509,7 @@
     "x": -145.7,
     "z": -159.8,
     "m": 14.0,
-    "esito": "passaggio a livello"
+    "esito": "una via che attraversa"
    },
    {
     "x": -1106.3,
