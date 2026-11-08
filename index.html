@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo facciate-fix · dopo 2a317aa2 · assemblato 08/11 15:39 · porta ' + location.port;
+    const txt = 'locale · ramo facciate-fix · dopo d5c6857d · assemblato 08/11 15:50 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -12584,6 +12584,8 @@ const FAC_GEO = (() => {
   /* the reveal: unit opening (x -0.5..0.5, y 0..1), depth 1 into the wall (z 0..-1) */
   G.reveal = quads([[[-0.5, 0, 0], [-0.5, 0, -1], [-0.5, 1, -1], [-0.5, 1, 0], [1, 0, 0]], [[0.5, 0, -1], [0.5, 0, 0], [0.5, 1, 0], [0.5, 1, -1], [-1, 0, 0]],
     [[-0.5, 1, 0], [-0.5, 1, -1], [0.5, 1, -1], [0.5, 1, 0], [0, -1, 0]], [[-0.5, 0, -1], [-0.5, 0, 0], [0.5, 0, 0], [0.5, 0, -1], [0, 1, 0]]]);
+  { /* the head of the reveal: plaster in the shade lit by the street and the sky, not the brown of the ground light (its third face) */
+    const c = new Float32Array(G.reveal.attributes.position.count * 3).fill(1); for (let i = 12; i < 18; i++) c.set([1.25, 1.3, 1.42], i * 3); G.reveal.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
   G.back = quads([[[-0.5, 0, 0], [0.5, 0, 0], [0.5, 1, 0], [-0.5, 1, 0], [0, 0, 1]]]);
   G.glass = G.back;
   const box = (x0, x1, y0, y1, z0, z1) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return g; };
@@ -12594,6 +12596,8 @@ const FAC_GEO = (() => {
   G.leaf = box(0, 1, 0, 1, 0, 0.045); /* a shutter leaf 4.5 cm thick, hinged at x 0 */
   G.tapp = quads([[[-0.5, -1, 0], [0.5, -1, 0], [0.5, 0, 0], [-0.5, 0, 0], [0, 0, 1]]]);
   G.slab = box(-0.5, 0.5, -1, 0, 0, 1); /* scaled: (w, 0.16, d) */
+  { /* the underside of a balcony: plaster in the shade lit by the street and the sky, not the brown of the ground light (the -y face of the box) */
+    const c = new Float32Array(G.slab.attributes.position.count * 3).fill(1); for (let i = 12; i < 16; i++) c.set([1.25, 1.3, 1.42], i * 3); G.slab.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
   G.rail = quads([[[-0.5, 0, 0], [0.5, 0, 0], [0.5, 1, 0], [-0.5, 1, 0], [0, 0, 1]]]);
   G.wall = box(-0.5, 0.5, 0, 1, -0.5, 0.5); /* a solid parapet, scaled (w, 1.05, 0.1) */
   G.fin = box(-0.5, 0.5, 0, 1, 0, 1);
@@ -12635,7 +12639,7 @@ const FAC_PARTS = (() => {
     scene.add(m); P[name] = { m, cap, n: 0, lit: o.lit ? geo.attributes.aLit : null, wo: o.win ? geo.attributes.aWO : null, wn: o.win ? geo.attributes.aWN : null };
   };
   /* recessed parts: no fade (only seen through the hole); the sun in them only through the opening (facRecMat) */
-  mk('reveal', FAC_GEO.reveal, lam({}), 6000, { win: true });
+  mk('reveal', FAC_GEO.reveal, lam({ vertexColors: true }), 6000, { win: true });
   mk('back', FAC_GEO.back, lam({}), 1500, { win: true });
   mk('glass', FAC_GEO.glass.clone(), glassMat, 6000, { noCol: true, lit: true, win: true });
   mk('bar', FAC_GEO.bar, lam({}), 40000, { win: true });
@@ -12646,7 +12650,7 @@ const FAC_PARTS = (() => {
   mk('fin', FAC_GEO.fin, facFadeMat(lam({}), FAC_R), 3000);
   mk('bow', FAC_GEO.bow, facFadeMat(lam({ color: 0x27313b }), FAC_R), 1500, { noCol: true });
   mk('bowBox', FAC_GEO.bowBox, facFadeMat(lam({}), FAC_R), 3000);
-  mk('slab', FAC_GEO.slab, facFadeMat(lam({}), FAC_RB), 8000, { cast: true });
+  mk('slab', FAC_GEO.slab, facFadeMat(lam({ vertexColors: true }), FAC_RB), 8000, { cast: true });
   mk('railFe', FAC_GEO.rail, facFadeMat(lam({ map: FAC_BARS, alphaTest: 0.5, side: THREE.DoubleSide }), FAC_RB), 16000, { cast: true });
   mk('railMe', FAC_GEO.rail, facFadeMat(lam({ map: FAC_BARS2, alphaTest: 0.5, side: THREE.DoubleSide }), FAC_RB), 8000, { cast: true });
   mk('railLe', FAC_GEO.rail, facFadeMat(lam({ map: FAC_WOOD, alphaTest: 0.5, side: THREE.DoubleSide }), FAC_RB), 4000, { cast: true });
@@ -12686,7 +12690,7 @@ function facWin(r) {
     facPut('reveal', x, y, z, Xx, Xz, nx, nz, w, h, D, wd);
     facPut('back', x - nx * D, y, z - nz * D, Xx, Xz, nx, nz, w, h, 1, wd);
     const gw = Math.min(w * 0.5, 1.6), gh = Math.min(2.3, h - 0.1), zb = D - 0.02, fb = 0.07;
-    facPut('glass', x - nx * (zb + 0.03), y + 0.05, z - nz * (zb + 0.03), Xx, Xz, nx, nz, gw, gh, 1, null, r.lit);
+    facPut('glass', x - nx * zb, y + 0.05, z - nz * zb, Xx, Xz, nx, nz, gw, gh, 1, null, r.lit); /* 2 cm in front of the back wall, the frame 5 cm more */
     bar(-gw / 2 + fb / 2, y + 0.05, fb, gh, zb - 0.05, 0.05, r.fr); bar(gw / 2 - fb / 2, y + 0.05, fb, gh, zb - 0.05, 0.05, r.fr); bar(0, y + 0.05 + gh - fb, gw, fb, zb - 0.05, 0.05, r.fr); bar(0, y + 0.05, gw, fb, zb - 0.05, 0.05, r.fr); bar(0, y + 0.05, 0.1, gh, zb - 0.05, 0.05, r.fr);
     FAC_W = null;
     facRail(r.rail, r.rc, x, y, z, Xx, Xz, nx, nz, w, -0.02); return;
