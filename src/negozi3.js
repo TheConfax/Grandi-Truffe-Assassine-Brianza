@@ -207,12 +207,80 @@ const NG_SUBTHEME = {
 };
 const NG_DEFTHEME = { alimentari: () => 5, moda: () => 0, ufficio: mi => 2 + mi % 2, medico: mi => mi % 2 ? 5 : 0, tabacchi: () => 0, bottega: () => 5, officina: mi => mi % 5, auto: mi => mi % 5 };
 
-// ---- the window atlas: 128 px per theme, 2 x 3 per class, drawn once
+// ---- near and far (vetrine HQ, Carlo 8/11: "sembrano adesivi 2D"). Within 75 m of the camera a front is drawn whole: set 20-30 cm into the wall,
+// with its reveal, stone sill and step, the frame with its mullions, the door with its handle, the shutter in its guides under its box. Further off a
+// plain version, flat on the wall, as the fronts were before. Each vertex knows its front (ngC: centre x, z and the outward normal) and its version
+// (ngL: 0 both, 1 near, 2 far): the vertex shader drops the triangles of the other one, so the switch costs no draw call and no work on the CPU.
+// The sun's pass uses the same rule (uNgCam is the player's camera there too). The wall itself is not cut (world3.js draws it whole): an invisible
+// plug on the opening, drawn after the inside of the opening and before the walls (renderOrder 8, 9, walls 10), keeps the wall from covering it.
+// The inside of the opening takes the sun's shadow 35 cm out of the wall (push), where the facade has it: otherwise the wall would shade it always
+const NG_U = { cam: { value: new THREE.Vector3(0, -1e5, 0) }, R2: { value: 75 * 75 }, lamps: { value: 0 } };
+function ngLodVS(s, push) {
+  s.uniforms.uNgCam = NG_U.cam; s.uniforms.uNgR2 = NG_U.R2;
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 ngC;\nattribute float ngL;\nuniform vec3 uNgCam;\nuniform float uNgR2;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\n  { vec2 ngD = ngC.xy - uNgCam.xz; bool ngNear = dot(ngD, ngD) < uNgR2; if ((ngL > 0.5 && ngL < 1.5 && !ngNear) || (ngL > 1.5 && ngNear)) gl_Position = vec4(0.0, 0.0, -2.0, 1.0); }');
+  if (push) s.vertexShader = s.vertexShader.replace('#include <shadowmap_vertex>', '#ifdef USE_SHADOWMAP\n  worldPosition.xyz += vec3(ngC.z, 0.0, ngC.w) * ' + push.toFixed(2) + ';\n#endif\n#include <shadowmap_vertex>');
+}
+/* a material of the fronts: the rule of near and far, then its own changes (extra); key: its own program */
+function ngLodMat(m, key, push = 0, extra = null) {
+  const b0 = m.onBeforeCompile; m.onBeforeCompile = (s, r) => { if (b0) b0.call(m, s, r); ngLodVS(s, push); if (extra) extra(s); };
+  m.customProgramCacheKey = () => 'ng-' + key; m.needsUpdate = true; return m;
+}
+/* the shadow of the fronts (what is in the sun's map follows the same rule), and of the signs (the letters cut out of their board) */
+const NG_DEPTH = ngLodMat(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), 'depth');
+const ngDepthMap = tex => ngLodMat(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.5 }), 'depthmap');
+// ---- what shows through the glass: a room behind it (interior mapping). One atlas for all: the back wall of each class and theme (the 128 px
+// pictures below, as before), and one layer per kind of shop that stands in the room, 1.4 m in (a counter, a desk, mannequins): the eye sees
+// the counter move against the shelves as it walks. Floor, ceiling with its lights and side walls in the colours of the picture's room.
+// Columns of 16 cells of 128 px; class c, theme th at c * 6 + th, the layers from 114
+// The room: vUv is where the eye meets the glass across the opening (0..1), vNgV the way it looks in the frame of the wall (x along, y up, z in),
+// ngR (width, height, cell, layer), ngW (side walls, depth), ngF (floor). The ray goes on to the first wall of the box; the back wall repeats the
+// picture every 2.4 m or so; the layer is a plane at 38% of the depth
+const NG_ROOM_GLSL = `
+vec4 ngAt(vec2 cell, vec2 q, vec2 gx, vec2 gy) {
+  vec2 uv = vec2((cell.x + 0.03 + q.x * 0.94) / 16.0, 1.0 - (cell.y + 0.97 - q.y * 0.94) / 8.0);
+#if __VERSION__ >= 300
+  return mapTexelToLinear(textureGrad(map, uv, gx, gy));
+#else
+  return mapTexelToLinear(texture2D(map, uv));
+#endif
+}
+vec3 ngRoom() {
+  vec3 d = vNgV; d.z = max(d.z, 1e-3);
+  float Wm = max(vNgR.x, 0.3), Hm = max(vNgR.y, 0.3), Dm = vNgW.w;
+  vec3 dn = d / vec3(Wm, Hm, Dm);
+  vec2 p0 = clamp(vUv, 0.0, 1.0);
+  float tx = dn.x > 1e-6 ? (1.0 - p0.x) / dn.x : (dn.x < -1e-6 ? -p0.x / dn.x : 1e9);
+  float ty = dn.y > 1e-6 ? (1.0 - p0.y) / dn.y : (dn.y < -1e-6 ? -p0.y / dn.y : 1e9);
+  float tz = 1.0 / dn.z;
+  float t = min(min(tx, ty), tz);
+  vec3 h = vec3(p0, 0.0) + dn * t;
+  vec3 hm = h * vec3(Wm, Hm, Dm);
+  float nrep = max(1.0, floor(Wm / 2.4 + 0.5));
+  vec2 cell = vec2(mod(vNgR.z, 16.0), floor(vNgR.z / 16.0 + 0.001));
+  vec2 gs = vec2(nrep * 0.94 / 16.0, 0.94 / 8.0) * 0.6;
+  vec2 gx = dFdx(vUv) * gs, gy = dFdy(vUv) * gs;
+  vec3 col;
+  if (t == tz) col = ngAt(cell, vec2(fract(h.x * nrep), h.y), gx, gy).rgb;
+  else if (t == ty && dn.y < 0.0) { vec2 f = fract(hm.xz / 0.6); col = vNgF * mix(0.78, 1.0, step(0.05, f.x) * step(0.05, f.y)); }
+  else if (t == ty) { vec2 f = fract(vec2(hm.x / 1.6, hm.z / 1.3)) - 0.5; float l = 1.0 - smoothstep(0.1, 0.16, length(f * vec2(1.6, 1.3))); col = mix(vec3(0.78, 0.77, 0.74), vec3(2.6, 2.4, 2.0), l * (0.25 + 0.75 * vNgOn)); }
+  else col = vNgW.rgb * (0.72 + 0.2 * h.y);
+  if (vNgR.w > -0.5) {
+    float tm = 0.38 / dn.z;
+    if (tm < t) {
+      vec2 pm = p0 + dn.xy * tm;
+      if (pm.x > 0.0 && pm.x < 1.0 && pm.y > 0.0 && pm.y < 1.0) { float mi = 114.0 + vNgR.w; vec4 m = ngAt(vec2(mod(mi, 16.0), floor(mi / 16.0 + 0.001)), vec2(fract(pm.x * nrep + 0.37), pm.y), gx, gy); if (m.a > 0.5) col = m.rgb; }
+    }
+  }
+  return col * mix(1.0, 0.68, h.z);
+}`;
+const NG_MID = { bar: 0, gelateria: 0, pizzeria: 0, ristorante: 1, farmacia: 2, banca: 3, alimentari: 4, supermercato: 4, tabacchi: 4, moda: 5, ufficio: 6, medico: 6, bottega: 7, bellezza: 7 };
 const NG_WIN = (() => {
   const shade = (hex, k) => '#' + new THREE.Color(hex).multiplyScalar(k).getHexString();
   const F = (g, c, x, y, w, h) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
   const O = (g, c, x, y, r) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); };
-  const room = (g, wall, floor, lit = 1) => {
+  let lastRoom = null; // the colours of the room the picture drew: the floor and the side walls take them
+  const room = (g, wall, floor, lit = 1) => { lastRoom = [wall, floor];
     F(g, wall, 0, 0, 128, 96); F(g, floor, 0, 96, 128, 32);
     const gr = g.createLinearGradient(0, 0, 0, 96); gr.addColorStop(0, `rgba(255,250,235,${0.25 * lit})`); gr.addColorStop(1, 'rgba(0,0,0,0.12)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 96);
     for (const x of [24, 64, 104]) F(g, `rgba(255,250,230,${0.8 * lit})`, x - 8, 2, 16, 3);
@@ -376,23 +444,68 @@ const NG_WIN = (() => {
       if (th !== 5) poster(g, 24, 38, 80, 36, '#f2c230', '#c8102e', th === 2 ? 'VENDESI' : th === 3 ? 'CEDESI' : 'AFFITTASI', 13);
     },
   };
-  const tex = {}, mat = {};
-  for (const cls of NG_CLASSES) {
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 384; const g = cv.getContext('2d');
+  // what stands in the room, 1.4 m in, on a clear ground: the floor of the room is the bottom of the cell
+  const MID = [
+    g => { /* bar: the counter, the coffee machine, the taps, stools */ F(g, '#5a3a22', 0, 80, 128, 48); F(g, '#3a2414', 0, 80, 128, 3); F(g, '#e8e4dc', 0, 76, 128, 5); for (let x = 8; x < 128; x += 16) F(g, '#4a2e1a', x, 88, 2, 38);
+      F(g, '#c9ccd1', 14, 54, 30, 22); F(g, '#8f949a', 18, 58, 22, 8); F(g, '#1d1d1f', 22, 68, 3, 8); F(g, '#1d1d1f', 33, 68, 3, 8); for (const x of [66, 76, 86]) { F(g, '#c9a85a', x, 60, 3, 16); O(g, '#f2efe6', x + 1.5, 59, 2.5); }
+      for (const x of [12, 46, 82, 114]) { O(g, '#2b2b2b', x, 102, 7); F(g, '#55575b', x - 1, 102, 3, 24); F(g, '#55575b', x - 6, 124, 13, 3); } },
+    g => { /* restaurant: laid tables and chairs */ for (const x of [8, 72]) { F(g, '#ffffff', x, 92, 48, 6); F(g, '#e8e4dc', x + 2, 98, 44, 10); F(g, '#3a2e26', x + 4, 98, 3, 30); F(g, '#3a2e26', x + 41, 98, 3, 30); O(g, '#f2efe6', x + 16, 90, 3); O(g, '#f2efe6', x + 32, 90, 3); F(g, '#7a1f1a', x + 23, 82, 2, 8);
+      for (const cx of [x - 4, x + 46]) { F(g, '#4a3a2e', cx, 78, 4, 50); F(g, '#4a3a2e', cx - 2, 104, 10, 3); } } },
+    g => { /* pharmacy: the counter with its green front and a display stand */ F(g, '#f2efe6', 6, 84, 116, 44); F(g, '#1d8f4e', 6, 92, 116, 30); F(g, '#d9d6cf', 4, 80, 120, 5); F(g, '#1d1d1f', 30, 66, 18, 14); F(g, '#5ab4e6', 32, 68, 14, 9);
+      F(g, '#ffffff', 84, 60, 26, 20); F(g, '#1d8f4e', 95, 63, 4, 14); F(g, '#1d8f4e', 90, 68, 14, 4); },
+    g => { /* bank: the tellers behind glass */ F(g, '#d9d0bc', 0, 86, 128, 42); F(g, '#8a6a4a', 0, 82, 128, 5); F(g, 'rgba(190,215,225,0.85)', 0, 40, 128, 42); for (let x = 0; x <= 128; x += 32) F(g, '#8f949a', x - 1, 40, 3, 46);
+      for (const x of [14, 46, 78, 110]) { F(g, '#1d1d1f', x - 6, 66, 14, 12); F(g, '#5ab4e6', x - 5, 67, 12, 9); } },
+    g => { /* food: the chilled counter */ F(g, '#e8e6e0', 0, 92, 128, 36); F(g, '#c9ccd1', 0, 88, 128, 5); F(g, 'rgba(210,235,245,0.9)', 0, 66, 128, 22); F(g, '#8f949a', 0, 64, 128, 3);
+      for (let i = 0; i < 9; i++) F(g, ['#b8323a', '#e8c070', '#f2d8c8', '#9ac46a', '#d06a6a', '#f6efd8'][i % 6], 4 + i * 14, 76, 11, 10); },
+    g => { /* clothes: mannequins and a rail */ const manq = (x, c, c2) => { O(g, '#e9dccb', x, 38, 6); F(g, c, x - 10, 45, 20, 30); F(g, c2, x - 9, 75, 8, 34); F(g, c2, x + 1, 75, 8, 34); F(g, '#555', x - 1, 109, 2, 14); F(g, '#555', x - 9, 123, 18, 3); };
+      manq(22, '#1a1a1a', '#3a3d55'); manq(104, '#c8331f', '#2b2b2b'); F(g, '#8f949a', 40, 50, 46, 3); F(g, '#8f949a', 41, 50, 2, 76); F(g, '#8f949a', 83, 50, 2, 76);
+      for (let i = 0; i < 9; i++) F(g, ['#2a4d7a', '#e8d9a8', '#6b3a2a', '#1a1a1a', '#c8331f'][i % 5], 43 + i * 4.6, 53, 4, 30 + (i % 3) * 6); },
+    g => { /* office: desks with screens, chairs */ for (const x of [6, 70]) { F(g, '#d9d6cf', x, 86, 52, 5); F(g, '#8f949a', x + 3, 91, 3, 37); F(g, '#8f949a', x + 46, 91, 3, 37); F(g, '#1d1d1f', x + 14, 66, 24, 18); F(g, '#5ab4e6', x + 16, 68, 20, 13); F(g, '#1d1d1f', x + 24, 84, 4, 3);
+      F(g, '#2a2d33', x + 18, 92, 16, 14); F(g, '#2a2d33', x + 20, 76, 12, 18); F(g, '#55575b', x + 25, 106, 2, 18); } },
+    g => { /* a shop: a low table with goods, a stand */ F(g, '#8a6a4a', 20, 96, 88, 5); F(g, '#6b4f3a', 24, 101, 4, 27); F(g, '#6b4f3a', 100, 101, 4, 27); for (let i = 0; i < 8; i++) F(g, ['#c8331f', '#f2c230', '#1d4f9a', '#2a7a3a', '#f2efe6'][i % 5], 24 + i * 10, 86 + (i % 2) * 3, 8, 10 - (i % 2) * 3);
+      F(g, '#c9ccd1', 110, 50, 3, 78); for (let r = 0; r < 4; r++) { F(g, '#c9ccd1', 104, 56 + r * 18, 16, 2); F(g, ['#e5007e', '#1d6fb8', '#f2c230', '#2a9a4a'][r], 106, 48 + r * 18, 12, 8); } },
+  ];
+  // one atlas: 16 x 8 cells of 128 px. The back walls, as they were, without the glass drawn over (the glass now mirrors for real)
+  const cv = document.createElement('canvas'); cv.width = 2048; cv.height = 1024; const g = cv.getContext('2d'), col = [];
+  NG_CLASSES.forEach((cls, c) => {
     for (let th = 0; th < 6; th++) {
-      let s = 1 + th * 7919 + cls.length * 104729; const R = () => (s = (s * 16807) % 2147483647) / 2147483647;
-      g.save(); g.translate((th % 2) * 128, Math.floor(th / 2) * 128); g.beginPath(); g.rect(0, 0, 128, 128); g.clip(); D[cls](g, th, R); glassOver(g); g.restore();
+      const i = c * 6 + th; let s = 1 + th * 7919 + cls.length * 104729; const R = () => (s = (s * 16807) % 2147483647) / 2147483647; lastRoom = null;
+      g.save(); g.translate((i % 16) * 128, Math.floor(i / 16) * 128); g.beginPath(); g.rect(0, 0, 128, 128); g.clip(); D[cls](g, th, R); g.restore();
+      const rc = lastRoom || ['#dcd8d0', '#9a958b']; col[i] = [new THREE.Color(rc[0]), new THREE.Color(rc[1])];
     }
-    const t = tex[cls] = new THREE.CanvasTexture(cv); t.anisotropy = 4;
-    const m = mat[cls] = new THREE.MeshLambertMaterial({ map: t, emissiveMap: t, emissive: 0xfff0d0, emissiveIntensity: 0.06, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
-    LM_GLOW.push({ m, a: 0.06, b: cls === 'sfitto' ? 0.05 : 0.75 });
-  }
-  return { mat, cell: th => [(th % 2) / 2 + 0.004, 1 - (Math.floor(th / 2) + 1) / 3 + 0.003, (th % 2 + 1) / 2 - 0.004, 1 - Math.floor(th / 2) / 3 - 0.003] };
+  });
+  MID.forEach((f, k) => { const i = 114 + k; g.save(); g.translate((i % 16) * 128, Math.floor(i / 16) * 128); g.beginPath(); g.rect(0, 0, 128, 128); g.clip(); f(g); g.restore(); });
+  const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4; tex.minFilter = THREE.LinearMipmapLinearFilter;
+  const mat = ngLodMat(new THREE.MeshLambertMaterial({ map: tex, color: 0x0e1215 }), 'glass', 0.35, s => {
+    s.uniforms.uNgLamps = NG_U.lamps;
+    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 ngR;\nattribute vec4 ngW;\nattribute vec3 ngF;\nattribute float ngOn;\nvarying vec3 vNgV;\nvarying vec4 vNgR;\nvarying vec4 vNgW;\nvarying vec3 vNgF;\nvarying float vNgOn;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\n  { vec4 ngWp = modelMatrix * vec4(transformed, 1.0); vec3 ngN = normalize(vec3(ngC.z, 0.0, ngC.w) + vec3(1e-6, 0.0, 0.0)), ngT = vec3(ngN.z, 0.0, -ngN.x), ngVv = ngWp.xyz - cameraPosition;\n    vNgV = vec3(dot(ngVv, ngT), ngVv.y, -dot(ngVv, ngN)); vNgR = ngR; vNgW = ngW; vNgF = ngF; vNgOn = ngOn; }');
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNgLamps;\nvarying vec3 vNgV;\nvarying vec4 vNgR;\nvarying vec4 vNgW;\nvarying vec3 vNgF;\nvarying float vNgOn;')
+      .replace('void main() {', NG_ROOM_GLSL + '\nvoid main() {')
+      .replace('#include <map_fragment>', 'vec3 ngIn = ngRoom();\n  float ngCos = clamp(normalize(vNgV).z, 0.0, 1.0);\n  float ngLev = mix(mix(0.16, 0.55, vNgOn), mix(0.01, 1.0, vNgOn), uNgLamps) * (0.3 + 0.7 * ngCos);')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += ngIn * ngLev;');
+  });
+  return { tex, mat: { all: mat }, col, ci: (cls, th) => NG_CLASSES.indexOf(cls) * 6 + th };
 })();
 // lit bits: the pharmacy's green cross, wall lamps, the cash machine's screen
-const NG_NEON = { green: new THREE.MeshLambertMaterial({ color: 0x1d8f4e, emissive: 0x2bff7a, emissiveIntensity: 0.5 }), warm: new THREE.MeshLambertMaterial({ color: 0xf4e6c8, emissive: 0xffd28a, emissiveIntensity: 0.05 }),
-  screen: new THREE.MeshLambertMaterial({ color: 0x1b2a33, emissive: 0x6fb6ff, emissiveIntensity: 0.35 }) };
+const NG_NEON = { green: ngLodMat(new THREE.MeshLambertMaterial({ color: 0x1d8f4e, emissive: 0x2bff7a, emissiveIntensity: 0.5 }), 'n-green'), warm: ngLodMat(new THREE.MeshLambertMaterial({ color: 0xf4e6c8, emissive: 0xffd28a, emissiveIntensity: 0.05 }), 'n-warm'),
+  screen: ngLodMat(new THREE.MeshLambertMaterial({ color: 0x1b2a33, emissive: 0x6fb6ff, emissiveIntensity: 0.35 }), 'n-screen') };
 LM_GLOW.push({ m: NG_NEON.green, a: 0.45, b: 0.8 }, { m: NG_NEON.warm, a: 0.05, b: 0.95 }, { m: NG_NEON.screen, a: 0.35, b: 0.3 });
+// the frames, sills, doors, signs' bodies, awnings (vertex colours); the plug that keeps the wall off the opening; the shutters; the light on the pavement at night
+const NG_SOLID = ngLodMat(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), 'solid', 0.35);
+const NG_PLUG = ngLodMat(new THREE.MeshBasicMaterial({ colorWrite: false }), 'plug');
+const NG_POOL = ngLodMat(new THREE.MeshBasicMaterial({ color: 0xffc98a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+  map: canvasTex(64, 64, (g, w, h) => { const gr = g.createRadialGradient(w / 2, 0, 2, w / 2, 0, h); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, false) }), 'pool', 0, s => {
+  s.uniforms.uNgLamps = NG_U.lamps;
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float ngOn;\nvarying float vNgOn;').replace('#include <project_vertex>', '#include <project_vertex>\n  vNgOn = ngOn;');
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNgLamps;\nvarying float vNgOn;').replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb *= vNgOn * uNgLamps * 0.55;');
+});
+/* the signs of a tile: their own texture; dim (the back layers of the letters standing off the wall) and how much each part glows at night, when the shop is open */
+const ngSignMat = mat => ngLodMat(mat, 'sign', 0, s => {
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 ngS;\nattribute float ngOn;\nvarying vec2 vNgS;\nvarying float vNgOn;').replace('#include <project_vertex>', '#include <project_vertex>\n  vNgS = ngS; vNgOn = ngOn;');
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vNgS;\nvarying float vNgOn;').replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb *= vNgS.x;')
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= vNgS.x * vNgS.y * mix(0.08, 1.0, vNgOn);');
+});
 
 // ---- things on the pavement: one geometry per kind (and colour), modelled facing +z (the street), foot at the origin
 const NG_PSPEC = { vas: { r: 0.3, h: 1 }, lav: { r: 0.3, h: 1 }, cas: { r: 0.65, h: 1, w: 1.3 }, sec: { r: 0.5, h: 0.9, w: 1.1 }, gio: { r: 0.4, h: 1.4, w: 0.9 }, pne: { r: 0.4, h: 0.9 }, bid: { r: 0.32, h: 0.9 },
@@ -669,7 +782,6 @@ const NG_DAYK = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 // these trades have no shutters: when shut, about half of them (never the banks) leave the window lit to show the goods, the others switch it off.
 // Everyone else pulls the shutter down
 const NG_NOSHUT = new Set(['moda', 'mobili', 'auto', 'supermercato', 'banca']), NG_LIT = new Set(['moda', 'mobili', 'auto', 'supermercato']);
-const NG_DARK_MAT = new THREE.MeshBasicMaterial({ color: 0x0b0d10, transparent: true, opacity: 0.78, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
 function ngHours(str) {
   const s = (str || '').trim(); if (!s) return null; if (/^24\/7/.test(s)) return { all: true };
   const D_ = '(?:Mo|Tu|We|Th|Fr|Sa|Su)', week = [[], [], [], [], [], [], []]; let any = false;
@@ -693,30 +805,57 @@ function ngIsOpen(s, day, min) {
 // the game's clock: the hour is TOD (extras.js), the day starts from today's and moves on at midnight
 const NG_CLOCK = { day: (new Date().getDay() + 6) % 7, last: -1 };
 const ngTOD = () => { try { return TOD; } catch (e) { return 12; } };
-const NG_SHUT_MAT = new THREE.MeshLambertMaterial({ map: canvasTex(32, 64, (g, w, h) => { g.fillStyle = '#b4b8bd'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 6) { g.fillStyle = 'rgba(40,44,48,.45)'; g.fillRect(0, y, w, 1); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, y + 1, w, 1); } }), side: THREE.DoubleSide,
-  polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }); // stronger than the glass (-1) and the signs (-2) it covers: from far off they would win
-function ngShutters(T) { // each shutter (or dark veil) is down or rolled up to nothing: its two bottom corners go up to the top
-  const min = ngTOD() * 60;
-  for (const S of T.ngShut || []) {
-    if (!S.mesh.parent) continue; const pos = S.mesh.geometry.attributes.position; let ch = false;
-    for (const it of S.items) { const shut = !ngIsOpen(it.s, NG_CLOCK.day, min), down = it.dark ? shut && !it.s.litNight : shut; if (down === it.down) continue; it.down = down; for (const k of [0, 1]) pos.setY(it.i0 + k, down ? it.y0 : it.y1); ch = true; }
-    if (ch) pos.needsUpdate = true;
+// the shutters: steel slats, about 9 cm each, lit from above (one repeat a metre: u and v in metres)
+const NG_SHUT_MAT = ngLodMat(new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, map: canvasTex(64, 128, (g, w, h) => {
+  for (let y = 0; y < h; y += 12) { const gr = g.createLinearGradient(0, y, 0, y + 12); gr.addColorStop(0, '#d2d6da'); gr.addColorStop(0.35, '#b9bdc2'); gr.addColorStop(0.8, '#9ea2a7'); gr.addColorStop(1, '#6e7276'); g.fillStyle = gr; g.fillRect(0, y, w, 12); g.fillStyle = 'rgba(30,32,36,.55)'; g.fillRect(0, y + 11, w, 1); }
+  for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(80,70,60,${0.03 + (i % 5) * 0.012})`; g.fillRect((i * 37) % w, (i * 53) % h, 3 + (i % 4), 1); } }) }), 'shut', 0.35);
+// The shutters and the lights, per tile (T.ngShut: the meshes and the fronts). A front: { s, sh: its shutters, u: 0 rolled up .. 1 down, on: lit or not,
+// rng: the vertices its light reaches in glass, signs and pool }. Each second a front looks at its hours; a shutter that has to move rolls in 7 s when
+// the player is within 70 m (Carlo: "le serrande si animano quando si chiudono e si aprono"), otherwise it is just where it has to be.
+// The light goes off when the shutter is down and on as it starts to go up. Shops without shutters (NG_NOSHUT) only switch the light
+const NG_ANIM = new Set();
+function ngShutSet(D, f, u) {
+  f.u = u; if (!D.shut) return; const pos = D.shut.geometry.attributes.position, uv = D.shut.geometry.attributes.uv;
+  for (const it of f.sh) { const yb = it.yUp + (it.yDown - it.yUp) * u; for (const i of it.bot) pos.setY(i, yb); for (const i of it.top) uv.setY(i, it.yTop - yb); for (const [i, dy] of it.bar) pos.setY(i, yb + dy); }
+  pos.needsUpdate = true; uv.needsUpdate = true;
+}
+function ngOnSet(D, f, on) {
+  f.on = on;
+  for (const [k, a, b] of f.rng) { const m = D[k], at = m && m.geometry.attributes.ngOn; if (!at || b <= a) continue; at.array.fill(on, a, b); at.needsUpdate = true; }
+}
+function ngLightOf(f, open) { return f.s.cls === 'sfitto' ? 0 : open || (f.s.noShut && f.s.litNight) ? 1 : 0; }
+function ngTickTile(T, first) {
+  const D = T.ngShut; if (!D) return; const min = ngTOD() * 60, cx = camera.position.x, cz = camera.position.z;
+  for (const f of D.fronts) {
+    const open = ngIsOpen(f.s, NG_CLOCK.day, min), want = f.sh.length && f.s.oh && !f.fixed ? (open ? 0 : 1) : f.fixed ? 1 : 0;
+    if (first) { f.want = want; ngShutSet(D, f, want); ngOnSet(D, f, want === 1 && f.sh.length ? 0 : ngLightOf(f, open)); continue; }
+    if (f.want !== want) {
+      f.want = want;
+      if (hyp(f.s.cx - cx, f.s.cz - cz) < 70) { f.anim = { D, to: want }; NG_ANIM.add(f); if (want === 0) ngOnSet(D, f, ngLightOf(f, open)); }
+      else { if (f.anim) { NG_ANIM.delete(f); f.anim = null; } ngShutSet(D, f, want); }
+    }
+    if (!f.anim) { const on = want === 1 && f.sh.length ? 0 : ngLightOf(f, open); if (on !== f.on) ngOnSet(D, f, on); }
   }
 }
 let ngTick = 0;
 function updNegozi(dt) {
+  NG_U.cam.value.copy(camera.position); NG_U.lamps.value = LIGHTS.on || 0;
+  for (const f of NG_ANIM) {
+    const a = f.anim; if (!a || a.D.T.ngShut !== a.D) { NG_ANIM.delete(f); if (f.anim) f.anim = null; continue; }
+    const st = Math.sign(a.to - f.u) * dt / 7; let u = f.u + st, done = false; if (st >= 0 ? u >= a.to : u <= a.to) { u = a.to; done = true; }
+    ngShutSet(a.D, f, u); if (done) { NG_ANIM.delete(f); f.anim = null; if (a.to === 1) ngOnSet(a.D, f, 0); }
+  }
   ngTick -= dt; if (ngTick > 0) return; ngTick = 1;
   const h = ngTOD(); if (NG_CLOCK.last >= 0 && h < NG_CLOCK.last - 12) NG_CLOCK.day = (NG_CLOCK.day + 1) % 7; NG_CLOCK.last = h;
-  for (const T of VIVI) if (T.ngShut && T.group) ngShutters(T);
+  for (const T of VIVI) if (T.ngShut && T.group) ngTickTile(T, false);
 }
-
 // ---- modelling in a wall's own frame: x along the wall, y up from the pavement, z out of the wall
 function ngKit(C, cx, gy, cz, nx, nz) {
   const F = lmFrame(new THREE.Matrix4().makeRotationY(Math.atan2(nx, nz)).setPosition(cx, gy, cz));
   const lx = (x, z) => [cx + nz * x + nx * z, cz - nx * x + nz * z]; // local (x, z) -> world
   /* on a curved wall the front is cut in pieces of C.chunk metres, so that the bend (ngBend) can follow the wall */
   const nCh = w => Math.min(60, Math.max(1, Math.ceil(w / (C.chunk || 1e9))));
-  const box = (w, h, d, x, y, z, col) => { const n = nCh(w); for (let j = 0; j < n; j++) F.geo(C.solid, lmBox(w / n, h, d, x - w / 2 + (j + 0.5) * w / n, y, z), null, COL(col)); };
+  const box = (w, h, d, x, y, z, col, b = C.solid) => { const n = nCh(w); for (let j = 0; j < n; j++) F.geo(b, lmBox(w / n, h, d, x - w / 2 + (j + 0.5) * w / n, y, z), null, col === null ? null : COL(col)); };
   const faceX = (b, P, S, col) => { const n = nCh(Math.abs(P[1][0] - P[0][0])); for (let j = 0; j < n; j++) { const xa = P[0][0] + (P[1][0] - P[0][0]) * j / n, xb = P[0][0] + (P[1][0] - P[0][0]) * (j + 1) / n; F.face(b, [[xa, P[0][1], P[0][2]], [xb, P[1][1], P[1][2]], [xb, P[2][1], P[2][2]], [xa, P[3][1], P[3][2]]], S, col); } };
   let qzn = 1; /* how many quads the last qz made */
   const neon = (k, w, h, d, x, y, z) => F.geo(C.neon[k] || (C.neon[k] = Buf()), lmBox(w, h, d, x, y, z), null, null);
@@ -725,13 +864,37 @@ function ngKit(C, cx, gy, cz, nx, nz) {
   const qz = (b, x0, y0, x1, y1, z) => { const n = nCh(x1 - x0); let first = -1;
     for (let j = 0; j < n; j++) { const a0 = j / n, a1 = (j + 1) / n, xa = x0 + (x1 - x0) * a0, xb = x0 + (x1 - x0) * a1, i0 = quad(b, [[xa, y0, z], [xb, y0, z], [xb, y1, z], [xa, y1, z]], [0, 0, 1], [[a0, 0], [a1, 0], [a1, 1], [a0, 1]]); if (!j) first = i0; }
     qzn = n; return first; };
-  const winUV = (b, i0, wc) => { for (let k = 0; k < 4 * qzn; k++) { const q = (i0 + k) * 2, u = b.uv[q], v = b.uv[q + 1]; b.uv[q] = wc[0] + (wc[2] - wc[0]) * u; b.uv[q + 1] = wc[1] + (wc[3] - wc[1]) * v; } };
   const qx = (b, z0, y0, z1, y1, x, sgn) => sgn > 0 ? quad(b, [[x, y0, z1], [x, y0, z0], [x, y1, z0], [x, y1, z1]], [1, 0, 0]) : quad(b, [[x, y0, z0], [x, y0, z1], [x, y1, z1], [x, y1, z0]], [-1, 0, 0]);
   const cell = (wm, hm, draw) => { const pw = Math.min(1000, Math.max(48, Math.round(wm * 180))), ph = Math.min(512, Math.max(16, Math.round(hm * pw / wm))); const c = { pw, ph, draw }; C.cells.push(c); return c; };
   const sign = (c, i0) => { const n = qzn; for (let j = 0; j < n; j++) C.sq.push([i0 + 4 * j, c]); };
-  // a pane of shop window showing theme th of its class
-  const pane = (cls, th, x0, y0, x1, y1, z) => { const b = C.glass[cls] || (C.glass[cls] = Buf()), wc = NG_WIN.cell(th), i0 = qz(b, x0, y0, x1, y1, z); winUV(b, i0, wc); };
-  return { F, lx, box, neon, quad, qz, qx, cell, sign, pane, winUV, faceX, nq: () => qzn };
+  /* a quad with a colour at each corner (the shade deep in the opening), turned to face n; cut along x on a curved wall */
+  const quadC = (b, P, n, cols) => {
+    const k = Math.abs(P[1][0] - P[0][0]) > 0.01 ? nCh(Math.abs(P[1][0] - P[0][0])) : 1, L = (p, q, t) => p.map((v, i) => v + (q[i] - v) * t), LC = (p, q, t) => new THREE.Color().copy(p).lerp(q, t);
+    for (let j = 0; j < k; j++) {
+      const t0 = j / k, t1 = (j + 1) / k, Q = [L(P[0], P[1], t0), L(P[0], P[1], t1), L(P[3], P[2], t1), L(P[3], P[2], t0)], Cc = [LC(cols[0], cols[1], t0), LC(cols[0], cols[1], t1), LC(cols[3], cols[2], t1), LC(cols[3], cols[2], t0)];
+      const i0 = b.p.length / 3; Q.forEach((p, i) => F.v(b, p[0], p[1], p[2], n[0], n[1], n[2], 0, 0, Cc[i]));
+      const e1 = [Q[1][0] - Q[0][0], Q[1][1] - Q[0][1], Q[1][2] - Q[0][2]], e2 = [Q[2][0] - Q[0][0], Q[2][1] - Q[0][1], Q[2][2] - Q[0][2]], cr = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+      if (cr[0] * n[0] + cr[1] * n[1] + cr[2] * n[2] >= 0) b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); else b.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2);
+    }
+  };
+  /* a pane: the room R behind it (xa..xb, ya..yb in the frame of the wall, its picture and layer, colours, depth) seen through the quad */
+  const glass = (R, xa, ya, xb, yb, z) => {
+    if (xb - xa < 0.02 || yb - ya < 0.02) return; const b = C.glassB, i0 = qz(b, xa, ya, xb, yb, z), n = 4 * qzn, rw = R.xb - R.xa, rh = R.yb - R.ya;
+    for (let k = 0; k < n; k++) { const q = (i0 + k) * 2, xl = xa + (xb - xa) * b.uv[q], yl = ya + (yb - ya) * b.uv[q + 1]; b.uv[q] = (xl - R.xa) / rw; b.uv[q + 1] = (yl - R.ya) / rh; b.R.push(rw, rh, R.cell, R.mid); b.W.push(R.wc.r, R.wc.g, R.wc.b, R.dp); b.Fc.push(R.fc.r, R.fc.g, R.fc.b); }
+  };
+  const mode = m => { ngFill(C); C.mode = m; }, sk = (d, k) => { ngFill(C); C.sk = [d, k]; };
+  return { F, lx, box, neon, quad, qz, qx, cell, sign, faceX, quadC, glass, mode, sk, nq: () => qzn };
+}
+// the attributes of near and far (ngL, ngC), of the light (ngOn) and of the signs (ngS) for the vertices made since the last call: as things were when they were made
+function ngFill(C) {
+  for (const b of ngBufs(C)) { const n = b.p.length / 3, L = b.L || (b.L = []), cc = b.cc || (b.cc = []), on = b.on || (b.on = []); while (L.length < n) { L.push(C.mode); cc.push(C.fc[0], C.fc[1], C.fc[2], C.fc[3]); on.push(1); } }
+  const S = C.sign.S || (C.sign.S = []), n2 = C.sign.p.length / 3 * 2; while (S.length < n2) S.push(C.sk[0], C.sk[1]);
+}
+// the opening hours of OSM as the sticker on the door has them (only the real ones: the copied ones are not written anywhere)
+const NG_DAYIT = { Mo: 'LUN', Tu: 'MAR', We: 'MER', Th: 'GIO', Fr: 'VEN', Sa: 'SAB', Su: 'DOM', PH: 'FESTIVI' };
+function ngOhText(str) {
+  const s = (str || '').trim(); if (/^24\/7/.test(s)) return ['SEMPRE APERTO'];
+  return s.split(';').map(r => r.trim().replace(/\b(Mo|Tu|We|Th|Fr|Sa|Su|PH)\b/g, d => NG_DAYIT[d]).replace(/\b(off|closed)\b/gi, 'CHIUSO').replace(/\b0(\d):/g, '$1:').replace(/\s*,\s*/g, '  ')).filter(Boolean).slice(0, 6);
 }
 // ---- one front
 function ngText(g, txt, cx, cy, maxW, maxH, font, col) {
@@ -753,24 +916,30 @@ function ngProfile(s) {
   return out;
 }
 const ngOffAt = (prof, w, x) => { const n = prof.length - 1, f = Math.max(0, Math.min(n, (x + w / 2) / w * n)), i = Math.min(n - 1, Math.floor(f)); return prof[i] + (prof[i + 1] - prof[i]) * (f - i); };
-function ngBufs(C) { return [C.solid, C.sign, C.shut, C.dark, ...Object.values(C.glass), ...Object.values(C.neon)]; }
+function ngBufs(C) { return [C.solid, C.sign, C.shut, C.plug, C.glassB, C.pool, ...Object.values(C.neon)]; }
 function ngFront(s, C) {
+  ngFill(C); C.fc = [s.cx, s.cz, s.nx, s.nz]; C.mode = 0; C.sk = [1, 0.6];
   const prof = ngProfile(s), n = prof.length - 1, a0 = prof[0], da = prof[n] - a0; let dev = 0, big = 0;
   for (let i = 0; i <= n; i++) { dev = Math.max(dev, Math.abs(prof[i] - a0 - da * i / n)); big = Math.max(big, Math.abs(prof[i])); }
   const bend = big > 0.012; C.chunk = dev > 0.02 ? 0.8 : 0; C.nBend = (C.nBend || 0) + (dev > 0.02 ? 1 : 0);
   const from = new Map(ngBufs(C).map(b => [b, b.p.length / 3]));
+  const f = { s, sh: [], u: 0, on: 1, rng: null, fixed: false }; C.cur = f;
   const c0 = C.cells.length; ngFront0(s, C); for (let i = c0; i < C.cells.length; i++) C.cells[i].nm = !!s.name;
+  ngFill(C); C.mode = 0;
+  f.rng = [['glass', from.get(C.glassB), C.glassB.p.length / 3], ['sign', from.get(C.sign), C.sign.p.length / 3], ['pool', from.get(C.pool), C.pool.p.length / 3]];
+  C.fronts.push(f);
   if (!bend) return;
   for (const b of ngBufs(C)) for (let v = from.get(b) || 0, N = b.p.length / 3; v < N; v++) {
     const X = b.p[v * 3], Z = b.p[v * 3 + 2], xl = (X - s.cx) * s.nz - (Z - s.cz) * s.nx, d = ngOffAt(prof, s.w, xl) + 0.01;
     b.p[v * 3] = X + s.nx * d; b.p[v * 3 + 2] = Z + s.nz * d;
   }
 }
+const ngShade = (hex, k) => new THREE.Color(hex).multiplyScalar(k);
 function ngFront0(s, C) {
   const m = s.m, cls = s.cls, W = s.w, hw = W / 2, gy = H.ground(s.cx + s.nx * 0.6, s.cz + s.nz * 0.6), top = s.b.gtop - gy;
   if (top < 2.7) return;
   const gl = Math.min(H.ground(s.cx - s.ux * hw, s.cz - s.uz * hw), H.ground(s.cx + s.ux * hw, s.cz + s.uz * hw)) - gy - 0.35;
-  const { F, lx, box, neon, qz, qx, cell, sign, winUV, faceX, nq } = ngKit(C, s.cx, gy, s.cz, s.nx, s.nz);
+  const { F, lx, box, neon, qz, qx, cell, sign, faceX, quadC, glass, mode, sk, nq } = ngKit(C, s.cx, gy, s.cz, s.nx, s.nz);
   const pal = s.pal || ['#25303f', '#f2f2ee'], bg = pal[0], fg = pal[1], kc = m.k, font = NG_FONT[m.f || 'sans'];
   const caseOf = t => (m.f === 'script' || m.f === 'serif') && s.name ? t : t.toUpperCase();
   const main = caseOf(s.name || s.label), sub = s.name && m.sub ? s.label : '';
@@ -801,118 +970,238 @@ function ngFront0(s, C) {
   else if (m.d === 'p') { segs.push(['wall', x0, -0.75], ['port', -0.75, 0.75], ['wall', 0.75, x1]); }
   else segs.push(['shut', x0, x1]);
   if (ext.has('atm')) { const i = segs.map(q => q[0]).lastIndexOf('glass'); if (i >= 0 && segs[i][2] - segs[i][1] >= 1.7) { const e = segs[i][2]; segs[i][2] = e - 0.95; segs.splice(i + 1, 0, ['atm', e - 0.95, e]); } }
-  const wc = NG_WIN.cell(s.th), gb = C.glass[cls] || (C.glass[cls] = Buf()), stone = m.fs === 'wood' ? kc : m.fs === 'portal' ? '#9a958b' : '#4a4d52';
-  const doors = [];
+  const stone = m.fs === 'wood' ? kc : m.fs === 'portal' ? '#9a958b' : '#4a4d52', doors = segs.filter(q => ['door', 'slide', 'bay', 'port'].includes(q[0])).map(q => [q[1], q[2]]);
+  // the frame by the age of the building (Carlo 8/11): wood in the old town and the old houses (CENED epoch 0-1, before 1945), dark aluminium in the newer ones
+  const ep = s.b.ep, wood = ep !== undefined && ep !== null ? ep <= 1 : m.fs === 'wood', hs = NG_HASH('serr|' + s.h0);
+  const sc = wood ? ['#4a2f1c', '#5a3a22', '#3b2a1e', '#2f4536'][Math.floor(hs * 4)] : ['#2b2e33', '#3a3d42', '#1f2124', '#45484d'][Math.floor(hs * 4)];
+  const hc = wood ? '#c9a85a' : '#c9ccd1', fr = wood ? 0.085 : 0.055, Dp = wood ? 0.27 : 0.22; // the handle, the profile of the frame, how deep the opening is
+  const sillC = m.fs === 'portal' || wood ? '#cdc7ba' : '#b8b3a8', revC = m.fs === 'portal' ? '#d6d0c2' : m.fs === 'wood' ? kc : '#cfc9bd';
+  const yS = (ep !== undefined && ep !== null && ep <= 1 && hs < 0.55) || gl < -0.5 ? 0.15 : 0.03; // the shop's floor: a step in the old houses and where the pavement falls away
+  const yT = Hv - 0.08, yG = yS + (bay ? 0 : wood ? 0.5 : 0.28), zb = -Dp + 0.05; // the top of the opening (under the lintel), the bottom of the glass, the plane of the frames
+  const ci = NG_WIN.ci(cls, s.th), cc = NG_WIN.col[ci] || [COL('#dcd8d0'), COL('#9a958b')];
+  const room = { xa: x0, xb: x1, ya: yS, yb: yT, cell: ci, mid: NG_MID[cls] ?? -1, wc: cc[0], fc: cc[1], dp: bay ? 6 : 3.6 }, roomF = { ...room, ya: 0, yb: Hv - 0.06 };
+  const shutters = !s.noShut && m.d !== 'p', shutCol = '#9da1a6';
+  /* a shutter (near or far): the curtain from yTopS down to yBot at z, the bar at its foot; it rolls (ngShutSet) */
+  const curtain = (a, b, yBot, yTopS, z) => {
+    const bS = C.shut, i0 = qz(bS, a, yBot, b, yTopS, z), n = nq(), it = { bot: [], top: [], bar: [], yUp: gy + yTopS, yDown: gy + yBot, yTop: gy + yTopS };
+    for (let j = 0; j < n; j++) { const v = i0 + 4 * j; it.bot.push(v, v + 1); it.top.push(v + 2, v + 3); for (let k = 0; k < 4; k++) { const q = (v + k) * 2; bS.uv[q] = a + (b - a) * bS.uv[q]; bS.uv[q + 1] = k < 2 ? 0 : yTopS - yBot; } }
+    const v0 = bS.p.length / 3; box(b - a, 0.06, 0.05, (a + b) / 2, yBot + 0.03, z, null, bS); for (let v = v0, v1 = bS.p.length / 3; v < v1; v++) it.bar.push([v, bS.p[v * 3 + 1] - (gy + yBot)]);
+    C.cur.sh.push(it);
+  };
+  if (m.d === 'x') C.cur.fixed = true;
+
+  // ================= near: the opening set into the wall
+  mode(1);
+  const opens = m.d === 'p' ? segs.filter(q => q[0] === 'port').map(q => [q[1], q[2], Math.min(2.7, Hv)]) : [[x0, x1, yT]];
+  for (const [oa, ob, ot] of opens) {
+    const ow = ob - oa, oc = (oa + ob) / 2, rv = COL(m.d === 'p' ? '#cdc7ba' : revC), rk = rv.clone().multiplyScalar(0.55), dz = -Dp - 0.02;
+    quadC(C.solid, [[oa, yS, 0.03], [oa, yS, dz], [oa, ot, dz], [oa, ot, 0.03]], [1, 0, 0], [rv, rk, rk, rv]); // the reveals, darker deep in
+    quadC(C.solid, [[ob, yS, dz], [ob, yS, 0.03], [ob, ot, 0.03], [ob, ot, dz]], [-1, 0, 0], [rk, rv, rv, rk]);
+    quadC(C.solid, [[oa, ot, 0.03], [ob, ot, 0.03], [ob, ot, dz], [oa, ot, dz]], [0, -1, 0], [rv.clone().multiplyScalar(0.8), rv.clone().multiplyScalar(0.8), rk.clone().multiplyScalar(0.8), rk.clone().multiplyScalar(0.8)]); // the soffit
+    quadC(C.solid, [[oa, yS, dz], [ob, yS, dz], [ob, ot, dz], [oa, ot, dz]], [0, 0, 1], [COL('#15171a'), COL('#15171a'), COL('#15171a'), COL('#15171a')]); // the back: nothing shows behind
+    box(ow + 0.06, 0.06, Dp + 0.09, oc, yS - 0.03, (dz + 0.07) / 2, sillC); // the stone sill, 4 cm proud of the wall
+    if (yS - 0.06 - gl > 0.02) box(ow + 0.06, yS - 0.06 - gl, 0.06, oc, (yS - 0.06 + gl) / 2, 0.04, sillC);
+    qz(C.plug, oa, yS, ob, ot, 0.03); // the plug: from here on the wall does not cover the opening
+  }
+  for (const [t, a, b] of segs) {
+    const w = b - a, c = (a + b) / 2;
+    if (t === 'glass') {
+      if (yG > yS + 0.05) { box(w, yG - yS, 0.07, c, (yS + yG) / 2, zb - 0.01, wood ? sc : '#4d5055'); if (wood && w > 0.5) box(w - 0.22, yG - yS - 0.16, 0.02, c, (yS + yG) / 2, zb + 0.035, ngShade(sc, 1.3)); } // the plinth: a panel of wood, or of metal
+      const n = Math.max(1, Math.round(w / 1.6)), pw = w / n;
+      glass(room, a, yG, b, yT, zb - 0.005);
+      for (let i = 0; i <= n; i++) { const xm = i === 0 ? a + fr / 2 : i === n ? b - fr / 2 : a + i * pw; box(fr, yT - yG, 0.09, xm, (yT + yG) / 2, zb, sc); } // jambs and mullions
+      box(w, fr, 0.09, c, yT - fr / 2, zb, sc); box(w, fr * 1.3, 0.1, c, yG + fr * 0.65, zb + 0.005, sc);
+      if (wood && yT - yG > 2.0) box(w, fr * 0.8, 0.08, c, yT - 0.55, zb, sc); // the transom of the old wooden fronts
+    } else if (t === 'door' || t === 'slide') {
+      const dh = Math.min(t === 'slide' ? 2.5 : 2.3, yT - yS - 0.12), dT = yS + dh, la = a + fr, lb = b - fr, lw = lb - la, lz = zb + 0.015;
+      box(fr, yT - yS, 0.1, a + fr / 2, (yT + yS) / 2, zb, sc); box(fr, yT - yS, 0.1, b - fr / 2, (yT + yS) / 2, zb, sc); box(w, fr, 0.1, c, dT + fr / 2, zb, sc); box(w, fr, 0.1, c, yT - fr / 2, zb, sc);
+      if (yT - fr - (dT + fr) > 0.12) glass(room, la, dT + fr, lb, yT - fr, zb - 0.005); // the light over the door
+      if (t === 'slide') { // two leaves of glass that slide apart, thin frames, the sensor over them
+        for (const [p, q] of [[la, (la + lb) / 2], [(la + lb) / 2, lb]]) { glass(room, p + 0.04, yS + 0.08, q - 0.04, dT - 0.04, lz); box(0.045, dh, 0.06, p + 0.0225, yS + dh / 2, lz, sc); box(0.045, dh, 0.06, q - 0.0225, yS + dh / 2, lz, sc); box(q - p, 0.08, 0.06, (p + q) / 2, yS + 0.04, lz, sc); box(q - p, 0.045, 0.06, (p + q) / 2, dT - 0.0225, lz, sc); }
+        box(0.28, 0.06, 0.07, c, dT + fr + 0.04, zb + 0.06, '#2b2e33');
+      } else { // the leaf: stiles and rails round a pane (wood: a panel at the foot); the handle away from the hinges
+        const st = wood ? 0.11 : 0.065, br = wood ? 0.42 : 0.15, hx = lb - st - 0.07;
+        box(st, dh, 0.06, la + st / 2, yS + dh / 2, lz, sc); box(st, dh, 0.06, lb - st / 2, yS + dh / 2, lz, sc); box(lw, br, 0.06, (la + lb) / 2, yS + br / 2, lz, sc); box(lw, st, 0.06, (la + lb) / 2, dT - st / 2, lz, sc);
+        if (wood) box(lw - 2 * st - 0.08, br - 0.13, 0.02, (la + lb) / 2, yS + br / 2, lz + 0.035, ngShade(sc, 1.3));
+        glass(room, la + st, yS + br, lb - st, dT - st, lz);
+        if (wood) { box(0.05, 0.17, 0.015, hx, yS + 1.05, lz + 0.037, hc); box(0.03, 0.03, 0.05, hx, yS + 1.09, lz + 0.06, hc); box(0.14, 0.024, 0.024, hx - 0.06, yS + 1.09, lz + 0.085, hc); box(0.02, 0.05, 0.012, hx, yS + 0.98, lz + 0.045, '#2a1f10'); }
+        else { box(0.026, 0.95, 0.026, hx, yS + 1.05, lz + 0.085, hc); for (const dy of [-0.42, 0.42]) box(0.02, 0.02, 0.06, hx, yS + 1.05 + dy, lz + 0.05, hc); }
+        // what hangs on the glass of the door: the card OPEN, the hours of OSM (only where OSM has them)
+        if (NG_HASH('aperto|' + s.h0) < 0.6 && cls !== 'sfitto' && lw > 0.6) {
+          const ac = cell(0.3, 0.12, (g, w2, h2) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w2, h2); g.fillStyle = '#c8102e'; g.fillRect(2, 2, w2 - 4, h2 - 4); ngText(g, 'APERTO', w2 / 2, h2 / 2, w2 * 0.86, h2 * 0.62, NG_FONT.black, '#ffffff'); });
+          sk(1, 0); const xa = (la + lb) / 2 - 0.15; sign(ac, qz(C.sign, xa, yS + 1.58, xa + 0.3, yS + 1.7, lz + 0.006));
+        }
+        if (s.ohs && lw > 0.6) {
+          const lines = ngOhText(s.ohs); if (lines.length) {
+            const oc = cell(0.2, 0.06 + lines.length * 0.035, (g, w2, h2) => { g.fillStyle = '#f6f4ee'; g.fillRect(0, 0, w2, h2); const lh = h2 / (lines.length + 1.6); ngText(g, 'ORARI', w2 / 2, lh * 0.8, w2 * 0.8, lh * 0.9, NG_FONT.black, '#1a1a1a'); lines.forEach((l, i) => ngText(g, l, w2 / 2, lh * (2.05 + i), w2 * 0.92, lh * 0.75, NG_FONT.cond, '#2b2b2b')); });
+            sk(1, 0); const xa = la + st + 0.03, hh = 0.06 + lines.length * 0.035; sign(oc, qz(C.sign, xa, yS + 1.3 - hh, xa + 0.2, yS + 1.3, lz + 0.006));
+          }
+        }
+        sk(1, 0.6);
+      }
+      if (yS > 0.1) box(w + 0.3, yS - gl, 0.36, c, (yS + gl) / 2, 0.22, sillC); // the step outside
+    } else if (t === 'bay') { // the workshop's door rolled up in its box at the top, the workshop seen through
+      glass({ ...room, xa: a, xb: b, ya: yS, yb: yT - 0.4, dp: 6 }, a, yS, b, yT - 0.4, -Dp + 0.03);
+      box(w, 0.4, Dp - 0.02, c, yT - 0.2, -Dp / 2 - 0.01, '#8f949a'); for (let k = 0; k < 4; k++) box(w, 0.012, 0.01, c, yT - 0.08 - k * 0.09, -0.015, '#6b6e72');
+    } else if (t === 'port') { // the street door of the offices: wooden leaves set back in the stone, the brass knob in the middle, the plates beside it
+      const ph = Math.min(2.7, Hv), lz = -0.17, lc = m.k === '#e8e2d0' ? '#2f4a3a' : '#5a3e28', pc = m.k === '#e8e2d0' ? '#263d30' : '#4a3220';
+      box(w, ph - yS, 0.08, c, (ph + yS) / 2, lz, lc);
+      for (const sx of [-1, 1]) for (const [yy, hh] of [[yS + 0.55, 0.62], [yS + 1.5, 0.95]]) { box(w / 2 - 0.2, hh, 0.03, c + sx * w / 4, yy, lz + 0.055, pc); box(w / 2 - 0.28, hh - 0.1, 0.02, c + sx * w / 4, yy, lz + 0.075, lc); }
+      box(0.035, ph - yS, 0.03, c, (ph + yS) / 2, lz + 0.055, '#2a1f10');
+      F.geo(C.solid, new THREE.SphereGeometry(0.05, 10, 7).translate(c, yS + 1.15, lz + 0.12), null, COL('#d4af5a')); box(0.12, 0.12, 0.015, c, yS + 1.15, lz + 0.05, '#c9a85a'); // the gilded knob
+      box(0.24, 0.05, 0.012, c, yS + 0.95, lz + 0.05, '#c9a85a'); // the letter slot
+    } else if (t === 'atm') { // the cash machine in a stone panel flush with the wall, its face 13 cm in
+      const pc = '#d9d6cf', na = c - 0.3, nb = c + 0.3, ny0 = yS + 0.92, ny1 = yS + 1.72, zf = -0.02;
+      box(w, ny0 - yS, 0.06, c, (ny0 + yS) / 2, zf, pc); box(w, yT - ny1, 0.06, c, (yT + ny1) / 2, zf, pc); box(na - a, ny1 - ny0, 0.06, (a + na) / 2, (ny0 + ny1) / 2, zf, pc); box(b - nb, ny1 - ny0, 0.06, (nb + b) / 2, (ny0 + ny1) / 2, zf, pc);
+      box(0.6, 0.8, 0.02, c, (ny0 + ny1) / 2, -0.16, '#3a3d40'); for (const xs of [na + 0.01, nb - 0.01]) box(0.02, 0.8, 0.14, xs, (ny0 + ny1) / 2, -0.09, '#8f949a'); for (const ys of [ny0 + 0.01, ny1 - 0.01]) box(0.6, 0.02, 0.14, c, ys, -0.09, '#8f949a');
+      neon('screen', 0.3, 0.22, 0.02, c, ny0 + 0.52, -0.145); box(0.28, 0.1, 0.08, c, ny0 + 0.18, -0.12, '#2b2f33'); box(0.2, 0.015, 0.03, c, ny0 + 0.34, -0.14, '#111');
+      const hc2 = cell(0.6, 0.15, (g, w2, h2) => { g.fillStyle = '#1d6fb8'; g.fillRect(0, 0, w2, h2); ngText(g, 'BANCOMAT', w2 / 2, h2 / 2, w2 * 0.9, h2 * 0.75, NG_FONT.sans, '#fff'); });
+      sk(1, 1); sign(hc2, qz(C.sign, c - 0.3, ny1 + 0.06, c + 0.3, ny1 + 0.21, zf + 0.032)); sk(1, 0.6);
+    }
+    if (shutters && ['glass', 'door', 'slide', 'bay', 'shut'].includes(t)) { // the shutter: guides in the reveal, the box under the lintel, the curtain behind the face of the wall
+      const yTopS = t === 'bay' ? yT - 0.4 : yT - 0.3;
+      for (const xg of [a + 0.03, b - 0.03]) box(0.05, yTopS - yS, 0.06, xg, (yTopS + yS) / 2, -0.045, '#8a8e93');
+      if (t !== 'bay') box(w, 0.3, Dp - 0.03, c, yT - 0.15, -Dp / 2 - 0.02, shutCol);
+      curtain(a + 0.055, b - 0.055, yS, yTopS, -0.045);
+    }
+  }
+  if (m.d === 'x') { /* the vacant shop: nothing to see but the shutter */ }
+
+  // ================= far: as the fronts were, flat on the wall
+  mode(2);
   for (const [t, a, b] of segs) {
     const w = b - a, c = (a + b) / 2;
     if (t === 'glass') {
       box(w, y0 - gl, 0.1, c, (y0 + gl) / 2, 0.05, stone);
       const n = Math.max(1, Math.round(w / 1.9)), pw = w / n;
-      for (let i = 0; i < n; i++) { const i0 = qz(gb, a + i * pw + 0.03, y0, a + (i + 1) * pw - 0.03, Hv - 0.06, 0.035); winUV(gb, i0, wc); if (i) box(0.06, Hv - y0, 0.08, a + i * pw, (Hv + y0) / 2, 0.05, kc); }
+      glass(roomF, a + 0.03, y0, b - 0.03, Hv - 0.06, 0.035); for (let i = 1; i < n; i++) box(0.06, Hv - y0, 0.08, a + i * pw, (Hv + y0) / 2, 0.05, kc);
       box(w, 0.05, 0.14, c, y0 + 0.02, 0.07, kc);
     } else if (t === 'door' || t === 'slide') {
       const dh = Math.min(t === 'slide' ? 2.5 : 2.35, Hv - 0.12);
-      box(w - 0.08, dh, 0.03, c, dh / 2, 0.04, '#28303a'); box(0.06, dh, 0.09, a + 0.03, dh / 2, 0.05, kc); box(0.06, dh, 0.09, b - 0.03, dh / 2, 0.05, kc); box(w, 0.08, 0.09, c, dh + 0.04, 0.05, kc);
-      if (t === 'slide') box(0.03, dh, 0.06, c, dh / 2, 0.06, '#c9ccd1'); else box(0.03, 0.55, 0.05, b - 0.16, 1.05, 0.08, '#c9ccd1');
+      glass(roomF, a + 0.04, 0.02, b - 0.04, dh, 0.04); box(0.06, dh, 0.09, a + 0.03, dh / 2, 0.05, sc); box(0.06, dh, 0.09, b - 0.03, dh / 2, 0.05, sc); box(w, 0.08, 0.09, c, dh + 0.04, 0.05, sc);
+      if (t === 'slide') box(0.03, dh, 0.06, c, dh / 2, 0.06, sc); else box(0.03, 0.55, 0.05, b - 0.16, 1.05, 0.08, hc);
       if (Hv - 0.06 - dh - 0.08 > 0.15) box(w, Hv - 0.06 - dh - 0.08, 0.07, c, (Hv - 0.06 + dh + 0.08) / 2, 0.04, kc);
-      box(w + 0.2, 0.12 - gl, 0.4, c, 0.06 + gl / 2, 0.2, '#b8b3a8'); box(w, 0.03 - gl, 0.11, c, (0.03 + gl) / 2, 0.05, '#28303a');
-      doors.push([a, b]);
+      box(w + 0.2, 0.12 - gl, 0.4, c, 0.06 + gl / 2, 0.2, '#b8b3a8');
     } else if (t === 'bay') {
-      const i0 = qz(gb, a, 0.0, b, Hv - 0.45, 0.02); winUV(gb, i0, wc);
+      glass({ ...roomF, xa: a, xb: b, yb: Hv - 0.45, dp: 6 }, a, 0.0, b, Hv - 0.45, 0.02);
       box(w + 0.1, 0.34, 0.34, c, Hv - 0.2, 0.17, '#8f949a');
       for (let y = Hv - 0.37, k = 0; k < 6; y -= 0.07, k++) box(w, 0.07, 0.03, c, y - 0.035, 0.05, k % 2 ? '#a9adb2' : '#bfc3c8');
       box(w, 0.04, 0.06, c, Hv - 0.81, 0.06, '#6b6e72'); box(w + 0.1, 0.02 - gl, 0.6, c, (0.02 + gl) / 2, 0.3, '#8a857c');
-      doors.push([a, b]);
     } else if (t === 'port') {
       const ph = Math.min(2.7, Hv); box(w, ph, 0.12, c, ph / 2, 0.02, m.k === '#e8e2d0' ? '#2f4a3a' : '#5a3e28');
       for (const sx of [-1, 1]) for (const yy of [0.6, 1.6]) box(w / 2 - 0.2, 0.7, 0.03, c + sx * w / 4, yy, 0.09, m.k === '#e8e2d0' ? '#263d30' : '#4a3220');
       box(0.04, ph, 0.03, c, ph / 2, 0.09, '#2a1f10'); box(0.06, 0.18, 0.06, c + 0.12, 1.1, 0.12, '#c9a85a');
-      box(w + 0.5, 0.25, 0.2, c, ph + 0.12, 0.08, '#b8b3a8'); for (const sx of [-1, 1]) box(0.25, ph, 0.18, c + sx * (w / 2 + 0.12), ph / 2, 0.06, '#b8b3a8');
       box(w + 0.3, 0.14 - gl, 0.5, c, 0.07 + gl / 2, 0.25, '#b8b3a8');
-      doors.push([a, b]);
-    } else if (t === 'shut') {
-      for (let y = 0, k = 0; y < Hv - 0.3; y += 0.09, k++) box(w, Math.min(0.09, Hv - 0.3 - y), 0.03, c, y + 0.045, 0.045, k % 2 ? '#9da1a6' : '#b4b8bd');
-      box(w + 0.1, 0.3, 0.3, c, Hv - 0.15, 0.15, '#8f949a'); box(w, 0.03 - gl, 0.09, c, (0.03 + gl) / 2, 0.045, '#55575b');
-      if (m.k !== '#3a3d40') { const pc = cell(0.8, 0.4, (g, w2, h2) => { g.fillStyle = '#f2c230'; g.fillRect(0, 0, w2, h2); ngText(g, 'AFFITTASI', w2 / 2, h2 / 2, w2 * 0.9, h2 * 0.55, NG_FONT.black, '#c8102e'); }); sign(pc, qz(C.sign, c - 0.4, 1.35, c + 0.4, 1.75, 0.065)); }
-    } else if (t === 'wall') {
-      box(w, 0.25 - gl, 0.05, c, (0.25 + gl) / 2, 0.025, '#8a857c');
     } else if (t === 'atm') {
       box(w, Hv - 0.06 - gl, 0.1, c, (Hv - 0.06 + gl) / 2, 0.05, '#d9d6cf'); neon('screen', 0.34, 0.26, 0.04, c, 1.4, 0.12); box(0.3, 0.2, 0.08, c, 1.08, 0.12, '#2b2f33'); box(0.5, 0.75, 0.04, c, 1.28, 0.105, '#55575b');
-      const hc = cell(0.8, 0.2, (g, w2, h2) => { g.fillStyle = '#1d6fb8'; g.fillRect(0, 0, w2, h2); ngText(g, 'BANCOMAT', w2 / 2, h2 / 2, w2 * 0.9, h2 * 0.75, NG_FONT.sans, '#fff'); });
-      sign(hc, qz(C.sign, c - 0.38, 1.85, c + 0.38, 2.04, 0.105));
+      const hc2 = cell(0.8, 0.2, (g, w2, h2) => { g.fillStyle = '#1d6fb8'; g.fillRect(0, 0, w2, h2); ngText(g, 'BANCOMAT', w2 / 2, h2 / 2, w2 * 0.9, h2 * 0.75, NG_FONT.sans, '#fff'); });
+      sk(1, 1); sign(hc2, qz(C.sign, c - 0.38, 1.85, c + 0.38, 2.04, 0.105)); sk(1, 0.6);
+    }
+    if (shutters && ['glass', 'door', 'slide', 'bay', 'shut'].includes(t)) {
+      const yTf = t === 'bay' ? Hv - 0.37 : Hv - 0.06;
+      if (t !== 'bay') box(b - a, 0.18, 0.16, c, Hv - 0.13, 0.1, shutCol);
+      curtain(a, b, 0, yTf, 0.12);
     }
   }
-  // the rolling shutters over windows, doors and the workshop bay: down when the shop is shut (ngShutters), rolled into their box when open
-  // (or, in the trades without shutters, a dark veil over the glass when the shop is shut with its lights off)
-  if (s.oh && m.d !== 'x' && m.d !== 'p') for (const [t, a, b] of segs) {
-    if (!['glass', 'door', 'slide', 'bay'].includes(t)) continue;
-    const yT = t === 'bay' ? Hv - 0.37 : Hv - 0.06;
-    if (s.noShut) { if (t === 'bay') continue; const i0 = qz(C.dark, a, 0.02, b, yT, 0.1); for (let j = 0, n = nq(); j < n; j++) { const i = i0 + 4 * j; C.darks.push({ s, i0: i, dark: true, y0: C.dark.p[i * 3 + 1], y1: C.dark.p[(i + 3) * 3 + 1] }); } continue; }
-    const i0 = qz(C.shut, a, 0, b, yT, 0.12), U = C.shut.uv, nqs = nq();
-    for (let k = 0; k < 4 * nqs; k++) { const q = (i0 + k) * 2; U[q] *= b - a; U[q + 1] *= yT; }
-    for (let j = 0; j < nqs; j++) { const i = i0 + 4 * j; C.shuts.push({ s, i0: i, y0: C.shut.p[i * 3 + 1], y1: C.shut.p[(i + 3) * 3 + 1] }); }
-    if (t !== 'bay') box(b - a, 0.18, 0.16, (a + b) / 2, Hv - 0.13, 0.1, '#9da1a6');
-  }
+  // ================= both: the vacant shop's notice, the frame, the sign, the awning, what hangs on the wall and stands outside
+  if (m.d === 'x') for (const [near, z] of [[1, -0.04], [2, 0.15]]) { mode(near); const pc = cell(0.8, 0.4, (g, w2, h2) => { g.fillStyle = '#f2c230'; g.fillRect(0, 0, w2, h2); ngText(g, 'AFFITTASI', w2 / 2, h2 / 2, w2 * 0.9, h2 * 0.55, NG_FONT.black, '#c8102e'); }); sk(1, 0); sign(pc, qz(C.sign, -0.4, 1.35, 0.4, 1.75, z + 0.008)); sk(1, 0.6); }
+  mode(0);
+  for (const [t, a, b] of segs) if (t === 'wall') box(b - a, 0.25 - gl, 0.05, (a + b) / 2, (0.25 + gl) / 2, 0.025, '#8a857c');
   // the frame (a street door has its own stone surround)
   if (m.d !== 'p') {
     box(fw, Hv - gl, m.fs === 'portal' ? 0.16 : 0.11, -hw + fw / 2, (Hv + gl) / 2, 0.055, kc); box(fw, Hv - gl, m.fs === 'portal' ? 0.16 : 0.11, hw - fw / 2, (Hv + gl) / 2, 0.055, kc);
     box(W, 0.1, 0.12, 0, Hv - 0.03, 0.06, kc);
+  } else for (const [t, a, b] of segs) if (t === 'port') { // the stone round the street door
+    const w = b - a, c = (a + b) / 2, ph = Math.min(2.7, Hv);
+    box(w + 0.5, 0.25, 0.2, c, ph + 0.12, 0.08, '#b8b3a8'); for (const sx of [-1, 1]) box(0.25, ph - gl, 0.18, c + sx * (w / 2 + 0.12), (ph + gl) / 2, 0.06, '#b8b3a8');
   }
-  // the sign
+  // the sign: a lightbox has its depth and an aluminium rim round its face; letters stand off the wall (layers 6 mm apart, the back ones darker)
   const sy = Hv + 0.08, scy = sy + sh / 2;
   if (stype === 'pan' || stype === 'cas') {
     const d = stype === 'cas' ? 0.22 : 0.06, sw = W - 0.12; box(sw, sh, d, 0, scy, d / 2 + 0.01, kc);
+    if (stype === 'cas') { const rc = '#8f949a'; box(sw, 0.045, 0.035, 0, sy + sh - 0.0225, d + 0.0185, rc); box(sw, 0.045, 0.035, 0, sy + 0.0225, d + 0.0185, rc); for (const sx of [-1, 1]) box(0.055, sh, 0.035, sx * (sw / 2 - 0.0275), scy, d + 0.0185, rc); }
     const c = cell(sw - 0.1, sh - 0.08, (g, w, h) => drawSign(g, w, h, bg, fg, { main, sub, icon: m.icon }));
-    sign(c, qz(C.sign, -sw / 2 + 0.05, sy + 0.04, sw / 2 - 0.05, sy + sh - 0.04, d + 0.012));
+    sk(1, stype === 'cas' ? 1 : 0.45); sign(c, qz(C.sign, -sw / 2 + 0.05, sy + 0.04, sw / 2 - 0.05, sy + sh - 0.04, d + 0.012)); sk(1, 0.6);
   } else if (stype === 'fas' || stype === 'let') {
     const lw = stype === 'fas' ? W : Math.min(W - 0.2, Math.max(1.6, (main.length * 0.42 + 0.6) * sh));
     const c = cell(lw, sh, (g, w, h) => { if (stype === 'let') g.clearRect(0, 0, w, h); drawSign(g, w, h, stype === 'fas' ? bg : null, bg && stype === 'let' ? bg : fg, { main, sub, icon: m.icon }); });
-    sign(c, qz(C.sign, -lw / 2, sy, lw / 2, sy + sh, 0.03));
+    if (stype === 'let') { for (let k = 0; k < 7; k++) { sk(k === 6 ? 1 : 0.42, k === 6 ? 0.9 : 0.25); sign(c, qz(C.sign, -lw / 2, sy, lw / 2, sy + sh, 0.035 + k * 0.006)); } }
+    else { sk(1, 0.25); sign(c, qz(C.sign, -lw / 2, sy, lw / 2, sy + sh, 0.03)); }
+    sk(1, 0.6);
   }
   if (stype === 'tar' || ext.has('targ')) {
-    // flat on the facade beside the door, clear of the stone pilaster of a street door (0.25 m wide, 0.12 m off the leaf): the plaque must not sink into it
+    // flat on the facade beside the door, clear of the stone pilaster of a street door (0.25 m wide, 0.12 m off the leaf): the plaque must not sink into it.
+    // Off the wall (on the glass) it goes on the glass of the near front
     const gap = m.d === 'p' ? 0.48 : 0.3, dx = doors.length ? doors[0][1] + gap : 0.6, xx = dx + 0.25 > hw + (m.d === 'p' ? 0.4 : 0) ? (doors.length ? doors[0][0] - gap : -0.6) : dx, n = stype === 'tar' ? 2 : 1;
-    for (let i = 0; i < n; i++) {
-      const c = cell(0.42, 0.3, (g, w, h) => { g.fillStyle = bg || '#c9a85a'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; g.strokeRect(2, 2, w - 4, h - 4); ngText(g, i ? s.label : main, w / 2, h * 0.42, w * 0.85, h * 0.3, NG_FONT.serif, fg); if (!i) ngText(g, s.label, w / 2, h * 0.75, w * 0.85, h * 0.16, NG_FONT.sans, fg); });
-      sign(c, qz(C.sign, xx - 0.21, 1.35 - i * 0.36, xx + 0.21, 1.65 - i * 0.36, 0.11)); box(0.44, 0.32, 0.02, xx, 1.5 - i * 0.36, 0.1, '#8a6a3a');
+    const onGlass = m.d !== 'p' && xx > x0 && xx < x1;
+    for (const [md, z] of onGlass ? [[1, zb + 0.06], [2, 0.11]] : [[0, 0.11]]) {
+      mode(md);
+      for (let i = 0; i < n; i++) {
+        const c = cell(0.42, 0.3, (g, w, h) => { g.fillStyle = bg || '#c9a85a'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; g.strokeRect(2, 2, w - 4, h - 4); ngText(g, i ? s.label : main, w / 2, h * 0.42, w * 0.85, h * 0.3, NG_FONT.serif, fg); if (!i) ngText(g, s.label, w / 2, h * 0.75, w * 0.85, h * 0.16, NG_FONT.sans, fg); });
+        sk(1, 0.05); sign(c, qz(C.sign, xx - 0.21, 1.35 - i * 0.36, xx + 0.21, 1.65 - i * 0.36, z)); sk(1, 0.6); box(0.44, 0.32, 0.02, xx, 1.5 - i * 0.36, z - 0.01, '#8a6a3a');
+        if (m.d === 'p') for (const [px, py] of [[-0.19, 0.13], [0.19, 0.13], [-0.19, -0.13], [0.19, -0.13]]) box(0.018, 0.018, 0.01, xx + px, 1.5 - i * 0.36 + py, z + 0.004, '#8a6a2a'); // the brass screws
+      }
     }
+    mode(0);
   }
   if (m.fs === 'portal' && m.d !== 'p' && top > sy + sh + 0.35) { box(W + 0.3, 0.14, 0.24, 0, sy + sh + 0.12, 0.12, kc); for (const sx of [-1, 1]) box(fw, sh + 0.2, 0.16, sx * (hw - fw / 2), sy + sh / 2, 0.08, kc); }
-  // the awning (or the glass canopy)
+  // the awning on its folding arms out of its box, the valance cut in scallops (or the glass canopy)
   const depth = C.depth(s), aw = m.a;
   if (aw && depth >= 1.1) {
-    const D_ = Math.min(aw[0] === 'pen' ? 1.6 : 1.4, depth - 0.35), yT = Hv + 0.06, drop = aw[0] === 'pen' ? 0 : 0.42 * D_ / 1.4, val = 0.24, xa = -hw + 0.04, xb = hw - 0.04;
+    const D_ = Math.min(aw[0] === 'pen' ? 1.6 : 1.4, depth - 0.35), yT_ = Hv + 0.06, drop = aw[0] === 'pen' ? 0 : 0.42 * D_ / 1.4, val = 0.24, xa = -hw + 0.04, xb = hw - 0.04;
     if (aw[0] === 'pen') { // over the sign when the wall is high enough, so it never hides it
-      const yC = stype !== 'none' && stype !== 'tar' && top > sy + sh + 0.9 ? sy + sh + 0.1 : yT, yR = Math.min(yC + 0.9, top - 0.1);
+      const yC = stype !== 'none' && stype !== 'tar' && top > sy + sh + 0.9 ? sy + sh + 0.1 : yT_, yR = Math.min(yC + 0.9, top - 0.1);
       box(W - 0.1, 0.07, D_, 0, yC + 0.05, D_ / 2, '#c9d6dc'); box(W - 0.1, 0.12, 0.06, 0, yC + 0.05, D_, kc);
       for (const sx of [-1, 1]) { const g2 = new THREE.CylinderGeometry(0.015, 0.015, 1, 4); const a = new THREE.Vector3(sx * (hw - 0.4), yR, 0.02), b = new THREE.Vector3(sx * (hw - 0.4), yC + 0.08, D_ - 0.05), v = b.clone().sub(a), L = v.length(); g2.translate(0, 0.5, 0).scale(1, L, 1).applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.normalize()))).translate(a.x, a.y, a.z); F.geo(C.solid, g2, null, COL('#8f949a')); }
     } else {
-      const c1 = aw[1], c2 = aw[0] === 'strip' ? aw[2] : shade2(aw[1]), prof = aw[0] === 'cap' ? [0, 0.25, 0.5, 0.75, 1].map(f => [D_ * Math.sin(f * Math.PI / 2), yT - drop + (drop + 0.35) * Math.cos(f * Math.PI / 2)]) : [[0.05, yT], [D_, yT - drop]];
+      const c1 = aw[1], c2 = aw[0] === 'strip' ? aw[2] : shade2(aw[1]), prof = aw[0] === 'cap' ? [0, 0.25, 0.5, 0.75, 1].map(f => [D_ * Math.sin(f * Math.PI / 2), yT_ - drop + (drop + 0.35) * Math.cos(f * Math.PI / 2)]) : [[0.05, yT_], [D_, yT_ - drop]];
       const n = aw[0] === 'strip' ? Math.max(2, Math.round((xb - xa) / 0.32)) : 1, sw2 = (xb - xa) / n;
       for (let i = 0; i < n; i++) { const xA = xa + i * sw2, xB = xA + sw2, col = i % 2 ? c2 : c1; for (let k = 1; k < prof.length; k++) { const [zA, yA] = prof[k - 1], [zB, yB] = prof[k]; faceX(C.solid, [[xA, yA, zA], [xB, yA, zA], [xB, yB, zB], [xA, yB, zB]], 2, COL(col)); } }
       const [zE, yE] = prof[prof.length - 1];
       for (const xs of [xa, xb]) F.face(C.solid, [...prof.map(([z, y]) => [xs, y, z]), [xs, yE - val, zE]], 2, COL(c1));
-      if (stype === 'ten') { const c = cell(W - 0.1, val, (g, w, h) => drawSign(g, w, h, c1, fg, { main })); sign(c, qz(C.sign, xa, yE - val, xb, yE, zE + 0.005)); box(W - 0.08, val, 0.015, 0, yE - val / 2, zE - 0.004, c1); }
-      else for (let i = 0; i < n; i++) { const xA = xa + i * sw2; box(sw2, val, 0.015, xA + sw2 / 2, yE - val / 2, zE, i % 2 ? c2 : c1); }
+      if (aw[0] !== 'cap') { // the box it rolls into, the bar at its edge, the arms
+        box(W - 0.06, 0.1, 0.17, 0, yT_ - 0.03, 0.09, shade2(c1)); box(xb - xa, 0.05, 0.05, 0, yE - 0.02, zE - 0.025, '#d9d6cf');
+        for (const sx of [-1, 1]) { const a = new THREE.Vector3(sx * (hw - 0.35), yT_ - 0.75, 0.03), b = new THREE.Vector3(sx * (hw - 0.35), yE - 0.04, zE - 0.06), v = b.clone().sub(a), L = v.length(); F.geo(C.solid, new THREE.CylinderGeometry(0.022, 0.022, 1, 5).translate(0, 0.5, 0).scale(1, L, 1).applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.normalize()))).translate(a.x, a.y, a.z), null, COL('#c9ccd1')); box(0.06, 0.12, 0.05, sx * (hw - 0.35), yT_ - 0.75, 0.025, '#8f949a'); }
+      }
+      if (stype === 'ten') { const c = cell(W - 0.1, val, (g, w, h) => drawSign(g, w, h, c1, fg, { main })); sk(1, 0.15); sign(c, qz(C.sign, xa, yE - val, xb, yE, zE + 0.005)); sk(1, 0.6); box(W - 0.08, val, 0.015, 0, yE - val / 2, zE - 0.004, c1); }
+      else { // the valance: scallops about 30 cm wide, a stripe each on a striped awning
+        const nv = aw[0] === 'strip' ? n : Math.max(2, Math.round((xb - xa) / 0.3)), vw = (xb - xa) / nv;
+        for (let i = 0; i < nv; i++) { const xA = xa + i * vw, xB = xA + vw, col = aw[0] === 'strip' ? (i % 2 ? c2 : c1) : c1, P = [[xA, yE, zE], [xB, yE, zE], [xB, yE - val * 0.72, zE]]; for (let k = 1; k < 6; k++) { const f = k / 6; P.push([xB - vw * f, yE - val * (0.72 + 0.28 * Math.sin(f * Math.PI)), zE]); } P.push([xA, yE - val * 0.72, zE]); F.face(C.solid, P, 2, COL(col)); }
+      }
     }
   }
   // on the wall
   const hsY = Math.max(Hv + 0.45, 2.75), side = m.d === 'r' ? -1 : 1;
   if (ext.has('ban') && top > hsY + 0.4) {
-    const bx = side * (hw - 0.3), c = cell(0.7, 0.7, (g, w, h) => { g.fillStyle = bg || kc; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(0, 0, w, 4); const words = main.split(' ').slice(0, 3); words.forEach((wd, i) => ngText(g, wd, w / 2, h * (i + 0.5) / words.length + (words.length === 1 ? 0 : 0), w * 0.86, h * 0.8 / words.length, font, bg ? fg : '#fff')); });
-    box(0.08, 0.72, 0.72, bx, hsY, 0.66, kc); box(0.05, 0.05, 0.32, bx, hsY + 0.38, 0.16, '#55575b');
-    sign(c, qx(C.sign, 0.31, hsY - 0.35, 1.01, hsY + 0.35, bx + 0.042, 1)); sign(c, qx(C.sign, 0.31, hsY - 0.35, 1.01, hsY + 0.35, bx - 0.042, -1));
+    const bx = side * (hw - 0.3), c = cell(0.7, 0.7, (g, w, h) => { g.fillStyle = bg || kc; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(0, 0, w, 4); const words = main.split(' ').slice(0, 3); words.forEach((wd, i) => ngText(g, wd, w / 2, h * (i + 0.5) / words.length, w * 0.86, h * 0.8 / words.length, font, bg ? fg : '#fff')); });
+    box(0.12, 0.76, 0.76, bx, hsY, 0.66, kc); box(0.05, 0.05, 0.32, bx, hsY + 0.38, 0.16, '#55575b'); box(0.04, 0.04, 0.3, bx, hsY - 0.25, 0.15, '#55575b');
+    sk(1, 1); sign(c, qx(C.sign, 0.31, hsY - 0.35, 1.01, hsY + 0.35, bx + 0.062, 1)); sign(c, qx(C.sign, 0.31, hsY - 0.35, 1.01, hsY + 0.35, bx - 0.062, -1)); sk(1, 0.6);
   }
-  if (ext.has('croce') && top > hsY + 0.5) { const bx = -side * (hw - 0.25); box(0.06, 0.06, 0.32, bx, hsY, 0.16, '#55575b'); neon('green', 0.12, 0.8, 0.27, bx, hsY, 0.72); neon('green', 0.12, 0.27, 0.8, bx, hsY, 0.72); }
+  if (ext.has('croce') && top > hsY + 0.5) { // the green cross: a grey body with its arms, the green faces lit, a rim of 3 cm round them
+    const bx = -side * (hw - 0.3), cz0 = 0.74; box(0.06, 0.06, 0.4, bx, hsY, 0.2, '#55575b'); box(0.14, 0.9, 0.31, bx, hsY, cz0, '#5d6166'); box(0.14, 0.31, 0.9, bx, hsY, cz0, '#5d6166');
+    neon('green', 0.152, 0.84, 0.25, bx, hsY, cz0); neon('green', 0.152, 0.25, 0.84, bx, hsY, cz0);
+  }
   if (ext.has('T') && (s.sub === 'tobacco' || s.sub === 'lottery') && top > hsY + 0.45) {
     const bx = -side * (hw - 0.25), c = cell(0.55, 0.7, (g, w, h) => { g.fillStyle = '#1d3a8a'; g.fillRect(0, 0, w, h); g.strokeStyle = '#fff'; g.lineWidth = 3; g.strokeRect(4, 4, w - 8, h - 8); ngText(g, 'T', w / 2, h * 0.55, w * 0.8, h * 0.8, NG_FONT.serif, '#fff'); });
-    box(0.07, 0.7, 0.55, bx, hsY, 0.6, '#1d3a8a'); box(0.05, 0.05, 0.32, bx, hsY + 0.36, 0.16, '#55575b');
-    sign(c, qx(C.sign, 0.325, hsY - 0.35, 0.875, hsY + 0.35, bx + 0.037, 1)); sign(c, qx(C.sign, 0.325, hsY - 0.35, 0.875, hsY + 0.35, bx - 0.037, -1));
+    box(0.1, 0.72, 0.57, bx, hsY, 0.6, '#1d3a8a'); box(0.05, 0.05, 0.32, bx, hsY + 0.36, 0.16, '#55575b');
+    sk(1, 1); sign(c, qx(C.sign, 0.325, hsY - 0.35, 0.875, hsY + 0.35, bx + 0.052, 1)); sign(c, qx(C.sign, 0.325, hsY - 0.35, 0.875, hsY + 0.35, bx - 0.052, -1)); sk(1, 0.6);
   }
   if (ext.has('palo')) { const bx = side * (hw - 0.22), cols = ['#c8102e', '#f2f2ee', '#1d4f9a', '#f2f2ee']; for (let i = 0; i < 8; i++) F.geo(C.solid, new THREE.CylinderGeometry(0.09, 0.09, 0.09, 10).translate(bx, 1.75 + i * 0.09, 0.2), null, COL(cols[i % 4])); for (const y of [1.68, 2.5]) F.geo(C.solid, new THREE.SphereGeometry(0.1, 10, 5).translate(bx, y, 0.2), null, COL('#c9ccd1')); box(0.04, 0.04, 0.15, bx, 2.1, 0.08, '#8f949a'); }
   if (ext.has('app')) { const ly = top > sy + sh + 0.45 ? sy + sh + 0.18 : Hv - 0.35; for (const sx of [-1, 1]) { const x = sx * (hw - 0.3); box(0.04, 0.04, 0.35, x, ly + 0.05, 0.17, '#2b2b2b'); neon('warm', 0.16, 0.1, 0.18, x, ly, 0.33); } }
-  if (ext.has('menu') && doors.length) { const x = doors[0][1] + 0.35 < hw - 0.2 ? doors[0][1] + 0.35 : doors[0][0] - 0.35; box(0.46, 0.62, 0.06, x, 1.45, 0.07, '#2b2b2b'); neon('warm', 0.38, 0.52, 0.02, x, 1.45, 0.105); }
-  if (ext.has('neon')) { const g0 = segs.find(q => q[0] === 'glass'); if (g0 && g0[2] - g0[1] > 0.9) { const x = (g0[1] + g0[2]) / 2, c = cell(0.72, 0.24, (g, w, h) => { g.fillStyle = '#120a0a'; g.fillRect(0, 0, w, h); g.shadowColor = '#ff3a3a'; g.shadowBlur = 6; ngText(g, 'APERTO', w / 2, h / 2, w * 0.85, h * 0.7, NG_FONT.script, '#ff5a4a'); g.shadowBlur = 0; }); sign(c, qz(C.sign, x - 0.36, Hv - 0.62, x + 0.36, Hv - 0.38, 0.06)); } }
+  // in the window: the menu, the neon OPEN (near on the glass set back in the wall, far as before)
+  if (ext.has('menu') && doors.length) { const x = doors[0][1] + 0.35 < hw - 0.2 ? doors[0][1] + 0.35 : doors[0][0] - 0.35; for (const [md, z] of [[1, zb + 0.06], [2, 0.07]]) { mode(md); box(0.46, 0.62, 0.06, x, 1.45, z, '#2b2b2b'); neon('warm', 0.38, 0.52, 0.02, x, 1.45, z + 0.035); } mode(0); }
+  if (ext.has('neon')) { const g0 = segs.find(q => q[0] === 'glass'); if (g0 && g0[2] - g0[1] > 0.9) { const x = (g0[1] + g0[2]) / 2, c = cell(0.72, 0.24, (g, w, h) => { g.fillStyle = '#120a0a'; g.fillRect(0, 0, w, h); g.shadowColor = '#ff3a3a'; g.shadowBlur = 6; ngText(g, 'APERTO', w / 2, h / 2, w * 0.85, h * 0.7, NG_FONT.script, '#ff5a4a'); g.shadowBlur = 0; });
+    sk(1, 1); for (const [md, z] of [[1, zb + 0.04], [2, 0.06]]) { mode(md); sign(c, qz(C.sign, x - 0.36, Hv - 0.62, x + 0.36, Hv - 0.38, z)); } sk(1, 0.6); mode(0); } }
+  // the light of an open shop on the pavement at night (NG_POOL): from the wall out to 3 m, as wide as the front and a bit more
+  if (m.d !== 'p' && cls !== 'sfitto') {
+    const dz = clamp(depth - 0.15, 0.8, 3.2), xa = -hw - 0.4, xb = hw + 0.4, n = Math.max(1, Math.ceil((xb - xa) / 1.5)), pb = C.pool;
+    const yAt = (x, z) => { const [wx, wz] = lx(x, z); return H.surface(wx, wz) - gy + 0.035; };
+    for (let j = 0; j < n; j++) for (const [za, zc] of [[0.05, dz / 2], [dz / 2, dz]]) {
+      const p = xa + (xb - xa) * j / n, q = xa + (xb - xa) * (j + 1) / n, i0 = pb.p.length / 3;
+      for (const [x, z] of [[p, za], [q, za], [q, zc], [p, zc]]) F.v(pb, x, yAt(x, z), z, 0, 1, 0, (x - xa) / (xb - xa), 1 - z / dz);
+      pb.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2);
+    }
+  }
   // standing on the pavement: worked out once (what stands there stays, even when the tile is built again). Off the asphalt as drawn too
   // (nearAsph: in Meda the carriageways, parking lanes and car parks AC_VEI, wider than the axis band of ngRoad; unione di strade e verde,
   // 24/10: 34 pots, tables and bins of the shops stood on them)
@@ -930,6 +1219,8 @@ function ngFront0(s, C) {
     const wallX = [], blocked = doors.map(([a, b]) => [a - 0.15, b + 0.15]);
     for (let x = -hw + 0.6; x <= hw - 0.6; x += 0.5) if (!blocked.some(([a, b]) => x > a - 0.4 && x < b + 0.4)) wallX.push(x);
     const want = [...(NG_SUBPROP[s.sub] || []), ...(m.p || []), ...(ext.has('band') ? ['bdr'] : [])], used = [];
+    // two pots by the door of some shops (vetrine HQ, approved by Carlo 8/11), where the pavement is wide enough
+    if (!want.includes('vas') && NG_VASI.has(cls) && depth >= 2.2 && NG_HASH('vasi|' + s.h0) < 0.35) want.push('vas', 'vas');
     const omb = (m.a && m.a[1]) || bg || '#f2efe6', tav = s.h0 > 0.5 ? 'w' : 'm';
     let row = 0;
     for (const k0 of want) {
@@ -956,10 +1247,11 @@ function ngFront0(s, C) {
   if (s.tot) {
     const { x, z } = s.tot, th = 2.7, c = cell(0.62, 2.0, (g, w, h) => { g.fillStyle = bg || kc; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(0, 0, w, 5); const words = main.split(' ').slice(0, 4); words.forEach((wd, i) => ngText(g, wd, w / 2, h * 0.12 + i * h * 0.16, w * 0.88, h * 0.11, font, bg ? fg : '#fff')); ngText(g, s.label, w / 2, h * 0.9, w * 0.88, h * 0.05, NG_FONT.sans, bg ? fg : '#fff'); });
     box(0.25, th, 0.72, x, th / 2, z, kc); box(0.4, 0.12 - gl, 0.85, x, 0.06 + gl / 2, z, '#8a857c');
-    sign(c, qx(C.sign, z - 0.31, th - 2.1, z + 0.31, th - 0.08, x + 0.127, 1)); sign(c, qx(C.sign, z - 0.31, th - 2.1, z + 0.31, th - 0.08, x - 0.127, -1));
+    sk(1, 0.8); sign(c, qx(C.sign, z - 0.31, th - 2.1, z + 0.31, th - 0.08, x + 0.127, 1)); sign(c, qx(C.sign, z - 0.31, th - 2.1, z + 0.31, th - 0.08, x - 0.127, -1)); sk(1, 0.6);
   }
   for (const it of s.items) if (!it.tot) C.props.push(it); else C.solids.push(it);
 }
+const NG_VASI = new Set(['bar', 'ristorante', 'gelateria', 'moda', 'farmacia', 'banca', 'bellezza', 'alimentari', 'mobili']);
 const shade2 = hex => '#' + new THREE.Color(hex).multiplyScalar(0.78).getHexString();
 const ngLum = hex => { const c = new THREE.Color(hex); return 0.3 * c.r + 0.59 * c.g + 0.11 * c.b; };
 const ngFlag = (bg, fg) => bg && ngLum(bg) > 0.15 ? bg : fg && ngLum(fg) > 0.15 && ngLum(fg) < 0.9 ? fg : '#c8102e'; // a flag is never black
@@ -1011,7 +1303,7 @@ function ngBig(B, C) {
   K.box(w + 0.2, 0.3 - gl, 0.14, 0, (0.3 + gl) / 2, 0.07, dark); K.box(w + 0.2, 0.25, 0.2, 0, Hg + 0.08, 0.1, dark);
   for (const sx of [-1, 1]) K.box(0.14, Hg - gl, 0.16, sx * (hw + 0.03), (Hg + gl) / 2, 0.08, dark);
   const cuts = [-hw, ...doors.flatMap(d => [d - dw / 2, d + dw / 2]), hw];
-  for (let i = 0; i < cuts.length; i += 2) { const a = cuts[i], b = cuts[i + 1], np = Math.max(1, Math.round((b - a) / 1.6)), pw = (b - a) / np; for (let k = 0; k < np; k++) { K.pane('supermercato', th, a + k * pw + 0.04, 0.3, a + (k + 1) * pw - 0.04, Hg - 0.05, 0.04); K.box(0.08, Hg - 0.3, 0.12, a + k * pw, (Hg + 0.3) / 2, 0.06, dark); } }
+  for (let i = 0; i < cuts.length; i += 2) { const a = cuts[i], b = cuts[i + 1], np = Math.max(1, Math.round((b - a) / 1.6)), pw = (b - a) / np; const ci = NG_WIN.ci('supermercato', th), R = { xa: a, xb: b, ya: 0.3, yb: Hg - 0.05, cell: ci, mid: 4, wc: NG_WIN.col[ci][0], fc: NG_WIN.col[ci][1], dp: 6 }; for (let k = 0; k < np; k++) { K.glass(R, a + k * pw + 0.04, 0.3, a + (k + 1) * pw - 0.04, Hg - 0.05, 0.04); K.box(0.08, Hg - 0.3, 0.12, a + k * pw, (Hg + 0.3) / 2, 0.06, dark); } }
   for (const d of doors) { K.box(dw - 0.1, 2.5, 0.04, d, 1.25, 0.05, '#28303a'); K.box(0.05, 2.5, 0.07, d, 1.25, 0.07, '#c9ccd1'); K.box(dw, 0.12, 0.12, d, 2.56, 0.07, dark); K.box(dw - 0.1, Hg - 2.62, 0.04, d, (Hg + 2.62) / 2, 0.05, '#2b3238'); K.box(dw + 1.2, 0.08 - gl, 1.6, d, (0.08 + gl) / 2, 0.8, '#b8b3a8'); }
   // the canopy over the doors, its edge lettered, lights under it
   const depth = ngDepth(f), Dc = clamp(depth - 0.6, 1.8, 4), Wc = Math.min(w + 0.4, doors.length > 1 ? doors[1] - doors[0] + 5 : 6.5), yc = Hg + 0.45, ccol = v % 2 ? fasc : '#e8e6e0';
@@ -1069,21 +1361,26 @@ function ngBig(B, C) {
 }
 function* buildNegozi(T, G) { // a generator: the tile builder yields between slices, so a street of shops never stalls a frame
   const list = ngDelTile(T), bigs = T.bld.filter(B => B.big); if (!list.length && !bigs.length) return;
-  const C = { solid: Buf(), sign: Buf(), shut: Buf(), shuts: [], dark: Buf(), darks: [], sq: [], cells: [], glass: {}, neon: {}, props: [], solids: [], depth: ngDepth };
+  const C = { solid: Buf(), sign: Buf(), shut: Buf(), plug: Buf(), glassB: Buf(), pool: Buf(), sq: [], cells: [], neon: {}, props: [], solids: [], depth: ngDepth, mode: 0, fc: [0, 0, 1, 0], sk: [1, 0.6], fronts: [], cur: null };
+  C.glassB.R = []; C.glassB.W = []; C.glassB.Fc = [];
   T.ngShut = null;
-  for (const B of bigs) { try { ngBig(B, C); } catch (e) { console.warn('supermercato', B.big.name, e); } yield 'negozi'; }
+  for (const B of bigs) { const f = B.big.front; ngFill(C); C.mode = 0; C.fc = f ? [f.cx, f.cz, f.nx, f.nz] : [0, 0, 1, 0]; try { ngBig(B, C); } catch (e) { console.warn('supermercato', B.big.name, e); } ngFill(C); yield 'negozi'; }
   if (C.panel) mkMesh(C.panel, NG_PANEL, 10, 'cast', G);
   if (C.roof) mkMesh(C.roof, MAT.roof, 10, 'cast', G);
   let n = 0;
   for (const s of list) { try { ngFront(s, C); } catch (e) { console.warn('negozio', s.name, e); } if (++n % 3 === 0) yield 'negozi'; }
+  ngFill(C);
   yield 'negozi';
-  if (C.solid.i.length) mkMesh(C.solid, LMAT.trim, 10, 'cast', G);
-  T.ngShut = [];
-  if (C.shut.i.length) T.ngShut.push({ mesh: mkMesh(C.shut, NG_SHUT_MAT, 10, 'cast', G), items: C.shuts });
-  if (C.dark.i.length) T.ngShut.push({ mesh: mkMesh(C.dark, NG_DARK_MAT, 11, false, G), items: C.darks });
-  ngShutters(T);
-  for (const k in C.glass) if (C.glass[k].i.length) mkMesh(C.glass[k], NG_WIN.mat[k], 10, false, G);
-  for (const k in C.neon) if (C.neon[k].i.length) mkMesh(C.neon[k], NG_NEON[k], 10, false, G);
+  // the meshes: each with its front and version per vertex (ngC, ngL); the inside of the openings before the plugs, the plugs before the walls (renderOrder 8, 9, 10)
+  const F32 = (a, k) => new THREE.Float32BufferAttribute(a, k);
+  const mk = (b, mat, ro, cast, extra) => { if (!b.i.length) return null; const me = mkMesh(b, mat, ro, cast, G), g = me.geometry; g.setAttribute('ngC', F32(b.cc, 4)); g.setAttribute('ngL', F32(b.L, 1)); if (extra) extra(g, b); me.userData.ng = true; return me; };
+  const D = { T, fronts: C.fronts };
+  D.solid = mk(C.solid, NG_SOLID, 8, 'cast'); if (D.solid) D.solid.customDepthMaterial = NG_DEPTH;
+  D.plug = mk(C.plug, NG_PLUG, 9, false);
+  D.glass = mk(C.glassB, NG_WIN.mat.all, 8, false, (g, b) => { g.setAttribute('ngR', F32(b.R, 4)); g.setAttribute('ngW', F32(b.W, 4)); g.setAttribute('ngF', F32(b.Fc, 3)); g.setAttribute('ngOn', F32(b.on, 1)); });
+  D.shut = mk(C.shut, NG_SHUT_MAT, 8, false); if (D.shut) D.shut.frustumCulled = false; /* its curtains move: the box of the mesh was measured once */
+  D.pool = mk(C.pool, NG_POOL, 11, false, (g, b) => g.setAttribute('ngOn', F32(b.on, 1)));
+  for (const k in C.neon) mk(C.neon[k], NG_NEON[k], 8, false);
   // the signs: one texture per tile, cells packed in shelves 1024 px wide
   if (C.cells.length) {
     /* the cells fill shelves of one texture 4096 px high; if they do not fit, all of them shrink a little (before, the last ones, the wide low signs, stayed blank) */
@@ -1094,10 +1391,11 @@ function* buildNegozi(T, G) { // a generator: the tile builder yields between sl
     (window.NG_VUOTE || (window.NG_VUOTE = {}))[T.t] = vu;
     for (const [i0, c] of C.sq) for (let k = 0; k < 4; k++) { const q = (i0 + k) * 2, u = C.sign.uv[q], v = C.sign.uv[q + 1]; C.sign.uv[q] = (c.x + 0.5 + u * (c.pw - 1)) / 1024; C.sign.uv[q + 1] = 1 - (c.y + 0.5 + (1 - v) * (c.ph - 1)) / Hh; }
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
-    const mat = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    SIGN_MATS.push(mat); mkMesh(C.sign, mat, 10, false, G);
+    const mat = ngSignMat(new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    SIGN_MATS.push(mat); D.sign = mk(C.sign, mat, 10, 'cast', (g, b) => { g.setAttribute('ngS', F32(b.S, 2)); g.setAttribute('ngOn', F32(b.on, 1)); }); if (D.sign) D.sign.customDepthMaterial = ngDepthMap(tex);
     yield 'negozi';
   }
+  T.ngShut = D; ngTickTile(T, true);
   if (!T.ngDone) for (const it of C.solids) { const gy = H.ground(it.x, it.z); WALLS.add(it.x - it.r, it.z - it.r, it.x + it.r, it.z + it.r, { r: it.r, x: it.x, z: it.z, y0: gy - 3, y1: gy + 3 }); }
   // the things outside: one instanced mesh per kind, knocked over like the bins and the benches
   const by = {}; C.props.forEach((it, i) => { it.id = it.id ?? i; (by[it.key] = by[it.key] || []).push(it); });
