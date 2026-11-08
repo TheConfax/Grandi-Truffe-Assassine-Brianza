@@ -16,9 +16,9 @@ Cartelle: `S=C:/Users/theco/AppData/Local/Temp/claude/645585d1e8c08b81/7a2efc23-
 | Lavoro | Ramo | Cartella | Porta | Agente | Stato |
 |---|---|---|---|---|---|
 | Vetrine 2.0, terzo giro (insegne doppie, vuote, via taglio 40 lettere, con build) | `vetrine-2` | `$S/vet2` | 8088 | ab0afbf820f8750d0 | FATTO 2c5c5a4c (server 8088 acceso, resta acceso) |
-| Epoca degli edifici dal CENED | `epoca-edifici` | `$S/epoca` | 8089 | a109aa865b73fc4a3 | in corso |
+| Epoca degli edifici dal CENED | `epoca-edifici` | `$S/epoca` | 8089 | a109aa865b73fc4a3 | FATTO 23186bdc + 029ee9fb (server 8089 acceso, resta acceso) |
 | Merge edifici-piccoli in dev | — | principale | 8013 | — | FATTO (1fc245be) |
-| nightly/snap1 = dev + vetrine-2 + epoca, build sola | `nightly` | `$S/snap1` | 8090 | — | da fare dopo i due sopra |
+| nightly/snap1 = dev + vetrine-2 + epoca, build sola | `nightly` | `$S/nightly` (lavoro), `$S/snap1` (fermo) | 8090 | a73fe46c21b7a4d66 | in corso dalle 4:50 |
 | Facciate 2.0 (Opus) da snap1 | `facciate-2` | `$S/fac2` | 8093 | — | da lanciare dopo le 6:00 |
 | Vetrine HQ (Opus) da snap1 | `vetrine-hq` | `$S/vhq` | 8094 | — | da lanciare dopo le 6:00 |
 | Androni secondo giro (Sonnet) da snap1 | `androni` (rifatto su snap1) | `$S/andr2` | 8095 | — | da lanciare dopo le 6:00 |
