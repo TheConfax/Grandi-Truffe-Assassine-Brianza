@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 21.9,
+  "tempo_s": 10.8,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 35.4,
+  "tempo_s": 58.8,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -1563,26 +1563,30 @@
   "troppo_larghi": 625,
   "androni": {
    "passaggio:lontano_dalla_strada": 2885,
-   "passaggio:una_bocca": 3932,
-   "passaggio:cancello": 519,
-   "passaggio:non_in_un_cortile": 1852,
-   "passaggio:collega_due_vie": 145,
-   "passaggio:gia_cancello": 20,
+   "passaggio:una_bocca": 3924,
+   "passaggio:cancello": 498,
+   "passaggio:non_in_un_cortile": 1894,
+   "passaggio:collega_due_vie": 106,
+   "passaggio:gia_cancello": 21,
    "passaggio:troppo_larga": 1,
    "passaggio:via_pubblica": 9,
-   "passaggio:cancellata": 1,
-   "porticato:collega_due_vie": 84,
+   "passaggio:cieco": 8,
+   "passaggio:cancellata": 2,
+   "passaggio:stretta_extra": 1,
+   "passaggio:stretta": 1,
+   "porticato:collega_due_vie": 63,
    "porticato:gia_passaggio": 128,
-   "porticato:cancello": 93,
-   "porticato:cancellata": 56,
+   "porticato:cancellata": 52,
+   "porticato:cancello": 81,
    "porticato:lontano_dalla_strada": 29,
-   "porticato:stretta_extra": 9,
    "porticato:gia_cancello": 6,
-   "porticato:una_bocca": 12,
-   "porticato:stretta": 14,
+   "porticato:una_bocca": 11,
+   "porticato:stretta": 16,
+   "porticato:cieco": 1,
+   "porticato:stretta_extra": 1,
    "porticato:troppo_larga": 3
   },
-  "androni_tolti_vecchi": 133,
+  "androni_tolti_vecchi": 122,
   "per_origine": {
    "passo_carraio": 277,
    "rampa": 2,
@@ -1610,9 +1614,9 @@
   "dbgt_cancellata_02": 1743,
   "dedotto_cortile": 1081,
   "osm": 293,
-  "dedotto_varchi": 2006
+  "dedotto_varchi": 1984
  },
- "divisori_tagliati_da_cancelli": 509,
+ "divisori_tagliati_da_cancelli": 507,
  "monconi_in_carreggiata_tolti": 200,
  "cancelli_in_carreggiata_tolti": 766,
  "barriere_in_carreggiata": {
@@ -1721,15 +1725,15 @@
  },
  "cancelli_ante_alberi": {
   "ante_girate": 7,
-  "alberi_spostati": 95
+  "alberi_spostati": 96
  },
  "doppioni_tolti_alla_fine": {
   "cancelli": {
    "0": 2,
-   "1": 61,
+   "1": 58,
    "2": 234
   },
-  "divisori": 216
+  "divisori": 214
  },
  "recinzioni_controllo": {
   "coppie_doppie_rimaste": 0,
@@ -2774,6 +2778,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 9.0
+  "tempo_s": 16.0
  }
 }
