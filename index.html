@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 06d0ca6 · assemblato 08/11 02:50 · porta ' + location.port;
+    const txt = 'locale · ramo cartelli-stazione · dopo f58abc1 · assemblato 08/11 03:01 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -5086,11 +5086,11 @@ const lmBox = (w, h, d, x, y, z, ry = 0) => new THREE.BoxGeometry(w, h, d).rotat
 // the canopies on posts, the stairs down to the underpass, the blue name boards, benches and lamps
 const PLAT_STATIONS = D.pois.filter(p => p.k === 'stazione');
 const PLAT_MAT = { top: new THREE.MeshLambertMaterial({ map: sidewalkTex, color: 0xd8d4cc }), side: new THREE.MeshLambertMaterial({ map: concreteTex }), line: new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }) };
-const STATION_SIGN = {};
+const STATION_SIGN = {}, STATION_BOARD_M = new THREE.MeshLambertMaterial({ color: 0x1f3f8c });
 function stationSignMat(name) { // the blue Ferrovienord board with the station's name
   if (STATION_SIGN[name]) return STATION_SIGN[name];
   const t = canvasTex(512, 96, (g, w, h) => { g.fillStyle = '#1f3f8c'; g.fillRect(0, 0, w, h); g.strokeStyle = '#ffffff'; g.lineWidth = 4; g.strokeRect(6, 6, w - 12, h - 12); g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = 56; g.font = `bold ${fs}px Arial, sans-serif`; while (g.measureText(name).width > w - 40 && fs > 20) { fs -= 2; g.font = `bold ${fs}px Arial, sans-serif`; } g.fillText(name, w / 2, h / 2 + 3); }, false);
-  return (STATION_SIGN[name] = new THREE.MeshLambertMaterial({ map: t, side: THREE.DoubleSide }));
+  return (STATION_SIGN[name] = new THREE.MeshLambertMaterial({ map: t })); /* FrontSide: the back is a second plane turned round, so the writing reads straight from both sides */
 }
 // across-section of a polygon on the line through (cx,cz)+u*s, perpendicular to u: the [vmin, vmax] where it is inside
 function lmSection(poly, cx, cz, ux, uz, s) {
@@ -5140,7 +5140,8 @@ function buildPlatforms(T, G) {
       if (si % 40 === 20 && name) { // name board on two posts, readable from the trains: a sign, knocked down whole
         const root = new THREE.Group(); root.position.set(x, gy, z); root.rotation.y = Math.atan2(-uz, ux); G.add(root);
         for (const e of [-1.4, 1.4]) { const m = new THREE.Mesh(boxG(0.1, 3.0, 0.1), BOARD_POST_M); m.position.set(e, 1.5, 0); m.castShadow = true; root.add(m); }
-        const bd = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.65), stationSignMat(name)); bd.position.set(0, 2.525, 0.06); bd.renderOrder = 10; root.add(bd);
+        const bd = new THREE.Mesh(boxG(3.04, 0.69, 0.04), STATION_BOARD_M); bd.position.set(0, 2.525, 0.08); bd.castShadow = true; root.add(bd); /* a solid slab, blue edge, and the writing on both faces */
+        for (const e of [1, -1]) { const f = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.65), stationSignMat(name)); f.position.set(0, 2.525, 0.08 + e * 0.021); if (e < 0) f.rotation.y = Math.PI; root.add(f); }
         const key = 'tabella:' + x.toFixed(1) + ',' + z.toFixed(1), q = ISTA_PROPS.get(key);
         if (!q) ISTA_PROPS.set(key, addProp({ x: x - ux * 1.4, z: z - uz * 1.4, y: gy, r: 0.1, h: 3, obj: root, parts: [[x + ux * 1.4, z + uz * 1.4, 0.1]] }));
         else { q.obj = root; if (q.broken) root.visible = false; }
