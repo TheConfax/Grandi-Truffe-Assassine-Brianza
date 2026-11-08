@@ -3,7 +3,7 @@ Il capo di una recinzione, di un muro o di una siepe che finisce libero a pochi 
 si prolunga sulla sua linea fino a toccarlo e li' si chiude a T. Vale ovunque (fronte strada e dentro i lotti), per ogni comune. Non si chiude dove c'e'
 un accesso: un cancello o una porta nel varco, una via o un sentiero OSM, una superficie pavimentata (strada, marciapiede, vialetto, parcheggio) o un
 passo carraio del DBGT entro 4 m. Funzione pura (shapely), provata fuori dalla build su brianza.json (scratchpad della sessione)."""
-import math
+import math, os
 from collections import Counter
 from shapely.geometry import LineString, Point
 from shapely.strtree import STRtree
@@ -18,6 +18,7 @@ COSMIN = 0.92
 LAT_G = 1.5       # m: the same towards a gate, which stands on the line of the street front the short end of a fence may point slightly beside
 VIA_D = 1.0
 TAN_W = 1.5       # m: the direction of the target is read over this much of it each side of the hit (a short hook at the end of a line is no flank)
+PC_GATE_D = 4.0   # m
 PC_D = 1.5        # m: a closure that passes this near a passo carraio of the DBGT closes an access
 PAR_D = 2.3       # m: a closure that runs side by side with another divider nearer than this for PAR_L m or more is a double of it (src/barriere.py DOPPIO_D, DOPPIO_L, DOPPIO_COS)
 PAR_L = 3.0
@@ -52,11 +53,16 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
     VT = STRtree(vie) if vie else None
     PT = STRtree(pav) if pav else None
     CAT = STRtree(carr) if carr else None
+    # a passo carraio of the DBGT that has a gate within PC_GATE_D already has its access: the rest of the opening beside it is not the driveway (voto 38)
+    gT = STRtree(gg) if gg else None
+    pc = [p for p in pc if gT is None or not any(gg[k].distance(Point(p)) < PC_GATE_D for k in gT.query(Point(p).buffer(PC_GATE_D)))]
     CT = STRtree([Point(p) for p in pc]) if pc else None
     pcs = [Point(p) for p in pc]
     out = []; seg_done = []
+    _dbg = [tuple(map(float, x_.split(','))) for x_ in os.environ.get('GTA_T_DEBUG', '').split(';') if x_]   # x,z;x,z: say what became of the free ends within 3 m of these points
     def note(e, why, d=None, k=None):
         rep[why] += 1
+        if _dbg and any(math.dist(e, q_) < 3.0 for q_ in _dbg): print('chiusura a T debug', (round(e[0], 1), round(e[1], 1)), why, None if d is None else round(d, 1))
         if dec is not None: dec.append((e, why, d, k))
     for i, (L, kind, h) in enumerate(lines):
         if L.length < 1.0: continue

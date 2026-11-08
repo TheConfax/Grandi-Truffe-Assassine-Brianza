@@ -148,7 +148,7 @@ def fondi_doppi(items, dist_strada, prio=None):
             if q < len(mid) and mark[q]:
                 if s is None: s = q
             elif s is not None:
-                if nn[s:q].sum() >= DOPPIO_L: cut[s:q] = True
+                if nn[s:q].sum() >= DOPPIO_L or (nn.sum() >= 1.0 and nn[s:q].sum() >= 0.9 * nn.sum()): cut[s:q] = True   # or the whole short piece lies beside a stronger divider (a rail on a low wall in front of a wall: Jolly Pub alley, 8/11)
                 s = None
         if not cut.any(): surv[i] = [li]; continue
         FUSI['linee_toccate'] += 1; FUSI['metri_tolti'] += float(nn[cut].sum())
