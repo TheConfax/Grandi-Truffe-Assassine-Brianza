@@ -1606,7 +1606,9 @@ function aiTraffic(v, dt) {
   const t = steerTo(v, tx, tz, cruise, true);
   passStep(v, cruise, dt);
   ai.ignore -= dt;
-  if (t < 0.5 && v.speed < 0.5) { ai.blocked += dt; if (ai.blocked > 4 && P.car && hyp(P.car.x - v.x, P.car.z - v.z) < 10) hornOther = 0.3; if (ai.blocked > 7) { ai.ignore = 2.5; ai.blocked = 0; } } else ai.blocked = 0;
+  if (t < 0.5 && v.speed < 0.5) { ai.blocked += dt; if (ai.blocked > 4 && P.car && hyp(P.car.x - v.x, P.car.z - v.z) < 10) hornOther = 0.3; if (ai.blocked > (ai.pat || (ai.pat = 4 + rnd() * 5))) { /* each driver has his own patience: of two cars face to face the one with less backs up, the other goes on; any other block is ignored for a moment (a lane line shared with a wall or a parked car) */
+      const b = ai.blocker; ai.pat = 4 + rnd() * 5; ai.blocked = 0; if (b && Math.cos(b.h - v.h) < -0.3) ai.reverse = 2.2; else ai.ignore = 2.5;
+    } } else ai.blocked = 0;
   unstick(v, dt);
 }
 function passStep(v, cruise, dt) { // cars overtake slow scooters and bikes when the other lane is clear for 50 m
@@ -1623,7 +1625,8 @@ function passStep(v, cruise, dt) { // cars overtake slow scooters and bikes when
 function unstick(v, dt) { // any AI car pressing the gas without moving (wedged on a wall or a kerb corner) backs off, steering the other way
   const ai = v.ai;
   if (ai.reverse > 0) { ai.reverse -= dt; v.inp.thr = 0; v.inp.brk = 1; v.inp.steer *= -1; return; }
-  if (v.inp.thr > 0 && v.speed < 0.4) { ai.wedged = (ai.wedged || 0) + dt; if (ai.wedged > 2.5) { ai.reverse = 1.3; ai.wedged = 0; } } else ai.wedged = 0;
+  if (v.speed > 2) ai.rc = 0;
+  if (v.inp.thr > 0 && v.speed < 0.4) { ai.wedged = (ai.wedged || 0) + dt; if (ai.wedged > 2.5) { ai.rc = (ai.rc || 0) + 1; ai.reverse = Math.min(4, 0.6 + 0.7 * ai.rc); ai.wedged = 0; } } else ai.wedged = 0; /* against a wall, a closed gate it cannot open: it backs off, each failed try longer (1.3 s, 2 s ... 4 s) */
 }
 function aiCop(v, dt) {
   const ai = v.ai, tx = P.mode === 'car' ? P.car.x : P.x, tz = P.mode === 'car' ? P.car.z : P.z, d = hyp(tx - v.x, tz - v.z);
