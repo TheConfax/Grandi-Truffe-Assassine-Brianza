@@ -263,8 +263,8 @@ vec3 ngRoom() {
   vec3 col;
   if (t == tz) col = ngAt(cell, vec2(fract(h.x * nrep), h.y), gx, gy).rgb;
   else if (t == ty && dn.y < 0.0) { vec2 f = fract(hm.xz / 0.6); col = vNgF * mix(0.78, 1.0, step(0.05, f.x) * step(0.05, f.y)); }
-  else if (t == ty) { vec2 f = fract(vec2(hm.x / 1.6, hm.z / 1.3)) - 0.5; float l = 1.0 - smoothstep(0.1, 0.16, length(f * vec2(1.6, 1.3))); col = mix(vec3(0.78, 0.77, 0.74), vec3(2.6, 2.4, 2.0), l * (0.25 + 0.75 * vNgOn)); }
-  else col = vNgW.rgb * (0.72 + 0.2 * h.y);
+  else if (t == ty) { vec2 f = fract(vec2(hm.x / 1.6, hm.z / 1.3)) - 0.5; float l = 1.0 - smoothstep(0.1, 0.16, length(f * vec2(1.6, 1.3))); col = mix(vec3(0.62, 0.61, 0.58), vec3(2.6, 2.4, 2.0), l * (0.25 + 0.75 * vNgOn)); }
+  else col = vNgW.rgb * (0.6 + 0.2 * h.y);
   if (vNgR.w > -0.5) {
     float tm = 0.38 / dn.z;
     if (tm < t) {
@@ -274,7 +274,7 @@ vec3 ngRoom() {
   }
   return col * mix(1.0, 0.68, h.z);
 }`;
-const NG_MID = { bar: 0, gelateria: 0, pizzeria: 0, ristorante: 1, farmacia: 2, banca: 3, alimentari: 4, supermercato: 4, tabacchi: 4, moda: 5, ufficio: 6, medico: 6, bottega: 7, bellezza: 7 };
+const NG_MID = { bar: 0, gelateria: 0, pizzeria: 0, ristorante: 1, farmacia: 2, banca: 3, alimentari: 4, supermercato: 4, moda: 5, ufficio: 6, medico: 6, bottega: 7, bellezza: 7 };
 const NG_WIN = (() => {
   const shade = (hex, k) => '#' + new THREE.Color(hex).multiplyScalar(k).getHexString();
   const F = (g, c, x, y, w, h) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
@@ -479,10 +479,10 @@ const NG_WIN = (() => {
   const mat = ngLodMat(new THREE.MeshLambertMaterial({ map: tex, color: 0x0e1215 }), 'glass', 0.35, s => {
     s.uniforms.uNgLamps = NG_U.lamps;
     s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 ngR;\nattribute vec4 ngW;\nattribute vec3 ngF;\nattribute float ngOn;\nvarying vec3 vNgV;\nvarying vec4 vNgR;\nvarying vec4 vNgW;\nvarying vec3 vNgF;\nvarying float vNgOn;')
-      .replace('#include <project_vertex>', '#include <project_vertex>\n  { vec4 ngWp = modelMatrix * vec4(transformed, 1.0); vec3 ngN = normalize(vec3(ngC.z, 0.0, ngC.w) + vec3(1e-6, 0.0, 0.0)), ngT = vec3(ngN.z, 0.0, -ngN.x), ngVv = ngWp.xyz - cameraPosition;\n    vNgV = vec3(dot(ngVv, ngT), ngVv.y, -dot(ngVv, ngN)); vNgR = ngR; vNgW = ngW; vNgF = ngF; vNgOn = ngOn; }');
+      .replace('#include <project_vertex>', '#include <project_vertex>\n  { vec4 ngWp = modelMatrix * vec4(transformed, 1.0); vec3 ngN = normalize(vec3(ngC.z, 0.0, ngC.w) + vec3(1e-6, 0.0, 0.0)), ngT = vec3(ngN.z, 0.0, -ngN.x), ngVv = ngWp.xyz - uNgCam;\n    vNgV = vec3(dot(ngVv, ngT), ngVv.y, -dot(ngVv, ngN)); vNgR = ngR; vNgW = ngW; vNgF = ngF; vNgOn = ngOn; }');
     s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNgLamps;\nvarying vec3 vNgV;\nvarying vec4 vNgR;\nvarying vec4 vNgW;\nvarying vec3 vNgF;\nvarying float vNgOn;')
       .replace('void main() {', NG_ROOM_GLSL + '\nvoid main() {')
-      .replace('#include <map_fragment>', 'vec3 ngIn = ngRoom();\n  float ngCos = clamp(normalize(vNgV).z, 0.0, 1.0);\n  float ngLev = mix(mix(0.16, 0.55, vNgOn), mix(0.01, 1.0, vNgOn), uNgLamps) * (0.3 + 0.7 * ngCos);')
+      .replace('#include <map_fragment>', 'vec3 ngIn = ngRoom();\n  float ngCos = clamp(normalize(vNgV).z, 0.0, 1.0);\n  float ngLev = mix(mix(0.12, 0.42, vNgOn), mix(0.01, 1.0, vNgOn), uNgLamps) * (0.3 + 0.7 * ngCos);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += ngIn * ngLev;');
   });
   return { tex, mat: { all: mat }, col, ci: (cls, th) => NG_CLASSES.indexOf(cls) * 6 + th };
@@ -495,7 +495,8 @@ LM_GLOW.push({ m: NG_NEON.green, a: 0.45, b: 0.8 }, { m: NG_NEON.warm, a: 0.05, 
 const NG_SOLID = ngLodMat(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), 'solid', 0.35);
 const NG_PLUG = ngLodMat(new THREE.MeshBasicMaterial({ colorWrite: false }), 'plug');
 const NG_POOL = ngLodMat(new THREE.MeshBasicMaterial({ color: 0xffc98a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
-  map: canvasTex(64, 64, (g, w, h) => { const gr = g.createRadialGradient(w / 2, 0, 2, w / 2, 0, h); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, false) }), 'pool', 0, s => {
+  map: canvasTex(64, 64, (g, w, h) => { /* brightest at the wall, fading out over the pavement and softly at the two ends */ const im = g.createImageData(w, h), sm = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const u = (x + 0.5) / w, v = (y + 0.5) / h, k = Math.pow(1 - v, 1.7) * sm(0, 0.2, u) * sm(0, 0.2, 1 - u), i = (y * w + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = Math.round(255 * k); im.data[i + 3] = 255; } g.putImageData(im, 0, 0); }, false) }), 'pool', 0, s => {
   s.uniforms.uNgLamps = NG_U.lamps;
   s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float ngOn;\nvarying float vNgOn;').replace('#include <project_vertex>', '#include <project_vertex>\n  vNgOn = ngOn;');
   s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNgLamps;\nvarying float vNgOn;').replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb *= vNgOn * uNgLamps * 0.55;');
@@ -839,7 +840,10 @@ function ngTickTile(T, first) {
 }
 let ngTick = 0;
 function updNegozi(dt) {
-  NG_U.cam.value.copy(camera.position); NG_U.lamps.value = LIGHTS.on || 0;
+  if (!NG_U.hook) { /* the camera of each render (and of its sun's pass) for near and far and for the rooms behind the glass: three.js gives cameraPosition only to some materials */
+    NG_U.hook = true; const prev = scene.onBeforeRender; scene.onBeforeRender = function (r, sc, cam, rt) { NG_U.cam.value.setFromMatrixPosition(cam.matrixWorld); return prev ? prev.call(this, r, sc, cam, rt) : undefined; };
+  }
+  NG_U.lamps.value = LIGHTS.on || 0;
   for (const f of NG_ANIM) {
     const a = f.anim; if (!a || a.D.T.ngShut !== a.D) { NG_ANIM.delete(f); if (f.anim) f.anim = null; continue; }
     const st = Math.sign(a.to - f.u) * dt / 7; let u = f.u + st, done = false; if (st >= 0 ? u >= a.to : u <= a.to) { u = a.to; done = true; }
