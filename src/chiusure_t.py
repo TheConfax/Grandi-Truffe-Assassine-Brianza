@@ -10,14 +10,16 @@ from shapely.strtree import STRtree
 from shapely.ops import nearest_points
 
 GAP_MIN = 0.5
+GAP_MAX_G = 12.0   # m: the gap between the end of a fence and a gate on its line (the opening beside a gate: Carlo 8/11, voto 38) may be wider
 GAP_MAX = 7.5      # m: wider than this is an opening to think about, not a T
 ANG_MIN = 30.0     # deg: a T, not two lines running side by side
 LAT = 0.8          # m: tolerance when the extension of the end misses the target by a corner
 COSMIN = 0.92
+LAT_G = 1.5       # m: the same towards a gate, which stands on the line of the street front the short end of a fence may point slightly beside
 VIA_D = 1.0
 
-def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None):
-    """lines [(LineString, kind, h)] (no railway); edifici [Polygon]; gates [(LineString, tipo)]; doors [LineString]; vie [LineString]; pav [Polygon];
+def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None, carr=()):
+    """lines [(LineString, kind, h)] (no railway); edifici [Polygon]; gates [(LineString, tipo)]; doors [LineString]; vie [LineString]; pav [Polygon] (surfaces a fence never crosses); carr [Polygon] (the carriageway proper: never crossed; a closure that ends on a gate, along the line of the lot, may cross the rest of pav);
     pc [(x, z)] passi carrai. Returns ([(pts, kind, h)] new segments, rep)."""
     rep = rep if rep is not None else Counter()
     cl = [l[0] for l in lines] + [g.boundary for g in edifici]
@@ -29,6 +31,7 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
     GT = STRtree(blk) if blk else None
     VT = STRtree(vie) if vie else None
     PT = STRtree(pav) if pav else None
+    CAT = STRtree(carr) if carr else None
     CT = STRtree([Point(p) for p in pc]) if pc else None
     pcs = [Point(p) for p in pc]
     out = []; seg_done = []
@@ -48,7 +51,7 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
             if any(j != i and cl[j].distance(P) < 0.5 for j in T.query(P.buffer(0.5))): continue
             rep['capi_liberi'] += 1
             if GT is not None and any(blk[j].distance(P) < 1.5 for j in GT.query(P.buffer(1.5))): note(e, 'cancello_al_capo'); continue
-            axis = LineString([e, (e[0] + ux * GAP_MAX, e[1] + uz * GAP_MAX)])
+            axis = LineString([e, (e[0] + ux * GAP_MAX_G, e[1] + uz * GAP_MAX_G)])
             best = None
             for j in T.query(axis):
                 if j == i: continue
@@ -57,7 +60,7 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
                 c = nearest_points(x, P)[0].coords[0]; d = math.dist(e, c)
                 if d > 0.05 and (best is None or d < best[0]): best = (d, j, c)
             if best is None:
-                strip = axis.buffer(LAT, cap_style=2)
+                strip = axis.buffer(LAT_G, cap_style=2)
                 for j in T.query(strip):
                     if j == i: continue
                     x = cl[j].intersection(strip)
@@ -67,11 +70,12 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
                         if part.geom_type == 'LineString' and part.length > 0.2: pts_ += [part.interpolate(k_ * 0.2).coords[0] for k_ in range(int(part.length / 0.2) + 1)]
                         for c in pts_:
                             d = math.dist(e, c)
-                            if d > 0.05 and ((c[0] - e[0]) * ux + (c[1] - e[1]) * uz) / d >= COSMIN and (best is None or d < best[0]): best = (d, j, c)
+                            if d > 0.05 and ((c[0] - e[0]) * ux + (c[1] - e[1]) * uz) / d >= (COSMIN if j < nb else 0.85) and abs((c[0] - e[0]) * uz - (c[1] - e[1]) * ux) <= (LAT if j < nb else LAT_G) and (best is None or d < best[0]): best = (d, j, c)
             if best is None: note(e, 'niente_davanti'); continue
             d, j, c = best
             if d < GAP_MIN: note(e, 'gia_vicino', d); continue
             isg = j >= nb
+            if not isg and d > GAP_MAX: note(e, 'troppo_largo', d); continue
             if not isg:
                 tg = cl[j]; pos = tg.project(Point(c))
                 p1 = tg.interpolate(max(0, pos - 0.5)); p2 = tg.interpolate(min(tg.length, pos + 0.5))
@@ -85,7 +89,8 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
             # a gate or a door stands in the opening (its own gate, not the one the end is next to): an access
             if GT is not None and any(blk[k].distance(S) < 0.8 for k in GT.query(S.buffer(0.8)) if not (isg and blk[k] is cl[j])): note(e, 'cancello_nel_varco', d); continue
             if VT is not None and any(vie[k].distance(S) < VIA_D for k in VT.query(S.buffer(VIA_D))): note(e, 'via_nel_varco', d); continue
-            if PT is not None and any(pav[k].intersects(S) and pav[k].intersection(S).length > 0.3 for k in PT.query(S)): note(e, 'pavimentato_nel_varco', d); continue
+            if CAT is not None and any(carr[k].intersects(S) and carr[k].intersection(S).length > 0.3 for k in CAT.query(S)): note(e, 'carreggiata_nel_varco', d); continue
+            if PT is not None and not isg and any(pav[k].intersects(S) and pav[k].intersection(S).length > 0.3 for k in PT.query(S)): note(e, 'pavimentato_nel_varco', d); continue
             if CT is not None and any(pcs[k].distance(S) < 4.0 for k in CT.query(S.buffer(4.0))): note(e, 'passo_carraio_vicino', d); continue
             if any(S.distance(sd) < 0.2 for sd in seg_done): note(e, 'doppio'); continue
             seg_done.append(S)

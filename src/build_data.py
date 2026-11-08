@@ -2781,7 +2781,7 @@ from chiusure_t import chiudi_a_t as _chiudi_t
 _gt_ = [(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]) if (g_[0], g_[1]) != (g_[2], g_[3]) else Point(g_[0] / 10, g_[1] / 10), g_[4]) for g_ in gate_out]
 _dr_ = [LineString([(d_[0] / 10, d_[1] / 10), (d_[2] / 10, d_[3] / 10)]) for d_ in doors_out if (d_[0], d_[1]) != (d_[2], d_[3])]
 _nt_, _rt_ = _chiudi_t([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if len(p_) >= 2 and k_ != 6], list(btree_geoms), _gt_, _dr_,
-                       [r_['line'] for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x'] and r_['c'] <= 6], list(_paved_in) + ([_ucarr_in] if _ucarr_in is not None else []), pc=list(dbt_pc))
+                       [r_['line'] for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x'] and r_['c'] <= 6], list(_paved_in) + ([_ucarr_in] if _ucarr_in is not None else []), pc=list(dbt_pc), carr=([_ucarr_in] if _ucarr_in is not None else []))
 bar_out += [(list(p_), k_, h_) for p_, k_, h_ in _nt_]
 log('chiusure a T', dict(_rt_))
 if STR: STR.rep['chiusure_a_t'] = dict(_rt_)
