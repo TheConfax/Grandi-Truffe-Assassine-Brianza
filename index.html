@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo nightly · dopo 474bfa99 · assemblato 08/11 20:57 · porta ' + location.port;
+    const txt = 'locale · ramo heli-frenata · dopo 966feb11 · assemblato 08/11 22:06 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -10698,11 +10698,13 @@ const HELI = {
   spinUp: 3.5, spinDown: 7,          /* seconds for the rotor to reach full speed, and to stop */
   /* the numbers of a real light twin, the Airbus H135 of the air ambulances (Carlo 7/11: "un po' lento per essere un elicottero"): fast cruise 254 km/h = 70.5 m/s
      at full weight, climb 7.6 m/s (1500 ft/min) (airbus.com, H135 technical information; LPR, the Polish air ambulance). The sink is not in the data sheets: 6 m/s */
-  tilt: 0.45, tiltK: 3.2,            /* most tilt from the stick (rad, 26 degrees: g tan = 4.7 m/s2 at the start), how fast the body follows it (1/s) */
-  hold: 0.06, holdMax: 0.52,         /* stick let go: tilt against the drift (rad per m/s) and its cap: 30 degrees nose up, a quick stop (Carlo 7/11: it slid on for far too long) */
+  tiltF: 0.627,                      /* most tilt forward and back from the stick (rad, 36 degrees: g tan = 7.1 m/s2; Carlo 8/11: up to full speed in 2/3 of the way it took with 0.45) */
+  tilt: 0.45, tiltK: 3.2,            /* most tilt sideways from the stick (rad, 26 degrees: g tan = 4.7 m/s2 at the start), how fast the body follows it (1/s) */
+  flare: 0.25,                       /* the flare's brake: with the body tilted against the way it goes, the speed dies at flare times the sine of the tilt (1/s) */
+  hold: 0.06, holdMax: 0.7,          /* stick let go: tilt against the drift (rad per m/s) and its cap: 40 degrees nose up, a quick stop (Carlo 7/11: it slid on for far too long; 8/11: from full speed to still in half the way it took with 30 degrees and no flare) */
   stopV0: 1, stopV1: 5, stopK: 3, stopV: 0.03, /* stick let go and slow (Carlo 8/11: still in the air it must stand still, as a car): under stopV1 m/s the tilt hands over to a plain stop (stopK 1/s, in full under stopV0), under stopV it stands */
-  drag1: 0.015, drag2: 0.00074,      /* air drag, linear and quadratic: full stick ends at 70.5 m/s, the H135's fast cruise */
-  climb: 7.6, sink: 6, vyK: 1.8,     /* climb and sink speed at full R2/L2 (m/s), how fast the vertical speed follows (1/s) */
+  drag1: 0.0225, drag2: 0.00111,     /* air drag, linear and quadratic: full stick (tiltF) ends at 70.5 m/s, the H135's fast cruise */
+  climb: 15.2, sink: 12, vyK: 1.8,   /* climb and sink speed at full R2/L2 (m/s; Carlo 8/11: twice the H135's 7.6 and 6), how fast the vertical speed follows (1/s) */
   yawRate: 1.4, yawK: 4,             /* turn on the spot with L1/R1 (rad/s) and its ease (1/s) */
   bankV0: 2, bankV1: 7, bankVmin: 5, /* autotimone (Carlo 7/11): banked, the nose goes into the turn in full (g tan(roll) / speed) from bankV0 to bankV1 m/s forward; bankVmin keeps the rate sane when slow */
   bankHi: 2, bankHiV0: 15, bankHiV1: 45, /* fast, the nose turns up to bankHi times the coordinated rate (half the radius at 45 m/s, Carlo 7/11), growing smoothly between these speeds (m/s forward); slow flight as before */
@@ -10854,7 +10856,7 @@ function heliStep1(e, dt) {
   let pT = e.gp, rT = e.gr;
   if (!e.ground) {
     /* the brake against the drift only with the stick let go; the stick held only sideways keeps the speed it has (the nose down just enough against the drag) */
-    pT = Math.abs(sf) > 0.05 ? sf * HELI.tilt : Math.abs(ss) > 0.05 ? clamp(Math.atan((HELI.drag1 + HELI.drag2 * sp) * vf / (9.81 * Math.max(lift, 0.1))), -HELI.tilt, HELI.tilt) : clamp(-vf * HELI.hold, -HELI.holdMax, HELI.holdMax);
+    pT = Math.abs(sf) > 0.05 ? sf * HELI.tiltF : Math.abs(ss) > 0.05 ? clamp(Math.atan((HELI.drag1 + HELI.drag2 * sp) * vf / (9.81 * Math.max(lift, 0.1))), -HELI.tiltF, HELI.tiltF) : clamp(-vf * HELI.hold, -HELI.holdMax, HELI.holdMax);
     rT = Math.abs(ss) > 0.05 ? ss * HELI.tilt : clamp(-vs * HELI.hold, -HELI.holdMax, HELI.holdMax);
     if (!alive) { pT = 0.25; rT = Math.sin(now * 1.7) * 0.3; } /* broken: it tumbles */
   }
@@ -10865,6 +10867,9 @@ function heliStep1(e, dt) {
     const hw = alive && Math.abs(sf) < 0.05 && Math.abs(ss) < 0.05 ? 1 - heliSm((sp - HELI.stopV0) / (HELI.stopV1 - HELI.stopV0)) : 0;
     const g = 9.81 * lift * (1 - hw), af = g * Math.tan(e.pitch), as = g * Math.tan(e.roll), dr = HELI.drag1 + HELI.drag2 * sp;
     e.vx += (fx * af + rx * as - e.vx * dr) * dt; e.vz += (fz * af + rz * as - e.vz * dr) * dt;
+    /* the flare: the disc tilted back against the way it goes meets the air and brakes it, the more the faster and the steeper (the height stays, as if the collective went down) */
+    if (alive) { const v1 = e.vx * fx + e.vz * fz, s1 = e.vx * rx + e.vz * rz, kf = e.pitch * v1 < 0 ? 1 - Math.exp(-HELI.flare * lift * Math.abs(Math.sin(e.pitch)) * dt) : 0, ks = e.roll * s1 < 0 ? 1 - Math.exp(-HELI.flare * lift * Math.abs(Math.sin(e.roll)) * dt) : 0;
+      e.vx -= (fx * v1 * kf + rx * s1 * ks); e.vz -= (fz * v1 * kf + rz * s1 * ks); }
     if (hw > 0) { const k = Math.exp(-HELI.stopK * hw * dt); e.vx *= k; e.vz *= k; if (hw >= 1 && hyp(e.vx, e.vz) < HELI.stopV) e.vx = e.vz = 0; }
     /* grip on the air: going forward, the speed across the nose turns into speed along it (no sliding as on ice); slow, it slides freely as before */
     const gw = heliGrip(e, fx, fz);
