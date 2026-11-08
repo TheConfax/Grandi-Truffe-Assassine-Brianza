@@ -2733,48 +2733,18 @@ for g_ in gate_out:
     if g_[4] != 'o': continue
     a_, b_ = (g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)
     if _in_carr(_anta(a_, b_)) and not _in_carr(_anta(b_, a_)): g_[0], g_[1], g_[2], g_[3] = g_[2], g_[3], g_[0], g_[1]; _vfl['ante_girate'] += 1
-_gseg = [LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]) for g_ in gate_out if g_[4] != 'l' and (g_[0], g_[1]) != (g_[2], g_[3])]
-if _gseg and trees:
-    _gst = STRtree(_gseg)
-    for k_, t_ in enumerate(trees):
-        P_ = Point(t_[0], t_[1]); js_ = [j_ for j_ in _gst.query(P_.buffer(_ALB_D)) if _gseg[j_].distance(P_) < _ALB_D]
-        if not js_: continue
-        L_ = _gseg[js_[0]]; (x0_, z0_), (x1_, z1_) = L_.coords[0], L_.coords[-1]; ln_ = L_.length; nx_, nz_ = -(z1_ - z0_) / ln_, (x1_ - x0_) / ln_
-        s_ = L_.project(P_); F_ = L_.interpolate(s_); side_ = 1.0 if (P_.x - F_.x) * nx_ + (P_.y - F_.y) * nz_ >= 0 else -1.0
-        if Point(F_.x + nx_ * side_, F_.y + nz_ * side_).distance(_carr_cl) < Point(F_.x - nx_ * side_, F_.y - nz_ * side_).distance(_carr_cl): side_ = -side_   # away from the street
-        x_, z_ = F_.x + nx_ * side_ * (_ALB_D + 0.5), F_.y + nz_ * side_ * (_ALB_D + 0.5)
-        trees[k_] = type(t_)([x_, z_] + list(t_[2:])) if isinstance(t_, (list, tuple)) else (x_, z_); _vfl['alberi_spostati'] += 1
+# ---- the place of every tree, once, at the end (src/posto_albero.py): crown off the buildings, trunk off the carriageway, passages, door and gate fronts, fences, manufatti
+# (a tree on the line of a gate is one of these cases: varco 28, src/controllo_varchi.py counts it)
+from posto_albero import Posto as _Posto
+_sezs = lambda gs_: [g_ for g_ in gs_ if g_ is not None]
+_pos_alb = _Posto([(P(b_['p'], b_.get('k', [])), b_.get('h') or 0) for b_ in buildings if b_['t'] != 9], _carr_cl, unary_union([g_ for g_ in (pedz, side, foot) if g_ is not None and not g_.is_empty]),
+                  [g_ for g_ in (globals().get('_gaps') or [])], [(d_[0] / 10, d_[1] / 10, d_[2] / 10, d_[3] / 10) for d_ in doors_out if (d_[0], d_[1]) != (d_[2], d_[3])],
+                  [(g_[0] / 10, g_[1] / 10, g_[2] / 10, g_[3] / 10) for g_ in gate_out if g_[4] != 'l' and (g_[0], g_[1]) != (g_[2], g_[3])],
+                  [list(b_[0]) for b_ in bar_out] + [list(f_) for f_ in fences], [o_['g'] for o_ in MANUF.ind if o_.get('kind')])
+trees, _ALB_CH = _pos_alb.sistema(trees); _vfl['alberi_spostati'] = _ALB_CH['spostati']
+log('alberi: posto unico', _ALB_CH)
+if STR: STR.rep['alberi_posto'] = _ALB_CH
 log('cancelli aperti e alberi', _vfl)
-# ---- a tree does not stand where its crown would go into a building (Carlo 8/11, via San Carlo a Seveso: crowns inside the front and the shed): the trunk must be at least
-# 0.8 crown radii from every building 3 m or more high (the crown of the DBGT tree is d/2 wide, d from the DSM; 2.7 m for a tree of no height, the crown model is 5.4 m across).
-# Too near: it moves straight off the wall to that distance (at most 3.5 m, trying a few angles round it) if there it is clear of the buildings and of the carriageway, else it goes
-import numpy as _npa, shapely as _shp
-from shapely.ops import nearest_points as _nearp
-_ALB_CH = {'spostati': 0, 'tolti': 0, 'alberi': len(trees)}
-_bh = [g_ for g_, b_ in zip([P(b['p'], b.get('k', [])) for b in buildings if b['t'] != 9], [b for b in buildings if b['t'] != 9]) if g_ is not None and (b_.get('h') or 0) >= 3.0]
-if _bh and trees:
-    _bht = STRtree(_bh); _TP = _shp.points(_npa.array([[t_[0], t_[1]] for t_ in trees])); _hit = _bht.query(_TP, predicate='dwithin', distance=6.5)[0]
-    _out = list(trees)
-    for k_ in sorted(set(_hit.tolist())):
-        t_ = trees[k_]; r_ = (t_[3] / 2.0) if len(t_) >= 4 and t_[3] else 2.7; need_ = 0.8 * r_; Pt_ = _TP[k_]
-        near_ = [j_ for j_ in _bht.query(Pt_.buffer(need_)) if _bh[j_].distance(Pt_) < need_]
-        if not near_: continue
-        j0_ = min(near_, key=lambda j_: _bh[j_].distance(Pt_)); nb_ = _nearp(_bh[j0_], Pt_)[0]
-        dx_, dz_ = Pt_.x - nb_.x, Pt_.y - nb_.y; dd_ = math.hypot(dx_, dz_); best_ = None
-        if dd_ > 1e-6:
-            for ang_ in (0, 0.5, -0.5, 1.0, -1.0):
-                ca_, sa_ = math.cos(ang_), math.sin(ang_); ux_, uz_ = (dx_ * ca_ - dz_ * sa_) / dd_, (dx_ * sa_ + dz_ * ca_) / dd_
-                for st_ in (need_ + 0.1, need_ + 0.8, need_ + 1.5):
-                    C_ = Point(nb_.x + ux_ * st_, nb_.y + uz_ * st_)
-                    if math.hypot(C_.x - Pt_.x, C_.y - Pt_.y) > 3.5: break
-                    if any(_bh[j_].distance(C_) < need_ - 0.05 for j_ in _bht.query(C_.buffer(need_))) or _carr_cl.contains(C_): continue
-                    best_ = C_; break
-                if best_ is not None: break
-        if best_ is None: _out[k_] = None; _ALB_CH['tolti'] += 1
-        else: _out[k_] = type(t_)([best_.x, best_.y] + list(t_[2:])) if isinstance(t_, (list, tuple)) else (best_.x, best_.y); _ALB_CH['spostati'] += 1
-    trees = [t_ for t_ in _out if t_ is not None]
-log('alberi con la chioma in un edificio', _ALB_CH)
-if STR: STR.rep['alberi_chioma_edificio'] = _ALB_CH
 if STR: STR.rep['cancelli_ante_alberi'] = _vfl
 _nb1 = len(bar_out) + len(fences); _fz_ = fondi_doppi(bar_out + [(f_, 'fe', 0) for f_ in fences], _dstr)
 bar_out = [b_ for b_ in _fz_ if b_[1] != 'fe']; fences = [list(b_[0]) for b_ in _fz_ if b_[1] == 'fe']
