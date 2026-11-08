@@ -157,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo muri-tetti · dopo 299cf00 · assemblato 08/11 01:24 · porta ' + location.port;
+    const txt = 'locale · ramo muri-tetti · dopo 66885b0 · assemblato 08/11 01:29 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1846,7 +1846,7 @@ function domeWalls(B) {
     const w = { r, x: cx, z: cz, y0: lo - 0.3, y1: hi, dome: 1 }; WALLS.add(cx - r, cz - r, cx + r, cz + r, w); B.domeW.push(w);
   }
 }
-function domeY(cu, x, z) { // the top of a dome or a spire over a point, -Infinity off it
+function domeY(cu, x, z) { /* the top of a dome or a spire over a point, -Infinity off it */
   const d = hyp(x - cu.c[0], z - cu.c[1]), R = cu.r, Y = cu.y; let y = -Infinity;
   for (let i = 0; i + 1 < R.length; i++) { const r0 = R[i], r1 = R[i + 1]; if (d < Math.min(r0, r1) - 1e-6 || d > Math.max(r0, r1) + 1e-6) continue; y = Math.max(y, Math.abs(r1 - r0) < 1e-6 ? Math.max(Y[i], Y[i + 1]) : Y[i] + (Y[i + 1] - Y[i]) * (d - r0) / (r1 - r0)); }
   return y;

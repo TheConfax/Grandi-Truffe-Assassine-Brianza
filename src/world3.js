@@ -187,7 +187,7 @@ function domeWalls(B) {
     const w = { r, x: cx, z: cz, y0: lo - 0.3, y1: hi, dome: 1 }; WALLS.add(cx - r, cz - r, cx + r, cz + r, w); B.domeW.push(w);
   }
 }
-function domeY(cu, x, z) { // the top of a dome or a spire over a point, -Infinity off it
+function domeY(cu, x, z) { /* the top of a dome or a spire over a point, -Infinity off it */
   const d = hyp(x - cu.c[0], z - cu.c[1]), R = cu.r, Y = cu.y; let y = -Infinity;
   for (let i = 0; i + 1 < R.length; i++) { const r0 = R[i], r1 = R[i + 1]; if (d < Math.min(r0, r1) - 1e-6 || d > Math.max(r0, r1) + 1e-6) continue; y = Math.max(y, Math.abs(r1 - r0) < 1e-6 ? Math.max(Y[i], Y[i + 1]) : Y[i] + (Y[i + 1] - Y[i]) * (d - r0) / (r1 - r0)); }
   return y;
