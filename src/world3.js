@@ -2558,6 +2558,7 @@ function freeTile(T) {
 /* what was done to a gate stays done when its tile is built again (androni-3, Carlo 8/11): GATE_ROTTI key of the gate -> 1 for a lift arm snapped;
    key#leaf -> the state of that leaf: +1 / -1 swung open by a car to that side of the gate (its left normal), 2 torn off its hinges */
 const GATE_ROTTI = new Map(), GATEG = new Grid(16), GATE_FLY = [], GATE_OPEN = new Set();
+const GATE_ANG = new Map(); /* key#leaf -> how far an open leaf stands (rad, + towards the left normal of the gate), where a vehicle left it */
 const GATE_TEX = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d'); x.fillStyle = '#fff'; for (let i = 0; i < 4; i++) x.fillRect(i * 16 + 6, 0, 4, 128); x.fillRect(0, 0, 64, 9); x.fillRect(0, 119, 64, 9); x.fillRect(0, 54, 64, 6); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; })();
 const ARM_TEX = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 8; const x = c.getContext('2d'); for (let i = 0; i < 4; i++) { x.fillStyle = i % 2 ? '#f2f2ee' : '#d22a1e'; x.fillRect(i * 16, 0, 16, 8); } const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; })();
 const GATE_MAT = new THREE.MeshLambertMaterial({ color: 0x33413a, map: GATE_TEX, alphaTest: 0.5, side: THREE.DoubleSide });
@@ -2583,15 +2584,16 @@ function layCancelli(T) { T.gates = []; for (const [X0, Z0, X1, Z1, k, h, auto] 
     else for (const [x0, w, dir] of gateLeaves(g)) { const i = g.segs.length, sx = ax + ux * x0, sz = az + uz * x0, ex = sx + ux * dir * w, ez = sz + uz * dir * w;
       const sg = { ax: sx, az: sz, bx: ex, bz: ez, nx: -uz, nz: ux, two: true, dyn: true, on: g.st[i] === 0, y0: gy - 2, y1: gy + h + 0.4 }; g.segs.push(sg); WALLS.add(Math.min(sx, ex), Math.min(sz, ez), Math.max(sx, ex), Math.max(sz, ez), sg);
       const os = { ax: sx, az: sz, bx: sx, bz: sz, nx: 1, nz: 0, two: true, dyn: true, on: false, y0: gy - 2, y1: gy + h + 0.4, hx: sx, hz: sz, w, dir }; g.os.push(os); WALLS.add(sx - w, sz - w, sx + w, sz + w, os); /* the leaf open, to either side: a box round the hinge */
-      if (g.st[i] === 1 || g.st[i] === -1) gateAnta(g, i, g.st[i], true); }
+      if (g.st[i] === 1 || g.st[i] === -1) gateAnta(g, i, gateAng(g, i), true); }
     g.seg = g.segs[0];
   }
   T.gates.push(g); GATEG.add(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), g);
   for (const [x, z] of k !== 'l' ? [[ax, az], [bx, bz]] : [[ax, az]]) { const r = k !== 'l' ? 0.2 : 0.15, g0 = H.ground(x, z); WALLS.add(x - r - 0.2, z - r - 0.2, x + r + 0.2, z + r + 0.2, { r, x, z, y0: g0 - 3, y1: g0 + (k !== 'l' ? h + 0.25 : 1.15) }); } /* the pillars (buildGates) */
 } }
-/* the wall of leaf i standing open to side s (+1 the left normal of the gate, -1 the other): from the hinge along the open leaf; on when asked and nobody stands in it */
-function gateAnta(g, i, s, on) {
-  const o = g.os[i]; if (!o) return; const c = Math.cos(GATE_SPALANCA), sn = Math.sin(GATE_SPALANCA), tx = o.dir * c * g.ux + s * sn * -g.uz, tz = o.dir * c * g.uz + s * sn * g.ux;
+const gateAng = (g, i) => GATE_ANG.has(g.key + '#' + i) ? GATE_ANG.get(g.key + '#' + i) : g.st[i] * GATE_SPALANCA;
+/* the wall of leaf i standing open at angle a (rad from closed, + towards the left normal of the gate): from the hinge along the open leaf; on when asked and nobody stands in it */
+function gateAnta(g, i, a, on) {
+  const o = g.os[i]; if (!o) return; const tx = o.dir * Math.cos(a) * g.ux + Math.sin(a) * -g.uz, tz = o.dir * Math.cos(a) * g.uz + Math.sin(a) * g.ux;
   o.ax = o.hx + tx * 0.12; o.az = o.hz + tz * 0.12; o.bx = o.hx + tx * o.w; o.bz = o.hz + tz * o.w; o.nx = -tz; o.nz = tx; o.on = on;
 }
 function gateAntaLibera(o) { /* no vehicle, walker or pedestrian on the open leaf: its wall can come on without shoving anyone */
@@ -2720,7 +2722,7 @@ function gateOggetti(g, G) {
     if (g.st[i] === 2) return; /* torn off: gone */
     const m = new THREE.Mesh(leafG(g, w, dir), GATE3_MAT); m.castShadow = true; hinge.add(m);
     if (g.k === 'o') hinge.rotation.y = -1.35 * dir; /* footpath gates stand open */
-    else if (g.st[i]) hinge.rotation.y = -GATE_SPALANCA * dir * g.st[i]; /* swung wide open by a car */
+    else if (g.st[i]) hinge.rotation.y = -dir * gateAng(g, i); /* swung open by a car, where it was left */
   });
 }
 function buildGates(T, G) {
@@ -2752,18 +2754,20 @@ function buildGates(T, G) {
   F.fine();
 }
 function gateHits(v) {
-  if (v.speed < 0.6) return;
+  if (v.speed < 0.05) return;
   const F = propForza(v), ai = v.driver === 'ai';
   GATEG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, g => {
     if (g.broken || g.k === 'o' || g.perm || Math.abs(v.y - g.gy) > 2.5) return;
     if (ai && g.auto && !g.open) { for (const c of v.circles()) if (segDist(c[0], c[1], g.ax, g.az, g.bx, g.bz) < v.rad + 4) { openGate(g); return; } }
-    if (F < FORZA[gateForza(g)]) return; /* under the blow it is a wall: the vehicle stops against it (Vehicle.collide) */
+    const forte = F >= FORZA[gateForza(g)]; /* under the blow a closed gate is a wall: the vehicle stops against it (Vehicle.collide) */
     const reach = v.rad + 0.3, tocca = sg => { for (const c of v.circles()) if (segDist(c[0], c[1], sg.ax, sg.az, sg.bx, sg.bz) < reach) return true; return false; };
-    if (g.k === 'l') { if (!g.open && tocca(g)) breakGate(g, v); return; }
-    const chiuse = [];
-    g.segs.forEach((sg, i) => { if (sg.on && g.st[i] === 0 && tocca(sg)) chiuse.push(i); });
-    if (chiuse.length) { spalancaGate(g, v, chiuse); return; }
-    g.os.forEach((o, i) => { if (o.on && g.st[i] !== 2 && tocca(o)) staccaAnta(g, v, i); });
+    if (g.k === 'l') { if (forte && !g.open && tocca(g)) breakGate(g, v); return; }
+    if (forte) {
+      const chiuse = [];
+      g.segs.forEach((sg, i) => { if (sg.on && g.st[i] === 0 && tocca(sg)) chiuse.push(i); });
+      if (chiuse.length) { spalancaGate(g, v, chiuse); return; }
+    }
+    g.os.forEach((o, i) => { if (o.on && g.st[i] !== 2 && tocca(o)) { if (forte) staccaAnta(g, v, i); else spingiAnta(g, v, i); } }); /* an open leaf: torn off over the blow, pushed round its hinges under it (Carlo 8/11) */
   });
 }
 function gateSegs(g, on) { g.segs.forEach((sg, i) => { sg.on = on && (g.k === 'l' ? !g.broken : g.st[i] === 0); }); }
@@ -2778,10 +2782,23 @@ function spalancaGate(g, v, idx) { /* closed leaves rammed: they swing wide open
   const had = g.outer; gateVivo(g); if (!had && g.outer) for (const [hn] of g.hinges) hn.rotation.y = 0;
   for (const i of idx) {
     g.st[i] = s; GATE_ROTTI.set(g.key + '#' + i, s); g.segs[i].on = false; g.os[i].on = false;
-    const h = g.hinges[i]; if (!h) { gateAnta(g, i, s, true); continue; }
+    GATE_ANG.set(g.key + '#' + i, s * GATE_SPALANCA);
+    const h = g.hinges[i]; if (!h) { gateAnta(g, i, s * GATE_SPALANCA, true); continue; }
     const a0 = -h[0].rotation.y * h[1] * s; /* how far it is already open that way (an auto gate half open) */
     GATE_FLY.push({ g, i, hn: h[0], dir: h[1], s, a: Math.max(0, a0), w: clamp(v.speed / (g.os[i].w * 0.6), 2.5, 9), t: 0 });
   }
+}
+/* an open leaf pushed by a vehicle at any speed under the blow (Carlo 8/11): it turns on its hinges the way it is pushed, just as far as the vehicle
+   needs to go by, and stays where it stops. Against its stop (GATE_ARRESTO, the fence or the wall beside it) it does not turn any more: the vehicle stops there */
+const GATE_ARRESTO = 1.6;
+function spingiAnta(g, v, i) {
+  const o = g.os[i], h = g.hinges[i]; if (!o) return; let a = gateAng(g, i);
+  const ttx = -o.dir * Math.sin(a) * g.ux + Math.cos(a) * -g.uz, ttz = -o.dir * Math.sin(a) * g.uz + Math.cos(a) * g.ux; /* how the leaf moves as its angle grows */
+  const sg = Math.sign(v.vx * ttx + v.vz * ttz) || 1, tocca = () => { for (const c of v.circles()) if (segDist(c[0], c[1], o.ax, o.az, o.bx, o.bz) < v.rad + 0.05) return true; return false; };
+  let k = 0; while (tocca() && k++ < 40) { const a2 = clamp(a + sg * 0.04, -GATE_ARRESTO, GATE_ARRESTO); if (a2 === a) break; a = a2; gateAnta(g, i, a, true); }
+  if (k === 0) return;
+  g.st[i] = Math.sign(a) || 1; GATE_ROTTI.set(g.key + '#' + i, g.st[i]); GATE_ANG.set(g.key + '#' + i, a); g.segs[i].on = false;
+  if (!g.outer) gateVivo(g); const hh = g.hinges[i]; if (hh) hh[0].rotation.y = -hh[1] * a;
 }
 function staccaAnta(g, v, i) { /* an open leaf rammed again over the blow: it is torn off its hinges and falls as the rigid bodies of props3.js */
   const F = propForza(v); g.st[i] = 2; GATE_ROTTI.set(g.key + '#' + i, 2); g.os[i].on = false; g.segs[i].on = false;
@@ -2805,7 +2822,7 @@ function updGates(dt) {
     }
     g.oa = lerp(g.oa, g.open ? 1 : 0, 1 - Math.exp(-3 * dt));
     if (g.k === 'l') { if (g.inner) g.inner.rotation.z = 1.35 * g.oa; } else g.hinges.forEach(([hn, dir], i) => { if (g.st[i] === 0) hn.rotation.y = -GATE_SPALANCA * dir * g.oa; });
-    if (g.open && g.oa > 0.97) g.os.forEach((o, i) => { if (g.st[i] !== 0 || o.on) return; gateAnta(g, i, 1, false); if (gateAntaLibera(o)) o.on = true; }); /* open for a car or a walker: the leaves are solid where they stand */
+    if (g.open && g.oa > 0.97) g.os.forEach((o, i) => { if (g.st[i] !== 0 || o.on) return; gateAnta(g, i, GATE_SPALANCA, false); if (gateAntaLibera(o)) o.on = true; }); /* open for a car or a walker: the leaves are solid where they stand */
     if (!g.open && g.oa < 0.01) { g.oa = 0; GATE_OPEN.delete(g); if (!g.st.some(Boolean)) gateDorme(g); }
   }
   for (let i = GATE_FLY.length - 1; i >= 0; i--) {
@@ -2819,7 +2836,7 @@ function updGates(dt) {
       if (f.t > 3) { f.a = GATE_SPALANCA; f.fermo = true; }
       f.hn.rotation.y = -f.a * f.dir * f.s;
     }
-    if (f.fermo) { f.hn.rotation.y = -GATE_SPALANCA * f.dir * f.s; gateAnta(g, f.i, f.s, false); if (gateAntaLibera(g.os[f.i]) || f.t > 30) { g.os[f.i].on = true; GATE_FLY.splice(i, 1); } }
+    if (f.fermo) { f.hn.rotation.y = -GATE_SPALANCA * f.dir * f.s; gateAnta(g, f.i, f.s * GATE_SPALANCA, false); if (gateAntaLibera(g.os[f.i]) || f.t > 30) { g.os[f.i].on = true; GATE_FLY.splice(i, 1); } }
   }
 }
 
