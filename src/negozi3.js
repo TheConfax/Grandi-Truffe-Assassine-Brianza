@@ -237,13 +237,15 @@ const ngDepthMap = tex => ngLodMat(new THREE.MeshDepthMaterial({ depthPacking: T
 // ngR (width, height, cell, layer), ngW (side walls, depth), ngF (floor). The ray goes on to the first wall of the box; the back wall repeats the
 // picture every 2.4 m or so; the layer is a plane at 38% of the depth
 const NG_ROOM_GLSL = `
-vec4 ngAt(vec2 cell, vec2 q, vec2 gx, vec2 gy) {
+vec4 ngAt(vec2 cell, vec2 q, vec2 gx, vec2 gy, float lod) {
   vec2 uv = vec2((cell.x + 0.03 + q.x * 0.94) / 16.0, 1.0 - (cell.y + 0.97 - q.y * 0.94) / 8.0);
 #if __VERSION__ >= 300
-  return mapTexelToLinear(textureGrad(map, uv, gx, gy));
+  vec4 ngT = lod >= 0.0 ? textureLod(map, uv, lod) : textureGrad(map, uv, gx, gy);
 #else
-  return mapTexelToLinear(texture2D(map, uv));
+  vec4 ngT = texture2D(map, uv);
 #endif
+  ngT.rgb /= max(ngT.a, 0.004); /* the atlas is stored premultiplied (premultiplyAlpha): the edge of a chair or a table no longer filters towards black */
+  return mapTexelToLinear(ngT);
 }
 vec3 ngRoom() {
   vec3 d = vNgV; d.z = max(d.z, 1e-3);
@@ -256,20 +258,21 @@ vec3 ngRoom() {
   float t = min(min(tx, ty), tz);
   vec3 h = vec3(p0, 0.0) + dn * t;
   vec3 hm = h * vec3(Wm, Hm, Dm);
-  float nrep = max(1.0, floor(Wm / 2.4 + 0.5));
-  vec2 cell = vec2(mod(vNgR.z, 16.0), floor(vNgR.z / 16.0 + 0.001));
+  float ngCz = floor(vNgR.z + 0.5), nrep = floor(ngCz / 256.0), ngCi = ngCz - nrep * 256.0; /* the cell and how many times the picture repeats (made in glass(), whole numbers: Wm / 2.4 + 0.5 asked here fell on a whole number for a 10.8 m pane and floor() gave 4 or 5 pixel by pixel: the stipple on the chairs of the Ristorante 68) -- the cell number is a whole number carried by a varying: interpolated it jitters by a hair, and at 80.0 mod() gave 0 or 15.99999 pixel by pixel: the black stipple on the glass (Carlo 8/11) */
+  vec2 cell = vec2(mod(ngCi, 16.0), floor(ngCi / 16.0));
   vec2 gs = vec2(nrep * 0.94 / 16.0, 0.94 / 8.0) * 0.6;
   vec2 gx = dFdx(vUv) * gs, gy = dFdy(vUv) * gs;
   vec3 col;
-  if (t == tz) col = ngAt(cell, vec2(fract(h.x * nrep), h.y), gx, gy).rgb;
-  else if (t == ty && dn.y < 0.0) { vec2 f = fract(hm.xz / 0.6); col = vNgF * mix(0.78, 1.0, step(0.05, f.x) * step(0.05, f.y)); }
-  else if (t == ty) { vec2 f = fract(vec2(hm.x / 1.6, hm.z / 1.3)) - 0.5; float l = 1.0 - smoothstep(0.1, 0.16, length(f * vec2(1.6, 1.3))); col = mix(vec3(0.62, 0.61, 0.58), vec3(2.6, 2.4, 2.0), l * (0.25 + 0.75 * vNgOn)); }
+  bool ngHz = tz <= tx && tz <= ty, ngHy = !ngHz && ty <= tx; /* which wall the ray meets, decided by comparing the three, not by asking min() back for its own value: on some GPUs t == tz fails by a hair and the pixel is drawn as a side wall (the black stipple on the glass, Carlo 8/11) */
+  if (ngHz) col = ngAt(cell, vec2(fract(h.x * nrep), h.y), gx, gy, -1.0).rgb;
+  else if (ngHy && dn.y < 0.0) { vec2 f = fract(hm.xz / 0.6); col = vNgF * mix(0.78, 1.0, step(0.05, f.x) * step(0.05, f.y)); }
+  else if (ngHy) { vec2 f = fract(vec2(hm.x / 1.6, hm.z / 1.3)) - 0.5; float l = 1.0 - smoothstep(0.1, 0.16, length(f * vec2(1.6, 1.3))); col = mix(vec3(0.62, 0.61, 0.58), vec3(2.6, 2.4, 2.0), l * (0.25 + 0.75 * vNgOn)); }
   else col = vNgW.rgb * (0.6 + 0.2 * h.y);
   if (vNgR.w > -0.5) {
     float tm = 0.38 / dn.z;
     if (tm < t) {
       vec2 pm = p0 + dn.xy * tm;
-      if (pm.x > 0.0 && pm.x < 1.0 && pm.y > 0.0 && pm.y < 1.0) { float mi = 114.0 + vNgR.w; vec4 m = ngAt(vec2(mod(mi, 16.0), floor(mi / 16.0 + 0.001)), vec2(fract(pm.x * nrep + 0.37), pm.y), gx, gy); if (m.a > 0.5) col = m.rgb; }
+      if (pm.x > 0.0 && pm.x < 1.0 && pm.y > 0.0 && pm.y < 1.0) { float mi = 114.0 + floor(vNgR.w + 0.5); vec4 m = ngAt(vec2(mod(mi, 16.0), floor(mi / 16.0 + 0.001)), vec2(fract(pm.x * nrep + 0.37), pm.y), gx, gy, -1.0); col = mix(col, m.rgb, smoothstep(0.3, 0.7, m.a)); }
     }
   }
   return col * mix(1.0, 0.68, h.z);
@@ -475,7 +478,7 @@ const NG_WIN = (() => {
     }
   });
   MID.forEach((f, k) => { const i = 114 + k; g.save(); g.translate((i % 16) * 128, Math.floor(i / 16) * 128); g.beginPath(); g.rect(0, 0, 128, 128); g.clip(); f(g); g.restore(); });
-  const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4; tex.minFilter = THREE.LinearMipmapLinearFilter;
+  const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.premultiplyAlpha = true;
   const mat = ngLodMat(new THREE.MeshLambertMaterial({ map: tex, color: 0x0e1215 }), 'glass', 0.35, s => {
     s.uniforms.uNgLamps = NG_U.lamps;
     s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 ngR;\nattribute vec4 ngW;\nattribute vec3 ngF;\nattribute float ngOn;\nvarying vec3 vNgV;\nvarying vec4 vNgR;\nvarying vec4 vNgW;\nvarying vec3 vNgF;\nvarying float vNgOn;')
@@ -909,7 +912,7 @@ function ngKit(C, cx, gy, cz, nx, nz) {
   /* a pane: the room R behind it (xa..xb, ya..yb in the frame of the wall, its picture and layer, colours, depth) seen through the quad */
   const glass = (R, xa, ya, xb, yb, z) => {
     if (xb - xa < 0.02 || yb - ya < 0.02) return; const b = C.glassB, i0 = qz(b, xa, ya, xb, yb, z), n = 4 * qzn, rw = R.xb - R.xa, rh = R.yb - R.ya;
-    for (let k = 0; k < n; k++) { const q = (i0 + k) * 2, xl = xa + (xb - xa) * b.uv[q], yl = ya + (yb - ya) * b.uv[q + 1]; b.uv[q] = (xl - R.xa) / rw; b.uv[q + 1] = (yl - R.ya) / rh; b.R.push(rw, rh, R.cell, R.mid); b.W.push(R.wc.r, R.wc.g, R.wc.b, R.dp); b.Fc.push(R.fc.r, R.fc.g, R.fc.b); }
+    for (let k = 0; k < n; k++) { const q = (i0 + k) * 2, xl = xa + (xb - xa) * b.uv[q], yl = ya + (yb - ya) * b.uv[q + 1]; b.uv[q] = (xl - R.xa) / rw; b.uv[q + 1] = (yl - R.ya) / rh; b.R.push(rw, rh, R.cell + 256 * Math.max(1, Math.floor(rw / 2.4 + 0.5)), R.mid); b.W.push(R.wc.r, R.wc.g, R.wc.b, R.dp); b.Fc.push(R.fc.r, R.fc.g, R.fc.b); }
   };
   const mode = m => { ngFill(C); C.mode = m; }, sk = (d, k) => { ngFill(C); C.sk = [d, k]; };
   return { F, lx, box, neon, quad, qz, qx, cell, sign, faceX, quadC, glass, mode, sk, nq: () => qzn };
