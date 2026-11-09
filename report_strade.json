@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 4.8,
+  "tempo_s": 4.1,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 50.0,
+  "tempo_s": 33.7,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -1738,9 +1738,15 @@
    "doppi_tolti": 3
   }
  },
+ "alberi_posto": {
+  "alberi": 97308,
+  "spostati": 5041,
+  "tolti": 415,
+  "per_motivo": {}
+ },
  "cancelli_ante_alberi": {
   "ante_girate": 216,
-  "alberi_spostati": 95
+  "alberi_spostati": 5041
  },
  "chiusure_a_t": {
   "capi_liberi": 21196,
@@ -1751,8 +1757,8 @@
   "troppo_largo": 2229,
   "parallelo_a_un_altro": 409,
   "chiuso": 7164,
-  "chiusi_recinzione": 1738,
-  "chiusi_in_linea": 292,
+  "chiusi_recinzione": 1737,
+  "chiusi_in_linea": 293,
   "chiusi_edificio": 4510,
   "via_nel_varco": 564,
   "cancello_su_vialetto": 19,
@@ -2030,7 +2036,7 @@
   },
   "alberi_in_carreggiata": {
    "n": 0,
-   "di": 88737,
+   "di": 96893,
    "dove": []
   },
   "pali_dei_cartelli_in_carreggiata": {
@@ -2820,6 +2826,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 15.5
+  "tempo_s": 13.8
  }
 }

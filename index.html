@@ -93,6 +93,26 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 #start .credit { font-size: 15px; color: var(--ink-dim); margin: 0; }
 .ver { font: 13px ui-monospace, monospace !important; color: var(--ink-dim); margin: 0; opacity: .75; } #pause .ver { margin-top: 14px; }
 #start a, #osm a { color: var(--ocra); pointer-events: auto; }
+
+/* Schermata del titolo (Carlo, 8/11): il mondo vivo dietro (sorvolo()), il nome su tre righe con le iniziali in evidenza, GIOCA e OPZIONI. Tutto il resto del vecchio titolo (sottotitolo, tasti, crediti, versione) resta nel codice ma non si vede */
+body:has(#start:not([hidden])) :is(.hud, #osm, #touch, #fx, #dbghud, #pause) { display: none !important; }
+#start { background: linear-gradient(205deg, rgba(255,150,64,.17) 0%, rgba(255,150,64,0) 48%), radial-gradient(ellipse 75% 70% at 50% 52%, rgba(16,10,14,.42) 0%, rgba(16,10,14,.16) 55%, rgba(16,10,14,0) 100%), linear-gradient(180deg, rgba(16,10,14,.35) 0%, rgba(16,10,14,0) 22%, rgba(16,10,14,0) 70%, rgba(16,10,14,.55) 100%); display: grid; place-items: center; overflow: hidden; padding: 0; }
+#start .wrap { max-width: none; width: 100%; justify-items: center; align-content: center; gap: clamp(22px, 5vh, 56px); }
+#start .wrap > :not(.tit):not(.menu) { display: none !important; }
+#start .tit { font-family: var(--display); font-weight: 400; text-align: left; text-transform: uppercase; font-size: clamp(34px, min(10.5vw, 14vh), 140px); line-height: .95; letter-spacing: .01em; color: var(--ocra); margin: 0; text-shadow: 0 6px 0 var(--cotto), 0 10px 30px rgba(0,0,0,.5); }
+#start .tit span { display: block; white-space: nowrap; }
+#start .tit b { font-weight: 400; color: #e4001b; }
+#start .menu { display: grid; gap: 12px; justify-items: stretch; width: min(320px, 78vw); }
+#start .menu button { font-family: var(--body); font-weight: 700; font-size: clamp(22px, 2.6vw, 30px); letter-spacing: .38em; text-indent: .38em; text-transform: uppercase; padding: 12px 20px 11px; border-radius: 2px; border: 1px solid transparent; background: none; color: var(--ink); cursor: pointer; box-shadow: none; transform: none; transition: background .15s, color .15s, opacity .2s; justify-self: stretch; }
+#start .menu #go { background: var(--ocra); color: var(--shade); box-shadow: 0 6px 22px rgba(0,0,0,.4); }
+#start .menu #go:hover:not(:disabled) { background: #ffc85a; transform: none; box-shadow: 0 6px 22px rgba(0,0,0,.4); }
+#start .menu #go:active { transform: translateY(1px); box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+#start .menu #go:disabled { background: rgba(251,245,230,.16); color: rgba(251,245,230,.72); cursor: progress; box-shadow: none; font-size: clamp(16px, 1.9vw, 21px); letter-spacing: .22em; text-indent: .22em; }
+#start .menu #opz { color: rgba(251,245,230,.4); border-color: rgba(251,245,230,.16); background: rgba(14,10,14,.42); cursor: default; }
+/* la riga della versione (#ver sul titolo, #pver in pausa) e' nascosta, non tolta: il codice che la scrive resta (Carlo, 8/11) */
+.ver, #ver, #pver { display: none !important; }
+#fade { position: fixed; inset: 0; z-index: 30; background: #0c0a0d; opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
+#fade.on { opacity: 1; transition-duration: .32s; transition-timing-function: ease-in; }
 #pause { position: fixed; inset: 0; z-index: 9; background: rgba(14,15,20,.8); display: grid; place-items: center; text-align: center; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 #pause h2 { font-family: var(--display); font-size: clamp(36px, 7vw, 64px); margin: 0 0 10px; color: var(--ocra); }
 #pause p { font-size: 19px; margin: 6px 0; }
@@ -130,8 +150,11 @@ body:not(.debug) .dbg { display: none !important; }
 <div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span id="bighint">Rotella o due dita: zoom · trascina: sposta · clic: segnaposto · M: torna in strada</span></div><button id="bigx" aria-label="Chiudi la mappa">×</button></div>
 <div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p><p class="ver" id="pver" hidden></p></div></div>
 
+<div id="fade"></div>
 <div id="start">
   <div class="wrap">
+    <div class="tit" role="heading" aria-level="1"><span><b>G</b>RANDI</span><span><b>T</b>RUFFE</span><span><b>B</b>RIANZA</span></div>
+    <div class="menu"><button id="go" type="button" disabled>CARICO LA BRIANZA…</button><button id="opz" type="button" disabled aria-disabled="true" tabindex="-1">OPZIONI</button></div>
     <h1><b>G</b>RANDI <b>T</b>RUFFE<span><b>A</b>SSASSINE</span><em>BRIANZA</em></h1>
     <p class="sub">Meda, Seveso, Barlassina, Baruccana e Cabiate con le loro strade vere, i dislivelli veri e la Milano-Meda sopraelevata. Ruba un'auto, fai le consegne per i locali e semina la Polizia Locale.</p>
     <div class="keys">
@@ -148,7 +171,6 @@ body:not(.debug) .dbg { display: none !important; }
       <div><kbd>Q</kbd> / <kbd>E</kbd> in moto: peso indietro (impennata col gas) / avanti (stoppie in frenata)</div>
       <div class="dbg"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>
     </div>
-    <button id="go" type="button">ACCENDI IL MOTORE</button>
     <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale; <a href="https://www.radiomaria.it" target="_blank" rel="noopener">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href="https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy" target="_blank" rel="noopener">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href="https://www.mapillary.com" target="_blank" rel="noopener">Mapillary</a> e i suoi contributori, CC BY-SA 4.0. Foto delle superfici (asfalto, prato, pavimenti, ghiaia, terra, ciottoli, intonaco): <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a> e <a href="https://ambientcg.com" target="_blank" rel="noopener">ambientCG</a>, CC0.</p>
     <p class="ver" id="ver" hidden></p>
   </div>
@@ -157,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo varchi-2 · dopo 12d0dfa7 · assemblato 09/11 03:39 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo a03c912c · assemblato 09/11 10:45 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -171,9 +193,28 @@ body:not(.debug) .dbg { display: none !important; }
   const pv = document.getElementById('pver'); pv.textContent = txt; pv.hidden = false;
 })().catch(() => { }); // offline or inside claude.ai: no version line
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.186.1/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }
+</script>
 <script type="module">
+import * as THREE_NS from 'three';
+import { Sky as THREE_SKY } from 'three/addons/objects/Sky.js';
+// three.js 0.186.1, loaded as a module through the import map (assemble3.py). The game was written on r128, where three was a global: THREE is a copy of
+// the module's namespace (a module namespace is frozen, and foto3_colori.js swaps THREE.CanvasTexture), and window.THREE stays for the test scripts
+const THREE = Object.assign({}, THREE_NS, { Sky: THREE_SKY }); window.THREE = THREE;
+{
+  // r128 made every InstancedMesh with frustumCulled = false; r186 culls it on a sphere round its instances computed once, so what moves after (objects knocked
+  // down, pieces of barrier) would vanish. pezzi3.js puts its own culling sphere (cullS) on the tiles, as before
+  const IM = THREE.InstancedMesh;
+  THREE.InstancedMesh = class extends IM { constructor(...a) { super(...a); this.frustumCulled = false; } };
+  // our shaders were written on r128's chunks: vUv (now vMapUv when only a map is used) and mapTexelToLinear (gone: the hardware decodes sRGB textures)
+  THREE.ShaderChunk.common += '\n#define mapTexelToLinear( a ) a\n';
+  // r128 lit without physicallyCorrectLights multiplied every light by π, then the Lambert divided by π: the intensities of the game are written for that.
+  // r186 has no such mode, and the whole scene came out about three times darker (the wood black at noon): the Lambert keeps r128's scale
+  THREE.ShaderChunk.lights_lambert_pars_fragment = THREE.ShaderChunk.lights_lambert_pars_fragment.replaceAll('BRDF_Lambert( material.diffuseColor )', 'material.diffuseColor');
+  THREE.ShaderChunk.uv_pars_fragment += '\n#if defined( USE_MAP ) && !defined( USE_UV ) && !defined( USE_ANISOTROPY )\n#define vUv vMapUv\n#endif\n';
+}
+
 // =====================================================================
 //  GRANDI TRUFFE ASSASSINE · BRIANZA · open-world driving on the real OSM map of Meda (MB)
 // =====================================================================
@@ -239,17 +280,12 @@ const BLDR = new Grid(24); /* raised volumes (porticati, passages): the camera m
 const BLD = new Grid(24);     // building polygons (point-in-building)
 
 // ---------------------------------------------------------------- foto: light computed in linear space (ramo fotorealismo)
-// every colour of the game is written in sRGB (0xrrggbb, '#rrggbb', canvas textures), but light only adds up right in linear space:
-// hex and css colours are converted on the way in, read back in sRGB (canvas styles made from them), canvas textures are decoded,
-// and the renderer encodes the image at the end. three.js does all this by itself from r152; this is r128
+// every colour of the game is written in sRGB (0xrrggbb, '#rrggbb', canvas textures), but light only adds up right in linear space.
+// On r128 this file converted hex and css colours by hand; three.js 0.186 does it by itself (ColorManagement), and doing it twice made the
+// whole town near black. What is left: the canvas textures are drawn in sRGB, so they are decoded (colorSpace, r128's encoding)
 {
-  const C = THREE.Color.prototype, sh = C.setHex, ss = C.setStyle, gh = C.getHex, gs = C.getStyle, tmp = new THREE.Color(); let inStyle = false;
-  C.setHex = function (h) { sh.call(this, h); return inStyle ? this : this.convertSRGBToLinear(); };
-  C.setStyle = function (s) { inStyle = true; try { ss.call(this, s); } finally { inStyle = false; } return this.convertSRGBToLinear(); }; // a colour name goes through setHex: once only
-  C.getHex = function () { return gh.call(tmp.copy(this).convertLinearToSRGB()); };
-  C.getStyle = function () { return gs.call(tmp.copy(this).convertLinearToSRGB()); };
   const CT = THREE.CanvasTexture;
-  THREE.CanvasTexture = class extends CT { constructor(...a) { super(...a); this.encoding = THREE.sRGBEncoding; } };
+  THREE.CanvasTexture = class extends CT { constructor(...a) { super(...a); this.colorSpace = THREE.SRGBColorSpace; } };
 }
 
 // ---------------------------------------------------------------- renderer
@@ -257,7 +293,7 @@ const canvas = document.getElementById('gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, stencil: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.4, 7000);
 function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
@@ -1098,6 +1134,7 @@ function interpEnd(done) { for (const o of done) { const c = o._c, keys = o._pk;
 // the blow (speed times the vehicle's mass, propForza) and on the group of the object (Carlo, 8/11): FORZA.leggero (signs, bollards, meters,
 // bins, benches, columns, the fuel totem) goes at a gentle knock, FORZA.medio (lamp posts, bus shelters, bales, concrete blocks)
 // needs speed and mass; what is never broken has no prop, only its wall. A weaker blow stops the vehicle; on foot nothing breaks.
+// Knocked down, it stays solid as it falls and loses its walls only lying still on the ground (cadutaNuova, below).
 // via: the object is not knocked over but moves (bales roll away, blocks slide) and stands again where it stops, still solid.
 const PROPS = [], PROPG = new Grid(16), PROP_FALL = [], PROP_MOVE = [];
 const FORZA = { leggero: 8.3, medio: 16.7 }; // m/s of a car of mass 1 (a hatchback): 30 and 60 km/h (Carlo, 8/11); a two-wheeler weighs a quarter of it (as in the crashes between vehicles)
@@ -1121,17 +1158,146 @@ const SFONDA = { slow: 0.86, dmg: 2 }; // what a vehicle loses of its speed and 
    rod of its height (angular acceleration 3g/2L times the sine of the tilt), from the turn the blow gave it (FALL.kick times the speed over the
    height); it hits the ground, bounces a little, damped, and lies still. A blow over its threshold also throws its foot forward, a share of the
    vehicle's speed growing with the excess (FALL.spinta), the foot sliding to a stop on the ground (FALL.attrito). One way for everything knocked down */
-const FALL = { kick: 0.22, kickMax: 3, spinta: 0.5, attrito: 6, rimbalzo: 0.2, fermo: 0.6, steso: Math.PI / 2 - 0.04 };
+const FALL = { kick: 0.22, kickMax: 3, spinta: 0.5, attrito: 6, attritoSteso: 20, rimbalzo: 0.2, fermo: 0.6, steso: Math.PI / 2 - 0.04 }; /* attritoSteso: lying, the whole of it grinds on the ground */
 function breakProp(p, v, F) {
-  if (p.broken) return; p.broken = true; p.wall.on = false; for (const w of p.pw || []) w.on = false;
-  let dx = v ? v.vx : 1, dz = v ? v.vz : 0; const l = hyp(dx, dz) || 1; dx /= l; dz /= l;
-  const axis = new THREE.Vector3(dz, 0, -dx); // tips over along the car's way
+  if (p.broken) return; p.broken = true; p.wall.on = false; for (const w of p.pw || []) w.on = false; /* its standing walls: from now on its walls are those of the fall (cadutaNuova) */
   let o = p.obj, m0 = null;
   if (!o && p.inst) { o = new THREE.Object3D(); o.position.set(p.x, p.inst.base, p.z); o.updateMatrix(); m0 = propMatrici(p); } // a pivot at its foot: each instance turns about it from the matrix it had
-  const L = clamp(p.h || 3, 0.8, 9), sp = v ? v.speed : 0, ecc = F ? clamp(F / FORZA[p.forza || 'leggero'] - 1, 0, 1) : 0;
-  if (o) PROP_FALL.push({ o, p, axis, m0, L, a: 0, w: Math.min(FALL.kickMax, FALL.kick * sp / L) + 0.1, vx: dx * sp * FALL.spinta * ecc, vz: dz * sp * FALL.spinta * ecc, x0: o.position.x, y0: o.position.y, z0: o.position.z, giu: false, t: 0 });
+  const L = clamp(p.h || 3, 0.8, 9);
+  if (o) cadutaNuova(o, v, F, FORZA[p.forza || 'leggero'], L, propPezzi(p, o, L), m0, p);
   if (p.onBreak) p.onBreak();
   if (v) propUrto(v);
+}
+/* the pieces of a prop that falls, from the pivot at its foot: its post and its other posts, standing, and what else goes with it (p.pezzi: a level crossing's arm) */
+function propPezzi(p, o, L) {
+  const ox = o.position.x, oz = o.position.z, q = [[p.x - ox, 0, p.z - oz, p.x - ox, L, p.z - oz, p.r]];
+  for (const w of p.pw || []) q.push([w.x - ox, 0, w.z - oz, w.x - ox, L, w.z - oz, w.r]);
+  if (p.pezzi) q.push(...p.pezzi());
+  return q;
+}
+/* WHAT FALLS STAYS SOLID UNTIL IT LIES ON THE GROUND (Carlo, 9/11: "cadono come burro, dovrebbero perdere la collisione solo quando sono completamente a terra").
+   One way for everything knocked down (breakProp, a gate's leaf torn off): the body is a few straight pieces [x0, y0, z0, x1, y1, z1, r] from the pivot
+   at its foot, turned with it; the part of each under CADUTA.alto is in WALLS where it is at that moment, circles at its two ends and a segment between
+   (two along its sides when it is thick), so the walker, every vehicle and the helicopter meet it as any wall. A vehicle meets only the part under
+   CADUTA.auto (its roof): over that the body leans on it (cadutaDentro), the walker meets it up to CADUTA.alto. The vehicle that knocked it down, and any
+   other over its threshold, push it instead (cadutaUrti): the body takes the vehicle's speed along the push and goes on falling ahead of it, the vehicle
+   goes on (it lost its share once, propUrto). Falling or pushed, it stops against a wall or a vehicle (cadutaBloccata) and leans there. Its walls go only
+   once it lies still on the ground (giu) */
+const CADUTA = { auto: 1.5, alto: 2.0, passo: 0.5, grosso: 0.3, urto: 0, margine: 0.05, basso: 0.6 }; /* basso: held still with its top under this (on a kerb, a low wall), it lies on the ground */
+function cadutaNuova(o, v, F, soglia, L, pezzi, m0, p) {
+  let dx = v ? v.vx : 1, dz = v ? v.vz : 0; const l = hyp(dx, dz) || 1; dx /= l; dz /= l; // tips over along the vehicle's way
+  const sp = v ? v.speed : 0, ecc = F ? clamp(F / soglia - 1, 0, 1) : 0, mk = r => ({ r, x: 0, z: 0, dyn: true, on: true, y0: 0, y1: 0, bb: null }), ms = () => ({ ax: 0, az: 0, bx: 0, bz: 0, nx: 0, nz: 0, two: true, dyn: true, on: true, y0: 0, y1: 0, bb: null });
+  const f = { o, p, axis: new THREE.Vector3(dz, 0, -dx), m0, L, a: 0, w: Math.min(FALL.kickMax, FALL.kick * sp / L) + 0.1, vx: dx * sp * FALL.spinta * ecc, vz: dz * sp * FALL.spinta * ecc, x0: o.position.x, y0: o.position.y, z0: o.position.z, giu: false, t: 0,
+    dx, dz, soglia, urtati: new Set(v ? [v.chi || v] : []), attivo: true, muri: [], mie: new Set() };
+  for (const q of pezzi) { const m = { q, ws: [mk(q[6]), mk(q[6]), ms(), ms(), mk(q[6]), mk(q[6]), ms(), ms()] }; f.muri.push(m); for (const w of m.ws) f.mie.add(w); }
+  PROP_FALL.push(f); cadutaMuri(f); return f;
+}
+function cadRuota(f, x, y, z, ca, sa) { /* a point of the body, from its pivot, turned by the fall: [x, y, z] from the pivot */
+  const s = x * f.dx + z * f.dz, t = -x * f.dz + z * f.dx, s2 = s * ca + y * sa;
+  return [f.dx * s2 - f.dz * t, y * ca - s * sa, f.dz * s2 + f.dx * t];
+}
+function cadMuro(w, on, x0, z0, x1, z1) { /* a wall of a falling body in and out of WALLS, where it is now */
+  if (w.bb) { WALLS.del(w.bb[0], w.bb[1], w.bb[2], w.bb[3], w); w.bb = null; }
+  w.on = on; if (on) { w.bb = [x0, z0, x1, z1]; WALLS.add(x0, z0, x1, z1, w); }
+}
+function cadutaMuri(f) {
+  const o = f.o.position, ca = Math.cos(f.a), sa = Math.sin(f.a);
+  for (const m of f.muri) {
+    if (!f.attivo) { for (const w of m.ws) cadMuro(w, false); continue; }
+    const q = m.q, A = cadRuota(f, q[0], q[1], q[2], ca, sa), B = cadRuota(f, q[3], q[4], q[5], ca, sa);
+    cadBanda(o, q[6], A, B, -0.5, CADUTA.auto, m.ws.slice(0, 4), false); cadBanda(o, q[6], A, B, CADUTA.auto, CADUTA.alto, m.ws.slice(4), true);
+  }
+}
+/* the part of a piece (A to B from the pivot o) between heights H0 and H1, in WALLS: circles at its ends, a segment between (two when it is thick).
+   sopra: over the roof of a vehicle, the walker meets it and a vehicle does not (yv under the height a vehicle checks, collideStatic) */
+function cadBanda(o, r, A, B, H0, H1, ws, sopra) {
+  const [c0, c1, s0, s1] = ws, dh = B[1] - A[1]; let t0 = 0, t1 = 1;
+  if (Math.abs(dh) < 1e-6) { if (A[1] < H0 || A[1] > H1) t1 = -1; }
+  else { let u0 = (H0 - A[1]) / dh, u1 = (H1 - A[1]) / dh; if (u0 > u1) { const k = u0; u0 = u1; u1 = k; } t0 = Math.max(0, u0); t1 = Math.min(1, u1); }
+  if (t1 < t0) { for (const w of ws) cadMuro(w, false); return; } /* none of it in this band */
+  const ax = o.x + A[0] + (B[0] - A[0]) * t0, az = o.z + A[2] + (B[2] - A[2]) * t0, bx = o.x + A[0] + (B[0] - A[0]) * t1, bz = o.z + A[2] + (B[2] - A[2]) * t1;
+  const y0 = o.y - 3, y1 = o.y + Math.max(A[1] + dh * t0, A[1] + dh * t1) + 0.25, L = hyp(bx - ax, bz - az);
+  for (const w of ws) { w.y0 = y0; w.y1 = y1; if (sopra) w.yv = o.y + 0.2; }
+  c0.x = ax; c0.z = az; cadMuro(c0, true, ax - r - 0.2, az - r - 0.2, ax + r + 0.2, az + r + 0.2);
+  if (L < 0.05) { cadMuro(c1, false); cadMuro(s0, false); cadMuro(s1, false); return; }
+  c1.x = bx; c1.z = bz; cadMuro(c1, true, bx - r - 0.2, bz - r - 0.2, bx + r + 0.2, bz + r + 0.2);
+  const nx = -(bz - az) / L, nz = (bx - ax) / L, e = r < CADUTA.grosso ? 0 : r;
+  for (const [w, k] of [[s0, 1], [s1, -1]]) {
+    if (k < 0 && !e) { cadMuro(w, false); continue; }
+    w.ax = ax + nx * e * k; w.az = az + nz * e * k; w.bx = bx + nx * e * k; w.bz = bz + nz * e * k; w.nx = nx * k; w.nz = nz * k;
+    cadMuro(w, true, Math.min(w.ax, w.bx), Math.min(w.az, w.bz), Math.max(w.ax, w.bx), Math.max(w.az, w.bz));
+  }
+}
+/* points along the body with its pivot at (x, z) and turned by a: [x, z, y, r] */
+function cadutaPunti(f, x, z, a) {
+  const ca = Math.cos(a), sa = Math.sin(a), gy = f.y0 + H.ground(x, z) - H.ground(f.x0, f.z0), out = [];
+  for (const m of f.muri) {
+    const q = m.q, n = Math.max(2, Math.ceil(hyp(q[3] - q[0], q[4] - q[1], q[5] - q[2]) / CADUTA.passo) + 1), r = Math.min(q[6], CADUTA.grosso);
+    for (let i = 0; i < n; i++) { const t = i / (n - 1), P = cadRuota(f, q[0] + (q[3] - q[0]) * t, q[1] + (q[4] - q[1]) * t, q[2] + (q[5] - q[2]) * t, ca, sa); out.push([x + P[0], z + P[2], gy + P[1], r]); }
+  }
+  return out;
+}
+const cadutaMuro = (f, P) => !!collideStatic({ x: P[0], z: P[1] }, P[3], P[2], false, f.mie); /* a point of the body inside a wall, not its own */
+function cadutaDentro(P, vs) { /* how deep a point of the body is in a vehicle (not one pushing it): its box, up to its roof there (salto3.js vehTopAt); 0 outside */
+  let d = 0;
+  for (const v of vs) {
+    const S = v.spec, sh = Math.sin(v.h), ch = Math.cos(v.h), ex = P[0] - v.x, ez = P[1] - v.z, lz = ex * sh + ez * ch, lx = ex * ch - ez * sh;
+    const a = S.W / 2 + P[3] - Math.abs(lx), b = S.L / 2 + P[3] - Math.abs(lz); if (a <= 0 || b <= 0 || P[2] < v.y - 0.1) continue;
+    const t = vehTopAt(v, clamp(lx, -S.W / 2, S.W / 2), clamp(lz, -S.L / 2, S.L / 2)), c = v.y + (t === null ? vehMaxTop(v) : t) - P[2]; if (c > 0) d = Math.max(d, Math.min(a, b, c));
+  }
+  return d;
+}
+/* moving the pivot to (x, z) and turning it to a, the body goes into a wall it was not in already, or deeper into a vehicle */
+function cadutaBloccata(f, x, z, a) {
+  const o = f.o.position, R = f.L + 6, vs = VEH.filter(v => !v.heli && !f.urtati.has(v) && Math.abs(v.x - x) < R && Math.abs(v.z - z) < R);
+  const B = cadutaPunti(f, x, z, a); let A = null;
+  for (let i = 0; i < B.length; i++) {
+    const m = cadutaMuro(f, B[i]), d = vs.length ? cadutaDentro(B[i], vs) : 0; if (!m && d <= 0) continue;
+    if (!A) A = cadutaPunti(f, o.x, o.z, f.a);
+    if (m && !cadutaMuro(f, A[i]) || d > 0 && d > cadutaDentro(A[i], vs) + 1e-4) return true;
+  }
+  return false;
+}
+function cadutaSposta(f, x, z) { const o = f.o.position; o.x = x; o.z = z; o.y = f.y0 + H.ground(x, z) - H.ground(f.x0, f.z0); cadutaMuri(f); }
+/* how far the discs [x, z, r] of a vehicle between heights ya and yb are in a falling body's walls: [depth, nx, nz] towards the body, or null */
+function cadutaContatto(f, dischi, ya, yb, q, veh) {
+  let best = 0, nx = 0, nz = 0;
+  for (const m of f.muri) for (const w of m.ws) {
+    if (!w.bb || yb < w.y0 || ya > (veh && w.yv !== undefined ? w.yv : w.y1)) continue;
+    for (const [cx, cz, r] of dischi) {
+      let px, pz, R = r + CADUTA.margine;
+      if (w.r !== undefined) { px = w.x; pz = w.z; R += w.r; }
+      else { const ex = w.bx - w.ax, ez = w.bz - w.az, t = clamp(((cx - w.ax) * ex + (cz - w.az) * ez) / (ex * ex + ez * ez || 1), 0, 1); px = w.ax + ex * t; pz = w.az + ez * t; }
+      const dx = px - cx, dz = pz - cz, d = hyp(dx, dz), pen = R - d; if (pen <= best) continue;
+      best = pen; if (d > 1e-6) { nx = dx / d; nz = dz / d; } else { const l = hyp(q.vx, q.vz) || 1; nx = q.vx / l; nz = q.vz / l; }
+    }
+  }
+  return best > 0 ? [best, nx, nz] : null;
+}
+/* a vehicle (chi; q its speed, F its blow) against the bodies falling: the one that knocked it down and any other over its threshold push it away,
+   at their speed along the push; one under it meets it as a wall (collideStatic, heliPush). Pinned against something, it is a wall for all */
+function cadutaUrti(chi, dischi, q, F, ya, yb) {
+  let hit = false;
+  for (const f of PROP_FALL) {
+    if (!f.attivo) continue;
+    const o = f.o.position, mio = f.urtati.has(chi); if (!mio && F < f.soglia) continue;
+    if (Math.abs(dischi[0][0] - o.x) > f.L + 8 || Math.abs(dischi[0][1] - o.z) > f.L + 8) continue;
+    let nx = 0, nz = 0, tocco = false; const sp = hyp(q.vx, q.vz), vie = [null]; if (sp > 0.1) vie.push([q.vx / sp, q.vz / sp]);
+    for (let k = 0; k < 4; k++) {
+      const c = cadutaContatto(f, dischi, ya, yb, q, !chi.heli); if (!c) break;
+      tocco = true; vie[0] = [c[1], c[2]]; let mosso = false;
+      for (const [ux, uz] of vie) { /* away from the vehicle; held there (its edge along a fence), along the vehicle's way: it scrapes along */
+        const kk = ux * c[1] + uz * c[2]; if (kk < 0.3) continue;
+        const x = o.x + ux * c[0] / kk, z = o.z + uz * c[0] / kk; if (cadutaBloccata(f, x, z, f.a)) continue;
+        cadutaSposta(f, x, z); nx = ux; nz = uz; mosso = true; break;
+      }
+      if (!mosso) break;
+    }
+    if (!tocco) continue;
+    if (!mio) { f.urtati.add(chi); propUrto(q); hit = true; }
+    const vr = (q.vx - f.vx) * nx + (q.vz - f.vz) * nz; if (vr > 0) { f.vx += nx * vr * (1 + CADUTA.urto); f.vz += nz * vr * (1 + CADUTA.urto); }
+  }
+  return hit;
 }
 function propUrto(v) { const sp = v.speed; v.vx *= SFONDA.slow; v.vz *= SFONDA.slow; v.health = Math.max(0, v.health - SFONDA.dmg); if (v === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
 function propMatrici(p) { return p.inst.meshes.map(m => { const M = new THREE.Matrix4(); m.getMatrixAt(p.inst.i, M); return M; }); }
@@ -1154,7 +1320,12 @@ function propSpingi(p, v) { // pushed: it takes the vehicle's way at part of its
 }
 function propHits(v) {
   tombHits(v);
-  const F = propForza(v); if (F < FORZA.leggero) return;
+  const F = propForza(v);
+  propHitsDopo(v, F);
+  if (PROP_FALL.length) cadutaUrti(v, v.circles().map(c => [c[0], c[1], v.rad]), v, F, v.y + 0.4, v.y + 0.4); /* what falls, after what it knocks down in the same step */
+}
+function propHitsDopo(v, F) {
+  if (F < FORZA.leggero) return;
   PROPG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, p => {
     if (p.broken || Math.abs(v.y - p.y) > 3 || F < FORZA[p.forza || 'leggero']) return;
     for (const c of v.circles()) if (hyp(c[0] - p.x, c[1] - p.z) < v.rad + p.r + 0.15 || (p.pw || []).some(w => hyp(c[0] - w.x, c[1] - w.z) < v.rad + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < v.speed * 0.5) propSpingi(p, v); } else breakProp(p, v, F); return; }
@@ -1168,12 +1339,13 @@ function propHits(v) {
 /* the helicopter against the props: the same rule as the vehicles. Discs [x, z, r] between heights ya and yb; over the threshold it knocks them
    down or pushes them (and loses some speed), under it heliPush stops it on their walls. Its damage is not touched here */
 function propHitsElicottero(e, dischi, ya, yb) {
-  const sp = hyp(e.vx, e.vz), F = sp * heliMassa(); if (F < FORZA.leggero) return;
-  const q = { vx: e.vx, vz: e.vz, speed: sp }; let hit = false;
-  for (const [cx, cz, r] of dischi) PROPG.each(cx - r - 3, cz - r - 3, cx + r + 3, cz + r + 3, p => {
+  const sp = hyp(e.vx, e.vz), F = sp * heliMassa();
+  const q = { vx: e.vx, vz: e.vz, speed: sp, chi: e }; let hit = false;
+  if (F >= FORZA.leggero) for (const [cx, cz, r] of dischi) PROPG.each(cx - r - 3, cz - r - 3, cx + r + 3, cz + r + 3, p => {
     if (p.broken || F < FORZA[p.forza || 'leggero'] || yb < p.wall.y0 || ya > p.wall.y1) return;
     if (hyp(cx - p.x, cz - p.z) < r + p.r + 0.15 || (p.pw || []).some(w => hyp(cx - w.x, cz - w.z) < r + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < sp * 0.5) propSpingi(p, q); } else breakProp(p, q, F); hit = true; }
   });
+  if (PROP_FALL.length && cadutaUrti(e, dischi, q, F, ya, yb)) hit = true;
   if (hit) { e.vx = q.vx; e.vz = q.vz; if (e === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
 }
 const PROP_DEBRIS = [];
@@ -1187,14 +1359,24 @@ function snapArm(b, v) {
 function updProps(dt) {
   for (let i = PROP_FALL.length - 1; i >= 0; i--) {
     const f = PROP_FALL[i]; f.t += dt;
-    const sv = hyp(f.vx, f.vz); if (sv > 0) { const k = Math.max(0, sv - FALL.attrito * dt) / sv; f.vx *= k; f.vz *= k; const o = f.o.position; o.x += f.vx * dt; o.z += f.vz * dt; o.y = f.y0 + H.ground(o.x, o.z) - H.ground(f.x0, f.z0); }
-    if (!f.giu) {
-      f.w += 1.5 * 9.81 / f.L * Math.sin(Math.max(0.02, f.a)) * dt; let da = f.w * dt;
-      if (f.a + da >= FALL.steso) { da = FALL.steso - f.a; if (f.w > FALL.fermo) f.w = -f.w * FALL.rimbalzo; else { f.w = 0; f.giu = true; } } /* the ground: a small bounce, then still */
-      f.a += da; f.o.rotateOnWorldAxis(f.axis, da);
+    const o = f.o.position, sv = hyp(f.vx, f.vz);
+    if (sv > 0) { /* its foot slides, to a stop; not into a wall or a vehicle */
+      const k = Math.max(0, sv - (f.giu ? FALL.attritoSteso : FALL.attrito) * dt) / sv; f.vx *= k; f.vz *= k;
+      const x = o.x + f.vx * dt, z = o.z + f.vz * dt;
+      if (f.attivo && cadutaBloccata(f, x, z, f.a)) { f.vx = 0; f.vz = 0; } else { o.x = x; o.z = z; o.y = f.y0 + H.ground(o.x, o.z) - H.ground(f.x0, f.z0); }
     }
+    if (!f.giu) {
+      f.w += 1.5 * 9.81 / f.L * Math.sin(Math.max(0.02, f.a)) * dt; let da = f.w * dt, terra = false;
+      if (f.a + da >= FALL.steso) { da = FALL.steso - f.a; terra = true; }
+      if (da > 0 && f.attivo && cadutaBloccata(f, o.x, o.z, f.a + da)) { f.w = 0; if (f.L * Math.cos(f.a) < CADUTA.basso) f.giu = true; } /* against a wall or a vehicle: it leans there, as long as that stays; low and still, it lies */
+      else {
+        if (terra) { if (f.w > FALL.fermo) f.w = -f.w * FALL.rimbalzo; else { f.w = 0; f.giu = true; } } /* the ground: a small bounce, then still */
+        f.a += da; f.o.rotateOnWorldAxis(f.axis, da);
+      }
+    }
+    if (f.attivo) { if (f.giu) f.attivo = false; cadutaMuri(f); } /* lying still on the ground, it loses its walls */
     if (f.m0) propScrivi(f.p, f.o, f.m0, f.p.x, f.p.inst.base, f.p.z); else f.o.updateMatrix();
-    if (f.giu && f.vx === 0 && f.vz === 0 || f.giu && hyp(f.vx, f.vz) < 0.01 || f.t > 8) PROP_FALL.splice(i, 1);
+    if (f.giu && hyp(f.vx, f.vz) < 0.01 || f.giu && f.t > 30) PROP_FALL.splice(i, 1);
   }
   for (let i = PROP_MOVE.length - 1; i >= 0; i--) { // rolling and sliding: friction, the walls round it, its own wall going with it
     const p = PROP_MOVE[i], sp = hyp(p.vx, p.vz), ns = Math.max(0, sp - (p.via === 'rotola' ? 5 : 7) * dt), k = sp > 1e-6 ? ns / sp : 0;
@@ -2489,7 +2671,7 @@ const TREE_LEAF = (() => {
     mips.push({ data: d, width: w, height: w });
   }
   const t = new THREE.DataTexture(d0, S, S, THREE.RGBAFormat); t.mipmaps = mips; t.generateMipmaps = false;
-  t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.encoding = THREE.sRGBEncoding; t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); t.needsUpdate = true;
+  t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); t.needsUpdate = true;
   return t;
 })();
 const barkTex = canvasTex(64, 128, (g, w, h) => { g.fillStyle = '#e0dad0'; g.fillRect(0, 0, w, h); for (let i = 0; i < 260; i++) { const v = 170 + rnd() * 85 | 0; g.fillStyle = `rgb(${v},${v - 6},${v - 14})`; g.fillRect(rnd() * w, rnd() * h, 1, 6 + rnd() * 22); } });
@@ -2524,10 +2706,10 @@ Object.assign(MAT, { gravel: flatMat({ map: gravelTex }), gravelS: new THREE.Mes
 let FONDO_ = null;
 function fondoLook(m) {
   if (!FONDO_) {
-    const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t; };
+    const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
     const mk = (map, vs) => ({ S: new THREE.MeshLambertMaterial({ map }), F: flatMat({ map }), vs });
     FONDO_ = { g: mk(ld('ghiaia'), 2.5), t: mk(ld('terra'), 2.6), n: mk(ld('pavimento'), 3), b: { S: MAT.side, F: flatMat({ map: sidewalkTex }), vs: 4 }, f: { S: MAT.piazzaS, F: MAT.piazza, vs: 4 },
-      c: mk(ciottoliTex, 4), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
+      c: (c => { c.S.color.set(CIOTTOLI_TINTA); c.F.color.set(CIOTTOLI_TINTA); return c; })(mk(ciottoliTex, 4)), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
   }
   return FONDO_[m] || null;
 }
@@ -2611,8 +2793,8 @@ const AO_WALL = s => { // chained after the lit windows' patch of extras.js, in 
   float aoW = mix(0.45, 1.0, smoothstep(0.0, 2.0, vAoD.x)) * mix(0.72, 1.0, smoothstep(0.0, 0.9, vAoD.y)) * mix(0.5, 1.0, smoothstep(0.0, 1.8, min(vAoD.z, vAoD.w)));
   reflectedLight.indirectDiffuse *= aoW; reflectedLight.directDiffuse *= mix(1.0, aoW, 0.35);`);
 };
-const AO_GROUND_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
-AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n float fogF = smoothstep( fogNear, fogFar, fogDepth );\n gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 1.0 ), fogF );\n#endif'); }; // fades to nothing in the haze
+const AO_GROUND_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, premultipliedAlpha: true, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n float fogF = smoothstep( fogNear, fogFar, vFogDepth );\n gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 1.0 ), fogF );\n#endif'); }; // fades to nothing in the haze
 const AO_K = [[0, 0.2], [0.45, 0.5], [1.6, 1]]; // distance from the wall, shade (linear: multiplied on the screen, 0.2 darkens by half)
 // no shade over a pit (a ramp, an underpass, the stairs of the station): a triangle of the strip with a corner in it went down to its floor, one that crossed it
 // stood over the hole at the street's level. The dark bands across the floor and the walls of the station stairs, and the grey sheets over the hole (Carlo 3/11)
@@ -2654,8 +2836,8 @@ const FAC_WALL = s => {
   const plaster = '0.25 * ( texture2D( map, vec2( 0.03, 0.86 ) ) + texture2D( map, vec2( 0.5, 0.95 ) ) + texture2D( map, vec2( 0.97, 0.9 ) ) + texture2D( map, vec2( 0.3, 0.99 ) ) )';
   s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFac;')
     .replace('void main() {', 'void main() {\n  float facF = floor( vUv.y ), facW = step( vFac.x - 0.5, facF ) * step( facF, vFac.y + 0.5 ) * step( vFac.z, vUv.y );')
-    .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('texture2D( map, vUv )', `mix( ${plaster}, texture2D( map, vUv ), facW )`) + '\n  diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;')
-    .replace('#include <emissivemap_fragment>', THREE.ShaderChunk.emissivemap_fragment.replace('texture2D( emissiveMap, vUv )', '( texture2D( emissiveMap, vUv ) * facW )'))
+    .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('texture2D( map, vMapUv )', `mix( ${plaster}, texture2D( map, vMapUv ), facW )`) + '\n  diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;')
+    .replace('#include <emissivemap_fragment>', THREE.ShaderChunk.emissivemap_fragment.replace('texture2D( emissiveMap, vEmissiveMapUv )', '( texture2D( emissiveMap, vEmissiveMapUv ) * facW )'))
     .replace('texture2D( emissiveMap, vUv ).r', '( texture2D( emissiveMap, vUv ).r * facW )');
 };
 function addSill(b, x, y, z, ux, uz, nx, nz, W = 0.58) { // a stone sill 1.16 m long (W half of it) sticking 10 cm out of the wall: top, front and underside only (6 triangles)
@@ -4084,9 +4266,9 @@ function* buildTileGen(T) {
         });
         /* the doors on this house (Carlo 7/11, via Adua): a door takes the place of the ground-floor window of a bay, never sits over a window. It goes to the centre of the nearest free bay of its wall, flush on the wall, facing out; that bay draws no window on its lowest floor (R.noG). Where the wall has no bays the door stays where it is, put on the wall. PORTE_CNT counts the doors over a ground-floor window before and after (debug) */
         /* the shop fronts on this building (negozi3.js, decided by the bake: T.d.ngw) win over windows and doors (Carlo 8/11): no window in the bay of a front on the ground floor, no door under it */
-        for (const [bi, fx, fz, fwid] of T.d && T.d.ngw ? T.d.ngw.filter(q => q[0] === B.bi) : []) {
+        for (const [bi, fx, fz, fwid, hS] of T.d && T.d.ngw ? T.d.ngw.filter(q => q[0] === B.bi) : []) {
           let best = null; for (const rg of rings) for (let i = 0; i < rg.nr; i++) { const w = rg.W[i]; if (!w) continue; const a = rg.ring[i], [dx, dz, L] = rg.E[i], tt = clamp(((fx - a[0]) * dx + (fz - a[1]) * dz) / (L * L), 0, 1), dd = hyp(fx - a[0] - dx * tt, fz - a[1] - dz * tt); if (dd < 1.2 && (!best || dd < best.dd)) best = { dd, R: w[0], s: w[1] + tt * L }; }
-          if (!best) continue; const R = best.R, v0 = best.s - fwid / 2 - 0.15, v1 = best.s + fwid / 2 + 0.15; (R.vt || (R.vt = [])).push([v0, v1]);
+          if (!best) continue; const R = best.R, v0 = best.s - fwid / 2 - 0.15, v1 = best.s + fwid / 2 + 0.15; const gF = gCasa(fx, fz), tF = bldTop(B) - gF, hV = Math.min(Math.max(tF - 1.0, 2.6), 3.6), shF = Math.min(Math.max(tF - hV - 0.35, 0), 0.75); /* the sign and its window are free of everything, like a door: up to the top of the sign (the widest model: the one with the bay window) */ (R.vt || (R.vt = [])).push([v0, v1, hS !== undefined ? gF + hS : tF < 2.7 ? gF : gF + hV + (shF >= 0.32 ? shF : 0)]); /* hS: the sign of that very front, from its own model (the bake, ngSignTop); without it (old data) the highest model */
           const VC = window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0 }); VC.vetrine++;
           if (R.n) { const noG = R.noG || (R.noG = new Set()); for (let j = 0; j < R.n; j++) { const b0 = R.pad + j * R.bw, b1 = b0 + R.bw; if (b1 > v0 && b0 < v1) { noG.add(j); VC.campate++; } } }
         }
@@ -4173,7 +4355,7 @@ function* buildTileGen(T) {
             if (bay && f[0] < 900 && (R.dr || R.noG)) { /* a door in this bay: no window on the lowest floor (PORTE_CNT: the bays a door was over before, and the ones with a window under a door after) */
               const j = Math.round((s0 - R.pad) / bw), PC = window.PORTE_CNT || (window.PORTE_CNT = { porte: 0, sopra_prima: 0, sopra_dopo: 0, spostate: 0 }), w0 = s0 + rfw[2] * bw, w1 = s0 + rfw[3] * bw;
               if (R.ovl && R.ovl.has(j)) PC.sopra_prima++; R.dr = R.dr || [];
-              if (R.noG && R.noG.has(j) && F0 + f[0] * FL + rfw[0] * sc < g + 3.1) { /* the lowest window of the bay, if a door stands under it (its floor may be above kl where a volume in front covers the one below) */ dropped = 1; f = f[0] + 1 <= f[1] ? [f[0] + 1, f[1]] : [999, -999]; } else if (R.dr.some(([c, W]) => c + W / 2 > w0 && c - W / 2 < w1)) PC.sopra_dopo++;
+              if (R.noG && R.noG.has(j) && (F0 + f[0] * FL + rfw[0] * sc < g + 3.1 || facSotto(R, w0, w1, F0 + f[0] * FL + rfw[0] * sc))) { /* the lowest window of the bay, if a door stands under it (its floor may be above kl where a volume in front covers the one below) */ dropped = 1; f = f[0] + 1 <= f[1] ? [f[0] + 1, f[1]] : [999, -999]; while (f[0] < 900 && facSotto(R, w0, w1, F0 + f[0] * FL + rfw[0] * sc)) f = f[0] + 1 <= f[1] ? [f[0] + 1, f[1]] : [999, -999]; /* every floor whose window stands over the sign goes */ } else if (R.dr.some(([c, W]) => c + W / 2 > w0 && c - W / 2 < w1)) PC.sopra_dopo++;
             }
             /* the covered floors between the first and the last window: their bits (from the first) go to the wall, which draws no window and opens no hole there (Carlo 8/11: "restano i buchi") */
             let mask = 0; if (f[0] < 900) for (let k = f[0]; k <= Math.min(f[1], f[0] + 22); k++) if (covK(k)) mask += 2 ** (k - f[0]);
@@ -4281,12 +4463,14 @@ function* buildTileGen(T) {
     const geo = b => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setIndex(b.i); return g; };
     const n = LPS.length, pm = new THREE.InstancedMesh(geo(pole), MAT.lamp, n), hm = new THREE.InstancedMesh(geo(head), MAT.lampHead, n), o = new THREE.Object3D(), pool = Buf(), gp = [];
     pm.castShadow = true; pm.renderOrder = hm.renderOrder = 10;
+    T.lampL = []; /* the lamp heads, for the real lights of luci3.js */
     LPS.forEach(([x, z, ry], i) => {
       const gy = H.surface(x, z, 1e4), c = Math.cos(ry), s = Math.sin(ry), hx = x + c * 1.15, hz = z - s * 1.15; // the arm reaches out along local +x
       o.position.set(x, gy, z); o.rotation.set(0, ry, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix);
       const py = H.surface(hx, hz, 1e4) + 0.14, k = pool.p.length / 3, R = 7, cy = (x, z) => T.fine && py - 0.14 <= streetY(hx, hz) + 0.2 ? streetY(x, z) + 0.14 : py; // warm light pool on the street at night; in a tile of S its corners on S, so the ground (which writes its depth) does not cut it on a slope
       vtx(pool, hx - R, cy(hx - R, hz - R), hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, cy(hx + R, hz - R), hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, cy(hx + R, hz + R), hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, cy(hx - R, hz + R), hz + R, 0, 1, 0, 0, 1); triUp(pool, k, k + 1, k + 2); triUp(pool, k, k + 2, k + 3);
       gp.push(hx, gy + 6.82, hz); // glare under the lamp head
+      T.lampL.push({ x: hx, y: gy + 6.9, z: hz, off: false });
       if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, forza: 'medio', inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
       else for (const p of PROPS) if (p.tile === T && p.li === i) { p.inst.meshes = [pm, hm]; if (p.broken) { o.scale.set(0, 0, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix); o.scale.set(1, 1, 1); } } // built again: the lamps knocked down stay down
     });
@@ -4295,7 +4479,7 @@ function* buildTileGen(T) {
     const glare = new THREE.Points(pg, LAMPGLOW_MAT); glare.renderOrder = 14; G.add(glare);
     for (const p of PROPS) if (p.tile === T) p.onBreak = () => { // the lamp goes dark: its pool and its glare drop out of sight
       if (poolM) { const a = poolM.geometry.attributes.position; for (let q = p.li * 4; q < p.li * 4 + 4; q++) a.setY(q, -9999); a.needsUpdate = true; }
-      pg.attributes.position.setY(p.li, -9999); pg.attributes.position.needsUpdate = true; };
+      pg.attributes.position.setY(p.li, -9999); pg.attributes.position.needsUpdate = true; if (T.lampL && T.lampL[p.li]) T.lampL[p.li].off = true; };
     for (const p of PROPS) if (p.tile === T && p.broken && p.onBreak) p.onBreak(); // and dark
     T.lampsDone = true;
   }
@@ -4331,7 +4515,7 @@ const GATE_MAT = new THREE.MeshLambertMaterial({ color: 0x33413a, map: GATE_TEX,
 /* the double wooden door of an androne (kind 'w', Carlo 8/11): opaque vertical planks, dark brown, a rail across the middle */
 const WOOD_MAT = (() => { const c = document.createElement('canvas'); c.width = 128; c.height = 128; const x = c.getContext('2d');
   for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#6e4a2c' : '#654329'; x.fillRect(i * 16, 0, 16, 128); x.fillStyle = '#3d2716'; x.fillRect(i * 16, 0, 1.5, 128); }
-  x.fillStyle = '#4b3220'; x.fillRect(0, 22, 128, 7); x.fillRect(0, 98, 128, 7); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding;
+  x.fillStyle = '#4b3220'; x.fillRect(0, 22, 128, 7); x.fillRect(0, 98, 128, 7); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
   return new THREE.MeshLambertMaterial({ map: t, side: THREE.DoubleSide }); })();
 /* A leaf of a gate (androni-3, Carlo 8/11) is a door on its hinges: rammed over the blow of the objects (props3.js FORZA: a driveway gate and a
    wooden door as the 'medio' objects, a garden wicket as the 'leggero' ones) it swings wide open the way it was pushed and stays so; under it the
@@ -4571,8 +4755,8 @@ function staccaAnta(g, v, i) { /* an open leaf rammed again over the blow: it is
   for (let k = GATE_FLY.length - 1; k >= 0; k--) if (GATE_FLY[k].g === g && GATE_FLY[k].i === i) GATE_FLY.splice(k, 1);
   const h = g.hinges[i], m = h && h[0].children[0]; propUrto(v); if (!m || !g.outer || !g.outer.parent) return;
   const o = g.os[i], fx = (o.ax + o.bx) / 2, fz = (o.az + o.bz) / 2, piv = new THREE.Object3D(); piv.position.set(fx, g.gy, fz); g.outer.parent.add(piv); piv.updateMatrixWorld(); piv.attach(m);
-  let dx = v.vx, dz = v.vz; const l = hyp(dx, dz) || 1; dx /= l; dz /= l; const L = clamp(g.h, 0.8, 9), sp = v.speed, ecc = clamp(F / FORZA[gateForza(g)] - 1, 0, 1);
-  PROP_FALL.push({ o: piv, p: { x: fx, z: fz }, axis: new THREE.Vector3(dz, 0, -dx), m0: null, L, a: 0, w: Math.min(FALL.kickMax, FALL.kick * sp / L) + 0.1, vx: dx * sp * FALL.spinta * ecc, vz: dz * sp * FALL.spinta * ecc, x0: fx, y0: g.gy, z0: fz, giu: false, t: 0 });
+  const L = clamp(g.h, 0.8, 9), ax = o.ax - fx, az = o.az - fz, bx = o.bx - fx, bz = o.bz - fz; /* the leaf: its two ends and its middle standing, its bottom and its top edge */
+  cadutaNuova(piv, v, F, FORZA[gateForza(g)], L, [[ax, 0, az, ax, L, az, 0.1], [bx, 0, bz, bx, L, bz, 0.1], [0, 0, 0, 0, L, 0, 0.1], [ax, 0, az, bx, 0, bz, 0.1], [ax, L, az, bx, L, bz, 0.1]], null, { x: fx, z: fz });
 }
 function updGates(dt) {
   /* pedestrians open the small gates instead of walking through them */
@@ -4840,14 +5024,14 @@ function buildCemetery(T, G) {
   const slabs_ = mk(TOMB_G, lam(0xb8b4ac), tombs, (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.14, t[1]));
   T.tombeM = [slabs_, mk(STONE_G, lam(0x8e8a84), tombs.map(t => [t[0] - Math.sin(t[2]) * 0.95, t[1] + Math.cos(t[2]) * 0.95, t[2]]), (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.5, t[1]))]; tombeNascoste(T); // headstone at the head end; the broken ones stay broken
   if (cyps.length) { // the cypresses are trees like the others: the plain stem and the crown of TREE_G (leaf tufts), stretched to a narrow column (height th, crown td across, as the narrow DSM trees above)
-    const trunks = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, cyps.length), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, cyps.length), sc2 = new THREE.Vector3(), e2 = new THREE.Euler();
+    const trunks = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, cyps.length), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crownSemp, cyps.length), sc2 = new THREE.Vector3(), e2 = new THREE.Euler();
     cyps.forEach((c, i) => {
       const x = c[0], z = c[1], gy = H.ground(x, z), h = trHash(x, z), th = 7.5 + 3 * h, td = 2.2 + 0.6 * trHash(z, x), yb = Math.min(th - 1.2, Math.max(0.5, Math.min(0.15 * th, th - 0.55 * td))), hc = th - yb;
       const sx = td / 5.4, sy = hc / 4.5, yc = th - 2.5 * sy, tw = clamp(Math.min(Math.sqrt(th / 7), 0.4 * td), 0.5, 1.8);
       qq.identity(); m.compose(pp.set(x, gy, z), qq, sc2.set(tw, yb + 0.5 * hc, tw)); trunks.setMatrixAt(i, m); /* the plain stem: the branches of the tall trunk come out of so narrow a crown */
       qq.setFromEuler(e2.set(0, h * TAU * 7, 0)); m.compose(pp.set(x, gy + yc, z), qq, sc2.set(sx, sy, sx)); crowns.setMatrixAt(i, m); crowns.setColorAt(i, COL('#3d5a34'));
     });
-    trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns);
+    trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH_SEMP; G.add(trunks, crowns); /* evergreen: stagioni3.js */
   }
 }
 
@@ -4941,7 +5125,7 @@ function lxSbarre(g) { // the first time its tile is laid out; they stay, like t
     WALLS.add(px, pz, ex, ez, seg);
     const probe = []; for (let t = 0.1; t <= 1; t += 0.2) probe.push([lerp(px, ex, t), lerp(pz, ez, t)]);
     const bar = { arm, seg, probe, root }; g.bars.push(bar);
-    addProp({ lx: true, x: px, z: pz, y: H.ground(px, pz), r: 0.2, h: 3, obj: root, onBreak: () => { bar.broken = true; seg.on = false; bar.probe = []; } }); // the post knocked down takes its arm with it
+    addProp({ lx: true, x: px, z: pz, y: H.ground(px, pz), r: 0.2, h: 3, obj: root, pezzi: () => seg.on ? [[0, 1, 0, ex - px, 1, ez - pz, 0.07]] : [], onBreak: () => { bar.broken = true; seg.on = false; bar.probe = []; } }); // the post knocked down takes its arm with it: down, it falls with the post and is solid as it (props3.js cadutaNuova)
   }
 }
 
@@ -4970,6 +5154,7 @@ function lxSbarre(g) { // the first time its tile is laid out; they stay, like t
 // crescent beds edged in white stone (red flowers, low shrubs or bare soil), round bushes, or a stone paving. Drawn only in the tiles of S,
 // over the island the walls pass draws (kerb + top at MED_H, world3.js): the physics stays the island's
 const RO_RAISE = 0.12; // the lawn behind the inner kerb, over the top of the island (Carlo's photo: a low kerb, the lawn a hand over the cobbles)
+const CIOTTOLI_TINTA = 0xb4c2dc; /* fase 2: the photo's pebbles are beige, the cobbles of Meda grey (via Antona Traversi, Commons 2010): a cold tint on the photo */
 const ciottoliTex = canvasTex(8, 8, (g, w, h) => { g.fillStyle = '#a08f76'; g.fillRect(0, 0, w, h); }); // tex/ciottoli.jpg in its place (foto3.js), 4 m a repeat
 const fioriTex = canvasTex(128, 128, (g, w, h) => { // begonias: leaves and red flowers in the colours of Carlo's photo (leaves #2f4a1c, flowers #a5322a)
   g.fillStyle = '#2f4a1c'; g.fillRect(0, 0, w, h); let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -4978,7 +5163,7 @@ const fioriTex = canvasTex(128, 128, (g, w, h) => { // begonias: leaves and red 
 });
 const fogliaTex = canvasTex(128, 128, (g, w, h) => { /* leaves in greys: the colour is the material's, or each bush's */ g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, w, h); let s = 5; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; for (let k = 0; k < 700; k++) { g.fillStyle = ['#ffffff', '#9a9a9a', '#e0e0e0', '#7c7c7c'][k % 4]; g.beginPath(); g.arc(r() * w, r() * h, 1.5 + r() * 3.5, 0, 7); g.fill(); } });
 const RO_MAT = {
-  ciottoli: flatMat({ map: ciottoliTex }), fiori: new THREE.MeshLambertMaterial({ map: fioriTex, side: THREE.DoubleSide }),
+  ciottoli: flatMat({ map: ciottoliTex, color: CIOTTOLI_TINTA }), fiori: new THREE.MeshLambertMaterial({ map: fioriTex, side: THREE.DoubleSide }),
   bordo: new THREE.MeshLambertMaterial({ color: 0xe6e2d8, side: THREE.DoubleSide }), terra: new THREE.MeshLambertMaterial({ map: groundTex, color: 0x8a6e55 }),
   cespuglio: new THREE.MeshLambertMaterial({ map: fogliaTex }),
   fascia: flatMat({ map: concreteTex, color: 0xe2ded4 }), prato: new THREE.MeshLambertMaterial({ map: grassTex }) // the band of worked concrete of the base; the lawn of its dome
@@ -5054,6 +5239,74 @@ function roCespugliGeo() {
   const uv = []; for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] * 1.5 + 0.5, pos[i + 1] * 1.5 + pos[i + 2] * 0.7);
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); _roCesp = g; return g;
 }
+
+// ---------------------------------------------------------------- the seasons on the map (fase 3): the leaves of the trees and the grass follow the day of the year
+// The day is the true date (as the shops' clock and the light of luce3.js), or the link: ?stagione=primavera|estate|autunno|inverno or ?data=GG-MM (any day),
+// or the codes ESTATE, INVERNO, PRIMAVERA, AUTUNNO during the game (STAGIONE goes back to the true date). All goes day by day, not in four steps. Brianza's broadleaves:
+// from mid-September the crowns turn, each tree on its own (yellow, orange, a few red), at their fullest in late October; in November the leaves fall, from
+// December to the end of March the crowns are bare twigs (a few oaks keep some dry brown leaves), in April-May the new leaves are a light yellow-green.
+// The cypresses keep their green (MAT.crownSemp). The grass goes duller and yellower in autumn and winter, fresher in spring. Shader only, nothing rebuilt
+const STAG_GIORNI = { primavera: 110, estate: 196, autunno: 298, inverno: 15 }; // a day in the middle of each season, for the link and the codes
+const stagOggi = () => { const now = new Date(); return Math.round((now - new Date(now.getFullYear(), 0, 0)) / 864e5 - 0.5); }; /* round: the hour of daylight saving */
+let STAG_DOY = (() => {
+  const q = new URLSearchParams(location.search), st = (q.get('stagione') || '').toLowerCase(), dm = /^(\d{1,2})-(\d{1,2})$/.exec(q.get('data') || '');
+  if (dm) { const y = new Date().getFullYear(); return Math.round((new Date(y, +dm[2] - 1, +dm[1]) - new Date(y, 0, 0)) / 864e5); } /* ?data=GG-MM */
+  return STAG_GIORNI[st] ?? stagOggi();
+})();
+const STAG = { aut: 0, bare: 0, spring: 0, u: { value: new THREE.Vector3() } };
+function stagCalcola() { // the leaves and the grass of the day STAG_DOY
+  const d = STAG_DOY, ramp = (a, b) => clamp((d - a) / (b - a), 0, 1);
+  STAG.aut = ramp(255, 292) * (1 - ramp(316, 336)); STAG.bare = Math.max(ramp(310, 336), 1 - ramp(78, 108)); STAG.spring = ramp(92, 108) * (1 - ramp(140, 168));
+  STAG.u.value.set(STAG.aut, STAG.bare, STAG.spring);
+  // the grass: duller and yellower in autumn and winter, fresher in spring (a tint on the photo, the same on every lawn)
+  const t = new THREE.Color(1, 1, 1).lerp(new THREE.Color(1.08, 0.9, 0.66), STAG.aut * 0.8).lerp(new THREE.Color(1.12, 0.8, 0.5), STAG.bare * 0.9).lerp(new THREE.Color(1.05, 1.12, 0.72), STAG.spring);
+  for (const M of [MAT, RO_MAT]) for (const k in M) { const m = M[k]; if (m && m.isMaterial && m.map === grassTex && k !== 'hedge') { if (!m.userData.stagBase) m.userData.stagBase = m.color.clone(); m.color.copy(m.userData.stagBase).multiply(t); } }
+}
+stagCalcola();
+// during the game: the codes ESTATE, INVERNO, PRIMAVERA, AUTUNNO (nome) and STAGIONE (null: the true date); light (luce3.js), map and snow chance follow at once
+function stagioneImposta(nome) {
+  STAG_DOY = nome ? STAG_GIORNI[nome] : stagOggi(); stagCalcola(); luceCalcola(); WX_NEXT.nuvoloso.neve = STAG_DOY < 60 || STAG_DOY > 340 ? 0.5 : 0; skyT = -1;
+  const p = n => String(n).padStart(2, '0'), g = new Date(new Date().getFullYear(), 0, STAG_DOY);
+  toast((nome ? 'Stagione: ' + nome : 'Stagione vera: ' + LUCE.nome) + ' (' + p(g.getDate()) + '/' + p(g.getMonth() + 1) + ')');
+}
+const STAG_VERT = s => s.replace('#include <common>', '#include <common>\nvarying float vStH;').replace('#include <begin_vertex>', `#include <begin_vertex>
+#ifdef USE_INSTANCING
+  vStH = fract( sin( dot( instanceMatrix[ 3 ].xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+#else
+  vStH = 0.5;
+#endif`);
+const STAG_FRAG_DECL = '\nuniform vec3 uStag;\nvarying float vStH;\n';
+// the leaves that are gone (autumn's fall, winter's bare twigs): the same cut in the colour pass and in the shadow pass
+const STAG_FALL = `
+#ifdef USE_MAP
+  { float stF = uStag.y * ( vStH > 0.86 ? 0.6 : 1.0 ); vec2 stQ = vMapUv * 26.0; float stC = fract( sin( dot( floor( stQ ) + vStH * 17.0, vec2( 7.13, 3.71 ) ) ) * 91.37 );
+    vec2 stR = fract( stQ ) - 0.5; float stTw = step( abs( stR.x + stR.y * ( stC - 0.5 ) * 1.6 ), 0.09 ); /* a twig across the cell, at a random slant */
+    if ( stC < stF * 0.93 || ( uStag.y > 0.5 && vStH <= 0.86 && stTw < 0.5 ) ) discard; }
+#endif`;
+function stagCrown(m, sempre) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (s, r) => {
+    if (prev) prev.call(m, s, r); if (sempre) return;
+    s.uniforms.uStag = STAG.u; s.vertexShader = STAG_VERT(s.vertexShader);
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <color_fragment>', `#include <color_fragment>
+  { float stL = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ), stT = vStH;
+    float stA = uStag.x * smoothstep( 0.0, 0.4, uStag.x * 1.25 - stT * 0.25 ); /* some trees turn later than others */
+    vec3 stAu = stT < 0.5 ? vec3( 0.92, 0.66, 0.14 ) : stT < 0.82 ? vec3( 0.93, 0.40, 0.08 ) : vec3( 0.70, 0.15, 0.06 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, stAu * stL * 2.1, stA * 0.88 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 1.2, 1.38, 0.6 ), uStag.z ); /* spring: the new leaves, light and yellower */
+    diffuseColor.rgb = mix( diffuseColor.rgb, stT > 0.86 ? vec3( 0.42, 0.27, 0.13 ) * ( 0.6 + stL ) : vec3( 0.09, 0.075, 0.06 ), uStag.y ); /* winter: twigs, and the dry leaves of some oaks */
+  }` + STAG_FALL);
+  };
+  const ck = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.customProgramCacheKey = () => ck + (sempre ? '|semp' : '|stag'); m.needsUpdate = true;
+}
+function stagDepth(m) { // the shadow of a crown loses the same leaves
+  m.onBeforeCompile = s => { s.uniforms.uStag = STAG.u; s.vertexShader = STAG_VERT(s.vertexShader); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <alphatest_fragment>', '#include <alphatest_fragment>' + STAG_FALL); };
+  m.customProgramCacheKey = () => 'stag-depth'; m.needsUpdate = true;
+}
+// the cypresses (evergreen) get a crown and a shadow of their own, untouched
+MAT.crownSemp = MAT.crown.clone(); MAT.crownSemp.onBeforeCompile = MAT.crown.onBeforeCompile; stagCrown(MAT.crownSemp, true);
+const TREE_DEPTH_SEMP = TREE_DEPTH.clone();
+stagCrown(MAT.crown, false); stagDepth(TREE_DEPTH);
 
 // ---------------------------------------------------------------- materials and generators shared by the game (banchine, parcheggi, arredi dei parchi)
 // Until 24/10/2026 this file held the hand-made models of 48 real buildings (LANDMARKS), the squares, school yards, park paths, the stairwells of
@@ -6725,6 +6978,11 @@ function ngFront(s, C) {
   }
 }
 const ngShade = (hex, k) => new THREE.Color(hex).multiplyScalar(k);
+/* how high the sign of a front reaches over the ground (the glass up to Hv, the sign over it), from the model and the height of the wall: the same sums as ngFront0, which the facades ask (nothing of the house may stand over it, Carlo 9/11) */
+function ngSignTop(m, top) {
+  if (top < 2.7) return 0; const bay = m.d === 'g', Hv = clamp(top - (bay ? 1.0 : 1.2), bay ? 2.6 : 2.3, bay ? 3.6 : 2.9), sh = clamp(top - Hv - 0.35, 0, m.s === 'cas' || m.s === 'pan' ? 0.75 : 0.7);
+  return Hv + (sh >= 0.32 && ['pan', 'cas', 'fas', 'let', 'ten'].includes(m.s) ? sh : 0);
+}
 function ngFront0(s, C) {
   const m = s.m, cls = s.cls, W = s.w, hw = W / 2, gy = H.ground(s.cx + s.nx * 0.6, s.cz + s.nz * 0.6), top = s.b.gtop - gy;
   if (top < 2.7) return;
@@ -7545,6 +7803,11 @@ function lsSpans(Q, v) { // where the line across at v runs inside the polygon (
   xs.sort((p, q) => p - q); const out = []; for (let i = 0; i + 1 < xs.length; i += 2) out.push([xs[i], xs[i + 1]]); return out;
 }
 // a flat strip laid on the ground (draped, so y is the height above it), from (s0,v) to (s1,v) in the frame A, w wide, in pieces of 6 m
+function lsFlat(A, s0, s1, v, w) { /* a furrow is only laid where the ground is a field's: gentle along it and level across it, on a steep bank the flat quads stand off the slope like a fan */
+  let lo = 1e9, hi = -1e9, c0 = 1e9, c1 = -1e9; const n = Math.max(2, Math.ceil((s1 - s0) / 3));
+  for (let k = 0; k <= n; k++) { const s = s0 + (s1 - s0) * k / n, [xa, za] = A.at(s, v - w / 2), [xb, zb] = A.at(s, v + w / 2), [xm, zm] = A.at(s, v), ya = H.ground(xa, za), yb = H.ground(xb, zb), ym = H.ground(xm, zm); if (Math.abs(ya - yb) > 0.3) return false; lo = Math.min(lo, ym); hi = Math.max(hi, ym); if (k === 0) c0 = ym; if (k === n) c1 = ym; }
+  return Math.abs(c1 - c0) / Math.max(1, s1 - s0) < 0.12 && hi - lo < 1.2;
+}
 function lsStrip(b, A, s0, s1, v, w, col, dy = 0.05) {
   const n = Math.max(1, Math.ceil((s1 - s0) / 6)), cuts = [];
   for (let k = 0; k < n; k++) cuts.push([s0 + (s1 - s0) * k / n, s0 + (s1 - s0) * (k + 1) / n]);
@@ -7649,7 +7912,7 @@ function* buildPaesaggio(T, G) {
     if (kind === 'campo' || kind === 'prato') {
       if (kind === 'campo') { // furrows the long way: ploughed, green, ripe or stubble, the hash decides
         const pal = [['#8f6e4e', '#7d5f42'], ['#8fae5a', '#7c9a4b'], ['#d6bf72', '#c8b064'], ['#d9cf9e', '#cbbf8c']][Math.floor(h * 4)];
-        for (let v = A.v0 + 1.4, k = 0; v < A.v1 - 0.7; v += 1.4, k++) for (const [a, b] of lsSpans(A.Q, v)) if (b - a > 1) lsStrip(drape, A, a + 0.4, b - 0.4, v, 1.42, COL(pal[k % 2]), 0.04);
+        for (let v = A.v0 + 1.4, k = 0; v < A.v1 - 0.7; v += 1.4, k++) for (const [a, b] of lsSpans(A.Q, v)) if (b - a > 1 && lsFlat(A, a + 0.4, b - 0.4, v, 1.42)) lsStrip(drape, A, a + 0.4, b - 0.4, v, 1.42, COL(pal[k % 2]), 0.04);
       }
       if (h > (kind === 'campo' ? 0.6 : 0.75) && area > 1500) { // round bales left in the field
         const n = Math.min(10, Math.floor(area / 2500) + 2); let got = 0;
@@ -7666,13 +7929,40 @@ function* buildPaesaggio(T, G) {
       // L0.w: the walls and fences of the map along its edge, which the hoarding replaces on their own line (the build took them out, src/barriere.py
       // cantieri): drawn as they are, they already keep off the carriageway; L0.h: the rest of the edge, which gets the hoarding as before
       const runs = L0.w ? [...(L0.h || []).map(q => [dec(q), 1]), ...L0.w.map(q => [dec(q), 0])] : [[[...P, P[0]], 1]];
-      for (const [R, filt] of runs) for (let i = 0; i + 1 < R.length; i++) {
-        const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < (filt ? 0.5 : 0.05)) continue;
-        for (let t = 0; t < L; t += 2.5) {
-          const t1 = Math.min(L, t + 2.5), x0 = a[0] + (c[0] - a[0]) * t / L, z0 = a[1] + (c[1] - a[1]) * t / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-          if (filt && (onAnyRoad(mx, mz, 0.6) || nearAsph(mx, mz, 0.3) || onAsph(x0, z0) || onAsph(x1, z1) || inBuilding(mx, mz, 0.3))) continue; /* the drawn carriageway too (AC_VEI), ends included */
-          const g0 = H.ground(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); // a panel of its own: it goes over when rammed
-          box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8');
+      const WR = (L0.w || []).map(q => dec(q)), nearW = (x, z, d) => WR.some(r => { for (let i = 0; i + 1 < r.length; i++) if (segDist(x, z, r[i][0], r[i][1], r[i + 1][0], r[i + 1][1]) < d) return true; return false; });
+      const hoard = (x0, z0, x1, z1) => { const g0 = H.ground(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); /* a panel of its own: it goes over when rammed */ box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8'); };
+      const free = (x, z) => !(onAnyRoad(x, z, 0.6) || nearAsph(x, z, 0.3) || onAsph(x, z) || inBuilding(x, z, 0.3));
+      for (const [R, filt] of runs) {
+        if (!filt) { /* the dividers of the map taken as they are: drawn on their own line */
+          for (let i = 0; i + 1 < R.length; i++) { const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; for (let t = 0; t < L; t += 2.5) { const t1 = Math.min(L, t + 2.5); hoard(a[0] + (c[0] - a[0]) * t / L, a[1] + (c[1] - a[1]) * t / L, a[0] + (c[0] - a[0]) * t1 / L, a[1] + (c[1] - a[1]) * t1 / L); } }
+          continue;
+        }
+        /* the rest of the edge: ONE line. Samples every 2.5 m along it; where the edge lies on or by the carriageway the line moves inward by what each sample needs to be clear (up to 4.2 m, inside
+           the site), the move spread over 5 m either side and smoothed, so the hoarding runs straight and unbroken; the panels follow that line. Not where a divider of the map already runs (no double row) */
+        const S = [];
+        for (let i = 0; i + 1 < R.length; i++) {
+          const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5) continue;
+          const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, sd = inPoly(mx - uz * 0.8, mz + ux * 0.8, P) ? 1 : inPoly(mx + uz * 0.8, mz - ux * 0.8, P) ? -1 : 0, nn = Math.max(1, Math.ceil(L / 2.5));
+          for (let k = 0; k <= nn; k++) S.push({ x: a[0] + ux * L * k / nn, z: a[1] + uz * L * k / nn, nx: -uz * sd, nz: ux * sd, sd, seg: i, o: 0 });
+        }
+        for (const q of S) { q.req = Infinity; for (const o of [0, 0.6, 1.2, 1.8, 2.5, 3.3, 4.2]) { if (o && !q.sd) break; const x = q.x + q.nx * o, z = q.z + q.nz * o; if (o && !inPoly(x, z, P)) break; if (free(x, z)) { q.req = o; break; } } }
+        const n = S.length, dil = S.map((q, i) => { if (q.req === Infinity) return Infinity; let m = 0; for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) if (S[j].req !== Infinity) m = Math.max(m, S[j].req); return m; });
+        S.forEach((q, i) => { if (dil[i] === Infinity) { q.o = Infinity; return; } let t = 0, c = 0; for (let j = Math.max(0, i - 1); j <= Math.min(n - 1, i + 1); j++) if (dil[j] !== Infinity) { t += dil[j]; c++; } q.o = Math.max(q.req, t / c); });
+        /* a sample with no clear place keeps the move of the nearest one that has: the line goes on, it has no hole */
+        S.forEach((q, i) => { if (q.o !== Infinity) return; for (let d = 1; d < n; d++) { const j = [i - d, i + d].find(j => j >= 0 && j < n && S[j].o !== Infinity && S[j].req !== Infinity); if (j !== undefined) { q.o = S[j].o; return; } } });
+        S.forEach(q => { if (q.o !== Infinity) { q.px = q.x + q.nx * q.o; q.pz = q.z + q.nz * q.o; } });
+        /* the dividers of the map along the same edge draw their own panels: a stretch is left out only where it lies along one for its whole length (ends and middle within 1.5 m of it) */
+        const alongW = (x0, z0, x1, z1) => nearW(x0, z0, 1.5) && nearW(x1, z1, 1.5) && nearW((x0 + x1) / 2, (z0 + z1) / 2, 1.5);
+        for (let i = 0; i + 1 < n; i++) {
+          const p = S[i], q = S[i + 1]; if (p.o === Infinity || q.o === Infinity) continue; if (hyp(q.px - p.px, q.pz - p.pz) < 0.05) continue;
+          if (alongW(p.px, p.pz, q.px, q.pz)) continue;
+          hoard(p.px, p.pz, q.px, q.pz);
+        }
+        /* where the line ends (at a divider of the map or a gate) it runs on to the nearest post or end of one within 7 m, touching it */
+        const anchors = []; for (const r of WR) { anchors.push(r[0], r[r.length - 1]); } for (const g of T.gates || []) { anchors.push([g.ax, g.az]); if (g.W) anchors.push([g.ax + g.ux * g.W, g.az + g.uz * g.W]); }
+        for (const q of [S[0], S[n - 1]]) {
+          if (!q || q.o === Infinity) continue; let best = null, bd = 7; for (const an of anchors) { const d = hyp(an[0] - q.px, an[1] - q.pz); if (d > 0.3 && d < bd) { bd = d; best = an; } }
+          if (best && !onAsph((q.px + best[0]) / 2, (q.pz + best[1]) / 2)) hoard(q.px, q.pz, best[0], best[1]);
         }
       }
       const spots = [];
@@ -8670,7 +8960,7 @@ async function cuoci() {
   if (COTTURA) {
     // the big supermarkets, the shop fronts and the plain signs need all the buildings: their choices go in the tile of each
     ngSuperTutti(); const ref = b => [b.ti, b.bi];
-    for (const r of ngList()) { const { b, m, big, ...q } = r; (ogni(r.tile).ngf || (ogni(r.tile).ngf = [])).push({ ...q, b: ref(b) }); (ogni(b.ti).ngw || (ogni(b.ti).ngw = [])).push([b.bi, Math.round(r.cx * 100) / 100, Math.round(r.cz * 100) / 100, Math.round(r.w * 100) / 100]); } /* ngw: the fronts on the buildings of each tile, for the facades (facciate 2.0: no window or door under a front) */
+    for (const r of ngList()) { const { b, m, big, ...q } = r; (ogni(r.tile).ngf || (ogni(r.tile).ngf = [])).push({ ...q, b: ref(b) }); (ogni(b.ti).ngw || (ogni(b.ti).ngw = [])).push([b.bi, Math.round(r.cx * 100) / 100, Math.round(r.cz * 100) / 100, Math.round(r.w * 100) / 100, Math.round(ngSignTop(m, r.b.gtop - H.ground(r.cx + r.nx * 0.6, r.cz + r.nz * 0.6)) * 100) / 100]); } /* ngw: the fronts on the buildings of each tile, for the facades (facciate 2.0: no window or door under a front) */
     for (const T of TILES) T.bld.forEach((B, i) => { if (!B.big) return; const { e, front, ...big } = B.big; let fr; if (front) { const { b, big: _b, ...f } = front; fr = { ...f, b: ref(b) }; } (ogni(T.t).sup || (ogni(T.t).sup = [])).push([i, { ...big, front: fr }, B.h]); });
     for (const s of signList()) { if (s.b.lm) continue; const t = tileOf(s.p.x, s.p.z); (ogni(t).sgf || (ogni(t).sgf = [])).push({ ...s, p: D.pois.indexOf(s.p), b: ref(s.b) }); }
     window.__COTTA = JSON.stringify({ pezzi: pz, globale: glob }); // the numbers as they are: a shop draws its look from h0
@@ -8935,7 +9225,7 @@ function fusiGiro(o) { const K = o.children; for (let i = 0; i < K.length; i++) 
 function fusiDisegna(F, SF) { // F, SF: what the camera and the sun see (pezzi3.js)
   const L = FUSI.lista, K = scene.children, sf = FUSI.sf; for (let i = 0; i < L.length; i++) L[i].n = 0;
   for (let i = 0; i < K.length; i++) { const c = K[i]; if (!c.fRadice || !c.visible) continue; sf.center.setFromMatrixPosition(c.matrixWorld); if (!F.intersectsSphere(sf) && !(SF && SF.intersectsSphere(sf))) continue; fusiGiro(c); }
-  for (let i = 0; i < L.length; i++) { const l = L[i], m = l.m; m.count = l.n; m.visible = l.n > 0; if (!l.n) continue; const a = m.instanceMatrix; a.updateRange.count = l.n * 16; a.needsUpdate = true; if (l.col) { const b = m.instanceColor; b.updateRange.count = l.n * 3; b.needsUpdate = true; } }
+  for (let i = 0; i < L.length; i++) { const l = L[i], m = l.m; m.count = l.n; m.visible = l.n > 0; if (!l.n) continue; const a = m.instanceMatrix; a.clearUpdateRanges(); a.addUpdateRange(0, l.n * 16); a.needsUpdate = true; if (l.col) { const b = m.instanceColor; b.clearUpdateRanges(); b.addUpdateRange(0, l.n * 3); b.needsUpdate = true; } }
 }
 
 const _geo = {};
@@ -10698,11 +10988,13 @@ const HELI = {
   spinUp: 3.5, spinDown: 7,          /* seconds for the rotor to reach full speed, and to stop */
   /* the numbers of a real light twin, the Airbus H135 of the air ambulances (Carlo 7/11: "un po' lento per essere un elicottero"): fast cruise 254 km/h = 70.5 m/s
      at full weight, climb 7.6 m/s (1500 ft/min) (airbus.com, H135 technical information; LPR, the Polish air ambulance). The sink is not in the data sheets: 6 m/s */
-  tilt: 0.45, tiltK: 3.2,            /* most tilt from the stick (rad, 26 degrees: g tan = 4.7 m/s2 at the start), how fast the body follows it (1/s) */
-  hold: 0.06, holdMax: 0.52,         /* stick let go: tilt against the drift (rad per m/s) and its cap: 30 degrees nose up, a quick stop (Carlo 7/11: it slid on for far too long) */
+  tiltF: 0.627,                      /* most tilt forward and back from the stick (rad, 36 degrees: g tan = 7.1 m/s2; Carlo 8/11: up to full speed in 2/3 of the way it took with 0.45) */
+  tilt: 0.45, tiltK: 3.2,            /* most tilt sideways from the stick (rad, 26 degrees: g tan = 4.7 m/s2 at the start), how fast the body follows it (1/s) */
+  flare: 0.25,                       /* the flare's brake: with the body tilted against the way it goes, the speed dies at flare times the sine of the tilt (1/s) */
+  hold: 0.06, holdMax: 0.7,          /* stick let go: tilt against the drift (rad per m/s) and its cap: 40 degrees nose up, a quick stop (Carlo 7/11: it slid on for far too long; 8/11: from full speed to still in half the way it took with 30 degrees and no flare) */
   stopV0: 1, stopV1: 5, stopK: 3, stopV: 0.03, /* stick let go and slow (Carlo 8/11: still in the air it must stand still, as a car): under stopV1 m/s the tilt hands over to a plain stop (stopK 1/s, in full under stopV0), under stopV it stands */
-  drag1: 0.015, drag2: 0.00074,      /* air drag, linear and quadratic: full stick ends at 70.5 m/s, the H135's fast cruise */
-  climb: 7.6, sink: 6, vyK: 1.8,     /* climb and sink speed at full R2/L2 (m/s), how fast the vertical speed follows (1/s) */
+  drag1: 0.0225, drag2: 0.00111,     /* air drag, linear and quadratic: full stick (tiltF) ends at 70.5 m/s, the H135's fast cruise */
+  climb: 15.2, sink: 12, vyK: 1.8,   /* climb and sink speed at full R2/L2 (m/s; Carlo 8/11: twice the H135's 7.6 and 6), how fast the vertical speed follows (1/s) */
   yawRate: 1.4, yawK: 4,             /* turn on the spot with L1/R1 (rad/s) and its ease (1/s) */
   bankV0: 2, bankV1: 7, bankVmin: 5, /* autotimone (Carlo 7/11): banked, the nose goes into the turn in full (g tan(roll) / speed) from bankV0 to bankV1 m/s forward; bankVmin keeps the rate sane when slow */
   bankHi: 2, bankHiV0: 15, bankHiV1: 45, /* fast, the nose turns up to bankHi times the coordinated rate (half the radius at 45 m/s, Carlo 7/11), growing smoothly between these speeds (m/s forward); slow flight as before */
@@ -10854,7 +11146,7 @@ function heliStep1(e, dt) {
   let pT = e.gp, rT = e.gr;
   if (!e.ground) {
     /* the brake against the drift only with the stick let go; the stick held only sideways keeps the speed it has (the nose down just enough against the drag) */
-    pT = Math.abs(sf) > 0.05 ? sf * HELI.tilt : Math.abs(ss) > 0.05 ? clamp(Math.atan((HELI.drag1 + HELI.drag2 * sp) * vf / (9.81 * Math.max(lift, 0.1))), -HELI.tilt, HELI.tilt) : clamp(-vf * HELI.hold, -HELI.holdMax, HELI.holdMax);
+    pT = Math.abs(sf) > 0.05 ? sf * HELI.tiltF : Math.abs(ss) > 0.05 ? clamp(Math.atan((HELI.drag1 + HELI.drag2 * sp) * vf / (9.81 * Math.max(lift, 0.1))), -HELI.tiltF, HELI.tiltF) : clamp(-vf * HELI.hold, -HELI.holdMax, HELI.holdMax);
     rT = Math.abs(ss) > 0.05 ? ss * HELI.tilt : clamp(-vs * HELI.hold, -HELI.holdMax, HELI.holdMax);
     if (!alive) { pT = 0.25; rT = Math.sin(now * 1.7) * 0.3; } /* broken: it tumbles */
   }
@@ -10865,6 +11157,9 @@ function heliStep1(e, dt) {
     const hw = alive && Math.abs(sf) < 0.05 && Math.abs(ss) < 0.05 ? 1 - heliSm((sp - HELI.stopV0) / (HELI.stopV1 - HELI.stopV0)) : 0;
     const g = 9.81 * lift * (1 - hw), af = g * Math.tan(e.pitch), as = g * Math.tan(e.roll), dr = HELI.drag1 + HELI.drag2 * sp;
     e.vx += (fx * af + rx * as - e.vx * dr) * dt; e.vz += (fz * af + rz * as - e.vz * dr) * dt;
+    /* the flare: the disc tilted back against the way it goes meets the air and brakes it, the more the faster and the steeper (the height stays, as if the collective went down) */
+    if (alive) { const v1 = e.vx * fx + e.vz * fz, s1 = e.vx * rx + e.vz * rz, kf = e.pitch * v1 < 0 ? 1 - Math.exp(-HELI.flare * lift * Math.abs(Math.sin(e.pitch)) * dt) : 0, ks = e.roll * s1 < 0 ? 1 - Math.exp(-HELI.flare * lift * Math.abs(Math.sin(e.roll)) * dt) : 0;
+      e.vx -= (fx * v1 * kf + rx * s1 * ks); e.vz -= (fz * v1 * kf + rz * s1 * ks); }
     if (hw > 0) { const k = Math.exp(-HELI.stopK * hw * dt); e.vx *= k; e.vz *= k; if (hw >= 1 && hyp(e.vx, e.vz) < HELI.stopV) e.vx = e.vz = 0; }
     /* grip on the air: going forward, the speed across the nose turns into speed along it (no sliding as on ice); slow, it slides freely as before */
     const gw = heliGrip(e, fx, fz);
@@ -11021,7 +11316,7 @@ function step(dt) {
   }
   heliStep(dt);
   // ----- train
-  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWeather(dt); updWrecks(dt); updFuel(dt); updProps(dt); updOggetti(dt); updNegozi(dt);
+  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWeather(dt); luceEsp(); updWrecks(dt); updFuel(dt); updProps(dt); updOggetti(dt); updNegozi(dt);
   for (const [cx, cz, tvx, tvz] of TRAIN_CIRC) {
     for (const v of VEH) if (Math.abs(v.x - cx) <= 1.75 + v.rad + v.co && Math.abs(v.z - cz) <= 1.75 + v.rad + v.co) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad; if (d < RT && d > 1e-5) { const nx = dx / d, nz = dz / d; v.x += nx * (RT - d); v.z += nz * (RT - d); v.vx = tvx + nx * 6; v.vz = tvz + nz * 6; v.sleep = false; v.impact(12 + hyp(tvx, tvz)); } }
   }
@@ -11162,16 +11457,53 @@ function endRun(kind) {
 // ---------------------------------------------------------------- camera & visuals
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _camD = new THREE.Vector3();
 let camInit = false;
-function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */
-  const lo_ = P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity; /* from the helicopter: the walls whose top is under both ends do not count */
+/* ---- titolo: il sorvolo di Meda al tramonto, mentre il mondo si carica (Carlo, 8/11). La camera segue una linea chiusa di punti (posizione, altezza sul suolo, punto guardato) con una curva morbida; il mondo gira (traffico, passanti) ma il giocatore sta fermo; l'ora e' ferma al tramonto e a GIOCA torna quella di sempre.
+   Resta entro ~450 m dal punto di partenza: li' i pezzi del mondo ci sono gia' e il traffico vive (si toglie oltre 330 m dal giocatore se non e' in vista) */
+let titolo = true, tFade = 0;
+const TIT = { t: 0, gy: null, TOD: 17.75, TODGIOCO: 17.2, SEG: 15, FOV: 48,
+  K: [ /* x, z, altezza sul suolo, x guardata, z guardata, altezza guardata: si guarda sempre piu' in basso di 33 gradi, cosi' l'orizzonte spoglio resta fuori dall'inquadratura */
+    [520, -490, 88, 405, -545, 4], [430, -430, 92, 335, -520, 4], [320, -420, 95, 250, -535, 6], [215, -450, 92, 215, -550, 8],
+    [130, -560, 92, 215, -560, 8], [160, -670, 95, 245, -585, 6], [280, -690, 92, 340, -585, 4], [400, -680, 88, 400, -575, 4], [520, -640, 86, 450, -545, 4]] };
+const _titP = new THREE.Vector3(), _titL = new THREE.Vector3();
+function titCR(a, b, c, d, t) { const t2 = t * t, t3 = t2 * t; return 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3); }
+function titPose(u, P_, L_) {
+  const K = TIT.K, n = K.length, i = Math.floor(u) % n, t = u - Math.floor(u), k = j => K[(i + j + n) % n], a = k(-1), b = k(0), c = k(1), d = k(2), f = q => titCR(a[q], b[q], c[q], d[q], t);
+  P_.set(f(0), f(2), f(1)); L_.set(f(3), f(5), f(4));
+}
+function titoloIniz() { /* the sun low over the roofs, the lights of the title: after boot, before the first frame */
+  TIT.t = 0; window.__TIT = TIT; window.__setTOD(TIT.TOD);
+  Object.assign(sun.shadow.camera, { left: -230, right: 230, top: 230, bottom: -230 }); sun.shadow.camera.updateProjectionMatrix();
+}
+function titoloTick() { window.__setTOD(TIT.TOD); MS.cool = Math.max(MS.cool, 3); if (MS.marker) MS.marker.visible = false; } /* no mission begins under the title, and no marker beam shows */ /* the hour stays where the title put it while the world goes on */
+function titoloFine() {
+  titolo = false; window.__setTOD(TIT.TODGIOCO); if (MS.marker) MS.marker.visible = true;
+  Object.assign(sun.shadow.camera, { left: -95, right: 95, top: 95, bottom: -95 }); sun.shadow.camera.updateProjectionMatrix();
+  camInit = false; setTimeout(() => $('fade').classList.remove('on'), 450); /* the first frames of the game are the heavy ones (the pieces round the player take their turn): they pass under the black */
+}
+function sorvolo(dt) {
+  dt = Math.min(dt, 0.05); TIT.t += dt / TIT.SEG; titPose(TIT.t, _titP, _titL);
+  const gp = H.ground(_titP.x, _titP.z); TIT.gy = TIT.gy === null ? gp : TIT.gy + (gp - TIT.gy) * (1 - Math.exp(-1.5 * dt)); /* the ground under the camera, smoothed: the height does not follow every bump */
+  const gl = H.ground(_titL.x, _titL.z), w = TIT.t * 0.9;
+  camera.position.set(_titP.x + Math.sin(w * 1.7) * 1.2, TIT.gy + _titP.y + Math.sin(w * 1.1) * 0.8, _titP.z + Math.cos(w * 1.3) * 1.2);
+  camera.lookAt(_titL.x, gl + _titL.y, _titL.z);
+  if (Math.abs(camera.fov - TIT.FOV) > 0.05) { camera.fov = lerp(camera.fov, TIT.FOV, 0.1); camera.updateProjectionMatrix(); }
+  sun.target.position.set(_titL.x, gl, _titL.z); sun.position.set(_titL.x + SUN_DIR.x * 260, gl + SUN_DIR.y * 260, _titL.z + SUN_DIR.z * 260);
+  _far.position.x = camera.position.x * 0.9; _near.position.x = camera.position.x * 0.8;
+}
+function rayCam(ax, az, bx, bz, cy, ay) { /* like rayWalls, but a wall counts only where the ray from height ay (the subject end) to cy (the camera) is between its foot and its top; without ay a level line at cy, the walls that start above it do not count */
+  const lo_ = ay === undefined && P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity, ya_ = ay === undefined ? cy : ay, yh_ = Math.max(cy, ya_); /* lo_: getting out of the helicopter, the walls whose top is under both ends do not count (exitSpot) */
   let best = 1; const dx = bx - ax, dz = bz - az;
   WALLS.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => {
-    if (s.r || s.dyn || s.y0 > cy || s.off || (s.y0 !== undefined && (s.bt ? s.y1 - 3 : s.y1) < lo_) || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
+    if (s.r || s.dyn || s.y0 > yh_ || s.off || (s.y0 !== undefined && (s.bt ? s.y1 - 3 : s.y1) < lo_) || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
     const t = ((s.ax - ax) * ez - (s.az - az) * ex) / den, u = ((s.ax - ax) * dz - (s.az - az) * dx) / den;
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < best) best = t;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < best) { if (ay !== undefined && s.y0 !== undefined) { const ry_ = ya_ + (cy - ya_) * t; if (ry_ < s.y0 || ry_ > wallTopP(s, u)) return; } best = t; } /* the height of the ray where it crosses the wall: under its foot or over its top it passes */
   });
   return best;
 }
+function camSlabs(x, z) { /* the solid slabs over (x, z) as [underside, top]: the decks and the covers of the underpasses (gallAt) */
+  const out = []; for (const o of H.deckAt(x, z)) out.push([o.bot !== undefined ? o.bot : o.top - 0.6, o.top]); const u = H.gallAt(x, z); if (u) out.push([u.soff, Math.max(u.soff + 0.3, H.ground(x, z))]); return out;
+}
+function camCeil(x, z, y0) { let m = ceilAbove(x, z, y0); for (const [b] of camSlabs(x, z)) if (b > y0 && b < m) m = b; return m; } /* a raised volume, a deck or the cover of an underpass over the camera's way */
 function ceilAbove(x, z, y0) { /* lowest underside of a raised volume above y0 at (x,z), else Infinity */
   let m = Infinity;
   BLDR.each(x - 0.1, z - 0.1, x + 0.1, z + 0.1, b => { if (b.zb > y0 && b.zb < m && x >= b.bb[0] && x <= b.bb[2] && z >= b.bb[1] && z <= b.bb[3] && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) m = b.zb; });
@@ -11189,7 +11521,7 @@ const WHEEL = { bal: 0.55, fall: 1.4, kov: 32 };
 const STOP = { max: 0.55, v0: 15, bal: 0.4, kov: 16, fall: 0.9 };
 const TWO_STEER = { moto: 24, scooter: 18 };
 const CAMV = { delay: 0.25, k: 0.12, minW: 0.1, tau: 0.15 };
-const CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 14, PAD_MAXTURN = 14;
+const CAM_VMAX = 15, CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 14, PAD_MAXTURN = 14;
 function camSteer(dt, inCar, hb, moving) { /* hb = the heading the camera sits behind by default; camA = where the view points in the world */
   const lx = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, ly = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0, fp = camMode === 2;
   const lim = fp ? 0.7 : 1.3, lo = fp ? -0.7 : -0.45;
@@ -11219,6 +11551,7 @@ function camEase(dt, hb, k, minW, tau) { /* angular speed proportional to the er
   camW += (want - camW) * (1 - Math.exp(-dt / tau)); let st = camW * dt; if (Math.abs(st) > Math.abs(d)) st = d; camA = wrapA(camA + st);
 }
 function updCamera(dt) {
+  if (!running) { sorvolo(dt); return; }
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
   const fx = Math.sin(h), fz = Math.cos(h); let want, look;
   if (!inCar) P.model.g.visible = !((camMode === 2 && fpDone) || (hyp(camPos.x - px, camPos.z - pz) < 0.9 && camPos.y - P.y < 2.2)); /* the body is hidden only once the camera is close to the eyes */
@@ -11242,27 +11575,30 @@ function updCamera(dt) {
     let cx = px - hx * dist, cz = pz - hz * dist;
     /* low ceiling (portico, passage) over the subject or over the way back to the camera: the target is computed at once under it and in front of the walls, the camera only glides there (never up first) */
     const fy = inCar ? P.car.y : P.y; let ceil = Infinity;
-    for (const t of [0, 0.35, 0.7, 1]) { const c = ceilAbove(px + (cx - px) * t, pz + (cz - pz) * t, fy + 1.8); if (c < ceil) ceil = c; }
-    let cl = 1; if (ceil < Infinity) { const room = Math.max(0.9, ceil - 0.3 - fy); cl = clamp(room / ht, 0.35, 1); }
+    for (const t of [0, 0.35, 0.7, 1]) { const c = camCeil(px + (cx - px) * t, pz + (cz - pz) * t, fy + 1.8); if (c < ceil) ceil = c; }
+    { const la_ = Math.min(30, sp * 0.6); for (const a_ of [0.25, 0.5, 1]) { if (la_ * a_ < 1) continue; const x_ = px + hx * la_ * a_, z_ = pz + hz * la_ * a_, f_ = H.camG(x_, z_, fy), c = camCeil(x_, z_, f_ + 1.8); if (c < Infinity && c + fy - f_ < ceil) ceil = c + fy - f_; } } /* a ceiling the subject is about to go under, as high over the floor there: the camera starts down before the mouth, not at it */
+    let cl = 1; if (ceil < Infinity) { const room = Math.max(0.9, ceil - 0.45 - fy); cl = clamp(room / ht, 0.35, 1); }
+    { const C_ = updCamera, o_ = inCar ? P.car : P; if (C_.clO !== o_ || cl < C_.clS) C_.clS = cl; else C_.clS += (cl - C_.clS) * (1 - Math.exp(-1.2 * dt)); C_.clO = o_; cl = C_.clS; } /* down at once (the camera glides there), back up slowly once the ceiling is behind */
     if (cl < 1) { cx = px + (cx - px) * Math.max(cl, 0.4); cz = pz + (cz - pz) * Math.max(cl, 0.4); ht = Math.max(0.9, ht * cl); }
     let wy = H.camCap(cx, cz, fy, Math.max(fy, H.camG(cx, cz, fy)) + ht);
     if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */
-    const f = rayCam(px, pz, cx, cz, wy); let lift = 0; if (f < 1) { const dd = hyp(cx - px, cz - pz) || 1, k = Math.max(0.08, f - 0.5 / dd); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3 * cl; }
-    const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, H.camCap(cx, cz, gy, Math.max(gy, H.camG(cx, cz, gy)) + Math.max(0.6, ht + lift + (inCar && !P.car.heli ? camPitch * 6 : 0))), cz); const ld_ = inCar ? (P.car.heli ? 5 * clamp(1 - camPitch / 1.2, 0, 1) : 5) : 2; look = new THREE.Vector3(px + hx * ld_, gy + (inCar ? 1.3 : 1.5), pz + hz * ld_);
+    let f = rayCam(px, pz, cx, cz, wy, fy + (inCar ? 1.3 : 1.5)); { const dd_ = hyp(cx - px, cz - pz) || 1, ux_ = (cx - px) / dd_, uz_ = (cz - pz) / dd_; const C0_ = updCamera, dr_ = C0_.s === (inCar ? P.car : P) && C0_.y !== undefined ? clamp((fy - C0_.y) / Math.max(dt, 1e-3), -15, 0) * 0.35 : 0; const vs_ = inCar ? P.car.speed : Math.abs(P.speedNow || 0), pa_ = Math.min(1.2, vs_ * 0.09), pb_ = Math.min(0.7, vs_ * 0.05); for (const [a_, b_, e_] of [[pa_, 0, 0], [0, pb_, 0], [0, -pb_, 0], [0, 0, dr_]]) { if (a_ === 0 && b_ === 0 && e_ > -0.05) continue; const qx_ = cx + ux_ * a_ - uz_ * b_, qz_ = cz + uz_ * a_ + ux_ * b_, q_ = rayCam(px, pz, qx_, qz_, wy + e_, fy + (inCar ? 1.3 : 1.5) + e_); if (q_ < 1) f = Math.min(f, q_ * hyp(qx_ - px, qz_ - pz) / dd_); } } let lift = 0; /* the obstacle a little before the camera gets to it: further (up to 1.2 m) and to the sides (up to 0.7 m) as fast as the subject goes, and lower by what it goes down in 0.35 s (into a trench the walls come over the ray) */ if (f < 1) { const dd = hyp(cx - px, cz - pz) || 1, k = Math.max(0.08, f - 0.5 / dd); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3 * cl; }
+    const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, H.camCap(cx, cz, gy, Math.max(gy, H.camG(cx, cz, gy)) + Math.max(0.6, ht + lift + (inCar && !P.car.heli ? camPitch * 6 : 0))), cz); if (ceil < Infinity) want.y = Math.min(want.y, Math.max(gy + 0.9, ceil - 0.45)); /* under a ceiling (or about to go under one) the camera is under it however high the ground round it is: the edge of a trench */ const ld_ = inCar ? (P.car.heli ? 5 * clamp(1 - camPitch / 1.2, 0, 1) : 5) : 2; look = new THREE.Vector3(px + hx * ld_, gy + (inCar ? 1.3 : 1.5), pz + hz * ld_);
   }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
   // the camera rides along with what it follows and the smoothing below only softens turns and walls: chasing the car itself, a frame that
   // comes late (the phone busy for a moment) let the camera catch up a metre at once and the car looked shoved back
   const subj = inCar ? P.car : P, suby = inCar ? P.car.y : P.y, C = updCamera;
-  if (C.s === subj && hyp(px - C.x, pz - C.z) < 20) { const d = _camD.set(px - C.x, suby - C.y, pz - C.z); camPos.add(d); camLook.add(d); }
+  const ride_ = C.s === subj && hyp(px - C.x, pz - C.z) < 20; if (ride_) { const d = _camD.set(px - C.x, suby - C.y, pz - C.z); camPos.add(d); camLook.add(d); }
   C.s = subj; C.x = px; C.y = suby; C.z = pz;
   const k = camMode === 2 && fpDone ? 1 : 1 - Math.exp(-(camMode === 2 ? FP_ZOOM : camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : !inCar && camFree ? CAMF.posK : inCar && P.car.heli ? HELI.camK : 7.5) * dt);
-  camPos.lerp(want, k); camLook.lerp(look, camMode === 2 && fpDone ? 1 : 1 - Math.exp(-12 * dt));
+  { const bx_ = camPos.x, by_ = camPos.y, bz_ = camPos.z; camPos.lerp(want, k); const st_ = Math.hypot(camPos.x - bx_, camPos.y - by_, camPos.z - bz_), cap_ = CAM_VMAX * dt; if (camMode === 0 && ride_ && st_ > cap_ && Math.hypot(bx_ - want.x, by_ - want.y, bz_ - want.z) < 30 && !(Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12)) { const q_ = cap_ / st_; camPos.set(bx_ + (camPos.x - bx_) * q_, by_ + (camPos.y - by_) * q_, bz_ + (camPos.z - bz_) * q_); } } /* round the subject the camera glides at most CAM_VMAX m/s on its own (from far away, after a jump, it goes as ever) */ camLook.lerp(look, camMode === 2 && fpDone ? 1 : 1 - Math.exp(-12 * dt));
   /* going into first person is a soft zoom in, as coming out is a zoom out; once the camera is at the eyes it is locked on with no delay */
   if (camMode !== 2) fpDone = false; else if (!fpDone && camPos.distanceTo(want) < 0.12 && camLook.distanceTo(look) < 0.3) fpDone = true;
   if (camMode !== 1) { /* never inside a wall: the glide may cut a corner, so pull the camera back in front of the first wall between subject and camera */
-    const g = rayCam(px, pz, camPos.x, camPos.z, camPos.y);
+    const g = rayCam(px, pz, camPos.x, camPos.z, camPos.y, suby + (inCar ? 1.3 : 1.5));
     if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd), tx_ = px + (camPos.x - px) * kk, tz_ = pz + (camPos.z - pz) * kk, sl_ = hyp(tx_ - camPos.x, tz_ - camPos.z) > 0.4 ? 1 - Math.exp(-CAM_WALL * dt) : 1; /* a small correction is exact; a big one (the walker jumped past a wall edge) is a quick glide, not a jump */ camPos.x += (tx_ - camPos.x) * sl_; camPos.z += (tz_ - camPos.z) * sl_; }
+    { const ay_ = suby + (inCar ? 1.3 : 1.5); let hi_ = Infinity, lo_ = -Infinity; for (let i_ = 1; i_ <= 6; i_++) { const t_ = i_ / 6, x_ = px + (camPos.x - px) * t_, z_ = pz + (camPos.z - pz) * t_; for (const [b_, tp_] of camSlabs(x_, z_)) { if (ay_ < b_ - 0.45) hi_ = Math.min(hi_, ay_ + (b_ - 0.45 - ay_) / t_); else if (ay_ > tp_ + 0.45) lo_ = Math.max(lo_, ay_ + (tp_ + 0.45 - ay_) / t_); } } if (camPos.y > hi_) camPos.y = Math.max(hi_, ay_ - 0.5); else if (camPos.y < lo_) camPos.y = lo_; } /* never in a deck or in the cover of an underpass, nor with one between it and the subject: down under it or up over it, on the subject's side */
   }
   if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */
   camera.position.copy(camPos);
@@ -11274,6 +11610,96 @@ function updCamera(dt) {
   const sy = H.ground(px, pz); sun.target.position.set(px, sy, pz); sun.position.set(px + SUN_DIR.x * 220, sy + SUN_DIR.y * 220, pz + SUN_DIR.z * 220);
   _far.position.x = camera.position.x * 0.9; _near.position.x = camera.position.x * 0.8;
 }
+// ---------------------------------------------------------------- daylight as it is (three.js 0.186, fase 2): sun, sky, bounce, haze and exposure from the sun's height
+// The sun's light comes through the air: the longer the path (air mass, low sun) the less light and the warmer, blue going first (Rayleigh), the haze (aerosol,
+// LUCE.tau) taking all colours a little. The sky gives a soft blue light from everywhere, about a fifth of the whole on a clear noon (so the shadows are a fifth of the sun);
+// the ground sends back some of what falls on it (albedo 0.2, warm grey). The camera adapts in part, like an eye or a photo: a winter noon is darker than a summer one,
+// but not as much as the light. The season comes from the true date (the shops' clock does the same), or from the link: ?stagione=primavera|estate|autunno|inverno.
+// The hours of the day stay the game's (sunrise and sunset as before): the season changes how high the sun climbs, the colour of the light and the haze
+const LUCE = { doy: 0, nome: '', e: 0, alto: 1, tau: 0.2, wb: new THREE.Color(), fredda: 0, exp: 1, key: 1, day: 1, ghi: 0, dhi: 0, _c: new THREE.Color(), _s: new THREE.Color(), _g: new THREE.Color() };
+function luceCalcola() { // the season's light for the day STAG_DOY (stagioni3.js: the true date, ?stagione=, ?data= or the codes): changes day by day
+  const doy = STAG_DOY, D = Math.PI / 180, lat = 45.66 * D, decl = 23.44 * D * Math.sin(2 * Math.PI * (284 + doy) / 365);
+  const e = 0.5 + 0.5 * Math.sin(decl) / Math.sin(23.44 * D); // 0 at the winter solstice, 1 at the summer one
+  const aut = Math.max(0, Math.sin(2 * Math.PI * (doy - 200) / 365)); // late summer and autumn: the low golden haze of September-November
+  Object.assign(LUCE, { doy, e, nome: doy < 80 || doy >= 355 ? 'inverno' : doy < 172 ? 'primavera' : doy < 266 ? 'estate' : 'autunno',
+    alto: Math.sin(Math.PI / 2 - lat + decl) / Math.sin(Math.PI / 2 - lat), // how high the noon sun is against the equinox one (sin of the height)
+    tau: 0.1 + 0.16 * e + 0.04 * aut, // aerosol depth: clear cold winter air, hazy Po-valley summer
+    fredda: 1 - e }); // winter light: bluer sky light and shadows
+  // the colour of the season's light, on sun and sky by day: winter cold and pale, summer warm, autumn golden, spring neutral and fresh
+  LUCE.wb.setRGB(0.93, 0.975, 1.09).lerp(new THREE.Color().setRGB(1.06, 1.0, 0.91), e).lerp(new THREE.Color().setRGB(1.09, 1.0, 0.84), 0.7 * aut);
+}
+luceCalcola();
+const LUCE_K = 2.0, LUCE_RAY = [0.042, 0.072, 0.15], LUCE_AER = [1, 1.08, 1.2]; // overall scale (r128's units, see three186.js), Rayleigh and aerosol depth per colour
+const _luceWb = new THREE.Color();
+function luceGiorno(L) {
+  const el = L.elDeg, D = Math.PI / 180, s = Math.max(0, Math.sin(el * D)), ep = Math.max(el, 0);
+  const m = 1 / (Math.sin(ep * D) + 0.50572 * Math.pow(ep + 6.07995, -1.6364)); // Kasten-Young air mass
+  const up = clamp((el + 0.6) / 1.6, 0, 1), tau = LUCE.tau;
+  const c = LUCE._c.setRGB(Math.exp(-m * (LUCE_RAY[0] + tau * LUCE_AER[0])), Math.exp(-m * (LUCE_RAY[1] + tau * LUCE_AER[1])), Math.exp(-m * (LUCE_RAY[2] + tau * LUCE_AER[2])));
+  const dni = c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722; c.multiplyScalar(1 / Math.max(c.r, c.g, c.b, 1e-4));
+  // the sky's light on the flat: grows with the sun, more in haze; dusk keeps a glow for a while after sunset; the night has the moon and the town
+  const tw = 0.05 * Math.exp(Math.min(el, 4) / 2.4) * clamp((el + 10) / 6, 0, 1);
+  const dhi = (0.07 + 0.55 * tau) * Math.pow(s, 0.8) + tw;
+  const day = clamp((el + 2) / 8, 0, 1), nightI = 1 - day;
+  sun.intensity = LUCE_K * dni * up * day + 0.33 * nightI; LUCE.day = day; // under the horizon the "sun" is the moon (high, as before)
+  sun.color.copy(c).multiply(LUCE.wb).lerp(hexC(0x8fa6d8), nightI);
+  // sky light: blue by day (bluer in winter, whiter in haze), violet-blue at dusk, dark blue at night
+  const sk = LUCE._s.setRGB(0.62 + 0.25 * tau, 0.76 + 0.12 * tau, 1);
+  sk.lerp(hexC(0x8a86b8), L.dusk * 0.5); if (LUCE.fredda > 0) sk.b *= 1 + 0.06 * LUCE.fredda;
+  hemi.intensity = LUCE_K * dhi * day + 0.65 * nightI; /* the night as before */ hemi.color.copy(sk).multiply(LUCE.wb).lerp(hexC(0x5a6fa8), nightI);
+  // the ground's bounce, on what faces down and on the walls in shade: what falls on the ground times its albedo, as a share of the sky light
+  const ghi = dni * up * s + dhi, gr = LUCE._g.setRGB(0.24, 0.21, 0.17).multiplyScalar(clamp(ghi / Math.max(dhi, 0.02), 0, 6) * 0.9);
+  hemi.groundColor.copy(gr).lerp(hexC(0x2a2a36), nightI);
+  LUCE.ghi = LUCE_K * ghi * day; LUCE.dhi = LUCE_K * dhi * day;
+  // haze: warm-white in summer, a little bluer in winter; the visibility shorter in the summer haze
+  scene.fog.color.copy(mixHex(0x1f2a44, 0xd9dbd6, L.day)).lerp(hexC(0xe8dcc4), L.day * (0.25 + 0.4 * LUCE.e)).lerp(hexC(0xe39a72), L.dusk * 0.55);
+  scene.fog.far = (560 + 160 * L.day) * Math.pow(0.2 / tau, 0.7 * L.day); scene.fog.color.multiply(_luceWb.copy(LUCE.wb).lerp(hexC(0xffffff), 1 - L.day));
+}
+// the exposure, after the weather: about the square root of the light on the flat (an eye adapts in part), never under the night's floor
+function luceEsp() {
+  const key = Math.max(0.1, (sun.intensity - WX.flash * 0.8) * Math.max(0, SUN_DIR.y) + hemi.intensity - WX.flash * 2.2);
+  LUCE.key = key; LUCE.exp = lerp(1.1, clamp(1.1 * Math.pow(1.3 / key, 0.38), 0.85, 1.6), LUCE.day); renderer.toneMappingExposure = LUCE.exp; /* the night keeps its exposure: the lamps were made for it */
+}
+
+// ---------------------------------------------------------------- real lights at night (fase 3): the street lamps and the headlights light the street, the walls and the cars
+// On r128 the Lambert lit per vertex: a light on a road of big triangles did nothing, so the pools of light were painted (LAMPPOOL, HEADPOOL). three 0.186 lights per pixel:
+// a fixed set of spot lights (always the same number, so no shader is ever compiled again) is given every frame to what is nearest the camera: LUCI_N_LAMP street lamps
+// and LUCI_N_AUTO cars with their lights on, beside the player's headlight (headSpot). Each fades out towards the edge of its range, so a lamp that changes hands never jumps;
+// the painted pools fade out where the real light takes over (near the camera) and stay further away. ?luci=0 turns them off (the painted pools as before), for the fps
+const LUCI_ON = !/[?&]luci=0/.test(location.search), LUCI_N_LAMP = LUCI_ON ? 6 : 0, LUCI_N_AUTO = LUCI_ON ? 3 : 0, LUCI_R_LAMP = 60, LUCI_R_AUTO = 70;
+const LUCI = { kl: 1, ka: 1, init: false, lamp: [], auto: [], _c: [], near: { value: LUCI_ON ? 40 : -1 } };
+for (let i = 0; i < LUCI_N_LAMP; i++) { const s = new THREE.SpotLight(0xffd6a0, 0, 26, 1.15, 0.85, 2); s.castShadow = false; s.target.position.set(0, -1, 0); scene.add(s, s.target); LUCI.lamp.push(s); }
+for (let i = 0; i < LUCI_N_AUTO; i++) { const s = new THREE.SpotLight(0xfff0d8, 0, 55, 0.5, 0.55, 2); s.castShadow = false; scene.add(s, s.target); LUCI.auto.push(s); }
+function luciInit() { // at the first frame: headSpot and the pools are made in extras.js, after this file
+  LUCI.init = true; if (!LUCI_ON) return; // the player's headlight: a low beam from the bumper, that reaches about 40 m with the physical fall-off
+  Object.assign(headSpot, { distance: 75, angle: 0.52, penumbra: 0.55, decay: 2 });
+  for (const M of [LAMPPOOL_MAT]) M.onBeforeCompile = s => { // the painted pool fades out near the camera, where the lamp's own light is
+    s.uniforms.uLuciNear = LUCI.near;
+    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying float vLuciD;').replace('#include <project_vertex>', '#include <project_vertex>\nvLuciD = length( mvPosition.xyz );');
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vLuciD;\nuniform float uLuciNear;').replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a *= uLuciNear < 0.0 ? 1.0 : smoothstep( uLuciNear, uLuciNear + 18.0, vLuciD );');
+  };
+}
+function luciAggiorna(on) {
+  if (!LUCI.init) luciInit(); if (!LUCI_ON) return;
+  const cx = camera.position.x, cz = camera.position.z, k = on > 0.02 ? on : 0, C = LUCI._c; C.length = 0;
+  if (k) for (const T of VIVI) { if (!T.lampL || T.dist > 300) continue; for (const l of T.lampL) { if (l.off) continue; const d = Math.hypot(l.x - cx, l.z - cz); if (d < LUCI_R_LAMP) C.push(d, l); } }
+  const pick = [];
+  for (let i = 0; i < C.length; i += 2) { pick.push(i); } pick.sort((a, b) => C[a] - C[b]);
+  LUCI.lamp.forEach((s, i) => {
+    const j = pick[i]; if (j === undefined) { s.intensity = 0; return; }
+    const l = C[j + 1], d = C[j]; s.position.set(l.x, l.y, l.z); s.target.position.set(l.x, l.y - 7, l.z); s.target.updateMatrixWorld();
+    s.intensity = 110 * LUCI.kl * k * clamp((LUCI_R_LAMP - d) / 15, 0, 1);
+  });
+  // the cars: the nearest with someone at the wheel and the lights on, the player's own has headSpot
+  const A = []; if (k) for (const v of VEH) { if (v === P.car || !v.driver || v.health <= 0 || v.exploded || v.fallen || v.heli || v.spec.pedal || !v.m.g.visible) continue; const d = Math.hypot(v.x - cx, v.z - cz); if (d < LUCI_R_AUTO) A.push([d, v]); }
+  A.sort((a, b) => a[0] - b[0]);
+  LUCI.auto.forEach((s, i) => {
+    const e = A[i]; if (!e) { s.intensity = 0; return; }
+    const v = e[1], fx = Math.sin(v.h), fz = Math.cos(v.h), hl = v.spec.L / 2; s.position.set(v.x + fx * hl, v.y + 0.75, v.z + fz * hl); s.target.position.set(v.x + fx * (hl + 20), v.y - 0.6, v.z + fz * (hl + 20)); s.target.updateMatrixWorld();
+    s.intensity = 70 * LUCI.ka * k * clamp((LUCI_R_AUTO - e[0]) / 20, 0, 1);
+  });
+}
+
 // ---------------------------------------------------------------- day & night
 let TOD = 17.2; // ore del giorno, 1 ora di gioco = 1 minuto reale
 const WX = { cloud: 0.12, rain: 0, fog: 0, wet: 0, flash: 0 }; // weather mix, driven by weather3.js
@@ -11336,7 +11762,7 @@ function updGlow() {
     const ud = v.m.body.userData; if (!ud.tl) continue;
     const live = (!!v.driver || v.fariFino > now) && v.health > 0 && !v.exploded && !v.fallen && !v.ko, fs = v.fwdSpeed, brk = live && v.inp.brk > 0, rev = brk && fs < -0.5, stop = brk && !rev;
     const tm = live ? (stop ? M_BRAKE : M_TAIL) : M_TAIL_OFF; if (ud.tm !== tm) { ud.tm = tm; for (const m of ud.tails) m.material = tm; } /* nobody inside: lamps, pool and glare all off */
-    const hm = live ? M_HEAD : M_HEAD_OFF; if (ud.hm !== hm) { ud.hm = hm; for (const m of ud.heads) m.material = hm; } if (ud.hp) ud.hp.visible = live;
+    const hm = live ? M_HEAD : M_HEAD_OFF; if (ud.hm !== hm) { ud.hm = hm; for (const m of ud.heads) m.material = hm; } if (ud.hp) ud.hp.visible = live && !(LUCI_ON && v === P.car); /* the player's car has a real headlight (luci3.js) */
     if (!v.m.g.visible) continue;
     const kh = live ? on : 0, kt = live ? 0.45 * on + (stop ? 0.85 : 0) : 0; if (kh < 0.02 && kt < 0.02 && !rev) continue;
     v.m.g.updateMatrixWorld(true); const mw = v.m.body.matrixWorld;
@@ -11362,7 +11788,8 @@ const mixHex = (a, b, t) => _mixO[_mixI++ % 24].copy(hexC(a)).lerp(hexC(b), t); 
 let skyT = -1, nightK = 0;
 const LATR = 45.66 * Math.PI / 180, SOLAR_NOON = 12.52;
 function lightTones() {
-  const H = (TOD - SOLAR_NOON) * 15 * Math.PI / 180, E = -Math.sin(H), Nn = -Math.sin(LATR) * Math.cos(H), U = Math.cos(LATR) * Math.cos(H);
+  const H = (TOD - SOLAR_NOON) * 15 * Math.PI / 180, E0 = -Math.sin(H), N0 = -Math.sin(LATR) * Math.cos(H), U = clamp(Math.cos(LATR) * Math.cos(H) * LUCE.alto, -1, 1);
+  const hk = Math.sqrt(1 - U * U) / (Math.hypot(E0, N0) || 1), E = E0 * hk, Nn = N0 * hk; /* the season's height (luce3.js): sunrise and sunset at the same hours, at noon as high as on the true day */
   const elDeg = Math.asin(U) * 180 / Math.PI, day = clamp((elDeg + 4) / 12, 0, 1), dusk = Math.exp(-(((elDeg - 1) / 6) ** 2));
   return { E, Nn, U, elDeg, elev: U, day, night: 1 - day, dusk };
 }
@@ -11371,10 +11798,7 @@ function updDayNight(dt) {
   const L = lightTones(); nightK = L.night;
   // sun runs east -> south -> west, moon light when it is down
   if (L.U > 0) SUN_DIR.set(L.E, Math.max(0.12, L.U), -L.Nn).normalize(); else SUN_DIR.set(0.3, 0.8, 0.45).normalize(); // night: soft moonlight from high up
-  sun.intensity = 0.3 + 0.8 * L.day;
-  sun.color.copy(mixHex(0x8fa6d8, 0xffdcae, L.day)).lerp(hexC(0xff9356), L.dusk * 0.6);
-  hemi.intensity = 0.5 + 0.12 * L.day; hemi.color.copy(mixHex(0x5a6fa8, 0xdbe8ff, L.day)); hemi.groundColor.copy(mixHex(0x2a2a36, 0x8a7f6a, L.day));
-  const fog = mixHex(0x1f2a44, 0xebd9ba, L.day).lerp(hexC(0xe39a72), L.dusk * 0.55); scene.fog.color.copy(fog); scene.fog.far = 560 + 160 * L.day;
+  luceGiorno(L); // sun, sky light, the ground's bounce and the haze: luce3.js
   _far.material.color.setScalar(0.18 + 0.82 * L.day); _near.material.color.setScalar(0.15 + 0.85 * L.day);
   const skyW = WX.cloud + WX.fog * 2;
   if (Math.abs(TOD - skyT) > 0.04 || skyT < 0 || Math.abs(skyW - (updDayNight.w ?? -1)) > 0.015) { // redraw the 4x256 sky gradient now and then
@@ -11391,7 +11815,7 @@ function updDayNight(dt) {
   MAT.old.emissiveIntensity = MAT.mod.emissiveIntensity = 0.55 * lampsOn;
   M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn;
   const v = P.mode === 'car' ? P.car : null;
-  headSpot.intensity = v && v.health > 0 && !v.heli ? 2.4 * lampsOn : 0;
+  headSpot.intensity = v && v.health > 0 && !v.heli ? (LUCI_ON ? 90 : 2.4) * lampsOn : 0; luciAggiorna(lampsOn); /* luci3.js: the real lights of the lamps and the cars */
   if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); }
   const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0') + ' ' + (WX.icon || ''); }
 }
@@ -11445,7 +11869,7 @@ function explodeCar(v) {
 }
 
 updDayNight(0);
-window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); };
+window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); updWeather(0); luceEsp(); }; /* as a frame does: the day, the weather on it, the exposure */
 
 // ---------------------------------------------------------------- car radio: eight live stations, only while driving a car; each car keeps the station picked on it
 // claude.ai artifacts allow no external audio (media-src/connect-src 'self'): there the radio stays off with a note
@@ -11804,15 +12228,17 @@ const WX_STATES = {
   pioggia: { cloud: 0.95, rain: 0.6, fog: 0, icon: '🌧', msg: 'Comincia a piovere: strada bagnata, frena prima' },
   temporale: { cloud: 1, rain: 1, fog: 0, icon: '⛈', msg: 'Temporale sulla Brianza!' },
   nebbia: { cloud: 0.5, rain: 0, fog: 1, icon: '🌫', msg: 'Nebbia in Brianza: non si vede a un palmo dal naso' },
+  neve: { cloud: 0.95, rain: 0, fog: 0.3, snow: 1, icon: '❄️', msg: 'Nevica sulla Brianza' }, /* fase 3, neve3.js: only from a grey winter sky (WX_NEXT), or ?neve=1, or the code NEVE */
 };
 const WX_NEXT = { // where the weather goes next, by weight
   sereno: { sereno: 3, nuvoloso: 5, nebbia: 1.5 }, nuvoloso: { sereno: 4, nuvoloso: 1, pioggia: 4, temporale: 1 },
-  pioggia: { nuvoloso: 5, pioggia: 3, temporale: 2 }, temporale: { pioggia: 6, nuvoloso: 4 }, nebbia: { sereno: 5, nuvoloso: 5 },
+  pioggia: { nuvoloso: 5, pioggia: 3, temporale: 2 }, temporale: { pioggia: 6, nuvoloso: 4 }, nebbia: { sereno: 5, nuvoloso: 5 }, neve: { neve: 2, nuvoloso: 5, sereno: 1 },
 };
-Object.assign(WX, { state: 'sereno', icon: WX_STATES.sereno.icon, t: 300, drift: 0, thunderT: 15, sky: -1 });
+if (STAG_DOY < 60 || STAG_DOY > 340) WX_NEXT.nuvoloso.neve = 0.5; /* it may snow from mid-December to February, now and then */
+Object.assign(WX, { state: 'sereno', icon: WX_STATES.sereno.icon, t: 300, drift: 0, thunderT: 15, sky: -1, snow: 0, neve: 0 });
 function setWeather(st, now_) {
   WX.state = st; WX.t = 240 + rnd() * 360; const S = WX_STATES[st]; WX.icon = S.icon;
-  if (now_) { WX.cloud = S.cloud; WX.rain = S.rain; WX.fog = S.fog; WX.wet = S.rain ? 1 : 0; skyT = -1; }
+  if (now_) { WX.cloud = S.cloud; WX.rain = S.rain; WX.fog = S.fog; WX.wet = S.rain ? 1 : 0; WX.snow = S.snow || 0; if (S.snow) WX.neve = 1; skyT = -1; }
   if (running) toast(S.icon + ' ' + S.msg);
 }
 function updWeather(dt) {
@@ -11825,13 +12251,17 @@ function updWeather(dt) {
   WX.cloud = ap(WX.cloud, S.cloud, 1 / 40);
   WX.rain = ap(WX.rain, WX.cloud > 0.8 ? S.rain : 0, 1 / 25); // no rain before the sky is grey
   WX.fog = ap(WX.fog, S.fog, 1 / 45);
+  if (!WX.nvInit) { WX.nvInit = true; if (/[?&]neve=1/.test(location.search)) setWeather('neve', true); }
+  WX.snow = ap(WX.snow, WX.cloud > 0.8 ? S.snow || 0 : 0, 1 / 25); /* snow on the ground: white in about two minutes of snowfall, gone in some minutes, sooner in the rain */
+  WX.neve = WX.snow > 0.2 ? Math.min(1, WX.neve + dt * WX.snow / 110) : Math.max(0, WX.neve - dt * (1 + 3 * WX.rain) / 420); NEVE.u.value = WX.neve;
   WX.wet = WX.rain > 0.05 ? Math.min(1, WX.wet + dt / 50) : Math.max(0, WX.wet - dt / 200); // soaked in under a minute, dry in a few
+  RIF.wet.value = WX.wet; /* the wet asphalt of riflessi3.js: darker, smoother, sharper reflections of the sky and the sun (fase 3) */
   WX.flash = Math.max(0, WX.flash - dt * 4);
   if (WX.rain > 0.85 && (WX.thunderT -= dt) <= 0) { WX.thunderT = 12 + rnd() * 35; WX.flash = 1; const d = 0.8 + rnd() * 4; setTimeout(() => thunder(d), d * 1000); }
   // light: a grey sky softens the sun and the shadows
   const L = lightTones(), cov = WX.cloud * WX.cloud, grey = hexC(0x9aa0a8);
-  sun.intensity *= 1 - 0.8 * cov - 0.15 * WX.fog; sun.color.lerp(grey, cov * 0.6);
-  hemi.intensity *= 1 + 0.12 * cov - 0.25 * WX.rain * L.day; hemi.color.lerp(hexC(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
+  sun.intensity *= Math.max(0, 1 - 0.95 * cov - 0.5 * WX.fog); sun.color.lerp(grey, cov * 0.6); /* fase 2: under a grey sky almost no sun, no shadows; the sky gives more light than a blue one, */
+  hemi.intensity *= (1 + (1.1 * cov + 0.8 * WX.fog) * L.day) * (1 - 0.35 * WX.rain * L.day); /* the whole less than on a clear day (the exposure takes some back: luce3.js); rain darker */ hemi.color.lerp(hexC(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
   hemi.intensity += WX.flash * 2.2; sun.intensity += WX.flash * 0.8;
   // fog: grey haze, rain curtain, then the real nebbia
   const fogC = mixHex(0x262a33, 0xc3c7cb, L.day);
@@ -11883,15 +12313,16 @@ function updSkyFx(dt) {
     c.s.material.opacity = c.o * (0.55 + 0.45 * WX.cloud) * (1 - WX.fog); c.s.material.color.copy(col).multiplyScalar(1 + WX.flash);
   });
   // rain streaks, slanted by the wind and stretched by the car's own speed
-  const n = Math.round(RAIN_N * Math.min(1, WX.rain * 1.4)); RAIN.geometry.setDrawRange(0, n * 2); RAIN.material.opacity = 0.32 + 0.2 * WX.rain;
+  const sn = WX.snow > WX.rain, n = Math.round(RAIN_N * Math.min(1, Math.max(WX.rain * 1.4, WX.snow * 1.2))); RAIN.geometry.setDrawRange(0, n * 2); RAIN.material.opacity = sn ? 0.85 : 0.32 + 0.2 * WX.rain; RAIN.material.color.set(sn ? 0xf4f6fa : 0xc4ccd6); /* snow: slow white flakes */
   RAIN.visible = n > 0; if (!n) return;
   // drops live in world space, wrapped into the box round the camera; a streak points back along the drop's speed relative to the car
-  const v = P.mode === 'car' ? P.car : null, wx = (v ? v.vx : 0) - 2.2, wz = (v ? v.vz : 0) - 1.0, fall = 16 * dt, a = RAIN.geometry.attributes.position, A = a.array;
+  const v = P.mode === 'car' ? P.car : null, wx = (v ? v.vx : 0) - 2.2, wz = (v ? v.vz : 0) - 1.0, fall = (sn ? 1.4 : 16) * dt, a = RAIN.geometry.attributes.position, A = a.array, tt = performance.now() / 1000;
   const wrap = (q, B) => ((q % B) + B) % B - B / 2;
   for (let i = 0; i < n; i++) {
     let y = RAIN_P[i * 3 + 1] - fall; if (y < 0) y += RAIN_BOX[1]; RAIN_P[i * 3 + 1] = y;
     RAIN_P[i * 3] += 2.2 * dt; RAIN_P[i * 3 + 2] += 1.0 * dt; // wind
     const x = cp.x + wrap(RAIN_P[i * 3] - cp.x, RAIN_BOX[0]), z = cp.z + wrap(RAIN_P[i * 3 + 2] - cp.z, RAIN_BOX[2]), yy = cp.y - 12 + y;
+    if (sn) { const sw = Math.sin(tt * 1.3 + i) * 0.35, x2 = x + sw, z2 = z + Math.cos(tt * 1.1 + i * 1.7) * 0.35; A[i * 6] = x2; A[i * 6 + 1] = yy; A[i * 6 + 2] = z2; A[i * 6 + 3] = x2 + 0.03; A[i * 6 + 4] = yy + 0.05; A[i * 6 + 5] = z2; continue; }
     A[i * 6] = x; A[i * 6 + 1] = yy; A[i * 6 + 2] = z; A[i * 6 + 3] = x + wx * 0.05; A[i * 6 + 4] = yy + 0.85; A[i * 6 + 5] = z + wz * 0.05;
   }
   a.needsUpdate = true;
@@ -11999,7 +12430,7 @@ Promise.all(['prato', 'terreno'].map(f => new Promise(ok => { const i = new Imag
   incoltoTex.image = cv; incoltoTex.repeat.set(.75, .75); incoltoTex.needsUpdate = true; /* 16 m a repeat (UV every 12 m) */
 });
 // output in sRGB, through a filmic curve: highlights roll off instead of clipping
-renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+renderer.toneMapping = THREE.AgXToneMapping; renderer.toneMappingExposure = 1.1; /* AgX (fase 2): rolls the highlights off like film and keeps the colours of a photo, greens and blues less loud than ACES; the exposure is luce3.js's */
 // the sky: three's Preetham model (Sky.js r128, loaded beside three.min.js), with the sun's disc and the glow round it, the blue
 // deepening overhead and paling to the horizon, red and orange at sunset. It is drawn first, over the old gradient, and fades out
 // at night, under cloud and in fog, where the gradient (greyed by the weather) takes over. The haze takes the sky's colour at the
@@ -12007,10 +12438,11 @@ renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESF
 const FOTO_SKY = (() => {
   if (!THREE.Sky) return null; // the script did not load: the old sky stays
   const s = new THREE.Sky(), m = s.material;
-  Object.assign(m.uniforms, { uSkyK: { value: 0.13 }, uSkyA: { value: 1 }, uSkyS: { value: 1.8 } }); // exposure, opacity, saturation (the filmic curve greys a bright sky)
+  Object.assign(m.uniforms, { uSkyK: { value: 0.06 }, uSkyA: { value: 1 }, uSkyS: { value: 1.8 } }); // exposure, opacity, saturation (the filmic curve greys a bright sky)
   m.uniforms.turbidity.value = 2; m.uniforms.rayleigh.value = 2.5; m.uniforms.mieCoefficient.value = 0.003; m.uniforms.mieDirectionalG.value = 0.8;
-  m.fragmentShader = m.fragmentShader.replace('const vec3 cameraPos = vec3( 0.0, 0.0, 0.0 );', '#define cameraPos cameraPosition\nuniform float uSkyK;\nuniform float uSkyA;\nuniform float uSkyS;') // the box goes with the camera
-    .replace('gl_FragColor = vec4( retColor, 1.0 );', 'gl_FragColor = vec4( max( mix( vec3( dot( retColor, vec3( 0.2126, 0.7152, 0.0722 ) ) ), retColor, uSkyS ), 0.0 ) * vec3( 0.86, 0.95, 1.16 ) * uSkyK, uSkyA );'); // saturated, the model leans to teal: the tint takes it back towards blue
+  m.uniforms.cloudCoverage.value = 0; /* r186's Sky draws clouds of its own: none, the weather has its own */
+  m.fragmentShader = m.fragmentShader.replace('uniform float time;', 'uniform float time;\nuniform float uSkyK;\nuniform float uSkyA;\nuniform float uSkyS;\nvarying float vSunfade;') // r186's Sky already looks from cameraPosition (the box goes with the camera)
+    .replace('gl_FragColor = vec4( texColor, 1.0 );', 'vec3 retColor = texColor; /* linear, into the tone mapping and the sRGB output like everything else (r128 had a pow here in place of both) */\n gl_FragColor = vec4( max( mix( vec3( dot( retColor, vec3( 0.2126, 0.7152, 0.0722 ) ) ), retColor, uSkyS ), 0.0 ) * vec3( 0.86, 0.95, 1.16 ) * uSkyK, uSkyA );'); // saturated, the model leans to teal: the tint takes it back towards blue
   Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, fog: false }); // opaque list, drawn first, blended on the gradient
   s.scale.setScalar(SKY_R * 1.6); s.renderOrder = -100; s.frustumCulled = false; scene.add(s);
   const probe = new THREE.Mesh(s.geometry, Object.assign(m.clone(), { uniforms: m.uniforms, blending: THREE.NoBlending })); probe.scale.copy(s.scale); probe.frustumCulled = false;
@@ -12038,7 +12470,7 @@ function fotoSkyArrivi() { // the answers that have come: the colours, a frame o
 const _fotoV = new THREE.Vector3();
 // in linear light the sky's fill counts for less than in the old sums, and the fog took the curve's warm cast: more fill in the
 // shadows, a cooler and greyer haze by day. On top of what updDayNight sets every frame
-const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
+const FOTO_HEMI = 1, FOTO_SUN = 1, /* the light is luce3.js's now */ FOTO_FOGGREY = new THREE.Color(0xc9ced4);
 {
   const udn = updDayNight;
   updDayNight = function (dt) {
@@ -12049,6 +12481,7 @@ const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
       F.a = clamp((L.elDeg + 7) / 9, 0, 1) * (1 - 0.95 * clamp((WX.cloud - 0.25) / 0.55, 0, 1)) * (1 - WX.fog);
       F.s.material.uniforms.uSkyA.value = F.a; F.s.visible = F.a > 0.01;
       F.s.material.uniforms.uSkyS.value = 1.2 + 0.6 * clamp(L.elDeg / 15, 0, 1); // less boost with the sun low: twilight would turn teal
+      F.s.material.uniforms.uSkyK.value = 0.06 * (1 + 2.5 * (1 - clamp((L.elDeg + 2) / 22, 0, 1)) ** 2); /* the model's sky darkens much faster than the light on the ground as the sun goes down: an eye (and r128's pow) keeps it readable */
       if (F.s.visible) { fotoSkyArrivi();
         const d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z), dy = Math.abs(((yaw - F.yaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
         if (performance.now() - F.t > 500 || Math.abs(TOD - F.tod) > 0.05 || dy > 0.4) fotoSkyHorizon();
@@ -12257,8 +12690,7 @@ const PAT_PATCH = (org, idf) => s => { VAR_VERT(s); if (!org) { s.uniforms.uIdMa
 //    (it takes the shadow mask the Lambert lighting already computed, no second lookup);
 //  - the metals tint what they mirror with their own colour.
 // The kinds (RIF_KIND): paint (car bodies), glass (car panes), shop (shop windows), metal (guardrails, lamp posts, railings, gates, rails), asphalt.
-// RIF.wet: 0 dry .. 1 soaked, for the day it rains: the asphalt then darkens and goes smoother (sharper, stronger reflections). NOT connected to anything now, it stays 0
-// (the weather has WX.wet: when Carlo wants the wet roads, RIF.wet.value = WX.wet in updVisuals is all that is needed).
+// RIF.wet: 0 dry .. 1 soaked, for the day it rains: the asphalt then darkens and goes smoother (sharper, stronger reflections). It follows WX.wet (weather3.js, fase 3)
 const RIF = { wet: { value: 0 }, pre: [], cache: {} };
 const RIF_KIND = {
   paint: { f0: 0.055, rough: 0.28, k: 1.25, sun: 1.0, metal: 0, wet: 0 },
@@ -12310,11 +12742,19 @@ function rifFrag(q) {
 }
 `;
 }
+// the sun's shadow for the lobe (three 0.186): the Lambert lights per pixel and has no getShadowMask() any more; the shadow of the sun (the one directional light) is taken
+// where three computes it for the lighting, the same lookup, so the sun no longer shines on the asphalt and the cars in the shade
+const RIF_LFB = (() => {
+  const c = THREE.ShaderChunk.lights_fragment_begin, a = 'directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ]';
+  if (!c.includes(a)) return null;
+  const i = c.indexOf(a), j = c.indexOf(';', i), sh = c.slice(i + 'directLight.color *= '.length, j);
+  return c.slice(0, i) + '{ float rfS_ = ' + sh + '; directLight.color *= rfS_; rfSh = min( rfSh, rfS_ ); }' + c.slice(j + 1);
+})();
 function rifShader(s, q) {
   s.uniforms.uRfH = FOTO_FAC.uSkyH; s.uniforms.uRfZ = FOTO_FAC.uSkyZ; s.uniforms.uRfD = FOTO_FAC.uSunD; s.uniforms.uRfC = FOTO_FAC.uSunC; s.uniforms.uRfWet = RIF.wet;
   s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + RIF_VERT_DECL).replace('#include <project_vertex>', '#include <project_vertex>\nvRfP = mvPosition.xyz; vRfN = transformedNormal;');
   s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + RIF_FRAG_DECL).replace('void main() {', 'void main() {\n  float rfSh = 1.0;')
-    .replace('* getShadowMask();', '* (rfSh = getShadowMask());').replace('vec3 outgoingLight =', rifFrag(q) + '  vec3 outgoingLight =');
+    .replace('#include <lights_fragment_begin>', RIF_LFB || '#include <lights_fragment_begin>').replace('vec3 outgoingLight =', rifFrag(q) + '  vec3 outgoingLight =');
 }
 // patches a Lambert material in place (the other patches of the material, e.g. the asphalt's, are kept and run first)
 function rifMat(m, kind, instanced) {
@@ -12548,7 +12988,7 @@ const FAC_ATLAS = (() => {
     if (sp.lg) put(0, [0.5 - sp.lg.w / 2 / t + 0.004, 0.5 + sp.lg.w / 2 / t - 0.004, 0.004, v(2.6)]);
   });
   const tex = new THREE.CanvasTexture(C); tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const msk = new THREE.CanvasTexture(M); msk.encoding = THREE.LinearEncoding; msk.anisotropy = tex.anisotropy;
+  const msk = new THREE.CanvasTexture(M); msk.colorSpace = THREE.NoColorSpace; msk.anisotropy = tex.anisotropy;
   const mt = new THREE.DataTexture(meta, 8, FAC_ROWS * FAC_COLS, THREE.RGBAFormat, THREE.FloatType); mt.minFilter = mt.magFilter = THREE.NearestFilter; mt.needsUpdate = true;
   return { tex, msk, meta: mt, n: FAC_CELLS.length };
 })();
@@ -12602,7 +13042,7 @@ bool facIn(vec2 f, int c, int k) {
   diffuseColor *= texelColor;`)
     .replace('#include <color_fragment>', `
 #ifdef USE_COLOR
-  { float tm = facM.b; vec3 tc = mix( vec3( 1.0 ), vColor, clamp( tm * 2.0, 0.0, 1.0 ) ); tc *= 1.0 - 0.18 * step( 0.25, tm ) * ( 1.0 - clamp( abs( tm - 0.5 ) * 2.0, 0.0, 1.0 ) ); diffuseColor.rgb *= tc; }
+  { float tm = facM.b; vec3 tc = mix( vec3( 1.0 ), vColor.rgb, clamp( tm * 2.0, 0.0, 1.0 ) ); tc *= 1.0 - 0.18 * step( 0.25, tm ) * ( 1.0 - clamp( abs( tm - 0.5 ) * 2.0, 0.0, 1.0 ) ); diffuseColor.rgb *= tc; }
 #endif
   { vec3 tg = normalize( vec3( -vWNrm.z, 0.0, vWNrm.x ) + 1e-5 ); vec2 puv = vec2( dot( vWPos, tg ), vWPos.y ) / 1.8;
     diffuseColor.rgb *= 1.0 + ( texture2D( uPlaster, puv ).r - 0.5 ) * 1.1 * clamp( facM.b * 2.0 - 0.6, 0.0, 1.0 ); }
@@ -12664,6 +13104,8 @@ function facBalLibero(B, x, z, nx, nz, w, d, y) {
   for (const o of [Math.min(0.3, d * 0.5), d * 0.5, d - 0.05]) for (const s of [-0.47, -0.25, 0, 0.25, 0.47]) { const px = x + nx * o + ux * w * s, pz = z + nz * o + uz * w * s; for (const yy of [y + 0.1, y + 0.9]) if (facCoperto(B, px, pz, yy)) return false; }
   return true;
 }
+/* the shop sign with its window is free of everything, like a door (Carlo 9/11): is the span s0..s1 of the run, from height y, over a front's sign? (R.vt: [from, to, top of the sign]) */
+function facSotto(R, s0, s1, y) { return (R.vt || []).some(q => q[2] !== undefined && s1 > q[0] && s0 < q[1] && y < q[2]); }
 // does this wall look onto a street? (front cells); a courtyard (a hole of the plan) never does
 function facFronte(ax, az, cx, cz, nx, nz) {
   for (const f of [0.25, 0.5, 0.75]) { const mx = ax + (cx - ax) * f, mz = az + (cz - az) * f; for (const d of [3, 7, 11, 15]) if (onAnyRoad(mx + nx * d, mz + nz * d, 1.0)) return true; }
@@ -12691,8 +13133,8 @@ function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gr
     const st = w.sh === 'pe' ? (h0 < 0.12 ? 1 : h0 < 0.2 ? 2 : 0) : 0;
     out.push({ x: p[0], y: yF + lo, z: p[1], nx, nz, w: ww, h: hi - lo, D: facDepth(sty.S, w), old: sty.S.band === 'A', fr: COL(w.fr), wc: wallCol, sh: w.sh, shc: COL(w.shc || '#888'), st, tl: 0.15 + hashRnd(h0 * 91) * 0.55,
       sill: w.sill ? COL(w.sill) : null, mul: !w.rib && w.w > 0.75, rib: !!w.rib, fins: !!w.fins, bow: !!w.bow, lit: hashRnd(h0 * 17 + 3) });
-    const ux = nz, uz = -nx;
-    if (w.bal && !gro) {
+    const ux = nz, uz = -nx, p0s = s0 + w.u * bw;
+    if (w.bal && !gro && !facSotto(R, s0 + w.bal.u0 * bw, s0 + w.bal.u1 * bw, yF - 0.2)) { /* no balcony over a sign */
       const b = w.bal, bx0 = s0 + b.u0 * bw, bx1 = s0 + b.u1 * bw, q = at((bx0 + bx1) / 2), nastro = b.u0 <= 0.001 && b.u1 >= 0.999;
       const libero = facBalLibero(null, q[0], q[1], nx, nz, bx1 - bx0, b.d, yF); /* over another volume: only the railing at the French window, no balcony (Carlo 8/11, via Farga) */
       bal.push({ x: q[0], y: yF, z: q[1], nx, nz, w: bx1 - bx0, d: libero ? b.d : 0.12, rail: b.rail, rc: b.rc ? COL(b.rc) : wallCol.clone().multiplyScalar(0.92), sl: !nastro || j === 0, sr: !nastro || j === R.n - 1 });
@@ -12700,7 +13142,7 @@ function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gr
       if (hb < 0.35) det.push({ k: 'pot', x: q[0] + ux * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nx * (b.d - 0.3), y: yF, z: q[1] + uz * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nz * (b.d - 0.3), nx, nz, R: FAC_R });
       if ((fam === 'pal' || fam === 'alto' || fam === 'vil') && sty.S.band !== 'D' && hb > 0.82) det.push({ k: 'awn', x: p[0], y: yF + hi + 0.25, z: p[1], nx, nz, w: Math.min(bx1 - bx0, ww + 1.2), d: Math.min(b.d, 1.2), c: hashRnd(hb * 13), R: FAC_RB });
       if ((fam === 'pal' || fam === 'alto') && hb > 0.7 && hb < 0.76) det.push({ k: 'dish', x: q[0] + ux * (bx1 - bx0) * 0.4 + nx * (b.d - 0.05), y: yF + 1.15, z: q[1] + uz * (bx1 - bx0) * 0.4 + nz * (b.d - 0.05), nx, nz, R: FAC_RB });
-    } else if (!gro || fam !== 'corte') {
+    } else if ((!gro || fam !== 'corte') && !facSotto(R, p0s - 0.7, p0s + 0.7, yF + lo)) {
       const ha = hashRnd(h0 * 29 + 5), pAC = fam === 'pal' || fam === 'alto' ? (sty.S.band === 'D' ? 0.02 : 0.08) : fam === 'vil' || fam === 'corte' ? 0.04 : 0.03;
       if (ha < pAC && !w.rib && !w.cw) { const sd = ha < pAC / 2 ? 1 : -1, off = ww / 2 + (w.sh === 'pe' ? ww / 2 : 0) + 0.55; det.push({ k: 'ac', x: p[0] + ux * off * sd, y: yF + lo + 0.25, z: p[1] + uz * off * sd, nx, nz, R: FAC_R }); }
       else if (fam === 'corte' && w.sill && ha > 0.85) det.push({ k: 'pot', x: p[0] + nx * 0.06, y: yF + lo, z: p[1] + nz * 0.06, nx, nz, s: 0.6, R: FAC_R });
@@ -12712,6 +13154,7 @@ function facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, kind) {
   /* the balconies of the corner bays (ang) and the small stone ones of the piano nobile (bc): 3D only */
   const o = kind === 'ang' ? sty.S.ang : sty.S.bc, p = R.at(s0 + bw / 2), bal = T.fbal || (T.fbal = []);
   const w = kind === 'ang' ? bw * 0.86 : Math.min(bw * 0.5, 1.8);
+  if (facSotto(R, s0 + bw / 2 - w / 2, s0 + bw / 2 + w / 2, F0 + FL * k - 0.2)) return; /* none over a sign */
   if (!facBalLibero(null, p[0], p[1], e[3], e[4], w, o.d, F0 + FL * k)) return; /* over another volume: none */
   bal.push({ x: p[0], y: F0 + FL * k, z: p[1], nx: e[3], nz: e[4], w, d: o.d, rail: o.rail, rc: COL(o.rc || '#e6e0d0'), sl: true, sr: true });
 }
@@ -13039,6 +13482,27 @@ function facPinkBand(T, B, rings, top, F0) {
 }
 { const udnF = updDayNight; updDayNight = function (dt) { udnF(dt); facTick(); }; } /* every frame, after the light of the day: the 3D windows round the camera */
 
+// ---------------------------------------------------------------- snow (fase 3): it comes with the weather, not with the season (in Brianza it snows a few days a winter)
+// The weather 'neve' (weather3.js) lets the flakes fall round the camera and WX.neve grows: what faces up turns white (lawns and roofs first, the streets less, the
+// traffic clears them), the faces that look sideways stay as they are. When it stops, the snow melts in some minutes (sooner under the rain). Shader only: every
+// Lambert material of MAT and RO_MAT takes the same few lines, with its own share (NEVE_K). ?neve=1 in the link starts with snow falling and the town white
+const NEVE = { u: { value: 0 } };
+const NEVE_K = { asph: 0.42, asphS: 0.42, paved: 0.42, pavedS: 0.42, deck: 0.42, mark: 0.42, water: 0, crown: 0, crownSemp: 0, trunk: 0, lamp: 0, lampHead: 0, kerb: 0.6, side: 0.75 };
+function neveMat(m, k) {
+  if (!m || !m.isMeshLambertMaterial || m.userData.neve || k <= 0) return; m.userData.neve = k;
+  const prev = m.onBeforeCompile, ck = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
+  m.onBeforeCompile = (s, r) => {
+    if (prev) prev.call(m, s, r);
+    s.uniforms.uNeve = NEVE.u;
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNeve;').replace('#include <color_fragment>', `#include <color_fragment>
+  if ( uNeve > 0.0 ) { vec3 nvN = normalize( cross( dFdx( vViewPosition ), dFdy( vViewPosition ) ) ), nvU = normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz );
+    float nvF = smoothstep( 0.5, 0.85, dot( nvN, nvU ) ) * clamp( uNeve * ${k.toFixed(2)} * 1.25 - 0.25 * ( 1.0 - dot( diffuseColor.rgb, vec3( 0.33 ) ) ), 0.0, 1.0 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.86, 0.89, 0.93 ), nvF ); }`);
+  };
+  m.customProgramCacheKey = () => ck + '|neve'; m.needsUpdate = true;
+}
+for (const M of [MAT, RO_MAT]) for (const k in M) neveMat(M[k], NEVE_K[k] ?? 1);
+
 function updVisuals(dt) {
   heliDraw(dt);
   const cx = camera.position.x, cz = camera.position.z;
@@ -13182,21 +13646,21 @@ function cheatFerari() { // on foot: a Ferari right in front of you; driving: wh
   }
   toast('🏎 Ferari!');
 }
-const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), HELI: cheatHeli };
+const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), NEVE: () => setWeather('neve', true), ESTATE: () => stagioneImposta('estate'), INVERNO: () => stagioneImposta('inverno'), PRIMAVERA: () => stagioneImposta('primavera'), AUTUNNO: () => stagioneImposta('autunno'), STAGIONE: () => stagioneImposta(null), HELI: cheatHeli };
 let last = performance.now(), acc = 0;
 function frame(t) {
   requestAnimationFrame(frame);
   const m_ = DEBUG ? dbgBegin(t) : null;
   let dt = Math.min(0.1, (t - last) / 1000); last = t;
   pollPad();
-  if (running && !paused && !TELE) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); if (DEBUG) for (const v of [...VEH, ...HELIS]) if (v.health < 100 && !v.exploded) v.health = 100; acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
-  else if (!running) { now += dt; P.h += dt * 0.08; } // slow orbit behind the title
+  if ((running || titolo) && !paused && !TELE) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); if (DEBUG) for (const v of [...VEH, ...HELIS]) if (v.health < 100 && !v.exploded) v.health = 100; acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
+  if (titolo) titoloTick();
   if (m_) dbgMk(m_, 'sim');
   { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (m_) dbgMk(m_, 'tile'); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   if (m_) dbgMk(m_, 'sim');
-  const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;
-  updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);
-  updCamera(running ? dt : dt * 0.4); updGlow(); updSkyFx(running && !paused ? dt : 0);
+  const ipol = (running || titolo) && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;
+  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt); updDebugHud((running || titolo) && !paused ? dt : 0);
+  updCamera(dt); updGlow(); updSkyFx((running || titolo) && !paused ? dt : 0);
   if (running) { updHud(dt); updAudio(); updSfx(dt); }
   if (m_) dbgMk(m_, 'vis');
   const g_ = m_ ? dbgGpuBegin() : 0;
@@ -13206,14 +13670,15 @@ function frame(t) {
   if (m_) dbgEnd(m_);
 }
 function startGame() {
-  if (running) return; running = true; if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
+  if (!running && tFade !== 2) { if (!tFade) { tFade = 1; $('fade').classList.add('on'); audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume(); /* the sound is made while the click still counts as a gesture */ setTimeout(() => { tFade = 2; startGame(); }, 340); } return; } /* GIOCA: the screen goes dark first, the camera cut happens under it */
+  if (running) return; running = true; titoloFine(); if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
   camInit = false; banner(META.partenza.via, META.partenza.comune); setTimeout(() => { if (P.mode === 'foot') toast('Entra nella Ferari! (' + (GP.seen ? (GP.ps ? '△' : 'Y') : 'F') + ')'); }, 1600);
 }
 $('go').addEventListener('click', startGame);
-function boot(saved) { setupWorld(saved || {}); vetrinaShader(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
+function boot(saved) { setupWorld(saved || {}); vetrinaShader(); titoloIniz(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'GIOCA'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { facAggiorna, FAC_STATO, FAC_PARTS, facCoperto, facBalLibero, HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, GATE_ANG, gateVivo, gateAnta, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { facAggiorna, FAC_STATO, FAC_PARTS, facCoperto, facBalLibero, HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, GATE_ANG, gateVivo, gateAnta, barBreak, breakGate, breakProp, PROP_FALL, CADUTA, FALL, staccaAnta, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>
