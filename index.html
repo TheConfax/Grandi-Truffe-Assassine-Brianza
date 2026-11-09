@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo threejs · dopo d632792a · assemblato 09/11 03:51 · porta ' + location.port;
+    const txt = 'locale · ramo threejs · dopo 33a7f45b · assemblato 09/11 03:51 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -12216,15 +12216,17 @@ const WX_STATES = {
   pioggia: { cloud: 0.95, rain: 0.6, fog: 0, icon: '🌧', msg: 'Comincia a piovere: strada bagnata, frena prima' },
   temporale: { cloud: 1, rain: 1, fog: 0, icon: '⛈', msg: 'Temporale sulla Brianza!' },
   nebbia: { cloud: 0.5, rain: 0, fog: 1, icon: '🌫', msg: 'Nebbia in Brianza: non si vede a un palmo dal naso' },
+  neve: { cloud: 0.95, rain: 0, fog: 0.3, snow: 1, icon: '❄️', msg: 'Nevica sulla Brianza' }, /* fase 3, neve3.js: only from a grey winter sky (WX_NEXT), or ?neve=1, or the code NEVE */
 };
 const WX_NEXT = { // where the weather goes next, by weight
   sereno: { sereno: 3, nuvoloso: 5, nebbia: 1.5 }, nuvoloso: { sereno: 4, nuvoloso: 1, pioggia: 4, temporale: 1 },
-  pioggia: { nuvoloso: 5, pioggia: 3, temporale: 2 }, temporale: { pioggia: 6, nuvoloso: 4 }, nebbia: { sereno: 5, nuvoloso: 5 },
+  pioggia: { nuvoloso: 5, pioggia: 3, temporale: 2 }, temporale: { pioggia: 6, nuvoloso: 4 }, nebbia: { sereno: 5, nuvoloso: 5 }, neve: { neve: 2, nuvoloso: 5, sereno: 1 },
 };
-Object.assign(WX, { state: 'sereno', icon: WX_STATES.sereno.icon, t: 300, drift: 0, thunderT: 15, sky: -1 });
+if (STAG_DOY < 60 || STAG_DOY > 340) WX_NEXT.nuvoloso.neve = 0.5; /* it may snow from mid-December to February, now and then */
+Object.assign(WX, { state: 'sereno', icon: WX_STATES.sereno.icon, t: 300, drift: 0, thunderT: 15, sky: -1, snow: 0, neve: 0 });
 function setWeather(st, now_) {
   WX.state = st; WX.t = 240 + rnd() * 360; const S = WX_STATES[st]; WX.icon = S.icon;
-  if (now_) { WX.cloud = S.cloud; WX.rain = S.rain; WX.fog = S.fog; WX.wet = S.rain ? 1 : 0; skyT = -1; }
+  if (now_) { WX.cloud = S.cloud; WX.rain = S.rain; WX.fog = S.fog; WX.wet = S.rain ? 1 : 0; WX.snow = S.snow || 0; if (S.snow) WX.neve = 1; skyT = -1; }
   if (running) toast(S.icon + ' ' + S.msg);
 }
 function updWeather(dt) {
@@ -12237,6 +12239,9 @@ function updWeather(dt) {
   WX.cloud = ap(WX.cloud, S.cloud, 1 / 40);
   WX.rain = ap(WX.rain, WX.cloud > 0.8 ? S.rain : 0, 1 / 25); // no rain before the sky is grey
   WX.fog = ap(WX.fog, S.fog, 1 / 45);
+  if (!WX.nvInit) { WX.nvInit = true; if (/[?&]neve=1/.test(location.search)) setWeather('neve', true); }
+  WX.snow = ap(WX.snow, WX.cloud > 0.8 ? S.snow || 0 : 0, 1 / 25); /* snow on the ground: white in about two minutes of snowfall, gone in some minutes, sooner in the rain */
+  WX.neve = WX.snow > 0.2 ? Math.min(1, WX.neve + dt * WX.snow / 110) : Math.max(0, WX.neve - dt * (1 + 3 * WX.rain) / 420); NEVE.u.value = WX.neve;
   WX.wet = WX.rain > 0.05 ? Math.min(1, WX.wet + dt / 50) : Math.max(0, WX.wet - dt / 200); // soaked in under a minute, dry in a few
   RIF.wet.value = WX.wet; /* the wet asphalt of riflessi3.js: darker, smoother, sharper reflections of the sky and the sun (fase 3) */
   WX.flash = Math.max(0, WX.flash - dt * 4);
@@ -12296,15 +12301,16 @@ function updSkyFx(dt) {
     c.s.material.opacity = c.o * (0.55 + 0.45 * WX.cloud) * (1 - WX.fog); c.s.material.color.copy(col).multiplyScalar(1 + WX.flash);
   });
   // rain streaks, slanted by the wind and stretched by the car's own speed
-  const n = Math.round(RAIN_N * Math.min(1, WX.rain * 1.4)); RAIN.geometry.setDrawRange(0, n * 2); RAIN.material.opacity = 0.32 + 0.2 * WX.rain;
+  const sn = WX.snow > WX.rain, n = Math.round(RAIN_N * Math.min(1, Math.max(WX.rain * 1.4, WX.snow * 1.2))); RAIN.geometry.setDrawRange(0, n * 2); RAIN.material.opacity = sn ? 0.85 : 0.32 + 0.2 * WX.rain; RAIN.material.color.set(sn ? 0xf4f6fa : 0xc4ccd6); /* snow: slow white flakes */
   RAIN.visible = n > 0; if (!n) return;
   // drops live in world space, wrapped into the box round the camera; a streak points back along the drop's speed relative to the car
-  const v = P.mode === 'car' ? P.car : null, wx = (v ? v.vx : 0) - 2.2, wz = (v ? v.vz : 0) - 1.0, fall = 16 * dt, a = RAIN.geometry.attributes.position, A = a.array;
+  const v = P.mode === 'car' ? P.car : null, wx = (v ? v.vx : 0) - 2.2, wz = (v ? v.vz : 0) - 1.0, fall = (sn ? 1.4 : 16) * dt, a = RAIN.geometry.attributes.position, A = a.array, tt = performance.now() / 1000;
   const wrap = (q, B) => ((q % B) + B) % B - B / 2;
   for (let i = 0; i < n; i++) {
     let y = RAIN_P[i * 3 + 1] - fall; if (y < 0) y += RAIN_BOX[1]; RAIN_P[i * 3 + 1] = y;
     RAIN_P[i * 3] += 2.2 * dt; RAIN_P[i * 3 + 2] += 1.0 * dt; // wind
     const x = cp.x + wrap(RAIN_P[i * 3] - cp.x, RAIN_BOX[0]), z = cp.z + wrap(RAIN_P[i * 3 + 2] - cp.z, RAIN_BOX[2]), yy = cp.y - 12 + y;
+    if (sn) { const sw = Math.sin(tt * 1.3 + i) * 0.35, x2 = x + sw, z2 = z + Math.cos(tt * 1.1 + i * 1.7) * 0.35; A[i * 6] = x2; A[i * 6 + 1] = yy; A[i * 6 + 2] = z2; A[i * 6 + 3] = x2 + 0.03; A[i * 6 + 4] = yy + 0.05; A[i * 6 + 5] = z2; continue; }
     A[i * 6] = x; A[i * 6 + 1] = yy; A[i * 6 + 2] = z; A[i * 6 + 3] = x + wx * 0.05; A[i * 6 + 4] = yy + 0.85; A[i * 6 + 5] = z + wz * 0.05;
   }
   a.needsUpdate = true;
@@ -13461,6 +13467,27 @@ function facPinkBand(T, B, rings, top, F0) {
 }
 { const udnF = updDayNight; updDayNight = function (dt) { udnF(dt); facTick(); }; } /* every frame, after the light of the day: the 3D windows round the camera */
 
+// ---------------------------------------------------------------- snow (fase 3): it comes with the weather, not with the season (in Brianza it snows a few days a winter)
+// The weather 'neve' (weather3.js) lets the flakes fall round the camera and WX.neve grows: what faces up turns white (lawns and roofs first, the streets less, the
+// traffic clears them), the faces that look sideways stay as they are. When it stops, the snow melts in some minutes (sooner under the rain). Shader only: every
+// Lambert material of MAT and RO_MAT takes the same few lines, with its own share (NEVE_K). ?neve=1 in the link starts with snow falling and the town white
+const NEVE = { u: { value: 0 } };
+const NEVE_K = { asph: 0.42, asphS: 0.42, paved: 0.42, pavedS: 0.42, deck: 0.42, mark: 0.42, water: 0, crown: 0, crownSemp: 0, trunk: 0, lamp: 0, lampHead: 0, kerb: 0.6, side: 0.75 };
+function neveMat(m, k) {
+  if (!m || !m.isMeshLambertMaterial || m.userData.neve || k <= 0) return; m.userData.neve = k;
+  const prev = m.onBeforeCompile, ck = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
+  m.onBeforeCompile = (s, r) => {
+    if (prev) prev.call(m, s, r);
+    s.uniforms.uNeve = NEVE.u;
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNeve;').replace('#include <color_fragment>', `#include <color_fragment>
+  if ( uNeve > 0.0 ) { vec3 nvN = normalize( cross( dFdx( vViewPosition ), dFdy( vViewPosition ) ) ), nvU = normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz );
+    float nvF = smoothstep( 0.5, 0.85, dot( nvN, nvU ) ) * clamp( uNeve * ${k.toFixed(2)} * 1.25 - 0.25 * ( 1.0 - dot( diffuseColor.rgb, vec3( 0.33 ) ) ), 0.0, 1.0 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.86, 0.89, 0.93 ), nvF ); }`);
+  };
+  m.customProgramCacheKey = () => ck + '|neve'; m.needsUpdate = true;
+}
+for (const M of [MAT, RO_MAT]) for (const k in M) neveMat(M[k], NEVE_K[k] ?? 1);
+
 function updVisuals(dt) {
   heliDraw(dt);
   const cx = camera.position.x, cz = camera.position.z;
@@ -13604,7 +13631,7 @@ function cheatFerari() { // on foot: a Ferari right in front of you; driving: wh
   }
   toast('🏎 Ferari!');
 }
-const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), HELI: cheatHeli };
+const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), NEVE: () => setWeather('neve', true), HELI: cheatHeli };
 let last = performance.now(), acc = 0;
 function frame(t) {
   requestAnimationFrame(frame);

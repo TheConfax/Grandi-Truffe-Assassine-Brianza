@@ -607,14 +607,14 @@ rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'
 
 # ---- weather: clouds, rain, thunderstorms and fog; codes SOLE, NUVOLE, PIOGGIA, TEMPORALE, NEBBIA
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'weather3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
-rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'facciate3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'facciate3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'neve3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")  # neve3.js: snow on what faces up (fase 3)
 rep("// ---------------------------------------------------------------- renderer\n", open(os.path.join(HERE, 'foto3_colori.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- renderer\n")
 rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script type="importmap">\n{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.186.1/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }\n</script>')  # three.js 0.186.1: the module and its addons (the sky of foto3.js); the addons import 'three' through the map, one copy of three
 rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt); luceEsp();")  # luceEsp: the exposure, after the weather (luce3.js)
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
 rep("v -= 21 * dt * i.brk;", "v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
 rep("updGlow();", "updGlow(); updSkyFx((running || titolo) && !paused ? dt : 0);")
-rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), HELI: cheatHeli };")
+rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), NEVE: () => setWeather('neve', true), HELI: cheatHeli };")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')
