@@ -5,8 +5,7 @@
 // but not as much as the light. The season comes from the true date (the shops' clock does the same), or from the link: ?stagione=primavera|estate|autunno|inverno.
 // The hours of the day stay the game's (sunrise and sunset as before): the season changes how high the sun climbs, the colour of the light and the haze
 const LUCE = (() => {
-  const st = (new URLSearchParams(location.search).get('stagione') || '').toLowerCase(), now = new Date();
-  const doy = { primavera: 110, estate: 196, autunno: 288, inverno: 15 }[st] ?? Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 864e5);
+  const doy = STAG_DOY; /* stagioni3.js: the true date or ?stagione= */
   const D = Math.PI / 180, lat = 45.66 * D, decl = 23.44 * D * Math.sin(2 * Math.PI * (284 + doy) / 365);
   const e = 0.5 + 0.5 * Math.sin(decl) / Math.sin(23.44 * D); // 0 at the winter solstice, 1 at the summer one
   const aut = Math.max(0, Math.sin(2 * Math.PI * (doy - 200) / 365)); // late summer and autumn: the low golden haze of September-November

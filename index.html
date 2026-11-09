@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo threejs · dopo a64e25ef · assemblato 09/11 03:50 · porta ' + location.port;
+    const txt = 'locale · ramo threejs · dopo d632792a · assemblato 09/11 03:51 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -5024,14 +5024,14 @@ function buildCemetery(T, G) {
   const slabs_ = mk(TOMB_G, lam(0xb8b4ac), tombs, (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.14, t[1]));
   T.tombeM = [slabs_, mk(STONE_G, lam(0x8e8a84), tombs.map(t => [t[0] - Math.sin(t[2]) * 0.95, t[1] + Math.cos(t[2]) * 0.95, t[2]]), (t, p) => p.set(t[0], H.ground(t[0], t[1]) + 0.5, t[1]))]; tombeNascoste(T); // headstone at the head end; the broken ones stay broken
   if (cyps.length) { // the cypresses are trees like the others: the plain stem and the crown of TREE_G (leaf tufts), stretched to a narrow column (height th, crown td across, as the narrow DSM trees above)
-    const trunks = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, cyps.length), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crown, cyps.length), sc2 = new THREE.Vector3(), e2 = new THREE.Euler();
+    const trunks = new THREE.InstancedMesh(TREE_G.trunkS, MAT.trunk, cyps.length), crowns = new THREE.InstancedMesh(TREE_G.crown, MAT.crownSemp, cyps.length), sc2 = new THREE.Vector3(), e2 = new THREE.Euler();
     cyps.forEach((c, i) => {
       const x = c[0], z = c[1], gy = H.ground(x, z), h = trHash(x, z), th = 7.5 + 3 * h, td = 2.2 + 0.6 * trHash(z, x), yb = Math.min(th - 1.2, Math.max(0.5, Math.min(0.15 * th, th - 0.55 * td))), hc = th - yb;
       const sx = td / 5.4, sy = hc / 4.5, yc = th - 2.5 * sy, tw = clamp(Math.min(Math.sqrt(th / 7), 0.4 * td), 0.5, 1.8);
       qq.identity(); m.compose(pp.set(x, gy, z), qq, sc2.set(tw, yb + 0.5 * hc, tw)); trunks.setMatrixAt(i, m); /* the plain stem: the branches of the tall trunk come out of so narrow a crown */
       qq.setFromEuler(e2.set(0, h * TAU * 7, 0)); m.compose(pp.set(x, gy + yc, z), qq, sc2.set(sx, sy, sx)); crowns.setMatrixAt(i, m); crowns.setColorAt(i, COL('#3d5a34'));
     });
-    trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns);
+    trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH_SEMP; G.add(trunks, crowns); /* evergreen: stagioni3.js */
   }
 }
 
@@ -5238,6 +5238,64 @@ function roCespugliGeo() {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   const uv = []; for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] * 1.5 + 0.5, pos[i + 1] * 1.5 + pos[i + 2] * 0.7);
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); _roCesp = g; return g;
+}
+
+// ---------------------------------------------------------------- the seasons on the map (fase 3): the leaves of the trees and the grass follow the day of the year
+// The day is the true date (as the shops' clock and the light of luce3.js), or the link: ?stagione=primavera|estate|autunno|inverno. Brianza's broadleaves:
+// from mid-September the crowns turn, each tree on its own (yellow, orange, a few red), at their fullest in late October; in November the leaves fall, from
+// December to the end of March the crowns are bare twigs (a few oaks keep some dry brown leaves), in April-May the new leaves are a light yellow-green.
+// The cypresses keep their green (MAT.crownSemp). The grass goes duller and yellower in autumn and winter, fresher in spring. Shader only, nothing rebuilt
+const STAG_DOY = (() => {
+  const st = (new URLSearchParams(location.search).get('stagione') || '').toLowerCase(), now = new Date();
+  return { primavera: 110, estate: 196, autunno: 298, inverno: 15 }[st] ?? Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 864e5);
+})();
+const STAG = (() => {
+  const d = STAG_DOY, ramp = (a, b) => clamp((d - a) / (b - a), 0, 1);
+  const aut = ramp(255, 292) * (1 - ramp(316, 336)), bare = Math.max(ramp(310, 336), 1 - ramp(78, 108)), spring = ramp(92, 108) * (1 - ramp(140, 168));
+  return { aut, bare, spring, u: { value: new THREE.Vector3(aut, bare, spring) } };
+})();
+const STAG_VERT = s => s.replace('#include <common>', '#include <common>\nvarying float vStH;').replace('#include <begin_vertex>', `#include <begin_vertex>
+#ifdef USE_INSTANCING
+  vStH = fract( sin( dot( instanceMatrix[ 3 ].xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+#else
+  vStH = 0.5;
+#endif`);
+const STAG_FRAG_DECL = '\nuniform vec3 uStag;\nvarying float vStH;\n';
+// the leaves that are gone (autumn's fall, winter's bare twigs): the same cut in the colour pass and in the shadow pass
+const STAG_FALL = `
+#ifdef USE_MAP
+  { float stF = uStag.y * ( vStH > 0.86 ? 0.6 : 1.0 ); vec2 stQ = vMapUv * 26.0; float stC = fract( sin( dot( floor( stQ ) + vStH * 17.0, vec2( 7.13, 3.71 ) ) ) * 91.37 );
+    vec2 stR = fract( stQ ) - 0.5; float stTw = step( abs( stR.x + stR.y * ( stC - 0.5 ) * 1.6 ), 0.09 ); /* a twig across the cell, at a random slant */
+    if ( stC < stF * 0.93 || ( uStag.y > 0.5 && vStH <= 0.86 && stTw < 0.5 ) ) discard; }
+#endif`;
+function stagCrown(m, sempre) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (s, r) => {
+    if (prev) prev.call(m, s, r); if (sempre) return;
+    s.uniforms.uStag = STAG.u; s.vertexShader = STAG_VERT(s.vertexShader);
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <color_fragment>', `#include <color_fragment>
+  { float stL = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ), stT = vStH;
+    float stA = uStag.x * smoothstep( 0.0, 0.4, uStag.x * 1.25 - stT * 0.25 ); /* some trees turn later than others */
+    vec3 stAu = stT < 0.5 ? vec3( 0.92, 0.66, 0.14 ) : stT < 0.82 ? vec3( 0.93, 0.40, 0.08 ) : vec3( 0.70, 0.15, 0.06 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, stAu * stL * 2.1, stA * 0.88 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 1.2, 1.38, 0.6 ), uStag.z ); /* spring: the new leaves, light and yellower */
+    diffuseColor.rgb = mix( diffuseColor.rgb, stT > 0.86 ? vec3( 0.42, 0.27, 0.13 ) * ( 0.6 + stL ) : vec3( 0.09, 0.075, 0.06 ), uStag.y ); /* winter: twigs, and the dry leaves of some oaks */
+  }` + STAG_FALL);
+  };
+  const ck = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.customProgramCacheKey = () => ck + (sempre ? '|semp' : '|stag'); m.needsUpdate = true;
+}
+function stagDepth(m) { // the shadow of a crown loses the same leaves
+  m.onBeforeCompile = s => { s.uniforms.uStag = STAG.u; s.vertexShader = STAG_VERT(s.vertexShader); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <alphatest_fragment>', '#include <alphatest_fragment>' + STAG_FALL); };
+  m.customProgramCacheKey = () => 'stag-depth'; m.needsUpdate = true;
+}
+// the cypresses (evergreen) get a crown and a shadow of their own, untouched
+MAT.crownSemp = MAT.crown.clone(); MAT.crownSemp.onBeforeCompile = MAT.crown.onBeforeCompile; stagCrown(MAT.crownSemp, true);
+const TREE_DEPTH_SEMP = TREE_DEPTH.clone();
+stagCrown(MAT.crown, false); stagDepth(TREE_DEPTH);
+// the grass: duller and yellower in autumn and winter, fresher in spring (a tint on the photo, the same on every lawn)
+{
+  const t = new THREE.Color(1, 1, 1).lerp(new THREE.Color(1.08, 0.9, 0.66), STAG.aut * 0.8).lerp(new THREE.Color(1.12, 0.8, 0.5), STAG.bare * 0.9).lerp(new THREE.Color(1.05, 1.12, 0.72), STAG.spring);
+  for (const M of [MAT, RO_MAT]) for (const k in M) { const m = M[k]; if (m && m.isMaterial && m.map === grassTex && k !== 'hedge') m.color.multiply(t); }
 }
 
 // ---------------------------------------------------------------- materials and generators shared by the game (banchine, parcheggi, arredi dei parchi)
@@ -11544,8 +11602,7 @@ function updCamera(dt) {
 // but not as much as the light. The season comes from the true date (the shops' clock does the same), or from the link: ?stagione=primavera|estate|autunno|inverno.
 // The hours of the day stay the game's (sunrise and sunset as before): the season changes how high the sun climbs, the colour of the light and the haze
 const LUCE = (() => {
-  const st = (new URLSearchParams(location.search).get('stagione') || '').toLowerCase(), now = new Date();
-  const doy = { primavera: 110, estate: 196, autunno: 288, inverno: 15 }[st] ?? Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 864e5);
+  const doy = STAG_DOY; /* stagioni3.js: the true date or ?stagione= */
   const D = Math.PI / 180, lat = 45.66 * D, decl = 23.44 * D * Math.sin(2 * Math.PI * (284 + doy) / 365);
   const e = 0.5 + 0.5 * Math.sin(decl) / Math.sin(23.44 * D); // 0 at the winter solstice, 1 at the summer one
   const aut = Math.max(0, Math.sin(2 * Math.PI * (doy - 200) / 365)); // late summer and autumn: the low golden haze of September-November
