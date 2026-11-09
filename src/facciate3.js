@@ -215,7 +215,7 @@ const FAC_ATLAS = (() => {
     if (sp.lg) put(0, [0.5 - sp.lg.w / 2 / t + 0.004, 0.5 + sp.lg.w / 2 / t - 0.004, 0.004, v(2.6)]);
   });
   const tex = new THREE.CanvasTexture(C); tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const msk = new THREE.CanvasTexture(M); msk.encoding = THREE.LinearEncoding; msk.anisotropy = tex.anisotropy;
+  const msk = new THREE.CanvasTexture(M); msk.colorSpace = THREE.NoColorSpace; msk.anisotropy = tex.anisotropy;
   const mt = new THREE.DataTexture(meta, 8, FAC_ROWS * FAC_COLS, THREE.RGBAFormat, THREE.FloatType); mt.minFilter = mt.magFilter = THREE.NearestFilter; mt.needsUpdate = true;
   return { tex, msk, meta: mt, n: FAC_CELLS.length };
 })();
@@ -269,7 +269,7 @@ bool facIn(vec2 f, int c, int k) {
   diffuseColor *= texelColor;`)
     .replace('#include <color_fragment>', `
 #ifdef USE_COLOR
-  { float tm = facM.b; vec3 tc = mix( vec3( 1.0 ), vColor, clamp( tm * 2.0, 0.0, 1.0 ) ); tc *= 1.0 - 0.18 * step( 0.25, tm ) * ( 1.0 - clamp( abs( tm - 0.5 ) * 2.0, 0.0, 1.0 ) ); diffuseColor.rgb *= tc; }
+  { float tm = facM.b; vec3 tc = mix( vec3( 1.0 ), vColor.rgb, clamp( tm * 2.0, 0.0, 1.0 ) ); tc *= 1.0 - 0.18 * step( 0.25, tm ) * ( 1.0 - clamp( abs( tm - 0.5 ) * 2.0, 0.0, 1.0 ) ); diffuseColor.rgb *= tc; }
 #endif
   { vec3 tg = normalize( vec3( -vWNrm.z, 0.0, vWNrm.x ) + 1e-5 ); vec2 puv = vec2( dot( vWPos, tg ), vWPos.y ) / 1.8;
     diffuseColor.rgb *= 1.0 + ( texture2D( uPlaster, puv ).r - 0.5 ) * 1.1 * clamp( facM.b * 2.0 - 0.6, 0.0, 1.0 ); }

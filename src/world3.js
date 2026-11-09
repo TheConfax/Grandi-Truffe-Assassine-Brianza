@@ -758,7 +758,7 @@ const TREE_LEAF = (() => {
     mips.push({ data: d, width: w, height: w });
   }
   const t = new THREE.DataTexture(d0, S, S, THREE.RGBAFormat); t.mipmaps = mips; t.generateMipmaps = false;
-  t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.encoding = THREE.sRGBEncoding; t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); t.needsUpdate = true;
+  t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); t.needsUpdate = true;
   return t;
 })();
 const barkTex = canvasTex(64, 128, (g, w, h) => { g.fillStyle = '#e0dad0'; g.fillRect(0, 0, w, h); for (let i = 0; i < 260; i++) { const v = 170 + rnd() * 85 | 0; g.fillStyle = `rgb(${v},${v - 6},${v - 14})`; g.fillRect(rnd() * w, rnd() * h, 1, 6 + rnd() * 22); } });
@@ -793,7 +793,7 @@ Object.assign(MAT, { gravel: flatMat({ map: gravelTex }), gravelS: new THREE.Mes
 let FONDO_ = null;
 function fondoLook(m) {
   if (!FONDO_) {
-    const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t; };
+    const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
     const mk = (map, vs) => ({ S: new THREE.MeshLambertMaterial({ map }), F: flatMat({ map }), vs });
     FONDO_ = { g: mk(ld('ghiaia'), 2.5), t: mk(ld('terra'), 2.6), n: mk(ld('pavimento'), 3), b: { S: MAT.side, F: flatMat({ map: sidewalkTex }), vs: 4 }, f: { S: MAT.piazzaS, F: MAT.piazza, vs: 4 },
       c: mk(ciottoliTex, 4), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
@@ -880,8 +880,8 @@ const AO_WALL = s => { // chained after the lit windows' patch of extras.js, in 
   float aoW = mix(0.45, 1.0, smoothstep(0.0, 2.0, vAoD.x)) * mix(0.72, 1.0, smoothstep(0.0, 0.9, vAoD.y)) * mix(0.5, 1.0, smoothstep(0.0, 1.8, min(vAoD.z, vAoD.w)));
   reflectedLight.indirectDiffuse *= aoW; reflectedLight.directDiffuse *= mix(1.0, aoW, 0.35);`);
 };
-const AO_GROUND_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
-AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n float fogF = smoothstep( fogNear, fogFar, fogDepth );\n gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 1.0 ), fogF );\n#endif'); }; // fades to nothing in the haze
+const AO_GROUND_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, premultipliedAlpha: true, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n float fogF = smoothstep( fogNear, fogFar, vFogDepth );\n gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 1.0 ), fogF );\n#endif'); }; // fades to nothing in the haze
 const AO_K = [[0, 0.2], [0.45, 0.5], [1.6, 1]]; // distance from the wall, shade (linear: multiplied on the screen, 0.2 darkens by half)
 // no shade over a pit (a ramp, an underpass, the stairs of the station): a triangle of the strip with a corner in it went down to its floor, one that crossed it
 // stood over the hole at the street's level. The dark bands across the floor and the walls of the station stairs, and the grey sheets over the hole (Carlo 3/11)
@@ -923,8 +923,8 @@ const FAC_WALL = s => {
   const plaster = '0.25 * ( texture2D( map, vec2( 0.03, 0.86 ) ) + texture2D( map, vec2( 0.5, 0.95 ) ) + texture2D( map, vec2( 0.97, 0.9 ) ) + texture2D( map, vec2( 0.3, 0.99 ) ) )';
   s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFac;')
     .replace('void main() {', 'void main() {\n  float facF = floor( vUv.y ), facW = step( vFac.x - 0.5, facF ) * step( facF, vFac.y + 0.5 ) * step( vFac.z, vUv.y );')
-    .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('texture2D( map, vUv )', `mix( ${plaster}, texture2D( map, vUv ), facW )`) + '\n  diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;')
-    .replace('#include <emissivemap_fragment>', THREE.ShaderChunk.emissivemap_fragment.replace('texture2D( emissiveMap, vUv )', '( texture2D( emissiveMap, vUv ) * facW )'))
+    .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('texture2D( map, vMapUv )', `mix( ${plaster}, texture2D( map, vMapUv ), facW )`) + '\n  diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;')
+    .replace('#include <emissivemap_fragment>', THREE.ShaderChunk.emissivemap_fragment.replace('texture2D( emissiveMap, vEmissiveMapUv )', '( texture2D( emissiveMap, vEmissiveMapUv ) * facW )'))
     .replace('texture2D( emissiveMap, vUv ).r', '( texture2D( emissiveMap, vUv ).r * facW )');
 };
 function addSill(b, x, y, z, ux, uz, nx, nz, W = 0.58) { // a stone sill 1.16 m long (W half of it) sticking 10 cm out of the wall: top, front and underside only (6 triangles)
@@ -2600,7 +2600,7 @@ const GATE_MAT = new THREE.MeshLambertMaterial({ color: 0x33413a, map: GATE_TEX,
 /* the double wooden door of an androne (kind 'w', Carlo 8/11): opaque vertical planks, dark brown, a rail across the middle */
 const WOOD_MAT = (() => { const c = document.createElement('canvas'); c.width = 128; c.height = 128; const x = c.getContext('2d');
   for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#6e4a2c' : '#654329'; x.fillRect(i * 16, 0, 16, 128); x.fillStyle = '#3d2716'; x.fillRect(i * 16, 0, 1.5, 128); }
-  x.fillStyle = '#4b3220'; x.fillRect(0, 22, 128, 7); x.fillRect(0, 98, 128, 7); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding;
+  x.fillStyle = '#4b3220'; x.fillRect(0, 22, 128, 7); x.fillRect(0, 98, 128, 7); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
   return new THREE.MeshLambertMaterial({ map: t, side: THREE.DoubleSide }); })();
 /* A leaf of a gate (androni-3, Carlo 8/11) is a door on its hinges: rammed over the blow of the objects (props3.js FORZA: a driveway gate and a
    wooden door as the 'medio' objects, a garden wicket as the 'leggero' ones) it swings wide open the way it was pushed and stays so; under it the

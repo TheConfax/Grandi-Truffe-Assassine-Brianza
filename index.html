@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo e9e36269 · assemblato 09/11 02:33 · porta ' + location.port;
+    const txt = 'locale · ramo threejs · dopo c8dc4caf · assemblato 09/11 02:53 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -193,9 +193,28 @@ body:not(.debug) .dbg { display: none !important; }
   const pv = document.getElementById('pver'); pv.textContent = txt; pv.hidden = false;
 })().catch(() => { }); // offline or inside claude.ai: no version line
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.186.1/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }
+</script>
 <script type="module">
+import * as THREE_NS from 'three';
+import { Sky as THREE_SKY } from 'three/addons/objects/Sky.js';
+// three.js 0.186.1, loaded as a module through the import map (assemble3.py). The game was written on r128, where three was a global: THREE is a copy of
+// the module's namespace (a module namespace is frozen, and foto3_colori.js swaps THREE.CanvasTexture), and window.THREE stays for the test scripts
+const THREE = Object.assign({}, THREE_NS, { Sky: THREE_SKY }); window.THREE = THREE;
+{
+  // r128 made every InstancedMesh with frustumCulled = false; r186 culls it on a sphere round its instances computed once, so what moves after (objects knocked
+  // down, pieces of barrier) would vanish. pezzi3.js puts its own culling sphere (cullS) on the tiles, as before
+  const IM = THREE.InstancedMesh;
+  THREE.InstancedMesh = class extends IM { constructor(...a) { super(...a); this.frustumCulled = false; } };
+  // our shaders were written on r128's chunks: vUv (now vMapUv when only a map is used) and mapTexelToLinear (gone: the hardware decodes sRGB textures)
+  THREE.ShaderChunk.common += '\n#define mapTexelToLinear( a ) a\n';
+  // r128 lit without physicallyCorrectLights multiplied every light by π, then the Lambert divided by π: the intensities of the game are written for that.
+  // r186 has no such mode, and the whole scene came out about three times darker (the wood black at noon): the Lambert keeps r128's scale
+  THREE.ShaderChunk.lights_lambert_pars_fragment = THREE.ShaderChunk.lights_lambert_pars_fragment.replaceAll('BRDF_Lambert( material.diffuseColor )', 'material.diffuseColor');
+  THREE.ShaderChunk.uv_pars_fragment += '\n#if defined( USE_MAP ) && !defined( USE_UV ) && !defined( USE_ANISOTROPY )\n#define vUv vMapUv\n#endif\n';
+}
+
 // =====================================================================
 //  GRANDI TRUFFE ASSASSINE · BRIANZA · open-world driving on the real OSM map of Meda (MB)
 // =====================================================================
@@ -261,17 +280,12 @@ const BLDR = new Grid(24); /* raised volumes (porticati, passages): the camera m
 const BLD = new Grid(24);     // building polygons (point-in-building)
 
 // ---------------------------------------------------------------- foto: light computed in linear space (ramo fotorealismo)
-// every colour of the game is written in sRGB (0xrrggbb, '#rrggbb', canvas textures), but light only adds up right in linear space:
-// hex and css colours are converted on the way in, read back in sRGB (canvas styles made from them), canvas textures are decoded,
-// and the renderer encodes the image at the end. three.js does all this by itself from r152; this is r128
+// every colour of the game is written in sRGB (0xrrggbb, '#rrggbb', canvas textures), but light only adds up right in linear space.
+// On r128 this file converted hex and css colours by hand; three.js 0.186 does it by itself (ColorManagement), and doing it twice made the
+// whole town near black. What is left: the canvas textures are drawn in sRGB, so they are decoded (colorSpace, r128's encoding)
 {
-  const C = THREE.Color.prototype, sh = C.setHex, ss = C.setStyle, gh = C.getHex, gs = C.getStyle, tmp = new THREE.Color(); let inStyle = false;
-  C.setHex = function (h) { sh.call(this, h); return inStyle ? this : this.convertSRGBToLinear(); };
-  C.setStyle = function (s) { inStyle = true; try { ss.call(this, s); } finally { inStyle = false; } return this.convertSRGBToLinear(); }; // a colour name goes through setHex: once only
-  C.getHex = function () { return gh.call(tmp.copy(this).convertLinearToSRGB()); };
-  C.getStyle = function () { return gs.call(tmp.copy(this).convertLinearToSRGB()); };
   const CT = THREE.CanvasTexture;
-  THREE.CanvasTexture = class extends CT { constructor(...a) { super(...a); this.encoding = THREE.sRGBEncoding; } };
+  THREE.CanvasTexture = class extends CT { constructor(...a) { super(...a); this.colorSpace = THREE.SRGBColorSpace; } };
 }
 
 // ---------------------------------------------------------------- renderer
@@ -279,7 +293,7 @@ const canvas = document.getElementById('gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, stencil: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.4, 7000);
 function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
@@ -2657,7 +2671,7 @@ const TREE_LEAF = (() => {
     mips.push({ data: d, width: w, height: w });
   }
   const t = new THREE.DataTexture(d0, S, S, THREE.RGBAFormat); t.mipmaps = mips; t.generateMipmaps = false;
-  t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.encoding = THREE.sRGBEncoding; t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); t.needsUpdate = true;
+  t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); t.needsUpdate = true;
   return t;
 })();
 const barkTex = canvasTex(64, 128, (g, w, h) => { g.fillStyle = '#e0dad0'; g.fillRect(0, 0, w, h); for (let i = 0; i < 260; i++) { const v = 170 + rnd() * 85 | 0; g.fillStyle = `rgb(${v},${v - 6},${v - 14})`; g.fillRect(rnd() * w, rnd() * h, 1, 6 + rnd() * 22); } });
@@ -2692,7 +2706,7 @@ Object.assign(MAT, { gravel: flatMat({ map: gravelTex }), gravelS: new THREE.Mes
 let FONDO_ = null;
 function fondoLook(m) {
   if (!FONDO_) {
-    const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t; };
+    const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
     const mk = (map, vs) => ({ S: new THREE.MeshLambertMaterial({ map }), F: flatMat({ map }), vs });
     FONDO_ = { g: mk(ld('ghiaia'), 2.5), t: mk(ld('terra'), 2.6), n: mk(ld('pavimento'), 3), b: { S: MAT.side, F: flatMat({ map: sidewalkTex }), vs: 4 }, f: { S: MAT.piazzaS, F: MAT.piazza, vs: 4 },
       c: mk(ciottoliTex, 4), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
@@ -2779,8 +2793,8 @@ const AO_WALL = s => { // chained after the lit windows' patch of extras.js, in 
   float aoW = mix(0.45, 1.0, smoothstep(0.0, 2.0, vAoD.x)) * mix(0.72, 1.0, smoothstep(0.0, 0.9, vAoD.y)) * mix(0.5, 1.0, smoothstep(0.0, 1.8, min(vAoD.z, vAoD.w)));
   reflectedLight.indirectDiffuse *= aoW; reflectedLight.directDiffuse *= mix(1.0, aoW, 0.35);`);
 };
-const AO_GROUND_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
-AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n float fogF = smoothstep( fogNear, fogFar, fogDepth );\n gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 1.0 ), fogF );\n#endif'); }; // fades to nothing in the haze
+const AO_GROUND_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, premultipliedAlpha: true, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+AO_GROUND_MAT.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n float fogF = smoothstep( fogNear, fogFar, vFogDepth );\n gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 1.0 ), fogF );\n#endif'); }; // fades to nothing in the haze
 const AO_K = [[0, 0.2], [0.45, 0.5], [1.6, 1]]; // distance from the wall, shade (linear: multiplied on the screen, 0.2 darkens by half)
 // no shade over a pit (a ramp, an underpass, the stairs of the station): a triangle of the strip with a corner in it went down to its floor, one that crossed it
 // stood over the hole at the street's level. The dark bands across the floor and the walls of the station stairs, and the grey sheets over the hole (Carlo 3/11)
@@ -2822,8 +2836,8 @@ const FAC_WALL = s => {
   const plaster = '0.25 * ( texture2D( map, vec2( 0.03, 0.86 ) ) + texture2D( map, vec2( 0.5, 0.95 ) ) + texture2D( map, vec2( 0.97, 0.9 ) ) + texture2D( map, vec2( 0.3, 0.99 ) ) )';
   s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFac;')
     .replace('void main() {', 'void main() {\n  float facF = floor( vUv.y ), facW = step( vFac.x - 0.5, facF ) * step( facF, vFac.y + 0.5 ) * step( vFac.z, vUv.y );')
-    .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('texture2D( map, vUv )', `mix( ${plaster}, texture2D( map, vUv ), facW )`) + '\n  diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;')
-    .replace('#include <emissivemap_fragment>', THREE.ShaderChunk.emissivemap_fragment.replace('texture2D( emissiveMap, vUv )', '( texture2D( emissiveMap, vUv ) * facW )'))
+    .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('texture2D( map, vMapUv )', `mix( ${plaster}, texture2D( map, vMapUv ), facW )`) + '\n  diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;')
+    .replace('#include <emissivemap_fragment>', THREE.ShaderChunk.emissivemap_fragment.replace('texture2D( emissiveMap, vEmissiveMapUv )', '( texture2D( emissiveMap, vEmissiveMapUv ) * facW )'))
     .replace('texture2D( emissiveMap, vUv ).r', '( texture2D( emissiveMap, vUv ).r * facW )');
 };
 function addSill(b, x, y, z, ux, uz, nx, nz, W = 0.58) { // a stone sill 1.16 m long (W half of it) sticking 10 cm out of the wall: top, front and underside only (6 triangles)
@@ -4499,7 +4513,7 @@ const GATE_MAT = new THREE.MeshLambertMaterial({ color: 0x33413a, map: GATE_TEX,
 /* the double wooden door of an androne (kind 'w', Carlo 8/11): opaque vertical planks, dark brown, a rail across the middle */
 const WOOD_MAT = (() => { const c = document.createElement('canvas'); c.width = 128; c.height = 128; const x = c.getContext('2d');
   for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#6e4a2c' : '#654329'; x.fillRect(i * 16, 0, 16, 128); x.fillStyle = '#3d2716'; x.fillRect(i * 16, 0, 1.5, 128); }
-  x.fillStyle = '#4b3220'; x.fillRect(0, 22, 128, 7); x.fillRect(0, 98, 128, 7); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding;
+  x.fillStyle = '#4b3220'; x.fillRect(0, 22, 128, 7); x.fillRect(0, 98, 128, 7); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
   return new THREE.MeshLambertMaterial({ map: t, side: THREE.DoubleSide }); })();
 /* A leaf of a gate (androni-3, Carlo 8/11) is a door on its hinges: rammed over the blow of the objects (props3.js FORZA: a driveway gate and a
    wooden door as the 'medio' objects, a garden wicket as the 'leggero' ones) it swings wide open the way it was pushed and stays so; under it the
@@ -9135,7 +9149,7 @@ function fusiGiro(o) { const K = o.children; for (let i = 0; i < K.length; i++) 
 function fusiDisegna(F, SF) { // F, SF: what the camera and the sun see (pezzi3.js)
   const L = FUSI.lista, K = scene.children, sf = FUSI.sf; for (let i = 0; i < L.length; i++) L[i].n = 0;
   for (let i = 0; i < K.length; i++) { const c = K[i]; if (!c.fRadice || !c.visible) continue; sf.center.setFromMatrixPosition(c.matrixWorld); if (!F.intersectsSphere(sf) && !(SF && SF.intersectsSphere(sf))) continue; fusiGiro(c); }
-  for (let i = 0; i < L.length; i++) { const l = L[i], m = l.m; m.count = l.n; m.visible = l.n > 0; if (!l.n) continue; const a = m.instanceMatrix; a.updateRange.count = l.n * 16; a.needsUpdate = true; if (l.col) { const b = m.instanceColor; b.updateRange.count = l.n * 3; b.needsUpdate = true; } }
+  for (let i = 0; i < L.length; i++) { const l = L[i], m = l.m; m.count = l.n; m.visible = l.n > 0; if (!l.n) continue; const a = m.instanceMatrix; a.clearUpdateRanges(); a.addUpdateRange(0, l.n * 16); a.needsUpdate = true; if (l.col) { const b = m.instanceColor; b.clearUpdateRanges(); b.addUpdateRange(0, l.n * 3); b.needsUpdate = true; } }
 }
 
 const _geo = {};
@@ -12245,7 +12259,7 @@ Promise.all(['prato', 'terreno'].map(f => new Promise(ok => { const i = new Imag
   incoltoTex.image = cv; incoltoTex.repeat.set(.75, .75); incoltoTex.needsUpdate = true; /* 16 m a repeat (UV every 12 m) */
 });
 // output in sRGB, through a filmic curve: highlights roll off instead of clipping
-renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
 // the sky: three's Preetham model (Sky.js r128, loaded beside three.min.js), with the sun's disc and the glow round it, the blue
 // deepening overhead and paling to the horizon, red and orange at sunset. It is drawn first, over the old gradient, and fades out
 // at night, under cloud and in fog, where the gradient (greyed by the weather) takes over. The haze takes the sky's colour at the
@@ -12255,8 +12269,9 @@ const FOTO_SKY = (() => {
   const s = new THREE.Sky(), m = s.material;
   Object.assign(m.uniforms, { uSkyK: { value: 0.13 }, uSkyA: { value: 1 }, uSkyS: { value: 1.8 } }); // exposure, opacity, saturation (the filmic curve greys a bright sky)
   m.uniforms.turbidity.value = 2; m.uniforms.rayleigh.value = 2.5; m.uniforms.mieCoefficient.value = 0.003; m.uniforms.mieDirectionalG.value = 0.8;
-  m.fragmentShader = m.fragmentShader.replace('const vec3 cameraPos = vec3( 0.0, 0.0, 0.0 );', '#define cameraPos cameraPosition\nuniform float uSkyK;\nuniform float uSkyA;\nuniform float uSkyS;') // the box goes with the camera
-    .replace('gl_FragColor = vec4( retColor, 1.0 );', 'gl_FragColor = vec4( max( mix( vec3( dot( retColor, vec3( 0.2126, 0.7152, 0.0722 ) ) ), retColor, uSkyS ), 0.0 ) * vec3( 0.86, 0.95, 1.16 ) * uSkyK, uSkyA );'); // saturated, the model leans to teal: the tint takes it back towards blue
+  m.uniforms.cloudCoverage.value = 0; /* r186's Sky draws clouds of its own: none, the weather has its own */
+  m.fragmentShader = m.fragmentShader.replace('uniform float time;', 'uniform float time;\nuniform float uSkyK;\nuniform float uSkyA;\nuniform float uSkyS;\nvarying float vSunfade;') // r186's Sky already looks from cameraPosition (the box goes with the camera)
+    .replace('gl_FragColor = vec4( texColor, 1.0 );', 'vec3 retColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );\n gl_FragColor = vec4( max( mix( vec3( dot( retColor, vec3( 0.2126, 0.7152, 0.0722 ) ) ), retColor, uSkyS ), 0.0 ) * vec3( 0.86, 0.95, 1.16 ) * uSkyK, uSkyA );'); // saturated, the model leans to teal: the tint takes it back towards blue
   Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, fog: false }); // opaque list, drawn first, blended on the gradient
   s.scale.setScalar(SKY_R * 1.6); s.renderOrder = -100; s.frustumCulled = false; scene.add(s);
   const probe = new THREE.Mesh(s.geometry, Object.assign(m.clone(), { uniforms: m.uniforms, blending: THREE.NoBlending })); probe.scale.copy(s.scale); probe.frustumCulled = false;
@@ -12794,7 +12809,7 @@ const FAC_ATLAS = (() => {
     if (sp.lg) put(0, [0.5 - sp.lg.w / 2 / t + 0.004, 0.5 + sp.lg.w / 2 / t - 0.004, 0.004, v(2.6)]);
   });
   const tex = new THREE.CanvasTexture(C); tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const msk = new THREE.CanvasTexture(M); msk.encoding = THREE.LinearEncoding; msk.anisotropy = tex.anisotropy;
+  const msk = new THREE.CanvasTexture(M); msk.colorSpace = THREE.NoColorSpace; msk.anisotropy = tex.anisotropy;
   const mt = new THREE.DataTexture(meta, 8, FAC_ROWS * FAC_COLS, THREE.RGBAFormat, THREE.FloatType); mt.minFilter = mt.magFilter = THREE.NearestFilter; mt.needsUpdate = true;
   return { tex, msk, meta: mt, n: FAC_CELLS.length };
 })();
@@ -12848,7 +12863,7 @@ bool facIn(vec2 f, int c, int k) {
   diffuseColor *= texelColor;`)
     .replace('#include <color_fragment>', `
 #ifdef USE_COLOR
-  { float tm = facM.b; vec3 tc = mix( vec3( 1.0 ), vColor, clamp( tm * 2.0, 0.0, 1.0 ) ); tc *= 1.0 - 0.18 * step( 0.25, tm ) * ( 1.0 - clamp( abs( tm - 0.5 ) * 2.0, 0.0, 1.0 ) ); diffuseColor.rgb *= tc; }
+  { float tm = facM.b; vec3 tc = mix( vec3( 1.0 ), vColor.rgb, clamp( tm * 2.0, 0.0, 1.0 ) ); tc *= 1.0 - 0.18 * step( 0.25, tm ) * ( 1.0 - clamp( abs( tm - 0.5 ) * 2.0, 0.0, 1.0 ) ); diffuseColor.rgb *= tc; }
 #endif
   { vec3 tg = normalize( vec3( -vWNrm.z, 0.0, vWNrm.x ) + 1e-5 ); vec2 puv = vec2( dot( vWPos, tg ), vWPos.y ) / 1.8;
     diffuseColor.rgb *= 1.0 + ( texture2D( uPlaster, puv ).r - 0.5 ) * 1.1 * clamp( facM.b * 2.0 - 0.6, 0.0, 1.0 ); }

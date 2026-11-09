@@ -47,5 +47,5 @@ function fusiGiro(o) { const K = o.children; for (let i = 0; i < K.length; i++) 
 function fusiDisegna(F, SF) { // F, SF: what the camera and the sun see (pezzi3.js)
   const L = FUSI.lista, K = scene.children, sf = FUSI.sf; for (let i = 0; i < L.length; i++) L[i].n = 0;
   for (let i = 0; i < K.length; i++) { const c = K[i]; if (!c.fRadice || !c.visible) continue; sf.center.setFromMatrixPosition(c.matrixWorld); if (!F.intersectsSphere(sf) && !(SF && SF.intersectsSphere(sf))) continue; fusiGiro(c); }
-  for (let i = 0; i < L.length; i++) { const l = L[i], m = l.m; m.count = l.n; m.visible = l.n > 0; if (!l.n) continue; const a = m.instanceMatrix; a.updateRange.count = l.n * 16; a.needsUpdate = true; if (l.col) { const b = m.instanceColor; b.updateRange.count = l.n * 3; b.needsUpdate = true; } }
+  for (let i = 0; i < L.length; i++) { const l = L[i], m = l.m; m.count = l.n; m.visible = l.n > 0; if (!l.n) continue; const a = m.instanceMatrix; a.clearUpdateRanges(); a.addUpdateRange(0, l.n * 16); a.needsUpdate = true; if (l.col) { const b = m.instanceColor; b.clearUpdateRanges(); b.addUpdateRange(0, l.n * 3); b.needsUpdate = true; } }
 }

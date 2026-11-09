@@ -17,7 +17,7 @@ def cut(a, b, new):
 # ---- module script + async data load with progress
 rep('<script id="mapdata" type="application/json">/*__MAP__*/</script>\n', '')
 rep("""<script>
-'use strict';""", """<script type="module">""")
+'use strict';""", """<script type="module">\n""" + open(os.path.join(HERE, 'three186.js'), encoding='utf-8').read())  # three.js 0.186.1 as a module: the import map is where r128's tag was
 rep("const D = JSON.parse(document.getElementById('mapdata').textContent);", """const goBtn = document.getElementById('go');
 /* the world comes in pieces (pezzi3.js, docs/motore.md "Caricamento a pezzi"): at the start only what must be whole, mappa/globale.bin (the road graph, names, points of interest,
    railways, what the bake decided on the whole map) and mappa/suolo.bin (the 10 m ground of all the playable zone). They are always checked with the server (cache 'no-cache');
@@ -609,7 +609,7 @@ rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'weather3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'facciate3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("// ---------------------------------------------------------------- renderer\n", open(os.path.join(HERE, 'foto3_colori.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- renderer\n")
-rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>')  # the sky of foto3.js
+rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script type="importmap">\n{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.186.1/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }\n</script>')  # three.js 0.186.1: the module and its addons (the sky of foto3.js); the addons import 'three' through the map, one copy of three
 rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
 rep("v -= 21 * dt * i.brk;", "v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
