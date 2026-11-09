@@ -1,17 +1,32 @@
 // ---------------------------------------------------------------- the seasons on the map (fase 3): the leaves of the trees and the grass follow the day of the year
-// The day is the true date (as the shops' clock and the light of luce3.js), or the link: ?stagione=primavera|estate|autunno|inverno. Brianza's broadleaves:
+// The day is the true date (as the shops' clock and the light of luce3.js), or the link: ?stagione=primavera|estate|autunno|inverno or ?data=GG-MM (any day),
+// or the codes ESTATE, INVERNO, PRIMAVERA, AUTUNNO during the game (STAGIONE goes back to the true date). All goes day by day, not in four steps. Brianza's broadleaves:
 // from mid-September the crowns turn, each tree on its own (yellow, orange, a few red), at their fullest in late October; in November the leaves fall, from
 // December to the end of March the crowns are bare twigs (a few oaks keep some dry brown leaves), in April-May the new leaves are a light yellow-green.
 // The cypresses keep their green (MAT.crownSemp). The grass goes duller and yellower in autumn and winter, fresher in spring. Shader only, nothing rebuilt
-const STAG_DOY = (() => {
-  const st = (new URLSearchParams(location.search).get('stagione') || '').toLowerCase(), now = new Date();
-  return { primavera: 110, estate: 196, autunno: 298, inverno: 15 }[st] ?? Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 864e5);
+const STAG_GIORNI = { primavera: 110, estate: 196, autunno: 298, inverno: 15 }; // a day in the middle of each season, for the link and the codes
+const stagOggi = () => { const now = new Date(); return Math.round((now - new Date(now.getFullYear(), 0, 0)) / 864e5 - 0.5); }; /* round: the hour of daylight saving */
+let STAG_DOY = (() => {
+  const q = new URLSearchParams(location.search), st = (q.get('stagione') || '').toLowerCase(), dm = /^(\d{1,2})-(\d{1,2})$/.exec(q.get('data') || '');
+  if (dm) { const y = new Date().getFullYear(); return Math.round((new Date(y, +dm[2] - 1, +dm[1]) - new Date(y, 0, 0)) / 864e5); } /* ?data=GG-MM */
+  return STAG_GIORNI[st] ?? stagOggi();
 })();
-const STAG = (() => {
+const STAG = { aut: 0, bare: 0, spring: 0, u: { value: new THREE.Vector3() } };
+function stagCalcola() { // the leaves and the grass of the day STAG_DOY
   const d = STAG_DOY, ramp = (a, b) => clamp((d - a) / (b - a), 0, 1);
-  const aut = ramp(255, 292) * (1 - ramp(316, 336)), bare = Math.max(ramp(310, 336), 1 - ramp(78, 108)), spring = ramp(92, 108) * (1 - ramp(140, 168));
-  return { aut, bare, spring, u: { value: new THREE.Vector3(aut, bare, spring) } };
-})();
+  STAG.aut = ramp(255, 292) * (1 - ramp(316, 336)); STAG.bare = Math.max(ramp(310, 336), 1 - ramp(78, 108)); STAG.spring = ramp(92, 108) * (1 - ramp(140, 168));
+  STAG.u.value.set(STAG.aut, STAG.bare, STAG.spring);
+  // the grass: duller and yellower in autumn and winter, fresher in spring (a tint on the photo, the same on every lawn)
+  const t = new THREE.Color(1, 1, 1).lerp(new THREE.Color(1.08, 0.9, 0.66), STAG.aut * 0.8).lerp(new THREE.Color(1.12, 0.8, 0.5), STAG.bare * 0.9).lerp(new THREE.Color(1.05, 1.12, 0.72), STAG.spring);
+  for (const M of [MAT, RO_MAT]) for (const k in M) { const m = M[k]; if (m && m.isMaterial && m.map === grassTex && k !== 'hedge') { if (!m.userData.stagBase) m.userData.stagBase = m.color.clone(); m.color.copy(m.userData.stagBase).multiply(t); } }
+}
+stagCalcola();
+// during the game: the codes ESTATE, INVERNO, PRIMAVERA, AUTUNNO (nome) and STAGIONE (null: the true date); light (luce3.js), map and snow chance follow at once
+function stagioneImposta(nome) {
+  STAG_DOY = nome ? STAG_GIORNI[nome] : stagOggi(); stagCalcola(); luceCalcola(); WX_NEXT.nuvoloso.neve = STAG_DOY < 60 || STAG_DOY > 340 ? 0.5 : 0; skyT = -1;
+  const p = n => String(n).padStart(2, '0'), g = new Date(new Date().getFullYear(), 0, STAG_DOY);
+  toast((nome ? 'Stagione: ' + nome : 'Stagione vera: ' + LUCE.nome) + ' (' + p(g.getDate()) + '/' + p(g.getMonth() + 1) + ')');
+}
 const STAG_VERT = s => s.replace('#include <common>', '#include <common>\nvarying float vStH;').replace('#include <begin_vertex>', `#include <begin_vertex>
 #ifdef USE_INSTANCING
   vStH = fract( sin( dot( instanceMatrix[ 3 ].xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
@@ -50,8 +65,3 @@ function stagDepth(m) { // the shadow of a crown loses the same leaves
 MAT.crownSemp = MAT.crown.clone(); MAT.crownSemp.onBeforeCompile = MAT.crown.onBeforeCompile; stagCrown(MAT.crownSemp, true);
 const TREE_DEPTH_SEMP = TREE_DEPTH.clone();
 stagCrown(MAT.crown, false); stagDepth(TREE_DEPTH);
-// the grass: duller and yellower in autumn and winter, fresher in spring (a tint on the photo, the same on every lawn)
-{
-  const t = new THREE.Color(1, 1, 1).lerp(new THREE.Color(1.08, 0.9, 0.66), STAG.aut * 0.8).lerp(new THREE.Color(1.12, 0.8, 0.5), STAG.bare * 0.9).lerp(new THREE.Color(1.05, 1.12, 0.72), STAG.spring);
-  for (const M of [MAT, RO_MAT]) for (const k in M) { const m = M[k]; if (m && m.isMaterial && m.map === grassTex && k !== 'hedge') m.color.multiply(t); }
-}

@@ -4,22 +4,19 @@
 // the ground sends back some of what falls on it (albedo 0.2, warm grey). The camera adapts in part, like an eye or a photo: a winter noon is darker than a summer one,
 // but not as much as the light. The season comes from the true date (the shops' clock does the same), or from the link: ?stagione=primavera|estate|autunno|inverno.
 // The hours of the day stay the game's (sunrise and sunset as before): the season changes how high the sun climbs, the colour of the light and the haze
-const LUCE = (() => {
-  const doy = STAG_DOY; /* stagioni3.js: the true date or ?stagione= */
-  const D = Math.PI / 180, lat = 45.66 * D, decl = 23.44 * D * Math.sin(2 * Math.PI * (284 + doy) / 365);
+const LUCE = { doy: 0, nome: '', e: 0, alto: 1, tau: 0.2, wb: new THREE.Color(), fredda: 0, exp: 1, key: 1, day: 1, ghi: 0, dhi: 0, _c: new THREE.Color(), _s: new THREE.Color(), _g: new THREE.Color() };
+function luceCalcola() { // the season's light for the day STAG_DOY (stagioni3.js: the true date, ?stagione=, ?data= or the codes): changes day by day
+  const doy = STAG_DOY, D = Math.PI / 180, lat = 45.66 * D, decl = 23.44 * D * Math.sin(2 * Math.PI * (284 + doy) / 365);
   const e = 0.5 + 0.5 * Math.sin(decl) / Math.sin(23.44 * D); // 0 at the winter solstice, 1 at the summer one
   const aut = Math.max(0, Math.sin(2 * Math.PI * (doy - 200) / 365)); // late summer and autumn: the low golden haze of September-November
-  const nome = doy < 80 || doy >= 355 ? 'inverno' : doy < 172 ? 'primavera' : doy < 266 ? 'estate' : 'autunno';
-  return {
-    doy, nome, e,
+  Object.assign(LUCE, { doy, e, nome: doy < 80 || doy >= 355 ? 'inverno' : doy < 172 ? 'primavera' : doy < 266 ? 'estate' : 'autunno',
     alto: Math.sin(Math.PI / 2 - lat + decl) / Math.sin(Math.PI / 2 - lat), // how high the noon sun is against the equinox one (sin of the height)
     tau: 0.1 + 0.16 * e + 0.04 * aut, // aerosol depth: clear cold winter air, hazy Po-valley summer
-    // the colour of the season's light, on sun and sky by day: winter cold and pale, summer warm, autumn golden, spring neutral and fresh
-    wb: new THREE.Color().setRGB(0.93, 0.975, 1.09).lerp(new THREE.Color().setRGB(1.06, 1.0, 0.91), e).lerp(new THREE.Color().setRGB(1.09, 1.0, 0.84), 0.7 * aut),
-    fredda: 1 - e, // winter light: bluer sky light and shadows
-    exp: 1, key: 1, day: 1, ghi: 0, dhi: 0, _c: new THREE.Color(), _s: new THREE.Color(), _g: new THREE.Color(),
-  };
-})();
+    fredda: 1 - e }); // winter light: bluer sky light and shadows
+  // the colour of the season's light, on sun and sky by day: winter cold and pale, summer warm, autumn golden, spring neutral and fresh
+  LUCE.wb.setRGB(0.93, 0.975, 1.09).lerp(new THREE.Color().setRGB(1.06, 1.0, 0.91), e).lerp(new THREE.Color().setRGB(1.09, 1.0, 0.84), 0.7 * aut);
+}
+luceCalcola();
 const LUCE_K = 2.0, LUCE_RAY = [0.042, 0.072, 0.15], LUCE_AER = [1, 1.08, 1.2]; // overall scale (r128's units, see three186.js), Rayleigh and aerosol depth per colour
 const _luceWb = new THREE.Color();
 function luceGiorno(L) {
