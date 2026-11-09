@@ -13,7 +13,7 @@ Deciso con Carlo il 9/11/2026 notte. I dettagli e lo stato di ogni voce stanno i
 - Terreno ondulato, case che escono come garage, alberi nei cantieri.
 
 ## 2. Estensione della mappa
-- Altri comuni: tutte le regole sono già generali, poi un giro di controllo sulla mappa nuova.
+- Altri comuni: tutte le regole sono già generali, poi un giro di controllo sulla mappa nuova. Le idee di Carlo per i confini sono in `data/confine_gioco/GTA Brianza2.kmz` (fuori da git, accanto a `GTA Brianza.kmz`): "Linea 1" e quattro estensioni possibili ("Estensione?" a ovest, "Estensione2?" a est, "Estensione3?" e "Estensione4?" a sud).
 - Dopo l'estensione, a mappa fissata: srosatura degli edifici (macro-azione) insieme al kit per gli edifici pubblici (scuole, chiese, cappelle dei cimiteri).
 
 ## 3. Gameplay di base
