@@ -94,8 +94,8 @@ def _pct(a, q):
 
 class Grid:
     """A window of the LiDAR lattice (0.00001 deg, PixelIsPoint) over a box in game metres, in memory: DTM, DSM and their difference."""
-    def __init__(self, bounds, pad=30.0, d_dtm=None, d_dsm=None):
-        self.dtm = dq.Lidar(d_dtm); self.dsm = dq.Lidar(d_dsm or os.path.join(dq.DATA, 'terreno', 'lidar_dsm'))
+    def __init__(self, bounds, pad=30.0, d_dtm=None, d_dsm=None, dtm=None, dsm=None):
+        self.dtm = dtm or dq.Lidar(d_dtm); self.dsm = dsm or dq.Lidar(d_dsm or os.path.join(dq.DATA, 'terreno', 'lidar_dsm'))
         L = self.dtm; x0, z0, x1, z1 = bounds
         lonA, latA = dq.game_to_lonlat(x0 - pad, z1 + pad); lonB, latB = dq.game_to_lonlat(x1 + pad, z0 - pad)
         self.c0 = int(math.floor((lonA - L.lon0) / L.sx)); c1 = int(math.ceil((lonB - L.lon0) / L.sx))

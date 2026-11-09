@@ -435,6 +435,7 @@ for wid, (refs, t) in ways.items():
         pts = ring(refs)
         if len(pts) >= 3: land.append((k_, pts))
 log('terreni', len(land), dict(Counter(k.split(':')[0] + (':' + k.split(':')[1] if k.startswith('sport') else '') for k, _ in land)))
+_osm_bosco = [g for at, g in area_geoms if at in (11, 2)]  # OSM's own woods and parks, before WorldCover's come in: VERDE.aree wants wood from the crown only where OSM says wood or park too
 if WC is not None:
     osm_land = presto(lambda ag_: unary_union(ag_).buffer(1), [g for at, g in area_geoms])
     def _wc_fuori(cls_): return _wc_ap[cls_].result().difference(osm_land.result()).difference(_wc_roads.result()).intersection(RECT.buffer(40))  # never over a road
@@ -2163,7 +2164,7 @@ for at, g in area_geoms:
     ok = shapely.contains(g, ptsg) & ~shapely.intersects(roadsU, ptsg) & ~shapely.intersects(bunion, ptsg) & ~shapely.intersects(_railbuf, ptsg) & (np.abs(xs_) <= HW) & (np.abs(zs_) <= HH)
     for x, z in list(zip(xs_[ok], zs_[ok]))[:n]: trees.append((x, z))
 _srt.fine()
-area_geoms, land = VERDE.aree(area_geoms, land, cons=_cons_f.result())  # after OSM's woods got their trees: the scatter outside the DBGT stays as it was
+area_geoms, land = VERDE.aree(area_geoms, land, cons=_cons_f.result(), osm_bosco=_osm_bosco)  # after OSM's woods got their trees: the scatter outside the DBGT stays as it was
 area_geoms, land = MANUF.aree(area_geoms, land)
 log('pois', len(pois), 'places', len(places), 'trees', len(trees), 'crossings', len(crossings))
 # ---- street objects from OSM: [kind, x, z, angle, extra]. The angle follows the nearest street (a bench faces it, a bump lies across it);
