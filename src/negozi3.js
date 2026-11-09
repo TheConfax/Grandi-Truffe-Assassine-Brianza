@@ -967,6 +967,11 @@ function ngFront(s, C) {
   }
 }
 const ngShade = (hex, k) => new THREE.Color(hex).multiplyScalar(k);
+/* how high the sign of a front reaches over the ground (the glass up to Hv, the sign over it), from the model and the height of the wall: the same sums as ngFront0, which the facades ask (nothing of the house may stand over it, Carlo 9/11) */
+function ngSignTop(m, top) {
+  if (top < 2.7) return 0; const bay = m.d === 'g', Hv = clamp(top - (bay ? 1.0 : 1.2), bay ? 2.6 : 2.3, bay ? 3.6 : 2.9), sh = clamp(top - Hv - 0.35, 0, m.s === 'cas' || m.s === 'pan' ? 0.75 : 0.7);
+  return Hv + (sh >= 0.32 && ['pan', 'cas', 'fas', 'let', 'ten'].includes(m.s) ? sh : 0);
+}
 function ngFront0(s, C) {
   const m = s.m, cls = s.cls, W = s.w, hw = W / 2, gy = H.ground(s.cx + s.nx * 0.6, s.cz + s.nz * 0.6), top = s.b.gtop - gy;
   if (top < 2.7) return;

@@ -331,6 +331,8 @@ function facBalLibero(B, x, z, nx, nz, w, d, y) {
   for (const o of [Math.min(0.3, d * 0.5), d * 0.5, d - 0.05]) for (const s of [-0.47, -0.25, 0, 0.25, 0.47]) { const px = x + nx * o + ux * w * s, pz = z + nz * o + uz * w * s; for (const yy of [y + 0.1, y + 0.9]) if (facCoperto(B, px, pz, yy)) return false; }
   return true;
 }
+/* the shop sign with its window is free of everything, like a door (Carlo 9/11): is the span s0..s1 of the run, from height y, over a front's sign? (R.vt: [from, to, top of the sign]) */
+function facSotto(R, s0, s1, y) { return (R.vt || []).some(q => q[2] !== undefined && s1 > q[0] && s0 < q[1] && y < q[2]); }
 // does this wall look onto a street? (front cells); a courtyard (a hole of the plan) never does
 function facFronte(ax, az, cx, cz, nx, nz) {
   for (const f of [0.25, 0.5, 0.75]) { const mx = ax + (cx - ax) * f, mz = az + (cz - az) * f; for (const d of [3, 7, 11, 15]) if (onAnyRoad(mx + nx * d, mz + nz * d, 1.0)) return true; }
@@ -358,8 +360,8 @@ function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gr
     const st = w.sh === 'pe' ? (h0 < 0.12 ? 1 : h0 < 0.2 ? 2 : 0) : 0;
     out.push({ x: p[0], y: yF + lo, z: p[1], nx, nz, w: ww, h: hi - lo, D: facDepth(sty.S, w), old: sty.S.band === 'A', fr: COL(w.fr), wc: wallCol, sh: w.sh, shc: COL(w.shc || '#888'), st, tl: 0.15 + hashRnd(h0 * 91) * 0.55,
       sill: w.sill ? COL(w.sill) : null, mul: !w.rib && w.w > 0.75, rib: !!w.rib, fins: !!w.fins, bow: !!w.bow, lit: hashRnd(h0 * 17 + 3) });
-    const ux = nz, uz = -nx;
-    if (w.bal && !gro) {
+    const ux = nz, uz = -nx, p0s = s0 + w.u * bw;
+    if (w.bal && !gro && !facSotto(R, s0 + w.bal.u0 * bw, s0 + w.bal.u1 * bw, yF - 0.2)) { /* no balcony over a sign */
       const b = w.bal, bx0 = s0 + b.u0 * bw, bx1 = s0 + b.u1 * bw, q = at((bx0 + bx1) / 2), nastro = b.u0 <= 0.001 && b.u1 >= 0.999;
       const libero = facBalLibero(null, q[0], q[1], nx, nz, bx1 - bx0, b.d, yF); /* over another volume: only the railing at the French window, no balcony (Carlo 8/11, via Farga) */
       bal.push({ x: q[0], y: yF, z: q[1], nx, nz, w: bx1 - bx0, d: libero ? b.d : 0.12, rail: b.rail, rc: b.rc ? COL(b.rc) : wallCol.clone().multiplyScalar(0.92), sl: !nastro || j === 0, sr: !nastro || j === R.n - 1 });
@@ -367,7 +369,7 @@ function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gr
       if (hb < 0.35) det.push({ k: 'pot', x: q[0] + ux * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nx * (b.d - 0.3), y: yF, z: q[1] + uz * (bx1 - bx0) * (hashRnd(hb * 7) - 0.5) * 0.8 + nz * (b.d - 0.3), nx, nz, R: FAC_R });
       if ((fam === 'pal' || fam === 'alto' || fam === 'vil') && sty.S.band !== 'D' && hb > 0.82) det.push({ k: 'awn', x: p[0], y: yF + hi + 0.25, z: p[1], nx, nz, w: Math.min(bx1 - bx0, ww + 1.2), d: Math.min(b.d, 1.2), c: hashRnd(hb * 13), R: FAC_RB });
       if ((fam === 'pal' || fam === 'alto') && hb > 0.7 && hb < 0.76) det.push({ k: 'dish', x: q[0] + ux * (bx1 - bx0) * 0.4 + nx * (b.d - 0.05), y: yF + 1.15, z: q[1] + uz * (bx1 - bx0) * 0.4 + nz * (b.d - 0.05), nx, nz, R: FAC_RB });
-    } else if (!gro || fam !== 'corte') {
+    } else if ((!gro || fam !== 'corte') && !facSotto(R, p0s - 0.7, p0s + 0.7, yF + lo)) {
       const ha = hashRnd(h0 * 29 + 5), pAC = fam === 'pal' || fam === 'alto' ? (sty.S.band === 'D' ? 0.02 : 0.08) : fam === 'vil' || fam === 'corte' ? 0.04 : 0.03;
       if (ha < pAC && !w.rib && !w.cw) { const sd = ha < pAC / 2 ? 1 : -1, off = ww / 2 + (w.sh === 'pe' ? ww / 2 : 0) + 0.55; det.push({ k: 'ac', x: p[0] + ux * off * sd, y: yF + lo + 0.25, z: p[1] + uz * off * sd, nx, nz, R: FAC_R }); }
       else if (fam === 'corte' && w.sill && ha > 0.85) det.push({ k: 'pot', x: p[0] + nx * 0.06, y: yF + lo, z: p[1] + nz * 0.06, nx, nz, s: 0.6, R: FAC_R });
@@ -379,6 +381,7 @@ function facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, kind) {
   /* the balconies of the corner bays (ang) and the small stone ones of the piano nobile (bc): 3D only */
   const o = kind === 'ang' ? sty.S.ang : sty.S.bc, p = R.at(s0 + bw / 2), bal = T.fbal || (T.fbal = []);
   const w = kind === 'ang' ? bw * 0.86 : Math.min(bw * 0.5, 1.8);
+  if (facSotto(R, s0 + bw / 2 - w / 2, s0 + bw / 2 + w / 2, F0 + FL * k - 0.2)) return; /* none over a sign */
   if (!facBalLibero(null, p[0], p[1], e[3], e[4], w, o.d, F0 + FL * k)) return; /* over another volume: none */
   bal.push({ x: p[0], y: F0 + FL * k, z: p[1], nx: e[3], nz: e[4], w, d: o.d, rail: o.rail, rc: COL(o.rc || '#e6e0d0'), sl: true, sr: true });
 }

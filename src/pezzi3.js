@@ -237,7 +237,7 @@ async function cuoci() {
   if (COTTURA) {
     // the big supermarkets, the shop fronts and the plain signs need all the buildings: their choices go in the tile of each
     ngSuperTutti(); const ref = b => [b.ti, b.bi];
-    for (const r of ngList()) { const { b, m, big, ...q } = r; (ogni(r.tile).ngf || (ogni(r.tile).ngf = [])).push({ ...q, b: ref(b) }); (ogni(b.ti).ngw || (ogni(b.ti).ngw = [])).push([b.bi, Math.round(r.cx * 100) / 100, Math.round(r.cz * 100) / 100, Math.round(r.w * 100) / 100]); } /* ngw: the fronts on the buildings of each tile, for the facades (facciate 2.0: no window or door under a front) */
+    for (const r of ngList()) { const { b, m, big, ...q } = r; (ogni(r.tile).ngf || (ogni(r.tile).ngf = [])).push({ ...q, b: ref(b) }); (ogni(b.ti).ngw || (ogni(b.ti).ngw = [])).push([b.bi, Math.round(r.cx * 100) / 100, Math.round(r.cz * 100) / 100, Math.round(r.w * 100) / 100, Math.round(ngSignTop(m, r.b.gtop - H.ground(r.cx + r.nx * 0.6, r.cz + r.nz * 0.6)) * 100) / 100]); } /* ngw: the fronts on the buildings of each tile, for the facades (facciate 2.0: no window or door under a front) */
     for (const T of TILES) T.bld.forEach((B, i) => { if (!B.big) return; const { e, front, ...big } = B.big; let fr; if (front) { const { b, big: _b, ...f } = front; fr = { ...f, b: ref(b) }; } (ogni(T.t).sup || (ogni(T.t).sup = [])).push([i, { ...big, front: fr }, B.h]); });
     for (const s of signList()) { if (s.b.lm) continue; const t = tileOf(s.p.x, s.p.z); (ogni(t).sgf || (ogni(t).sgf = [])).push({ ...s, p: D.pois.indexOf(s.p), b: ref(s.b) }); }
     window.__COTTA = JSON.stringify({ pezzi: pz, globale: glob }); // the numbers as they are: a shop draws its look from h0
