@@ -93,26 +93,6 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
 #start .credit { font-size: 15px; color: var(--ink-dim); margin: 0; }
 .ver { font: 13px ui-monospace, monospace !important; color: var(--ink-dim); margin: 0; opacity: .75; } #pause .ver { margin-top: 14px; }
 #start a, #osm a { color: var(--ocra); pointer-events: auto; }
-
-/* Schermata del titolo (Carlo, 8/11): il mondo vivo dietro (sorvolo()), il nome su tre righe con le iniziali in evidenza, GIOCA e OPZIONI. Tutto il resto del vecchio titolo (sottotitolo, tasti, crediti, versione) resta nel codice ma non si vede */
-body:has(#start:not([hidden])) :is(.hud, #osm, #touch, #fx, #dbghud, #pause) { display: none !important; }
-#start { background: linear-gradient(205deg, rgba(255,150,64,.17) 0%, rgba(255,150,64,0) 48%), radial-gradient(ellipse 75% 70% at 50% 52%, rgba(16,10,14,.42) 0%, rgba(16,10,14,.16) 55%, rgba(16,10,14,0) 100%), linear-gradient(180deg, rgba(16,10,14,.35) 0%, rgba(16,10,14,0) 22%, rgba(16,10,14,0) 70%, rgba(16,10,14,.55) 100%); display: grid; place-items: center; overflow: hidden; padding: 0; }
-#start .wrap { max-width: none; width: 100%; justify-items: center; align-content: center; gap: clamp(22px, 5vh, 56px); }
-#start .wrap > :not(.tit):not(.menu) { display: none !important; }
-#start .tit { font-family: var(--display); font-weight: 400; text-align: left; text-transform: uppercase; font-size: clamp(34px, min(10.5vw, 14vh), 140px); line-height: .95; letter-spacing: .01em; color: var(--ocra); margin: 0; text-shadow: 0 6px 0 var(--cotto), 0 10px 30px rgba(0,0,0,.5); }
-#start .tit span { display: block; white-space: nowrap; }
-#start .tit b { font-weight: 400; color: #e4001b; }
-#start .menu { display: grid; gap: 12px; justify-items: stretch; width: min(320px, 78vw); }
-#start .menu button { font-family: var(--body); font-weight: 700; font-size: clamp(22px, 2.6vw, 30px); letter-spacing: .38em; text-indent: .38em; text-transform: uppercase; padding: 12px 20px 11px; border-radius: 2px; border: 1px solid transparent; background: none; color: var(--ink); cursor: pointer; box-shadow: none; transform: none; transition: background .15s, color .15s, opacity .2s; justify-self: stretch; }
-#start .menu #go { background: var(--ocra); color: var(--shade); box-shadow: 0 6px 22px rgba(0,0,0,.4); }
-#start .menu #go:hover:not(:disabled) { background: #ffc85a; transform: none; box-shadow: 0 6px 22px rgba(0,0,0,.4); }
-#start .menu #go:active { transform: translateY(1px); box-shadow: 0 4px 14px rgba(0,0,0,.4); }
-#start .menu #go:disabled { background: rgba(251,245,230,.16); color: rgba(251,245,230,.72); cursor: progress; box-shadow: none; font-size: clamp(16px, 1.9vw, 21px); letter-spacing: .22em; text-indent: .22em; }
-#start .menu #opz { color: rgba(251,245,230,.4); border-color: rgba(251,245,230,.16); background: rgba(14,10,14,.42); cursor: default; }
-/* la riga della versione (#ver sul titolo, #pver in pausa) e' nascosta, non tolta: il codice che la scrive resta (Carlo, 8/11) */
-.ver, #ver, #pver { display: none !important; }
-#fade { position: fixed; inset: 0; z-index: 30; background: #0c0a0d; opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
-#fade.on { opacity: 1; transition-duration: .32s; transition-timing-function: ease-in; }
 #pause { position: fixed; inset: 0; z-index: 9; background: rgba(14,15,20,.8); display: grid; place-items: center; text-align: center; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 #pause h2 { font-family: var(--display); font-size: clamp(36px, 7vw, 64px); margin: 0 0 10px; color: var(--ocra); }
 #pause p { font-size: 19px; margin: 6px 0; }
@@ -150,11 +130,8 @@ body:not(.debug) .dbg { display: none !important; }
 <div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span id="bighint">Rotella o due dita: zoom · trascina: sposta · clic: segnaposto · M: torna in strada</span></div><button id="bigx" aria-label="Chiudi la mappa">×</button></div>
 <div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p><p class="ver" id="pver" hidden></p></div></div>
 
-<div id="fade"></div>
 <div id="start">
   <div class="wrap">
-    <div class="tit" role="heading" aria-level="1"><span><b>G</b>RANDI</span><span><b>T</b>RUFFE</span><span><b>B</b>RIANZA</span></div>
-    <div class="menu"><button id="go" type="button" disabled>CARICO LA BRIANZA…</button><button id="opz" type="button" disabled aria-disabled="true" tabindex="-1">OPZIONI</button></div>
     <h1><b>G</b>RANDI <b>T</b>RUFFE<span><b>A</b>SSASSINE</span><em>BRIANZA</em></h1>
     <p class="sub">Meda, Seveso, Barlassina, Baruccana e Cabiate con le loro strade vere, i dislivelli veri e la Milano-Meda sopraelevata. Ruba un'auto, fai le consegne per i locali e semina la Polizia Locale.</p>
     <div class="keys">
@@ -171,6 +148,7 @@ body:not(.debug) .dbg { display: none !important; }
       <div><kbd>Q</kbd> / <kbd>E</kbd> in moto: peso indietro (impennata col gas) / avanti (stoppie in frenata)</div>
       <div class="dbg"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>
     </div>
+    <button id="go" type="button">ACCENDI IL MOTORE</button>
     <p class="credit">Strade, edifici e locali: dati reali © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licenza ODbL. Altezze degli edifici stimate dove la mappa non le riporta. Quote del terreno: Tarquini S., Isola I., Favalli M., Battistini A., Dotta G. (2023), TINITALY 1.1, INGV, <a href="https://doi.org/10.13127/tinitaly/1.1" target="_blank" rel="noopener">doi:10.13127/tinitaly/1.1</a>, CC BY 4.0. Edifici aggiuntivi e altezze: <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href="https://www.discoradio.it" target="_blank" rel="noopener">Discoradio</a>, stream ufficiale; <a href="https://www.radiomaria.it" target="_blank" rel="noopener">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href="https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy" target="_blank" rel="noopener">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href="https://www.mapillary.com" target="_blank" rel="noopener">Mapillary</a> e i suoi contributori, CC BY-SA 4.0. Foto delle superfici (asfalto, prato, pavimenti, ghiaia, terra, ciottoli, intonaco): <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a> e <a href="https://ambientcg.com" target="_blank" rel="noopener">ambientCG</a>, CC0.</p>
     <p class="ver" id="ver" hidden></p>
   </div>
@@ -179,7 +157,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo e9e36269 · assemblato 09/11 02:33 · porta ' + location.port;
+    const txt = 'locale · ramo varchi-2 · dopo 12d0dfa7 · assemblato 09/11 03:39 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1120,7 +1098,6 @@ function interpEnd(done) { for (const o of done) { const c = o._c, keys = o._pk;
 // the blow (speed times the vehicle's mass, propForza) and on the group of the object (Carlo, 8/11): FORZA.leggero (signs, bollards, meters,
 // bins, benches, columns, the fuel totem) goes at a gentle knock, FORZA.medio (lamp posts, bus shelters, bales, concrete blocks)
 // needs speed and mass; what is never broken has no prop, only its wall. A weaker blow stops the vehicle; on foot nothing breaks.
-// Knocked down, it stays solid as it falls and loses its walls only lying still on the ground (cadutaNuova, below).
 // via: the object is not knocked over but moves (bales roll away, blocks slide) and stands again where it stops, still solid.
 const PROPS = [], PROPG = new Grid(16), PROP_FALL = [], PROP_MOVE = [];
 const FORZA = { leggero: 8.3, medio: 16.7 }; // m/s of a car of mass 1 (a hatchback): 30 and 60 km/h (Carlo, 8/11); a two-wheeler weighs a quarter of it (as in the crashes between vehicles)
@@ -1144,146 +1121,17 @@ const SFONDA = { slow: 0.86, dmg: 2 }; // what a vehicle loses of its speed and 
    rod of its height (angular acceleration 3g/2L times the sine of the tilt), from the turn the blow gave it (FALL.kick times the speed over the
    height); it hits the ground, bounces a little, damped, and lies still. A blow over its threshold also throws its foot forward, a share of the
    vehicle's speed growing with the excess (FALL.spinta), the foot sliding to a stop on the ground (FALL.attrito). One way for everything knocked down */
-const FALL = { kick: 0.22, kickMax: 3, spinta: 0.5, attrito: 6, attritoSteso: 20, rimbalzo: 0.2, fermo: 0.6, steso: Math.PI / 2 - 0.04 }; /* attritoSteso: lying, the whole of it grinds on the ground */
+const FALL = { kick: 0.22, kickMax: 3, spinta: 0.5, attrito: 6, rimbalzo: 0.2, fermo: 0.6, steso: Math.PI / 2 - 0.04 };
 function breakProp(p, v, F) {
-  if (p.broken) return; p.broken = true; p.wall.on = false; for (const w of p.pw || []) w.on = false; /* its standing walls: from now on its walls are those of the fall (cadutaNuova) */
+  if (p.broken) return; p.broken = true; p.wall.on = false; for (const w of p.pw || []) w.on = false;
+  let dx = v ? v.vx : 1, dz = v ? v.vz : 0; const l = hyp(dx, dz) || 1; dx /= l; dz /= l;
+  const axis = new THREE.Vector3(dz, 0, -dx); // tips over along the car's way
   let o = p.obj, m0 = null;
   if (!o && p.inst) { o = new THREE.Object3D(); o.position.set(p.x, p.inst.base, p.z); o.updateMatrix(); m0 = propMatrici(p); } // a pivot at its foot: each instance turns about it from the matrix it had
-  const L = clamp(p.h || 3, 0.8, 9);
-  if (o) cadutaNuova(o, v, F, FORZA[p.forza || 'leggero'], L, propPezzi(p, o, L), m0, p);
+  const L = clamp(p.h || 3, 0.8, 9), sp = v ? v.speed : 0, ecc = F ? clamp(F / FORZA[p.forza || 'leggero'] - 1, 0, 1) : 0;
+  if (o) PROP_FALL.push({ o, p, axis, m0, L, a: 0, w: Math.min(FALL.kickMax, FALL.kick * sp / L) + 0.1, vx: dx * sp * FALL.spinta * ecc, vz: dz * sp * FALL.spinta * ecc, x0: o.position.x, y0: o.position.y, z0: o.position.z, giu: false, t: 0 });
   if (p.onBreak) p.onBreak();
   if (v) propUrto(v);
-}
-/* the pieces of a prop that falls, from the pivot at its foot: its post and its other posts, standing, and what else goes with it (p.pezzi: a level crossing's arm) */
-function propPezzi(p, o, L) {
-  const ox = o.position.x, oz = o.position.z, q = [[p.x - ox, 0, p.z - oz, p.x - ox, L, p.z - oz, p.r]];
-  for (const w of p.pw || []) q.push([w.x - ox, 0, w.z - oz, w.x - ox, L, w.z - oz, w.r]);
-  if (p.pezzi) q.push(...p.pezzi());
-  return q;
-}
-/* WHAT FALLS STAYS SOLID UNTIL IT LIES ON THE GROUND (Carlo, 9/11: "cadono come burro, dovrebbero perdere la collisione solo quando sono completamente a terra").
-   One way for everything knocked down (breakProp, a gate's leaf torn off): the body is a few straight pieces [x0, y0, z0, x1, y1, z1, r] from the pivot
-   at its foot, turned with it; the part of each under CADUTA.alto is in WALLS where it is at that moment, circles at its two ends and a segment between
-   (two along its sides when it is thick), so the walker, every vehicle and the helicopter meet it as any wall. A vehicle meets only the part under
-   CADUTA.auto (its roof): over that the body leans on it (cadutaDentro), the walker meets it up to CADUTA.alto. The vehicle that knocked it down, and any
-   other over its threshold, push it instead (cadutaUrti): the body takes the vehicle's speed along the push and goes on falling ahead of it, the vehicle
-   goes on (it lost its share once, propUrto). Falling or pushed, it stops against a wall or a vehicle (cadutaBloccata) and leans there. Its walls go only
-   once it lies still on the ground (giu) */
-const CADUTA = { auto: 1.5, alto: 2.0, passo: 0.5, grosso: 0.3, urto: 0, margine: 0.05, basso: 0.6 }; /* basso: held still with its top under this (on a kerb, a low wall), it lies on the ground */
-function cadutaNuova(o, v, F, soglia, L, pezzi, m0, p) {
-  let dx = v ? v.vx : 1, dz = v ? v.vz : 0; const l = hyp(dx, dz) || 1; dx /= l; dz /= l; // tips over along the vehicle's way
-  const sp = v ? v.speed : 0, ecc = F ? clamp(F / soglia - 1, 0, 1) : 0, mk = r => ({ r, x: 0, z: 0, dyn: true, on: true, y0: 0, y1: 0, bb: null }), ms = () => ({ ax: 0, az: 0, bx: 0, bz: 0, nx: 0, nz: 0, two: true, dyn: true, on: true, y0: 0, y1: 0, bb: null });
-  const f = { o, p, axis: new THREE.Vector3(dz, 0, -dx), m0, L, a: 0, w: Math.min(FALL.kickMax, FALL.kick * sp / L) + 0.1, vx: dx * sp * FALL.spinta * ecc, vz: dz * sp * FALL.spinta * ecc, x0: o.position.x, y0: o.position.y, z0: o.position.z, giu: false, t: 0,
-    dx, dz, soglia, urtati: new Set(v ? [v.chi || v] : []), attivo: true, muri: [], mie: new Set() };
-  for (const q of pezzi) { const m = { q, ws: [mk(q[6]), mk(q[6]), ms(), ms(), mk(q[6]), mk(q[6]), ms(), ms()] }; f.muri.push(m); for (const w of m.ws) f.mie.add(w); }
-  PROP_FALL.push(f); cadutaMuri(f); return f;
-}
-function cadRuota(f, x, y, z, ca, sa) { /* a point of the body, from its pivot, turned by the fall: [x, y, z] from the pivot */
-  const s = x * f.dx + z * f.dz, t = -x * f.dz + z * f.dx, s2 = s * ca + y * sa;
-  return [f.dx * s2 - f.dz * t, y * ca - s * sa, f.dz * s2 + f.dx * t];
-}
-function cadMuro(w, on, x0, z0, x1, z1) { /* a wall of a falling body in and out of WALLS, where it is now */
-  if (w.bb) { WALLS.del(w.bb[0], w.bb[1], w.bb[2], w.bb[3], w); w.bb = null; }
-  w.on = on; if (on) { w.bb = [x0, z0, x1, z1]; WALLS.add(x0, z0, x1, z1, w); }
-}
-function cadutaMuri(f) {
-  const o = f.o.position, ca = Math.cos(f.a), sa = Math.sin(f.a);
-  for (const m of f.muri) {
-    if (!f.attivo) { for (const w of m.ws) cadMuro(w, false); continue; }
-    const q = m.q, A = cadRuota(f, q[0], q[1], q[2], ca, sa), B = cadRuota(f, q[3], q[4], q[5], ca, sa);
-    cadBanda(o, q[6], A, B, -0.5, CADUTA.auto, m.ws.slice(0, 4), false); cadBanda(o, q[6], A, B, CADUTA.auto, CADUTA.alto, m.ws.slice(4), true);
-  }
-}
-/* the part of a piece (A to B from the pivot o) between heights H0 and H1, in WALLS: circles at its ends, a segment between (two when it is thick).
-   sopra: over the roof of a vehicle, the walker meets it and a vehicle does not (yv under the height a vehicle checks, collideStatic) */
-function cadBanda(o, r, A, B, H0, H1, ws, sopra) {
-  const [c0, c1, s0, s1] = ws, dh = B[1] - A[1]; let t0 = 0, t1 = 1;
-  if (Math.abs(dh) < 1e-6) { if (A[1] < H0 || A[1] > H1) t1 = -1; }
-  else { let u0 = (H0 - A[1]) / dh, u1 = (H1 - A[1]) / dh; if (u0 > u1) { const k = u0; u0 = u1; u1 = k; } t0 = Math.max(0, u0); t1 = Math.min(1, u1); }
-  if (t1 < t0) { for (const w of ws) cadMuro(w, false); return; } /* none of it in this band */
-  const ax = o.x + A[0] + (B[0] - A[0]) * t0, az = o.z + A[2] + (B[2] - A[2]) * t0, bx = o.x + A[0] + (B[0] - A[0]) * t1, bz = o.z + A[2] + (B[2] - A[2]) * t1;
-  const y0 = o.y - 3, y1 = o.y + Math.max(A[1] + dh * t0, A[1] + dh * t1) + 0.25, L = hyp(bx - ax, bz - az);
-  for (const w of ws) { w.y0 = y0; w.y1 = y1; if (sopra) w.yv = o.y + 0.2; }
-  c0.x = ax; c0.z = az; cadMuro(c0, true, ax - r - 0.2, az - r - 0.2, ax + r + 0.2, az + r + 0.2);
-  if (L < 0.05) { cadMuro(c1, false); cadMuro(s0, false); cadMuro(s1, false); return; }
-  c1.x = bx; c1.z = bz; cadMuro(c1, true, bx - r - 0.2, bz - r - 0.2, bx + r + 0.2, bz + r + 0.2);
-  const nx = -(bz - az) / L, nz = (bx - ax) / L, e = r < CADUTA.grosso ? 0 : r;
-  for (const [w, k] of [[s0, 1], [s1, -1]]) {
-    if (k < 0 && !e) { cadMuro(w, false); continue; }
-    w.ax = ax + nx * e * k; w.az = az + nz * e * k; w.bx = bx + nx * e * k; w.bz = bz + nz * e * k; w.nx = nx * k; w.nz = nz * k;
-    cadMuro(w, true, Math.min(w.ax, w.bx), Math.min(w.az, w.bz), Math.max(w.ax, w.bx), Math.max(w.az, w.bz));
-  }
-}
-/* points along the body with its pivot at (x, z) and turned by a: [x, z, y, r] */
-function cadutaPunti(f, x, z, a) {
-  const ca = Math.cos(a), sa = Math.sin(a), gy = f.y0 + H.ground(x, z) - H.ground(f.x0, f.z0), out = [];
-  for (const m of f.muri) {
-    const q = m.q, n = Math.max(2, Math.ceil(hyp(q[3] - q[0], q[4] - q[1], q[5] - q[2]) / CADUTA.passo) + 1), r = Math.min(q[6], CADUTA.grosso);
-    for (let i = 0; i < n; i++) { const t = i / (n - 1), P = cadRuota(f, q[0] + (q[3] - q[0]) * t, q[1] + (q[4] - q[1]) * t, q[2] + (q[5] - q[2]) * t, ca, sa); out.push([x + P[0], z + P[2], gy + P[1], r]); }
-  }
-  return out;
-}
-const cadutaMuro = (f, P) => !!collideStatic({ x: P[0], z: P[1] }, P[3], P[2], false, f.mie); /* a point of the body inside a wall, not its own */
-function cadutaDentro(P, vs) { /* how deep a point of the body is in a vehicle (not one pushing it): its box, up to its roof there (salto3.js vehTopAt); 0 outside */
-  let d = 0;
-  for (const v of vs) {
-    const S = v.spec, sh = Math.sin(v.h), ch = Math.cos(v.h), ex = P[0] - v.x, ez = P[1] - v.z, lz = ex * sh + ez * ch, lx = ex * ch - ez * sh;
-    const a = S.W / 2 + P[3] - Math.abs(lx), b = S.L / 2 + P[3] - Math.abs(lz); if (a <= 0 || b <= 0 || P[2] < v.y - 0.1) continue;
-    const t = vehTopAt(v, clamp(lx, -S.W / 2, S.W / 2), clamp(lz, -S.L / 2, S.L / 2)), c = v.y + (t === null ? vehMaxTop(v) : t) - P[2]; if (c > 0) d = Math.max(d, Math.min(a, b, c));
-  }
-  return d;
-}
-/* moving the pivot to (x, z) and turning it to a, the body goes into a wall it was not in already, or deeper into a vehicle */
-function cadutaBloccata(f, x, z, a) {
-  const o = f.o.position, R = f.L + 6, vs = VEH.filter(v => !v.heli && !f.urtati.has(v) && Math.abs(v.x - x) < R && Math.abs(v.z - z) < R);
-  const B = cadutaPunti(f, x, z, a); let A = null;
-  for (let i = 0; i < B.length; i++) {
-    const m = cadutaMuro(f, B[i]), d = vs.length ? cadutaDentro(B[i], vs) : 0; if (!m && d <= 0) continue;
-    if (!A) A = cadutaPunti(f, o.x, o.z, f.a);
-    if (m && !cadutaMuro(f, A[i]) || d > 0 && d > cadutaDentro(A[i], vs) + 1e-4) return true;
-  }
-  return false;
-}
-function cadutaSposta(f, x, z) { const o = f.o.position; o.x = x; o.z = z; o.y = f.y0 + H.ground(x, z) - H.ground(f.x0, f.z0); cadutaMuri(f); }
-/* how far the discs [x, z, r] of a vehicle between heights ya and yb are in a falling body's walls: [depth, nx, nz] towards the body, or null */
-function cadutaContatto(f, dischi, ya, yb, q, veh) {
-  let best = 0, nx = 0, nz = 0;
-  for (const m of f.muri) for (const w of m.ws) {
-    if (!w.bb || yb < w.y0 || ya > (veh && w.yv !== undefined ? w.yv : w.y1)) continue;
-    for (const [cx, cz, r] of dischi) {
-      let px, pz, R = r + CADUTA.margine;
-      if (w.r !== undefined) { px = w.x; pz = w.z; R += w.r; }
-      else { const ex = w.bx - w.ax, ez = w.bz - w.az, t = clamp(((cx - w.ax) * ex + (cz - w.az) * ez) / (ex * ex + ez * ez || 1), 0, 1); px = w.ax + ex * t; pz = w.az + ez * t; }
-      const dx = px - cx, dz = pz - cz, d = hyp(dx, dz), pen = R - d; if (pen <= best) continue;
-      best = pen; if (d > 1e-6) { nx = dx / d; nz = dz / d; } else { const l = hyp(q.vx, q.vz) || 1; nx = q.vx / l; nz = q.vz / l; }
-    }
-  }
-  return best > 0 ? [best, nx, nz] : null;
-}
-/* a vehicle (chi; q its speed, F its blow) against the bodies falling: the one that knocked it down and any other over its threshold push it away,
-   at their speed along the push; one under it meets it as a wall (collideStatic, heliPush). Pinned against something, it is a wall for all */
-function cadutaUrti(chi, dischi, q, F, ya, yb) {
-  let hit = false;
-  for (const f of PROP_FALL) {
-    if (!f.attivo) continue;
-    const o = f.o.position, mio = f.urtati.has(chi); if (!mio && F < f.soglia) continue;
-    if (Math.abs(dischi[0][0] - o.x) > f.L + 8 || Math.abs(dischi[0][1] - o.z) > f.L + 8) continue;
-    let nx = 0, nz = 0, tocco = false; const sp = hyp(q.vx, q.vz), vie = [null]; if (sp > 0.1) vie.push([q.vx / sp, q.vz / sp]);
-    for (let k = 0; k < 4; k++) {
-      const c = cadutaContatto(f, dischi, ya, yb, q, !chi.heli); if (!c) break;
-      tocco = true; vie[0] = [c[1], c[2]]; let mosso = false;
-      for (const [ux, uz] of vie) { /* away from the vehicle; held there (its edge along a fence), along the vehicle's way: it scrapes along */
-        const kk = ux * c[1] + uz * c[2]; if (kk < 0.3) continue;
-        const x = o.x + ux * c[0] / kk, z = o.z + uz * c[0] / kk; if (cadutaBloccata(f, x, z, f.a)) continue;
-        cadutaSposta(f, x, z); nx = ux; nz = uz; mosso = true; break;
-      }
-      if (!mosso) break;
-    }
-    if (!tocco) continue;
-    if (!mio) { f.urtati.add(chi); propUrto(q); hit = true; }
-    const vr = (q.vx - f.vx) * nx + (q.vz - f.vz) * nz; if (vr > 0) { f.vx += nx * vr * (1 + CADUTA.urto); f.vz += nz * vr * (1 + CADUTA.urto); }
-  }
-  return hit;
 }
 function propUrto(v) { const sp = v.speed; v.vx *= SFONDA.slow; v.vz *= SFONDA.slow; v.health = Math.max(0, v.health - SFONDA.dmg); if (v === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
 function propMatrici(p) { return p.inst.meshes.map(m => { const M = new THREE.Matrix4(); m.getMatrixAt(p.inst.i, M); return M; }); }
@@ -1306,12 +1154,7 @@ function propSpingi(p, v) { // pushed: it takes the vehicle's way at part of its
 }
 function propHits(v) {
   tombHits(v);
-  const F = propForza(v);
-  propHitsDopo(v, F);
-  if (PROP_FALL.length) cadutaUrti(v, v.circles().map(c => [c[0], c[1], v.rad]), v, F, v.y + 0.4, v.y + 0.4); /* what falls, after what it knocks down in the same step */
-}
-function propHitsDopo(v, F) {
-  if (F < FORZA.leggero) return;
+  const F = propForza(v); if (F < FORZA.leggero) return;
   PROPG.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, p => {
     if (p.broken || Math.abs(v.y - p.y) > 3 || F < FORZA[p.forza || 'leggero']) return;
     for (const c of v.circles()) if (hyp(c[0] - p.x, c[1] - p.z) < v.rad + p.r + 0.15 || (p.pw || []).some(w => hyp(c[0] - w.x, c[1] - w.z) < v.rad + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < v.speed * 0.5) propSpingi(p, v); } else breakProp(p, v, F); return; }
@@ -1325,13 +1168,12 @@ function propHitsDopo(v, F) {
 /* the helicopter against the props: the same rule as the vehicles. Discs [x, z, r] between heights ya and yb; over the threshold it knocks them
    down or pushes them (and loses some speed), under it heliPush stops it on their walls. Its damage is not touched here */
 function propHitsElicottero(e, dischi, ya, yb) {
-  const sp = hyp(e.vx, e.vz), F = sp * heliMassa();
-  const q = { vx: e.vx, vz: e.vz, speed: sp, chi: e }; let hit = false;
-  if (F >= FORZA.leggero) for (const [cx, cz, r] of dischi) PROPG.each(cx - r - 3, cz - r - 3, cx + r + 3, cz + r + 3, p => {
+  const sp = hyp(e.vx, e.vz), F = sp * heliMassa(); if (F < FORZA.leggero) return;
+  const q = { vx: e.vx, vz: e.vz, speed: sp }; let hit = false;
+  for (const [cx, cz, r] of dischi) PROPG.each(cx - r - 3, cz - r - 3, cx + r + 3, cz + r + 3, p => {
     if (p.broken || F < FORZA[p.forza || 'leggero'] || yb < p.wall.y0 || ya > p.wall.y1) return;
     if (hyp(cx - p.x, cz - p.z) < r + p.r + 0.15 || (p.pw || []).some(w => hyp(cx - w.x, cz - w.z) < r + w.r + 0.15)) { if (p.via) { if (!p.moving || hyp(p.vx, p.vz) < sp * 0.5) propSpingi(p, q); } else breakProp(p, q, F); hit = true; }
   });
-  if (PROP_FALL.length && cadutaUrti(e, dischi, q, F, ya, yb)) hit = true;
   if (hit) { e.vx = q.vx; e.vz = q.vz; if (e === P.car) { sfxCrash(Math.min(10, sp)); shake = Math.max(shake, 0.25); } }
 }
 const PROP_DEBRIS = [];
@@ -1345,24 +1187,14 @@ function snapArm(b, v) {
 function updProps(dt) {
   for (let i = PROP_FALL.length - 1; i >= 0; i--) {
     const f = PROP_FALL[i]; f.t += dt;
-    const o = f.o.position, sv = hyp(f.vx, f.vz);
-    if (sv > 0) { /* its foot slides, to a stop; not into a wall or a vehicle */
-      const k = Math.max(0, sv - (f.giu ? FALL.attritoSteso : FALL.attrito) * dt) / sv; f.vx *= k; f.vz *= k;
-      const x = o.x + f.vx * dt, z = o.z + f.vz * dt;
-      if (f.attivo && cadutaBloccata(f, x, z, f.a)) { f.vx = 0; f.vz = 0; } else { o.x = x; o.z = z; o.y = f.y0 + H.ground(o.x, o.z) - H.ground(f.x0, f.z0); }
-    }
+    const sv = hyp(f.vx, f.vz); if (sv > 0) { const k = Math.max(0, sv - FALL.attrito * dt) / sv; f.vx *= k; f.vz *= k; const o = f.o.position; o.x += f.vx * dt; o.z += f.vz * dt; o.y = f.y0 + H.ground(o.x, o.z) - H.ground(f.x0, f.z0); }
     if (!f.giu) {
-      f.w += 1.5 * 9.81 / f.L * Math.sin(Math.max(0.02, f.a)) * dt; let da = f.w * dt, terra = false;
-      if (f.a + da >= FALL.steso) { da = FALL.steso - f.a; terra = true; }
-      if (da > 0 && f.attivo && cadutaBloccata(f, o.x, o.z, f.a + da)) { f.w = 0; if (f.L * Math.cos(f.a) < CADUTA.basso) f.giu = true; } /* against a wall or a vehicle: it leans there, as long as that stays; low and still, it lies */
-      else {
-        if (terra) { if (f.w > FALL.fermo) f.w = -f.w * FALL.rimbalzo; else { f.w = 0; f.giu = true; } } /* the ground: a small bounce, then still */
-        f.a += da; f.o.rotateOnWorldAxis(f.axis, da);
-      }
+      f.w += 1.5 * 9.81 / f.L * Math.sin(Math.max(0.02, f.a)) * dt; let da = f.w * dt;
+      if (f.a + da >= FALL.steso) { da = FALL.steso - f.a; if (f.w > FALL.fermo) f.w = -f.w * FALL.rimbalzo; else { f.w = 0; f.giu = true; } } /* the ground: a small bounce, then still */
+      f.a += da; f.o.rotateOnWorldAxis(f.axis, da);
     }
-    if (f.attivo) { if (f.giu) f.attivo = false; cadutaMuri(f); } /* lying still on the ground, it loses its walls */
     if (f.m0) propScrivi(f.p, f.o, f.m0, f.p.x, f.p.inst.base, f.p.z); else f.o.updateMatrix();
-    if (f.giu && hyp(f.vx, f.vz) < 0.01 || f.giu && f.t > 30) PROP_FALL.splice(i, 1);
+    if (f.giu && f.vx === 0 && f.vz === 0 || f.giu && hyp(f.vx, f.vz) < 0.01 || f.t > 8) PROP_FALL.splice(i, 1);
   }
   for (let i = PROP_MOVE.length - 1; i >= 0; i--) { // rolling and sliding: friction, the walls round it, its own wall going with it
     const p = PROP_MOVE[i], sp = hyp(p.vx, p.vz), ns = Math.max(0, sp - (p.via === 'rotola' ? 5 : 7) * dt), k = sp > 1e-6 ? ns / sp : 0;
@@ -4739,8 +4571,8 @@ function staccaAnta(g, v, i) { /* an open leaf rammed again over the blow: it is
   for (let k = GATE_FLY.length - 1; k >= 0; k--) if (GATE_FLY[k].g === g && GATE_FLY[k].i === i) GATE_FLY.splice(k, 1);
   const h = g.hinges[i], m = h && h[0].children[0]; propUrto(v); if (!m || !g.outer || !g.outer.parent) return;
   const o = g.os[i], fx = (o.ax + o.bx) / 2, fz = (o.az + o.bz) / 2, piv = new THREE.Object3D(); piv.position.set(fx, g.gy, fz); g.outer.parent.add(piv); piv.updateMatrixWorld(); piv.attach(m);
-  const L = clamp(g.h, 0.8, 9), ax = o.ax - fx, az = o.az - fz, bx = o.bx - fx, bz = o.bz - fz; /* the leaf: its two ends and its middle standing, its bottom and its top edge */
-  cadutaNuova(piv, v, F, FORZA[gateForza(g)], L, [[ax, 0, az, ax, L, az, 0.1], [bx, 0, bz, bx, L, bz, 0.1], [0, 0, 0, 0, L, 0, 0.1], [ax, 0, az, bx, 0, bz, 0.1], [ax, L, az, bx, L, bz, 0.1]], null, { x: fx, z: fz });
+  let dx = v.vx, dz = v.vz; const l = hyp(dx, dz) || 1; dx /= l; dz /= l; const L = clamp(g.h, 0.8, 9), sp = v.speed, ecc = clamp(F / FORZA[gateForza(g)] - 1, 0, 1);
+  PROP_FALL.push({ o: piv, p: { x: fx, z: fz }, axis: new THREE.Vector3(dz, 0, -dx), m0: null, L, a: 0, w: Math.min(FALL.kickMax, FALL.kick * sp / L) + 0.1, vx: dx * sp * FALL.spinta * ecc, vz: dz * sp * FALL.spinta * ecc, x0: fx, y0: g.gy, z0: fz, giu: false, t: 0 });
 }
 function updGates(dt) {
   /* pedestrians open the small gates instead of walking through them */
@@ -5109,7 +4941,7 @@ function lxSbarre(g) { // the first time its tile is laid out; they stay, like t
     WALLS.add(px, pz, ex, ez, seg);
     const probe = []; for (let t = 0.1; t <= 1; t += 0.2) probe.push([lerp(px, ex, t), lerp(pz, ez, t)]);
     const bar = { arm, seg, probe, root }; g.bars.push(bar);
-    addProp({ lx: true, x: px, z: pz, y: H.ground(px, pz), r: 0.2, h: 3, obj: root, pezzi: () => seg.on ? [[0, 1, 0, ex - px, 1, ez - pz, 0.07]] : [], onBreak: () => { bar.broken = true; seg.on = false; bar.probe = []; } }); // the post knocked down takes its arm with it: down, it falls with the post and is solid as it (props3.js cadutaNuova)
+    addProp({ lx: true, x: px, z: pz, y: H.ground(px, pz), r: 0.2, h: 3, obj: root, onBreak: () => { bar.broken = true; seg.on = false; bar.probe = []; } }); // the post knocked down takes its arm with it
   }
 }
 
@@ -7713,11 +7545,6 @@ function lsSpans(Q, v) { // where the line across at v runs inside the polygon (
   xs.sort((p, q) => p - q); const out = []; for (let i = 0; i + 1 < xs.length; i += 2) out.push([xs[i], xs[i + 1]]); return out;
 }
 // a flat strip laid on the ground (draped, so y is the height above it), from (s0,v) to (s1,v) in the frame A, w wide, in pieces of 6 m
-function lsFlat(A, s0, s1, v, w) { /* a furrow is only laid where the ground is a field's: gentle along it and level across it, on a steep bank the flat quads stand off the slope like a fan */
-  let lo = 1e9, hi = -1e9, c0 = 1e9, c1 = -1e9; const n = Math.max(2, Math.ceil((s1 - s0) / 3));
-  for (let k = 0; k <= n; k++) { const s = s0 + (s1 - s0) * k / n, [xa, za] = A.at(s, v - w / 2), [xb, zb] = A.at(s, v + w / 2), [xm, zm] = A.at(s, v), ya = H.ground(xa, za), yb = H.ground(xb, zb), ym = H.ground(xm, zm); if (Math.abs(ya - yb) > 0.3) return false; lo = Math.min(lo, ym); hi = Math.max(hi, ym); if (k === 0) c0 = ym; if (k === n) c1 = ym; }
-  return Math.abs(c1 - c0) / Math.max(1, s1 - s0) < 0.12 && hi - lo < 1.2;
-}
 function lsStrip(b, A, s0, s1, v, w, col, dy = 0.05) {
   const n = Math.max(1, Math.ceil((s1 - s0) / 6)), cuts = [];
   for (let k = 0; k < n; k++) cuts.push([s0 + (s1 - s0) * k / n, s0 + (s1 - s0) * (k + 1) / n]);
@@ -7822,7 +7649,7 @@ function* buildPaesaggio(T, G) {
     if (kind === 'campo' || kind === 'prato') {
       if (kind === 'campo') { // furrows the long way: ploughed, green, ripe or stubble, the hash decides
         const pal = [['#8f6e4e', '#7d5f42'], ['#8fae5a', '#7c9a4b'], ['#d6bf72', '#c8b064'], ['#d9cf9e', '#cbbf8c']][Math.floor(h * 4)];
-        for (let v = A.v0 + 1.4, k = 0; v < A.v1 - 0.7; v += 1.4, k++) for (const [a, b] of lsSpans(A.Q, v)) if (b - a > 1 && lsFlat(A, a + 0.4, b - 0.4, v, 1.42)) lsStrip(drape, A, a + 0.4, b - 0.4, v, 1.42, COL(pal[k % 2]), 0.04);
+        for (let v = A.v0 + 1.4, k = 0; v < A.v1 - 0.7; v += 1.4, k++) for (const [a, b] of lsSpans(A.Q, v)) if (b - a > 1) lsStrip(drape, A, a + 0.4, b - 0.4, v, 1.42, COL(pal[k % 2]), 0.04);
       }
       if (h > (kind === 'campo' ? 0.6 : 0.75) && area > 1500) { // round bales left in the field
         const n = Math.min(10, Math.floor(area / 2500) + 2); let got = 0;
@@ -7839,40 +7666,13 @@ function* buildPaesaggio(T, G) {
       // L0.w: the walls and fences of the map along its edge, which the hoarding replaces on their own line (the build took them out, src/barriere.py
       // cantieri): drawn as they are, they already keep off the carriageway; L0.h: the rest of the edge, which gets the hoarding as before
       const runs = L0.w ? [...(L0.h || []).map(q => [dec(q), 1]), ...L0.w.map(q => [dec(q), 0])] : [[[...P, P[0]], 1]];
-      const WR = (L0.w || []).map(q => dec(q)), nearW = (x, z, d) => WR.some(r => { for (let i = 0; i + 1 < r.length; i++) if (segDist(x, z, r[i][0], r[i][1], r[i + 1][0], r[i + 1][1]) < d) return true; return false; });
-      const hoard = (x0, z0, x1, z1) => { const g0 = H.ground(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); /* a panel of its own: it goes over when rammed */ box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8'); };
-      const free = (x, z) => !(onAnyRoad(x, z, 0.6) || nearAsph(x, z, 0.3) || onAsph(x, z) || inBuilding(x, z, 0.3));
-      for (const [R, filt] of runs) {
-        if (!filt) { /* the dividers of the map taken as they are: drawn on their own line */
-          for (let i = 0; i + 1 < R.length; i++) { const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.05) continue; for (let t = 0; t < L; t += 2.5) { const t1 = Math.min(L, t + 2.5); hoard(a[0] + (c[0] - a[0]) * t / L, a[1] + (c[1] - a[1]) * t / L, a[0] + (c[0] - a[0]) * t1 / L, a[1] + (c[1] - a[1]) * t1 / L); } }
-          continue;
-        }
-        /* the rest of the edge: ONE line. Samples every 2.5 m along it; where the edge lies on or by the carriageway the line moves inward by what each sample needs to be clear (up to 4.2 m, inside
-           the site), the move spread over 5 m either side and smoothed, so the hoarding runs straight and unbroken; the panels follow that line. Not where a divider of the map already runs (no double row) */
-        const S = [];
-        for (let i = 0; i + 1 < R.length; i++) {
-          const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.5) continue;
-          const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2, sd = inPoly(mx - uz * 0.8, mz + ux * 0.8, P) ? 1 : inPoly(mx + uz * 0.8, mz - ux * 0.8, P) ? -1 : 0, nn = Math.max(1, Math.ceil(L / 2.5));
-          for (let k = 0; k <= nn; k++) S.push({ x: a[0] + ux * L * k / nn, z: a[1] + uz * L * k / nn, nx: -uz * sd, nz: ux * sd, sd, seg: i, o: 0 });
-        }
-        for (const q of S) { q.req = Infinity; for (const o of [0, 0.6, 1.2, 1.8, 2.5, 3.3, 4.2]) { if (o && !q.sd) break; const x = q.x + q.nx * o, z = q.z + q.nz * o; if (o && !inPoly(x, z, P)) break; if (free(x, z)) { q.req = o; break; } } }
-        const n = S.length, dil = S.map((q, i) => { if (q.req === Infinity) return Infinity; let m = 0; for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) if (S[j].req !== Infinity) m = Math.max(m, S[j].req); return m; });
-        S.forEach((q, i) => { if (dil[i] === Infinity) { q.o = Infinity; return; } let t = 0, c = 0; for (let j = Math.max(0, i - 1); j <= Math.min(n - 1, i + 1); j++) if (dil[j] !== Infinity) { t += dil[j]; c++; } q.o = Math.max(q.req, t / c); });
-        /* a sample with no clear place keeps the move of the nearest one that has: the line goes on, it has no hole */
-        S.forEach((q, i) => { if (q.o !== Infinity) return; for (let d = 1; d < n; d++) { const j = [i - d, i + d].find(j => j >= 0 && j < n && S[j].o !== Infinity && S[j].req !== Infinity); if (j !== undefined) { q.o = S[j].o; return; } } });
-        S.forEach(q => { if (q.o !== Infinity) { q.px = q.x + q.nx * q.o; q.pz = q.z + q.nz * q.o; } });
-        /* the dividers of the map along the same edge draw their own panels: a stretch is left out only where it lies along one for its whole length (ends and middle within 1.5 m of it) */
-        const alongW = (x0, z0, x1, z1) => nearW(x0, z0, 1.5) && nearW(x1, z1, 1.5) && nearW((x0 + x1) / 2, (z0 + z1) / 2, 1.5);
-        for (let i = 0; i + 1 < n; i++) {
-          const p = S[i], q = S[i + 1]; if (p.o === Infinity || q.o === Infinity) continue; if (hyp(q.px - p.px, q.pz - p.pz) < 0.05) continue;
-          if (alongW(p.px, p.pz, q.px, q.pz)) continue;
-          hoard(p.px, p.pz, q.px, q.pz);
-        }
-        /* where the line ends (at a divider of the map or a gate) it runs on to the nearest post or end of one within 7 m, touching it */
-        const anchors = []; for (const r of WR) { anchors.push(r[0], r[r.length - 1]); } for (const g of T.gates || []) { anchors.push([g.ax, g.az]); if (g.W) anchors.push([g.ax + g.ux * g.W, g.az + g.uz * g.W]); }
-        for (const q of [S[0], S[n - 1]]) {
-          if (!q || q.o === Infinity) continue; let best = null, bd = 7; for (const an of anchors) { const d = hyp(an[0] - q.px, an[1] - q.pz); if (d > 0.3 && d < bd) { bd = d; best = an; } }
-          if (best && !onAsph((q.px + best[0]) / 2, (q.pz + best[1]) / 2)) hoard(q.px, q.pz, best[0], best[1]);
+      for (const [R, filt] of runs) for (let i = 0; i + 1 < R.length; i++) {
+        const a = R[i], c = R[i + 1], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < (filt ? 0.5 : 0.05)) continue;
+        for (let t = 0; t < L; t += 2.5) {
+          const t1 = Math.min(L, t + 2.5), x0 = a[0] + (c[0] - a[0]) * t / L, z0 = a[1] + (c[1] - a[1]) * t / L, x1 = a[0] + (c[0] - a[0]) * t1 / L, z1 = a[1] + (c[1] - a[1]) * t1 / L, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+          if (filt && (onAnyRoad(mx, mz, 0.6) || nearAsph(mx, mz, 0.3) || onAsph(x0, z0) || onAsph(x1, z1) || inBuilding(mx, mz, 0.3))) continue; /* the drawn carriageway too (AC_VEI), ends included */
+          const g0 = H.ground(x0, z0); panels.push([x0, z0, x1, z1, h > 0.5 ? '#3d6a4a' : '#b8bcc0']); // a panel of its own: it goes over when rammed
+          box(0.4, 0.15, 0.25, x0, g0 + 0.07, z0, '#c9c4b8');
         }
       }
       const spots = [];
@@ -10898,13 +10698,11 @@ const HELI = {
   spinUp: 3.5, spinDown: 7,          /* seconds for the rotor to reach full speed, and to stop */
   /* the numbers of a real light twin, the Airbus H135 of the air ambulances (Carlo 7/11: "un po' lento per essere un elicottero"): fast cruise 254 km/h = 70.5 m/s
      at full weight, climb 7.6 m/s (1500 ft/min) (airbus.com, H135 technical information; LPR, the Polish air ambulance). The sink is not in the data sheets: 6 m/s */
-  tiltF: 0.627,                      /* most tilt forward and back from the stick (rad, 36 degrees: g tan = 7.1 m/s2; Carlo 8/11: up to full speed in 2/3 of the way it took with 0.45) */
-  tilt: 0.45, tiltK: 3.2,            /* most tilt sideways from the stick (rad, 26 degrees: g tan = 4.7 m/s2 at the start), how fast the body follows it (1/s) */
-  flare: 0.25,                       /* the flare's brake: with the body tilted against the way it goes, the speed dies at flare times the sine of the tilt (1/s) */
-  hold: 0.06, holdMax: 0.7,          /* stick let go: tilt against the drift (rad per m/s) and its cap: 40 degrees nose up, a quick stop (Carlo 7/11: it slid on for far too long; 8/11: from full speed to still in half the way it took with 30 degrees and no flare) */
+  tilt: 0.45, tiltK: 3.2,            /* most tilt from the stick (rad, 26 degrees: g tan = 4.7 m/s2 at the start), how fast the body follows it (1/s) */
+  hold: 0.06, holdMax: 0.52,         /* stick let go: tilt against the drift (rad per m/s) and its cap: 30 degrees nose up, a quick stop (Carlo 7/11: it slid on for far too long) */
   stopV0: 1, stopV1: 5, stopK: 3, stopV: 0.03, /* stick let go and slow (Carlo 8/11: still in the air it must stand still, as a car): under stopV1 m/s the tilt hands over to a plain stop (stopK 1/s, in full under stopV0), under stopV it stands */
-  drag1: 0.0225, drag2: 0.00111,     /* air drag, linear and quadratic: full stick (tiltF) ends at 70.5 m/s, the H135's fast cruise */
-  climb: 15.2, sink: 12, vyK: 1.8,   /* climb and sink speed at full R2/L2 (m/s; Carlo 8/11: twice the H135's 7.6 and 6), how fast the vertical speed follows (1/s) */
+  drag1: 0.015, drag2: 0.00074,      /* air drag, linear and quadratic: full stick ends at 70.5 m/s, the H135's fast cruise */
+  climb: 7.6, sink: 6, vyK: 1.8,     /* climb and sink speed at full R2/L2 (m/s), how fast the vertical speed follows (1/s) */
   yawRate: 1.4, yawK: 4,             /* turn on the spot with L1/R1 (rad/s) and its ease (1/s) */
   bankV0: 2, bankV1: 7, bankVmin: 5, /* autotimone (Carlo 7/11): banked, the nose goes into the turn in full (g tan(roll) / speed) from bankV0 to bankV1 m/s forward; bankVmin keeps the rate sane when slow */
   bankHi: 2, bankHiV0: 15, bankHiV1: 45, /* fast, the nose turns up to bankHi times the coordinated rate (half the radius at 45 m/s, Carlo 7/11), growing smoothly between these speeds (m/s forward); slow flight as before */
@@ -11056,7 +10854,7 @@ function heliStep1(e, dt) {
   let pT = e.gp, rT = e.gr;
   if (!e.ground) {
     /* the brake against the drift only with the stick let go; the stick held only sideways keeps the speed it has (the nose down just enough against the drag) */
-    pT = Math.abs(sf) > 0.05 ? sf * HELI.tiltF : Math.abs(ss) > 0.05 ? clamp(Math.atan((HELI.drag1 + HELI.drag2 * sp) * vf / (9.81 * Math.max(lift, 0.1))), -HELI.tiltF, HELI.tiltF) : clamp(-vf * HELI.hold, -HELI.holdMax, HELI.holdMax);
+    pT = Math.abs(sf) > 0.05 ? sf * HELI.tilt : Math.abs(ss) > 0.05 ? clamp(Math.atan((HELI.drag1 + HELI.drag2 * sp) * vf / (9.81 * Math.max(lift, 0.1))), -HELI.tilt, HELI.tilt) : clamp(-vf * HELI.hold, -HELI.holdMax, HELI.holdMax);
     rT = Math.abs(ss) > 0.05 ? ss * HELI.tilt : clamp(-vs * HELI.hold, -HELI.holdMax, HELI.holdMax);
     if (!alive) { pT = 0.25; rT = Math.sin(now * 1.7) * 0.3; } /* broken: it tumbles */
   }
@@ -11067,9 +10865,6 @@ function heliStep1(e, dt) {
     const hw = alive && Math.abs(sf) < 0.05 && Math.abs(ss) < 0.05 ? 1 - heliSm((sp - HELI.stopV0) / (HELI.stopV1 - HELI.stopV0)) : 0;
     const g = 9.81 * lift * (1 - hw), af = g * Math.tan(e.pitch), as = g * Math.tan(e.roll), dr = HELI.drag1 + HELI.drag2 * sp;
     e.vx += (fx * af + rx * as - e.vx * dr) * dt; e.vz += (fz * af + rz * as - e.vz * dr) * dt;
-    /* the flare: the disc tilted back against the way it goes meets the air and brakes it, the more the faster and the steeper (the height stays, as if the collective went down) */
-    if (alive) { const v1 = e.vx * fx + e.vz * fz, s1 = e.vx * rx + e.vz * rz, kf = e.pitch * v1 < 0 ? 1 - Math.exp(-HELI.flare * lift * Math.abs(Math.sin(e.pitch)) * dt) : 0, ks = e.roll * s1 < 0 ? 1 - Math.exp(-HELI.flare * lift * Math.abs(Math.sin(e.roll)) * dt) : 0;
-      e.vx -= (fx * v1 * kf + rx * s1 * ks); e.vz -= (fz * v1 * kf + rz * s1 * ks); }
     if (hw > 0) { const k = Math.exp(-HELI.stopK * hw * dt); e.vx *= k; e.vz *= k; if (hw >= 1 && hyp(e.vx, e.vz) < HELI.stopV) e.vx = e.vz = 0; }
     /* grip on the air: going forward, the speed across the nose turns into speed along it (no sliding as on ice); slow, it slides freely as before */
     const gw = heliGrip(e, fx, fz);
@@ -11367,53 +11162,16 @@ function endRun(kind) {
 // ---------------------------------------------------------------- camera & visuals
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), _camD = new THREE.Vector3();
 let camInit = false;
-/* ---- titolo: il sorvolo di Meda al tramonto, mentre il mondo si carica (Carlo, 8/11). La camera segue una linea chiusa di punti (posizione, altezza sul suolo, punto guardato) con una curva morbida; il mondo gira (traffico, passanti) ma il giocatore sta fermo; l'ora e' ferma al tramonto e a GIOCA torna quella di sempre.
-   Resta entro ~450 m dal punto di partenza: li' i pezzi del mondo ci sono gia' e il traffico vive (si toglie oltre 330 m dal giocatore se non e' in vista) */
-let titolo = true, tFade = 0;
-const TIT = { t: 0, gy: null, TOD: 17.75, TODGIOCO: 17.2, SEG: 15, FOV: 48,
-  K: [ /* x, z, altezza sul suolo, x guardata, z guardata, altezza guardata: si guarda sempre piu' in basso di 33 gradi, cosi' l'orizzonte spoglio resta fuori dall'inquadratura */
-    [520, -490, 88, 405, -545, 4], [430, -430, 92, 335, -520, 4], [320, -420, 95, 250, -535, 6], [215, -450, 92, 215, -550, 8],
-    [130, -560, 92, 215, -560, 8], [160, -670, 95, 245, -585, 6], [280, -690, 92, 340, -585, 4], [400, -680, 88, 400, -575, 4], [520, -640, 86, 450, -545, 4]] };
-const _titP = new THREE.Vector3(), _titL = new THREE.Vector3();
-function titCR(a, b, c, d, t) { const t2 = t * t, t3 = t2 * t; return 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3); }
-function titPose(u, P_, L_) {
-  const K = TIT.K, n = K.length, i = Math.floor(u) % n, t = u - Math.floor(u), k = j => K[(i + j + n) % n], a = k(-1), b = k(0), c = k(1), d = k(2), f = q => titCR(a[q], b[q], c[q], d[q], t);
-  P_.set(f(0), f(2), f(1)); L_.set(f(3), f(5), f(4));
-}
-function titoloIniz() { /* the sun low over the roofs, the lights of the title: after boot, before the first frame */
-  TIT.t = 0; window.__TIT = TIT; window.__setTOD(TIT.TOD);
-  Object.assign(sun.shadow.camera, { left: -230, right: 230, top: 230, bottom: -230 }); sun.shadow.camera.updateProjectionMatrix();
-}
-function titoloTick() { window.__setTOD(TIT.TOD); MS.cool = Math.max(MS.cool, 3); if (MS.marker) MS.marker.visible = false; } /* no mission begins under the title, and no marker beam shows */ /* the hour stays where the title put it while the world goes on */
-function titoloFine() {
-  titolo = false; window.__setTOD(TIT.TODGIOCO); if (MS.marker) MS.marker.visible = true;
-  Object.assign(sun.shadow.camera, { left: -95, right: 95, top: 95, bottom: -95 }); sun.shadow.camera.updateProjectionMatrix();
-  camInit = false; setTimeout(() => $('fade').classList.remove('on'), 450); /* the first frames of the game are the heavy ones (the pieces round the player take their turn): they pass under the black */
-}
-function sorvolo(dt) {
-  dt = Math.min(dt, 0.05); TIT.t += dt / TIT.SEG; titPose(TIT.t, _titP, _titL);
-  const gp = H.ground(_titP.x, _titP.z); TIT.gy = TIT.gy === null ? gp : TIT.gy + (gp - TIT.gy) * (1 - Math.exp(-1.5 * dt)); /* the ground under the camera, smoothed: the height does not follow every bump */
-  const gl = H.ground(_titL.x, _titL.z), w = TIT.t * 0.9;
-  camera.position.set(_titP.x + Math.sin(w * 1.7) * 1.2, TIT.gy + _titP.y + Math.sin(w * 1.1) * 0.8, _titP.z + Math.cos(w * 1.3) * 1.2);
-  camera.lookAt(_titL.x, gl + _titL.y, _titL.z);
-  if (Math.abs(camera.fov - TIT.FOV) > 0.05) { camera.fov = lerp(camera.fov, TIT.FOV, 0.1); camera.updateProjectionMatrix(); }
-  sun.target.position.set(_titL.x, gl, _titL.z); sun.position.set(_titL.x + SUN_DIR.x * 260, gl + SUN_DIR.y * 260, _titL.z + SUN_DIR.z * 260);
-  _far.position.x = camera.position.x * 0.9; _near.position.x = camera.position.x * 0.8;
-}
-function rayCam(ax, az, bx, bz, cy, ay) { /* like rayWalls, but a wall counts only where the ray from height ay (the subject end) to cy (the camera) is between its foot and its top; without ay a level line at cy, the walls that start above it do not count */
-  const lo_ = ay === undefined && P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity, ya_ = ay === undefined ? cy : ay, yh_ = Math.max(cy, ya_); /* lo_: getting out of the helicopter, the walls whose top is under both ends do not count (exitSpot) */
+function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */
+  const lo_ = P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity; /* from the helicopter: the walls whose top is under both ends do not count */
   let best = 1; const dx = bx - ax, dz = bz - az;
   WALLS.each(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), s => {
-    if (s.r || s.dyn || s.y0 > yh_ || s.off || (s.y0 !== undefined && (s.bt ? s.y1 - 3 : s.y1) < lo_) || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
+    if (s.r || s.dyn || s.y0 > cy || s.off || (s.y0 !== undefined && (s.bt ? s.y1 - 3 : s.y1) < lo_) || (P.mode === 'foot' && saltoLowBar(s))) return; /* on foot the camera goes over the barriers he can climb (updCamera), it does not stop at them */ const ex = s.bx - s.ax, ez = s.bz - s.az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) return;
     const t = ((s.ax - ax) * ez - (s.az - az) * ex) / den, u = ((s.ax - ax) * dz - (s.az - az) * dx) / den;
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < best) { if (ay !== undefined && s.y0 !== undefined) { const ry_ = ya_ + (cy - ya_) * t; if (ry_ < s.y0 || ry_ > wallTopP(s, u)) return; } best = t; } /* the height of the ray where it crosses the wall: under its foot or over its top it passes */
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < best) best = t;
   });
   return best;
 }
-function camSlabs(x, z) { /* the solid slabs over (x, z) as [underside, top]: the decks and the covers of the underpasses (gallAt) */
-  const out = []; for (const o of H.deckAt(x, z)) out.push([o.bot !== undefined ? o.bot : o.top - 0.6, o.top]); const u = H.gallAt(x, z); if (u) out.push([u.soff, Math.max(u.soff + 0.3, H.ground(x, z))]); return out;
-}
-function camCeil(x, z, y0) { let m = ceilAbove(x, z, y0); for (const [b] of camSlabs(x, z)) if (b > y0 && b < m) m = b; return m; } /* a raised volume, a deck or the cover of an underpass over the camera's way */
 function ceilAbove(x, z, y0) { /* lowest underside of a raised volume above y0 at (x,z), else Infinity */
   let m = Infinity;
   BLDR.each(x - 0.1, z - 0.1, x + 0.1, z + 0.1, b => { if (b.zb > y0 && b.zb < m && x >= b.bb[0] && x <= b.bb[2] && z >= b.bb[1] && z <= b.bb[3] && inPoly(x, z, b.pts) && !b.holes.some(h => inPoly(x, z, h))) m = b.zb; });
@@ -11431,7 +11189,7 @@ const WHEEL = { bal: 0.55, fall: 1.4, kov: 32 };
 const STOP = { max: 0.55, v0: 15, bal: 0.4, kov: 16, fall: 0.9 };
 const TWO_STEER = { moto: 24, scooter: 18 };
 const CAMV = { delay: 0.25, k: 0.12, minW: 0.1, tau: 0.15 };
-const CAM_VMAX = 15, CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 14, PAD_MAXTURN = 14;
+const CAM_WALL = 16, FP_ZOOM = 9, CAM_VEL = 3.4, CAM_VELP = 2.4, CAM_DELAY = 1.2, CAM_RE = 1.3, PAD_TURN = 14, PAD_MAXTURN = 14;
 function camSteer(dt, inCar, hb, moving) { /* hb = the heading the camera sits behind by default; camA = where the view points in the world */
   const lx = Math.abs(GP.lookx || 0) > 0.12 ? -GP.lookx : 0, ly = Math.abs(GP.looky || 0) > 0.12 ? GP.looky : 0, fp = camMode === 2;
   const lim = fp ? 0.7 : 1.3, lo = fp ? -0.7 : -0.45;
@@ -11461,7 +11219,6 @@ function camEase(dt, hb, k, minW, tau) { /* angular speed proportional to the er
   camW += (want - camW) * (1 - Math.exp(-dt / tau)); let st = camW * dt; if (Math.abs(st) > Math.abs(d)) st = d; camA = wrapA(camA + st);
 }
 function updCamera(dt) {
-  if (!running) { sorvolo(dt); return; }
   const inCar = P.mode === 'car', px = inCar ? P.car.x : P.x, pz = inCar ? P.car.z : P.z, h = inCar ? P.car.h : P.h, sp = inCar ? P.car.speed : 0;
   const fx = Math.sin(h), fz = Math.cos(h); let want, look;
   if (!inCar) P.model.g.visible = !((camMode === 2 && fpDone) || (hyp(camPos.x - px, camPos.z - pz) < 0.9 && camPos.y - P.y < 2.2)); /* the body is hidden only once the camera is close to the eyes */
@@ -11485,30 +11242,27 @@ function updCamera(dt) {
     let cx = px - hx * dist, cz = pz - hz * dist;
     /* low ceiling (portico, passage) over the subject or over the way back to the camera: the target is computed at once under it and in front of the walls, the camera only glides there (never up first) */
     const fy = inCar ? P.car.y : P.y; let ceil = Infinity;
-    for (const t of [0, 0.35, 0.7, 1]) { const c = camCeil(px + (cx - px) * t, pz + (cz - pz) * t, fy + 1.8); if (c < ceil) ceil = c; }
-    { const la_ = Math.min(30, sp * 0.6); for (const a_ of [0.25, 0.5, 1]) { if (la_ * a_ < 1) continue; const x_ = px + hx * la_ * a_, z_ = pz + hz * la_ * a_, f_ = H.camG(x_, z_, fy), c = camCeil(x_, z_, f_ + 1.8); if (c < Infinity && c + fy - f_ < ceil) ceil = c + fy - f_; } } /* a ceiling the subject is about to go under, as high over the floor there: the camera starts down before the mouth, not at it */
-    let cl = 1; if (ceil < Infinity) { const room = Math.max(0.9, ceil - 0.45 - fy); cl = clamp(room / ht, 0.35, 1); }
-    { const C_ = updCamera, o_ = inCar ? P.car : P; if (C_.clO !== o_ || cl < C_.clS) C_.clS = cl; else C_.clS += (cl - C_.clS) * (1 - Math.exp(-1.2 * dt)); C_.clO = o_; cl = C_.clS; } /* down at once (the camera glides there), back up slowly once the ceiling is behind */
+    for (const t of [0, 0.35, 0.7, 1]) { const c = ceilAbove(px + (cx - px) * t, pz + (cz - pz) * t, fy + 1.8); if (c < ceil) ceil = c; }
+    let cl = 1; if (ceil < Infinity) { const room = Math.max(0.9, ceil - 0.3 - fy); cl = clamp(room / ht, 0.35, 1); }
     if (cl < 1) { cx = px + (cx - px) * Math.max(cl, 0.4); cz = pz + (cz - pz) * Math.max(cl, 0.4); ht = Math.max(0.9, ht * cl); }
     let wy = H.camCap(cx, cz, fy, Math.max(fy, H.camG(cx, cz, fy)) + ht);
     if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */
-    let f = rayCam(px, pz, cx, cz, wy, fy + (inCar ? 1.3 : 1.5)); { const dd_ = hyp(cx - px, cz - pz) || 1, ux_ = (cx - px) / dd_, uz_ = (cz - pz) / dd_; const C0_ = updCamera, dr_ = C0_.s === (inCar ? P.car : P) && C0_.y !== undefined ? clamp((fy - C0_.y) / Math.max(dt, 1e-3), -15, 0) * 0.35 : 0; const vs_ = inCar ? P.car.speed : Math.abs(P.speedNow || 0), pa_ = Math.min(1.2, vs_ * 0.09), pb_ = Math.min(0.7, vs_ * 0.05); for (const [a_, b_, e_] of [[pa_, 0, 0], [0, pb_, 0], [0, -pb_, 0], [0, 0, dr_]]) { if (a_ === 0 && b_ === 0 && e_ > -0.05) continue; const qx_ = cx + ux_ * a_ - uz_ * b_, qz_ = cz + uz_ * a_ + ux_ * b_, q_ = rayCam(px, pz, qx_, qz_, wy + e_, fy + (inCar ? 1.3 : 1.5) + e_); if (q_ < 1) f = Math.min(f, q_ * hyp(qx_ - px, qz_ - pz) / dd_); } } let lift = 0; /* the obstacle a little before the camera gets to it: further (up to 1.2 m) and to the sides (up to 0.7 m) as fast as the subject goes, and lower by what it goes down in 0.35 s (into a trench the walls come over the ray) */ if (f < 1) { const dd = hyp(cx - px, cz - pz) || 1, k = Math.max(0.08, f - 0.5 / dd); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3 * cl; }
-    const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, H.camCap(cx, cz, gy, Math.max(gy, H.camG(cx, cz, gy)) + Math.max(0.6, ht + lift + (inCar && !P.car.heli ? camPitch * 6 : 0))), cz); if (ceil < Infinity) want.y = Math.min(want.y, Math.max(gy + 0.9, ceil - 0.45)); /* under a ceiling (or about to go under one) the camera is under it however high the ground round it is: the edge of a trench */ const ld_ = inCar ? (P.car.heli ? 5 * clamp(1 - camPitch / 1.2, 0, 1) : 5) : 2; look = new THREE.Vector3(px + hx * ld_, gy + (inCar ? 1.3 : 1.5), pz + hz * ld_);
+    const f = rayCam(px, pz, cx, cz, wy); let lift = 0; if (f < 1) { const dd = hyp(cx - px, cz - pz) || 1, k = Math.max(0.08, f - 0.5 / dd); cx = px + (cx - px) * k; cz = pz + (cz - pz) * k; lift = (1 - k) * 3 * cl; }
+    const gy = inCar ? P.car.y : P.y; want = new THREE.Vector3(cx, H.camCap(cx, cz, gy, Math.max(gy, H.camG(cx, cz, gy)) + Math.max(0.6, ht + lift + (inCar && !P.car.heli ? camPitch * 6 : 0))), cz); const ld_ = inCar ? (P.car.heli ? 5 * clamp(1 - camPitch / 1.2, 0, 1) : 5) : 2; look = new THREE.Vector3(px + hx * ld_, gy + (inCar ? 1.3 : 1.5), pz + hz * ld_);
   }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
   // the camera rides along with what it follows and the smoothing below only softens turns and walls: chasing the car itself, a frame that
   // comes late (the phone busy for a moment) let the camera catch up a metre at once and the car looked shoved back
   const subj = inCar ? P.car : P, suby = inCar ? P.car.y : P.y, C = updCamera;
-  const ride_ = C.s === subj && hyp(px - C.x, pz - C.z) < 20; if (ride_) { const d = _camD.set(px - C.x, suby - C.y, pz - C.z); camPos.add(d); camLook.add(d); }
+  if (C.s === subj && hyp(px - C.x, pz - C.z) < 20) { const d = _camD.set(px - C.x, suby - C.y, pz - C.z); camPos.add(d); camLook.add(d); }
   C.s = subj; C.x = px; C.y = suby; C.z = pz;
   const k = camMode === 2 && fpDone ? 1 : 1 - Math.exp(-(camMode === 2 ? FP_ZOOM : camMode === 1 ? 5 : (Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12) ? 40 : !inCar && camFree ? CAMF.posK : inCar && P.car.heli ? HELI.camK : 7.5) * dt);
-  { const bx_ = camPos.x, by_ = camPos.y, bz_ = camPos.z; camPos.lerp(want, k); const st_ = Math.hypot(camPos.x - bx_, camPos.y - by_, camPos.z - bz_), cap_ = CAM_VMAX * dt; if (camMode === 0 && ride_ && st_ > cap_ && Math.hypot(bx_ - want.x, by_ - want.y, bz_ - want.z) < 30 && !(Math.abs(GP.lookx || 0) > 0.12 || Math.abs(GP.looky || 0) > 0.12)) { const q_ = cap_ / st_; camPos.set(bx_ + (camPos.x - bx_) * q_, by_ + (camPos.y - by_) * q_, bz_ + (camPos.z - bz_) * q_); } } /* round the subject the camera glides at most CAM_VMAX m/s on its own (from far away, after a jump, it goes as ever) */ camLook.lerp(look, camMode === 2 && fpDone ? 1 : 1 - Math.exp(-12 * dt));
+  camPos.lerp(want, k); camLook.lerp(look, camMode === 2 && fpDone ? 1 : 1 - Math.exp(-12 * dt));
   /* going into first person is a soft zoom in, as coming out is a zoom out; once the camera is at the eyes it is locked on with no delay */
   if (camMode !== 2) fpDone = false; else if (!fpDone && camPos.distanceTo(want) < 0.12 && camLook.distanceTo(look) < 0.3) fpDone = true;
   if (camMode !== 1) { /* never inside a wall: the glide may cut a corner, so pull the camera back in front of the first wall between subject and camera */
-    const g = rayCam(px, pz, camPos.x, camPos.z, camPos.y, suby + (inCar ? 1.3 : 1.5));
+    const g = rayCam(px, pz, camPos.x, camPos.z, camPos.y);
     if (g < 1) { const dd = hyp(camPos.x - px, camPos.z - pz) || 1, kk = Math.max(0.05, g - 0.5 / dd), tx_ = px + (camPos.x - px) * kk, tz_ = pz + (camPos.z - pz) * kk, sl_ = hyp(tx_ - camPos.x, tz_ - camPos.z) > 0.4 ? 1 - Math.exp(-CAM_WALL * dt) : 1; /* a small correction is exact; a big one (the walker jumped past a wall edge) is a quick glide, not a jump */ camPos.x += (tx_ - camPos.x) * sl_; camPos.z += (tz_ - camPos.z) * sl_; }
-    { const ay_ = suby + (inCar ? 1.3 : 1.5); let hi_ = Infinity, lo_ = -Infinity; for (let i_ = 1; i_ <= 6; i_++) { const t_ = i_ / 6, x_ = px + (camPos.x - px) * t_, z_ = pz + (camPos.z - pz) * t_; for (const [b_, tp_] of camSlabs(x_, z_)) { if (ay_ < b_ - 0.45) hi_ = Math.min(hi_, ay_ + (b_ - 0.45 - ay_) / t_); else if (ay_ > tp_ + 0.45) lo_ = Math.max(lo_, ay_ + (tp_ + 0.45 - ay_) / t_); } } if (camPos.y > hi_) camPos.y = Math.max(hi_, ay_ - 0.5); else if (camPos.y < lo_) camPos.y = lo_; } /* never in a deck or in the cover of an underpass, nor with one between it and the subject: down under it or up over it, on the subject's side */
   }
   if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */
   camera.position.copy(camPos);
@@ -13435,14 +13189,14 @@ function frame(t) {
   const m_ = DEBUG ? dbgBegin(t) : null;
   let dt = Math.min(0.1, (t - last) / 1000); last = t;
   pollPad();
-  if ((running || titolo) && !paused && !TELE) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); if (DEBUG) for (const v of [...VEH, ...HELIS]) if (v.health < 100 && !v.exploded) v.health = 100; acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
-  if (titolo) titoloTick();
+  if (running && !paused && !TELE) { acc += dt; let n = 0; while (acc >= 1 / 60 && n < 5) { interpSnap(); step(1 / 60); if (DEBUG) for (const v of [...VEH, ...HELIS]) if (v.health < 100 && !v.exploded) v.health = 100; acc -= 1 / 60; n++; } if (n === 5) acc = 0; }
+  else if (!running) { now += dt; P.h += dt * 0.08; } // slow orbit behind the title
   if (m_) dbgMk(m_, 'sim');
   { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (m_) dbgMk(m_, 'tile'); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   if (m_) dbgMk(m_, 'sim');
-  const ipol = (running || titolo) && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;
-  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt); updDebugHud((running || titolo) && !paused ? dt : 0);
-  updCamera(dt); updGlow(); updSkyFx((running || titolo) && !paused ? dt : 0);
+  const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;
+  updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);
+  updCamera(running ? dt : dt * 0.4); updGlow(); updSkyFx(running && !paused ? dt : 0);
   if (running) { updHud(dt); updAudio(); updSfx(dt); }
   if (m_) dbgMk(m_, 'vis');
   const g_ = m_ ? dbgGpuBegin() : 0;
@@ -13452,15 +13206,14 @@ function frame(t) {
   if (m_) dbgEnd(m_);
 }
 function startGame() {
-  if (!running && tFade !== 2) { if (!tFade) { tFade = 1; $('fade').classList.add('on'); audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume(); /* the sound is made while the click still counts as a gesture */ setTimeout(() => { tFade = 2; startGame(); }, 340); } return; } /* GIOCA: the screen goes dark first, the camera cut happens under it */
-  if (running) return; running = true; titoloFine(); if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
+  if (running) return; running = true; if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */ $('start').hidden = true; audioInit(); if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume();
   camInit = false; banner(META.partenza.via, META.partenza.comune); setTimeout(() => { if (P.mode === 'foot') toast('Entra nella Ferari! (' + (GP.seen ? (GP.ps ? '△' : 'Y') : 'F') + ')'); }, 1600);
 }
 $('go').addEventListener('click', startGame);
-function boot(saved) { setupWorld(saved || {}); vetrinaShader(); titoloIniz(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'GIOCA'; }
+function boot(saved) { setupWorld(saved || {}); vetrinaShader(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }
 window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { facAggiorna, FAC_STATO, FAC_PARTS, facCoperto, facBalLibero, HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, GATE_ANG, gateVivo, gateAnta, barBreak, breakGate, breakProp, PROP_FALL, CADUTA, FALL, staccaAnta, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { facAggiorna, FAC_STATO, FAC_PARTS, facCoperto, facBalLibero, HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, GATE_ANG, gateVivo, gateAnta, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>

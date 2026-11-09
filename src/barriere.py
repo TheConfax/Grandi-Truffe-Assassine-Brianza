@@ -129,7 +129,7 @@ def fondi_doppi(items, dist_strada, prio=None):
         if m < 2: surv[i] = [li]; continue
         mid = (pts[:-1] + pts[1:]) / 2; P = shapely.points(mid)
         dr = np.diff(pts, axis=0); nn = np.hypot(*dr.T); nn[nn == 0] = 1; dr = dr / nn[:, None]
-        mark = np.zeros(len(mid), bool)
+        mark = np.zeros(len(mid), bool); mark_in = np.zeros(len(mid), bool)   # mark_in: beside the other divider along its length, not past its end (a piece that goes on in line with it is no double)
         for jj in tree.query(li.buffer(DOPPIO_D)):
             j = order[jj]
             if rank[j] >= rank[i] or j not in surv: continue
@@ -142,13 +142,14 @@ def fondi_doppi(items, dist_strada, prio=None):
                 dm = b - a; nm = np.hypot(*dm.T); nm[nm == 0] = 1; dm = dm / nm[:, None]
                 ok = np.abs((dm * dr[c]).sum(1)) > DOPPIO_COS
                 mark[np.nonzero(c)[0][ok]] = True
+                mark_in[np.nonzero(c)[0][ok & (pr > 0.05) & (pr < M.length - 0.05)]] = True
         # runs of marked half-metres of at least DOPPIO_L are removed; shorter ones stay (a corner, a crossing)
         cut = np.zeros(len(mid), bool); s = None
         for q in range(len(mid) + 1):
             if q < len(mid) and mark[q]:
                 if s is None: s = q
             elif s is not None:
-                if nn[s:q].sum() >= DOPPIO_L: cut[s:q] = True
+                if nn[s:q].sum() >= DOPPIO_L or (nn.sum() >= 1.0 and nn[s:q].sum() >= 0.9 * nn.sum() and mark_in[s:q].all()): cut[s:q] = True   # or the whole short piece lies beside a stronger divider (a rail on a low wall in front of a wall: Jolly Pub alley, 8/11)
                 s = None
         if not cut.any(): surv[i] = [li]; continue
         FUSI['linee_toccate'] += 1; FUSI['metri_tolti'] += float(nn[cut].sum())

@@ -10,17 +10,17 @@
    ],
    "pezzo_sciolto_m": 8.0
   },
-  "varchi_trovati": 101,
-  "chiusi": 36,
-  "metri_chiusi": 151.7,
+  "varchi_trovati": 100,
+  "chiusi": 35,
+  "metri_chiusi": 144.8,
   "pezzi_sciolti_spostati": 1,
   "aperti_per_motivo": {
-   "una via che attraversa": 12,
-   "edificio": 21,
-   "banchina": 5,
+   "una via che attraversa": 10,
+   "edificio": 19,
+   "banchina": 6,
    "carreggiata": 1,
-   "cancello": 13,
-   "passaggio a livello": 11,
+   "cancello": 14,
+   "passaggio a livello": 13,
    "sul binario": 2
   },
   "da_chiudere": 0,
@@ -299,7 +299,7 @@
     "x": 739.5,
     "z": -1113.2,
     "m": 7.0,
-    "esito": "chiuso"
+    "esito": "cancello"
    },
    {
     "x": 3635.9,
@@ -437,7 +437,7 @@
     "x": -142.0,
     "z": -155.0,
     "m": 11.0,
-    "esito": "una via che attraversa"
+    "esito": "passaggio a livello"
    },
    {
     "x": -2115.5,
@@ -509,7 +509,7 @@
     "x": -145.7,
     "z": -159.8,
     "m": 14.0,
-    "esito": "una via che attraversa"
+    "esito": "passaggio a livello"
    },
    {
     "x": -1106.3,
@@ -533,7 +533,7 @@
     "x": 368.0,
     "z": -538.2,
     "m": 1.5,
-    "esito": "edificio"
+    "esito": "banchina"
    },
    {
     "x": -984.6,
@@ -551,6 +551,12 @@
     "x": -821.1,
     "z": 428.4,
     "m": 3.5,
+    "esito": "cancello"
+   },
+   {
+    "x": 892.9,
+    "z": -1531.2,
+    "m": 3.7,
     "esito": "cancello"
    },
    {
@@ -602,12 +608,6 @@
     "esito": "edificio"
    },
    {
-    "x": 890.9,
-    "z": -1526.5,
-    "m": 9.6,
-    "esito": "cancello"
-   },
-   {
     "x": -273.2,
     "z": -60.0,
     "m": 9.9,
@@ -624,28 +624,28 @@
     "z": 900.2,
     "m": 10.8,
     "esito": "edificio"
-   },
-   {
-    "x": -993.8,
-    "z": 1518.8,
-    "m": 12.3,
-    "esito": "edificio"
    }
   ],
   "misti": {
    "limite_m": 6.0,
-   "trovati": 112,
-   "chiusi": 43,
+   "trovati": 114,
+   "chiusi": 42,
    "aperti_per_motivo": {
+    "cancello": 28,
     "una via che attraversa": 7,
     "edificio": 13,
-    "cancello": 25,
-    "carreggiata": 4,
+    "carreggiata": 3,
     "sul binario": 7,
-    "banchina": 8,
+    "banchina": 9,
     "passaggio a livello": 5
    },
    "elenco": [
+    {
+     "x": 892.8,
+     "z": -1531.5,
+     "m": 3.4,
+     "esito": "cancello"
+    },
     {
      "x": 528.8,
      "z": -650.8,
@@ -683,16 +683,10 @@
      "esito": "edificio"
     },
     {
-     "x": 892.2,
-     "z": -1530.6,
-     "m": 1.4,
-     "esito": "cancello"
-    },
-    {
      "x": 889.3,
      "z": -1524.1,
      "m": 4.2,
-     "esito": "carreggiata"
+     "esito": "cancello"
     },
     {
      "x": 891.6,
@@ -767,6 +761,12 @@
      "esito": "edificio"
     },
     {
+     "x": 430.3,
+     "z": 274.1,
+     "m": 3.8,
+     "esito": "edificio"
+    },
+    {
      "x": 70.7,
      "z": 206.7,
      "m": 3.7,
@@ -827,6 +827,12 @@
      "esito": "sul binario"
     },
     {
+     "x": -267.3,
+     "z": -64.4,
+     "m": 3.7,
+     "esito": "cancello"
+    },
+    {
      "x": 766.1,
      "z": -1232.1,
      "m": 1.0,
@@ -866,7 +872,7 @@
      "x": 265.9,
      "z": 265.8,
      "m": 4.5,
-     "esito": "chiuso"
+     "esito": "cancello"
     },
     {
      "x": -821.1,
@@ -1073,9 +1079,9 @@
      "esito": "chiuso"
     },
     {
-     "x": -1001.1,
-     "z": 1469.9,
-     "m": 3.6,
+     "x": -1001.2,
+     "z": 1468.9,
+     "m": 5.6,
      "esito": "cancello"
     },
     {
@@ -1292,7 +1298,7 @@
      "x": 368.0,
      "z": -538.2,
      "m": 1.5,
-     "esito": "edificio"
+     "esito": "banchina"
     },
     {
      "x": 444.8,

@@ -72,16 +72,57 @@ def cancelli_doppi(gates):
     return out
 
 
-def togli_cancelli_doppi(gates, prio):
+IMBOCCO_D = 8.0     # m: (Carlo 9/11, via Verga a Seveso x -574 z 934) two gates one behind the other on the same mouth, this near, are one gate
+IMBOCCO_COS = 0.866  # the same way within 30 degrees
+IMBOCCO_COPRE = 0.5  # the shorter one, seen along the mouth, lies in front of the longer one for at least this share of its width
+
+
+def cancelli_stesso_imbocco_coppie(gates, edifici=None):
+    """pairs (i, j), i < j, of gates one behind the other on the same mouth: running the same way, the shorter one in front of the other (projected across
+    onto its line) for IMBOCCO_COPRE of its width or more, within IMBOCCO_D, no building between them; gates: [(x0, z0, x1, z1)] in m; edifici: [Polygon] or None"""
+    seg = [LineString([(g[0], g[1]), (g[2], g[3])]) if math.dist(g[:2], g[2:4]) > 0.5 else None for g in gates]
+    idx = [i for i, l in enumerate(seg) if l is not None]
+    if not idx: return []
+    tree = STRtree([seg[i] for i in idx]); ET = STRtree(edifici) if edifici else None; out = []
+    for i in idx:
+        a = seg[i]; ua = ((gates[i][2] - gates[i][0]) / a.length, (gates[i][3] - gates[i][1]) / a.length)
+        for jj in tree.query(a.buffer(IMBOCCO_D)):
+            j = idx[jj]
+            if j <= i: continue
+            b = seg[j]; ub = ((gates[j][2] - gates[j][0]) / b.length, (gates[j][3] - gates[j][1]) / b.length)
+            if abs(ua[0] * ub[0] + ua[1] * ub[1]) < IMBOCCO_COS or a.distance(b) > IMBOCCO_D: continue
+            sh, lg = (a, b) if a.length <= b.length else (b, a)
+            s0, s1 = sorted((lg.project(Point(sh.coords[0])), lg.project(Point(sh.coords[-1]))))
+            # the projection clamps at the ends of the longer one: what is left is the part of the shorter one in front of it
+            if s1 - s0 < IMBOCCO_COPRE * sh.length: continue
+            if ET is not None:
+                H = LineString([sh.interpolate(0.5, normalized=True), lg.interpolate(lg.project(sh.interpolate(0.5, normalized=True)))])
+                if H.length > 0.05 and any(edifici[k].intersects(H) for k in ET.query(H)): continue
+            out.append((i, j))
+    return out
+
+
+def togli_cancelli_doppi(gates, prio, dstr=None, edifici=None, varco=True, imbocco=True):
     """gates: the gate_out list ([x0, z0, x1, z1, ...] in decimetres); prio: f(gate) -> 0 OSM, 1 DBGT, 2 derived. Of two gates on the same varco (see cancelli_doppi)
-    the one with the lower priority goes (of the same priority the later one). Returns the gates left and how many went per priority"""
+    the one with the lower priority goes (of the same priority the later one). Then, of two gates one behind the other on the same mouth (cancelli_stesso_imbocco_coppie),
+    the one of the weaker source goes; of the same source the one farther from the street (dstr: f(LineString) -> m), where a person would not put it.
+    Returns the gates left and how many went per priority (the second rule counted under 'imbocco')"""
     segs = [(g[0] / 10, g[1] / 10, g[2] / 10, g[3] / 10) for g in gates]
-    dup = cancelli_doppi_coppie(segs); tolti = set(); per = {0: 0, 1: 0, 2: 0}
+    dup = cancelli_doppi_coppie(segs) if varco else []; tolti = set(); per = {0: 0, 1: 0, 2: 0, 'imbocco': 0}
     for i, j in sorted(dup):
         if i in tolti or j in tolti: continue
         pi_, pj_ = prio(gates[i]), prio(gates[j])
         k = j if pj_ >= pi_ else i
         tolti.add(k); per[prio(gates[k])] += 1
+    for i, j in (sorted(cancelli_stesso_imbocco_coppie(segs, edifici)) if imbocco else []):
+        if i in tolti or j in tolti or gates[i][4] == 'l' or gates[j][4] == 'l': continue
+        pi_, pj_ = prio(gates[i]), prio(gates[j])
+        if pi_ != pj_: k = j if pj_ > pi_ else i
+        elif dstr is not None:
+            di_, dj_ = dstr(LineString([segs[i][:2], segs[i][2:]])), dstr(LineString([segs[j][:2], segs[j][2:]]))
+            k = j if dj_ >= di_ else i
+        else: k = j
+        tolti.add(k); per['imbocco'] += 1
     return [g for k, g in enumerate(gates) if k not in tolti], per
 
 
