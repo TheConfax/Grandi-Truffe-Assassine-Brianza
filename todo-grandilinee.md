@@ -11,11 +11,10 @@ Deciso con Carlo il 9/11/2026 notte. I dettagli e lo stato di ogni voce stanno i
 - "Nastro unico" di strade, ponti e fiumi: si parte dai 10 posti peggiori (cavalcavia, attraversamenti dei fiumi).
 - Recinzioni e cancelli: varchi rimasti, doppioni, lotti privati.
 - Terreno ondulato, case che escono come garage, alberi nei cantieri.
-- Kit per gli edifici pubblici (scuole, chiese, cappelle dei cimiteri).
 
 ## 2. Estensione della mappa
 - Altri comuni: tutte le regole sono già generali, poi un giro di controllo sulla mappa nuova.
-- Dopo l'estensione, a mappa fissata: srosatura degli edifici (macro-azione).
+- Dopo l'estensione, a mappa fissata: srosatura degli edifici (macro-azione) insieme al kit per gli edifici pubblici (scuole, chiese, cappelle dei cimiteri).
 
 ## 3. Gameplay di base
 - Veicoli rifatti: derapate (asfalto ed erba), dossi che fanno saltare, impennate e stoppie fino a 45°.
