@@ -172,7 +172,6 @@ function parkTile(T) {
       if (add(m, x, z, Math.atan2(ux, uz) + (side < 0 ? Math.PI : 0), 'bordo')) kerb++;
     }
   }
-  parkCaserme(T);
 }
 function parkTick() {
   for (const T of VIVI) {
@@ -257,11 +256,11 @@ rep("""function setupWorld(saved) {
   for (const T of TILES) T.dist = hyp(T.cx - STATION.x, T.cz - STATION.z);
   parkTick();""")
 rep("P.h = h; P.y = surfY(P.x, P.z); for (const v of VEH) { v.y = surfY(v.x, v.z); v.sync(); }", "P.h = h; P.y = H.surface(P.x, P.z); mine.y = H.surface(mine.x, mine.z); mine.sync();")
-rep("""  updVisuals(running && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
-  updVisuals(running && !paused ? dt : 0);""")
-rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); vetrinaShader(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'ACCENDI IL MOTORE'; }")
+rep("""  updVisuals((running || titolo) && !paused ? dt : 0);""", """  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
+  updVisuals((running || titolo) && !paused ? dt : 0);""")
+rep("function boot(saved) { setupWorld(saved || {}); requestAnimationFrame(frame); }", "function boot(saved) { setupWorld(saved || {}); vetrinaShader(); titoloIniz(); requestAnimationFrame(frame); goBtn.disabled = false; goBtn.textContent = 'GIOCA'; }")
 rep("window.__G = { D, LX, MODELS, Vehicle,", "window.__G = { VIVI, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS,")
-rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, CASERME, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };")
+rep("enterExit, startGame, TR };", "enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };")
 rep("const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h);", "const mine = new Vehicle('panda', '#c8332b', p0[0] + Math.sin(h) * 4, p0[1] + Math.cos(h) * 4, h); mine.moved = true;")
 # a moved parked car is no longer recycled
 rep("        a.impact(-rv * 0.8); b.impact(-rv * 0.8);", "        a.impact(-rv * 0.8); b.impact(-rv * 0.8); a.moved = b.moved = true;")
@@ -404,7 +403,7 @@ rep("const sp = (K.up ? 1 : K.down ? -0.5 : 0) * (K.hand || K.turbo ? 7.2 : 4.2)
     "        P.h = wrapA(P.h + tn_); sp = clamp(m_ / 0.9, 0, 1) * (4.2 + GP.sprint) * (0.45 + 0.55 * Math.max(0, Math.cos(dh_)));\n"
     "      }")
 rep("((K.horn && P.mode === 'car') ? 0.12", "(((K.horn || GP.horn > 0.5) && P.mode === 'car') ? 0.12")
-rep("  if (running && !paused && !TELE) { acc += dt;", "  pollPad();\n  if (running && !paused && !TELE) { acc += dt;")
+rep("  if ((running || titolo) && !paused && !TELE) { acc += dt;", "  pollPad();\n  if ((running || titolo) && !paused && !TELE) { acc += dt;")
 rep("<p>Premi <kbd>P</kbd> per riprendere</p>", "<p id=\"padline\" hidden></p><p>Premi <kbd>P</kbd> per riprendere</p>")
 # get out at any speed: you tumble out and the car rolls on
 rep("    const v = P.car; if (v.speed > 5) { toast('Frena prima di scendere'); return; }", "    const v = P.car, fast = v.speed > 6;")
@@ -436,7 +435,7 @@ rep("#start h1 { font-family: var(--display);", "#start h1 { color: var(--ocra) 
 # ---- day & night, car damage
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'extras.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("updSignals(); updGates(dt); updFountains();", "updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWrecks(dt); updFuel(dt); updProps(dt); updOggetti(dt);")
-rep("  updCamera(running ? dt : dt * 0.4);", "  updCamera(running ? dt : dt * 0.4); updGlow();")
+rep("  updCamera(dt);", "  updCamera(dt); updGlow();")
 rep("    add(boxG(S.W, S.bh, S.L), paint, 0, by, 0);", "    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);")
 rep("  scene.add(g);\n  return { g, body, wheels, rider, crew };", "  if (!S.ape) { const hp = new THREE.Mesh(makeCar.hp || (makeCar.hp = new THREE.PlaneGeometry(3.4, 9).rotateX(-Math.PI / 2)), HEADPOOL_MAT); hp.position.set(0, 0.14, hl + 4.4); if (S.two) hp.scale.set(0.6, 1, 0.75); hp.renderOrder = 12; g.add(hp); body.userData.hp = hp; }\n  scene.add(g);\n  return { g, body, wheels, rider, crew, bm: typeof bm !== 'undefined' ? bm : null, paint };")
 rep("""  impact(v) {
@@ -482,7 +481,7 @@ rep("KeyN: 'turbo', KeyH: 'horn' };", "KeyH: 'horn', KeyQ: 'back', KeyE: 'fwdw' 
 rep("v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false;", "v.inp.hand = K.hand || GP.hand > 0.5 ? 1 : 0; v.sleep = false; v.inp.lean = clamp((K.back ? 1 : 0) - (K.fwdw ? 1 : 0) - GP.fwd, -1, 1);")
 rep("  if (e.code === 'KeyN') skipTime(2);", "  if (e.code === 'KeyN') skipTime(2);\n  if (e.code === 'KeyR') toggleRadio();")
 
-rep("  updVisuals(running && !paused ? dt : 0);", "  updVisuals(running && !paused ? dt : 0); updRadio(dt);")
+rep("  updVisuals((running || titolo) && !paused ? dt : 0);", "  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);")
 rep("      <div><kbd>N</kbd> avanti di 2 ore</div>", "      <div><kbd>N</kbd> avanti di 2 ore</div>\n      <div><kbd>R</kbd> radio on/off (Discoradio, Radio Maria in volante)</div>")
 rep("<kbd>N</kbd> +2 ore · <kbd>B</kbd> segnala punto", "<kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>B</kbd> segnala punto")
 rep("CC BY 4.0.</p>", "CC BY 4.0. Edifici aggiuntivi e altezze: <a href=\"https://overturemaps.org\" target=\"_blank\" rel=\"noopener\">Overture Maps Foundation</a>, ODbL. Copertura del suolo: © ESA WorldCover project 2021, contiene dati Copernicus Sentinel modificati (2021) elaborati dal consorzio ESA WorldCover, CC BY 4.0. Radio: <a href=\"https://www.discoradio.it\" target=\"_blank\" rel=\"noopener\">Discoradio</a>, stream ufficiale; <a href=\"https://www.radiomaria.it\" target=\"_blank\" rel=\"noopener\">Radio Maria</a>. Cartelli stradali: disegni del Codice della Strada italiano su <a href=\"https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_Italy\" target=\"_blank\" rel=\"noopener\">Wikimedia Commons</a> (pubblico dominio; stop, passaggio obbligatorio, rotatoria, divieto di fermata e direzione obbligatoria: Flanker, CC BY-SA 3.0). Posizione di cartelli, lampioni e pali: <a href=\"https://www.mapillary.com\" target=\"_blank\" rel=\"noopener\">Mapillary</a> e i suoi contributori, CC BY-SA 4.0. Foto delle superfici (asfalto, prato, pavimenti, ghiaia, terra, ciottoli, intonaco): <a href=\"https://polyhaven.com\" target=\"_blank\" rel=\"noopener\">Poly Haven</a> e <a href=\"https://ambientcg.com\" target=\"_blank\" rel=\"noopener\">ambientCG</a>, CC0.</p>")
@@ -514,7 +513,7 @@ async function reportSpot() {
 rep("  if (!saved) { try { const a = JSON.parse(localStorage.getItem('gtaSpots') || '[]'); a.push(rec); localStorage.setItem('gtaSpots', JSON.stringify(a)); } catch (e) { } }",
     "  try { const a = spotsLocal(); a.push(rec); localStorage.setItem('gtaSpots', JSON.stringify(a)); } catch (e) { } updDbgMenu();")
 rep("(saved ? '' : ' (solo in locale)')", "(saved ? ' (anche su claude.ai)' : '')")
-rep("updVisuals(running && !paused ? dt : 0); updRadio(dt);", "updVisuals(running && !paused ? dt : 0); updRadio(dt); updDebugHud(running && !paused ? dt : 0);")
+rep("updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);", "updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt); updDebugHud((running || titolo) && !paused ? dt : 0);")
 rep("      <div><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>", "      <div class=\"dbg\"><kbd>B</kbd> / <kbd>R3</kbd> segnala un punto rotto</div>")
 rep("<kbd>B</kbd> segnala punto · ", "<span class=\"dbg\"><kbd>B</kbd> segnala punto · </span>")
 rep("<p id=\"padline\" hidden></p>", "<p id=\"padline\" hidden></p><p class=\"dbgline\"><span class=\"dbg\"><button id=\"dbgdl\" type=\"button\">⬇ Scarica segnalazioni</button> <button id=\"dbgclr\" type=\"button\">🗑 Svuota</button> </span><input id=\"dbgcode\" type=\"text\" spellcheck=\"false\" autocomplete=\"off\" placeholder=\"codice\" maxlength=\"12\"></p>")
@@ -561,22 +560,8 @@ rep("""  </div>
 })().catch(() => { }); // offline or inside claude.ai: no version line
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>""")
-# ---- caserme: parked volanti and agents on foot at the Carabinieri stations and Polizia Locale headquarters
-rep("function updVisuals(dt) {", open(os.path.join(HERE, 'police3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
-rep("updWrecks(dt); updFuel(dt);", "updWrecks(dt); updFuel(dt); updCaserme(dt);")
+# ---- caserme: tolte (Carlo 8/11, facciate-2: da rifare a mano); police3.js, i volanti parcheggiati, gli agenti a piedi e la porta nella storia git
 rep("updProps(dt); updOggetti(dt);", "updProps(dt); updOggetti(dt); updNegozi(dt);")
-rep("  missionStep(dt);\n}", "  updCaserme2(dt); missionStep(dt);\n}")
-rep("    if (p.state === 'flee') { p.t -= dt; spd = 5;", "    if (p.cop) { spd = copStep(p, dt); if (spd < 0) continue; }\n    else if (p.state === 'flee') { p.t -= dt; spd = 5;")
-rep("if (v === P.car) { crime(1, W.stars === 0 ? 'Pirata della strada! La Polizia Locale ti cerca.' : null);", "if (v === P.car) { crime(p.cop ? 2.5 : 1, p.cop ? 'Hai investito un agente!' : W.stars === 0 ? 'Pirata della strada! La Polizia Locale ti cerca.' : null);")
-rep("let close = false; for (const c of cs) if (hyp(c.x - P.x, c.z - P.z) < 6.5 && c.speed < 4) close = true;", "let close = footCopClose(); for (const c of cs) if (hyp(c.x - P.x, c.z - P.z) < 6.5 && c.speed < 4) close = true;")
-rep("if (wasCop) crime(2.5, 'Hai rubato un\\'auto della Polizia Locale!');", "if (wasCop) crime(2.5, 'Hai rubato ' + (best.color === CC_COL ? CC_NAME : PL_NAME) + '!');")
-rep("else if (cops().some(c => hyp(c.x - P.x, c.z - P.z) < 50)) crime(", "else if (cops().some(c => hyp(c.x - P.x, c.z - P.z) < 50) || footCopNear(40)) crime(")
-rep("    if (best.fallen) {", "    if (best.caserma && !best.taken && best.driver !== 'ai') { best.taken = true; crime(2, null); const msg = 'Hai rubato ' + (best.caserma.cc ? CC_NAME : PL_NAME) + ' davanti alla caserma!'; setTimeout(() => toast(msg), 1800); }\n    if (best.fallen) {")
-rep("near.kind === 'police' ? 'ruba l\\'auto della Polizia' :", "near.kind === 'police' ? 'ruba ' + (near.color === CC_COL ? 'la gazzella dei Carabinieri' : 'l\\'auto della Polizia') :")
-rep("${near.driver === 'ai' ? (", "${near.caserma && !near.taken && near.driver !== 'ai' ? 'ruba ' + (near.caserma.cc ? 'la gazzella dei Carabinieri' : 'l\\'auto della Polizia Locale') : near.driver === 'ai' ? (")
-rep("}${best.spec.name} · fino a", "}${best.color === CC_COL ? 'Gazzella dei Carabinieri' : best.spec.name} · fino a")
-# busted: you walk out of the door of the caserma
-rep("P.x = N[n][0]; P.z = N[n][1];", "P.x = N[n][0]; P.z = N[n][1]; const cz = kind === 'busted' && CASERME.find(c => c.p === spot); if (cz) { [P.x, P.z] = cz.at(0, 2.4); P.h = Math.atan2(cz.nx, cz.nz); cz.force = true; }")
 
 # ---- cheat codes in the pause menu: RESPAWN back to the start in Meda with the Ferari, FERARI spawns one
 rep("""function setupWorld(saved) {""", """function startSpot() { // the parking on via Yuri Gagarin in Meda, facing the fountain
@@ -622,13 +607,13 @@ rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'
 
 # ---- weather: clouds, rain, thunderstorms and fog; codes SOLE, NUVOLE, PIOGGIA, TEMPORALE, NEBBIA
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'weather3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
-rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'facciate3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("// ---------------------------------------------------------------- renderer\n", open(os.path.join(HERE, 'foto3_colori.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- renderer\n")
 rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>')  # the sky of foto3.js
 rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
 rep("v -= 21 * dt * i.brk;", "v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
-rep("updGlow();", "updGlow(); updSkyFx(running && !paused ? dt : 0);")
+rep("updGlow();", "updGlow(); updSkyFx((running || titolo) && !paused ? dt : 0);")
 rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), HELI: cheatHeli };")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
@@ -711,7 +696,7 @@ rep("  if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,",
     "  } else if (camMode === 1) {\n    camVA = Math.PI;\n    const ht = inCar ? 58 + sp * 0.9 : 36,")
 # debug mode: cars never break (health back to full after every physics step, so nothing reaches zero and burns)
 rep("interpSnap(); step(1 / 60);", "interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100;")
-rep("  updVisuals(running && !paused ? dt : 0); updRadio(dt);", "  const ipol = running && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  updVisuals(running && !paused ? dt : 0); updRadio(dt);")
+rep("  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);", "  const ipol = (running || titolo) && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);")
 rep("  renderer.render(scene, camera);\n}", "  renderer.render(scene, camera);\n  if (ipol) interpEnd(ipol);\n}")
 # ?x=..&z=.. in the address (START): the game starts there, on the nearest street, already at the wheel of the Ferari
 rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePed(p);\n}",
@@ -728,8 +713,8 @@ rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePe
     "      const cl_ = MODEL_COLS[START.mezzo], m2 = new Vehicle(START.mezzo, cl_ ? cl_[0] : '#c8332b', mine.x, mine.z, mine.h); m2.y = mine.y; m2.moved = true; mine.remove(); m2.sync();\n"
     "    }\n"
     "  }\n}")
-rep("function startGame() {\n  if (running) return; running = true;",
-    "function startGame() {\n  if (running) return; running = true; if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */")
+rep("  if (running) return; running = true; titoloFine();",
+    "  if (running) return; running = true; titoloFine(); if (START !== STATION && !START.piedi) setTimeout(() => { if (P.mode === 'foot') enterExit(); }, 50); /* started from a link: already in the car (with &piedi: on foot) */")
 # ---- the physics of the car in height (Carlo, 31/10: "manca la verticalita", "il motore fisico"): fisica3.js, every parameter is in FIS there. It replaces the jumps of 25/10
 # (a ballistic shadow on the bed): the player's vehicle stands on springs on its wheels and leaves the ground by itself; the driving on the ground, Vehicle.step, stays. The traffic keeps a plain height. docs/motore.md, "Salti"
 rep("const VEH = [];", """const VEH = [];
@@ -777,7 +762,7 @@ rep("if (s.r || s.dyn || s.y0 > cy) return; const ex = s.bx - s.ax, ez = s.bz - 
 rep("    const f = rayCam(px, pz, cx, cz, wy);", "    if (!inCar) { const tb_ = barTopOnRay(px, pz, cx, cz), wy0_ = wy; if (tb_ + 0.8 > wy0_) { ht += tb_ + 0.8 - wy0_; wy = tb_ + 0.8; } } /* over a barrier he can climb the camera looks over it */\n    const f = rayCam(px, pz, cx, cz, wy);")
 rep("    const wy = Math.max(fy, H.ground(cx, cz)) + ht;", "    let wy = H.camCap(cx, cz, fy, Math.max(fy, H.camG(cx, cz, fy)) + ht);")
 rep("  camera.position.copy(camPos);\n  if (shake > 0)", "  if (!inCar) { const C_ = updCamera; if (P.climb || P.air || P.land > 0) C_.hold = SALTO.camHold; else C_.hold = Math.max(0, (C_.hold || 0) - dt); const rx_ = camPos.x - px, ry_ = camPos.y - suby, rz_ = camPos.z - pz; if (C_.hold > 0 && C_.rel && camMode !== 2) { const ex_ = rx_ - C_.rel[0], ey_ = ry_ - C_.rel[1], ez_ = rz_ - C_.rel[2], el_ = Math.hypot(ex_, ey_, ez_), cap_ = SALTO.camV * dt; if (el_ > cap_) { const q_ = cap_ / el_; camPos.set(px + C_.rel[0] + ex_ * q_, suby + C_.rel[1] + ey_ * q_, pz + C_.rel[2] + ez_ * q_); } } C_.rel = [camPos.x - px, camPos.y - suby, camPos.z - pz]; } else updCamera.rel = null; /* no cuts during a gesture: round him the camera only glides */\n  camera.position.copy(camPos);\n  if (shake > 0)")
-rep("window.__G = { VIVI,", "window.__G = { FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
+rep("window.__G = { VIVI,", "window.__G = { FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, GATE_ANG, gateVivo, gateAnta, barBreak, breakGate, breakProp, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL,")
 # ---- a car off its wheels (Carlo, 1/11): fisica3.js. It steps with no grip, it turns round its waist, on its roof it is finished, he always gets out in a free place
 rep("    if (this.air) { this.stepAir(dt); return; }\n", "    if (this.air || (this.F && this.F.rig)) { this.stepAir(dt); return; }\n")
 rep("    const i = this.inp, k = 1 - 0.0004 * this.speed * dt;\n", "    const i = this.ko ? KO_INP : this.inp, k = 1 - 0.0004 * this.speed * dt;\n")
@@ -804,7 +789,7 @@ rep("    VEH.push(this); this.sync();", "    this.m.g.fVeh = this; VEH.push(this
 rep("async function reportSpot() {", open(os.path.join(HERE, 'misure3.js'), encoding='utf-8').read() + "\nasync function reportSpot() {")
 rep("  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();", "  const m_ = DEBUG ? dbgBegin(t) : null;\n  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();")
 rep("  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running &&", "  if (m_) dbgMk(m_, 'sim');\n  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (m_) dbgMk(m_, 'tile'); if (running &&")
-rep("  const ipol = running && !paused ? interpBegin(", "  if (m_) dbgMk(m_, 'sim');\n  const ipol = running && !paused ? interpBegin(")
+rep("  const ipol = (running || titolo) && !paused ? interpBegin(", "  if (m_) dbgMk(m_, 'sim');\n  const ipol = (running || titolo) && !paused ? interpBegin(")
 rep("  renderer.render(scene, camera);\n  if (ipol) interpEnd(ipol);\n}", "  if (m_) dbgMk(m_, 'vis');\n  const g_ = m_ ? dbgGpuBegin() : 0;\n  renderer.render(scene, camera);\n  if (m_) { dbgGpuEnd(g_); dbgMk(m_, 'draw'); }\n  if (ipol) interpEnd(ipol);\n  if (m_) dbgEnd(m_);\n}")
 rep("if (!DEBUG) { el.hidden = true; return; }", "if (!DEBUG) { el.hidden = true; if (MIS.el && !MIS.el.hidden) dbgOff(); return; }")
 rep("  spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }", "  rec.misure = MIS.txt; spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }")
@@ -869,5 +854,6 @@ rep("  if (veh) {\n    if (E[3]) { K.use = true;", "  if (kind === 'heli') {\n  
 rep("function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */\n  let best = 1;", "function rayCam(ax, az, bx, bz, cy) { /* like rayWalls, but walls that start above the camera (the sides of a raised portico) do not count */\n  const lo_ = P.mode === 'car' && P.car && P.car.heli ? Math.min(cy, P.car.y + 0.5) : -Infinity; /* from the helicopter: the walls whose top is under both ends do not count */\n  let best = 1;")
 rep("if (s.r || s.dyn || s.y0 > cy || s.off || (P.mode === 'foot' && saltoLowBar(s))) return;", "if (s.r || s.dyn || s.y0 > cy || s.off || (s.y0 !== undefined && (s.bt ? s.y1 - 3 : s.y1) < lo_) || (P.mode === 'foot' && saltoLowBar(s))) return;")
 rep("window.__G = { FARI,", "window.__G = { HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI,")
+rep("window.__G = { HELIS,", "window.__G = { facAggiorna, FAC_STATO, FAC_PARTS, facCoperto, facBalLibero, HELIS,")  # the facades 2.0 (facciate3.js): the 3D windows round the camera, for the photos
 rep("const v = P.mode === 'car' ? P.car : null; if (!v || bumpT > 0 || v.speed < 7) return;", "const v = P.mode === 'car' ? P.car : null; if (!v || v.heli || bumpT > 0 || v.speed < 7) return;")
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)

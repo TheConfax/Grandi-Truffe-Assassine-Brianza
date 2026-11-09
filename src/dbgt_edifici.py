@@ -60,6 +60,7 @@ TETTI_PROC = max(1, min(12, (os.cpu_count() or 4) - 2))
 # of 14 m2 and 19.6 m at x 283 z -608 where there is a house of two floors), Edifici.altezze_dal_dsm:
 ALTO_DZ, ALTO_LISCIO = 6.0, 1.5   # a part of a ground volume where the DSM stands this far over its top and is smooth (max - min in 3x3 under this)
 ALTO_MIN, ALTO_SH, ALTO_LISCI = 40.0, 0.15, 0.3   # ... a block this big (m2 and share of the volume, this share of it smooth) is a taller part
+CONF_REL = 0.15   # ... and at least as high as the block less this share of its height above the ground, if that is more than CONF_DZ (a 31 m block, 27.1 m of the tower: 3.8 m, Carlo 8/11 second time)
 CONF_DZ, CONF_D = 3.0, 40.0   # ... drawn at the DSM's height only where another volume of the same building within CONF_D m stands at least as high,
                    # less CONF_DZ: the DBGT has a body that tall, it drew this part low (Carlo 8/11: x 498 z -319, a block 24.3 m high by a tower
                    # of 27.1 m; at first within 2 m either way). Without it the volume stays (edificio 525 at x 210 z -605, Carlo:
@@ -528,6 +529,7 @@ class Edifici:
                                        lv=_num(tg.get('building:levels')), zt=round(v['z0'] + v['av'] - self.base, 2))
                 ho = [list(map(tuple, np.asarray(h.coords)[:-1])) for h in p.interiors if len(h.coords) >= 4]
                 if ho: rec['k'] = ho
+                rec['du'] = e['uso']; rec['dk'] = e['kind']; rec['dty'] = e['ty']; rec['tg'] = tg   # what the building is used for, for the public ones (src/pubblici.py)
                 if tg.get('building:colour'): rec['wc'] = tg['building:colour'][:20]
                 if tg.get('roof:colour'): rec['rcol'] = tg['roof:colour'][:20]
                 if tg.get('roof:shape'): rec['rs'] = tg['roof:shape']
@@ -776,7 +778,8 @@ class Edifici:
             ztn = md + f['eave'] if f.get('k') in ('gable', 'hip', 'shed') and -4.0 <= f.get('eave', 1) <= 0 else md   # the eaves, as UN_VOL_AV
             ztn -= B
             ss = [(w['zt'], w_p.distance(q)) for i_, w in sib[r['e']] if i_ != id(r) and i_ not in tolti for w_p in [Polygon(w['p']).buffer(0)]]
-            ok = [s for s in ss if s[0] >= ztn - CONF_DZ and s[1] <= CONF_D]
+            tol = max(CONF_DZ, CONF_REL * (ztn - (r['zt'] - r['h'])))   # the DSM roof against the DBGT top of a body of the same building: the difference grows with the height
+            ok = [s for s in ss if s[0] >= ztn - tol and s[1] <= CONF_D]
             if ok: conf[key[0]].append((q, round(ztn, 2), min(ok, key=lambda s: s[1])))
             else:
                 near = min(ss, key=lambda s: (abs(s[0] - ztn), s[1])) if ss else None

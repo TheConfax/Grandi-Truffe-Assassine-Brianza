@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 import numpy as np, tifffile
 from pyproj import Transformer
 from shapely.geometry import LineString, Polygon, Point, box, GeometryCollection, MultiLineString, MultiPolygon
-from shapely.ops import unary_union, linemerge
+from shapely.ops import unary_union, linemerge, nearest_points
 from shapely.strtree import STRtree
 from shapely import prepare, segmentize as _segmentize
 
@@ -223,7 +223,7 @@ def add_building(outer, holes, t, key):
     if t.get('man_made') == 'water_tower': rec['wt'] = True; rec['h'] = num(t.get('height')) or max(rec['h'], 25)
     if a < 40 and (t.get('power') in ('substation', 'transformer') or bt == 'transformer_tower'): rec['mn'] = '01'  # a small OSM substation: the electric cabin model of the DBGT ones (g 5, paesaggio3.js lsCabina, default look)
     if holes: rec['k'] = [h for h in holes if len(h) >= 3]
-    rec['tg'] = {k_: t[k_] for k_ in ('building', 'building:levels', 'roof:shape', 'roof:colour', 'building:colour', 'name', 'amenity', 'man_made') if k_ in t}  # what a DBGT building takes from OSM (dbgt_edifici.py)
+    rec['tg'] = {k_: t[k_] for k_ in ('building', 'building:levels', 'roof:shape', 'roof:colour', 'building:colour', 'name', 'amenity', 'man_made', 'leisure', 'healthcare', 'office', 'government', 'emergency', 'railway', 'public_transport', 'tourism', 'historic') if k_ in t}  # what a DBGT building takes from OSM (dbgt_edifici.py)
     buildings.append(rec)
 mp_ways = set()
 for members, t in rels:
@@ -435,6 +435,7 @@ for wid, (refs, t) in ways.items():
         pts = ring(refs)
         if len(pts) >= 3: land.append((k_, pts))
 log('terreni', len(land), dict(Counter(k.split(':')[0] + (':' + k.split(':')[1] if k.startswith('sport') else '') for k, _ in land)))
+_osm_bosco = [g for at, g in area_geoms if at in (11, 2)]  # OSM's own woods and parks, before WorldCover's come in: VERDE.aree wants wood from the crown only where OSM says wood or park too
 if WC is not None:
     osm_land = presto(lambda ag_: unary_union(ag_).buffer(1), [g for at, g in area_geoms])
     def _wc_fuori(cls_): return _wc_ap[cls_].result().difference(osm_land.result()).difference(_wc_roads.result()).intersection(RECT.buffer(40))  # never over a road
@@ -980,7 +981,7 @@ if not corridor.is_empty:
     parallel = _rbuf('parallel')
     corr = corridor.difference(parallel).difference(bunion)
     cut = corr.boundary.difference(openings).intersection(RECT.buffer(20))
-    merged = linemerge(cut) if not cut.is_empty and cut.geom_type in ('MultiLineString', 'LineString') else cut
+    merged = linemerge(cut) if not cut.is_empty and cut.geom_type == 'MultiLineString' else cut
     for l in (list(merged.geoms) if hasattr(merged, 'geoms') else [merged]):
         if isinstance(l, LineString) and l.length > 2: fences.append(list(l.simplify(0.15).coords))
 if dbt_walls:  # the railway fences stay where the DBGT has none of its own within 3 m (it does not map them all along the line)
@@ -1185,30 +1186,9 @@ if STR and STR.cortili and _dbt_i1 > _dbt_i0:
         _campioni['cancelli_cortile'].append((round(m_.x, 1), round(m_.y, 1), round(L_.length, 1)))
 log('bocche dei cortili -> cancelli', dict(_ccv))
 if STR: STR.rep['cancelli_cortile'] = dict(_ccv, dove=_campioni['cancelli_cortile'][:60])
-# police stations (amenity=police): the door looks onto the street, so the barrier between them opens there, as wide as the door and its canopy
-# (src/barriere.py facciata_su_strada; the game finds the same front, and takes it from the POI: pois[].fr). Where no front looks onto a street
-# nothing is opened
-from barriere import facciata_su_strada, apertura_ingresso
+# the police stations had an opening in the barrier in front of their door (4/11): gone with the stations themselves (Carlo 8/11, facciate-2:
+# the caserme are to be made again by hand); the code is in the git history (barriere.py facciata_su_strada, apertura_ingresso)
 pol_fronts = {}
-_polp = [nodes[r_] for r_, t_ in ntags.items() if t_.get('amenity') == 'police'] + [centroid(ring(refs_)) for wid_, (refs_, t_) in ways.items() if t_.get('amenity') == 'police' and refs_[0] == refs_[-1] and len(ring(refs_)) >= 3]
-if _polp:
-    _bt2 = STRtree([g for b_, g in _bl]); _st2 = [(r['line'], r['w']) for r in raw_roads if r['c'] <= 5 and flat(r) and r['line'].length > 0.1]
-    for p_ in _polp:
-        if not inside(p_, -15): continue
-        P_ = Point(p_); best_ = None
-        for j_ in _bt2.query(P_.buffer(40)):
-            b_, g_ = _bl[j_]
-            if b_['h'] < 3 or g_.geom_type != 'Polygon': continue
-            ins_ = g_.contains(P_); d_ = 0 if ins_ else g_.exterior.distance(P_)
-            sc_ = d_ - min(g_.area ** 0.5, 30) * 0.3
-            if (ins_ or d_ < 35) and (best_ is None or sc_ < best_[0]): best_ = (sc_, g_)
-        if best_ is None: continue
-        g_ = best_[1]; near_ = [o_ for o_ in (_bl[k_][1] for k_ in _bt2.query(g_.buffer(46))) if o_ is not g_]
-        f_ = facciata_su_strada(g_, near_, [(l_, w_) for l_, w_ in _st2 if l_.distance(g_) < 50])
-        if f_ is None: log('caserma senza facciata su una strada', p_); continue
-        a_, c_, mx_, mz_, nx_, nz_, t_ = f_
-        pc_cuts.append(apertura_ingresso(mx_, mz_, nx_, nz_, t_)); pol_fronts[(round(p_[0], 1), round(p_[1], 1))] = [a_[0], a_[1], c_[0], c_[1]]
-    log('caserme: aperture nelle recinzioni davanti alla porta', len(pol_fronts), 'su', len(_polp))
 _bc_parts_f = presto(lambda: ([r['line'].buffer(r['w'] / 2 + (0.5 if r['c'] <= 5 else 0.25), quad_segs=3) for r in raw_roads if r['c'] <= 6 and flat(r) and r['line'].length > 0.1], [g.buffer(0.2) for g in btree_geoms] + [g.buffer(1.8) for g in gates] + pc_cuts + ([g_ for g_ in (g.buffer(-0.3, join_style=2) for g in STR.carr_ponti) if not g_.is_empty] if STR else []) + ([g_.buffer(0.5) for g_ in (_Pp(b['p'], b.get('k', [])) for b in buildings if b.get('dbgt')) if g_ is not None] if ED else [])))  # the pieces the barriers are cut against (below), on a thread from here: all final
 # railway fill-in: along every track, wherever no fence or wall stands within 12 m on that side, a fence 4.2 m out from the outer track; open at
 # level crossings, platforms, buildings and the ends of the line (the corridor fences above only exist where OSM maps the railway land)
@@ -1217,7 +1197,7 @@ if railL:
     _xs, _tips = xpts, tips  # the same crossings and track ends as the corridor fences above
     _open = unary_union(_xs + [_plat06.result(), _bunb[0.3].result(), _have] + [Point(c_).buffer(9) for c_ in _tips]); del _plat06, _bunb[0.3], _openings_f
     _edge = _r42_f.pop().result().boundary.difference(_open).intersection(RECT.buffer(20))  # = unary_union([l.buffer(4.2, cap_style=2) for l in railL]).boundary...
-    _edge = linemerge(_edge) if not _edge.is_empty and _edge.geom_type in ('MultiLineString', 'LineString') else _edge
+    _edge = linemerge(_edge) if not _edge.is_empty and _edge.geom_type == 'MultiLineString' else _edge   # a single line is merged already (linemerge refuses it)
     nfill = 0
     for l in (list(_edge.geoms) if hasattr(_edge, 'geoms') else [_edge]):
         if isinstance(l, LineString) and l.length > 6: fences.append(list(l.simplify(0.15).coords)); nfill += 1
@@ -1308,7 +1288,7 @@ for r in raw_roads:
 node_bar = {}
 for bi, run in enumerate(bar_runs):
     for n_ in run: node_bar.setdefault(n_, bi)
-gate_out = []; doors_out = []
+gate_out = []; doors_out = []; _gpavset = set()   # the gates of the passages closed over pavement (the rule of the androni)
 _gov = PuntiVicini(gate_out, lambda g_: ((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20))   # the middles of the gates, as the checks below compute them (src/vicini.py); gate_out only grows until the gates in the carriageway go
 _cl = [(LineString(pts), h_, -1) for pts, k_, h_ in bar_out if len(pts) >= 2 and k_ != 6] + [(g_.boundary, 2.0, i_) for i_, (b_, g_) in enumerate(_bl) if g_ is not None]
 _clt = STRtree([c_[0] for c_ in _cl])
@@ -1550,6 +1530,17 @@ if dbt_pc:
             if not (any(_bg[j_].intersects(R12_) for j_ in _bgt.query(R12_)) or any(r_['line'].intersects(R12_) for r_ in (_rr[j_] for j_ in _rrt.query(R12_)))
                     or any(g_.intersects(R12_) and g_.intersection(R12_).area > 4 for g_ in _paved[1:])): return 'niente_dietro'
         return (a_, b_)
+    def _via_pubblica(a_, b_, nx_, nz_):
+        """the way that goes through the passage a_-b_ (the courtyard on the side of (nx_, nz_)) and is a public one: named, a street or a pedestrian street, or one that goes on beyond the courtyard
+        (Carlo 8/11, androni): the gate is not closed over it. A footway or a service road that ends in the courtyard does not count"""
+        S0_ = LineString([a_, b_]); wd_ = S0_.length; M0_ = S0_.centroid
+        strip_ = _vrett(a_, b_, nx_, nz_, 0.8, 9.0, 0.3)
+        for r_ in (_rr[j_] for j_ in _rrt.query(strip_)):
+            if not r_['line'].intersects(strip_) or r_['line'].intersection(strip_).length < 1.2: continue
+            if r_['c'] <= 3 or r_['c'] == 5 or r_['n'] >= 0: return True
+            L_ = r_['line']; pts_ = [L_.interpolate(i_ * 2.0) for i_ in range(int(L_.length // 2) + 1)]
+            if sum(1 for p0_ in pts_ if (p0_.x - M0_.x) * nx_ + (p0_.y - M0_.y) * nz_ > 14 and math.dist((p0_.x, p0_.y), (M0_.x, M0_.y)) < 70) >= 3: return True
+        return False
     _VDBG = [tuple(map(float, x_.split(','))) for x_ in os.environ.get('GTA_VARCHI_DEBUG', '').split(';') if x_]; _vdbg = None   # what became of the candidates near these points (x,z;x,z), in the log
     for p_, srcname_, dir_ in _cands + [((1e9, 1e9), None, None)]:
         if _vdbg is not None: log('varco debug', _vdbg[0], {k_: _gcc[k_] - v_ for k_, v_ in _vdbg[1].items() if isinstance(v_, int) and _gcc[k_] != v_}, {k_: v_ - _vdbg[2].get(k_, 0) for k_, v_ in _vrep.items() if v_ != _vdbg[2].get(k_, 0)}); _vdbg = None
@@ -1591,7 +1582,8 @@ if dbt_pc:
         if wd_ < (2.0 if dir_ else 1.0): _gcc['troppo_stretti'] += 1; continue
         if not dir_ and sum(1 for e_ in ext_ if e_ and e_[2] >= 0) == 2 and wd_ < 2.2: _gcc['capo_nel_vuoto'] += 1; continue  # a slot between two houses is not an entrance
         mid_ = G_.centroid
-        if any(g_.contains(G_.interpolate(t_, normalized=True)) for t_ in (0.1, 0.3, 0.5, 0.7, 0.9) for g_ in _paved_in): _gcc['carreggiata_o_marciapiede'] += 1; continue  # a gate never stands on any paved surface (street, square, pavement, footpath, car park); the 0.5 m along the edge of the surface do not count (the gate stands on the lot boundary, which the surface polygons overshoot by a few dm)
+        if any(g_.contains(G_.interpolate(t_, normalized=True)) for t_ in (0.1, 0.3, 0.5, 0.7, 0.9) for g_ in _paved_in): _gcc['carreggiata_o_marciapiede'] += 1; continue
+        # a gate never stands on any paved surface (street, square, pavement, footpath, car park); the 0.5 m along the edge of the surface do not count (the gate stands on the lot boundary, which the surface polygons overshoot by a few dm)
         if _gov.entro((mid_.x, mid_.y), 1.5) or _gdV.entro((mid_.x, mid_.y), 1.5): _gcc['gia_cancello'] += 1; continue
         if dir_ and not any(r_['c'] <= 3 and r_['line'].distance(mid_) <= r_['w'] / 2 + 4.5 for r_ in (_rr[j_] for j_ in _rrt.query(mid_.buffer(12)))): _gcc['senza_strada'] += 1; continue  # a fence end only counts on the boundary of a street
         if (_ucarr_in is not None and _ucarr_in.intersects(G_) and _ucarr_in.intersection(G_).length > 0.3) or (_asph_in.intersects(G_) and _asph_in.intersection(G_).length > 0.3) or (_side_in.intersects(G_) and _side_in.intersection(G_).length > 0.3): _gcc['carreggiata_o_marciapiede'] += 1; continue
@@ -1620,6 +1612,173 @@ if dbt_pc:
         _gd.append(tuple(mid_.coords[0])); _gcc['nuovi'] += 1; _src[srcname_] += 1
         if wd_ < 2.5: _gcc['pedonali'] += 1
         gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', round(hh_, 1), 0]); _vorig[id(gate_out[-1])] = srcname_; _vg_add(a_, b_, gate_out[-1])
+    # ---- the courtyards and the passages into them (Carlo 8/11, the courtyard comes first, not the passage). A courtyard is the space, green or paved, shut in by buildings all round; every gap between two
+    # buildings that leads into it from the street is closed, covered or open, straight, bent, narrow or wide, with its gate on the line of the facade on the street side. Pieces: (1) the gaps that closing the
+    # ground buildings by 3 m fills (necks up to 6 m); the open ones only when they lead into a courtyard (a free space of at most ACORTILE_MAX m2 once the gaps are filled in), the covered ones (a raised volume
+    # over them: an androne) always; (2) the free floor under a raised volume 30 m2 or more (a wide portico towards a garden). A piece is a passage when it has a mouth on the public side (within 14 m of a street)
+    # and another far from it that is not public too. Never closed: a public way through it (named, a street, or one that goes on beyond the courtyard). Wooden door or iron gate by the epoch of the building: decided
+    # at the end of the build, when the epoch is known (_gand)
+    ACORTILE_MAX = 3000.0
+    ACIECO_P = 6.0   # m: a covered passage closed at the back goes at least this deep into the block to be an androne (a porch, a doorway recess is less)
+    _acc = Counter(); _gnd = [g_ for b_, g_ in _bl if b_.get('zb') is None]; _gndt = STRtree(_gnd) if _gnd else None; _alti = [(b_, P(b_['p'], b_.get('k', []))) for b_ in (ED.alti if ED is not None else [])]
+    _alti = [(b_, g_) for b_, g_ in _alti if g_ is not None and not g_.is_empty and b_.get('zb') is not None and b_['zb'] - b_.get('zg', 0.0) <= 7.0]; _altit = STRtree([g_ for b_, g_ in _alti]) if _alti else None
+    _astr = [r_ for r_ in _rr if r_['c'] <= 3 or r_['c'] == 5]; _astrt = STRtree([r_['line'] for r_ in _astr]) if _astr else None
+    _apol = [p_ for g_ in (asph, side, parking) if g_ is not None and not g_.is_empty for p_ in (g_.geoms if hasattr(g_, 'geoms') else [g_])]; _apolt = STRtree(_apol) if _apol else None
+    def _a_dstr(P_):
+        """the distance of the point from the public places: the streets (to their edge), the carriageways, pavements and car parks"""
+        d_ = [_astr[j_]['line'].distance(P_) - _astr[j_]['w'] / 2 for j_ in _astrt.query(P_.buffer(12))] if _astrt is not None else []
+        d_ += [_apol[j_].distance(P_) + 4.0 for j_ in _apolt.query(P_.buffer(12))] if _apolt is not None else []   # a carriageway, pavement or car park 10 m away counts as a street 14 m away
+        return min(d_ or [1e9])
+    _aclr = [c_[0] for c_ in _cl if c_[2] < 0]; _aclrt = STRtree(_aclr) if _aclr else None
+    def _a_dstr_libera(P_):
+        """as _a_dstr, but a public place counts only when the straight way to it from the point crosses no fence or wall (_cl) and no ground
+        building: behind a fence a garden is private even 5 m from the street (Carlo 8/11, via Farga x -398 z -218)"""
+        best_ = 1e9
+        cands_ = [(_astr[j_]['line'], _astr[j_]['w'] / 2) for j_ in _astrt.query(P_.buffer(12))] if _astrt is not None else []
+        cands_ += [(_apol[j_], -4.0) for j_ in _apolt.query(P_.buffer(12))] if _apolt is not None else []
+        for g_, off_ in cands_:
+            d_ = g_.distance(P_) - off_
+            if d_ >= best_: continue
+            q_ = nearest_points(P_, g_)[1]; W_ = LineString([(P_.x, P_.y), (q_.x, q_.y)]) if P_.distance(q_) > 0.05 else None
+            if W_ is not None:
+                if _aclrt is not None and any(_aclr[j_].intersects(W_) for j_ in _aclrt.query(W_)): continue
+                if any(_gnd[j_].intersects(W_) for j_ in _gndt.query(W_)): continue
+            best_ = d_
+        return best_
+    def _a_bocche(Pz_):
+        """the mouths of a piece: the runs of its outline that do not lie on a wall of a ground building, as (a, b, length)"""
+        if not isinstance(Pz_, Polygon) or Pz_.is_empty: return []
+        near_ = [_gnd[j_] for j_ in _gndt.query(Pz_.buffer(1.5))]; Wl_ = unary_union(near_) if near_ else None
+        co_ = list(Pz_.exterior.coords); ed_ = []
+        for i_ in range(len(co_) - 1):
+            a_, b_ = co_[i_], co_[i_ + 1]; m_ = Point((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2)
+            ed_.append((a_, b_, Wl_ is None or Wl_.distance(m_) > 0.35))
+        k0_ = next((i_ for i_ in range(len(ed_)) if not ed_[i_][2]), None)
+        if k0_ is None: return []
+        ed_ = ed_[k0_:] + ed_[:k0_]; runs_ = []; cur_ = []
+        for a_, b_, op_ in ed_:
+            if op_: cur_.append((a_, b_))
+            elif cur_: runs_.append(cur_); cur_ = []
+        if cur_: runs_.append(cur_)
+        out_ = []
+        for run_ in runs_:   # a run turns into several mouths where it bends by more than 35 degrees
+            segs_ = [[run_[0]]]
+            for e_ in run_[1:]:
+                p_ = segs_[-1][-1]; an_ = abs(math.atan2(p_[1][1] - p_[0][1], p_[1][0] - p_[0][0]) - math.atan2(e_[1][1] - e_[0][1], e_[1][0] - e_[0][0])) % (2 * math.pi); an_ = min(an_, 2 * math.pi - an_)
+                if an_ > math.radians(35): segs_.append([e_])
+                else: segs_[-1].append(e_)
+            for s_ in segs_:
+                a_, b_ = s_[0][0], s_[-1][1]; L_ = math.dist(a_, b_)
+                if L_ >= 1.0: out_.append((a_, b_, L_))
+        return out_
+    _afree = None; _afreet = None
+    def _a_cortile_at(P_):
+        """the free space (the gaps filled in, the buildings and raised volumes taken away) that holds the point, or None"""
+        for j_ in _afreet.query(P_):
+            if _afree[j_].contains(P_): return _afree[j_]
+        return None
+    def _a_pezzo(Pz_, nome_, covered_):
+        cx_ = Pz_.centroid; dbg_ = any(math.dist((cx_.x, cx_.y), d_) < 25 for d_ in _VDBG)
+        def _arej(why_):
+            _acc[nome_ + ':' + why_] += 1
+            if dbg_: log('androne debug', nome_, round(cx_.x, 1), round(cx_.y, 1), 'area', round(Pz_.area, 1), why_)
+        ms_ = _a_bocche(Pz_); mg_ = []
+        for m_ in ms_:   # the short pieces of a mouth that bends (a chamfered corner) are one mouth: its door goes from end to end
+            if mg_ and math.dist(mg_[-1][1], m_[0]) < 0.3 and mg_[-1][2] < 3.5 and m_[2] < 3.5 and math.dist(mg_[-1][0], m_[1]) <= 6.0: mg_[-1] = (mg_[-1][0], m_[1], math.dist(mg_[-1][0], m_[1]))
+            else: mg_.append(m_)
+        ms_ = mg_
+        if len(ms_) == 1 and covered_:
+            m_ = ms_[0]; mx_, mz_ = (m_[0][0] + m_[1][0]) / 2, (m_[0][1] + m_[1][1]) / 2; ux_, uz_ = (m_[1][0] - m_[0][0]) / m_[2], (m_[1][1] - m_[0][1]) / m_[2]; nx_, nz_ = -uz_, ux_
+            if (mx_ - cx_.x) * nx_ + (mz_ - cx_.y) * nz_ < 0: nx_, nz_ = -nx_, -nz_
+            Pp_ = Point(mx_ + nx_ * 1.5, mz_ + nz_ * 1.5); return _a_cieco(Pz_, ms_, (_a_dstr(Pp_), m_[0], m_[1], m_[2], (nx_, nz_), (mx_, mz_), Pp_), nome_, covered_, dbg_, cx_, _arej)
+        if len(ms_) < 2: return _arej('una_bocca')
+        sc_ = []
+        for a_, b_, L_ in ms_:
+            mx_, mz_ = (a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2; ux_, uz_ = (b_[0] - a_[0]) / L_, (b_[1] - a_[1]) / L_; nx_, nz_ = -uz_, ux_
+            if (mx_ - cx_.x) * nx_ + (mz_ - cx_.y) * nz_ < 0: nx_, nz_ = -nx_, -nz_   # outwards, away from the piece
+            sc_.append((_a_dstr(Point(mx_ + nx_ * 1.5, mz_ + nz_ * 1.5)), a_, b_, L_, (nx_, nz_), (mx_, mz_), Point(mx_ + nx_ * 1.5, mz_ + nz_ * 1.5)))
+        sc_.sort(key=lambda x_: x_[0]); pub_ = sc_[0]
+        if dbg_: log('androne debug bocche', nome_, round(cx_.x, 1), round(cx_.y, 1), [(round(x_[0], 1), round(x_[3], 1), tuple(round(v_, 1) for v_ in x_[5]), (lambda c_: round(c_.area) if c_ is not None else None)(_a_cortile_at(x_[6]) if _afree is not None else None)) for x_ in sc_])
+        if pub_[0] > 14: return _arej('lontano_dalla_strada')
+        far_ = [x_ for x_ in sc_[1:] if math.dist(x_[5], pub_[5]) > 4.0]
+        if not far_: return _a_cieco(Pz_, ms_, pub_, nome_, covered_, dbg_, cx_, _arej)
+        if any(x_[0] < 7 and _a_dstr_libera(x_[6]) < 7 for x_ in far_): return _arej('collega_due_vie')
+        if pub_[3] > 25: return _arej('troppo_larga')
+        if not covered_:   # an open gap counts only when it leads into a courtyard
+            cp_ = _a_cortile_at(far_[-1][6]) if _afree is not None else None
+            if cp_ is None or cp_.area > ACORTILE_MAX or cp_.area < 12: return _arej('non_in_un_cortile')
+        if _a_chiudi(pub_, Pz_, nome_, covered_, dbg_, cx_, False) == 'cancellata':   # the wide front on the street closed by the railing (a portico): the way into the courtyard has its gate too, where the passage enters it (Carlo 8/11, via Giotto x 770.8 z -619)
+            for x_ in far_:
+                cp_ = _a_cortile_at(x_[6]) if _afree is not None else None
+                if cp_ is not None and 12 <= cp_.area <= ACORTILE_MAX and 1.2 <= x_[3] <= VARCO_LARGO: _a_chiudi(x_, Pz_, nome_, covered_, dbg_, cx_, True)
+    def _a_cieco(Pz_, ms_, pub_, nome_, covered_, dbg_, cx_, _arej):
+        """a covered passage with its only way out on the street (an androne that the DBGT closes at the back with a building, a shed, a box):
+        still a private passage, its door on the street side, when it goes into the block at least ACIECO_P m and is not a doorway in a facade"""
+        if not covered_ or pub_[0] > 14: return _arej('una_bocca')
+        Lm_ = LineString([pub_[1], pub_[2]]); dp_ = max(Lm_.distance(Point(c_)) for c_ in Pz_.exterior.coords)
+        if dp_ < ACIECO_P or pub_[3] > VARCO_LARGO: return _arej('una_bocca')
+        _acc[nome_ + ':cieco'] += 1; _a_chiudi(pub_, Pz_, nome_, covered_, dbg_, cx_, False)
+    def _a_chiudi(pub_, Pz_, nome_, covered_, dbg_, cx_, extra_):
+        def _arej(why_):
+            _acc[nome_ + ':' + why_ + ('_extra' if extra_ else '')] += 1
+            if dbg_: log('androne debug', nome_, round(cx_.x, 1), round(cx_.y, 1), 'area', round(Pz_.area, 1), why_)
+        _, a_, b_, wd_, (ox_, oz_), mid0_, _p = pub_
+        Wn_ = unary_union([_gnd[j_] for j_ in _gndt.query(Pz_.buffer(4.0))])   # the ends of the mouth go onto the walls of the buildings that bound it: no gap beside the door, its line from corner to corner
+        def _snap(p_):
+            if Wn_.is_empty: return p_
+            q_ = nearest_points(Point(p_), Wn_)[1]; d_ = math.dist(p_, (q_.x, q_.y))
+            return (q_.x, q_.y) if 0.03 < d_ <= 2.6 else p_
+        a_, b_ = _snap(a_), _snap(b_); wd_ = math.dist(a_, b_)
+        if wd_ < 0.8: return _arej('stretta')
+        ux_, uz_ = (b_[0] - a_[0]) / wd_, (b_[1] - a_[1]) / wd_
+        a_ = (a_[0] - ux_ * 0.1, a_[1] - uz_ * 0.1); b_ = (b_[0] + ux_ * 0.1, b_[1] + uz_ * 0.1); wd_ += 0.2
+        if (-uz_) * ox_ + ux_ * oz_ > 0: a_, b_ = b_, a_; ux_, uz_ = -ux_, -uz_   # the left normal (the side the leaves open to) away from the street
+        nx_, nz_ = -uz_, ux_
+        if _via_pubblica(a_, b_, nx_, nz_): return _arej('via_pubblica')
+        G2_ = LineString([a_, b_]); mid_ = G2_.centroid
+        if (_asph_in.intersects(G2_) and _asph_in.intersection(G2_).length > 0.3) or (_ucarr_in is not None and _ucarr_in.intersects(G2_) and _ucarr_in.intersection(G2_).length > 0.3): return _arej('in_carreggiata')
+        old_ = []; blocked_ = False   # a gate of the rule inside the passage or up to 10 m behind its mouth was set in the wrong place: it goes; any other one near the mouth is already the gate
+        for L2_, g2_ in _vg_vicini((mid_.x, mid_.y), 14):
+            if g2_ is None or id(g2_) in _arem or id(g2_) in _amine: continue
+            gm_ = Point((g2_[0] + g2_[2]) / 20, (g2_[1] + g2_[3]) / 20); inw_ = (gm_.x - mid_.x) * nx_ + (gm_.y - mid_.y) * nz_
+            if _gprio.get(id(g2_), 2) > 0 and g2_[4] == 'g' and (Pz_.buffer(1.0).contains(gm_) or (G2_.distance(gm_) < 10.0 and inw_ > -0.5)): old_.append(g2_)
+            elif L2_.distance(mid_) < 3.0 and inw_ > -3.0: blocked_ = True
+        if blocked_: return _arej('gia_cancello')
+        for g2_ in old_: _arem.add(id(g2_))
+        zb_ = None
+        if _altit is not None:
+            for j_ in _altit.query(mid_.buffer(0.5)):
+                if _alti[j_][1].distance(mid_) < 0.5: zb_ = _alti[j_][0]; break
+        hw_ = round(min(4.5, max(3.0, zb_['zb'] - zb_.get('zg', 0.0) - 0.2)), 1) if zb_ is not None else 3.0   # the height of a wooden door ('w'); an iron gate is 2 to 2,2 m
+        if wd_ > VARCO_LARGO:   # a wide front (a portico towards a garden): the railing of the sides closes it
+            k_, h_ = max((_vchiusura(a_), _vchiusura(b_)), key=lambda x_: x_[1]); _vcanc.append(([tuple(a_), tuple(b_)], k_, h_)); _vg_add(a_, b_); _gd.append((mid_.x, mid_.y)); _acc[nome_ + ':cancellata'] += 1
+            _gand.append((None, round(mid_.x, 1), round(mid_.y, 1), round(wd_, 1), covered_, hw_)); return 'cancellata'
+        gate_out.append([q(a_[0]), q(a_[1]), q(b_[0]), q(b_[1]), 'g', 2.0 if zb_ is None else 2.2, 0]); _gprio[id(gate_out[-1])] = 1; _amine.add(id(gate_out[-1])); _gpavset.add(id(gate_out[-1])); _vg_add(a_, b_, gate_out[-1]); _gd.append((mid_.x, mid_.y)); _acc[nome_ + ':cancello'] += 1
+        _gand.append((gate_out[-1], round(mid_.x, 1), round(mid_.y, 1), round(wd_, 1), covered_, hw_))
+        if dbg_: log('androne debug', nome_, round(cx_.x, 1), round(cx_.y, 1), 'CHIUSO', round(wd_, 1), covered_)
+    _gand = []; _arem = set(); _amine = set()
+    if _gndt is not None:
+        _Ug = unary_union(_gnd); _Ua = unary_union([g_ for b_, g_ in _alti]) if _alti else Polygon()
+        _Us = unary_union([r_['line'].buffer(r_['w'] / 2, cap_style=2) for r_ in _astr] + [g_ for g_ in (asph, side) if g_ is not None and not g_.is_empty])   # the streets themselves are no gap: a narrow street would be closed up by the 3 m and swallow the passages that open on it
+        _gp = _Ug.buffer(3.0, join_style=2).buffer(-3.0, join_style=2).difference(_Ug).difference(_Us.buffer(0.1)).buffer(-0.1, join_style=2).buffer(0.1, join_style=2)
+        _gaps = [p_ for p_ in getattr(_gp, 'geoms', [_gp]) if isinstance(p_, Polygon) and 1.5 <= p_.area <= 600]
+        _bb = unary_union([_Ug, _Ua] + _gaps + [unary_union(_aclr).buffer(0.15)] if _aclr else [_Ug, _Ua] + _gaps).buffer(0.02); _dom = box(*[v_ + s_ for v_, s_ in zip(_bb.bounds, (-50, -50, 50, 50))])
+        _fr = _dom.difference(_bb); _afree = [p_ for p_ in getattr(_fr, 'geoms', [_fr]) if isinstance(p_, Polygon)]
+        if _afree:
+            _afree_big = max(_afree, key=lambda p_: p_.area); _afree = [p_ for p_ in _afree if p_ is not _afree_big]   # the outside (the street network and what hangs on it) is not a courtyard
+        _afreet = STRtree(_afree); _gt = STRtree(_gaps)
+        for g_ in _gaps:
+            cov_ = sum(_alti[j_][1].intersection(g_).area for j_ in _altit.query(g_)) if _altit is not None else 0.0
+            _a_pezzo(g_, 'passaggio', cov_ > 0.6 * g_.area)
+        for b_, g_ in _alti:
+            if g_.area < 30: continue
+            Sg_ = unary_union([_gnd[j_] for j_ in _gndt.query(g_.buffer(2.0))]); F0_ = g_.difference(Sg_.buffer(0.05)) if not Sg_.is_empty else g_
+            for P_ in getattr(F0_, 'geoms', [F0_]):
+                if not isinstance(P_, Polygon) or P_.area < 30: continue
+                if sum(_gaps[j_].intersection(P_).area for j_ in _gt.query(P_)) > 0.5 * P_.area: _acc['porticato:gia_passaggio'] += 1; continue
+                _a_pezzo(P_, 'porticato', True)
+    if _arem: gate_out[:] = [g_ for g_ in gate_out if id(g_) not in _arem]
+    _gcc['androni'] = dict(_acc); _gcc['androni_tolti_vecchi'] = len(_arem); log('androni', dict(_acc), 'vecchi tolti', len(_arem))
     _gcc['per_origine'] = _src; _gcc['come_una_persona'] = dict(_vrep)
     bar_out += _vcanc   # (3) the wide openings closed by the railing of their sides
     log('cancelli sui varchi: aggiunti', _gcc)
@@ -1719,8 +1878,8 @@ def _gate_in_strada(g_):
     if any(r_['c'] <= 5 and r_['line'].distance(G_) < r_['w'] / 2 - 0.2 for r_ in (raw_roads[j_] for j_ in _rawt.query(box(x0_ - 12.001, z0_ - 12.001, x1_ + 12.001, z1_ + 12.001))) if flat(r_) and not r_['x'] and r_['line'].distance(G_) < 12): return True   # the ways within 12 m from the tree, not all of them
     return _frac_carr(G_) >= 0.7   # the gate in the middle of a carriageway whose own polygon has a sliver round the wall (via delle Grigne, x 687.8 z 2159)
 _rawt = STRtree([r_['line'] for r_ in raw_roads])
-_gtol = [(round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) for g_ in gate_out if g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and id(g_) not in _osm_gid and _gate_in_strada(g_)]
-gate_out = [g_ for g_ in gate_out if id(g_) in _osm_gid or not (g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and (round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) in _gtol)]
+_gtol = [(round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) for g_ in gate_out if g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and id(g_) not in _osm_gid and id(g_) not in _gpavset and _gate_in_strada(g_)]   # a passage between two walls closed over its pavement (androni) stands at the edge of the street by the rule: it stays
+gate_out = [g_ for g_ in gate_out if id(g_) in _osm_gid or id(g_) in _gpavset or not (g_[4] == 'g' and len(g_) > 6 and g_[6] == 0 and (round((g_[0] + g_[2]) / 20), round((g_[1] + g_[3]) / 20)) in _gtol)]
 _campioni['in_carreggiata_tolti'] = _gtol
 # a stub of wall or railing left alone in the carriageway (what remains of the gate's wall): a divider of at most 20 m (not a railway one) whose whole
 # length has the carriageway on both sides is not a boundary, it goes (the dividers at the edge of a street stay: only half the strip is carriageway there)
@@ -1921,7 +2080,7 @@ def add_ng(t, p):
     nm = (t.get('name') or '').strip()
     if not nm and c in ('ufficio', 'artigiano') and s in ('company', 'yes', 'association', 'ngo', 'political_party'): return  # an unnamed company: nothing to put on the door
     if any(c == c2 and nm == n2 and math.dist(p, p2) < 15 for c2, n2, p2 in ng_seen): return  # the same shop mapped twice (node and area)
-    ng_seen.append((c, nm, p)); negozi.append([q(p[0]), q(p[1]), NG.index(c), s[:24], nm[:40], (t.get('opening_hours') or '').strip()[:160], (t.get('addr:street') or '').strip()[:60]])  # the street of its address: the front looks onto it
+    ng_seen.append((c, nm, p)); negozi.append([q(p[0]), q(p[1]), NG.index(c), s[:24], nm, (t.get('opening_hours') or '').strip()[:160], (t.get('addr:street') or '').strip()[:60]])  # the street of its address: the front looks onto it
 for r_, t in ntags.items(): add_ng(t, nodes[r_])
 for wid, (refs, t) in ways.items():
     if refs[0] == refs[-1] and len(refs) >= 4: add_ng(t, centroid(ring(refs)))
@@ -2005,7 +2164,7 @@ for at, g in area_geoms:
     ok = shapely.contains(g, ptsg) & ~shapely.intersects(roadsU, ptsg) & ~shapely.intersects(bunion, ptsg) & ~shapely.intersects(_railbuf, ptsg) & (np.abs(xs_) <= HW) & (np.abs(zs_) <= HH)
     for x, z in list(zip(xs_[ok], zs_[ok]))[:n]: trees.append((x, z))
 _srt.fine()
-area_geoms, land = VERDE.aree(area_geoms, land, cons=_cons_f.result())  # after OSM's woods got their trees: the scatter outside the DBGT stays as it was
+area_geoms, land = VERDE.aree(area_geoms, land, cons=_cons_f.result(), osm_bosco=_osm_bosco)  # after OSM's woods got their trees: the scatter outside the DBGT stays as it was
 area_geoms, land = MANUF.aree(area_geoms, land)
 log('pois', len(pois), 'places', len(places), 'trees', len(trees), 'crossings', len(crossings))
 # ---- street objects from OSM: [kind, x, z, angle, extra]. The angle follows the nearest street (a bench faces it, a bump lies across it);
@@ -2342,23 +2501,34 @@ for k_, pts in land:
         except Exception: pass
 _sport_t = STRtree([g_[2] for g_ in _sport_c]) if _sport_c else None
 _gs_ = [b for b in buildings if b.get('bt') == 'grandstand']
-if _gs_:  # le tribune automatiche non si disegnano piu (Carlo, 2/11): gli stadi saranno edifici fatti a mano; sul loro posto resta il terreno
+_tolti_tribune = set()
+if _gs_:  # the stands of OSM (building=grandstand): a solid block on their footprint, OSM height or 6 m, pink with TRIBUNA (Carlo 8/11, facciate-2) until they are
+    # made by hand; the generic DBGT volumes standing on them go (more than half of the volume on the stand, or its middle in it)
     _gso_ = [Polygon(b['p']).buffer(0) for b in _gs_]
-    _ov_ = [(round(centroid(b['p'])[0]), round(centroid(b['p'])[1])) for b in buildings + (ED.alti if ED else []) if b.get('bt') != 'grandstand' and any(g_.intersects(Polygon(b['p']).buffer(0)) for g_ in _gso_)]
-    log('tribune tolte', len(_gs_), 'edifici che le toccano (non toccati)', _ov_); _campioni['tribune_tolte'] = [(round(centroid(b['p'])[0]), round(centroid(b['p'])[1])) for b in _gs_]
-for b in buildings + (ED.alti if ED else []):
-    if b.get('bt') == 'grandstand': continue
+    for b in _gs_:
+        b['t'] = 0; b.pop('g', None)
+        if not b.get('ht'): b['h'] = 6.0
+    for b in buildings + (ED.alti if ED else []):
+        if b.get('bt') == 'grandstand': continue
+        try: g_ = Polygon(b['p']).buffer(0)
+        except Exception: continue
+        if g_.is_empty: continue
+        if any(s_.intersection(g_).area > 0.5 * g_.area or s_.contains(g_.representative_point()) for s_ in _gso_ if s_.intersects(g_)): _tolti_tribune.add(id(b))
+    log('tribune come blocchi rosa', len(_gs_), 'volumi tolti sotto/sopra', len(_tolti_tribune)); _campioni['tribune'] = [(round(centroid(b['p'])[0]), round(centroid(b['p'])[1])) for b in _gs_]
+import pubblici as _PUB, famiglie as _FAM
+_tutti_b = [b for b in buildings + (ED.alti if ED else []) if id(b) not in _tolti_tribune]
+_campioni['pubblici'] = _PUB.classifica(_tutti_b, ntags, ways, nodes, ring, log)
+for b in _gs_: b['pu'] = _PUB.GRUPPI.index('TRIBUNA')
+_fam_shops = [nodes[r] for r, t in ntags.items() if r in nodes and (any(k in t for k in _FAM.SHOP_K) or t.get('amenity') in _FAM.SHOP_AM)]  # the shops and offices: a big low building with them is no capannone (Carlo 8/11)
+_campioni['famiglie'] = _FAM.famiglie(_tutti_b, log, _fam_shops, [g for at, g in area_geoms if at == 8])  # at 8: landuse=industrial
+for b in _tutti_b:
     c = centroid(b['p']); rec = {'p': enc(b['p']), 'h': b['h'], 't': b.get('t', BTYPE.get(b.get('bt'), 0))}
-    for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
+    for k_ in ('zt', 'zb', 'e', 'rk', 'rf', 'rc', 'cu', 'wc', 'rcol', 'st', 'fa', 'pu', 'pn'):  # a DBGT volume: top (and raised base) above terrain.base, building, roof planes, OSM colours, state (2 ruin, 1 shell)
         if b.get(k_) is not None: rec[k_] = b[k_]
     if b.get('k'): rec['k'] = [enc(h) for h in b['k']]
     if b.get('bt') in ('garage', 'garages'): rec['g'] = 1  # rows of up-and-over doors
     elif b.get('bt') == 'greenhouse': rec['g'] = 2  # glass
-    elif b.get('bt') == 'grandstand':  # stepped seats under a roof, looking at the nearest pitch of the whole map (pt, decimetres)
-        rec['g'] = 3
-        if _sport_c:
-            gb_ = Polygon(b['p']).buffer(0); j_ = min((int(i_) for i_ in _sport_t.query(gb_.buffer(150))), key=lambda i_: _sport_c[i_][2].distance(gb_), default=None)
-            if j_ is not None: rec['pt'] = [round(_sport_c[j_][0] * 10), round(_sport_c[j_][1] * 10)]
+    elif b.get('bt') == 'grandstand': pass  # a solid pink block for now (Carlo 8/11; the stepped seats of 1/11 looked at the nearest pitch, git history)
     elif b.get('wt'): rec['g'] = 4  # a water tower mapped as a building
     elif b.get('mn') in ('01', '02', '03'): rec['g'] = 5  # a cabin of the DBGT (dbgt_manufatti.py): its own model in paesaggio3.js
     if b.get('mm'): rec['mm'] = b['mm']  # the model of a manufatto and what the photos say of it (src/manufatti_foto.json)
@@ -2564,17 +2734,17 @@ for g_ in gate_out:
     if g_[4] != 'o': continue
     a_, b_ = (g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)
     if _in_carr(_anta(a_, b_)) and not _in_carr(_anta(b_, a_)): g_[0], g_[1], g_[2], g_[3] = g_[2], g_[3], g_[0], g_[1]; _vfl['ante_girate'] += 1
-_gseg = [LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]) for g_ in gate_out if g_[4] != 'l' and (g_[0], g_[1]) != (g_[2], g_[3])]
-if _gseg and trees:
-    _gst = STRtree(_gseg)
-    for k_, t_ in enumerate(trees):
-        P_ = Point(t_[0], t_[1]); js_ = [j_ for j_ in _gst.query(P_.buffer(_ALB_D)) if _gseg[j_].distance(P_) < _ALB_D]
-        if not js_: continue
-        L_ = _gseg[js_[0]]; (x0_, z0_), (x1_, z1_) = L_.coords[0], L_.coords[-1]; ln_ = L_.length; nx_, nz_ = -(z1_ - z0_) / ln_, (x1_ - x0_) / ln_
-        s_ = L_.project(P_); F_ = L_.interpolate(s_); side_ = 1.0 if (P_.x - F_.x) * nx_ + (P_.y - F_.y) * nz_ >= 0 else -1.0
-        if Point(F_.x + nx_ * side_, F_.y + nz_ * side_).distance(_carr_cl) < Point(F_.x - nx_ * side_, F_.y - nz_ * side_).distance(_carr_cl): side_ = -side_   # away from the street
-        x_, z_ = F_.x + nx_ * side_ * (_ALB_D + 0.5), F_.y + nz_ * side_ * (_ALB_D + 0.5)
-        trees[k_] = type(t_)([x_, z_] + list(t_[2:])) if isinstance(t_, (list, tuple)) else (x_, z_); _vfl['alberi_spostati'] += 1
+# ---- the place of every tree, once, at the end (src/posto_albero.py): crown off the buildings, trunk off the carriageway, passages, door and gate fronts, fences, manufatti
+# (a tree on the line of a gate is one of these cases: varco 28, src/controllo_varchi.py counts it)
+from posto_albero import Posto as _Posto
+_sezs = lambda gs_: [g_ for g_ in gs_ if g_ is not None]
+_pos_alb = _Posto([(P(b_['p'], b_.get('k', [])), b_.get('h') or 0) for b_ in buildings if b_['t'] != 9], _carr_cl, unary_union([g_ for g_ in (pedz, side, foot) if g_ is not None and not g_.is_empty]),
+                  [g_ for g_ in (globals().get('_gaps') or [])], [(d_[0] / 10, d_[1] / 10, d_[2] / 10, d_[3] / 10) for d_ in doors_out if (d_[0], d_[1]) != (d_[2], d_[3])],
+                  [(g_[0] / 10, g_[1] / 10, g_[2] / 10, g_[3] / 10) for g_ in gate_out if g_[4] != 'l' and (g_[0], g_[1]) != (g_[2], g_[3])],
+                  [list(b_[0]) for b_ in bar_out] + [list(f_) for f_ in fences], [o_['g'] for o_ in MANUF.ind if o_.get('kind')])
+trees, _ALB_CH = _pos_alb.sistema(trees); _vfl['alberi_spostati'] = _ALB_CH['spostati']
+log('alberi: posto unico', _ALB_CH)
+if STR: STR.rep['alberi_posto'] = _ALB_CH
 log('cancelli aperti e alberi', _vfl)
 if STR: STR.rep['cancelli_ante_alberi'] = _vfl
 _nb1 = len(bar_out) + len(fences); _fz_ = fondi_doppi(bar_out + [(f_, 'fe', 0) for f_ in fences], _dstr)
@@ -2797,6 +2967,36 @@ for _k_, _v_ in _ctl['prove_fisse'].items(): log('PROVA FISSA', _k_, 'OK' if _v_
 _ctl['prove_fisse_mapillary_ok'] = all(v_['ok'] for k_, v_ in _ctl['prove_fisse'].items() if k_.startswith('mapillary'))
 out.setdefault('report', {})['controlli_28_10'] = _ctl
 
+# the epoch of construction of each building ('ep' 0-6, absent = unknown) from the CENED energy certificates in data/cened/ (src/epoca.py, docs/dati.md); the rule Carlo approved on 8/11
+import epoca as _EP
+_ind_ep = [(nodes[r_][0], nodes[r_][1], t.get('addr:street') or t.get('addr:place') or '', t['addr:housenumber']) for r_, t in ntags.items() if 'addr:housenumber' in t and r_ in nodes]
+for w_, (nd_, t) in ways.items():
+    if 'addr:housenumber' in t:
+        pp_ = [nodes[n_] for n_ in nd_ if n_ in nodes]
+        if pp_: _ind_ep.append((sum(p_[0] for p_ in pp_) / len(pp_), sum(p_[1] for p_ in pp_) / len(pp_), t.get('addr:street') or t.get('addr:place') or '', t['addr:housenumber']))
+out.setdefault('report', {})['epoca'] = _EP.calcola(out, _ind_ep, os.path.join(DATA, 'cened'), CONF, proj, log)
+json.dump(out['report']['epoca'], open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'report_epoca.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+# the door of each androne by the epoch of its building (Carlo 8/11): ep 0-1 (before '45) a wooden door of two leaves ('w'), later an iron gate; unknown epoch: gate
+_andr_rep = []
+if '_gand' in globals() and _gand:
+    _eg, _ee = [], []
+    for t_ in out['tiles']:
+        for b_ in t_.get('b', []):
+            if 'ep' not in b_: continue
+            p_ = b_['p']; x_ = p_[0]; z_ = p_[1]; pts_ = [(x_ / 10, z_ / 10)]
+            for i_ in range(2, len(p_), 2): x_ += p_[i_]; z_ += p_[i_ + 1]; pts_.append((x_ / 10, z_ / 10))
+            if len(pts_) >= 3:
+                g_ = Polygon(pts_)
+                if not g_.is_valid: g_ = g_.buffer(0)
+                if not g_.is_empty: _eg.append(g_); _ee.append(b_['ep'])
+    _egt = STRtree(_eg)
+    for g_, mx_, mz_, wd_, cov_, hw_ in _gand:
+        P0_ = Point(mx_, mz_); eps_ = [_ee[j_] for j_ in _egt.query(P0_.buffer(3.0)) if _eg[j_].distance(P0_) <= 3.0]
+        ep_ = min(eps_) if eps_ else None; kind_ = 'w' if ep_ is not None and ep_ <= 1 else 'g'
+        if g_ is not None and kind_ == 'w': g_[4] = 'w'; g_[5] = hw_
+        _andr_rep.append([mx_, mz_, wd_, int(cov_), kind_ if g_ is not None else 'cancellata', ep_])
+    log('androni per epoca', Counter(r_[4] for r_ in _andr_rep))
+out.setdefault('report', {})['androni'] = _andr_rep
 out.setdefault('report', {})['cantieri'] = _crep  # the dividers the building sites' hoarding replaces (src/barriere.py cantieri)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False)
 open(dst, 'w', encoding='utf-8').write(s)  # the game decodes UTF-8; Windows would default to cp1252

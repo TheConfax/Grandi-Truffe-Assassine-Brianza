@@ -1,0 +1,42 @@
+{
+ "edifici": 29657,
+ "aggancio_esatto": 358,
+ "dalla_via": 10622,
+ "dal_vicinato": 5066,
+ "sconosciuti": 13611,
+ "per_fascia": [
+  2254,
+  1482,
+  4340,
+  4409,
+  2110,
+  1011,
+  440
+ ],
+ "comuni": {
+  "MEDA": {
+   "edifici": 8264,
+   "attestati": 4864,
+   "attestati_agganciati_al_civico": 657,
+   "attestati_interpolati": 3948,
+   "senza_civico": 205,
+   "via_non_trovata": 54,
+   "esatti": 229,
+   "dalla_via": 4938,
+   "dal_vicinato": 2535,
+   "sconosciuti": 562
+  },
+  "SEVESO": {
+   "edifici": 8931,
+   "attestati": 4063,
+   "attestati_agganciati_al_civico": 402,
+   "attestati_interpolati": 3333,
+   "senza_civico": 283,
+   "via_non_trovata": 45,
+   "esatti": 129,
+   "dalla_via": 5684,
+   "dal_vicinato": 2531,
+   "sconosciuti": 587
+  }
+ }
+}

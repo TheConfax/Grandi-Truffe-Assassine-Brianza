@@ -1,10 +1,10 @@
 {
- "cancelli": 11102,
+ "cancelli": 11561,
  "della_regola": {
-  "passo_carraio": 255,
+  "passo_carraio": 239,
   "rampa": 2,
-  "varco": 723,
-  "capo_recinzione": 307
+  "varco": 668,
+  "capo_recinzione": 305
  },
  "dietro_cancello": 9,
  "dietro_cancello_regola": 9,
@@ -821,12 +821,6 @@
    10.8
   ],
   [
-   -860.5,
-   468.4,
-   "varco",
-   9.3
-  ],
-  [
    -1003.0,
    711.6,
    "varco",
@@ -1139,6 +1133,12 @@
    9.8
   ],
   [
+   1058.8,
+   859.6,
+   "capo_recinzione",
+   9.0
+  ],
+  [
    1510.5,
    -751.7,
    "capo_recinzione",
@@ -1211,20 +1211,14 @@
    9.2
   ]
  ],
- "storti": 117,
- "storti_regola": 117,
+ "storti": 110,
+ "storti_regola": 110,
  "dove_storti": [
   [
    82.8,
    -789.8,
    "passo_carraio",
    2.0
-  ],
-  [
-   674.4,
-   -722.5,
-   "passo_carraio",
-   1.0
   ],
   [
    808.2,
@@ -1317,12 +1311,6 @@
    1.0
   ],
   [
-   -1045.4,
-   796.4,
-   "passo_carraio",
-   1.0
-  ],
-  [
    -867.8,
    692.9,
    "passo_carraio",
@@ -1339,12 +1327,6 @@
    1082.2,
    "passo_carraio",
    2.0
-  ],
-  [
-   -557.1,
-   1043.8,
-   "passo_carraio",
-   1.0
   ],
   [
    944.8,
@@ -1377,18 +1359,6 @@
    2.0
   ],
   [
-   -993.2,
-   785.3,
-   "passo_carraio",
-   1.6
-  ],
-  [
-   -932.6,
-   718.7,
-   "passo_carraio",
-   2.0
-  ],
-  [
    284.4,
    1020.0,
    "passo_carraio",
@@ -1417,12 +1387,6 @@
    2164.2,
    "passo_carraio",
    1.4
-  ],
-  [
-   813.6,
-   1990.3,
-   "passo_carraio",
-   1.1
   ],
   [
    589.2,
@@ -1609,12 +1573,6 @@
    -552.5,
    "capo_recinzione",
    2.1
-  ],
-  [
-   544.1,
-   -1177.5,
-   "capo_recinzione",
-   1.5
   ],
   [
    518.0,
@@ -2030,7 +1988,7 @@
  },
  "ante_alberi": {
   "ante_girate": 7,
-  "alberi_spostati": 93
+  "alberi_spostati": 5017
  },
  "decisioni": [
   [
@@ -5124,14 +5082,6 @@
    ""
   ],
   [
-   -3428.6,
-   2259.9,
-   "varco",
-   "cancello",
-   4.0,
-   ""
-  ],
-  [
    -3419.8,
    2248.6,
    "varco",
@@ -8128,14 +8078,6 @@
    "varco",
    "dietro_recinzione",
    10.9,
-   ""
-  ],
-  [
-   530.0,
-   -191.8,
-   "varco",
-   "cancello",
-   4.0,
    ""
   ],
   [
@@ -21269,14 +21211,6 @@
    ""
   ],
   [
-   899.5,
-   -441.8,
-   "capo_recinzione",
-   "cancello",
-   4.0,
-   ""
-  ],
-  [
    384.9,
    -970.6,
    "capo_recinzione",
@@ -27160,14 +27094,6 @@
    "capo_recinzione",
    "allargato",
    7.0,
-   ""
-  ],
-  [
-   -682.7,
-   1453.7,
-   "capo_recinzione",
-   "cancello",
-   4.0,
    ""
   ],
   [
