@@ -2550,12 +2550,14 @@ function* buildTileGen(T) {
     const geo = b => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setIndex(b.i); return g; };
     const n = LPS.length, pm = new THREE.InstancedMesh(geo(pole), MAT.lamp, n), hm = new THREE.InstancedMesh(geo(head), MAT.lampHead, n), o = new THREE.Object3D(), pool = Buf(), gp = [];
     pm.castShadow = true; pm.renderOrder = hm.renderOrder = 10;
+    T.lampL = []; /* the lamp heads, for the real lights of luci3.js */
     LPS.forEach(([x, z, ry], i) => {
       const gy = H.surface(x, z, 1e4), c = Math.cos(ry), s = Math.sin(ry), hx = x + c * 1.15, hz = z - s * 1.15; // the arm reaches out along local +x
       o.position.set(x, gy, z); o.rotation.set(0, ry, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix);
       const py = H.surface(hx, hz, 1e4) + 0.14, k = pool.p.length / 3, R = 7, cy = (x, z) => T.fine && py - 0.14 <= streetY(hx, hz) + 0.2 ? streetY(x, z) + 0.14 : py; // warm light pool on the street at night; in a tile of S its corners on S, so the ground (which writes its depth) does not cut it on a slope
       vtx(pool, hx - R, cy(hx - R, hz - R), hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, cy(hx + R, hz - R), hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, cy(hx + R, hz + R), hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, cy(hx - R, hz + R), hz + R, 0, 1, 0, 0, 1); triUp(pool, k, k + 1, k + 2); triUp(pool, k, k + 2, k + 3);
       gp.push(hx, gy + 6.82, hz); // glare under the lamp head
+      T.lampL.push({ x: hx, y: gy + 6.9, z: hz, off: false });
       if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, forza: 'medio', inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
       else for (const p of PROPS) if (p.tile === T && p.li === i) { p.inst.meshes = [pm, hm]; if (p.broken) { o.scale.set(0, 0, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix); o.scale.set(1, 1, 1); } } // built again: the lamps knocked down stay down
     });
@@ -2564,7 +2566,7 @@ function* buildTileGen(T) {
     const glare = new THREE.Points(pg, LAMPGLOW_MAT); glare.renderOrder = 14; G.add(glare);
     for (const p of PROPS) if (p.tile === T) p.onBreak = () => { // the lamp goes dark: its pool and its glare drop out of sight
       if (poolM) { const a = poolM.geometry.attributes.position; for (let q = p.li * 4; q < p.li * 4 + 4; q++) a.setY(q, -9999); a.needsUpdate = true; }
-      pg.attributes.position.setY(p.li, -9999); pg.attributes.position.needsUpdate = true; };
+      pg.attributes.position.setY(p.li, -9999); pg.attributes.position.needsUpdate = true; if (T.lampL && T.lampL[p.li]) T.lampL[p.li].off = true; };
     for (const p of PROPS) if (p.tile === T && p.broken && p.onBreak) p.onBreak(); // and dark
     T.lampsDone = true;
   }

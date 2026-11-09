@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo threejs · dopo 2c916704 · assemblato 09/11 03:21 · porta ' + location.port;
+    const txt = 'locale · ramo threejs · dopo a64e25ef · assemblato 09/11 03:50 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -4463,12 +4463,14 @@ function* buildTileGen(T) {
     const geo = b => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setIndex(b.i); return g; };
     const n = LPS.length, pm = new THREE.InstancedMesh(geo(pole), MAT.lamp, n), hm = new THREE.InstancedMesh(geo(head), MAT.lampHead, n), o = new THREE.Object3D(), pool = Buf(), gp = [];
     pm.castShadow = true; pm.renderOrder = hm.renderOrder = 10;
+    T.lampL = []; /* the lamp heads, for the real lights of luci3.js */
     LPS.forEach(([x, z, ry], i) => {
       const gy = H.surface(x, z, 1e4), c = Math.cos(ry), s = Math.sin(ry), hx = x + c * 1.15, hz = z - s * 1.15; // the arm reaches out along local +x
       o.position.set(x, gy, z); o.rotation.set(0, ry, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix);
       const py = H.surface(hx, hz, 1e4) + 0.14, k = pool.p.length / 3, R = 7, cy = (x, z) => T.fine && py - 0.14 <= streetY(hx, hz) + 0.2 ? streetY(x, z) + 0.14 : py; // warm light pool on the street at night; in a tile of S its corners on S, so the ground (which writes its depth) does not cut it on a slope
       vtx(pool, hx - R, cy(hx - R, hz - R), hz - R, 0, 1, 0, 0, 0); vtx(pool, hx + R, cy(hx + R, hz - R), hz - R, 0, 1, 0, 1, 0); vtx(pool, hx + R, cy(hx + R, hz + R), hz + R, 0, 1, 0, 1, 1); vtx(pool, hx - R, cy(hx - R, hz + R), hz + R, 0, 1, 0, 0, 1); triUp(pool, k, k + 1, k + 2); triUp(pool, k, k + 2, k + 3);
       gp.push(hx, gy + 6.82, hz); // glare under the lamp head
+      T.lampL.push({ x: hx, y: gy + 6.9, z: hz, off: false });
       if (!T.lampsDone) addProp({ x, z, y: gy, r: 0.22, h: 7, forza: 'medio', inst: { meshes: [pm, hm], i, ry, base: gy }, tile: T, li: i });
       else for (const p of PROPS) if (p.tile === T && p.li === i) { p.inst.meshes = [pm, hm]; if (p.broken) { o.scale.set(0, 0, 0); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); hm.setMatrixAt(i, o.matrix); o.scale.set(1, 1, 1); } } // built again: the lamps knocked down stay down
     });
@@ -4477,7 +4479,7 @@ function* buildTileGen(T) {
     const glare = new THREE.Points(pg, LAMPGLOW_MAT); glare.renderOrder = 14; G.add(glare);
     for (const p of PROPS) if (p.tile === T) p.onBreak = () => { // the lamp goes dark: its pool and its glare drop out of sight
       if (poolM) { const a = poolM.geometry.attributes.position; for (let q = p.li * 4; q < p.li * 4 + 4; q++) a.setY(q, -9999); a.needsUpdate = true; }
-      pg.attributes.position.setY(p.li, -9999); pg.attributes.position.needsUpdate = true; };
+      pg.attributes.position.setY(p.li, -9999); pg.attributes.position.needsUpdate = true; if (T.lampL && T.lampL[p.li]) T.lampL[p.li].off = true; };
     for (const p of PROPS) if (p.tile === T && p.broken && p.onBreak) p.onBreak(); // and dark
     T.lampsDone = true;
   }
@@ -11590,6 +11592,45 @@ function luceEsp() {
   LUCE.key = key; LUCE.exp = lerp(1.1, clamp(1.1 * Math.pow(1.3 / key, 0.38), 0.85, 1.6), LUCE.day); renderer.toneMappingExposure = LUCE.exp; /* the night keeps its exposure: the lamps were made for it */
 }
 
+// ---------------------------------------------------------------- real lights at night (fase 3): the street lamps and the headlights light the street, the walls and the cars
+// On r128 the Lambert lit per vertex: a light on a road of big triangles did nothing, so the pools of light were painted (LAMPPOOL, HEADPOOL). three 0.186 lights per pixel:
+// a fixed set of spot lights (always the same number, so no shader is ever compiled again) is given every frame to what is nearest the camera: LUCI_N_LAMP street lamps
+// and LUCI_N_AUTO cars with their lights on, beside the player's headlight (headSpot). Each fades out towards the edge of its range, so a lamp that changes hands never jumps;
+// the painted pools fade out where the real light takes over (near the camera) and stay further away. ?luci=0 turns them off (the painted pools as before), for the fps
+const LUCI_ON = !/[?&]luci=0/.test(location.search), LUCI_N_LAMP = LUCI_ON ? 6 : 0, LUCI_N_AUTO = LUCI_ON ? 3 : 0, LUCI_R_LAMP = 60, LUCI_R_AUTO = 70;
+const LUCI = { kl: 1, ka: 1, init: false, lamp: [], auto: [], _c: [], near: { value: LUCI_ON ? 40 : -1 } };
+for (let i = 0; i < LUCI_N_LAMP; i++) { const s = new THREE.SpotLight(0xffd6a0, 0, 26, 1.15, 0.85, 2); s.castShadow = false; s.target.position.set(0, -1, 0); scene.add(s, s.target); LUCI.lamp.push(s); }
+for (let i = 0; i < LUCI_N_AUTO; i++) { const s = new THREE.SpotLight(0xfff0d8, 0, 55, 0.5, 0.55, 2); s.castShadow = false; scene.add(s, s.target); LUCI.auto.push(s); }
+function luciInit() { // at the first frame: headSpot and the pools are made in extras.js, after this file
+  LUCI.init = true; if (!LUCI_ON) return; // the player's headlight: a low beam from the bumper, that reaches about 40 m with the physical fall-off
+  Object.assign(headSpot, { distance: 75, angle: 0.52, penumbra: 0.55, decay: 2 });
+  for (const M of [LAMPPOOL_MAT]) M.onBeforeCompile = s => { // the painted pool fades out near the camera, where the lamp's own light is
+    s.uniforms.uLuciNear = LUCI.near;
+    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying float vLuciD;').replace('#include <project_vertex>', '#include <project_vertex>\nvLuciD = length( mvPosition.xyz );');
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vLuciD;\nuniform float uLuciNear;').replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a *= uLuciNear < 0.0 ? 1.0 : smoothstep( uLuciNear, uLuciNear + 18.0, vLuciD );');
+  };
+}
+function luciAggiorna(on) {
+  if (!LUCI.init) luciInit(); if (!LUCI_ON) return;
+  const cx = camera.position.x, cz = camera.position.z, k = on > 0.02 ? on : 0, C = LUCI._c; C.length = 0;
+  if (k) for (const T of VIVI) { if (!T.lampL || T.dist > 300) continue; for (const l of T.lampL) { if (l.off) continue; const d = Math.hypot(l.x - cx, l.z - cz); if (d < LUCI_R_LAMP) C.push(d, l); } }
+  const pick = [];
+  for (let i = 0; i < C.length; i += 2) { pick.push(i); } pick.sort((a, b) => C[a] - C[b]);
+  LUCI.lamp.forEach((s, i) => {
+    const j = pick[i]; if (j === undefined) { s.intensity = 0; return; }
+    const l = C[j + 1], d = C[j]; s.position.set(l.x, l.y, l.z); s.target.position.set(l.x, l.y - 7, l.z); s.target.updateMatrixWorld();
+    s.intensity = 110 * LUCI.kl * k * clamp((LUCI_R_LAMP - d) / 15, 0, 1);
+  });
+  // the cars: the nearest with someone at the wheel and the lights on, the player's own has headSpot
+  const A = []; if (k) for (const v of VEH) { if (v === P.car || !v.driver || v.health <= 0 || v.exploded || v.fallen || v.heli || v.spec.pedal || !v.m.g.visible) continue; const d = Math.hypot(v.x - cx, v.z - cz); if (d < LUCI_R_AUTO) A.push([d, v]); }
+  A.sort((a, b) => a[0] - b[0]);
+  LUCI.auto.forEach((s, i) => {
+    const e = A[i]; if (!e) { s.intensity = 0; return; }
+    const v = e[1], fx = Math.sin(v.h), fz = Math.cos(v.h), hl = v.spec.L / 2; s.position.set(v.x + fx * hl, v.y + 0.75, v.z + fz * hl); s.target.position.set(v.x + fx * (hl + 20), v.y - 0.6, v.z + fz * (hl + 20)); s.target.updateMatrixWorld();
+    s.intensity = 70 * LUCI.ka * k * clamp((LUCI_R_AUTO - e[0]) / 20, 0, 1);
+  });
+}
+
 // ---------------------------------------------------------------- day & night
 let TOD = 17.2; // ore del giorno, 1 ora di gioco = 1 minuto reale
 const WX = { cloud: 0.12, rain: 0, fog: 0, wet: 0, flash: 0 }; // weather mix, driven by weather3.js
@@ -11652,7 +11693,7 @@ function updGlow() {
     const ud = v.m.body.userData; if (!ud.tl) continue;
     const live = (!!v.driver || v.fariFino > now) && v.health > 0 && !v.exploded && !v.fallen && !v.ko, fs = v.fwdSpeed, brk = live && v.inp.brk > 0, rev = brk && fs < -0.5, stop = brk && !rev;
     const tm = live ? (stop ? M_BRAKE : M_TAIL) : M_TAIL_OFF; if (ud.tm !== tm) { ud.tm = tm; for (const m of ud.tails) m.material = tm; } /* nobody inside: lamps, pool and glare all off */
-    const hm = live ? M_HEAD : M_HEAD_OFF; if (ud.hm !== hm) { ud.hm = hm; for (const m of ud.heads) m.material = hm; } if (ud.hp) ud.hp.visible = live;
+    const hm = live ? M_HEAD : M_HEAD_OFF; if (ud.hm !== hm) { ud.hm = hm; for (const m of ud.heads) m.material = hm; } if (ud.hp) ud.hp.visible = live && !(LUCI_ON && v === P.car); /* the player's car has a real headlight (luci3.js) */
     if (!v.m.g.visible) continue;
     const kh = live ? on : 0, kt = live ? 0.45 * on + (stop ? 0.85 : 0) : 0; if (kh < 0.02 && kt < 0.02 && !rev) continue;
     v.m.g.updateMatrixWorld(true); const mw = v.m.body.matrixWorld;
@@ -11705,7 +11746,7 @@ function updDayNight(dt) {
   MAT.old.emissiveIntensity = MAT.mod.emissiveIntensity = 0.55 * lampsOn;
   M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn;
   const v = P.mode === 'car' ? P.car : null;
-  headSpot.intensity = v && v.health > 0 && !v.heli ? 2.4 * lampsOn : 0;
+  headSpot.intensity = v && v.health > 0 && !v.heli ? (LUCI_ON ? 90 : 2.4) * lampsOn : 0; luciAggiorna(lampsOn); /* luci3.js: the real lights of the lamps and the cars */
   if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); }
   const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0') + ' ' + (WX.icon || ''); }
 }

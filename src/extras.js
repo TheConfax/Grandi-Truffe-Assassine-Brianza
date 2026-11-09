@@ -60,7 +60,7 @@ function updGlow() {
     const ud = v.m.body.userData; if (!ud.tl) continue;
     const live = !!v.driver && v.health > 0 && !v.exploded && !v.fallen, fs = v.fwdSpeed, brk = live && v.inp.brk > 0, rev = brk && fs < -0.5, stop = brk && !rev;
     const tm = live ? (stop ? M_BRAKE : M_TAIL) : M_TAIL_OFF; if (ud.tm !== tm) { ud.tm = tm; for (const m of ud.tails) m.material = tm; } /* nobody inside: lamps, pool and glare all off */
-    const hm = live ? M_HEAD : M_HEAD_OFF; if (ud.hm !== hm) { ud.hm = hm; for (const m of ud.heads) m.material = hm; } if (ud.hp) ud.hp.visible = live;
+    const hm = live ? M_HEAD : M_HEAD_OFF; if (ud.hm !== hm) { ud.hm = hm; for (const m of ud.heads) m.material = hm; } if (ud.hp) ud.hp.visible = live && !(LUCI_ON && v === P.car); /* the player's car has a real headlight (luci3.js) */
     if (!v.m.g.visible) continue;
     const kh = live ? on : 0, kt = live ? 0.45 * on + (stop ? 0.85 : 0) : 0; if (kh < 0.02 && kt < 0.02 && !rev) continue;
     v.m.g.updateMatrixWorld(true); const mw = v.m.body.matrixWorld;
@@ -113,7 +113,7 @@ function updDayNight(dt) {
   MAT.old.emissiveIntensity = MAT.mod.emissiveIntensity = 0.55 * lampsOn;
   M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn;
   const v = P.mode === 'car' ? P.car : null;
-  headSpot.intensity = v && v.health > 0 ? 2.4 * lampsOn : 0;
+  headSpot.intensity = v && v.health > 0 ? (LUCI_ON ? 90 : 2.4) * lampsOn : 0; luciAggiorna(lampsOn); /* luci3.js: the real lights of the lamps and the cars */
   if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); }
   const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0') + ' ' + (WX.icon || ''); }
 }
