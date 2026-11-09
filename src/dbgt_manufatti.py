@@ -60,6 +60,7 @@ ALB_R = 2.5          # tree height: highest DSM - DTM within this of the point (
 ALB_SEEN = 2.5       # below this the DSM does not see a tree there (planted after 2008, or nothing standing)
 ALB_H = (3.0, 35.0)  # m
 ALB_D = (2.0, 18.0)  # crown diameter, m
+ALB_D_H = 0.45       # a crown is never narrower than this times the tree's height (Carlo, 9/11: stick trees like poplars). One constant for every tree, seen by the DSM or not, in the woods or out
 ALB_CMIN, ALB_CFR, ALB_CR = 2.0, 0.25, 10.0  # crown: canopy pixels at least this high (m, and times the height), at most this far from the tree (m)
 ALB_ISOLA = 6.0      # m: a tree of a road island that the DSM sees lower than this is a sapling of 2008 (see alberi)
 ALB_ISOLA_D = 0.5    # m: a tree this close to an island is on it
@@ -618,7 +619,7 @@ class Manufatti:
         from scipy.spatial import cKDTree
         nn = cKDTree(P).query(P, k=2)[0][:, 1] if len(P) > 1 else np.full(len(P), 10.0)
         H = np.where(seen, np.clip(H, *ALB_H), np.nan)
-        D = np.where(seen, np.clip(np.clip(D, 0.2 * H, 1.5 * H), *ALB_D), np.nan)
+        D = np.where(seen, np.clip(np.clip(D, ALB_D_H * H, 1.5 * H), *ALB_D), np.nan)
         inb = shapely.contains_xy(boschi, P[:, 0], P[:, 1]) if boschi is not None and not boschi.is_empty else np.zeros(len(P), bool)
         # the trees the DSM does not see take the typical height of the seen ones in the same setting: in a wood the wood's, outside the
         # street and garden trees' (the median of all, 11.5 m, was the woods' pulling up the young trees planted after 2008)
@@ -651,6 +652,12 @@ class Manufatti:
         if self.blds and len(P):
             ii, dist = STRtree(self.blds).query_nearest(shapely.points(P), return_distance=True, max_distance=ALB_CR, all_matches=False); dB[ii[0]] = dist
         cap = np.maximum(ALB_D[0], 2 * (dB + ALB_SPORGE)); n_cap = int((keep & (D > cap)).sum()); D = np.minimum(D, cap)
+        # the one minimum for every crown (ALB_D_H), last: the unseen trees, the island ones and the ones the walls narrowed come under it too (the crowns of a wood overlap, as in life;
+        # posto_albero.py then moves or takes off a tree whose crown, so wide, touches a building)
+        D0 = D.copy(); D = np.where(D < ALB_D_H * H, np.minimum(ALB_D_H * H, ALB_D[1]), D); n_min = int((keep & (D != D0)).sum())
+        def sotto(m): return {'n': int(m.sum()), 'sotto_%g_prima' % ALB_D_H: round(float(((D0 / H)[m] < ALB_D_H - 1e-9).mean()), 3) if m.any() else None, 'mediana_prima': round(float(np.median((D0 / H)[m])), 3) if m.any() else None,
+                              'sotto_%g_dopo' % ALB_D_H: round(float(((D / H)[m] < ALB_D_H - 1e-9).mean()), 3) if m.any() else None, 'mediana_dopo': round(float(np.median((D / H)[m])), 3) if m.any() else None}
+        self.rep['chioma_minima'] = {'costante': ALB_D_H, 'alberi_cambiati': n_min, 'tutti': sotto(keep), 'nei_boschi_dbgt': sotto(keep & inb), 'fuori_dai_boschi': sotto(keep & ~inb)}
         def st(m): return {'n': int(m.sum()), 'visti_dal_dsm': int((m & seen).sum()), 'h_p10_p50_p90': [_pct(H[m & seen], q) for q in (10, 50, 90)], 'chioma_p10_p50_p90': [_pct(D[m & seen], q) for q in (10, 50, 90)]}
         self.rep['alberi'] = {'dentro': int(len(P)), 'spostati_fuori_dai_manufatti': n_mv, 'tolti_dentro_i_manufatti': n_rm, 'altezza_tipica_se_il_dsm_non_vede': self.htyp_ctx,
                               'pixel_vicino_ai_fili_aperti_3x3': getattr(self, 'n_wire_px', 0), 'non_visti_sotto_le_linee_con_altezza_fuori_bosco': int((wz & inb & ~seen).sum()),

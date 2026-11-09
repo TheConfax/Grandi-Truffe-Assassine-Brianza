@@ -3695,6 +3695,31 @@
    8.4
   ]
  },
+ "chioma_minima": {
+  "costante": 0.45,
+  "alberi_cambiati": 735,
+  "tutti": {
+   "n": 47801,
+   "sotto_0.45_prima": 0.015,
+   "mediana_prima": 0.765,
+   "sotto_0.45_dopo": 0.0,
+   "mediana_dopo": 0.765
+  },
+  "nei_boschi_dbgt": {
+   "n": 27371,
+   "sotto_0.45_prima": 0.022,
+   "mediana_prima": 0.717,
+   "sotto_0.45_dopo": 0.0,
+   "mediana_dopo": 0.717
+  },
+  "fuori_dai_boschi": {
+   "n": 20430,
+   "sotto_0.45_prima": 0.007,
+   "mediana_prima": 0.852,
+   "sotto_0.45_dopo": 0.0,
+   "mediana_dopo": 0.852
+  }
+ },
  "alberi": {
   "dentro": 47801,
   "spostati_fuori_dai_manufatti": 0,
@@ -3707,7 +3732,7 @@
   "non_visti_sotto_le_linee_con_altezza_fuori_bosco": 141,
   "chioma_su_altezza_tipica": 0.77,
   "chioma_dal_raggio_dove_i_pixel_non_bastano": 15767,
-  "chiome_strette_dagli_edifici": 1661,
+  "chiome_strette_dagli_edifici": 1694,
   "chioma_su_altezza_p10_p50_p90_visti": [
    0.45,
    0.77,
@@ -3722,8 +3747,8 @@
     22.49
    ],
    "chioma_p10_p50_p90": [
-    4.68,
-    9.0,
+    4.77,
+    9.39,
     15.75
    ]
   },
@@ -3736,8 +3761,8 @@
     24.64
    ],
    "chioma_p10_p50_p90": [
-    6.28,
-    10.52,
+    6.78,
+    11.0,
     16.5
    ]
   },
@@ -3751,8 +3776,8 @@
    ],
    "chioma_p10_p50_p90": [
     3.92,
-    7.02,
-    11.78
+    7.1,
+    11.79
    ]
   }
  },
