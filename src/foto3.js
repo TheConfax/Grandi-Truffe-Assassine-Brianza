@@ -79,7 +79,7 @@ Promise.all(['prato', 'terreno'].map(f => new Promise(ok => { const i = new Imag
   incoltoTex.image = cv; incoltoTex.repeat.set(.75, .75); incoltoTex.needsUpdate = true; /* 16 m a repeat (UV every 12 m) */
 });
 // output in sRGB, through a filmic curve: highlights roll off instead of clipping
-renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+renderer.toneMapping = THREE.AgXToneMapping; renderer.toneMappingExposure = 1.1; /* AgX (fase 2): rolls the highlights off like film and keeps the colours of a photo, greens and blues less loud than ACES; the exposure is luce3.js's */
 // the sky: three's Preetham model (Sky.js r128, loaded beside three.min.js), with the sun's disc and the glow round it, the blue
 // deepening overhead and paling to the horizon, red and orange at sunset. It is drawn first, over the old gradient, and fades out
 // at night, under cloud and in fog, where the gradient (greyed by the weather) takes over. The haze takes the sky's colour at the
@@ -87,10 +87,11 @@ renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESF
 const FOTO_SKY = (() => {
   if (!THREE.Sky) return null; // the script did not load: the old sky stays
   const s = new THREE.Sky(), m = s.material;
-  Object.assign(m.uniforms, { uSkyK: { value: 0.13 }, uSkyA: { value: 1 }, uSkyS: { value: 1.8 } }); // exposure, opacity, saturation (the filmic curve greys a bright sky)
+  Object.assign(m.uniforms, { uSkyK: { value: 0.06 }, uSkyA: { value: 1 }, uSkyS: { value: 1.8 } }); // exposure, opacity, saturation (the filmic curve greys a bright sky)
   m.uniforms.turbidity.value = 2; m.uniforms.rayleigh.value = 2.5; m.uniforms.mieCoefficient.value = 0.003; m.uniforms.mieDirectionalG.value = 0.8;
-  m.fragmentShader = m.fragmentShader.replace('const vec3 cameraPos = vec3( 0.0, 0.0, 0.0 );', '#define cameraPos cameraPosition\nuniform float uSkyK;\nuniform float uSkyA;\nuniform float uSkyS;') // the box goes with the camera
-    .replace('gl_FragColor = vec4( retColor, 1.0 );', 'gl_FragColor = vec4( max( mix( vec3( dot( retColor, vec3( 0.2126, 0.7152, 0.0722 ) ) ), retColor, uSkyS ), 0.0 ) * vec3( 0.86, 0.95, 1.16 ) * uSkyK, uSkyA );'); // saturated, the model leans to teal: the tint takes it back towards blue
+  m.uniforms.cloudCoverage.value = 0; /* r186's Sky draws clouds of its own: none, the weather has its own */
+  m.fragmentShader = m.fragmentShader.replace('uniform float time;', 'uniform float time;\nuniform float uSkyK;\nuniform float uSkyA;\nuniform float uSkyS;\nvarying float vSunfade;') // r186's Sky already looks from cameraPosition (the box goes with the camera)
+    .replace('gl_FragColor = vec4( texColor, 1.0 );', 'vec3 retColor = texColor; /* linear, into the tone mapping and the sRGB output like everything else (r128 had a pow here in place of both) */\n gl_FragColor = vec4( max( mix( vec3( dot( retColor, vec3( 0.2126, 0.7152, 0.0722 ) ) ), retColor, uSkyS ), 0.0 ) * vec3( 0.86, 0.95, 1.16 ) * uSkyK, uSkyA );'); // saturated, the model leans to teal: the tint takes it back towards blue
   Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, fog: false }); // opaque list, drawn first, blended on the gradient
   s.scale.setScalar(SKY_R * 1.6); s.renderOrder = -100; s.frustumCulled = false; scene.add(s);
   const probe = new THREE.Mesh(s.geometry, Object.assign(m.clone(), { uniforms: m.uniforms, blending: THREE.NoBlending })); probe.scale.copy(s.scale); probe.frustumCulled = false;
@@ -118,7 +119,7 @@ function fotoSkyArrivi() { // the answers that have come: the colours, a frame o
 const _fotoV = new THREE.Vector3();
 // in linear light the sky's fill counts for less than in the old sums, and the fog took the curve's warm cast: more fill in the
 // shadows, a cooler and greyer haze by day. On top of what updDayNight sets every frame
-const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
+const FOTO_HEMI = 1, FOTO_SUN = 1, /* the light is luce3.js's now */ FOTO_FOGGREY = new THREE.Color(0xc9ced4);
 {
   const udn = updDayNight;
   updDayNight = function (dt) {
@@ -129,6 +130,7 @@ const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
       F.a = clamp((L.elDeg + 7) / 9, 0, 1) * (1 - 0.95 * clamp((WX.cloud - 0.25) / 0.55, 0, 1)) * (1 - WX.fog);
       F.s.material.uniforms.uSkyA.value = F.a; F.s.visible = F.a > 0.01;
       F.s.material.uniforms.uSkyS.value = 1.2 + 0.6 * clamp(L.elDeg / 15, 0, 1); // less boost with the sun low: twilight would turn teal
+      F.s.material.uniforms.uSkyK.value = 0.06 * (1 + 2.5 * (1 - clamp((L.elDeg + 2) / 22, 0, 1)) ** 2); /* the model's sky darkens much faster than the light on the ground as the sun goes down: an eye (and r128's pow) keeps it readable */
       if (F.s.visible) { fotoSkyArrivi();
         const d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z), dy = Math.abs(((yaw - F.yaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
         if (performance.now() - F.t > 500 || Math.abs(TOD - F.tod) > 0.05 || dy > 0.4) fotoSkyHorizon();

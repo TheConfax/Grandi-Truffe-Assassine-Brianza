@@ -17,7 +17,7 @@ def cut(a, b, new):
 # ---- module script + async data load with progress
 rep('<script id="mapdata" type="application/json">/*__MAP__*/</script>\n', '')
 rep("""<script>
-'use strict';""", """<script type="module">""")
+'use strict';""", """<script type="module">\n""" + open(os.path.join(HERE, 'three186.js'), encoding='utf-8').read())  # three.js 0.186.1 as a module: the import map is where r128's tag was
 rep("const D = JSON.parse(document.getElementById('mapdata').textContent);", """const goBtn = document.getElementById('go');
 /* the world comes in pieces (pezzi3.js, docs/motore.md "Caricamento a pezzi"): at the start only what must be whole, mappa/globale.bin (the road graph, names, points of interest,
    railways, what the bake decided on the whole map) and mappa/suolo.bin (the 10 m ground of all the playable zone). They are always checked with the server (cache 'no-cache');
@@ -52,7 +52,7 @@ const flatMat""", """  parent.add(m); return m;
 const flatMat""")
 
 # ---- world: replace everything from "the world" to "audio" with the tiled world + level-aware collisions
-world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'rotonde3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'acqua3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'pezzi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'gps3.js'), encoding='utf-8').read()
+world = open(os.path.join(HERE, 'altezze3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'interp3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'props3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'sfondabili3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'segnali3.js'), encoding='utf-8').read().replace('/*__SEGN__*/[]', open(os.path.join(HERE, 'segnaletica.json'), encoding='utf-8').read()) + '\n' + open(os.path.join(HERE, 'world3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'rotonde3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'stagioni3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'landmarks3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'oggetti3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'negozi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'acqua3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'paesaggio3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'confine3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'pezzi3.js'), encoding='utf-8').read() + '\n' + open(os.path.join(HERE, 'gps3.js'), encoding='utf-8').read()
 coll = """
 // ---------------------------------------------------------------- collisions (walls can be limited to a height band: guardrails, embankments, pillars)
 function collideStatic(p, r, y, veh, skip) { /* skip: what a car rests on (fisica3.js vehAppoggio) */
@@ -433,7 +433,7 @@ rep("  tileTick(STATION.x, STATION.z, 0, 420);\n  for (const T of TILES) T.dist 
 rep("#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ink);", "#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ocra);")
 rep("#start h1 { font-family: var(--display);", "#start h1 { color: var(--ocra) !important; font-family: var(--display);")
 # ---- day & night, car damage
-rep("function updVisuals(dt) {", open(os.path.join(HERE, 'extras.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'luce3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'luci3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'extras.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")  # luce3.js: the daylight (fase 2); luci3.js: the real lights at night (fase 3)
 rep("updSignals(); updGates(dt); updFountains();", "updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWrecks(dt); updFuel(dt); updProps(dt); updOggetti(dt);")
 rep("  updCamera(dt);", "  updCamera(dt); updGlow();")
 rep("    add(boxG(S.W, S.bh, S.L), paint, 0, by, 0);", "    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);")
@@ -607,14 +607,14 @@ rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'
 
 # ---- weather: clouds, rain, thunderstorms and fog; codes SOLE, NUVOLE, PIOGGIA, TEMPORALE, NEBBIA
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'weather3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
-rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'facciate3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'facciate3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'neve3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")  # neve3.js: snow on what faces up (fase 3)
 rep("// ---------------------------------------------------------------- renderer\n", open(os.path.join(HERE, 'foto3_colori.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- renderer\n")
-rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>')  # the sky of foto3.js
-rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
+rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script type="importmap">\n{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.186.1/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }\n</script>')  # three.js 0.186.1: the module and its addons (the sky of foto3.js); the addons import 'three' through the map, one copy of three
+rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt); luceEsp();")  # luceEsp: the exposure, after the weather (luce3.js)
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
 rep("v -= 21 * dt * i.brk;", "v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
 rep("updGlow();", "updGlow(); updSkyFx((running || titolo) && !paused ? dt : 0);")
-rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), HELI: cheatHeli };")
+rep("const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari };", "const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setPolizia(!W.off, true), SOLE: () => setWeather('sereno', true), NUVOLE: () => setWeather('nuvoloso', true), PIOGGIA: () => setWeather('pioggia', true), TEMPORALE: () => setWeather('temporale', true), NEBBIA: () => setWeather('nebbia', true), NEVE: () => setWeather('neve', true), ESTATE: () => stagioneImposta('estate'), INVERNO: () => stagioneImposta('inverno'), PRIMAVERA: () => stagioneImposta('primavera'), AUTUNNO: () => stagioneImposta('autunno'), STAGIONE: () => stagioneImposta(null), HELI: cheatHeli };")
 
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(s)
 print('assembled', len(s) // 1024, 'KB')

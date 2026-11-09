@@ -7,15 +7,17 @@ const WX_STATES = {
   pioggia: { cloud: 0.95, rain: 0.6, fog: 0, icon: '🌧', msg: 'Comincia a piovere: strada bagnata, frena prima' },
   temporale: { cloud: 1, rain: 1, fog: 0, icon: '⛈', msg: 'Temporale sulla Brianza!' },
   nebbia: { cloud: 0.5, rain: 0, fog: 1, icon: '🌫', msg: 'Nebbia in Brianza: non si vede a un palmo dal naso' },
+  neve: { cloud: 0.95, rain: 0, fog: 0.3, snow: 1, icon: '❄️', msg: 'Nevica sulla Brianza' }, /* fase 3, neve3.js: only from a grey winter sky (WX_NEXT), or ?neve=1, or the code NEVE */
 };
 const WX_NEXT = { // where the weather goes next, by weight
   sereno: { sereno: 3, nuvoloso: 5, nebbia: 1.5 }, nuvoloso: { sereno: 4, nuvoloso: 1, pioggia: 4, temporale: 1 },
-  pioggia: { nuvoloso: 5, pioggia: 3, temporale: 2 }, temporale: { pioggia: 6, nuvoloso: 4 }, nebbia: { sereno: 5, nuvoloso: 5 },
+  pioggia: { nuvoloso: 5, pioggia: 3, temporale: 2 }, temporale: { pioggia: 6, nuvoloso: 4 }, nebbia: { sereno: 5, nuvoloso: 5 }, neve: { neve: 2, nuvoloso: 5, sereno: 1 },
 };
-Object.assign(WX, { state: 'sereno', icon: WX_STATES.sereno.icon, t: 300, drift: 0, thunderT: 15, sky: -1 });
+if (STAG_DOY < 60 || STAG_DOY > 340) WX_NEXT.nuvoloso.neve = 0.5; /* it may snow from mid-December to February, now and then */
+Object.assign(WX, { state: 'sereno', icon: WX_STATES.sereno.icon, t: 300, drift: 0, thunderT: 15, sky: -1, snow: 0, neve: 0 });
 function setWeather(st, now_) {
   WX.state = st; WX.t = 240 + rnd() * 360; const S = WX_STATES[st]; WX.icon = S.icon;
-  if (now_) { WX.cloud = S.cloud; WX.rain = S.rain; WX.fog = S.fog; WX.wet = S.rain ? 1 : 0; skyT = -1; }
+  if (now_) { WX.cloud = S.cloud; WX.rain = S.rain; WX.fog = S.fog; WX.wet = S.rain ? 1 : 0; WX.snow = S.snow || 0; if (S.snow) WX.neve = 1; skyT = -1; }
   if (running) toast(S.icon + ' ' + S.msg);
 }
 function updWeather(dt) {
@@ -28,13 +30,17 @@ function updWeather(dt) {
   WX.cloud = ap(WX.cloud, S.cloud, 1 / 40);
   WX.rain = ap(WX.rain, WX.cloud > 0.8 ? S.rain : 0, 1 / 25); // no rain before the sky is grey
   WX.fog = ap(WX.fog, S.fog, 1 / 45);
+  if (!WX.nvInit) { WX.nvInit = true; if (/[?&]neve=1/.test(location.search)) setWeather('neve', true); }
+  WX.snow = ap(WX.snow, WX.cloud > 0.8 ? S.snow || 0 : 0, 1 / 25); /* snow on the ground: white in about two minutes of snowfall, gone in some minutes, sooner in the rain */
+  WX.neve = WX.snow > 0.2 ? Math.min(1, WX.neve + dt * WX.snow / 110) : Math.max(0, WX.neve - dt * (1 + 3 * WX.rain) / 420); NEVE.u.value = WX.neve;
   WX.wet = WX.rain > 0.05 ? Math.min(1, WX.wet + dt / 50) : Math.max(0, WX.wet - dt / 200); // soaked in under a minute, dry in a few
+  RIF.wet.value = WX.wet; /* the wet asphalt of riflessi3.js: darker, smoother, sharper reflections of the sky and the sun (fase 3) */
   WX.flash = Math.max(0, WX.flash - dt * 4);
   if (WX.rain > 0.85 && (WX.thunderT -= dt) <= 0) { WX.thunderT = 12 + rnd() * 35; WX.flash = 1; const d = 0.8 + rnd() * 4; setTimeout(() => thunder(d), d * 1000); }
   // light: a grey sky softens the sun and the shadows
   const L = lightTones(), cov = WX.cloud * WX.cloud, grey = hexC(0x9aa0a8);
-  sun.intensity *= 1 - 0.8 * cov - 0.15 * WX.fog; sun.color.lerp(grey, cov * 0.6);
-  hemi.intensity *= 1 + 0.12 * cov - 0.25 * WX.rain * L.day; hemi.color.lerp(hexC(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
+  sun.intensity *= Math.max(0, 1 - 0.95 * cov - 0.5 * WX.fog); sun.color.lerp(grey, cov * 0.6); /* fase 2: under a grey sky almost no sun, no shadows; the sky gives more light than a blue one, */
+  hemi.intensity *= (1 + (1.1 * cov + 0.8 * WX.fog) * L.day) * (1 - 0.35 * WX.rain * L.day); /* the whole less than on a clear day (the exposure takes some back: luce3.js); rain darker */ hemi.color.lerp(hexC(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
   hemi.intensity += WX.flash * 2.2; sun.intensity += WX.flash * 0.8;
   // fog: grey haze, rain curtain, then the real nebbia
   const fogC = mixHex(0x262a33, 0xc3c7cb, L.day);
@@ -85,15 +91,16 @@ function updSkyFx(dt) {
     c.s.material.opacity = c.o * (0.55 + 0.45 * WX.cloud) * (1 - WX.fog); c.s.material.color.copy(col).multiplyScalar(1 + WX.flash);
   });
   // rain streaks, slanted by the wind and stretched by the car's own speed
-  const n = Math.round(RAIN_N * Math.min(1, WX.rain * 1.4)); RAIN.geometry.setDrawRange(0, n * 2); RAIN.material.opacity = 0.32 + 0.2 * WX.rain;
+  const sn = WX.snow > WX.rain, n = Math.round(RAIN_N * Math.min(1, Math.max(WX.rain * 1.4, WX.snow * 1.2))); RAIN.geometry.setDrawRange(0, n * 2); RAIN.material.opacity = sn ? 0.85 : 0.32 + 0.2 * WX.rain; RAIN.material.color.set(sn ? 0xf4f6fa : 0xc4ccd6); /* snow: slow white flakes */
   RAIN.visible = n > 0; if (!n) return;
   // drops live in world space, wrapped into the box round the camera; a streak points back along the drop's speed relative to the car
-  const v = P.mode === 'car' ? P.car : null, wx = (v ? v.vx : 0) - 2.2, wz = (v ? v.vz : 0) - 1.0, fall = 16 * dt, a = RAIN.geometry.attributes.position, A = a.array;
+  const v = P.mode === 'car' ? P.car : null, wx = (v ? v.vx : 0) - 2.2, wz = (v ? v.vz : 0) - 1.0, fall = (sn ? 1.4 : 16) * dt, a = RAIN.geometry.attributes.position, A = a.array, tt = performance.now() / 1000;
   const wrap = (q, B) => ((q % B) + B) % B - B / 2;
   for (let i = 0; i < n; i++) {
     let y = RAIN_P[i * 3 + 1] - fall; if (y < 0) y += RAIN_BOX[1]; RAIN_P[i * 3 + 1] = y;
     RAIN_P[i * 3] += 2.2 * dt; RAIN_P[i * 3 + 2] += 1.0 * dt; // wind
     const x = cp.x + wrap(RAIN_P[i * 3] - cp.x, RAIN_BOX[0]), z = cp.z + wrap(RAIN_P[i * 3 + 2] - cp.z, RAIN_BOX[2]), yy = cp.y - 12 + y;
+    if (sn) { const sw = Math.sin(tt * 1.3 + i) * 0.35, x2 = x + sw, z2 = z + Math.cos(tt * 1.1 + i * 1.7) * 0.35; A[i * 6] = x2; A[i * 6 + 1] = yy; A[i * 6 + 2] = z2; A[i * 6 + 3] = x2 + 0.03; A[i * 6 + 4] = yy + 0.05; A[i * 6 + 5] = z2; continue; }
     A[i * 6] = x; A[i * 6 + 1] = yy; A[i * 6 + 2] = z; A[i * 6 + 3] = x + wx * 0.05; A[i * 6 + 4] = yy + 0.85; A[i * 6 + 5] = z + wz * 0.05;
   }
   a.needsUpdate = true;
