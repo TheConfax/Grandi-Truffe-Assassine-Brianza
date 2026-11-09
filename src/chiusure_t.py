@@ -23,9 +23,12 @@ PC_D = 1.5        # m: a closure that passes this near a passo carraio of the DB
 PAR_D = 2.3       # m: a closure that runs side by side with another divider nearer than this for PAR_L m or more is a double of it (src/barriere.py DOPPIO_D, DOPPIO_L, DOPPIO_COS)
 PAR_L = 3.0
 PAR_COS = 0.9
-GAP_I = 2.5        # m: (varchi 3, Carlo 9/11, via Vespucci x -311 z -900: "manca una cancellata, non un varco") two pieces of a boundary in line with a hole up to this wide between them,
+GAP_I = 2.0        # m: (varchi 3, Carlo 9/11, via Vespucci x -311 z -900: "manca una cancellata, non un varco") two pieces of a boundary in line with a hole up to this wide between them,
                    # and nothing that enters there (the same accesses as for a T), are one boundary: the hole closes
 COS_I = 0.94       # in line: the two ends point at each other within 20 degrees
+VIA_OUT, VIA_LAT = 1.5, 1.0   # m: (varchi 3, scuola Diaz) the hole in line is the mouth of a drive or a path when a paved surface reaches it from one side (VIA_OUT and 2 VIA_OUT out from its middle)
+                              # and is no wider than the hole (VIA_LAT beyond one of its ends, VIA_OUT out, there is none): it gets a gate (a footgate below 2,5 m). A street that runs
+                              # along the boundary is paved beyond both ends too: there the hole is closed (via Vespucci)
 
 def _parallelo(S, altre):
     """True if S runs side by side (within PAR_D, the same way) with one of the lines altre for PAR_L m or more"""
@@ -42,9 +45,24 @@ def _parallelo(S, altre):
     return False
 
 
-def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None, carr=()):
+def _vialetto(e, c, piene):
+    """True if a paved surface of piene (prepared polygons, the carriageways and paved surfaces as drawn) comes up to the hole e-c, from one side or through it, and on every side it comes from it is no wider than the hole"""
+    if not piene: return False
+    L = math.dist(e, c)
+    if L < 0.5: return False
+    ux, uz = (c[0] - e[0]) / L, (c[1] - e[1]) / L; nx, nz = -uz, ux; mx, mz = (e[0] + c[0]) / 2, (e[1] + c[1]) / 2
+    P = lambda x, z: any(g.contains(Point(x, z)) for g in piene)
+    lati = 0
+    for sg in (1, -1):
+        if not (P(mx + nx * VIA_OUT * sg, mz + nz * VIA_OUT * sg) and P(mx + nx * 2 * VIA_OUT * sg, mz + nz * 2 * VIA_OUT * sg)): continue
+        if P(e[0] - ux * VIA_LAT + nx * VIA_OUT * sg, e[1] - uz * VIA_LAT + nz * VIA_OUT * sg) and P(c[0] + ux * VIA_LAT + nx * VIA_OUT * sg, c[1] + uz * VIA_LAT + nz * VIA_OUT * sg): return False   # wider than the hole on this side: a street or a square along the boundary
+        lati += 1
+    return lati > 0
+
+
+def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None, carr=(), piene=(), nuovi_cancelli=None):
     """lines [(LineString, kind, h)] (no railway); edifici [Polygon]; gates [(LineString, tipo)]; doors [LineString]; vie [LineString]; pav [Polygon] (surfaces a fence never crosses); carr [Polygon] (the carriageway proper: never crossed; a closure that ends on a gate, along the line of the lot, may cross the rest of pav);
-    pc [(x, z)] passi carrai. Returns ([(pts, kind, h)] new segments, rep)."""
+    pc [(x, z)] passi carrai. Returns ([(pts, kind, h, middle of the line it carries on)] new segments, rep)."""
     rep = rep if rep is not None else Counter()
     cl = [l[0] for l in lines] + [g.boundary for g in edifici]
     nl = len(lines); nb = nl + len(edifici)
@@ -114,7 +132,7 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
                 ang = math.degrees(math.asin(min(1.0, abs(sx * tz - sz * tx) / tl)))
                 if ang < ANG_MIN:
                     inl = False
-                    if j < nl and d <= GAP_I:   # not a T: the end of another piece in line with this one, across a short hole
+                    if j < nl and d <= GAP_MAX:   # not a T: the end of another piece in line with this one, across a short hole
                         for ce in (tg.coords[0], tg.coords[-1]):
                             if math.dist(ce, c) > 0.6: continue
                             s2 = 0.0 if ce == tg.coords[0] else tg.length; f2 = tg.interpolate(min(tg.length, 3.0) if s2 == 0.0 else max(0.0, tg.length - 3.0)).coords[0]; d2 = math.dist(ce, f2)
@@ -126,6 +144,11 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
             # a gate or a door stands in the opening (its own gate, not the one the end is next to): an access
             if GT is not None and any(blk[k].distance(S) < 0.8 for k in GT.query(S.buffer(0.8)) if not (isg and blk[k] is cl[j])): note(e, 'cancello_nel_varco', d); continue
             if VT is not None and any(vie[k].distance(S) < VIA_D for k in VT.query(S.buffer(VIA_D))): note(e, 'via_nel_varco', d); continue
+            if not isg and ang < ANG_MIN:   # a hole in line
+                if nuovi_cancelli is not None and _vialetto(e, c, piene):
+                    if any(S.distance(sd) < 0.2 for sd in seg_done): note(e, 'doppio'); continue
+                    seg_done.append(S); nuovi_cancelli.append(([e, c], kind, h)); note(e, 'cancello_su_vialetto', d); continue
+                if d > GAP_I: note(e, 'troppo_largo_in_linea', d); continue
             if CAT is not None and any(carr[k].intersects(S) and carr[k].intersection(S).length > 0.3 for k in CAT.query(S)): note(e, 'carreggiata_nel_varco', d); continue
             if PT is not None and not isg and any(pav[k].intersects(S) and pav[k].intersection(S).length > 0.3 for k in PT.query(S)): note(e, 'pavimentato_nel_varco', d); continue
             if CT is not None and any(pcs[k].distance(S) < PC_D for k in CT.query(S.buffer(PC_D))): note(e, 'passo_carraio_vicino', d); continue
@@ -134,5 +157,5 @@ def chiudi_a_t(lines, edifici, gates, doors, vie, pav, pc=(), rep=None, dec=None
             seg_done.append(S)
             note(e, 'chiuso', d, j >= nl)
             rep['chiusi_' + ('cancello' if isg else 'edificio' if j >= nl else 'in_linea' if ang < ANG_MIN else 'recinzione')] += 1
-            out.append(([e, c], kind, h))
+            out.append(([e, c], kind, h, L.interpolate(0.5, normalized=True).coords[0]))   # the middle of the line it carries on: the closure looks like it (build_data.py, the style of the barriers)
     return out, rep
