@@ -59,11 +59,19 @@ function rifFrag(q) {
 }
 `;
 }
+// the sun's shadow for the lobe (three 0.186): the Lambert lights per pixel and has no getShadowMask() any more; the shadow of the sun (the one directional light) is taken
+// where three computes it for the lighting, the same lookup, so the sun no longer shines on the asphalt and the cars in the shade
+const RIF_LFB = (() => {
+  const c = THREE.ShaderChunk.lights_fragment_begin, a = 'directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ]';
+  if (!c.includes(a)) return null;
+  const i = c.indexOf(a), j = c.indexOf(';', i), sh = c.slice(i + 'directLight.color *= '.length, j);
+  return c.slice(0, i) + '{ float rfS_ = ' + sh + '; directLight.color *= rfS_; rfSh = min( rfSh, rfS_ ); }' + c.slice(j + 1);
+})();
 function rifShader(s, q) {
   s.uniforms.uRfH = FOTO_FAC.uSkyH; s.uniforms.uRfZ = FOTO_FAC.uSkyZ; s.uniforms.uRfD = FOTO_FAC.uSunD; s.uniforms.uRfC = FOTO_FAC.uSunC; s.uniforms.uRfWet = RIF.wet;
   s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + RIF_VERT_DECL).replace('#include <project_vertex>', '#include <project_vertex>\nvRfP = mvPosition.xyz; vRfN = transformedNormal;');
   s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + RIF_FRAG_DECL).replace('void main() {', 'void main() {\n  float rfSh = 1.0;')
-    .replace('* getShadowMask();', '* (rfSh = getShadowMask());').replace('vec3 outgoingLight =', rifFrag(q) + '  vec3 outgoingLight =');
+    .replace('#include <lights_fragment_begin>', RIF_LFB || '#include <lights_fragment_begin>').replace('vec3 outgoingLight =', rifFrag(q) + '  vec3 outgoingLight =');
 }
 // patches a Lambert material in place (the other patches of the material, e.g. the asphalt's, are kept and run first)
 function rifMat(m, kind, instanced) {
