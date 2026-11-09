@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo threejs · dopo c8dc4caf · assemblato 09/11 02:53 · porta ' + location.port;
+    const txt = 'locale · ramo threejs · dopo 7fb70301 · assemblato 09/11 03:17 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -2709,7 +2709,7 @@ function fondoLook(m) {
     const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
     const mk = (map, vs) => ({ S: new THREE.MeshLambertMaterial({ map }), F: flatMat({ map }), vs });
     FONDO_ = { g: mk(ld('ghiaia'), 2.5), t: mk(ld('terra'), 2.6), n: mk(ld('pavimento'), 3), b: { S: MAT.side, F: flatMat({ map: sidewalkTex }), vs: 4 }, f: { S: MAT.piazzaS, F: MAT.piazza, vs: 4 },
-      c: mk(ciottoliTex, 4), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
+      c: (c => { c.S.color.set(CIOTTOLI_TINTA); c.F.color.set(CIOTTOLI_TINTA); return c; })(mk(ciottoliTex, 4)), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
   }
   return FONDO_[m] || null;
 }
@@ -5152,6 +5152,7 @@ function lxSbarre(g) { // the first time its tile is laid out; they stay, like t
 // crescent beds edged in white stone (red flowers, low shrubs or bare soil), round bushes, or a stone paving. Drawn only in the tiles of S,
 // over the island the walls pass draws (kerb + top at MED_H, world3.js): the physics stays the island's
 const RO_RAISE = 0.12; // the lawn behind the inner kerb, over the top of the island (Carlo's photo: a low kerb, the lawn a hand over the cobbles)
+const CIOTTOLI_TINTA = 0xb4c2dc; /* fase 2: the photo's pebbles are beige, the cobbles of Meda grey (via Antona Traversi, Commons 2010): a cold tint on the photo */
 const ciottoliTex = canvasTex(8, 8, (g, w, h) => { g.fillStyle = '#a08f76'; g.fillRect(0, 0, w, h); }); // tex/ciottoli.jpg in its place (foto3.js), 4 m a repeat
 const fioriTex = canvasTex(128, 128, (g, w, h) => { // begonias: leaves and red flowers in the colours of Carlo's photo (leaves #2f4a1c, flowers #a5322a)
   g.fillStyle = '#2f4a1c'; g.fillRect(0, 0, w, h); let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -5160,7 +5161,7 @@ const fioriTex = canvasTex(128, 128, (g, w, h) => { // begonias: leaves and red 
 });
 const fogliaTex = canvasTex(128, 128, (g, w, h) => { /* leaves in greys: the colour is the material's, or each bush's */ g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, w, h); let s = 5; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; for (let k = 0; k < 700; k++) { g.fillStyle = ['#ffffff', '#9a9a9a', '#e0e0e0', '#7c7c7c'][k % 4]; g.beginPath(); g.arc(r() * w, r() * h, 1.5 + r() * 3.5, 0, 7); g.fill(); } });
 const RO_MAT = {
-  ciottoli: flatMat({ map: ciottoliTex }), fiori: new THREE.MeshLambertMaterial({ map: fioriTex, side: THREE.DoubleSide }),
+  ciottoli: flatMat({ map: ciottoliTex, color: CIOTTOLI_TINTA }), fiori: new THREE.MeshLambertMaterial({ map: fioriTex, side: THREE.DoubleSide }),
   bordo: new THREE.MeshLambertMaterial({ color: 0xe6e2d8, side: THREE.DoubleSide }), terra: new THREE.MeshLambertMaterial({ map: groundTex, color: 0x8a6e55 }),
   cespuglio: new THREE.MeshLambertMaterial({ map: fogliaTex }),
   fascia: flatMat({ map: concreteTex, color: 0xe2ded4 }), prato: new THREE.MeshLambertMaterial({ map: grassTex }) // the band of worked concrete of the base; the lawn of its dome
@@ -11240,7 +11241,7 @@ function step(dt) {
   }
   heliStep(dt);
   // ----- train
-  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWeather(dt); updWrecks(dt); updFuel(dt); updProps(dt); updOggetti(dt); updNegozi(dt);
+  updTrain(dt); updCrossings(dt); updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWeather(dt); luceEsp(); updWrecks(dt); updFuel(dt); updProps(dt); updOggetti(dt); updNegozi(dt);
   for (const [cx, cz, tvx, tvz] of TRAIN_CIRC) {
     for (const v of VEH) if (Math.abs(v.x - cx) <= 1.75 + v.rad + v.co && Math.abs(v.z - cz) <= 1.75 + v.rad + v.co) for (const c of v.circles()) { const dx = c[0] - cx, dz = c[1] - cz, d = hyp(dx, dz), RT = 1.75 + v.rad; if (d < RT && d > 1e-5) { const nx = dx / d, nz = dz / d; v.x += nx * (RT - d); v.z += nz * (RT - d); v.vx = tvx + nx * 6; v.vz = tvz + nz * 6; v.sleep = false; v.impact(12 + hyp(tvx, tvz)); } }
   }
@@ -11534,6 +11535,61 @@ function updCamera(dt) {
   const sy = H.ground(px, pz); sun.target.position.set(px, sy, pz); sun.position.set(px + SUN_DIR.x * 220, sy + SUN_DIR.y * 220, pz + SUN_DIR.z * 220);
   _far.position.x = camera.position.x * 0.9; _near.position.x = camera.position.x * 0.8;
 }
+// ---------------------------------------------------------------- daylight as it is (three.js 0.186, fase 2): sun, sky, bounce, haze and exposure from the sun's height
+// The sun's light comes through the air: the longer the path (air mass, low sun) the less light and the warmer, blue going first (Rayleigh), the haze (aerosol,
+// LUCE.tau) taking all colours a little. The sky gives a soft blue light from everywhere, about a fifth of the whole on a clear noon (so the shadows are a fifth of the sun);
+// the ground sends back some of what falls on it (albedo 0.2, warm grey). The camera adapts in part, like an eye or a photo: a winter noon is darker than a summer one,
+// but not as much as the light. The season comes from the true date (the shops' clock does the same), or from the link: ?stagione=primavera|estate|autunno|inverno.
+// The hours of the day stay the game's (sunrise and sunset as before): the season changes how high the sun climbs, the colour of the light and the haze
+const LUCE = (() => {
+  const st = (new URLSearchParams(location.search).get('stagione') || '').toLowerCase(), now = new Date();
+  const doy = { primavera: 110, estate: 196, autunno: 288, inverno: 15 }[st] ?? Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 864e5);
+  const D = Math.PI / 180, lat = 45.66 * D, decl = 23.44 * D * Math.sin(2 * Math.PI * (284 + doy) / 365);
+  const e = 0.5 + 0.5 * Math.sin(decl) / Math.sin(23.44 * D); // 0 at the winter solstice, 1 at the summer one
+  const aut = Math.max(0, Math.sin(2 * Math.PI * (doy - 200) / 365)); // late summer and autumn: the low golden haze of September-November
+  const nome = doy < 80 || doy >= 355 ? 'inverno' : doy < 172 ? 'primavera' : doy < 266 ? 'estate' : 'autunno';
+  return {
+    doy, nome, e,
+    alto: Math.sin(Math.PI / 2 - lat + decl) / Math.sin(Math.PI / 2 - lat), // how high the noon sun is against the equinox one (sin of the height)
+    tau: 0.1 + 0.16 * e + 0.04 * aut, // aerosol depth: clear cold winter air, hazy Po-valley summer
+    // the colour of the season's light, on sun and sky by day: winter cold and pale, summer warm, autumn golden, spring neutral and fresh
+    wb: new THREE.Color().setRGB(0.93, 0.975, 1.09).lerp(new THREE.Color().setRGB(1.06, 1.0, 0.91), e).lerp(new THREE.Color().setRGB(1.09, 1.0, 0.84), 0.7 * aut),
+    fredda: 1 - e, // winter light: bluer sky light and shadows
+    exp: 1, key: 1, day: 1, ghi: 0, dhi: 0, _c: new THREE.Color(), _s: new THREE.Color(), _g: new THREE.Color(),
+  };
+})();
+const LUCE_K = 2.0, LUCE_RAY = [0.042, 0.072, 0.15], LUCE_AER = [1, 1.08, 1.2]; // overall scale (r128's units, see three186.js), Rayleigh and aerosol depth per colour
+const _luceWb = new THREE.Color();
+function luceGiorno(L) {
+  const el = L.elDeg, D = Math.PI / 180, s = Math.max(0, Math.sin(el * D)), ep = Math.max(el, 0);
+  const m = 1 / (Math.sin(ep * D) + 0.50572 * Math.pow(ep + 6.07995, -1.6364)); // Kasten-Young air mass
+  const up = clamp((el + 0.6) / 1.6, 0, 1), tau = LUCE.tau;
+  const c = LUCE._c.setRGB(Math.exp(-m * (LUCE_RAY[0] + tau * LUCE_AER[0])), Math.exp(-m * (LUCE_RAY[1] + tau * LUCE_AER[1])), Math.exp(-m * (LUCE_RAY[2] + tau * LUCE_AER[2])));
+  const dni = c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722; c.multiplyScalar(1 / Math.max(c.r, c.g, c.b, 1e-4));
+  // the sky's light on the flat: grows with the sun, more in haze; dusk keeps a glow for a while after sunset; the night has the moon and the town
+  const tw = 0.05 * Math.exp(Math.min(el, 4) / 2.4) * clamp((el + 10) / 6, 0, 1);
+  const dhi = (0.07 + 0.55 * tau) * Math.pow(s, 0.8) + tw;
+  const day = clamp((el + 2) / 8, 0, 1), nightI = 1 - day;
+  sun.intensity = LUCE_K * dni * up * day + 0.33 * nightI; LUCE.day = day; // under the horizon the "sun" is the moon (high, as before)
+  sun.color.copy(c).multiply(LUCE.wb).lerp(hexC(0x8fa6d8), nightI);
+  // sky light: blue by day (bluer in winter, whiter in haze), violet-blue at dusk, dark blue at night
+  const sk = LUCE._s.setRGB(0.62 + 0.25 * tau, 0.76 + 0.12 * tau, 1);
+  sk.lerp(hexC(0x8a86b8), L.dusk * 0.5); if (LUCE.fredda > 0) sk.b *= 1 + 0.06 * LUCE.fredda;
+  hemi.intensity = LUCE_K * dhi * day + 0.65 * nightI; /* the night as before */ hemi.color.copy(sk).multiply(LUCE.wb).lerp(hexC(0x5a6fa8), nightI);
+  // the ground's bounce, on what faces down and on the walls in shade: what falls on the ground times its albedo, as a share of the sky light
+  const ghi = dni * up * s + dhi, gr = LUCE._g.setRGB(0.24, 0.21, 0.17).multiplyScalar(clamp(ghi / Math.max(dhi, 0.02), 0, 6) * 0.9);
+  hemi.groundColor.copy(gr).lerp(hexC(0x2a2a36), nightI);
+  LUCE.ghi = LUCE_K * ghi * day; LUCE.dhi = LUCE_K * dhi * day;
+  // haze: warm-white in summer, a little bluer in winter; the visibility shorter in the summer haze
+  scene.fog.color.copy(mixHex(0x1f2a44, 0xd9dbd6, L.day)).lerp(hexC(0xe8dcc4), L.day * (0.25 + 0.4 * LUCE.e)).lerp(hexC(0xe39a72), L.dusk * 0.55);
+  scene.fog.far = (560 + 160 * L.day) * Math.pow(0.2 / tau, 0.7 * L.day); scene.fog.color.multiply(_luceWb.copy(LUCE.wb).lerp(hexC(0xffffff), 1 - L.day));
+}
+// the exposure, after the weather: about the square root of the light on the flat (an eye adapts in part), never under the night's floor
+function luceEsp() {
+  const key = Math.max(0.1, (sun.intensity - WX.flash * 0.8) * Math.max(0, SUN_DIR.y) + hemi.intensity - WX.flash * 2.2);
+  LUCE.key = key; LUCE.exp = lerp(1.1, clamp(1.1 * Math.pow(1.3 / key, 0.38), 0.85, 1.6), LUCE.day); renderer.toneMappingExposure = LUCE.exp; /* the night keeps its exposure: the lamps were made for it */
+}
+
 // ---------------------------------------------------------------- day & night
 let TOD = 17.2; // ore del giorno, 1 ora di gioco = 1 minuto reale
 const WX = { cloud: 0.12, rain: 0, fog: 0, wet: 0, flash: 0 }; // weather mix, driven by weather3.js
@@ -11622,7 +11678,8 @@ const mixHex = (a, b, t) => _mixO[_mixI++ % 24].copy(hexC(a)).lerp(hexC(b), t); 
 let skyT = -1, nightK = 0;
 const LATR = 45.66 * Math.PI / 180, SOLAR_NOON = 12.52;
 function lightTones() {
-  const H = (TOD - SOLAR_NOON) * 15 * Math.PI / 180, E = -Math.sin(H), Nn = -Math.sin(LATR) * Math.cos(H), U = Math.cos(LATR) * Math.cos(H);
+  const H = (TOD - SOLAR_NOON) * 15 * Math.PI / 180, E0 = -Math.sin(H), N0 = -Math.sin(LATR) * Math.cos(H), U = clamp(Math.cos(LATR) * Math.cos(H) * LUCE.alto, -1, 1);
+  const hk = Math.sqrt(1 - U * U) / (Math.hypot(E0, N0) || 1), E = E0 * hk, Nn = N0 * hk; /* the season's height (luce3.js): sunrise and sunset at the same hours, at noon as high as on the true day */
   const elDeg = Math.asin(U) * 180 / Math.PI, day = clamp((elDeg + 4) / 12, 0, 1), dusk = Math.exp(-(((elDeg - 1) / 6) ** 2));
   return { E, Nn, U, elDeg, elev: U, day, night: 1 - day, dusk };
 }
@@ -11631,10 +11688,7 @@ function updDayNight(dt) {
   const L = lightTones(); nightK = L.night;
   // sun runs east -> south -> west, moon light when it is down
   if (L.U > 0) SUN_DIR.set(L.E, Math.max(0.12, L.U), -L.Nn).normalize(); else SUN_DIR.set(0.3, 0.8, 0.45).normalize(); // night: soft moonlight from high up
-  sun.intensity = 0.3 + 0.8 * L.day;
-  sun.color.copy(mixHex(0x8fa6d8, 0xffdcae, L.day)).lerp(hexC(0xff9356), L.dusk * 0.6);
-  hemi.intensity = 0.5 + 0.12 * L.day; hemi.color.copy(mixHex(0x5a6fa8, 0xdbe8ff, L.day)); hemi.groundColor.copy(mixHex(0x2a2a36, 0x8a7f6a, L.day));
-  const fog = mixHex(0x1f2a44, 0xebd9ba, L.day).lerp(hexC(0xe39a72), L.dusk * 0.55); scene.fog.color.copy(fog); scene.fog.far = 560 + 160 * L.day;
+  luceGiorno(L); // sun, sky light, the ground's bounce and the haze: luce3.js
   _far.material.color.setScalar(0.18 + 0.82 * L.day); _near.material.color.setScalar(0.15 + 0.85 * L.day);
   const skyW = WX.cloud + WX.fog * 2;
   if (Math.abs(TOD - skyT) > 0.04 || skyT < 0 || Math.abs(skyW - (updDayNight.w ?? -1)) > 0.015) { // redraw the 4x256 sky gradient now and then
@@ -11705,7 +11759,7 @@ function explodeCar(v) {
 }
 
 updDayNight(0);
-window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); };
+window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); updWeather(0); luceEsp(); }; /* as a frame does: the day, the weather on it, the exposure */
 
 // ---------------------------------------------------------------- car radio: eight live stations, only while driving a car; each car keeps the station picked on it
 // claude.ai artifacts allow no external audio (media-src/connect-src 'self'): there the radio stays off with a note
@@ -12090,8 +12144,8 @@ function updWeather(dt) {
   if (WX.rain > 0.85 && (WX.thunderT -= dt) <= 0) { WX.thunderT = 12 + rnd() * 35; WX.flash = 1; const d = 0.8 + rnd() * 4; setTimeout(() => thunder(d), d * 1000); }
   // light: a grey sky softens the sun and the shadows
   const L = lightTones(), cov = WX.cloud * WX.cloud, grey = hexC(0x9aa0a8);
-  sun.intensity *= 1 - 0.8 * cov - 0.15 * WX.fog; sun.color.lerp(grey, cov * 0.6);
-  hemi.intensity *= 1 + 0.12 * cov - 0.25 * WX.rain * L.day; hemi.color.lerp(hexC(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
+  sun.intensity *= Math.max(0, 1 - 0.95 * cov - 0.5 * WX.fog); sun.color.lerp(grey, cov * 0.6); /* fase 2: under a grey sky almost no sun, no shadows; the sky gives more light than a blue one, */
+  hemi.intensity *= (1 + (1.1 * cov + 0.8 * WX.fog) * L.day) * (1 - 0.35 * WX.rain * L.day); /* the whole less than on a clear day (the exposure takes some back: luce3.js); rain darker */ hemi.color.lerp(hexC(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
   hemi.intensity += WX.flash * 2.2; sun.intensity += WX.flash * 0.8;
   // fog: grey haze, rain curtain, then the real nebbia
   const fogC = mixHex(0x262a33, 0xc3c7cb, L.day);
@@ -12259,7 +12313,7 @@ Promise.all(['prato', 'terreno'].map(f => new Promise(ok => { const i = new Imag
   incoltoTex.image = cv; incoltoTex.repeat.set(.75, .75); incoltoTex.needsUpdate = true; /* 16 m a repeat (UV every 12 m) */
 });
 // output in sRGB, through a filmic curve: highlights roll off instead of clipping
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+renderer.toneMapping = THREE.AgXToneMapping; renderer.toneMappingExposure = 1.1; /* AgX (fase 2): rolls the highlights off like film and keeps the colours of a photo, greens and blues less loud than ACES; the exposure is luce3.js's */
 // the sky: three's Preetham model (Sky.js r128, loaded beside three.min.js), with the sun's disc and the glow round it, the blue
 // deepening overhead and paling to the horizon, red and orange at sunset. It is drawn first, over the old gradient, and fades out
 // at night, under cloud and in fog, where the gradient (greyed by the weather) takes over. The haze takes the sky's colour at the
@@ -12267,11 +12321,11 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure
 const FOTO_SKY = (() => {
   if (!THREE.Sky) return null; // the script did not load: the old sky stays
   const s = new THREE.Sky(), m = s.material;
-  Object.assign(m.uniforms, { uSkyK: { value: 0.13 }, uSkyA: { value: 1 }, uSkyS: { value: 1.8 } }); // exposure, opacity, saturation (the filmic curve greys a bright sky)
+  Object.assign(m.uniforms, { uSkyK: { value: 0.06 }, uSkyA: { value: 1 }, uSkyS: { value: 1.8 } }); // exposure, opacity, saturation (the filmic curve greys a bright sky)
   m.uniforms.turbidity.value = 2; m.uniforms.rayleigh.value = 2.5; m.uniforms.mieCoefficient.value = 0.003; m.uniforms.mieDirectionalG.value = 0.8;
   m.uniforms.cloudCoverage.value = 0; /* r186's Sky draws clouds of its own: none, the weather has its own */
   m.fragmentShader = m.fragmentShader.replace('uniform float time;', 'uniform float time;\nuniform float uSkyK;\nuniform float uSkyA;\nuniform float uSkyS;\nvarying float vSunfade;') // r186's Sky already looks from cameraPosition (the box goes with the camera)
-    .replace('gl_FragColor = vec4( texColor, 1.0 );', 'vec3 retColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );\n gl_FragColor = vec4( max( mix( vec3( dot( retColor, vec3( 0.2126, 0.7152, 0.0722 ) ) ), retColor, uSkyS ), 0.0 ) * vec3( 0.86, 0.95, 1.16 ) * uSkyK, uSkyA );'); // saturated, the model leans to teal: the tint takes it back towards blue
+    .replace('gl_FragColor = vec4( texColor, 1.0 );', 'vec3 retColor = texColor; /* linear, into the tone mapping and the sRGB output like everything else (r128 had a pow here in place of both) */\n gl_FragColor = vec4( max( mix( vec3( dot( retColor, vec3( 0.2126, 0.7152, 0.0722 ) ) ), retColor, uSkyS ), 0.0 ) * vec3( 0.86, 0.95, 1.16 ) * uSkyK, uSkyA );'); // saturated, the model leans to teal: the tint takes it back towards blue
   Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, fog: false }); // opaque list, drawn first, blended on the gradient
   s.scale.setScalar(SKY_R * 1.6); s.renderOrder = -100; s.frustumCulled = false; scene.add(s);
   const probe = new THREE.Mesh(s.geometry, Object.assign(m.clone(), { uniforms: m.uniforms, blending: THREE.NoBlending })); probe.scale.copy(s.scale); probe.frustumCulled = false;
@@ -12299,7 +12353,7 @@ function fotoSkyArrivi() { // the answers that have come: the colours, a frame o
 const _fotoV = new THREE.Vector3();
 // in linear light the sky's fill counts for less than in the old sums, and the fog took the curve's warm cast: more fill in the
 // shadows, a cooler and greyer haze by day. On top of what updDayNight sets every frame
-const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
+const FOTO_HEMI = 1, FOTO_SUN = 1, /* the light is luce3.js's now */ FOTO_FOGGREY = new THREE.Color(0xc9ced4);
 {
   const udn = updDayNight;
   updDayNight = function (dt) {
@@ -12310,6 +12364,7 @@ const FOTO_HEMI = 1.3, FOTO_SUN = 1.1, FOTO_FOGGREY = new THREE.Color(0xc9ced4);
       F.a = clamp((L.elDeg + 7) / 9, 0, 1) * (1 - 0.95 * clamp((WX.cloud - 0.25) / 0.55, 0, 1)) * (1 - WX.fog);
       F.s.material.uniforms.uSkyA.value = F.a; F.s.visible = F.a > 0.01;
       F.s.material.uniforms.uSkyS.value = 1.2 + 0.6 * clamp(L.elDeg / 15, 0, 1); // less boost with the sun low: twilight would turn teal
+      F.s.material.uniforms.uSkyK.value = 0.06 * (1 + 2.5 * (1 - clamp((L.elDeg + 2) / 22, 0, 1)) ** 2); /* the model's sky darkens much faster than the light on the ground as the sun goes down: an eye (and r128's pow) keeps it readable */
       if (F.s.visible) { fotoSkyArrivi();
         const d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z), dy = Math.abs(((yaw - F.yaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
         if (performance.now() - F.t > 500 || Math.abs(TOD - F.tod) > 0.05 || dy > 0.4) fotoSkyHorizon();

@@ -796,7 +796,7 @@ function fondoLook(m) {
     const ld = f => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
     const mk = (map, vs) => ({ S: new THREE.MeshLambertMaterial({ map }), F: flatMat({ map }), vs });
     FONDO_ = { g: mk(ld('ghiaia'), 2.5), t: mk(ld('terra'), 2.6), n: mk(ld('pavimento'), 3), b: { S: MAT.side, F: flatMat({ map: sidewalkTex }), vs: 4 }, f: { S: MAT.piazzaS, F: MAT.piazza, vs: 4 },
-      c: mk(ciottoliTex, 4), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
+      c: (c => { c.S.color.set(CIOTTOLI_TINTA); c.F.color.set(CIOTTOLI_TINTA); return c; })(mk(ciottoliTex, 4)), p: { S: MAT.grassS, F: MAT.grass, vs: 9, col: COL('#ffffff') }, a: { S: MAT.asphS, F: MAT.asph, vs: 9 } };
   }
   return FONDO_[m] || null;
 }

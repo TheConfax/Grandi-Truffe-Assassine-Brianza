@@ -433,7 +433,7 @@ rep("  tileTick(STATION.x, STATION.z, 0, 420);\n  for (const T of TILES) T.dist 
 rep("#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ink);", "#start h1 em { display: block; font-style: normal; font-size: .34em; letter-spacing: .5em; color: var(--ocra);")
 rep("#start h1 { font-family: var(--display);", "#start h1 { color: var(--ocra) !important; font-family: var(--display);")
 # ---- day & night, car damage
-rep("function updVisuals(dt) {", open(os.path.join(HERE, 'extras.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'luce3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'extras.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")  # luce3.js: the daylight (fase 2)
 rep("updSignals(); updGates(dt); updFountains();", "updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWrecks(dt); updFuel(dt); updProps(dt); updOggetti(dt);")
 rep("  updCamera(dt);", "  updCamera(dt); updGlow();")
 rep("    add(boxG(S.W, S.bh, S.L), paint, 0, by, 0);", "    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);")
@@ -610,7 +610,7 @@ rep("function updVisuals(dt) {", open(os.path.join(HERE, 'weather3.js'), encodin
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'facciate3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("// ---------------------------------------------------------------- renderer\n", open(os.path.join(HERE, 'foto3_colori.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- renderer\n")
 rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script type="importmap">\n{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.186.1/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }\n</script>')  # three.js 0.186.1: the module and its addons (the sky of foto3.js); the addons import 'three' through the map, one copy of three
-rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt);")
+rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt); luceEsp();")  # luceEsp: the exposure, after the weather (luce3.js)
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
 rep("v -= 21 * dt * i.brk;", "v -= 21 * (1 - 0.25 * WX.wet) * dt * i.brk;") # wet brakes
 rep("updGlow();", "updGlow(); updSkyFx((running || titolo) && !paused ? dt : 0);")

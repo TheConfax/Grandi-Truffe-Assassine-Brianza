@@ -4,6 +4,7 @@
 // crescent beds edged in white stone (red flowers, low shrubs or bare soil), round bushes, or a stone paving. Drawn only in the tiles of S,
 // over the island the walls pass draws (kerb + top at MED_H, world3.js): the physics stays the island's
 const RO_RAISE = 0.12; // the lawn behind the inner kerb, over the top of the island (Carlo's photo: a low kerb, the lawn a hand over the cobbles)
+const CIOTTOLI_TINTA = 0xb4c2dc; /* fase 2: the photo's pebbles are beige, the cobbles of Meda grey (via Antona Traversi, Commons 2010): a cold tint on the photo */
 const ciottoliTex = canvasTex(8, 8, (g, w, h) => { g.fillStyle = '#a08f76'; g.fillRect(0, 0, w, h); }); // tex/ciottoli.jpg in its place (foto3.js), 4 m a repeat
 const fioriTex = canvasTex(128, 128, (g, w, h) => { // begonias: leaves and red flowers in the colours of Carlo's photo (leaves #2f4a1c, flowers #a5322a)
   g.fillStyle = '#2f4a1c'; g.fillRect(0, 0, w, h); let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -12,7 +13,7 @@ const fioriTex = canvasTex(128, 128, (g, w, h) => { // begonias: leaves and red 
 });
 const fogliaTex = canvasTex(128, 128, (g, w, h) => { /* leaves in greys: the colour is the material's, or each bush's */ g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, w, h); let s = 5; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; for (let k = 0; k < 700; k++) { g.fillStyle = ['#ffffff', '#9a9a9a', '#e0e0e0', '#7c7c7c'][k % 4]; g.beginPath(); g.arc(r() * w, r() * h, 1.5 + r() * 3.5, 0, 7); g.fill(); } });
 const RO_MAT = {
-  ciottoli: flatMat({ map: ciottoliTex }), fiori: new THREE.MeshLambertMaterial({ map: fioriTex, side: THREE.DoubleSide }),
+  ciottoli: flatMat({ map: ciottoliTex, color: CIOTTOLI_TINTA }), fiori: new THREE.MeshLambertMaterial({ map: fioriTex, side: THREE.DoubleSide }),
   bordo: new THREE.MeshLambertMaterial({ color: 0xe6e2d8, side: THREE.DoubleSide }), terra: new THREE.MeshLambertMaterial({ map: groundTex, color: 0x8a6e55 }),
   cespuglio: new THREE.MeshLambertMaterial({ map: fogliaTex }),
   fascia: flatMat({ map: concreteTex, color: 0xe2ded4 }), prato: new THREE.MeshLambertMaterial({ map: grassTex }) // the band of worked concrete of the base; the lawn of its dome

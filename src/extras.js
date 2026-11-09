@@ -86,7 +86,8 @@ const mixHex = (a, b, t) => _mixO[_mixI++ % 24].copy(hexC(a)).lerp(hexC(b), t); 
 let skyT = -1, nightK = 0;
 const LATR = 45.66 * Math.PI / 180, SOLAR_NOON = 12.52;
 function lightTones() {
-  const H = (TOD - SOLAR_NOON) * 15 * Math.PI / 180, E = -Math.sin(H), Nn = -Math.sin(LATR) * Math.cos(H), U = Math.cos(LATR) * Math.cos(H);
+  const H = (TOD - SOLAR_NOON) * 15 * Math.PI / 180, E0 = -Math.sin(H), N0 = -Math.sin(LATR) * Math.cos(H), U = clamp(Math.cos(LATR) * Math.cos(H) * LUCE.alto, -1, 1);
+  const hk = Math.sqrt(1 - U * U) / (Math.hypot(E0, N0) || 1), E = E0 * hk, Nn = N0 * hk; /* the season's height (luce3.js): sunrise and sunset at the same hours, at noon as high as on the true day */
   const elDeg = Math.asin(U) * 180 / Math.PI, day = clamp((elDeg + 4) / 12, 0, 1), dusk = Math.exp(-(((elDeg - 1) / 6) ** 2));
   return { E, Nn, U, elDeg, elev: U, day, night: 1 - day, dusk };
 }
@@ -95,10 +96,7 @@ function updDayNight(dt) {
   const L = lightTones(); nightK = L.night;
   // sun runs east -> south -> west, moon light when it is down
   if (L.U > 0) SUN_DIR.set(L.E, Math.max(0.12, L.U), -L.Nn).normalize(); else SUN_DIR.set(0.3, 0.8, 0.45).normalize(); // night: soft moonlight from high up
-  sun.intensity = 0.3 + 0.8 * L.day;
-  sun.color.copy(mixHex(0x8fa6d8, 0xffdcae, L.day)).lerp(hexC(0xff9356), L.dusk * 0.6);
-  hemi.intensity = 0.5 + 0.12 * L.day; hemi.color.copy(mixHex(0x5a6fa8, 0xdbe8ff, L.day)); hemi.groundColor.copy(mixHex(0x2a2a36, 0x8a7f6a, L.day));
-  const fog = mixHex(0x1f2a44, 0xebd9ba, L.day).lerp(hexC(0xe39a72), L.dusk * 0.55); scene.fog.color.copy(fog); scene.fog.far = 560 + 160 * L.day;
+  luceGiorno(L); // sun, sky light, the ground's bounce and the haze: luce3.js
   _far.material.color.setScalar(0.18 + 0.82 * L.day); _near.material.color.setScalar(0.15 + 0.85 * L.day);
   const skyW = WX.cloud + WX.fog * 2;
   if (Math.abs(TOD - skyT) > 0.04 || skyT < 0 || Math.abs(skyW - (updDayNight.w ?? -1)) > 0.015) { // redraw the 4x256 sky gradient now and then
@@ -169,7 +167,7 @@ function explodeCar(v) {
 }
 
 updDayNight(0);
-window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); };
+window.__setTOD = h => { TOD = h; skyT = -1; updDayNight(0); updWeather(0); luceEsp(); }; /* as a frame does: the day, the weather on it, the exposure */
 
 // ---------------------------------------------------------------- car radio: eight live stations, only while driving a car; each car keeps the station picked on it
 // claude.ai artifacts allow no external audio (media-src/connect-src 'self'): there the radio stays off with a note

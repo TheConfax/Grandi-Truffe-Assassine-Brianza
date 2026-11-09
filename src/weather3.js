@@ -33,8 +33,8 @@ function updWeather(dt) {
   if (WX.rain > 0.85 && (WX.thunderT -= dt) <= 0) { WX.thunderT = 12 + rnd() * 35; WX.flash = 1; const d = 0.8 + rnd() * 4; setTimeout(() => thunder(d), d * 1000); }
   // light: a grey sky softens the sun and the shadows
   const L = lightTones(), cov = WX.cloud * WX.cloud, grey = hexC(0x9aa0a8);
-  sun.intensity *= 1 - 0.8 * cov - 0.15 * WX.fog; sun.color.lerp(grey, cov * 0.6);
-  hemi.intensity *= 1 + 0.12 * cov - 0.25 * WX.rain * L.day; hemi.color.lerp(hexC(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
+  sun.intensity *= Math.max(0, 1 - 0.95 * cov - 0.5 * WX.fog); sun.color.lerp(grey, cov * 0.6); /* fase 2: under a grey sky almost no sun, no shadows; the sky gives more light than a blue one, */
+  hemi.intensity *= (1 + (1.1 * cov + 0.8 * WX.fog) * L.day) * (1 - 0.35 * WX.rain * L.day); /* the whole less than on a clear day (the exposure takes some back: luce3.js); rain darker */ hemi.color.lerp(hexC(L.day > 0.5 ? 0xc9ced6 : 0x3a4150), cov * 0.7);
   hemi.intensity += WX.flash * 2.2; sun.intensity += WX.flash * 0.8;
   // fog: grey haze, rain curtain, then the real nebbia
   const fogC = mixHex(0x262a33, 0xc3c7cb, L.day);
