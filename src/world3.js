@@ -2840,8 +2840,8 @@ function staccaAnta(g, v, i) { /* an open leaf rammed again over the blow: it is
   for (let k = GATE_FLY.length - 1; k >= 0; k--) if (GATE_FLY[k].g === g && GATE_FLY[k].i === i) GATE_FLY.splice(k, 1);
   const h = g.hinges[i], m = h && h[0].children[0]; propUrto(v); if (!m || !g.outer || !g.outer.parent) return;
   const o = g.os[i], fx = (o.ax + o.bx) / 2, fz = (o.az + o.bz) / 2, piv = new THREE.Object3D(); piv.position.set(fx, g.gy, fz); g.outer.parent.add(piv); piv.updateMatrixWorld(); piv.attach(m);
-  let dx = v.vx, dz = v.vz; const l = hyp(dx, dz) || 1; dx /= l; dz /= l; const L = clamp(g.h, 0.8, 9), sp = v.speed, ecc = clamp(F / FORZA[gateForza(g)] - 1, 0, 1);
-  PROP_FALL.push({ o: piv, p: { x: fx, z: fz }, axis: new THREE.Vector3(dz, 0, -dx), m0: null, L, a: 0, w: Math.min(FALL.kickMax, FALL.kick * sp / L) + 0.1, vx: dx * sp * FALL.spinta * ecc, vz: dz * sp * FALL.spinta * ecc, x0: fx, y0: g.gy, z0: fz, giu: false, t: 0 });
+  const L = clamp(g.h, 0.8, 9), ax = o.ax - fx, az = o.az - fz, bx = o.bx - fx, bz = o.bz - fz; /* the leaf: its two ends and its middle standing, its bottom and its top edge */
+  cadutaNuova(piv, v, F, FORZA[gateForza(g)], L, [[ax, 0, az, ax, L, az, 0.1], [bx, 0, bz, bx, L, bz, 0.1], [0, 0, 0, 0, L, 0, 0.1], [ax, 0, az, bx, 0, bz, 0.1], [ax, L, az, bx, L, bz, 0.1]], null, { x: fx, z: fz });
 }
 function updGates(dt) {
   /* pedestrians open the small gates instead of walking through them */
@@ -3210,7 +3210,7 @@ function lxSbarre(g) { // the first time its tile is laid out; they stay, like t
     WALLS.add(px, pz, ex, ez, seg);
     const probe = []; for (let t = 0.1; t <= 1; t += 0.2) probe.push([lerp(px, ex, t), lerp(pz, ez, t)]);
     const bar = { arm, seg, probe, root }; g.bars.push(bar);
-    addProp({ lx: true, x: px, z: pz, y: H.ground(px, pz), r: 0.2, h: 3, obj: root, onBreak: () => { bar.broken = true; seg.on = false; bar.probe = []; } }); // the post knocked down takes its arm with it
+    addProp({ lx: true, x: px, z: pz, y: H.ground(px, pz), r: 0.2, h: 3, obj: root, pezzi: () => seg.on ? [[0, 1, 0, ex - px, 1, ez - pz, 0.07]] : [], onBreak: () => { bar.broken = true; seg.on = false; bar.probe = []; } }); // the post knocked down takes its arm with it: down, it falls with the post and is solid as it (props3.js cadutaNuova)
   }
 }
 
