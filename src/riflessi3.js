@@ -6,8 +6,7 @@
 //    (it takes the shadow mask the Lambert lighting already computed, no second lookup);
 //  - the metals tint what they mirror with their own colour.
 // The kinds (RIF_KIND): paint (car bodies), glass (car panes), shop (shop windows), metal (guardrails, lamp posts, railings, gates, rails), asphalt.
-// RIF.wet: 0 dry .. 1 soaked, for the day it rains: the asphalt then darkens and goes smoother (sharper, stronger reflections). NOT connected to anything now, it stays 0
-// (the weather has WX.wet: when Carlo wants the wet roads, RIF.wet.value = WX.wet in updVisuals is all that is needed).
+// RIF.wet: 0 dry .. 1 soaked, for the day it rains: the asphalt then darkens and goes smoother (sharper, stronger reflections). It follows WX.wet (weather3.js, fase 3)
 const RIF = { wet: { value: 0 }, pre: [], cache: {} };
 const RIF_KIND = {
   paint: { f0: 0.055, rough: 0.28, k: 1.25, sun: 1.0, metal: 0, wet: 0 },

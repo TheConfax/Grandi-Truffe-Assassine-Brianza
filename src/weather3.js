@@ -29,6 +29,7 @@ function updWeather(dt) {
   WX.rain = ap(WX.rain, WX.cloud > 0.8 ? S.rain : 0, 1 / 25); // no rain before the sky is grey
   WX.fog = ap(WX.fog, S.fog, 1 / 45);
   WX.wet = WX.rain > 0.05 ? Math.min(1, WX.wet + dt / 50) : Math.max(0, WX.wet - dt / 200); // soaked in under a minute, dry in a few
+  RIF.wet.value = WX.wet; /* the wet asphalt of riflessi3.js: darker, smoother, sharper reflections of the sky and the sun (fase 3) */
   WX.flash = Math.max(0, WX.flash - dt * 4);
   if (WX.rain > 0.85 && (WX.thunderT -= dt) <= 0) { WX.thunderT = 12 + rnd() * 35; WX.flash = 1; const d = 0.8 + rnd() * 4; setTimeout(() => thunder(d), d * 1000); }
   // light: a grey sky softens the sun and the shadows
