@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo realismo-2 · dopo 4732c323 · assemblato 12/11 20:30 · porta ' + location.port;
+    const txt = 'locale · ramo realismo-2 · dopo 40df9253 · assemblato 12/11 20:39 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -296,8 +296,8 @@ const BLD = new Grid(24);     // building polygons (point-in-building)
 // ---------------------------------------------------------------- renderer
 const canvas = document.getElementById('gl');
 /* the picture after the scene (post3.js, realismo 2): multisampling, ambient occlusion, glow, tone mapping and SMAA in passes of their own; ?post=0 draws straight to the canvas as before.
-   ?ao=0, ?aa=0, ?smaa=0, ?bloom=0 turn one off; ?csm=0 the cascaded shadows of the sun (back to one box round the player) */
-const POST = (() => { const q = new URLSearchParams(location.search), no = k => q.get(k) === '0'; return { on: !no('post'), ao: !no('ao'), aa: !no('aa'), smaa: !no('smaa'), bloom: !no('bloom'), csm: !no('csm') && !!THREE.SunLight }; })();
+   ?ao=0, ?aa=0, ?smaa=0, ?bloom=0, ?raggi=0 turn one off; ?csm=0 the cascaded shadows of the sun (back to one box round the player) */
+const POST = (() => { const q = new URLSearchParams(location.search), no = k => q.get(k) === '0'; return { on: !no('post'), ao: !no('ao'), aa: !no('aa'), smaa: !no('smaa'), bloom: !no('bloom'), raggi: !no('raggi'), csm: !no('csm') && !!THREE.SunLight }; })();
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !POST.on, stencil: true, powerPreference: 'high-performance' }); /* with the passes the multisampling is post3.js's */
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.shadowMap.enabled = true;
@@ -339,7 +339,8 @@ function sunSegui(x, y, z, d) { if (sun.isSunLight) { sun.position.copy(SUN_DIR)
 // and the fences, come out smooth. Then, in passes:
 //  - ambient occlusion (GTAO of three, at half size, from the depth only): the light of the sky does not get into corners, under eaves, under cars and
 //    between the trees of a wood. Close it is a soft shade, far away nothing (the radius is in metres);
-//  - glow of the lights (fase B, post3 POSTFX.bloom);
+//  - rays of the sun (fase B): with the sun low and in sight, the light through the gaps between houses and trees spreads in the haze (RAGGI);
+//  - glow of the lights (fase B, UnrealBloomPass of three): what is brighter than white (bulbs, headlights, the sun) spreads a halo, as in a photo;
 //  - tone mapping and sRGB (OutputPass: the same AgX and exposure luce3.js gives the renderer);
 //  - SMAA on the finished picture, for what multisampling does not catch (lines drawn inside a texture, shine on thin things).
 // ?post=0 draws straight to the canvas as before; ?ao=0, ?aa=0, ?smaa=0, ?bloom=0 one off (POST in game.src.html)
@@ -356,12 +357,13 @@ const POSTFX = (() => {
     ao.blendIntensity = 0.85;
   }
   const out = new THREE.OutputPass(), smaa = POST.smaa && THREE.SMAAPass ? new THREE.SMAAPass() : null;
-  const F = { rtS, rtA, rtB, ao, out, smaa, bloom: null, w: 0, h: 0 };
+  const bloom = POST.bloom && THREE.UnrealBloomPass ? new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 1.0) : null;
+  const F = { rtS, rtA, rtB, ao, out, smaa, bloom, raggi: POST.raggi ? raggiFai(dt) : null, w: 0, h: 0 };
   F.size = () => {
     renderer.getDrawingBufferSize(v); if (v.x === F.w && v.y === F.h) return; F.w = v.x; F.h = v.y;
     rtS.setSize(v.x, v.y); rtA.setSize(v.x, v.y); rtB.setSize(v.x, v.y); if (smaa) smaa.setSize(v.x, v.y);
     if (ao) ao.setSize(Math.ceil(v.x / 2), Math.ceil(v.y / 2)); /* half size: the occlusion is soft, and four times cheaper */
-    if (F.bloom) F.bloom.setSize(v.x, v.y);
+    if (F.bloom) F.bloom.setSize(v.x, v.y); if (F.raggi) F.raggi.rt.setSize(Math.ceil(v.x / 2), Math.ceil(v.y / 2));
   };
   addEventListener('resize', F.size); F.size();
   return F;
@@ -406,12 +408,49 @@ if (sun.isSunLight) {
     }
   };
 }
+// ---- the rays of the sun: from each pixel (at half size) a march of RG_N steps towards the sun on the screen, adding the open sky it meets near the sun
+// (depth = clear: nothing in front of it), each step a little less (decay): where a roof or a crown hides the sun, a darker shaft; where the sky is open,
+// a light one. Strongest with the sun low (morning, evening), nothing at night, under cloud or with the sun behind the camera
+function raggiFai(depth) {
+  const VS = `varying vec2 vUv;
+void main() { vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`;
+  const mR = new THREE.ShaderMaterial({ uniforms: { tCol: { value: null }, tDepth: { value: depth }, uSun: { value: new THREE.Vector2() }, uAsp: { value: 1 } }, vertexShader: VS, depthTest: false, depthWrite: false,
+    fragmentShader: `uniform sampler2D tCol; uniform sampler2D tDepth; uniform vec2 uSun; uniform float uAsp; varying vec2 vUv;
+void main() {
+  const int RG_N = 40; vec2 st = ( uSun - vUv ) / float( RG_N ); float j = fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+  vec2 p = vUv + st * j; float sum = 0.0, w = 1.0;
+  for ( int i = 0; i < RG_N; i ++ ) {
+    float sky = step( 0.9999995, texture2D( tDepth, p ).x ), near = exp( - length( ( p - uSun ) * vec2( uAsp, 1.0 ) ) * 7.0 );
+    sum += sky * near * min( dot( texture2D( tCol, p ).rgb, vec3( 0.2126, 0.7152, 0.0722 ) ), 3.0 ) * w; w *= 0.955; p += st;
+  }
+  gl_FragColor = vec4( vec3( sum / float( RG_N ) ), 1.0 );
+}` });
+  const mC = new THREE.ShaderMaterial({ uniforms: { tRays: { value: null }, uCol: { value: new THREE.Color() } }, vertexShader: VS, depthTest: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending,
+    fragmentShader: `uniform sampler2D tRays; uniform vec3 uCol; varying vec2 vUv;
+void main() { gl_FragColor = vec4( texture2D( tRays, vUv ).rgb * uCol, 1.0 ); }` });
+  const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mR), sc = new THREE.Scene(); q.frustumCulled = false; sc.add(q);
+  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false }); mC.uniforms.tRays.value = rt.texture;
+  return { mR, mC, q, sc, rt, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), v: new THREE.Vector3(), d: new THREE.Vector3() };
+}
+function raggiDisegna(R, src) {
+  const L = lightTones(), clear = (1 - WX.cloud * WX.cloud) * (1 - WX.fog) * (1 - WX.rain);
+  const low = L.elDeg > -1 ? clamp((L.elDeg + 1) / 3, 0, 1) * (0.45 + 0.55 * Math.exp(-Math.max(0, L.elDeg) / 14)) : 0; /* low sun: long rays; high: faint */
+  R.v.set(L.E, L.U, -L.Nn).normalize(); camera.getWorldDirection(R.d); const front = R.v.dot(R.d);
+  R.v.multiplyScalar(1000).add(camera.position).project(camera); const ux = R.v.x * 0.5 + 0.5, uy = R.v.y * 0.5 + 0.5;
+  const out = Math.max(0, Math.max(-ux, ux - 1, -uy, uy - 1)), k = low * clear * clamp(front * 3, 0, 1) * clamp(1 - out / 0.35, 0, 1);
+  if (k < 0.01) return;
+  R.mR.uniforms.tCol.value = src.texture; R.mR.uniforms.uSun.value.set(ux, uy); R.mR.uniforms.uAsp.value = camera.aspect;
+  R.mC.uniforms.uCol.value.copy(sun.color).multiplyScalar(1.6 * k);
+  R.q.material = R.mR; renderer.setRenderTarget(R.rt); renderer.render(R.sc, R.cam);
+  const ac = renderer.autoClear; renderer.autoClear = false; R.q.material = R.mC; renderer.setRenderTarget(src); renderer.render(R.sc, R.cam); renderer.autoClear = ac;
+}
 function disegna() { // one frame: the scene, then the passes (or the scene alone, straight to the canvas, with ?post=0)
   const F = POSTFX; if (!F) { renderer.render(scene, camera); return; }
   F.size(); renderer.setRenderTarget(F.rtS); renderer.render(scene, camera);
   let src = F.rtS;
   if (F.ao) { F.ao.render(renderer, F.rtA, src); src = F.rtA; }
-  if (F.bloom && F.bloom.enabled) F.bloom.render(renderer, null, src); /* adds onto src itself */
+  if (F.raggi) raggiDisegna(F.raggi, src);
+  if (F.bloom) { const on = LIGHTS.on || 0; F.bloom.strength = 0.22 + 0.5 * on; F.bloom.threshold = 1.0; F.bloom.radius = 0.4 + 0.2 * on; F.bloom.render(renderer, null, src); } /* adds onto src itself; by day only the sun and its glints are over the threshold */
   F.out.renderToScreen = !F.smaa; F.out.render(renderer, F.rtB, src);
   if (F.smaa) { F.smaa.renderToScreen = true; F.smaa.render(renderer, null, F.rtB); }
   renderer.setRenderTarget(null);
@@ -11890,7 +11929,7 @@ for (const [k, kind] of [['old', 'old'], ['mod', 'modern']]) {
   MAT[k].emissiveMap = WIN_EMI(kind); MAT[k].emissive = new THREE.Color(0xffc870); MAT[k].emissiveIntensity = 0;
   MAT[k].onBeforeCompile = sh => {
     sh.uniforms.uLit = WIN_LIT; sh.uniforms.uSky = WIN_SKY;
-    sh.fragmentShader = 'uniform float uLit;\nuniform vec3 uSky;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float wh = fract(sin(dot(floor(vUv) + 0.37, vec2(12.9898, 78.233))) * 43758.5453);\n  totalEmissiveRadiance *= step(wh, uLit) * (0.7 + 0.6 * fract(wh * 7.13));\n  totalEmissiveRadiance += uSky * emissiveColor.r * (0.45 + 0.8 * fract(wh * 3.71)) * (0.75 + 0.25 * vUv.y - 0.25 * floor(vUv.y));');
+    sh.fragmentShader = 'uniform float uLit;\nuniform vec3 uSky;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float wh = fract(sin(dot(floor(vUv) + 0.37, vec2(12.9898, 78.233))) * 43758.5453);\n  totalEmissiveRadiance *= step(wh, uLit) * (0.7 + 0.6 * fract(wh * 7.13)) * ' + WIN_TINTA('wh') + ';\n  totalEmissiveRadiance += uSky * emissiveColor.r * (0.45 + 0.8 * fract(wh * 3.71)) * (0.75 + 0.25 * vUv.y - 0.25 * floor(vUv.y));');
   };
   MAT[k].needsUpdate = true;
 }
@@ -12183,6 +12222,28 @@ function radioWheelStick(sx, sy) { /* right stick, raw axes (x right, y down) */
   else { RW.cand = -2; if (RW.touched && m < 0.4) radioWheelPick(RW.last); }
 }
 function radioWheelCancel() { if (!RW.open) return; RW.open = false; if (RW.el) RW.el.hidden = true; }
+
+// ---------------------------------------------------------------- lights of the evening (realismo 2, fase B)
+// A lamp, a headlight are a hundred times brighter than the wall they light: drawn at the wall's brightness they looked like painted white boxes. Their bulbs are
+// now as bright as they are (above white: the tone mapping keeps them white and the glow of post3.js spreads them, a halo as in a photo or the eye).
+// The headlights and tail lights of the cars far away keep a few pixels of glare (in the distance one sees the lights before the car), and the lit
+// windows are not all the same: most a warm yellow, some the cool white of LED lamps, a few the blue of a television (WIN_TINTA, on the three window shaders)
+const SERA = { lamp: 6.5, head: 5.5, tail: 2.2, minHead: 4.5, minTail: 3.5, minLamp: 3 };
+{
+  const udnS = updDayNight;
+  updDayNight = function (dt) { // after the day's own values, every frame: the bulbs above white (only at night: by day they are off, as before)
+    udnS(dt); const on = LIGHTS.on;
+    MAT.lampHead.emissiveIntensity = 0.3 + SERA.lamp * on; M_HEAD.emissiveIntensity = 0.6 + SERA.head * on; M_TAIL.emissiveIntensity = 0.5 + SERA.tail * on;
+  };
+  const minPx = (m, px) => { // the halo of a light keeps px pixels however far it is (fog still fades it: glowFog)
+    const prev = m.onBeforeCompile;
+    m.onBeforeCompile = (s, r) => { if (prev) prev.call(m, s, r); s.vertexShader = s.vertexShader.replace('#include <logdepthbuf_vertex>', 'gl_PointSize = max( gl_PointSize, ' + px.toFixed(1) + ' );\n#include <logdepthbuf_vertex>'); };
+    const ck = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.customProgramCacheKey = () => ck + '|min' + px; m.needsUpdate = true;
+  };
+  minPx(CARGLOW[0].material, SERA.minHead); minPx(CARGLOW[1].material, SERA.minTail); minPx(LAMPGLOW_MAT, SERA.minLamp);
+}
+// the colour of a lit window from its own hash wh: 70% warm (as the emissive), 20% cool white, 10% television blue
+const WIN_TINTA = wh => `( fract( ${wh} * 13.7 ) < 0.7 ? vec3( 1.0 ) : fract( ${wh} * 13.7 ) < 0.9 ? vec3( 0.8, 0.95, 1.3 ) : vec3( 0.5, 0.72, 1.45 ) )`;
 
 // ---------------------------------------------------------------- bug reports: R3 on the pad, B on the keyboard
 let spotDb = null, spotN = 0; (async () => { try { spotDb = await window.claude?.use?.('db'); } catch (e) { spotDb = null; } })();
@@ -13224,7 +13285,7 @@ bool facIn(vec2 f, int c, int k) {
   diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;`)
     .replace('#include <emissivemap_fragment>', `
   float paneM = facM.r * facW;
-  { float wh = fract( sin( dot( floor( vUv ) + 0.37, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ); totalEmissiveRadiance *= paneM * step( wh, uLit ) * ( 0.7 + 0.6 * fract( wh * 7.13 ) ); }`)
+  { float wh = fract( sin( dot( floor( vUv ) + 0.37, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ); totalEmissiveRadiance *= paneM * step( wh, uLit ) * ( 0.7 + 0.6 * fract( wh * 7.13 ) ) * ${WIN_TINTA('wh')}; /* sera3.js */ }`)
     .replace('vec3 outgoingLight =', `
   if ( paneM > 0.01 ) {
     float paneH = fract( sin( dot( floor( vUv ) + 0.37, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
@@ -13425,7 +13486,7 @@ const FAC_PARTS = (() => {
     Object.assign(s.uniforms, FOTO_FAC, { uLit: WIN_LIT });
     s.vertexShader = 'attribute float aLit;\nvarying float vLit;\nvarying vec3 vGW;\nvarying vec3 vGN;\n' + s.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvLit = aLit; { vec4 gw = vec4( transformed, 1.0 ); vec3 gn = objectNormal;\n#ifdef USE_INSTANCING\n gw = instanceMatrix * gw; gn = mat3( instanceMatrix ) * gn;\n#endif\n vGW = ( modelMatrix * gw ).xyz; vGN = normalize( mat3( modelMatrix ) * gn ); }');
     s.fragmentShader = 'uniform vec3 uSkyH;\nuniform vec3 uSkyZ;\nuniform vec3 uSunD;\nuniform vec3 uSunC;\nuniform float uLit;\nvarying float vLit;\nvarying vec3 vGW;\nvarying vec3 vGN;\n' + FAC_CAMGL + s.fragmentShader
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= step( vLit, uLit ) * ( 0.7 + 0.6 * fract( vLit * 7.13 ) );')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= step( vLit, uLit ) * ( 0.7 + 0.6 * fract( vLit * 7.13 ) ) * ' + WIN_TINTA('vLit') + ';')
       .replace('vec3 outgoingLight =', `{ vec3 Vd = normalize( vGW - facCamW() ), Np = normalize( vGN + vec3( 0.0, ( vLit - 0.5 ) * 0.1, 0.0 ) ), Rd = reflect( Vd, Np );
     float fres = 0.04 + 0.96 * pow( 1.0 - clamp( dot( -Vd, Np ), 0.0, 1.0 ), 5.0 );
     vec3 seen = Rd.y > 0.0 ? mix( uSkyH, uSkyZ, smoothstep( 0.0, 0.5, Rd.y ) ) : uSkyH * 0.3;

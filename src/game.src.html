@@ -221,8 +221,8 @@ const JUNC = new Grid(16);
 // ---------------------------------------------------------------- renderer
 const canvas = document.getElementById('gl');
 /* the picture after the scene (post3.js, realismo 2): multisampling, ambient occlusion, glow, tone mapping and SMAA in passes of their own; ?post=0 draws straight to the canvas as before.
-   ?ao=0, ?aa=0, ?smaa=0, ?bloom=0 turn one off; ?csm=0 the cascaded shadows of the sun (back to one box round the player) */
-const POST = (() => { const q = new URLSearchParams(location.search), no = k => q.get(k) === '0'; return { on: !no('post'), ao: !no('ao'), aa: !no('aa'), smaa: !no('smaa'), bloom: !no('bloom'), csm: !no('csm') && !!THREE.SunLight }; })();
+   ?ao=0, ?aa=0, ?smaa=0, ?bloom=0, ?raggi=0 turn one off; ?csm=0 the cascaded shadows of the sun (back to one box round the player) */
+const POST = (() => { const q = new URLSearchParams(location.search), no = k => q.get(k) === '0'; return { on: !no('post'), ao: !no('ao'), aa: !no('aa'), smaa: !no('smaa'), bloom: !no('bloom'), raggi: !no('raggi'), csm: !no('csm') && !!THREE.SunLight }; })();
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !POST.on, stencil: true, powerPreference: 'high-performance' }); /* with the passes the multisampling is post3.js's */
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.shadowMap.enabled = true;

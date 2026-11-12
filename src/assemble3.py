@@ -434,6 +434,7 @@ rep("#start h1 em { display: block; font-style: normal; font-size: .34em; letter
 rep("#start h1 { font-family: var(--display);", "#start h1 { color: var(--ocra) !important; font-family: var(--display);")
 # ---- day & night, car damage
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'luce3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'luci3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'extras.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")  # luce3.js: the daylight (fase 2); luci3.js: the real lights at night (fase 3)
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'sera3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")  # sera3.js: the lights of the evening (realismo 2, fase B)
 rep("updSignals(); updGates(dt); updFountains();", "updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWrecks(dt); updFuel(dt); updProps(dt); updOggetti(dt);")
 rep("  updCamera(dt);", "  updCamera(dt); updGlow();")
 rep("    add(boxG(S.W, S.bh, S.L), paint, 0, by, 0);", "    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);")

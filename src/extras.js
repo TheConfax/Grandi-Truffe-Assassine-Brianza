@@ -13,7 +13,7 @@ for (const [k, kind] of [['old', 'old'], ['mod', 'modern']]) {
   MAT[k].emissiveMap = WIN_EMI(kind); MAT[k].emissive = new THREE.Color(0xffc870); MAT[k].emissiveIntensity = 0;
   MAT[k].onBeforeCompile = sh => {
     sh.uniforms.uLit = WIN_LIT; sh.uniforms.uSky = WIN_SKY;
-    sh.fragmentShader = 'uniform float uLit;\nuniform vec3 uSky;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float wh = fract(sin(dot(floor(vUv) + 0.37, vec2(12.9898, 78.233))) * 43758.5453);\n  totalEmissiveRadiance *= step(wh, uLit) * (0.7 + 0.6 * fract(wh * 7.13));\n  totalEmissiveRadiance += uSky * emissiveColor.r * (0.45 + 0.8 * fract(wh * 3.71)) * (0.75 + 0.25 * vUv.y - 0.25 * floor(vUv.y));');
+    sh.fragmentShader = 'uniform float uLit;\nuniform vec3 uSky;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float wh = fract(sin(dot(floor(vUv) + 0.37, vec2(12.9898, 78.233))) * 43758.5453);\n  totalEmissiveRadiance *= step(wh, uLit) * (0.7 + 0.6 * fract(wh * 7.13)) * ' + WIN_TINTA('wh') + ';\n  totalEmissiveRadiance += uSky * emissiveColor.r * (0.45 + 0.8 * fract(wh * 3.71)) * (0.75 + 0.25 * vUv.y - 0.25 * floor(vUv.y));');
   };
   MAT[k].needsUpdate = true;
 }
