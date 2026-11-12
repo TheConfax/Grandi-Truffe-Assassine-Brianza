@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo a03c912c · assemblato 09/11 10:45 · porta ' + location.port;
+    const txt = 'locale · ramo fari-fermi · dopo 1d1c247e · assemblato 12/11 20:11 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -11679,6 +11679,8 @@ function luciInit() { // at the first frame: headSpot and the pools are made in 
     s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vLuciD;\nuniform float uLuciNear;').replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a *= uLuciNear < 0.0 ? 1.0 : smoothstep( uLuciNear, uLuciNear + 18.0, vLuciD );');
   };
 }
+function luciPosAuto(s) { const v = s.userData.v; if (!v) return; const fx = Math.sin(v.h), fz = Math.cos(v.h), hl = v.spec.L / 2; s.position.set(v.x + fx * hl, v.y + 0.75, v.z + fz * hl); s.target.position.set(v.x + fx * (hl + 20), v.y - 0.6, v.z + fz * (hl + 20)); s.target.updateMatrixWorld(); }
+function luciPosiziona() { if (LUCI.auto) for (const s of LUCI.auto) if (s.intensity > 0) luciPosAuto(s); } /* each frame after the interpolation: the lights follow the cars as drawn */
 function luciAggiorna(on) {
   if (!LUCI.init) luciInit(); if (!LUCI_ON) return;
   const cx = camera.position.x, cz = camera.position.z, k = on > 0.02 ? on : 0, C = LUCI._c; C.length = 0;
@@ -11694,8 +11696,8 @@ function luciAggiorna(on) {
   const A = []; if (k) for (const v of VEH) { if (v === P.car || !v.driver || v.health <= 0 || v.exploded || v.fallen || v.heli || v.spec.pedal || !v.m.g.visible) continue; const d = Math.hypot(v.x - cx, v.z - cz); if (d < LUCI_R_AUTO) A.push([d, v]); }
   A.sort((a, b) => a[0] - b[0]);
   LUCI.auto.forEach((s, i) => {
-    const e = A[i]; if (!e) { s.intensity = 0; return; }
-    const v = e[1], fx = Math.sin(v.h), fz = Math.cos(v.h), hl = v.spec.L / 2; s.position.set(v.x + fx * hl, v.y + 0.75, v.z + fz * hl); s.target.position.set(v.x + fx * (hl + 20), v.y - 0.6, v.z + fz * (hl + 20)); s.target.updateMatrixWorld();
+    const e = A[i]; if (!e) { s.intensity = 0; s.userData.v = null; return; }
+    s.userData.v = e[1]; luciPosAuto(s);
     s.intensity = 70 * LUCI.ka * k * clamp((LUCI_R_AUTO - e[0]) / 20, 0, 1);
   });
 }
@@ -11793,6 +11795,12 @@ function lightTones() {
   const elDeg = Math.asin(U) * 180 / Math.PI, day = clamp((elDeg + 4) / 12, 0, 1), dusk = Math.exp(-(((elDeg - 1) / 6) ** 2));
   return { E, Nn, U, elDeg, elev: U, day, night: 1 - day, dusk };
 }
+/* the headlight sits on the car as it is DRAWN: updDayNight runs inside step() on the raw state, the car is drawn between the last two steps (interp3.js), so called there it lagged and swung at speed; frame() calls this after interpBegin */
+function fariPosiziona() {
+  const v = P.mode === 'car' ? P.car : null;
+  if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); headSpot.target.updateMatrixWorld(); }
+  if (typeof luciPosiziona === 'function') luciPosiziona();
+}
 function updDayNight(dt) {
   TOD = (TOD + dt / 60) % 24;
   const L = lightTones(); nightK = L.night;
@@ -11816,7 +11824,7 @@ function updDayNight(dt) {
   M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn;
   const v = P.mode === 'car' ? P.car : null;
   headSpot.intensity = v && v.health > 0 && !v.heli ? (LUCI_ON ? 90 : 2.4) * lampsOn : 0; luciAggiorna(lampsOn); /* luci3.js: the real lights of the lamps and the cars */
-  if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); }
+  fariPosiziona();
   const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0') + ' ' + (WX.icon || ''); }
 }
 function skipTime(h) { TOD = (TOD + h) % 24; skyT = -1; updDayNight(0); toast('Ora: ' + String(TOD | 0).padStart(2, '0') + ':' + String(Math.floor((TOD % 1) * 60)).padStart(2, '0')); }
@@ -13659,6 +13667,7 @@ function frame(t) {
   { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (m_) dbgMk(m_, 'tile'); if (running && ((now * 2) | 0) !== frame.pk) { frame.pk = (now * 2) | 0; parkTick(); } }
   if (m_) dbgMk(m_, 'sim');
   const ipol = (running || titolo) && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;
+  if (ipol) fariPosiziona(); /* headlights on the car as drawn (Carlo 10/11) */
   updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt); updDebugHud((running || titolo) && !paused ? dt : 0);
   updCamera(dt); updGlow(); updSkyFx((running || titolo) && !paused ? dt : 0);
   if (running) { updHud(dt); updAudio(); updSfx(dt); }
