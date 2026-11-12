@@ -2542,7 +2542,7 @@ function* buildTileGen(T) {
       }
       crowns.setColorAt(j, COL(GREENS[Math.floor(tRnd() * GREENS.length)]));
     });
-    for (const e of VM) if (e) { const [trunks, crowns] = e; /* VM is sparse (no plain trees in the tile: VM[0] empty) */ trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns); }
+    VM.forEach((e, v) => { const [trunks, crowns] = e; /* VM is sparse (no plain trees in the tile: VM[0] empty) */ trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns); ramiAggiungi(G, crowns, v > 0); }); /* ramiAggiungi: the bare branches of winter (stagioni3.js) */
   }
   const LPS = (d.lp || []).map(([X, Z]) => { const q = postFree(X / 10, Z / 10); return q ? [q[0], q[1], 0] : null; }).filter(Boolean); LPS.push(...genLamps(T, d, LPS)); // [x, z, arm direction]; never in a wall (postFree)
   if (LPS.length) { // one instance per lamp, so each can be knocked down on its own: pole and arm, head; the light pool and the glare go with it

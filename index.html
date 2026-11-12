@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo a03c912c · assemblato 09/11 10:45 · porta ' + location.port;
+    const txt = 'locale · ramo realismo-2 · dopo 4732c323 · assemblato 12/11 20:30 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -199,9 +199,14 @@ body:not(.debug) .dbg { display: none !important; }
 <script type="module">
 import * as THREE_NS from 'three';
 import { Sky as THREE_SKY } from 'three/addons/objects/Sky.js';
+import { SunLight as THREE_SUN } from 'three/addons/lights/SunLight.js';
+import { GTAOPass as THREE_GTAO } from 'three/addons/postprocessing/GTAOPass.js';
+import { SMAAPass as THREE_SMAA } from 'three/addons/postprocessing/SMAAPass.js';
+import { OutputPass as THREE_OUT } from 'three/addons/postprocessing/OutputPass.js';
+import { UnrealBloomPass as THREE_BLOOM } from 'three/addons/postprocessing/UnrealBloomPass.js';
 // three.js 0.186.1, loaded as a module through the import map (assemble3.py). The game was written on r128, where three was a global: THREE is a copy of
 // the module's namespace (a module namespace is frozen, and foto3_colori.js swaps THREE.CanvasTexture), and window.THREE stays for the test scripts
-const THREE = Object.assign({}, THREE_NS, { Sky: THREE_SKY }); window.THREE = THREE;
+const THREE = Object.assign({}, THREE_NS, { Sky: THREE_SKY, SunLight: THREE_SUN, GTAOPass: THREE_GTAO, SMAAPass: THREE_SMAA, OutputPass: THREE_OUT, UnrealBloomPass: THREE_BLOOM }); window.THREE = THREE; /* the sun with cascaded shadows and the passes after the scene: post3.js (realismo 2) */
 {
   // r128 made every InstancedMesh with frustumCulled = false; r186 culls it on a sphere round its instances computed once, so what moves after (objects knocked
   // down, pieces of barrier) would vanish. pezzi3.js puts its own culling sphere (cullS) on the tiles, as before
@@ -290,7 +295,10 @@ const BLD = new Grid(24);     // building polygons (point-in-building)
 
 // ---------------------------------------------------------------- renderer
 const canvas = document.getElementById('gl');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, stencil: true, powerPreference: 'high-performance' });
+/* the picture after the scene (post3.js, realismo 2): multisampling, ambient occlusion, glow, tone mapping and SMAA in passes of their own; ?post=0 draws straight to the canvas as before.
+   ?ao=0, ?aa=0, ?smaa=0, ?bloom=0 turn one off; ?csm=0 the cascaded shadows of the sun (back to one box round the player) */
+const POST = (() => { const q = new URLSearchParams(location.search), no = k => q.get(k) === '0'; return { on: !no('post'), ao: !no('ao'), aa: !no('aa'), smaa: !no('smaa'), bloom: !no('bloom'), csm: !no('csm') && !!THREE.SunLight }; })();
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !POST.on, stencil: true, powerPreference: 'high-performance' }); /* with the passes the multisampling is post3.js's */
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -315,12 +323,99 @@ scene.background = canvasTex(4, 256, (g, w, h) => {
 scene.fog = new THREE.Fog(0xebd9ba, 160, 720);
 
 const hemi = new THREE.HemisphereLight(0xdbe8ff, 0x8a7f6a, 0.78); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffdcae, 0.88);
+/* the sun (realismo 2): a SunLight of three, two cascades of shadow fitted to what the camera sees, the near one sharp and the far one out to SUN_OMBRA m (before: one
+   box 190 m wide round the player, nothing further, and the edge of it ran with the car). It shines from its position towards the origin: sunSegui keeps the position on SUN_DIR */
+const SUN_OMBRA = 330;
+const sun = POST.csm ? new THREE.SunLight(0xffdcae, 0.88) : new THREE.DirectionalLight(0xffdcae, 0.88);
 const SUN_DIR = new THREE.Vector3(-0.58, 0.6, 0.36).normalize();
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -95, right: 95, top: 95, bottom: -95, near: 10, far: 520 });
-sun.shadow.bias = -0.0007; sun.shadow.normalBias = 0.03;
+if (sun.isSunLight) { sun.target = new THREE.Object3D(); Object.assign(sun.shadow.camera, { near: 1, far: SUN_OMBRA }); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.045; sun.shadow.radius = 1.6; } /* target: only for the old code that moves it */
+else { Object.assign(sun.shadow.camera, { left: -95, right: 95, top: 95, bottom: -95, near: 10, far: 520 }); sun.shadow.bias = -0.0007; sun.shadow.normalBias = 0.03; }
 scene.add(sun, sun.target);
+function sunSegui(x, y, z, d) { if (sun.isSunLight) { sun.position.copy(SUN_DIR); return; } sun.target.position.set(x, y, z); sun.position.set(x + SUN_DIR.x * d, y + SUN_DIR.y * d, z + SUN_DIR.z * d); }
+
+// ---------------------------------------------------------------- the picture after the scene (realismo 2, fase A): what a camera does to the light before the photo
+// The scene is drawn into a buffer of its own (half float, light above 1 kept), with 4 samples a pixel: the edges, and with alpha to coverage the leaves, the twigs
+// and the fences, come out smooth. Then, in passes:
+//  - ambient occlusion (GTAO of three, at half size, from the depth only): the light of the sky does not get into corners, under eaves, under cars and
+//    between the trees of a wood. Close it is a soft shade, far away nothing (the radius is in metres);
+//  - glow of the lights (fase B, post3 POSTFX.bloom);
+//  - tone mapping and sRGB (OutputPass: the same AgX and exposure luce3.js gives the renderer);
+//  - SMAA on the finished picture, for what multisampling does not catch (lines drawn inside a texture, shine on thin things).
+// ?post=0 draws straight to the canvas as before; ?ao=0, ?aa=0, ?smaa=0, ?bloom=0 one off (POST in game.src.html)
+const POSTFX = (() => {
+  if (!POST.on || !THREE.OutputPass) return null;
+  const v = new THREE.Vector2(), dt = new THREE.DepthTexture(1, 1); dt.format = THREE.DepthStencilFormat; dt.type = THREE.UnsignedInt248Type; /* the pools of acqua3.js use the stencil */
+  const rtS = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: POST.aa ? 4 : 0, depthTexture: dt, stencilBuffer: true });
+  const rtA = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false }), rtB = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false }); // rtB: the finished picture (sRGB, 8 bit), for SMAA
+  let ao = null;
+  if (POST.ao && THREE.GTAOPass) {
+    ao = new THREE.GTAOPass(scene, camera, 1, 1); ao.setGBuffer(dt); /* the depth of the scene's own buffer: no second drawing of the scene for the normals */
+    ao.updateGtaoMaterial({ radius: 1.1, distanceExponent: 1.6, thickness: 2.0, distanceFallOff: 1, scale: 1.15, samples: 12 });
+    ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+    ao.blendIntensity = 0.85;
+  }
+  const out = new THREE.OutputPass(), smaa = POST.smaa && THREE.SMAAPass ? new THREE.SMAAPass() : null;
+  const F = { rtS, rtA, rtB, ao, out, smaa, bloom: null, w: 0, h: 0 };
+  F.size = () => {
+    renderer.getDrawingBufferSize(v); if (v.x === F.w && v.y === F.h) return; F.w = v.x; F.h = v.y;
+    rtS.setSize(v.x, v.y); rtA.setSize(v.x, v.y); rtB.setSize(v.x, v.y); if (smaa) smaa.setSize(v.x, v.y);
+    if (ao) ao.setSize(Math.ceil(v.x / 2), Math.ceil(v.y / 2)); /* half size: the occlusion is soft, and four times cheaper */
+    if (F.bloom) F.bloom.setSize(v.x, v.y);
+  };
+  addEventListener('resize', F.size); F.size();
+  return F;
+})();
+// the sun's cascades (game.src.html): three's SunLightShadow splits the distance halfway between even and logarithmic; here more of it logarithmic (SUN_LAMBDA),
+// so the near cascade holds the first ~45 m and its shadows are as sharp as the old box's (the far one, to SUN_OMBRA m, is coarser: far away it does not show).
+// The same code as three 0.186.1's SunLightShadow.updateMatrices, with that one number
+const SUN_LAMBDA = 0.8;
+if (sun.isSunLight) {
+  const sh = sun.shadow, N = 2, V = () => new THREE.Vector3(), nearC = [V(), V(), V(), V()], farC = [V(), V(), V(), V()], cc = [V(), V(), V(), V(), V(), V(), V(), V()];
+  const lo = new THREE.Matrix4(), v2l = new THREE.Matrix4(), ld = V(), up = V(), ce = V();
+  sh.updateMatrices = function (light, vc) {
+    if (vc === undefined) return;
+    const insX = Math.min(0.25, (Math.ceil(this.radius) + 1) / this.mapSize.x), insY = Math.min(0.25, (Math.ceil(this.radius) + 1) / this.mapSize.y);
+    for (let i = 0; i < N; i++) this._viewports[i].set(i + insX, insY, 1 - 2 * insX, 1 - 2 * insY);
+    const resX = this.mapSize.x * (1 - 2 * insX), resY = this.mapSize.y * (1 - 2 * insY), res = Math.min(resX, resY), cam = this.camera;
+    const cN = vc.near, cF = Math.max(cN + 1e-6, Math.min(cam.far, vc.far)), sp = this._cascadeSplits; sp[0] = cN;
+    for (let i = 1; i < N; i++) { const a = i / N; sp[i] = (cN + (cF - cN) * a) * (1 - SUN_LAMBDA) + cN * Math.pow(cF / cN, a) * SUN_LAMBDA; }
+    sp[N] = cF;
+    ld.setFromMatrixPosition(light.matrixWorld).negate().normalize(); up.set(0, 1, 0); if (Math.abs(up.dot(ld)) > 0.99) up.set(0, 0, 1);
+    lo.lookAt(ce.set(0, 0, 0), ld, up); v2l.copy(lo).transpose().multiply(vc.matrixWorld);
+    const zN = vc.reversedDepth ? 1 : -1; let gMax = -Infinity;
+    for (let i = 0; i < 4; i++) {
+      const x = i === 0 || i === 1 ? 1 : -1, y = i === 0 || i === 3 ? 1 : -1, n = nearC[i].set(x, y, zN).applyMatrix4(vc.projectionMatrixInverse), f = farC[i];
+      if (vc.isPerspectiveCamera === true) f.copy(n).multiplyScalar(cF / cN); else f.set(n.x, n.y, -cF);
+      n.applyMatrix4(v2l); f.applyMatrix4(v2l); gMax = Math.max(gMax, n.z, f.z);
+    }
+    gMax += cF; const sN = cam.near;
+    for (let i = 0; i < N; i++) {
+      const cn = i === 0 ? sp[0] : this._cascadeData[i - 1].z, cf = sp[i + 1], fs = cf - 0.1 * (cf - sp[i]);
+      this._cascadeData[i].set(i === 0 ? -1e10 : cn, cf, fs, 0);
+      const na = (cn - cN) / (cF - cN), fa = (cf - cN) / (cF - cN); ce.set(0, 0, 0);
+      for (let j = 0; j < 4; j++) { cc[j * 2].lerpVectors(nearC[j], farC[j], na); cc[j * 2 + 1].lerpVectors(nearC[j], farC[j], fa); ce.add(cc[j * 2]).add(cc[j * 2 + 1]); }
+      ce.multiplyScalar(1 / 8); let r2 = 0, minZ = Infinity;
+      for (let j = 0; j < 8; j++) { r2 = Math.max(r2, cc[j].distanceToSquared(ce)); minZ = Math.min(minZ, cc[j].z); }
+      let rad = Math.sqrt(r2);
+      if (res > 1) { rad /= 1 - 1 / res; const tx = 2 * rad / resX, ty = 2 * rad / resY; ce.x = Math.round(ce.x / tx) * tx; ce.y = Math.round(ce.y / ty) * ty; }
+      ce.z = gMax + sN; ce.applyMatrix4(lo);
+      const c = this._cameras[i]; c.position.copy(ce); c.quaternion.setFromRotationMatrix(lo);
+      Object.assign(c, { left: -rad, right: rad, top: rad, bottom: -rad, near: sN, far: gMax - minZ + 2 * sN, coordinateSystem: cam.coordinateSystem }); c._reversedDepth = cam.reversedDepth;
+      c.updateProjectionMatrix(); c.updateMatrixWorld(); this._updateMatrix(c, this._matrices[i], this._frustums[i], this._viewports[i]);
+    }
+  };
+}
+function disegna() { // one frame: the scene, then the passes (or the scene alone, straight to the canvas, with ?post=0)
+  const F = POSTFX; if (!F) { renderer.render(scene, camera); return; }
+  F.size(); renderer.setRenderTarget(F.rtS); renderer.render(scene, camera);
+  let src = F.rtS;
+  if (F.ao) { F.ao.render(renderer, F.rtA, src); src = F.rtA; }
+  if (F.bloom && F.bloom.enabled) F.bloom.render(renderer, null, src); /* adds onto src itself */
+  F.out.renderToScreen = !F.smaa; F.out.render(renderer, F.rtB, src);
+  if (F.smaa) { F.smaa.renderToScreen = true; F.smaa.render(renderer, null, F.rtB); }
+  renderer.setRenderTarget(null);
+}
 
 // ---------------------------------------------------------------- geometry buffers
 // ---------------------------------------------------------------- the blocks of numbers a tile is built in (Buf): the same blocks again, tile after tile
@@ -4455,7 +4550,7 @@ function* buildTileGen(T) {
       }
       crowns.setColorAt(j, COL(GREENS[Math.floor(tRnd() * GREENS.length)]));
     });
-    for (const e of VM) if (e) { const [trunks, crowns] = e; /* VM is sparse (no plain trees in the tile: VM[0] empty) */ trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns); }
+    VM.forEach((e, v) => { const [trunks, crowns] = e; /* VM is sparse (no plain trees in the tile: VM[0] empty) */ trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; crowns.customDepthMaterial = TREE_DEPTH; G.add(trunks, crowns); ramiAggiungi(G, crowns, v > 0); }); /* ramiAggiungi: the bare branches of winter (stagioni3.js) */
   }
   const LPS = (d.lp || []).map(([X, Z]) => { const q = postFree(X / 10, Z / 10); return q ? [q[0], q[1], 0] : null; }).filter(Boolean); LPS.push(...genLamps(T, d, LPS)); // [x, z, arm direction]; never in a wall (postFree)
   if (LPS.length) { // one instance per lamp, so each can be knocked down on its own: pole and arm, head; the light pool and the glare go with it
@@ -5254,10 +5349,76 @@ let STAG_DOY = (() => {
   return STAG_GIORNI[st] ?? stagOggi();
 })();
 const STAG = { aut: 0, bare: 0, spring: 0, u: { value: new THREE.Vector3() } };
+// ---- the bare trees of winter (realismo 2, fase A). Before, the crown's cards drew dashes in the shader where the leaves had gone: from near they floated
+// round a bare trunk like scraps. Now a bare tree is what one sees in Brianza in January: the limbs out of the trunk, the branches out of the limbs, the
+// thinner branches out to the edge of the crown (RAMI_G, real 3D, in the crown's own space, so it takes the crown's place and size: the same instance matrices),
+// and at the edge the fine twigs as a haze (TWIG_TEX on the crown's cards, where the leaves fell; seen from far the haze stays, a grey-brown veil, as a real one).
+// Shown only when the leaves are gone (STAG.bare): in summer the branches are not drawn at all
+const RAMI_G = (() => {
+  const EX = 2.55, EY = 2.2, EC = 0.2; // the crown's envelope in its own space (TREE_G: 5.4 m across, 4.5 m high, its bottom 2 m under its origin)
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const mk = (seed, nP, nCh, nTw) => {
+    let sd = seed; const r = () => (sd = sd * 16807 % 2147483647) / 2147483647;
+    const P = [], N = [];
+    const env = (p, d) => { // how far from p along d the envelope is
+      const px = p.x / EX, py = (p.y - EC) / EY, pz = p.z / EX, dx = d.x / EX, dy = d.y / EY, dz = d.z / EX;
+      const A = dx * dx + dy * dy + dz * dz, B = 2 * (px * dx + py * dy + pz * dz), C = px * px + py * py + pz * pz - 1, D = B * B - 4 * A * C;
+      return D < 0 ? 0 : Math.max(0, (-B + Math.sqrt(D)) / (2 * A));
+    };
+    const tube = (a, b, r0, r1, n) => { // an open tapered tube a -> b, n sides, normals out from its axis
+      const d = b.clone().sub(a).normalize(), u = (Math.abs(d.y) < 0.9 ? V(0, 1, 0) : V(1, 0, 0)).cross(d).normalize(), w = d.clone().cross(u), ring = [];
+      for (let k = 0; k <= n; k++) { const t = k / n * TAU, c = Math.cos(t), s = Math.sin(t); ring.push(u.clone().multiplyScalar(c).addScaledVector(w, s)); }
+      for (let k = 0; k < n; k++) {
+        const A0 = a.clone().addScaledVector(ring[k], r0), A1 = a.clone().addScaledVector(ring[k + 1], r0), B0 = b.clone().addScaledVector(ring[k], r1), B1 = b.clone().addScaledVector(ring[k + 1], r1);
+        for (const [p, nn] of [[A0, ring[k]], [B0, ring[k]], [B1, ring[k + 1]], [A0, ring[k]], [B1, ring[k + 1]], [A1, ring[k + 1]]]) { P.push(p.x, p.y, p.z); N.push(nn.x, nn.y, nn.z); }
+      }
+    };
+    const veer = (d, a) => { // d turned by about a radians, a random way, a little upwards (branches reach for the light)
+      const u = (Math.abs(d.y) < 0.9 ? V(0, 1, 0) : V(1, 0, 0)).cross(d).normalize(), w = d.clone().cross(u), t = r() * TAU;
+      return d.clone().multiplyScalar(Math.cos(a)).addScaledVector(u, Math.sin(a) * Math.cos(t)).addScaledVector(w, Math.sin(a) * Math.sin(t)).add(V(0, 0.18, 0)).normalize();
+    };
+    // a branch of level lev from p along d, length len, radius r0: bent once, with nc side branches, each to the envelope
+    const branch = (p, d, len, r0, lev) => {
+      const segs = lev < 2 ? 2 : 1, pts = [p.clone()], rs = [r0]; let q = p.clone(), dir = d.clone();
+      for (let s = 0; s < segs; s++) { if (s) dir = veer(dir, 0.22); const e = q.clone().addScaledVector(dir, len / segs), r1 = r0 * (1 - 0.62 * (s + 1) / segs); tube(q, e, rs[s], r1, lev === 0 ? 5 : lev === 1 ? 4 : 3); pts.push(e); rs.push(r1); q = e; }
+      const nc = lev === 0 ? nCh : lev === 1 ? nTw : 0;
+      for (let c = 0; c < nc; c++) {
+        const f = (c + 1) / (nc + 0.6) + (r() - 0.5) * 0.12, at = Math.min(segs - 0.001, f * segs), si = Math.floor(at), ft = at - si;
+        const o = pts[si].clone().lerp(pts[si + 1], ft), rr = rs[si] + (rs[si + 1] - rs[si]) * ft, cd = veer(pts[si + 1].clone().sub(pts[si]).normalize(), 0.55 + r() * 0.45);
+        branch(o, cd, env(o, cd) * (0.82 + r() * 0.14), Math.max(0.006, rr * 0.62), lev + 1);
+      }
+    };
+    const base = V(0, -2.05, 0), up = V((r() - 0.5) * 0.1, 1, (r() - 0.5) * 0.1).normalize();
+    branch(base, up, env(base, up) * 0.86, 0.095, 1); // the leader, on from the trunk to near the top
+    for (let i = 0; i < nP; i++) { // the limbs, all round, rising
+      const az = (i + r() * 0.6) / nP * TAU, el = 0.55 + r() * 0.45, d = V(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)), o = base.clone().addScaledVector(up, 0.25 + 0.95 * i / nP);
+      branch(o, d, env(o, d) * (0.72 + r() * 0.12), 0.08 - 0.02 * i / nP, 0);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.computeBoundingSphere(); return g;
+  };
+  return { big: mk(11, 6, 3, 3), small: mk(29, 4, 3, 2) }; // the small trees and the woods: fewer limbs and twigs (there are many of them)
+})();
+// the fine twigs: three sprays in the leaf atlas's three tuft cells (TREE_LEAF's layout; the fourth, the crown's core, stays empty)
+const TWIG_TEX = (() => {
+  const S = 512, C = S / 2, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); let sd = 5; const r = () => (sd = sd * 16807 % 2147483647) / 2147483647;
+  g.strokeStyle = '#fff'; g.lineCap = 'round';
+  const twig = (x, y, a, L, w, lev) => { // a twig in three slightly bent pieces, then two or three thinner ones out of it
+    let px = x, py = y; for (let k = 0; k < 3; k++) { a += (r() - 0.5) * 0.35; const nx = px + Math.cos(a) * L / 3, ny = py + Math.sin(a) * L / 3; g.lineWidth = Math.max(0.9, w * (1 - 0.18 * k)); g.beginPath(); g.moveTo(px, py); g.lineTo(nx, ny); g.stroke(); px = nx; py = ny; }
+    if (lev >= 3) return; const n = 2 + (r() < 0.4 ? 1 : 0);
+    for (let k = 0; k < n; k++) { const f = 0.35 + 0.6 * (k + r() * 0.5) / n, sx = x + (px - x) * f, sy = y + (py - y) * f; twig(sx, sy, a + (r() < 0.5 ? -1 : 1) * (0.35 + r() * 0.45), L * (0.5 + r() * 0.2) * (1.1 - f * 0.4), w * 0.66, lev + 1); }
+  };
+  for (let cell = 0; cell < 3; cell++) { const cx = (cell % 2) * C + C / 2, cy = (cell >> 1) * C + C / 2; for (let k = 0; k < 6; k++) twig(cx + (r() - 0.5) * 10, cy + (r() - 0.5) * 10, (k + r() * 0.7) / 6 * TAU, C * (0.2 + r() * 0.08), 2.6, 0); }
+  const t = new THREE.CanvasTexture(c); t.flipY = false; t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); return t; /* flipY off: the same rows as TREE_LEAF, a DataTexture */
+})();
+const TWIG_U = { uTwig: { value: TWIG_TEX }, uTwigK: { value: 2.6 } }; // uTwigK: how much the far twigs (small mip levels, thin lines averaged away) are made denser
+MAT.rami = new THREE.MeshLambertMaterial({ color: 0x55473c }); MAT.rami.visible = false;
+function ramiAggiungi(G, crowns, small) { // the bare branches of a set of crowns: the same instances (the same matrix buffer), drawn only when the leaves are gone
+  const m = new THREE.InstancedMesh(small ? RAMI_G.small : RAMI_G.big, MAT.rami, crowns.count); m.instanceMatrix = crowns.instanceMatrix; m.castShadow = m.receiveShadow = true; G.add(m); return m;
+}
 function stagCalcola() { // the leaves and the grass of the day STAG_DOY
   const d = STAG_DOY, ramp = (a, b) => clamp((d - a) / (b - a), 0, 1);
   STAG.aut = ramp(255, 292) * (1 - ramp(316, 336)); STAG.bare = Math.max(ramp(310, 336), 1 - ramp(78, 108)); STAG.spring = ramp(92, 108) * (1 - ramp(140, 168));
-  STAG.u.value.set(STAG.aut, STAG.bare, STAG.spring);
+  STAG.u.value.set(STAG.aut, STAG.bare, STAG.spring); MAT.rami.visible = STAG.bare > 0.02;
   // the grass: duller and yellower in autumn and winter, fresher in spring (a tint on the photo, the same on every lawn)
   const t = new THREE.Color(1, 1, 1).lerp(new THREE.Color(1.08, 0.9, 0.66), STAG.aut * 0.8).lerp(new THREE.Color(1.12, 0.8, 0.5), STAG.bare * 0.9).lerp(new THREE.Color(1.05, 1.12, 0.72), STAG.spring);
   for (const M of [MAT, RO_MAT]) for (const k in M) { const m = M[k]; if (m && m.isMaterial && m.map === grassTex && k !== 'hedge') { if (!m.userData.stagBase) m.userData.stagBase = m.color.clone(); m.color.copy(m.userData.stagBase).multiply(t); } }
@@ -5275,34 +5436,47 @@ const STAG_VERT = s => s.replace('#include <common>', '#include <common>\nvaryin
 #else
   vStH = 0.5;
 #endif`);
-const STAG_FRAG_DECL = '\nuniform vec3 uStag;\nvarying float vStH;\n';
-// the leaves that are gone (autumn's fall, winter's bare twigs): the same cut in the colour pass and in the shadow pass
+const STAG_FRAG_DECL = '\nuniform vec3 uStag;\nvarying float vStH;\nuniform sampler2D uTwig;\nuniform float uTwigK;\n';
+// the leaves that are gone (autumn's fall, winter's bare crowns): the same cut in the colour pass and in the shadow pass. Where a leaf has gone the card shows the
+// fine twigs (TWIG_TEX) in its place, never on the crown's solid core (it would be a ball). stTwig tells the later lines of the shader which it is
 const STAG_FALL = `
+  bool stTwig = false;
 #ifdef USE_MAP
-  { float stF = uStag.y * ( vStH > 0.86 ? 0.6 : 1.0 ); vec2 stQ = vMapUv * 26.0; float stC = fract( sin( dot( floor( stQ ) + vStH * 17.0, vec2( 7.13, 3.71 ) ) ) * 91.37 );
-    vec2 stR = fract( stQ ) - 0.5; float stTw = step( abs( stR.x + stR.y * ( stC - 0.5 ) * 1.6 ), 0.09 ); /* a twig across the cell, at a random slant */
-    if ( stC < stF * 0.93 || ( uStag.y > 0.5 && vStH <= 0.86 && stTw < 0.5 ) ) discard; }
+  vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+  { vec2 stTs = vMapUv * 512.0, stDx = dFdx( stTs ), stDy = dFdy( stTs ); float stLod = max( 0.0, 0.5 * log2( max( dot( stDx, stDx ), dot( stDy, stDy ) ) ) );
+    float stTa = texture2D( uTwig, vMapUv ).a;
+    float stF = uStag.y * ( vStH > 0.86 ? 0.9 : 1.0 ); vec2 stQ = vMapUv * 48.0; float stC = fract( sin( dot( floor( stQ ) + vStH * 17.0, vec2( 7.13, 3.71 ) ) ) * 91.37 );
+    if ( stC < stF ) { /* this leaf has fallen: the twigs (denser far away, where the mip levels thin the lines out) */
+      if ( vMapUv.x > 0.5 && vMapUv.y > 0.5 ) discard;
+      sampledDiffuseColor = vec4( 1.0, 1.0, 1.0, min( 1.0, stTa * mix( 1.0, uTwigK, clamp( stLod / 4.0, 0.0, 1.0 ) ) ) * smoothstep( 0.3, 0.7, uStag.y ) ); stTwig = true;
+    } }
+  diffuseColor *= sampledDiffuseColor;
 #endif`;
+const STAG_TWIG_ALPHA = `if ( stTwig ) { if ( diffuseColor.a < 0.04 ) discard; } else {
+#include <alphatest_fragment>
+}`; // the twigs keep their thin alpha (alpha to coverage makes it a veil), the leaves are cut as before
 function stagCrown(m, sempre) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (s, r) => {
     if (prev) prev.call(m, s, r); if (sempre) return;
-    s.uniforms.uStag = STAG.u; s.vertexShader = STAG_VERT(s.vertexShader);
-    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <color_fragment>', `#include <color_fragment>
+    s.uniforms.uStag = STAG.u; Object.assign(s.uniforms, TWIG_U); s.vertexShader = STAG_VERT(s.vertexShader);
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <map_fragment>', STAG_FALL).replace('#include <alphatest_fragment>', STAG_TWIG_ALPHA).replace('#include <color_fragment>', `#include <color_fragment>
   { float stL = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ), stT = vStH;
     float stA = uStag.x * smoothstep( 0.0, 0.4, uStag.x * 1.25 - stT * 0.25 ); /* some trees turn later than others */
     vec3 stAu = stT < 0.5 ? vec3( 0.92, 0.66, 0.14 ) : stT < 0.82 ? vec3( 0.93, 0.40, 0.08 ) : vec3( 0.70, 0.15, 0.06 );
     diffuseColor.rgb = mix( diffuseColor.rgb, stAu * stL * 2.1, stA * 0.88 );
     diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 1.2, 1.38, 0.6 ), uStag.z ); /* spring: the new leaves, light and yellower */
-    diffuseColor.rgb = mix( diffuseColor.rgb, stT > 0.86 ? vec3( 0.42, 0.27, 0.13 ) * ( 0.6 + stL ) : vec3( 0.09, 0.075, 0.06 ), uStag.y ); /* winter: twigs, and the dry leaves of some oaks */
-  }` + STAG_FALL);
+    if ( stT > 0.86 ) diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.42, 0.27, 0.13 ) * ( 0.6 + stL ), uStag.y ); /* winter: the dry leaves some oaks keep */
+    if ( stTwig ) diffuseColor.rgb = vec3( 0.085, 0.072, 0.062 ) * 1.8; /* the twigs: grey-brown bark (MAT.crown's colour is 1.8) */
+  }`);
   };
-  const ck = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.customProgramCacheKey = () => ck + (sempre ? '|semp' : '|stag'); m.needsUpdate = true;
+  const ck = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.customProgramCacheKey = () => ck + (sempre ? '|semp' : '|stag2'); m.needsUpdate = true;
 }
-function stagDepth(m) { // the shadow of a crown loses the same leaves
-  m.onBeforeCompile = s => { s.uniforms.uStag = STAG.u; s.vertexShader = STAG_VERT(s.vertexShader); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <alphatest_fragment>', '#include <alphatest_fragment>' + STAG_FALL); };
-  m.customProgramCacheKey = () => 'stag-depth'; m.needsUpdate = true;
+function stagDepth(m) { // the shadow of a crown loses the same leaves and keeps the twigs
+  m.onBeforeCompile = s => { s.uniforms.uStag = STAG.u; Object.assign(s.uniforms, TWIG_U); s.vertexShader = STAG_VERT(s.vertexShader); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <map_fragment>', STAG_FALL); };
+  m.customProgramCacheKey = () => 'stag-depth2'; m.needsUpdate = true;
 }
+MAT.crown.alphaToCoverage = true; // the edges of the leaves and the twigs smooth with the multisampling (post3.js draws with it, or the canvas does)
 // the cypresses (evergreen) get a crown and a shadow of their own, untouched
 MAT.crownSemp = MAT.crown.clone(); MAT.crownSemp.onBeforeCompile = MAT.crown.onBeforeCompile; stagCrown(MAT.crownSemp, true);
 const TREE_DEPTH_SEMP = TREE_DEPTH.clone();
@@ -8437,7 +8611,7 @@ function lsOrchardMeshes(G, ftrees, H) {
         const hits = ray.intersectObject(probe, false); let hit = null; for (let h = hits.length - 1; h >= 0; h--) if (!hits[h].uv || leafAt(hits[h].uv) >= 128) { hit = hits[h]; break; } if (!hit) continue;
         const d = Math.max(0, hit.distance - FR / 2 - 0.05); fruits.push([ro.x + rd.x * d, ro.y + rd.y * d, ro.z + rd.z * d, 1, 1, 1, t.pal[k % 3]]); }
     });
-    tr.castShadow = cr.castShadow = true; cr.receiveShadow = true; cr.customDepthMaterial = TREE_DEPTH; G.add(tr, cr);
+    tr.castShadow = cr.castShadow = true; cr.receiveShadow = true; cr.customDepthMaterial = TREE_DEPTH; G.add(tr, cr); ramiAggiungi(G, cr, true); /* bare in winter (stagioni3.js) */
   }
   lsInstances(G, LS_FRUIT_G, fruits);
 }
@@ -8905,9 +9079,10 @@ function tileLimiti(T, G) {
   B.expandByScalar(CULL_MARGINE);
 }
 const _vistaF = new THREE.Frustum(), _vistaM = new THREE.Matrix4();
+const _ombraF = { intersectsBox: B => sun.shadow.getFrustum(0).intersectsBox(B) || sun.shadow.getFrustum(1).intersectsBox(B), intersectsSphere: S => sun.shadow.getFrustum(0).intersectsSphere(S) || sun.shadow.getFrustum(1).intersectsSphere(S) };
 scene.onBeforeRender = (r, sc, cam) => { // after the matrices of the frame, before the renderer walks the scene
   _vistaF.setFromProjectionMatrix(_vistaM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
-  const om = sun.castShadow && sun.visible; let SF = null; if (om) { sun.shadow.updateMatrices(sun); SF = sun.shadow.getFrustum(); }
+  const om = sun.castShadow && sun.visible; let SF = null; if (om) { sun.shadow.updateMatrices(sun, cam); SF = sun.isSunLight ? _ombraF : sun.shadow.getFrustum(); } /* the sun's two cascades (realismo 2): what either sees */
   for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
   fusiDisegna(_vistaF, om ? SF : null);
 };
@@ -11487,7 +11662,7 @@ function sorvolo(dt) {
   camera.position.set(_titP.x + Math.sin(w * 1.7) * 1.2, TIT.gy + _titP.y + Math.sin(w * 1.1) * 0.8, _titP.z + Math.cos(w * 1.3) * 1.2);
   camera.lookAt(_titL.x, gl + _titL.y, _titL.z);
   if (Math.abs(camera.fov - TIT.FOV) > 0.05) { camera.fov = lerp(camera.fov, TIT.FOV, 0.1); camera.updateProjectionMatrix(); }
-  sun.target.position.set(_titL.x, gl, _titL.z); sun.position.set(_titL.x + SUN_DIR.x * 260, gl + SUN_DIR.y * 260, _titL.z + SUN_DIR.z * 260);
+  sunSegui(_titL.x, gl, _titL.z, 260);
   _far.position.x = camera.position.x * 0.9; _near.position.x = camera.position.x * 0.8;
 }
 function rayCam(ax, az, bx, bz, cy, ay) { /* like rayWalls, but a wall counts only where the ray from height ay (the subject end) to cy (the camera) is between its foot and its top; without ay a level line at cy, the walls that start above it do not count */
@@ -11607,7 +11782,7 @@ function updCamera(dt) {
   if (inCar && P.car.heli && camMode === 0) camera.rotateZ(-heliCamLean(P.car)); /* banking, the view leans a little with it; still, it does not (elicottero3.js heliCamLean) */
   const fov = camMode === 1 ? 55 : 62 + clamp(sp - 15, 0, 30) * 0.35 + (inCar && P.car.boost ? 9 : 0); if (Math.abs(camera.fov - fov) > 0.1) { camera.fov = lerp(camera.fov, fov, 0.08); camera.updateProjectionMatrix(); }
   // sun & shadow box follow the action
-  const sy = H.ground(px, pz); sun.target.position.set(px, sy, pz); sun.position.set(px + SUN_DIR.x * 220, sy + SUN_DIR.y * 220, pz + SUN_DIR.z * 220);
+  sunSegui(px, H.ground(px, pz), pz, 220);
   _far.position.x = camera.position.x * 0.9; _near.position.x = camera.position.x * 0.8;
 }
 // ---------------------------------------------------------------- daylight as it is (three.js 0.186, fase 2): sun, sky, bounce, haze and exposure from the sun's height
@@ -12075,7 +12250,7 @@ async function reportSpot() {
   const v = P.mode === 'car' ? P.car : null, x = v ? v.x : P.x, z = v ? v.z : P.z, y = v ? v.y : P.y;
   const lat = META.lat0 - z / 110540, lon = META.lon0 + x / (111320 * Math.cos(META.lat0 * Math.PI / 180));
   const rec = { x: +x.toFixed(1), z: +z.toFixed(1), y: +y.toFixed(1), suolo: +H.ground(x, z).toFixed(1), lat: +lat.toFixed(6), lon: +lon.toFixed(6), via: streetAt(x, z) || '', zona: placeAt(x, z) || '', direzione: Math.round(((v ? v.h : P.h) * 180 / Math.PI + 360) % 360), modo: P.mode, velocita: v ? Math.round(v.speed * 3.6) : 0, cam: camMode, ora: $('clock') ? $('clock').textContent : '', quando: new Date().toISOString(), versione: 'v16' };
-  let foto = ''; try { renderer.render(scene, camera); foto = canvas.toDataURL('image/jpeg', 0.85); } catch (e) { } /* photo of what Carlo sees, taken before the toast and in the same task as the render (no preserveDrawingBuffer) */
+  let foto = ''; try { disegna(); foto = canvas.toDataURL('image/jpeg', 0.85); } catch (e) { } /* photo of what Carlo sees, taken before the toast and in the same task as the render (no preserveDrawingBuffer) */
   rec.misure = MIS.txt; spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }
   let saved = false; if (spotDb) { try { await spotDb.collection('segnalazioni').add(rec); saved = true; } catch (e) { saved = false; } }
   if (!saved && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { try { const r = await fetch('/segnala', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(foto ? Object.assign({}, rec, { fotob64: foto }) : rec) }); saved = r.ok; } catch (e) { } } /* local game: straight to the dev server, Claude reads it live */
@@ -13664,7 +13839,7 @@ function frame(t) {
   if (running) { updHud(dt); updAudio(); updSfx(dt); }
   if (m_) dbgMk(m_, 'vis');
   const g_ = m_ ? dbgGpuBegin() : 0;
-  renderer.render(scene, camera);
+  disegna();
   if (m_) { dbgGpuEnd(g_); dbgMk(m_, 'draw'); }
   if (ipol) interpEnd(ipol);
   if (m_) dbgEnd(m_);
@@ -13680,5 +13855,5 @@ window.claude?.hot?.snapshot?.(() => ({ money: P.money }));
 if (TUTTO) await cuoci();
 { const [x0, z0] = partenza(); await mondoPronto(x0, z0, START !== STATION ? 420 : 260); }
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
-window.__G = { facAggiorna, FAC_STATO, FAC_PARTS, facCoperto, facBalLibero, HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, GATE_ANG, gateVivo, gateAnta, barBreak, breakGate, breakProp, PROP_FALL, CADUTA, FALL, staccaAnta, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
+window.__G = { facAggiorna, FAC_STATO, FAC_PARTS, facCoperto, facBalLibero, HELIS, HELI, heliStep, cheatHeli, camPosOf: () => camera.position, camOf: () => camera, fogOf: () => scene.fog, FARI, PENDIO, SALITA, pendioPresa, pendioTan, footSlope, TOMBE, acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI, step, exitSpot, walkGround, bldFloorAt, bldRoofY, inBuildingAt, updVisuals, BAR_ROTTE, GATE_ROTTI, GATE_ANG, gateVivo, gateAnta, barBreak, breakGate, breakProp, PROP_FALL, CADUTA, FALL, staccaAnta, hedgeHit, cheatRespawn, cheatFerari, endRun, teletrasporto, toggleBig, reportSpot, SALTO, capsuleFree, tryClimb, footFloor, isBarrier, saltoCrosses, vehMaxTop, FUEL, PZ, tileLay, mondoPronto, FUEL, FUEL_ROOFS: () => FUEL_ROOFS, WALLS, MAT, LMAT, H, tileTick, buildTileGen, ngList, ngWall, NG_SKIP: () => NG_SKIP, BLD, EDIF, BUILDINGS, NG_CLASSES, updNegozi, updCamera, interpSnap, interpBegin, interpEnd, D, LX, MODELS, Vehicle, TILES, TRAINS, DECK_BAR: { get rails() { return H.DECKS.flatMap(d => d.bar ? d.bar.rails : []); }, get pillars() { return H.DECKS.flatMap(d => d.bar ? d.bar.pillars : []); } }, ROAD_BAR, GUARD, roadBarriers, collideStatic, PROPS, BARG, BAR_FLY, PARK_PROPS, barHits, BUSH_G, onAsph, nearAsph, onAnyRoad, tileOf, SEGN, SIGNALS, renderer, scene, camera, disegna, POSTFX, sun, P, VEH, PEDS, W, MS, K, step, enterExit, startGame, pollPad, GP, getCam: () => camMode, getVA: () => camVA, setCam: v => { camMode = v; }, aiTraffic, extendRoute, edgePts, get GATES() { return TILES.flatMap(T => T.gates || []); }, WALLS, N, DRIVE, TRAF, WALK, DRIVE_NODES, TRAF_NODES, WALK_NODES, nearestNode, nodeInRing, cops, crime, spawnPolice, spawnPed, pedPick, pedPickZona, inZona, pedNext, pedLine, pedCross, pedZones, zebraNear, spawnTraffic, policeField, rayWalls, inBuilding, placeAt, streetAt, BLD, pedTarget, STATIC, RADIO, RW, ORDER, STATIONS, HLS, radioStartFor, stationFor, radioNext, radioWheelStick, radioWheelCancel, RC, curStation, radioCtx, getRadio: () => ({ on: radioOn, st: radioSt, err: radioErr }), setRadioOn: v => { radioOn = v; } };
 </script>
