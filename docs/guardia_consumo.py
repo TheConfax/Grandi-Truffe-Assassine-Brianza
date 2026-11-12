@@ -1,6 +1,6 @@
 """Guardia del consumo: chiede get_usage al monitor di Carlo (MCP stdio) senza passare da Claude.
 Uso: python guardia_consumo.py [margine=0] [minuti=10] [--una]  (Carlo: ci si ferma al punto esatto)
-Limite di Carlo (12/11, prima 80%): seven_day al 92% = fermata morbida (i 5 H li gestisce Claude).
+Limite di Carlo (12/11, prima 80%, poi 92%): seven_day al 95% = fermata morbida (i 5 H li gestisce Claude).
 Esce (e stampa il motivo) quando used_percent >= limite - margine.
 """
 import json, subprocess, sys, time, datetime
@@ -46,7 +46,7 @@ def main():
         try:
             q = {x["field"]: x for x in leggi()["quotas"]}["seven_day"]
             usato, atteso = q["used_percent"], q["expected_percent"]
-            limite = 92
+            limite = 95
             print(f"{ora} seven_day {usato}% atteso {atteso}% limite {limite:.1f}%", flush=True)
             if usato >= limite - margine:
                 print(f"LIMITE: al {usato}%, limite {limite:.1f}% (tetto fisso): fermata morbida", flush=True)
