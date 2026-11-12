@@ -74,9 +74,25 @@ const TWIG_TEX = (() => {
   const t = new THREE.CanvasTexture(c); t.flipY = false; t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); return t; /* flipY off: the same rows as TREE_LEAF, a DataTexture */
 })();
 const TWIG_U = { uTwig: { value: TWIG_TEX }, uTwigK: { value: 2.6 } }; // uTwigK: how much the far twigs (small mip levels, thin lines averaged away) are made denser
-MAT.rami = new THREE.MeshLambertMaterial({ color: 0x55473c }); MAT.rami.visible = false;
+// ---- the wind in the crowns (realismo 2, fase C): each crown leans and sways with the wind, the top more than the bottom (the trunk stays), each tree at its own
+// phase, with slow gusts, and the leaves flutter. The same lines on the leaves, the bare branches and their shadows (all in the crown's own space), so nothing
+// comes apart. VENTO.u: direction (x, z), strength (calm 0.2, a storm 1), time. The direction is the one the rain slants with (weather3.js)
+const VENTO = { u: { value: new THREE.Vector4(0.91, 0.41, 0.25, 0) }, k: 0.25 };
+const VENTO_VERT = s => s.replace('#include <common>', `#include <common>
+uniform vec4 uVento;`).replace('#include <begin_vertex>', `#include <begin_vertex>
+#ifdef USE_INSTANCING
+  { vec3 vnP = instanceMatrix[ 3 ].xyz; float vnH = clamp( ( transformed.y + 2.0 ) / 4.5, 0.0, 1.2 ), vnF = dot( vnP.xz, vec2( 0.13, 0.09 ) ), vnT = uVento.w;
+    float vnS = uVento.z * ( 0.5 + 0.4 * sin( vnT * 0.27 + vnF * 0.2 ) + 0.55 * sin( vnT * 1.1 + vnF ) + 0.25 * sin( vnT * 2.3 + vnF * 1.7 ) );
+    vec3 vnO = vec3( uVento.x, 0.0, uVento.y ) * vnS * 0.18 * vnH * vnH;
+    float vnL = uVento.z * 0.025 * sin( vnT * 7.0 + dot( transformed, vec3( 3.1, 2.3, 4.7 ) ) + vnF ); vnO += vec3( vnL, 0.6 * vnL, - vnL ) * vnH;
+    transformed += inverse( mat3( instanceMatrix ) ) * vnO; }
+#endif`);
+function ventoMat(m, key) { const prev = m.onBeforeCompile; m.onBeforeCompile = (s, r) => { if (prev) prev.call(m, s, r); s.uniforms.uVento = VENTO.u; s.vertexShader = VENTO_VERT(s.vertexShader); }; const ck = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.customProgramCacheKey = () => ck + '|vento' + key; m.needsUpdate = true; }
+{ const u = updDayNight; updDayNight = function (dt) { u(dt); const w = (0.2 + 0.3 * WX.cloud + 0.75 * WX.rain + 0.3 * WX.flash) * (1 - 0.7 * WX.fog); VENTO.k += (w - VENTO.k) * Math.min(1, dt / 8); VENTO.u.value.z = VENTO.k; VENTO.u.value.w = (VENTO.u.value.w + dt) % 2000; }; }
+MAT.rami = new THREE.MeshLambertMaterial({ color: 0x55473c }); MAT.rami.visible = false; ventoMat(MAT.rami, 'r');
+const RAMI_DEPTH = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }); ventoMat(RAMI_DEPTH, 'rd');
 function ramiAggiungi(G, crowns, small) { // the bare branches of a set of crowns: the same instances (the same matrix buffer), drawn only when the leaves are gone
-  const m = new THREE.InstancedMesh(small ? RAMI_G.small : RAMI_G.big, MAT.rami, crowns.count); m.instanceMatrix = crowns.instanceMatrix; m.castShadow = m.receiveShadow = true; G.add(m); return m;
+  const m = new THREE.InstancedMesh(small ? RAMI_G.small : RAMI_G.big, MAT.rami, crowns.count); m.instanceMatrix = crowns.instanceMatrix; m.castShadow = m.receiveShadow = true; m.customDepthMaterial = RAMI_DEPTH; G.add(m); return m;
 }
 function stagCalcola() { // the leaves and the grass of the day STAG_DOY
   const d = STAG_DOY, ramp = (a, b) => clamp((d - a) / (b - a), 0, 1);
@@ -121,7 +137,7 @@ const STAG_TWIG_ALPHA = `if ( stTwig ) { if ( diffuseColor.a < 0.04 ) discard; }
 function stagCrown(m, sempre) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (s, r) => {
-    if (prev) prev.call(m, s, r); if (sempre) return;
+    if (prev) prev.call(m, s, r); s.uniforms.uVento = VENTO.u; s.vertexShader = VENTO_VERT(s.vertexShader); if (sempre) return;
     s.uniforms.uStag = STAG.u; Object.assign(s.uniforms, TWIG_U); s.vertexShader = STAG_VERT(s.vertexShader);
     s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <map_fragment>', STAG_FALL).replace('#include <alphatest_fragment>', STAG_TWIG_ALPHA).replace('#include <color_fragment>', `#include <color_fragment>
   { float stL = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ), stT = vStH;
@@ -133,14 +149,14 @@ function stagCrown(m, sempre) {
     if ( stTwig ) diffuseColor.rgb = vec3( 0.085, 0.072, 0.062 ) * 1.8; /* the twigs: grey-brown bark (MAT.crown's colour is 1.8) */
   }`);
   };
-  const ck = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.customProgramCacheKey = () => ck + (sempre ? '|semp' : '|stag2'); m.needsUpdate = true;
+  const ck = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.customProgramCacheKey = () => ck + (sempre ? '|semp|vento' : '|stag2|vento'); m.needsUpdate = true;
 }
 function stagDepth(m) { // the shadow of a crown loses the same leaves and keeps the twigs
-  m.onBeforeCompile = s => { s.uniforms.uStag = STAG.u; Object.assign(s.uniforms, TWIG_U); s.vertexShader = STAG_VERT(s.vertexShader); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <map_fragment>', STAG_FALL); };
-  m.customProgramCacheKey = () => 'stag-depth2'; m.needsUpdate = true;
+  m.onBeforeCompile = s => { s.uniforms.uStag = STAG.u; s.uniforms.uVento = VENTO.u; Object.assign(s.uniforms, TWIG_U); s.vertexShader = STAG_VERT(VENTO_VERT(s.vertexShader)); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + STAG_FRAG_DECL).replace('#include <map_fragment>', STAG_FALL); };
+  m.customProgramCacheKey = () => 'stag-depth2-vento'; m.needsUpdate = true;
 }
 MAT.crown.alphaToCoverage = true; // the edges of the leaves and the twigs smooth with the multisampling (post3.js draws with it, or the canvas does)
 // the cypresses (evergreen) get a crown and a shadow of their own, untouched
 MAT.crownSemp = MAT.crown.clone(); MAT.crownSemp.onBeforeCompile = MAT.crown.onBeforeCompile; stagCrown(MAT.crownSemp, true);
-const TREE_DEPTH_SEMP = TREE_DEPTH.clone();
+const TREE_DEPTH_SEMP = TREE_DEPTH.clone(); ventoMat(TREE_DEPTH_SEMP, 'sd');
 stagCrown(MAT.crown, false); stagDepth(TREE_DEPTH);
