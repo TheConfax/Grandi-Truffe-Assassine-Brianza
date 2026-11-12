@@ -2876,6 +2876,17 @@ _dr_ = [LineString([(d_[0] / 10, d_[1] / 10), (d_[2] / 10, d_[3] / 10)]) for d_ 
 _ncv_ = []
 _nt_, _rt_ = _chiudi_t([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if len(p_) >= 2 and k_ != 6], list(btree_geoms), _gt_, _dr_,
                        [r_['line'] for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x'] and r_['c'] <= 6], list(_paved_in) + ([_ucarr_in] if _ucarr_in is not None else []), pc=list(dbt_pc), carr=([_ucarr_in] if _ucarr_in is not None else []), piene=list(_paved) + [_carr_cl], nuovi_cancelli=_ncv_)
+# ---- lotti chiusi dal cancello (caso 40, Carlo 12/11; NON nella build completa: la vota Carlo per gruppo). Solo dove lo chiede GTA_LOTTI_CHIUSI="x,z,r;x,z,r":
+# a gate of a fence (g) with a pillar that touches nothing (no fence, wall, building, gate or door within 1.3 m) gets the fence carried on along its line from that pillar
+# to the first fence, wall, building or gate (up to 60 m), in the style of the fence beside the gate. Not across a carriageway. src/lotti_chiusi.py
+_LC = [tuple(map(float, x_.split(','))) for x_ in os.environ.get('GTA_LOTTI_CHIUSI', '').split(';') if x_]
+if _LC:
+    from lotti_chiusi import chiudi_dal_cancello as _lcc
+    _nl_, _rl_ = _lcc([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if len(p_) >= 2] + [(LineString(p_), k_, h_) for p_, k_, h_, m_ in _nt_], list(btree_geoms),
+                      [(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]), g_[4]) for g_ in gate_out if (g_[0], g_[1]) != (g_[2], g_[3])], _dr_,
+                      [_ucarr_in] if _ucarr_in is not None else [], _LC)
+    _nt_ += _nl_; log('lotti chiusi dal cancello', dict(_rl_))
+    if STR: STR.rep['lotti_chiusi'] = dict(_rl_)
 bar_out += [(list(p_), k_, h_) for p_, k_, h_, m_ in _nt_]
 _vanc = {frozenset(((round(p_[0][0], 1), round(p_[0][1], 1)), (round(p_[-1][0], 1), round(p_[-1][1], 1)))) for p_, k_, h_, m_ in _nt_}   # a closure takes the style of the line it carries on, not of the house nearest to it (via Vespucci: a lattice in a railing)
 for p_, k_, h_ in _ncv_: gate_out.append([q(p_[0][0]), q(p_[0][1]), q(p_[1][0]), q(p_[1][1]), 'g', round(min(2.2, max(1.2, h_)), 1), 0])   # the mouths of the drives and paths in line with a boundary (src/chiusure_t.py _vialetto)
