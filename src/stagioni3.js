@@ -88,7 +88,7 @@ uniform vec4 uVento;`).replace('#include <begin_vertex>', `#include <begin_verte
     transformed += inverse( mat3( instanceMatrix ) ) * vnO; }
 #endif`);
 function ventoMat(m, key) { const prev = m.onBeforeCompile; m.onBeforeCompile = (s, r) => { if (prev) prev.call(m, s, r); s.uniforms.uVento = VENTO.u; s.vertexShader = VENTO_VERT(s.vertexShader); }; const ck = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.customProgramCacheKey = () => ck + '|vento' + key; m.needsUpdate = true; }
-{ const u = updDayNight; updDayNight = function (dt) { u(dt); const w = (0.2 + 0.3 * WX.cloud + 0.75 * WX.rain + 0.3 * WX.flash) * (1 - 0.7 * WX.fog); VENTO.k += (w - VENTO.k) * Math.min(1, dt / 8); VENTO.u.value.z = VENTO.k; VENTO.u.value.w = (VENTO.u.value.w + dt) % 2000; }; }
+{ const u = updDayNight; updDayNight = function (dt) { u(dt); const st = Math.min(1, Math.max(0, (WX.rain - 0.7) / 0.3)), w = (0.2 + 0.3 * WX.cloud + 0.75 * WX.rain + 0.3 * WX.flash + 1.7 * st + 0.6 * st * Math.max(0, Math.sin(VENTO.u.value.w * 0.35))) * (1 - 0.7 * WX.fog); /* a storm (rain over 0.7): much stronger, gusts on top, and time runs faster so the gusts come more often and the leaves flutter */ VENTO.k += (w - VENTO.k) * Math.min(1, dt / (st > 0 ? 2.5 : 8)); VENTO.u.value.z = VENTO.k; VENTO.u.value.w = (VENTO.u.value.w + dt * (1 + 1.3 * st)) % 2000; }; }
 MAT.rami = new THREE.MeshLambertMaterial({ color: 0x55473c }); MAT.rami.visible = false; ventoMat(MAT.rami, 'r');
 const RAMI_DEPTH = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }); ventoMat(RAMI_DEPTH, 'rd');
 function ramiAggiungi(G, crowns, small) { // the bare branches of a set of crowns: the same instances (the same matrix buffer), drawn only when the leaves are gone
