@@ -2486,6 +2486,7 @@ function* buildTileGen(T) {
             b.ao.push(wbot - ga, pitched ? ya - wbot : 99, ia + e0, ic + L - e0, wbot - gc, pitched ? yc - wbot : 99, ia + e1, ic + L - e1, yc - gc, pitched ? 0 : 99, ia + e1, ic + L - e1, ya - ga, pitched ? 0 : 99, ia + e0, ic + L - e0);
             for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], f[4] ? R.codeN : R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
             if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
+            if (!raised && !B.st) kitZoccolo(roofB, B, ax, az, cx, cz, nx, nz, s0, s1, (f[2] - voff) * FL + F0, R, wallCol); /* the plinth in 3D (kit3.js, realismo 3) */
             if (B.st === 2) { // a ruin has no roof: the inside of its walls shows from above
               const bi = b.p.length / 3;
               vtx(b, ax, wbot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, wbot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, vOf(yc), wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, vOf(ya), wallCol);
@@ -2501,9 +2502,10 @@ function* buildTileGen(T) {
       if (raised) soffit(roofB, outer, holes, bot, COL('#9a958c'));
       if (B.cu) domeFaces(roofB, B.cu, COL('#8e928c')); // lead grey: the DSM does not say the colour
       if (B.st === 2) continue;
-      if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
+      let rcolK = null; /* the colour of the roof, for its eaves (kit3.js) */
+      if (planes) roofFaces(roofB, B, top, rcolK = colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
       else if (pitched) {
-        const [cx, cz] = centroid(outer), rh = bldPitch(B), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
+        const [cx, cz] = centroid(outer), rh = bldPitch(B), col = rcolK = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
         for (let i = 0; i < outer.length; i++) {
           const a = outer[i], c = outer[(i + 1) % outer.length];
           const v1 = new THREE.Vector3(a[0], top, a[1]), v2 = new THREE.Vector3(c[0], top, c[1]), v3 = new THREE.Vector3(cx, top + rh, cz);
@@ -2513,6 +2515,7 @@ function* buildTileGen(T) {
           triUp(roofB, base, base + 1, base + 2);
         }
       } else { try { polyFill(roofB, outer, holes, top, 10, B.st === 1 ? COL('#a9a6a0') : colOr(B.rcol, () => pcB(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT, 1))); } catch (e) { } }
+      kitCasa(roofB, B, outer, holes, top, planes, pitched, t, wallCol, raised, rcolK); /* eaves, gutters, chimneys, copings (kit3.js, realismo 3) */
     }
     T.porteFatte = (T.doors || []).filter(d => !d.skip).map(d => ({ ax: d.ax, az: d.az, bx: d.bx, bz: d.bz, ux: d.ux, uz: d.uz, W: d.W, h: d.h, gy: d.gy, sty: d.sty, fit: d.fit })); /* the doors as this build drew them, for the checks (T.doors can be laid again by the time one counts) */
     if (wb.fac.i.length) { const g = mkMesh(wb.fac, MAT.fac, 10, 'cast', G).geometry; g.setAttribute('aoD', new THREE.Float32BufferAttribute(wb.fac.ao, 4)); g.setAttribute('facD', new THREE.Float32BufferAttribute(wb.fac.fac, 4)); g.setAttribute('facX', new THREE.Float32BufferAttribute(wb.fac.facX, 1)); }
