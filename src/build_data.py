@@ -1856,11 +1856,21 @@ if dbt_pc:
     log('cancelli sui varchi: aggiunti', _gcc)
     if STR: STR.rep['cancelli_passi_carrai'] = dict(_gcc)
 _gsrc['osm'] = _n_gosm; _gsrc['dedotto_varchi'] = len(gate_out) - _n_gpc
+_dg_ = os.environ.get('GTA_DBG_GATE')
+if _dg_:
+    _dx_, _dz_, _dr_ = map(float, _dg_.split(','))
+    for g_ in gate_out:
+        if abs((g_[0] + g_[2]) / 20 - _dx_) < _dr_ and abs((g_[1] + g_[3]) / 20 - _dz_) < _dr_: log('DBG gate', g_, 'prio', _gprio.get(id(g_)), 'varchi', _vorig.get(id(g_)) if '_vorig' in globals() else '?', 'osm', id(g_) in _osm_gid)
+    for pg_ in pc_gates:
+        if abs((pg_[0][0] + pg_[1][0]) / 2 - _dx_) < _dr_ and abs((pg_[0][1] + pg_[1][1]) / 2 - _dz_) < _dr_: log('DBG pc_gate', pg_)
 log('CANCELLI per origine', dict(_gsrc)); STR and STR.rep.__setitem__('cancelli_per_origine', dict(_gsrc))
 # a gate wins over a fence or wall under it: the divider is cut there (the posts stand at the ends of the cut)
 # (varchi 3, Carlo 9/11, via Verga a Seveso x -574 z 934) two gates one behind the other on the same mouth are one: of the weaker source the one goes, of the same source the one
 # farther from the carriageway (src/controllo_recinzioni.py togli_cancelli_doppi). Before the gates cut the dividers under them: the gate that goes leaves its divider whole
 from controllo_recinzioni import togli_cancelli_doppi as _togli_gd
+from controllo_recinzioni import cancelli_arretrati as _canc_arr
+gate_out, _arr_ = _canc_arr(gate_out, [b_[0] for b_ in bar_out] + [list(f_) for f_ in fences], list(btree_geoms))
+log('cancelli arretrati (doppione di uno sul confine), spostati sul confine', len(_arr_), _arr_[:60]); STR and STR.rep.__setitem__('cancelli_arretrati_spostati sul confine', {'n': len(_arr_), 'dove': _arr_})
 _carr_tmp = _carr_cl_f.result()
 gate_out, _gim_ = _togli_gd(gate_out, lambda g_: _gprio.get(id(g_), 2), dstr=lambda L_: _carr_tmp.distance(L_.interpolate(0.5, normalized=True)), edifici=list(btree_geoms), varco=False)
 log('cancelli uno dietro l altro sullo stesso imbocco, tolti', _gim_['imbocco']); STR and STR.rep.__setitem__('cancelli_stesso_imbocco_tolti', _gim_['imbocco'])
@@ -2876,15 +2886,16 @@ _dr_ = [LineString([(d_[0] / 10, d_[1] / 10), (d_[2] / 10, d_[3] / 10)]) for d_ 
 _ncv_ = []
 _nt_, _rt_ = _chiudi_t([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if len(p_) >= 2 and k_ != 6], list(btree_geoms), _gt_, _dr_,
                        [r_['line'] for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x'] and r_['c'] <= 6], list(_paved_in) + ([_ucarr_in] if _ucarr_in is not None else []), pc=list(dbt_pc), carr=([_ucarr_in] if _ucarr_in is not None else []), piene=list(_paved) + [_carr_cl], nuovi_cancelli=_ncv_)
-# ---- lotti chiusi dal cancello (caso 40, Carlo 12/11; NON nella build completa: la vota Carlo per gruppo). Solo dove lo chiede GTA_LOTTI_CHIUSI="x,z,r;x,z,r":
+# ---- lotti chiusi dal cancello (caso 40, Carlo 12/11; da Carlo 13/11 vale su tutta la mappa, fino a 35 m; GTA_LOTTI_CHIUSI=0 lo spegne):
 # a gate of a fence (g) with a pillar that touches nothing (no fence, wall, building, gate or door within 1.3 m) gets the fence carried on along its line from that pillar
 # to the first fence, wall, building or gate (up to 60 m), in the style of the fence beside the gate. Not across a carriageway. src/lotti_chiusi.py
-_LC = [tuple(map(float, x_.split(','))) for x_ in os.environ.get('GTA_LOTTI_CHIUSI', '').split(';') if x_]
-if _LC:
+_LC_ENV = os.environ.get('GTA_LOTTI_CHIUSI', '')   # '' = everywhere (the rule of Carlo 13/11), '0' = off, 'x,z,r;x,z,r' = only there
+_LC = [tuple(map(float, x_.split(','))) for x_ in _LC_ENV.split(';') if x_ and x_ != '0']
+if _LC_ENV != '0':
     from lotti_chiusi import chiudi_dal_cancello as _lcc
     _nl_, _rl_ = _lcc([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if len(p_) >= 2] + [(LineString(p_), k_, h_) for p_, k_, h_, m_ in _nt_], list(btree_geoms),
-                      [(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]), g_[4]) for g_ in gate_out if (g_[0], g_[1]) != (g_[2], g_[3])], _dr_,
-                      [_ucarr_in] if _ucarr_in is not None else [], _LC)
+                      [(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]), g_[4]) for g_ in gate_out if (g_[0], g_[1]) != (g_[2], g_[3])] + [(LineString([tuple(p_[0]), tuple(p_[1])]), 'n') for p_, k2_, h2_ in _ncv_ if tuple(p_[0]) != tuple(p_[1])], _dr_,
+                      [_ucarr_in] if _ucarr_in is not None else [], _LC or None)
     _nt_ += _nl_; log('lotti chiusi dal cancello', dict(_rl_))
     if STR: STR.rep['lotti_chiusi'] = dict(_rl_)
 bar_out += [(list(p_), k_, h_) for p_, k_, h_, m_ in _nt_]

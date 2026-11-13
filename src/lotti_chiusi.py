@@ -4,27 +4,36 @@ cancello (fino a LMAX m), dello stile della recinzione accanto al cancello. Non 
 Ritorna ([(pts, kind, h, punto della linea di cui prende lo stile)], contatori)."""
 import math
 from collections import Counter
+import shapely
 from shapely.geometry import LineString, Point
 from shapely.strtree import STRtree
 
 ATT = 1.3      # m: un pilastro con qualcosa entro questa distanza e' attaccato
-LMAX = 60.0    # m: oltre non e' piu' un lotto
+LMAX = 35.0    # m: oltre non e' piu' un lotto (Carlo 13/11: fino a 35 si chiude, oltre resta aperto, verso strada come verso piazzale o altro lotto)
+GATE_M = 0.5   # m: il tratto nuovo si ferma prima di un cancello (mai sopra, mai a contatto: sotto un cancello il divisore verrebbe tagliato a 0.45 m)
 LMIN = 0.8     # m: sotto non serve
 CARR_MAX = 1.5 # m di carreggiata attraversata oltre i quali non si chiude
 
 
+def _taglia(poly, S):
+    x0, z0, x1, z1 = S.bounds
+    return shapely.clip_by_rect(poly, x0 - 1, z0 - 1, x1 + 1, z1 + 1)
+
+
 def chiudi_dal_cancello(lines, edifici, gates, doors, carr, punti, rep=None):
-    """lines [(LineString, kind, h)]; edifici [Polygon]; gates [(LineString, tipo)]; doors [LineString]; carr [Polygon] (la carreggiata); punti [(x, z, r)]: dove vale"""
+    """lines [(LineString, kind, h)]; edifici [Polygon]; gates [(LineString, tipo)]; doors [LineString]; carr [Polygon] (la carreggiata); punti [(x, z, r)] o None: dove vale (None = ovunque)"""
     rep = rep if rep is not None else Counter()
     gl = [g for g, t in gates]
     obst = [l[0] for l in lines] + [b.boundary for b in edifici] + gl + list(doors)
     nl, nb, ng = len(lines), len(edifici), len(gl)
-    T = STRtree(obst); CT = STRtree(carr) if carr else None
+    T = STRtree(obst)
+    carr = [p for c in (carr or []) for p in getattr(c, 'geoms', [c]) if not p.is_empty]   # in pezzi: un poligono solo per tutta la mappa renderebbe ogni intersezione lentissima
+    CT = STRtree(carr) if carr else None
     out = []; fatti = []
     for gi, (g, t) in enumerate(gates):
         if t != 'g' or g.length < 1.5: continue
         a, b = g.coords[0], g.coords[-1]
-        if not any(math.dist(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), (x, z)) <= r for x, z, r in punti): continue
+        if punti and not any(math.dist(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), (x, z)) <= r for x, z, r in punti): continue
         sides = []
         for p, q in ((a, b), (b, a)):
             P = Point(p)
@@ -43,11 +52,12 @@ def chiudi_dal_cancello(lines, edifici, gates, doors, carr, punti, rep=None):
                 pts = [c for gg in getattr(x, 'geoms', [x]) for c in gg.coords]
                 d = min(ray.project(Point(c)) for c in pts)
                 if d > 0.05 and (best is None or d < best[0]): best = (d, j)
-            if best is None: rep['senza_fine'] += 1; continue
+            if best is None: rep['senza_fine'] += 1; continue   # oltre LMAX: resta aperto
             d, j = best
+            if gl and j >= nl + nb and j < nl + nb + ng: d -= GATE_M   # un cancello: ci si ferma prima
             if d < LMIN: rep['troppo_corto'] += 1; continue
             e = ray.interpolate(d).coords[0]; S = LineString([p, e])
-            if CT is not None and sum(carr[k].intersection(S).length for k in CT.query(S)) > CARR_MAX: rep['attraversa_la_carreggiata'] += 1; continue
+            if CT is not None and sum(_taglia(carr[k], S).intersection(S).length for k in CT.query(S)) > CARR_MAX: rep['attraversa_la_carreggiata'] += 1; continue
             if any(S.distance(f) < 0.2 for f in fatti): rep['doppio'] += 1; continue
             # lo stile: la recinzione (non un edificio) piu' vicina all'altro pilastro del cancello
             qp = Point(q); cand = [k for k in T.query(qp.buffer(3.0)) if k < nl and obst[k].distance(qp) < 3.0]
