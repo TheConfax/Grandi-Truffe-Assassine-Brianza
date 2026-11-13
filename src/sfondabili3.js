@@ -9,9 +9,9 @@
 const BAR_PANEL = { 5: { len: 2.6, slow: 0.86, dmg: 2, bit: 0x6f8a6f }, 7: { len: 2.5, slow: 0.88, dmg: 1.5, bit: 0x8a6a4a } };
 const BAR_HEDGE = { slowPerM: 0.12, dmgPerM: 0.4, bit: 0x4f7a3a };
 const BAR_MIN_P = 3, BAR_VN_P = 1.2, BAR_MIN_H = 2.5, BAR_VN_H = 0.8; // m/s: speed of the car and towards the barrier needed to break it
-const BAR_KEYS = ['wl', 'ft', 'hd', 'wlP0', 'wlP1', 'bars', 'mesh', 'rly', 'wood'];
+const BAR_KEYS = ['wl', 'ft', 'hd', 'wlP0', 'wlP1', 'bars', 'mesh', 'rly', 'wood', 'hdF', 'ivy']; /* hdF: the leafy shell of the hedges (verde3.js, realismo 3) */
 const BAR_CAST = { wl: 'cast', hd: 'cast', wlP0: 'cast', wlP1: 'cast', wood: 'cast' };
-const barMats = () => ({ wl: MAT.wall, ft: MAT.railing, hd: MAT.hedge, wlP0: MAT.wallPlaster, wlP1: MAT.wallOchre, bars: MAT.bars, mesh: MAT.mesh, rly: MAT.railPanel, wood: MAT.wood });
+const barMats = () => ({ hdF: MAT.hedgeLeaf || MAT.hedge, ivy: MAT.ivy || MAT.wall, wl: MAT.wall, ft: MAT.railing, hd: MAT.hedge, wlP0: MAT.wallPlaster, wlP1: MAT.wallOchre, bars: MAT.bars, mesh: MAT.mesh, rly: MAT.railPanel, wood: MAT.wood });
 const BARG = new Grid(8), BAR_FLY = [], BAR_DOWN = [], BAR_ROTTE = new Map(); // BAR_ROTTE: what cars have broken, for good: a panel 1, a hedge its cuts. Its tile can go away and come back
 // the foot of a barrier (lisciatore, phase 2, 31/10; it was decided vertex by vertex, 28/10, and the 2 m cells made it come and go: fences up and down
 // like a saw along the tracks, a net rising alone for 3 m by a football pitch, Carlo). Now it is decided per stretch, on whole chains of lines (the
@@ -156,8 +156,8 @@ function barDraw(B, br, lk, a, c, acc, cap = 0) {
   };
   const panel = (b, y0, y1, rep, ba = ga + y0, bc = gc + y0) => { const b0 = b.p.length / 3; vtx(b, a[0], ba, a[1], nx, 0, nz, acc / rep, 0); vtx(b, c[0], bc, c[1], nx, 0, nz, (acc + L) / rep, 0); vtx(b, c[0], gc + y1, c[1], nx, 0, nz, (acc + L) / rep, 1); vtx(b, a[0], ga + y1, a[1], nx, 0, nz, acc / rep, 1); b.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
   const postsEvery = (step, y0) => { for (let s0 = 0; s0 < L; s0 += step) B.posts.push([a[0] + ux * s0, a[1] + uz * s0, ga + (gc - ga) * s0 / L + y0, br.h - y0]); };
-  if (br.t === 1 || br.t === 4) slab(B.wl, 0.14, la - 0.3, lc - 0.3, ga + br.h, gc + br.h);
-  else if (br.t === 3) slab(B.hd, 0.45, la - 0.2, lc - 0.2, ga + br.h, gc + br.h);
+  if (br.t === 1 || br.t === 4) { slab(B.wl, 0.14, la - 0.3, lc - 0.3, ga + br.h, gc + br.h); if (B.ivy && MAT.ivy && L > 1.5 && trHash(a[0] * 0.37, a[1] * 0.61) < 0.11) { VERDE3.edera++; for (const sd of [1, -1]) { if (trHash(a[1], c[0] + sd) < 0.35) continue; const o = 0.14 + 0.015, b0 = B.ivy.p.length / 3, top = Math.min(br.h + 0.3, 2.8); vtx(B.ivy, a[0] + nx * o * sd, ga - 0.05, a[1] + nz * o * sd, nx * sd, 0, nz * sd, acc / 1.6, 0); vtx(B.ivy, c[0] + nx * o * sd, gc - 0.05, c[1] + nz * o * sd, nx * sd, 0, nz * sd, (acc + L) / 1.6, 0); vtx(B.ivy, c[0] + nx * o * sd, gc + top, c[1] + nz * o * sd, nx * sd, 0, nz * sd, (acc + L) / 1.6, 1); vtx(B.ivy, a[0] + nx * o * sd, ga + top, a[1] + nz * o * sd, nx * sd, 0, nz * sd, acc / 1.6, 1); B.ivy.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); } } } /* ivy on some garden walls (verde3.js, realismo 3) */
+  else if (br.t === 3) { slab(B.hd, 0.45, la - 0.2, lc - 0.2, ga + br.h, gc + br.h); if (B.hdF && MAT.hedgeLeaf) slab(B.hdF, 0.45 + HEDGE_FR, la - 0.2, lc - 0.2, ga + br.h + HEDGE_FR, gc + br.h + HEDGE_FR); } /* the leaves stand out of the solid hedge by HEDGE_FR (verde3.js) */
   else if (br.t === 5) { if (plinth) { slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); panel(B.mesh, 0, br.h, 2.6); postsEvery(2.5, 0); } else { panel(B.mesh, 0, br.h, 2.6, Math.min(ga, la - 0.1), Math.min(gc, lc - 0.1)); postsEvery(2.5, -0.5); } } // wire mesh on posts, from the ground
   else if (br.t === 6) { slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga + 0.3, gc + 0.3, 3); panel(B.rly, 0.3, br.h, 2.6); postsEvery(2.5, 0.3); } // by the railway: a concrete kerb, tall panels
   else if (br.t === 7) { if (plinth) slab(B.wl, 0.1, la - 0.3, lc - 0.3, ga, gc); for (const y of [0.45, 0.95]) slab(B.wood, 0.04, ga + y, gc + y, ga + y + 0.12, gc + y + 0.12); for (let s0 = 0; s0 < L; s0 += 2.5) { const x = a[0] + ux * s0, z = a[1] + uz * s0, gy = ga + (gc - ga) * s0 / L; addBox(B.wood, x, gy + 0.35, z, 0.12, 1.7, 0.12, null); } } // post and rail
@@ -184,7 +184,7 @@ function barTile(T, B, G) {
   const tagli = [];
   for (const pc of T.barPc || []) {
     pc.M = M; const st = BAR_ROTTE.get(pc.key);
-    if (pc.hedge) { pc.off = false; for (const s of pc.segs) s.off = false; pc.cut = st ? st.cut.map(c => c.slice()) : []; pc.rep = null; pc.hid = false; pc.ext = st ? st.ext : 0; for (const s of pc.subs) s.off = true; if (st) tagli.push(pc); continue; }
+    if (pc.hedge) { pc.off = false; for (const s of pc.segs) s.off = false; pc.cut = st ? st.cut.map(c => c.slice()) : []; pc.rep = null; pc.repF = null; pc.hid = false; pc.ext = st ? st.ext : 0; for (const s of pc.subs) s.off = true; if (st) tagli.push(pc); continue; }
     pc.off = !!st; for (const s of pc.segs) s.off = !!st; if (st) barHide(pc); // broken stays broken
   }
   for (const pc of tagli) hedgeRedraw(pc);
@@ -262,14 +262,16 @@ function hedgeRedraw(pc) { // the segment drawn again without its cuts; its coll
   const s = pc.seg, rec = pc.rec, L = hyp(s.bx - s.ax, s.bz - s.az), keep = []; let u = 0;
   for (const [a, b] of pc.cut) { if (a - u > 0.1 / L) keep.push([u, a]); u = b; } if (1 - u > 0.1 / L) keep.push([u, 1]);
   if (pc.rep) { if (pc.rep.parent) pc.rep.parent.remove(pc.rep); pc.rep.geometry.dispose(); pc.rep = null; }
-  const b = Buf(), lk = barLook(rec), A = rec.pts[pc.k0 - 1], C = rec.pts[pc.k0], at = t => { const q = [A[0] + (C[0] - A[0]) * t, A[1] + (C[1] - A[1]) * t]; q.fy = A.fy + (C.fy - A.fy) * t; q.lo = Math.min(A.lo, C.lo); q.g0 = q.fy; return q; };
+  if (pc.repF) { if (pc.repF.parent) pc.repF.parent.remove(pc.repF); pc.repF.geometry.dispose(); pc.repF = null; }
+  const b = Buf(), bF = Buf(), lk = barLook(rec), A = rec.pts[pc.k0 - 1], C = rec.pts[pc.k0], at = t => { const q = [A[0] + (C[0] - A[0]) * t, A[1] + (C[1] - A[1]) * t]; q.fy = A.fy + (C.fy - A.fy) * t; q.lo = Math.min(A.lo, C.lo); q.g0 = q.fy; return q; };
   keep.forEach(([t0, t1], i) => {
-    const a = at(t0), c = at(t1), B = { hd: b, posts: [] }; barDraw(B, rec, lk, a, c, (pc.acc0 || 0) + t0 * L, (t0 > 0 || ((pc.cap | pc.ext) & 1) ? 1 : 0) | (t1 < 1 || ((pc.cap | pc.ext) & 2) ? 2 : 0));
+    const a = at(t0), c = at(t1), B = { hd: b, hdF: bF, posts: [] }; barDraw(B, rec, lk, a, c, (pc.acc0 || 0) + t0 * L, (t0 > 0 || ((pc.cap | pc.ext) & 1) ? 1 : 0) | (t1 < 1 || ((pc.cap | pc.ext) & 2) ? 2 : 0));
     let q = pc.subs[i]; if (!q) { q = { two: true, nx: s.nx, nz: s.nz, y0: s.y0, y1: s.y1, yv: s.yv, off: true }; pc.subs.push(q); WALLS.add(s.ax, s.az, s.bx, s.bz, q); }
     q.ax = a[0]; q.az = a[1]; q.bx = c[0]; q.bz = c[1]; q.off = false;
   });
   for (let i = keep.length; i < pc.subs.length; i++) pc.subs[i].off = true;
   if (b.i.length && pc.T.group) pc.rep = mkMesh(b, MAT.hedge, 10, 'cast', pc.T.group);
+  if (bF.i.length && pc.T.group && MAT.hedgeLeaf) pc.repF = mkMesh(bF, MAT.hedgeLeaf, 10, false, pc.T.group);
 }
 
 // a few bits thrown off: one pool of small boxes for the whole map
