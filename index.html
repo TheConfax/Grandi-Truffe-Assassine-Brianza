@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo e3037f24 · assemblato 13/11 21:58 · porta ' + location.port;
+    const txt = 'locale · ramo realismo-3 · dopo 28c4d831 · assemblato 13/11 23:09 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -4567,7 +4567,7 @@ function* buildTileGen(T) {
     if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  for (const f of [confineMesh, buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
+  for (const f of [confineMesh, buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti, buildChiusini]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
@@ -12631,6 +12631,7 @@ window.__FX = { headSpot, CLOUDS, RAIN, STARS, CARGLOW, LAMPGLOW_MAT, LAMPPOOL_M
 const ASF_FILE = 'asfalto', ASF_M = 4.04;
 const ASF_PAT = { value: new THREE.TextureLoader().load('tex/asfalto_toppa.jpg', t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; }) }; /* new asphalt for the patches: ambientCG Asphalt020S (CC0), recoloured, 512 px */
 const ASF_U = { value: /[?&]asfsh=0/.test(location.search) ? 0 : 1 }; window.__ASFU = ASF_U;
+const ASF_US = { value: /[?&]usura=0/.test(location.search) ? 0 : 1 }; /* realismo 3: the light wear of the asphalt, &usura=0 off */
 const ASF_T = { value: +((/[?&]asftono=([0-9.]+)/.exec(location.search) || [0, '1'])[1]) || 1 }; /* &asftono=N: multiplier of the asphalt brightness (default 1) */
 const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 2], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
 {
@@ -12810,7 +12811,7 @@ for (const [k, m, tile] of [['old', MAT.old, 3.4], ['mod', MAT.mod, 4.2], ['plai
    tone variation over 20-40 m, rare sealed cracks (edges of a Voronoi net, 12 m cells, only some edges kept, warped to wander, 2-4 cm wide), rare patches
    (rectangles of 1-4 m, a little turned, darker and blacker, sharp edge). All in world coordinates. The wheel tracks are not done: the asphalt UVs do not know the road direction */
 const ASF_GLSL = `
-uniform float uAsf, uAsT;
+uniform float uAsf, uAsT, uUsura;
 uniform sampler2D uPat;
 vec2 h22(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); q += dot(q, q.yzx + 33.33); return fract((q.xx + q.yz) * q.zy); }
 `;
@@ -12867,12 +12868,26 @@ const ASF_FRAG = `
         float m = 1. - smoothstep(-px, px + .005, sd);
         if (m > 0.) texelColor.rgb = mix(texelColor.rgb, pow(texture2D(uPat, P / 2.).rgb, vec3(2.2)) * (.9 + .2 * r3.y), m); /* the photo, 2 m a repeat, in linear */
       } }
+    /* realismo 3, light wear (Carlo: "non troppa"; &usura=0 off): oil drips, dark ovals of 0.3-1 m stretched along the road, one cell of 7 m in eight; hairline cracks, a finer
+       net of 3.5 m cells with one edge in seven kept, only in some stretches (slow noise), so most of the road stays as it was */
+    if (uUsura > .5) {
+      { vec2 gc = floor(P / 7.), lp = P - gc * 7. - 3.5; vec2 q1 = h22(gc + 71.), q2 = h22(gc + 83.);
+        if (q1.x < .125) { vec2 nd = vec2(-rd.y, rd.x), d = lp - (q2 - .5) * 4.; float a = .15 + .35 * q1.y, b = a * (hasDir > .5 ? .45 : 1.);
+          float e = length(vec2(dot(d, rd) / a, dot(d, nd) / b)) + .25 * (vn(P * 3.1 + 7.) - .5); float ms = 1. - smoothstep(.75, 1.05, e);
+          texelColor.rgb *= 1. - .4 * ms * far; } }
+      { float zone = smoothstep(.62, .78, slowN(P + 311., 1.)) * far;
+        if (zone > 0.) { vec2 Q = P + vec2(vn(P / 1.3 + 2.), vn(P / 1.3 + 9.)) * .6; vec2 ig = floor(Q / 3.5), fg = Q / 3.5 - ig; float d1 = 9., d2 = 9.; vec2 id1 = vec2(0.), id2 = vec2(0.);
+          for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) { vec2 g = vec2(float(i), float(j)), c = ig + g, pt = g + .15 + .7 * h22(c + 9.7); float d = length(pt - fg);
+            if (d < d1) { d2 = d1; id2 = id1; d1 = d; id1 = c; } else if (d < d2) { d2 = d; id2 = c; } }
+          float keep = step(.86, h21(id1 + id2 + 5.)), wd = .006, dm = (d2 - d1) * .5 * 3.5;
+          texelColor.rgb *= 1. - .55 * (1. - smoothstep(wd - px, wd + px, dm)) * min(1., wd * 2. / px) * keep * zone; } }
+    }
   }
   texelColor.rgb *= uAsT;
   diffuseColor *= texelColor;`;
 /* dir: the colour of the mesh is the direction of the road (cos 2a, sin 2a, 1; asp buffer of world3.js), not a tint: it is read, and not multiplied in */
 const ASF_PATCH = dir => s => {
-  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T; s.uniforms.uPat = ASF_PAT;
+  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T; s.uniforms.uPat = ASF_PAT; s.uniforms.uUsura = ASF_US;
   let f = s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
   if (dir) f = '#define ASF_DIR\n' + f.replace('#include <color_fragment>', '');
   s.fragmentShader = ASF_GLSL + VAR_GLSL + f;
@@ -12973,7 +12988,8 @@ const RIF_KIND = {
   glass: { f0: 0.06, rough: 0.07, k: 1.45, sun: 1.0, metal: 0, wet: 0 },
   shop: { f0: 0.06, rough: 0.05, k: 2.0, sun: 1.0, metal: 0, wet: 0 },
   metal: { f0: 0.05, rough: 0.42, k: 1.0, sun: 0.9, metal: 1, wet: 0 },
-  asphalt: { f0: 0.04, rough: 0.62, k: 0.8, sun: 0.9, metal: 0, wet: 1, far: 1 }, /* far: only where it is seen at a grazing angle (the shader does nothing above 30 degrees: it would be under 2% of the light) */
+  asphalt: { f0: 0.04, rough: 0.62, k: 0.8, sun: 0.9, metal: 0, wet: 1, far: 1 },
+  stone: { f0: 0.04, rough: 0.75, k: 0.6, sun: 0.7, metal: 0, wet: 1, far: 1 }, /* realismo 3: pavements, setts, concrete (materiali3.js) */ /* far: only where it is seen at a grazing angle (the shader does nothing above 30 degrees: it would be under 2% of the light) */
 };
 const RIF_VERT_DECL = 'varying vec3 vRfP;\nvarying vec3 vRfN;';
 const RIF_FRAG_DECL = `uniform vec3 uRfH;
@@ -13007,20 +13023,22 @@ function rifFrag(q) {
   const F0 = q.f0.toFixed(4), RO = q.rough.toFixed(3), K = q.k.toFixed(3), SU = q.sun.toFixed(3), ME = q.metal.toFixed(3), WE = q.wet ? '1' : '0';
   return `{
   vec3 rfVv = normalize(vRfP); vec3 rfNv = normalize(vRfN); if (dot(rfNv, -rfVv) < 0.0) rfNv = -rfNv;
+  vec3 rfNb = normalize(RF_NRM); if (dot(rfNb, -rfVv) < 0.0) rfNb = -rfNb; /* realismo 3: the normal bent by the relief (materiali3.js) for the lobes of the sun and the lamps; the sky's Fresnel keeps the surface's own */
   float rfWet = ${WE}.0 * uRfWet, rfPd = 0.0;
   ${q.wet ? `if (rfWet > 0.0) { vec3 rfWp = (vec4(vRfP, 0.0) * viewMatrix).xyz + cameraPosition; /* the puddles, on what lies flat */
     if (inverseTransformDirection(rfNv, viewMatrix).y > 0.9) {
       vec2 rfQ = rfWp.xz; float rfNs = rfNoise(rfQ * 0.3) * 0.5 + rfNoise(mat2(0.8, -0.6, 0.6, 0.8) * rfQ * 0.75 + 7.3) * 0.3 + rfNoise(mat2(0.28, 0.96, -0.96, 0.28) * rfQ * 1.8 + 3.1) * 0.2, rfTh = 1.0 - 0.25 * rfWet; /* three turned octaves: round puddles, not squares */ rfPd = smoothstep(rfTh, rfTh + 0.035, rfNs);
       if (rfPd > 0.0 && uRfRain > 0.0) { vec2 rfRp = rfRipple(rfWp.xz, uRfT) * min(uRfRain * 1.5, 1.0) * rfPd; rfNv = normalize(rfNv + (viewMatrix * vec4(rfRp.x, 0.0, rfRp.y, 0.0)).xyz); }
     } }` : ''}
+  rfNb = normalize(mix(rfNv, rfNb, 0.5 * (1.0 - rfPd))); /* half the relief for the lobes (all of it lit the rough setts like glass at a grazing angle); a puddle is flat water */
   float rfNdv = clamp(dot(rfNv, -rfVv), 0.001, 1.0);
   ${q.far ? 'if (rfNdv < 0.5 || rfPd > 0.0) {' : '{'}
-  float rfR = mix(${RO} * (1.0 - 0.75 * rfWet), 0.03, rfPd);
+  float rfR = mix(clamp(${RO} * mix(1.0, r3R, 0.5), 0.04, 1.0) * (1.0 - 0.75 * rfWet), 0.03, rfPd);
   float rfF0 = ${F0} + 0.03 * rfWet - 0.05 * rfPd;
   vec3 rfFv0 = mix(vec3(rfF0), clamp(diffuseColor.rgb * 0.95, 0.0, 1.0), ${ME});
   vec3 rfFr = rfFv0 + (max(vec3(1.0 - rfR), rfFv0) - rfFv0) * pow(1.0 - rfNdv, 5.0);
   vec3 rfRw = inverseTransformDirection(reflect(rfVv, rfNv), viewMatrix);
-  vec3 rfVw = inverseTransformDirection(rfVv, viewMatrix), rfNw = inverseTransformDirection(rfNv, viewMatrix), rfLw = normalize(uRfD);
+  vec3 rfVw = inverseTransformDirection(rfVv, viewMatrix), rfNw = inverseTransformDirection(rfNb, viewMatrix), rfLw = normalize(uRfD);
   vec3 rfAdd = rfSky(rfRw, rfR, ${q.wet ? '0.0' : '1.0'}) * rfFr * ${K}; /* the ground mirrors the sky only: a skyline drawn by direction would not match what stands round */
   float rfNl = max(dot(rfNw, rfLw), 0.0);
   if (rfNl > 0.0 && rfSh > 0.0) {
@@ -13036,10 +13054,10 @@ function rifFrag(q) {
   }
   ${q.wet ? `#if NUM_SPOT_LIGHTS > 0
   if (rfWet > 0.0) { /* the lamps and the headlights mirrored by the wet ground and the puddles: the light's own lobe, long at a grazing angle */
-    float rfR2 = mix(${RO} * (1.0 - 0.75 * rfWet), 0.03, rfPd), rfSp2 = clamp(2.0 / max(rfR2 * rfR2 * rfR2 * rfR2, 0.0004) - 2.0, 4.0, 2500.0); vec3 rfS2 = vec3(0.0); IncidentLight rfIL;
+    float rfR2 = mix(clamp(${RO} * mix(1.0, r3R, 0.5), 0.04, 1.0) * (1.0 - 0.75 * rfWet), 0.03, rfPd), rfSp2 = clamp(2.0 / max(rfR2 * rfR2 * rfR2 * rfR2, 0.0004) - 2.0, 4.0, 2500.0); vec3 rfS2 = vec3(0.0); IncidentLight rfIL;
     for (int i = 0; i < NUM_SPOT_LIGHTS; i++) {
-      getSpotLightInfo(spotLights[i], geometryPosition, rfIL); float rfNl2 = max(dot(rfNv, rfIL.direction), 0.0); if (rfNl2 <= 0.0) continue;
-      vec3 rfH2 = normalize(rfIL.direction - rfVv); float rfD2 = (rfSp2 + 2.0) * 0.1592 * pow(max(dot(rfNv, rfH2), 0.0), rfSp2);
+      getSpotLightInfo(spotLights[i], geometryPosition, rfIL); float rfNl2 = max(dot(rfNb, rfIL.direction), 0.0); if (rfNl2 <= 0.0) continue;
+      vec3 rfH2 = normalize(rfIL.direction - rfVv); float rfD2 = (rfSp2 + 2.0) * 0.1592 * pow(max(dot(rfNb, rfH2), 0.0), rfSp2);
       rfS2 += rfIL.color * (0.02 + 0.98 * pow(1.0 - max(dot(rfIL.direction, rfH2), 0.0), 5.0)) * rfD2 * 0.25 * rfNl2;
     }
     totalEmissiveRadiance += min(rfS2 * rfWet, vec3(30.0));
@@ -13060,7 +13078,7 @@ const RIF_LFB = (() => {
 function rifShader(s, q) {
   s.uniforms.uRfH = FOTO_FAC.uSkyH; s.uniforms.uRfZ = FOTO_FAC.uSkyZ; s.uniforms.uRfD = FOTO_FAC.uSunD; s.uniforms.uRfC = FOTO_FAC.uSunC; s.uniforms.uRfWet = RIF.wet; s.uniforms.uRfT = RIF.t; s.uniforms.uRfRain = RIF.rain;
   s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + RIF_VERT_DECL).replace('#include <project_vertex>', '#include <project_vertex>\nvRfP = mvPosition.xyz; vRfN = transformedNormal;');
-  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + RIF_FRAG_DECL).replace('void main() {', 'void main() {\n  float rfSh = 1.0;')
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n#ifdef R3_NRM\n#define RF_NRM normal\n#else\n#define RF_NRM vRfN\n#endif\n' + RIF_FRAG_DECL).replace('void main() {', 'void main() {\n  float rfSh = 1.0;' + (/float r3R = /.test(s.fragmentShader) ? '' : '\n  vec3 r3N = vec3(0., 0., 1.); float r3R = 1.;')) /* RF_NRM, r3R: the normal bent by the relief and the roughness of the texel (materiali3.js, realismo 3) */
     .replace('#include <lights_fragment_begin>', RIF_LFB || '#include <lights_fragment_begin>').replace('vec3 outgoingLight =', rifFrag(q) + '  vec3 outgoingLight =');
 }
 // patches a Lambert material in place (the other patches of the material, e.g. the asphalt's, are kept and run first)
@@ -13077,6 +13095,144 @@ for (const k of ['rail', 'steel', 'railing', 'bars', 'railPanel']) if (MAT[k]) r
 rifMat(MAT.lamp, 'metal', true); rifMat(GATE_MAT, 'metal');
 rifMat(M_GLASS, 'glass'); rifMat(M_GLASS_SEE, 'glass');
 for (const k in NG_WIN.mat) rifMat(NG_WIN.mat[k], 'shop');
+
+// ---------------------------------------------------------------- realismo 3, fase A: materials with relief and gloss (Carlo 13/11: "sembra ancora un gioco PS1/PS2")
+// Every photo of the ground, the plaster and the roofs gets its relief (normal) and its roughness, from the same CC0 set as the colour (Poly Haven) or, where the
+// colour photo has no matching set, worked out of the photo itself (the joints of the blocks and setts, the grain): tex/<name>_nr.jpg, src/tex_pbr.py.
+// R, G: the normal (OpenGL), B: the roughness against the mean of the material (128 = the mean). The normal is sampled the same way the colour is (the
+// stochastic tiling of the asphalt, the blocks of the pavement, the mirrored tiles of grass and setts), so relief and colour stay together. The Lambert lights
+// with the bent normal (sun and shade on every block); the reflections of riflessi3.js (sky, sun, lamps on the wet) take the bent normal and the roughness.
+// The roofs: the coppi (Poly Haven clay_roof_tiles_02, 2.5 m) laid along the slope of each pitch from the world position (the roofs have no UVs), the colour of
+// the house's roof kept (the photo divided by its mean). &pbr=0 turns all of it off
+const R3 = { on: !/[?&]pbr=0/.test(location.search), tex: {}, skip: ((/[?&]r3x=([a-z,]+)/.exec(location.search) || [])[1] || '').split(',') }; /* &r3x=marciapiede,asfalto: those without relief (tests) */
+const r3Load = (f, srgb) => R3.tex[f] || (R3.tex[f] = (() => { const t = new THREE.TextureLoader().load('tex/' + f + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); return t; })());
+const R3_GLSL = `
+vec3 r3Dec(vec4 t) { vec2 xy = t.xy * 2. - 1.; return vec3(xy, sqrt(max(1. - dot(xy, xy), 0.))); }
+`;
+/* the frame of the texture on the surface, from the screen derivatives (as three's getTangentFrame); not three's normalMap: with it the colour map sampled the relief */
+const R3_TBN = `
+uniform sampler2D uR3Nm; uniform float uR3K;
+mat3 r3Frame(vec3 eye, vec3 N, vec2 uv) { vec3 q0 = dFdx(eye), q1 = dFdy(eye); vec2 st0 = dFdx(uv), st1 = dFdy(uv); vec3 q1p = cross(q1, N), q0p = cross(N, q0);
+  vec3 T = q1p * st0.x + q0p * st1.x, B = q1p * st0.y + q0p * st1.y; float det = max(dot(T, T), dot(B, B)), sc = det == 0. ? 0. : inversesqrt(det); return mat3(T * sc, B * sc, N); }
+`;
+/* the sampling of the relief, as the colour of each kind is sampled (foto3.js, pattern3.js): r3N tangent normal, r3R roughness against the mean */
+const R3_SAMPLE = {
+  plain: `{ vec4 t = texture2D(uR3Nm, vUv); r3N = r3Dec(t); r3R = t.b * 2.; }`,
+  asf: `{ vec2 uv = vUv, dx = dFdx(uv), dy = dFdy(uv), ci = floor(uv), cf = fract(uv), w2 = cf * cf * (3. - 2. * cf); vec3 an = vec3(0.); float ar = 0.;
+    for (int k = 0; k < 4; k++) {
+      vec2 o = vec2(float(k - k / 2 * 2), float(k / 2)), c = ci + o; float w = (o.x > .5 ? w2.x : 1. - w2.x) * (o.y > .5 ? w2.y : 1. - w2.y);
+      vec2 r = h22(c + 7.3); float a = r.x * 6.2832, ca = cos(a), sa = sin(a); mat2 R = mat2(ca, sa, -sa, ca);
+      vec4 t = textureGrad(uR3Nm, R * (uv - c) + r.yx * 13.7, R * dx, R * dy); vec3 n = r3Dec(t); n.xy = n.xy * R; /* back from the turned sample */
+      an += n * w; ar += t.b * w; }
+    r3N = normalize(an); r3R = ar * 2.; }`,
+  side: `{ vec2 dx = dFdx(vUv), dy = dFdy(vUv); float fw = max(length(dx), length(dy)), a2 = 1. - smoothstep(.008, .03, fw);
+    vec2 P = vec2(vUv.x, 1. - vUv.y) * 512.; float r = floor(mod(P.y - 25., 512.) / 25.6), ph = uPh[int(r)], j = floor(mod(P.x - ph, 512.) / 51.2);
+    vec2 cen = vec2(ph + 51.2 * (j + .5), 25. + 25.6 * (r + .5)), rel = mod(P - cen + 256., 512.) - 256.;
+    vec2 cell = floor(vec2(vUv.x - rel.x / 512., vUv.y + rel.y / 512.)), sd = vec2(r * 13. + j + 1., cell.x * 3.17 + cell.y * 5.31 + 1.7);
+    float hd = h21(sd + 31.7), he = h21(sd + 47.3), hf = h21(sd + 63.9), rd = min(floor(hd * 20.), 19.), jd = min(floor(he * 10.), 9.), rot = hf > .5 ? -1. : 1.;
+    vec2 cen2 = vec2(uPh[int(rd)] + 51.2 * (jd + .5), 25. + 25.6 * (rd + .5)), P2 = cen2 + rel * rot, uv2 = vec2(P2.x, 512. - P2.y) / 512.;
+    vec4 t0 = texture2D(uR3Nm, vUv), t1 = textureGrad(uR3Nm, uv2, dx * rot, dy * rot); vec3 n1 = r3Dec(t1); n1.xy *= rot;
+    r3N = normalize(mix(r3Dec(t0), n1, a2)); r3R = mix(t0.b, t1.b, a2) * 2.; }`,
+  pat: `{ vec2 dx = dFdx(vUv), dy = dFdy(vUv), c = floor(vUv), f = fract(vUv), h = vec2(h21(c + 1.3), h21(c + 1.3 + 31.7));
+    vec2 s = vec2(h.x > .5 ? -1. : 1., h.y > .5 ? -1. : 1.); vec4 t = textureGrad(uR3Nm, f * s + (1. - s) * .5, dx * s, dy * s);
+    r3N = r3Dec(t); r3N.xy *= s; r3R = t.b * 2.; }`,
+};
+const r3Decl = s => { if (!/float r3R = /.test(s.fragmentShader)) s.fragmentShader = s.fragmentShader.replace('void main() {', 'void main() {\n  vec3 r3N = vec3(0., 0., 1.); float r3R = 1.;'); };
+/* a ground material: its relief texture (the same repeat as its colour), sampled as the colour is */
+function r3Ground(m, f, mode, k = 1) {
+  if (!R3.on || !m || m.userData.r3 || R3.skip.includes(f)) return; m.userData.r3 = f;
+  const t = r3Load(f + '_nr'); m.userData.r3t = t;
+  const sync = () => { if (m.map) { t.repeat.copy(m.map.repeat); t.offset.copy(m.map.offset); } }; sync(); R3.sync = (R3.sync || []).concat(sync); /* the photos set their repeat when they load */
+  const before = m.onBeforeCompile, prev = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
+  m.onBeforeCompile = (s, r) => {
+    if (before) before.call(m, s, r);
+    r3Decl(s); s.uniforms.uR3Nm = { value: t }; s.uniforms.uR3K = { value: k };
+    s.fragmentShader = '#define R3_NRM\n' + s.fragmentShader.replace('#include <common>', '#include <common>\n' + R3_GLSL + R3_TBN + (/float h21\(/.test(s.fragmentShader) ? '' : VAR_GLSL.replace('varying vec3 vWp;', '')) + (mode === 'asf' && !/vec2 h22\(/.test(s.fragmentShader) ? 'vec2 h22(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); q += dot(q, q.yzx + 33.33); return fract((q.xx + q.yz) * q.zy); }\n' : ''))
+      .replace('#include <normal_fragment_maps>', R3_SAMPLE[mode] + '\n  { vec3 mapN = r3N; mapN.xy *= uR3K; normal = normalize( r3Frame( - vViewPosition, normal, vUv ) * mapN ); }');
+    if (/[?&]r3dbg=1/.test(location.search)) s.fragmentShader = s.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor = vec4(r3R * .5, normal.z * .5 + .5, fract(vUv.x), 1.);');
+  };
+  m.customProgramCacheKey = () => prev + '|r3-' + mode; m.needsUpdate = true;
+}
+/* the photos (foto3.js FOTO_TEX) set the repeat of their textures when they come: the relief follows */
+{ const u = updDayNight; let n = 0; updDayNight = function (dt) { u(dt); if (n++ % 30 === 0 && R3.sync) for (const f of R3.sync) f(); }; }
+if (R3.on) {
+  for (const k of ['asph', 'asphS', 'paved', 'pavedS', 'deck']) r3Ground(MAT[k], 'asfalto', 'asf', 2.5);
+  r3Ground(MAT.side, 'marciapiede', 'side', 1.5);
+  for (const k of ['piazza', 'piazzaS']) r3Ground(MAT[k], 'porfido', 'pat', 1);
+  for (const k of ['grass', 'grassS', 'embank']) r3Ground(MAT[k], 'prato', MAT[k].onBeforeCompile && /pattern/.test(MAT[k].customProgramCacheKey ? MAT[k].customProgramCacheKey() : '') ? 'pat' : 'plain', 1);
+  for (const k of ['terrain', 'terrainS']) r3Ground(MAT[k], 'terreno', 'pat', 1);
+  if (typeof RO_MAT !== 'undefined') { r3Ground(RO_MAT.ciottoli, 'ciottoli', 'pat', 1); r3Ground(RO_MAT.prato, 'prato', 'pat', 1); }
+  if (!/[?&]r3st=0/.test(location.search)) for (const k of ['side', 'piazza', 'piazzaS']) rifMat(MAT[k], 'stone');
+  /* the looks of the surfaces by material (world3.js fondoLook), made at their first use */
+  const fl = fondoLook; fondoLook = function (m) {
+    const L = fl(m); if (L && !L.r3) { L.r3 = true; const f = { g: 'ghiaia', t: 'terra', n: 'pavimento', c: 'ciottoli', b: 'marciapiede' }[m];
+      if (f) for (const q of [L.S, L.F]) { r3Ground(q, f, q === MAT.side ? 'side' : m === 'c' ? 'pat' : 'plain', 1); if (m === 'n' || m === 'b' || m === 'c') rifMat(q, 'stone'); } }
+    return L;
+  };
+}
+// the plaster of the facades: the relief of the stucco (white_stucco_02, 1.8 m, as the grain of foto3.js), not on the panes and shutters of the drawing; the frame from the wall
+const R3_FAC = (s, tile) => {
+  r3Decl(s); s.uniforms.uR3Pl = { value: r3Load('intonaco_nr') };
+  const facW = /float facF = floor/.test(s.fragmentShader);
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uR3Pl;\n' + R3_GLSL)
+    .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  { vec3 Nw = normalize(vWNrm); if (abs(Nw.y) < .5) {
+      vec2 uvp = vUv * vec2(${tile.toFixed(2)}, 3.1) / 1.8; vec4 t = texture2D(uR3Pl, uvp); vec3 n = r3Dec(t);
+      float m = smoothstep(.5, .8, dot(texture2D(map, vUv).rgb, vec3(.3333)));${facW ? ' m = mix(1., m, facW);' : ''} m = clamp(m, 0., 1.) * (1. - smoothstep(30., 90., length(vWPos - cameraPosition)));
+      vec3 T = normalize(vec3(Nw.z, 0., -Nw.x)), B = vec3(0., 1., 0.), nw = normalize(mix(Nw, T * n.x + B * n.y + Nw * n.z, m));
+      normal = normalize((viewMatrix * vec4(nw, 0.)).xyz); r3R = t.b * 2.; } }`);
+};
+if (R3.on) for (const [k, m, tile] of [['old', MAT.old, 3.4], ['mod', MAT.mod, 4.2], ['plain', MAT.plain, 4]]) {
+  const before = m.onBeforeCompile, prev = m.customProgramCacheKey(); m.onBeforeCompile = (s, r) => { before.call(m, s, r); R3_FAC(s, tile); }; m.customProgramCacheKey = () => prev + '|r3fac'; m.needsUpdate = true;
+}
+// the roofs: coppi on the pitches (laid along the slope: rows across it, the courses down it), a faint grain of concrete on the flat ones. World position, no UVs
+const R3_ROOF = s => {
+  r3Decl(s); s.uniforms.uR3T = { value: r3Load('tegole') }; s.uniforms.uR3TN = { value: r3Load('tegole_nr') }; s.uniforms.uR3F = { value: r3Load('pavimento_nr') };
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vR3P;\nvarying vec3 vR3N;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\n  vR3P = (modelMatrix * vec4(transformed, 1.0)).xyz; vR3N = normalize(mat3(modelMatrix) * objectNormal);');
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uR3T;\nuniform sampler2D uR3TN;\nuniform sampler2D uR3F;\nvarying vec3 vR3P;\nvarying vec3 vR3N;\n' + R3_GLSL)
+    .replace('void main() {', 'void main() {\n  vec3 r3W = vec3(0.); float r3K = 0.;')
+    .replace('#include <color_fragment>', `#include <color_fragment>
+  { vec3 Nw = normalize(vR3N);
+    if (Nw.y > .2 && Nw.y < .985) { /* a pitch: u along the eaves, v down the slope (metres along the roof), 2.5 m a repeat */
+      vec2 dn = normalize(Nw.xz), ea = vec2(-dn.y, dn.x); vec2 uv = vec2(-dot(vR3P.xz, ea), -dot(vR3P.xz, dn) / Nw.y) / 2.5;
+      diffuseColor.rgb *= texture2D(uR3T, uv).rgb * 2.; vec4 t = texture2D(uR3TN, uv); vec3 n = r3Dec(t);
+      vec3 T = vec3(-ea.x, 0., -ea.y), B = normalize(cross(Nw, T)); /* where u and v grow: along the eaves, up the slope */ r3W = T * n.x + B * n.y + Nw * n.z; r3K = 1.; r3R = t.b * 2.;
+    } else if (Nw.y >= .985) { /* flat: sheath or concrete, a faint grain */
+      vec4 t = texture2D(uR3F, vR3P.xz / 3.); vec3 n = r3Dec(t); r3W = normalize(vec3(n.x * .6, n.z, n.y * .6)); r3K = 1.; diffuseColor.rgb *= .94 + .12 * t.b; }
+  }`)
+    .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  if (r3K > 0.) normal = normalize((viewMatrix * vec4(r3W, 0.)).xyz);');
+};
+if (R3.on) { const m = MAT.roof, before = m.onBeforeCompile, prev = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.onBeforeCompile = (s, r) => { if (before) before.call(m, s, r); R3_ROOF(s); }; m.customProgramCacheKey = () => prev + '|r3roof'; m.needsUpdate = true; }
+// the covers in the asphalt (realismo 3, fase A; Carlo: "i tombini che mancano"), flush with the road, photos of ambientCG (CC0) in one atlas, tex/chiusini.png.
+// The data have almost none (Mapillary sees 118 on the whole map, OSM none), so a cautious rule, the same for every town, on the roads of the town (class 1-3, asphalt, on the
+// ground, at least 4 m wide): a sewer cover in a lane every 40 m on average, a drain grate at the kerb every 22 m where a pavement runs beside, a double utility cover
+// near the edge every 90 m. The place along each piece of road from a hash of its ends, so the same in every build and in both tiles a piece crosses. &tombini=0 turns them off
+const CHIUSINI = window.__CH = { on: !/[?&]tombini=0/.test(location.search), n: 0, slot: [[0.78, 0.77], [0.75, 0.75], [0.9, 0.48], [0.6, 0.38]] };
+const chiusiniMat = (() => { const t = r3Load('chiusini', true); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.loader = new THREE.TextureLoader().load('tex/chiusini.png', i => { t.image = i.image; t.needsUpdate = true; }); return t; })();
+const CHIUSINI_MAT = new THREE.MeshLambertMaterial({ map: chiusiniMat, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+r3Ground(CHIUSINI_MAT, 'chiusini', 'plain', 1); rifMat(CHIUSINI_MAT, 'stone');
+function buildChiusini(T, G) {
+  if (!CHIUSINI.on) return;
+  const x0 = T.cx - TS / 2, z0 = T.cz - TS / 2, x1 = T.cx + TS / 2, z1 = T.cz + TS / 2, seen = new Set(), b = Object.assign(FBuf(), { noclip: true }), cw = COL('#ffffff'), placed = [];
+  const put = (x, z, ux, uz, k) => {
+    if (x < x0 || x >= x1 || z < z0 || z >= z1 || !onAsph(x, z) || inBuilding(x, z, 0.3) || H.inPit(x, z, 0.5) || placed.some(([px, pz]) => hyp(px - x, pz - z) < 1.5)) return;
+    const [W, L] = CHIUSINI.slot[k], nx = -uz, nz = ux, i0 = b.p.length / 3, u0 = k / 4;
+    const fu = 0.125 * (W >= L ? 1 : W / L), fv = 0.5 * (L >= W ? 1 : L / W); /* the photo fills its square cell along its longer side */
+    for (const [s, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) vtx(b, x + ux * s * W / 2 + nx * v * L / 2, 0.02, z + uz * s * W / 2 + nz * v * L / 2, 0, 1, 0, u0 + 0.125 + s * fu, 0.5 + v * fv, cw);
+    b.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); placed.push([x, z]); CHIUSINI.n++;
+  };
+  ROADSEG.each(x0 - 2, z0 - 2, x1 + 2, z1 + 2, s => {
+    const r = s.r; if (seen.has(s) || r.c < 1 || r.c > 3 || r.d || (r.m && r.m !== 'a') || r.w < 4 || !atGrade(s)) return; seen.add(s);
+    const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L = hyp(ex, ez); if (L < 1) return; const ux = ex / L, uz = ez / L, nx = -uz, nz = ux;
+    const h = k => hashRnd(s.a[0] * 0.731 + s.a[1] * 1.37 + s.b[0] * 2.11 + s.b[1] * 0.53 + k * 17.3);
+    const along = (step, k, f) => { for (let d = h(k) * step; d < L; d += step * (0.7 + 0.6 * h(k + d))) f(s.a[0] + ux * d, s.a[1] + uz * d, d); };
+    along(40, 1, (x, z, d) => { const lane = [0, -1, 1][Math.floor(h(d + 3) * 3)] * r.w / 4, a = h(d + 5) * TAU; put(x + nx * lane, z + nz * lane, Math.cos(a), Math.sin(a), h(d + 7) < 0.55 ? 0 : 1); });
+    for (const sd of [-1, 1]) along(22, 10 + sd, (x, z) => { const o = sd * (r.w / 2 - 0.3), ox = sd * (r.w / 2 + 1.2); if (onSide(x + nx * ox, z + nz * ox)) put(x + nx * o, z + nz * o, ux, uz, 3); });
+    along(90, 20, (x, z, d) => { const sd = h(d + 9) < 0.5 ? -1 : 1, o = sd * (r.w / 2 - 0.8); put(x + nx * o, z + nz * o, ux, uz, 2); });
+  });
+  if (b.i.length) mkMesh(b, CHIUSINI_MAT, 6, false, G);
+}
 
 // ---------------------------------------------------------------- facciate 2.0 (Carlo 8/11: "gli edifici si assomigliano tutti")
 // Eight families from the data (build: src/famiglie.py, b.fa; the public ones b.pu, src/pubblici.py), the epoch of construction (b.ep, CENED) and three

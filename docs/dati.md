@@ -70,6 +70,14 @@ Dal 1/11 la build legge `mapillary_grande/oggetti.json` (tutta la mappa grande) 
 - CC BY-SA 3.0, autore Flanker (5): `fermarsi e dare precedenza - stop`, `passaggio obbligatorio a destra`, `rotatoria`, `divieto di fermata`, `direzione obbligatoria dritto`. Attribuzione nella riga dei crediti del gioco.
 - Non coperti, restano disegnati a mano: `paese` (cartello di localita') e `via` (nome della strada), che sono testi, e i limiti di velocita' fuori da 10-130 in passi da 10.
 
+## Materiali con rilievo e tombini (`tex/*_nr.jpg`, `tex/tegole.jpg`, `tex/chiusini.png`, dal 13/11, realismo 3, `src/materiali3.js`)
+
+- Tutti CC0 (pubblico dominio, nessun obbligo di citazione; li citiamo lo stesso). Scaricati il 13/11/2026 a 1K da Poly Haven (`dl.polyhaven.org`, licenza <https://polyhaven.com/license>) e ambientCG (`ambientcg.com/get`, licenza <https://docs.ambientcg.com/license/>), ridotti da `src/tex_pbr.py` a 512 px (128 per i tombini). In ogni `_nr.jpg`: R e G la normale, B la ruvidità rispetto alla media.
+- Poly Haven: `asphalt_04` (asfalto, stessa foto di `tex/asfalto.jpg`), `white_stucco_02` (intonaco), `concrete_floor_02` (pavimento), `gravel_floor_02` (ghiaia), `brown_mud_dry` (terra), `clay_roof_tiles_02` di Amal Kumar (coppi: `tex/tegole.jpg` è la foto divisa per la sua media, così il tetto tiene il suo colore).
+- Ricavati dalle nostre foto, senza fonte nuova: marciapiede (fughe della griglia dei masselli), porfido e ciottoli (fughe da `tex/<nome>_id.png`), prato e terreno (grana della foto).
+- ambientCG: `ManholeCover006`, `ManholeCover003` (chiusini tondi), `ManholeCover007` (pozzetto a due coperchi, scurito del 30%), `Grate002` (caditoia), in un atlante di 4 caselle.
+- Dove stanno i tombini: nessun dato (Mapillary ne vede 118 su tutta la mappa, OSM nessuno): regola prudente in `materiali3.js` (`buildChiusini`).
+
 ## Non usati da nessuno script
 
 - `_vecchi/map.osm` (2,5 MB): primo estratto OSM dal sito di openstreetmap.org (17/10/2026), un riquadro di circa 1,3 × 0,7 km sul centro di Meda. Sostituito da `osm/maplarge.osm`.

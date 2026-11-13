@@ -17,7 +17,8 @@ const RIF_KIND = {
   glass: { f0: 0.06, rough: 0.07, k: 1.45, sun: 1.0, metal: 0, wet: 0 },
   shop: { f0: 0.06, rough: 0.05, k: 2.0, sun: 1.0, metal: 0, wet: 0 },
   metal: { f0: 0.05, rough: 0.42, k: 1.0, sun: 0.9, metal: 1, wet: 0 },
-  asphalt: { f0: 0.04, rough: 0.62, k: 0.8, sun: 0.9, metal: 0, wet: 1, far: 1 }, /* far: only where it is seen at a grazing angle (the shader does nothing above 30 degrees: it would be under 2% of the light) */
+  asphalt: { f0: 0.04, rough: 0.62, k: 0.8, sun: 0.9, metal: 0, wet: 1, far: 1 },
+  stone: { f0: 0.04, rough: 0.75, k: 0.6, sun: 0.7, metal: 0, wet: 1, far: 1 }, /* realismo 3: pavements, setts, concrete (materiali3.js) */ /* far: only where it is seen at a grazing angle (the shader does nothing above 30 degrees: it would be under 2% of the light) */
 };
 const RIF_VERT_DECL = 'varying vec3 vRfP;\nvarying vec3 vRfN;';
 const RIF_FRAG_DECL = `uniform vec3 uRfH;
@@ -51,20 +52,22 @@ function rifFrag(q) {
   const F0 = q.f0.toFixed(4), RO = q.rough.toFixed(3), K = q.k.toFixed(3), SU = q.sun.toFixed(3), ME = q.metal.toFixed(3), WE = q.wet ? '1' : '0';
   return `{
   vec3 rfVv = normalize(vRfP); vec3 rfNv = normalize(vRfN); if (dot(rfNv, -rfVv) < 0.0) rfNv = -rfNv;
+  vec3 rfNb = normalize(RF_NRM); if (dot(rfNb, -rfVv) < 0.0) rfNb = -rfNb; /* realismo 3: the normal bent by the relief (materiali3.js) for the lobes of the sun and the lamps; the sky's Fresnel keeps the surface's own */
   float rfWet = ${WE}.0 * uRfWet, rfPd = 0.0;
   ${q.wet ? `if (rfWet > 0.0) { vec3 rfWp = (vec4(vRfP, 0.0) * viewMatrix).xyz + cameraPosition; /* the puddles, on what lies flat */
     if (inverseTransformDirection(rfNv, viewMatrix).y > 0.9) {
       vec2 rfQ = rfWp.xz; float rfNs = rfNoise(rfQ * 0.3) * 0.5 + rfNoise(mat2(0.8, -0.6, 0.6, 0.8) * rfQ * 0.75 + 7.3) * 0.3 + rfNoise(mat2(0.28, 0.96, -0.96, 0.28) * rfQ * 1.8 + 3.1) * 0.2, rfTh = 1.0 - 0.25 * rfWet; /* three turned octaves: round puddles, not squares */ rfPd = smoothstep(rfTh, rfTh + 0.035, rfNs);
       if (rfPd > 0.0 && uRfRain > 0.0) { vec2 rfRp = rfRipple(rfWp.xz, uRfT) * min(uRfRain * 1.5, 1.0) * rfPd; rfNv = normalize(rfNv + (viewMatrix * vec4(rfRp.x, 0.0, rfRp.y, 0.0)).xyz); }
     } }` : ''}
+  rfNb = normalize(mix(rfNv, rfNb, 0.5 * (1.0 - rfPd))); /* half the relief for the lobes (all of it lit the rough setts like glass at a grazing angle); a puddle is flat water */
   float rfNdv = clamp(dot(rfNv, -rfVv), 0.001, 1.0);
   ${q.far ? 'if (rfNdv < 0.5 || rfPd > 0.0) {' : '{'}
-  float rfR = mix(${RO} * (1.0 - 0.75 * rfWet), 0.03, rfPd);
+  float rfR = mix(clamp(${RO} * mix(1.0, r3R, 0.5), 0.04, 1.0) * (1.0 - 0.75 * rfWet), 0.03, rfPd);
   float rfF0 = ${F0} + 0.03 * rfWet - 0.05 * rfPd;
   vec3 rfFv0 = mix(vec3(rfF0), clamp(diffuseColor.rgb * 0.95, 0.0, 1.0), ${ME});
   vec3 rfFr = rfFv0 + (max(vec3(1.0 - rfR), rfFv0) - rfFv0) * pow(1.0 - rfNdv, 5.0);
   vec3 rfRw = inverseTransformDirection(reflect(rfVv, rfNv), viewMatrix);
-  vec3 rfVw = inverseTransformDirection(rfVv, viewMatrix), rfNw = inverseTransformDirection(rfNv, viewMatrix), rfLw = normalize(uRfD);
+  vec3 rfVw = inverseTransformDirection(rfVv, viewMatrix), rfNw = inverseTransformDirection(rfNb, viewMatrix), rfLw = normalize(uRfD);
   vec3 rfAdd = rfSky(rfRw, rfR, ${q.wet ? '0.0' : '1.0'}) * rfFr * ${K}; /* the ground mirrors the sky only: a skyline drawn by direction would not match what stands round */
   float rfNl = max(dot(rfNw, rfLw), 0.0);
   if (rfNl > 0.0 && rfSh > 0.0) {
@@ -80,10 +83,10 @@ function rifFrag(q) {
   }
   ${q.wet ? `#if NUM_SPOT_LIGHTS > 0
   if (rfWet > 0.0) { /* the lamps and the headlights mirrored by the wet ground and the puddles: the light's own lobe, long at a grazing angle */
-    float rfR2 = mix(${RO} * (1.0 - 0.75 * rfWet), 0.03, rfPd), rfSp2 = clamp(2.0 / max(rfR2 * rfR2 * rfR2 * rfR2, 0.0004) - 2.0, 4.0, 2500.0); vec3 rfS2 = vec3(0.0); IncidentLight rfIL;
+    float rfR2 = mix(clamp(${RO} * mix(1.0, r3R, 0.5), 0.04, 1.0) * (1.0 - 0.75 * rfWet), 0.03, rfPd), rfSp2 = clamp(2.0 / max(rfR2 * rfR2 * rfR2 * rfR2, 0.0004) - 2.0, 4.0, 2500.0); vec3 rfS2 = vec3(0.0); IncidentLight rfIL;
     for (int i = 0; i < NUM_SPOT_LIGHTS; i++) {
-      getSpotLightInfo(spotLights[i], geometryPosition, rfIL); float rfNl2 = max(dot(rfNv, rfIL.direction), 0.0); if (rfNl2 <= 0.0) continue;
-      vec3 rfH2 = normalize(rfIL.direction - rfVv); float rfD2 = (rfSp2 + 2.0) * 0.1592 * pow(max(dot(rfNv, rfH2), 0.0), rfSp2);
+      getSpotLightInfo(spotLights[i], geometryPosition, rfIL); float rfNl2 = max(dot(rfNb, rfIL.direction), 0.0); if (rfNl2 <= 0.0) continue;
+      vec3 rfH2 = normalize(rfIL.direction - rfVv); float rfD2 = (rfSp2 + 2.0) * 0.1592 * pow(max(dot(rfNb, rfH2), 0.0), rfSp2);
       rfS2 += rfIL.color * (0.02 + 0.98 * pow(1.0 - max(dot(rfIL.direction, rfH2), 0.0), 5.0)) * rfD2 * 0.25 * rfNl2;
     }
     totalEmissiveRadiance += min(rfS2 * rfWet, vec3(30.0));
@@ -104,7 +107,7 @@ const RIF_LFB = (() => {
 function rifShader(s, q) {
   s.uniforms.uRfH = FOTO_FAC.uSkyH; s.uniforms.uRfZ = FOTO_FAC.uSkyZ; s.uniforms.uRfD = FOTO_FAC.uSunD; s.uniforms.uRfC = FOTO_FAC.uSunC; s.uniforms.uRfWet = RIF.wet; s.uniforms.uRfT = RIF.t; s.uniforms.uRfRain = RIF.rain;
   s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + RIF_VERT_DECL).replace('#include <project_vertex>', '#include <project_vertex>\nvRfP = mvPosition.xyz; vRfN = transformedNormal;');
-  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + RIF_FRAG_DECL).replace('void main() {', 'void main() {\n  float rfSh = 1.0;')
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n#ifdef R3_NRM\n#define RF_NRM normal\n#else\n#define RF_NRM vRfN\n#endif\n' + RIF_FRAG_DECL).replace('void main() {', 'void main() {\n  float rfSh = 1.0;' + (/float r3R = /.test(s.fragmentShader) ? '' : '\n  vec3 r3N = vec3(0., 0., 1.); float r3R = 1.;')) /* RF_NRM, r3R: the normal bent by the relief and the roughness of the texel (materiali3.js, realismo 3) */
     .replace('#include <lights_fragment_begin>', RIF_LFB || '#include <lights_fragment_begin>').replace('vec3 outgoingLight =', rifFrag(q) + '  vec3 outgoingLight =');
 }
 // patches a Lambert material in place (the other patches of the material, e.g. the asphalt's, are kept and run first)

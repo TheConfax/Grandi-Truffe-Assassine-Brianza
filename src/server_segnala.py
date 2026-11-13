@@ -25,4 +25,5 @@ class H(http.server.SimpleHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-cache')  # il browser ricontrolla sempre: niente terreno vecchio dalla cache
         super().end_headers()
     def log_message(self, *a): pass
+http.server.ThreadingHTTPServer.request_queue_size = 256  # la coda di 5 di socketserver: con molti pezzi e foto chiesti insieme Windows rifiutava le connessioni e le foto restavano disegnate
 http.server.ThreadingHTTPServer(('127.0.0.1', port), functools.partial(H, directory=root)).serve_forever()
