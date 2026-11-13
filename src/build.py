@@ -45,4 +45,5 @@ out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'brianza.json')
 env = dict(os.environ, GTA_DATA=DATA, PYTHONIOENCODING='utf-8')
 rc = subprocess.call([sys.executable, '-u', os.path.join(ROOT, 'src', 'build_data.py'), OSM, DEM, out, S, N, W, E], env=env)
 if rc == 0: subprocess.call([sys.executable, os.path.join(ROOT, 'src', 'confine_dbgt.py'), os.path.join(os.path.dirname(os.path.abspath(out)), 'confine_dbgt.json')], env=env)  # il confine della zona DBGT, accanto ai dati
+if rc == 0: subprocess.call([sys.executable, os.path.join(ROOT, 'src', 'nastri.py'), os.path.dirname(os.path.abspath(out))], env=env)  # i nastri delle carreggiate (docs/nastri.md): mappa/nastri.bin e report_nastri.json
 sys.exit(rc)

@@ -153,6 +153,8 @@ def main(argv=None):
     # the check of the parapets and walls of the bridges, in the game just written (src/controlli_ponti.mjs, key barriere of report_ponti.json)
     srv = server(a.root)
     subprocess.call(['node', os.path.join(ROOT, 'src', 'controlli_ponti.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], os.path.join(a.root, 'report_ponti.json')])
+    # il metro dei livelli (docs/nastri.md passo 0, src/controllo_livelli.mjs): report_livelli.json; serve mappa/nastri.bin (src/nastri.py, lanciato da build.py)
+    if os.path.exists(os.path.join(a.root, 'mappa', 'nastri.bin')): subprocess.call(['node', os.path.join(ROOT, 'src', 'controllo_livelli.mjs'), 'http://127.0.0.1:%d/' % srv.server_address[1], os.path.join(a.root, 'report_livelli.json')])
     srv.shutdown()
 
 

@@ -1788,7 +1788,7 @@ function* buildTileGen(T) {
   if (T.built) return; T.built = true; T.ready = false; srndT = 1000 + T.seme * 7919; 
   T.tex0 = new THREE.Texture().id; // textures newer than this were made for this tile: freed with it
   const G = new THREE.Group(); G.visible = false; scene.add(G); T.group = G;
-  const put = (b, mat, ro, shadow) => { if (b.i.length) mkMesh(b, mat, ro, shadow, G); };
+  const put = (b, mat, ro, shadow, fam) => { if (b.i.length) { const m = mkMesh(b, mat, ro, shadow, G); if (fam && m) m.userData.fam = fam; } }; /* fam: the family of what the mesh draws, read by the check of the levels (src/controllo_livelli.mjs) */
   const pc = a => COL(a[Math.floor(tRnd() * a.length)]), d = T.d, x0 = T.cx - TS / 2, z0 = T.cz - TS / 2;
   const FB = new Map(), fbuf = (m, rk, street, V) => { const k = m + '|' + rk; let b = FB.get(k); if (!b) { b = V ? VBuf() : FBuf(); b.rk = rk; if (street) b.street = true; if (m === 'a') { b.angc = true; b.asf = asfGrid(T); } /* asphalt as the streets' (asfCol: the direction of the road in the colour; without it the drape came out pale, Carlo 6/11) */ b.fm = m; if (m === 'f') b.pg = porGrid(T); FB.set(k, b); } return b; }; /* the drapes of the materials of src/fondi.py, one buffer per material and rank */
   // terrain patch
@@ -2167,9 +2167,9 @@ function* buildTileGen(T) {
     }
     if (T.fine) drawDecks(T, deck, dside);
     { const s_ = srndT; yield 'streets put'; srndT = s_; } 
-    for (const b of [mark, lett, lettB]) senzaStrisce(T, b); put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); for (const b of FB.values()) put(b, fondoLook(b.fm).F, b.rk >= 5 ? 5 : 3); FB.clear(); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
-    put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9); put(kerbS, MAT.kerb, 9);
-    put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10); put(dmark, MAT.deckMark, 10); put(pil, MAT.deckSide, 10, 'cast');
+    for (const b of [mark, lett, lettB]) senzaStrisce(T, b); put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); for (const b of FB.values()) put(b, fondoLook(b.fm).F, b.rk >= 5 ? 5 : 3); FB.clear(); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6, undefined, 'righe'); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
+    put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9, undefined, 'cordoli'); put(kerbS, MAT.kerb, 9, undefined, 'cordoli');
+    put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10, undefined, 'guardrail'); put(dmark, MAT.deckMark, 10, undefined, 'righe'); put(pil, MAT.deckSide, 10, 'cast');
   }
   yield 'walls';
   // walls, fences, hedges and the expressway median
@@ -2212,7 +2212,7 @@ function* buildTileGen(T) {
       const o = dec(q.p), k = q.k.map(dec), yAt = (x, z) => { let best = null, bd = 1e9; DECKG.each(x - 8, z - 8, x + 8, z + 8, s => { const ex = s.bx - s.ax, ez = s.bz - s.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - s.ax) * ex + (z - s.az) * ez) / L2, 0, 1), dd = hyp(x - s.ax - ex * t, z - s.az - ez * t); if (dd < bd && dd < s.hw + 7) { bd = dd; best = lerp(s.ya, s.yb, t); } }); return best === null ? H.ground(x, z) : best; };
       try { const base = md.p.length / 3; polyFill(md, densify(o, 4), k.map(h => densify(h, 4)), 0, 4); for (let i = base * 3; i < md.p.length; i += 3) md.p[i + 1] = yAt(md.p[i], md.p[i + 2]) + 0.12; } catch (e) { }
     }
-    barTile(T, B, G); put(md, MAT.median, 9); put(mdS, MAT.median, 9); put(mdG, MAT.grass, 9); put(mdD, conProfondita(MAT.grass), 9); put(mdK, MAT.kerb, 9); // the barrier meshes and posts, every piece whole again
+    barTile(T, B, G); put(md, MAT.median, 9, undefined, 'spartitraffico'); put(mdS, MAT.median, 9, undefined, 'spartitraffico'); put(mdG, MAT.grass, 9); put(mdD, conProfondita(MAT.grass), 9); put(mdK, MAT.kerb, 9, undefined, 'cordoli'); // the barrier meshes and posts, every piece whole again
     rotondeTile(T, put, G); /* the aiuole of the roundabouts over their islands (rotonde3.js) */
   }
   yield 'railway';

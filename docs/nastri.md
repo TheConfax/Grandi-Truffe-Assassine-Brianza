@@ -167,3 +167,64 @@ Quanto è grosso: i passi 1 e 2 sono quasi tutti nella build e sono il cuore; il
 4. **Strade sull'acqua senza PONTE nel DBGT.** Regola proposta: se una carreggiata passa sopra un alveo, quel tratto è un ponte (profilo della strada dritto fra le due sponde, alveo che continua sotto, parapetti). Oppure preferisci il tombino: strada a raso e acqua che entra in un tubo, coi parapetti sopra le bocche?
 5. **Parcheggi su più piani.** I dati dicono che esistono (OSM) e la sagoma dell'edificio, non come sono fatti dentro: piani, rampe, pilastri. Costruirli vuol dire inventare l'interno con una regola. Si fa (interno neutro, uguale per tutti) o restano scatole chiuse finché non c'è una fonte?
 6. **Misure che il DBGT non dà.** Spessore della soletta e tipo di parapetto oggi sono valori generici (0,9 m; parapetto di cemento con corrimano, ringhiera sulle passerelle). Li tengo così?
+
+### Le risposte di Carlo (13/11)
+
+1. Il ponte è largo come la strada: carreggiata misurata dal DBGT, marciapiede dove c'è, parapetto subito fuori. La sagoma PONTE dice solo dove comincia e dove finisce.
+2. Dopo i passi 0 e 1 si parte dai ponti (passo 2).
+3. Comuni senza DBGT non ce ne saranno: tutti quelli dentro il confine lo hanno.
+4. Strada su un corso d'acqua senza PONTE nel DBGT: se il corso d'acqua è largo oltre 4-5 m è un ponte (strada dritta fra le sponde, acqua scoperta sotto, muretto con ringhiera ai lati); sotto quella larghezza un tombino. Caso tipo: corso Isonzo sul Seveso (x -685 z 1688), dal vero strada piatta, Seveso scoperto in un canale con muri di cemento.
+5. Parcheggi su più piani: per ora niente.
+6. Soletta 0,9 m. Parapetto per tipo di strada: sulle superstrade (Milano-Meda, Valassina) new jersey di cemento con rete sopra; sulle strade normali muretto di cemento con ringhiera o corrimano; sulle passerelle ringhiera.
+
+---
+
+## 6. Passi 0 e 1: fatti (14/11)
+
+Il gioco non cambia: senza `&nastri=1` nel link non si carica e non si disegna niente di nuovo. Nessuna correzione in questo giro.
+
+### Passo 1, il nastro nella build
+
+- `src/nastri.py` (lo lancia `build.py` dopo `build_data.py`; da solo: `python src/nastri.py`, mezzo minuto). Scrive `mappa/nastri.bin` e `report_nastri.json`.
+- Un nastro è una carreggiata: gli elementi EL_STR uniti capo a capo come fa `dbgt_righe.py` per le righe, con la quota del DBGT a ogni vertice, una stazione al metro. **866 nastri, 196 km**: 195,0 a raso, 0,60 su ponte (SED 02), 0,07 in galleria (SED 03), 0,28 "sotto" (LIV 01: il pezzo di strada che passa sotto un'altra opera).
+- I due bordi si misurano di traverso sull'AC_VEI **alla stessa quota** della stazione (entro 2,5 m). È la prima regola "stesso livello" scritta nella build: il bordo della strada che passa sotto un ponte sta a un'altra quota e il raggio non lo vede; il capo del ponte, dove l'area su ponte e quella a raso si toccano alla stessa quota, non è un bordo e si toglie. Senza questa regola sul ponte di corso Isonzo il nastro veniva largo 1,5 m.
+- Dove un bordo si apre (imbocchi, incroci, piazzali) si porta dritto fra prima e dopo: 31 km di bordo su 392 sono portati così; l'elenco è in `report_nastri.json` (`bordo_portato`). Larghezza: mediana 7,3 m.
+- La trincea scoperta il DBGT non la scrive (SED e LIV dicono solo ponte, galleria e "sotto"): la dirà la quota dell'asse rispetto al terreno, al passo 4.
+- Nel gioco `src/nastri3.js`: con `&nastri=1` i due bordi di ogni nastro alla loro quota, visibili attraverso tutto (giallo a raso, magenta ponte, azzurro galleria, arancio sotto); con `&nastri=2` stanno dietro a quello che li copre.
+
+Cosa mostrano le linee ai punti di prova (foto in `docs/nastri_foto/`, `passo1_*`):
+
+| Punto | Cosa si vede |
+|---|---|
+| Milano-Meda su corso Isonzo (x 346 z 1998) | sul ponte le due carreggiate sono dritte e in alto, larghe come l'asfalto prima e dopo; l'impalcato del gioco è più largo e a denti. Il tratto "ponte" del DBGT è lungo 24 m, la parte sopraelevata prima e dopo è a raso su rilevato |
+| via Vignazzola (x -20 z 769) | il nastro passa dritto sopra la Milano-Meda, più stretto dell'impalcato del gioco; sotto, i pezzi della Milano-Meda sono "sotto" |
+| Milano-Meda sulla ferrovia (x 417 z 2243) | carreggiate in alto e dritte; via don Sturzo e i binari sotto |
+| corso Isonzo sul Seveso (x -685 z 1688) | il nastro è a raso e piatto (15,37 m) e il suolo del gioco sull'asse è alla stessa quota: sull'asse la conca non c'è. Il DBGT lì non ha né PONTE né SED 02: il ponte sull'acqua lo farà il passo 5 |
+| bocca sud del sottopasso della Milano-Meda (x -769 z 118) | il tratto coperto è galleria (azzurro) e sta in basso; le rampe sono a raso e scendono con la quota del DBGT |
+| via Montecassino (x 754 z 2132) | il sottopasso della ferrovia è galleria, in basso, e le rampe scendono |
+
+Dove nastro e strada del gioco non combaciano:
+
+- **In quota**, su tutta la mappa (`strada_fuori_quota` in `report_livelli.json`): **17 tratti, 193 m** in cui sull'asse del nastro nessun piano del gioco sta entro 0,6 m dalla quota del DBGT. Nessuno ai punti di prova; i più lunghi: via Santa Maria (x -192 z -2597, 64 m, il gioco 1,5 m più basso), via Cascina Bricola (x -1320 z 2320), via Marziali (x -1432 z 1065), via Conte Ugo di Carpegna (x 536 z -1343).
+- **In pianta**: i bordi sono misurati sull'AC_VEI, lo stesso da cui il gioco stende l'asfalto, quindi a raso combaciano dove sono misurati. Non combaciano per costruzione nei tratti di `bordo_portato` (incroci e imbocchi) e sui ponti, dove l'impalcato del gioco è più largo del nastro e ha i denti: è quello che corregge il passo 2.
+
+### Passo 0, il metro
+
+- `src/controllo_livelli.mjs` (lo lancia `pezzi.py` dopo `controlli_ponti.mjs`; da solo: `node src/controllo_livelli.mjs http://127.0.0.1:<porta>/ report_livelli.json --elenco`, un minuto). Scrive `report_livelli.json`, con un link per caso.
+- Gira nel gioco (`?tutto`) e guarda quello che il gioco ha disegnato davvero: stende le maglie dei tile che toccano un posto a più livelli (82 tile: entro 25 m da un impalcato, una fossa, una galleria o un tratto di nastro non a raso). Le maglie delle famiglie portano un'etichetta (`userData.fam`, messa in `world3.js` dove si creano: unica modifica al disegno, senza effetto).
+- Le cose della strada (righe, cordoli, spartitraffico, guardrail, parapetti): ogni triangolo che cade sopra un nastro e corre lungo di lui (entro 30 gradi) appartiene a quel nastro; se più nastri lo coprono, a quello più vicino in quota. È sbagliato se sta sotto o sopra la quota del suo nastro oltre la tolleranza (righe 0,5 m; cordoli da -0,5 a +0,8; spartitraffico e guardrail fino a +1,6; parapetti 0,8). Quello che attraversa (strisce pedonali, linee d'arresto) e i paletti non si guardano: non si sa di chi sono.
+- Recinzioni e muri: il piede non sta sul piano che ha sotto (oltre 0,6 m). Alberi: sotto un impalcato, entro la loro altezza.
+- I campioni sbagliati si raccolgono in casi (celle di 8 m per famiglia).
+
+**Numero di partenza: 115 casi** (righe 34, cordoli 12, spartitraffico 10, guardrail 12, parapetti 15, recinzioni 32, alberi 0), più la strada fuori quota (17 tratti, 193 m) che si conta a parte.
+
+Cosa c'è dentro, per tipo (i casi non li ho guardati tutti uno per uno: ho controllato a campione che le classi tornino con i difetti noti):
+
+- righe disegnate al suolo sotto il loro ponte, 5-7 m più in basso: Milano-Meda su corso Isonzo (x 328 z 1984, x 343 z 1985), sul viale Francia (x -517 z 143), via Vignazzola (x -37 z 767);
+- righe sotto l'impalcato lungo le rampe, 1-3 m più in basso: via Ravenna sul cavalcaferrovia (x 1402 z 490), svincolo della Milano-Meda (x 44 z 506);
+- spartitraffico e cordoli del ponte disegnati sulla strada sotto: via Senofonte (x 26 z 955), via Vignazzola (x -22 z 770), via dei Vignee (x 174 z 1441);
+- guardrail e parapetti a 5-8 m sopra la strada lungo cui corrono: i pezzi di parapetto che ai capi dei ponti girano lungo la strada di sotto (le scalette del reticolo: Vignazzola x -4 z 766, corso Isonzo x 334 z 2008, via Marco Polo x 52 z 462);
+- cordoli fuori quota in via Farga (x -984 z 88) e in viale Vittorio Veneto (x -1245 z 1088);
+- recinzioni col piede 1-3 m sopra o sotto il piano (32 casi): la più sparsa, da guardare al passo 6.
+
+**Limiti del metro.** Vede le cose al livello sbagliato, non quelle che mancano (per le strisce che mancano sui ponti c'è `controllo_strisce_ponti.py`). Asfalto, lampioni e cartelli non hanno ancora la loro misura: l'asfalto è coperto in quota dalla strada fuori quota; lampioni e cartelli entrano quando prendono il numero del nastro (passo 3). Dove due nastri corrono paralleli uno sopra l'altro sceglie il più vicino in quota, quindi lì non può sbagliare a favore: sugli svincoli della Valassina andrà riguardato.
