@@ -2882,7 +2882,21 @@ _nt_, _rt_ = _chiudi_t([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if le
 _LC = [tuple(map(float, x_.split(','))) for x_ in os.environ.get('GTA_LOTTI_CHIUSI', '').split(';') if x_]
 if _LC:
     from lotti_chiusi import chiudi_dal_cancello as _lcc
-    _nl_, _rl_ = _lcc([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if len(p_) >= 2] + [(LineString(p_), k_, h_) for p_, k_, h_, m_ in _nt_], list(btree_geoms),
+    _cat_f = os.path.join(DATA, 'catasto', 'particelle.geojson')
+    if os.path.exists(_cat_f) and not os.environ.get('GTA_LOTTI_SENZA_CATASTO'):   # versione col catasto (data/catasto, Agenzia delle Entrate, CC BY 4.0): chiude i lati del lotto che danno sul vuoto pubblico
+        from lotti_chiusi import chiudi_col_catasto as _lcc2
+        _parc_ = []
+        for f_ in json.load(open(_cat_f))['features']:
+            for rs_ in f_['geometry']['coordinates']:
+                pp_ = Polygon([((lo_ - lon0) * KX, -(la_ - lat0) * KZ) for lo_, la_ in rs_[0]], [[((lo_ - lon0) * KX, -(la_ - lat0) * KZ) for lo_, la_ in h_] for h_ in rs_[1:]]).buffer(0)
+                if not pp_.is_empty: _parc_.append(pp_)
+        _str_ = [g_ for gg_ in (asph, side) if gg_ is not None and not gg_.is_empty for g_ in getattr(gg_, 'geoms', [gg_])]
+        _nl2_, _rl_ = _lcc2([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if len(p_) >= 2] + [(LineString(p_), k_, h_) for p_, k_, h_, m_ in _nt_], list(btree_geoms),
+                            [(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]), g_[4]) for g_ in gate_out if (g_[0], g_[1]) != (g_[2], g_[3])], _dr_,
+                            [_ucarr_in] if _ucarr_in is not None else [], _parc_, _LC, strade=_str_)
+        _nl_ = [(p_, k_, h_, m_) for p_, k_, h_, m_, i_ in _nl2_]
+    else:
+      _nl_, _rl_ = _lcc([(LineString(p_), k_, h_) for p_, k_, h_ in bar_out if len(p_) >= 2] + [(LineString(p_), k_, h_) for p_, k_, h_, m_ in _nt_], list(btree_geoms),
                       [(LineString([(g_[0] / 10, g_[1] / 10), (g_[2] / 10, g_[3] / 10)]), g_[4]) for g_ in gate_out if (g_[0], g_[1]) != (g_[2], g_[3])], _dr_,
                       [_ucarr_in] if _ucarr_in is not None else [], _LC)
     _nt_ += _nl_; log('lotti chiusi dal cancello', dict(_rl_))
