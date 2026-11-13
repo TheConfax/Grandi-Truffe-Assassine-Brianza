@@ -123,7 +123,7 @@ function facCell(spec, tile) {
       let fw = null;
       if (win.length) { const w0 = win[0], k = w0.sh === 'pe' ? 1 : 0.5, half = Math.min(0.5, w0.w * (0.5 + 0.5 * k) / st.tile); fw = [w0.lo, w0.hi, Math.max(0, w0.u - half), Math.min(1, w0.u + half)]; if (win.length > 1) { fw[2] = 0.05; fw[3] = 0.95; } }
       else if (lg) fw = [0.0, 2.6, 0.5 - lg.w / 2 / st.tile, 0.5 + lg.w / 2 / st.tile];
-      st[side] = Object.assign({}, src); st[side + 'c'] = { P: cP, U: cU < 0 ? cP : cU, G: cG < 0 ? cP : cG, fw, code: (cU < 0 ? cP : cU) + 128 * (cG < 0 ? cP : cG) + 16384 * cP, spU: U, spG: G };
+      st[side] = Object.assign({}, src); st[side + 'c'] = { P: cP, U: cU < 0 ? cP : cU, G: cG < 0 ? cP : cG, fw, code: (cU < 0 ? cP : cU) + 128 * (cG < 0 ? cP : cG) + 16384 * cP, codeN: (cU < 0 ? cP : cU) + 128 * (cU < 0 ? cP : cU) + 16384 * cP /* the ground floor with the window of the upper ones, where a garage door has no place (facGarAcc) */, spU: U, spG: G };
     }
   }
 })();
@@ -340,13 +340,25 @@ function facFronte(ax, az, cx, cz, nx, nz) {
   for (const f of [0.25, 0.5, 0.75]) { const mx = ax + (cx - ax) * f, mz = az + (cz - az) * f; for (const d of [3, 7, 11, 15]) if (onAnyRoad(mx + nx * d, mz + nz * d, 1.0)) return true; }
   return false;
 }
+/* is there a place for a car right in front of this door (Carlo 12/11: the garage doors on the lawns)? The door gives straight onto a street, a car park or a hard
+   yard (1 m and 2.5 m out, nothing between: no railing, hedge, wall), or onto a pavement and just after it the street. A drive or a gap in the fence some metres
+   to the side is not enough. x, z: the middle of the door on the wall; n: where it looks */
+function facGarAcc(x, z, nx, nz) {
+  const cls = d => { const px = x + nx * d, pz = z + nz * d, k = H.kind(px, pz); if (k === 'side') return 1; return onAsph(px, pz) || k === 'plat' || (k !== 'road' && hardAt(px, pz)) ? 2 : 0; /* (the kind 'road' of the ground also covers the verges: only the asphalt counts) */ };
+  const clear = d => rayWalls(x + nx * 0.2, z + nz * 0.2, x + nx * d, z + nz * d, false) >= 1;
+  const c0 = cls(0.6), c1 = cls(1.0);
+  if (c0 === 2 && c1 === 2 && cls(2.5) === 2) return clear(2.5);
+  if (c1 !== 1 || c0 === 0) return false;
+  for (let d = 1.5; d <= 6; d += 0.5) { const c = cls(d); if (c === 1) continue; return c === 2 && clear(d); }
+  return false;
+}
 // ---- the 3D records of a tile, filled by the building loop of world3.js
 /* how deep the window stands in the wall, by the age of the house: the thick brick walls of the old courtyard houses, thinner and thinner after the war, the
    ribbon windows and the curtain walls of offices nearly flush */
 function facDepth(S, w) { if (w.cw) return 0.05; if (w.rib) return 0.12; return { A: 0.32, B: 0.26, C: 0.22, D: 0.18, W: 0.22 }[S.band] || 0.16; }
-function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gro) {
+function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gro, nog) {
   /* one bay (j) on one floor (k) of run R; e: its side [dx, dz, L, nx, nz]; s0: the bay's start along the run */
-  const cells = sty.S[side + 'c'], spec = gro ? cells.spG : cells.spU; if (!spec) return;
+  const cells = sty.S[side + 'c'], spec = gro && !nog ? cells.spG : cells.spU; if (!spec) return;
   const nx = e[3], nz = e[4], yF = F0 + FL * k, out = T.fwin || (T.fwin = []), bal = T.fbal || (T.fbal = []), det = T.fdet || (T.fdet = []);
   const h0 = hashRnd((B.e !== undefined ? B.e * 13.1 : B.pts[0][0]) + j * 7.7 + k * 3.3 + side.length);
   const at = s => { const p = R.at(s); return p; };
