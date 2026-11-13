@@ -153,7 +153,7 @@ function* buildPaesaggio(T, G) {
     const P = dec(L0.p); if (P.length < 3) continue;
     const kind = L0.s, A = lsAxis(P), [cx, cz] = [A.cx, A.cz], h = LS_HASH(cx, cz, kind), area = Math.abs(sArea(P));
     if (kind === 'campo' || kind === 'prato') {
-      if (kind === 'campo') { // furrows the long way: ploughed, green, ripe or stubble, the hash decides
+      if (kind === 'campo' && !(typeof PRATO !== 'undefined' && PRATO.on)) { // furrows the long way: ploughed, green, ripe or stubble, the hash decides (the old flat stripes: with the new lawn no more, giro del verde)
         const pal = [['#8f6e4e', '#7d5f42'], ['#8fae5a', '#7c9a4b'], ['#d6bf72', '#c8b064'], ['#d9cf9e', '#cbbf8c']][Math.floor(h * 4)];
         for (let v = A.v0 + 1.4, k = 0; v < A.v1 - 0.7; v += 1.4, k++) for (const [a, b] of lsSpans(A.Q, v)) if (b - a > 1 && lsFlat(A, a + 0.4, b - 0.4, v, 1.42)) lsStrip(drape, A, a + 0.4, b - 0.4, v, 1.42, COL(pal[k % 2]), 0.04);
       }

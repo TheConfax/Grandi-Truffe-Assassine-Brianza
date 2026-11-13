@@ -22,7 +22,8 @@ TILE = 250.0
 # area types of build_data.py (AREA_T; colours in world3.js AREA_COL): 1 grass, 3 pitch, 6 water, 11 wood, 12 scrub, 13 farmland
 # AR_VRD_TY (Specifiche di contenuto regionali, p. 312): 01 giardino, 02 prato, 04 aiuola -> prato; 03 alberi, "area alberata non sufficiente a
 # definirsi bosco (sotto i 2000 m2)", l'inviluppo delle chiome -> bosco
-VRD_T = {'01': 1, '0101': 1, '0102': 1, '0103': 1, '0104': 1, '0105': 1, '0106': 1, '0107': 1, '02': 1, '04': 1, '07': 1, '95': 1, '03': 11}
+VRD_T = {'01': 19, '0101': 19, '0102': 19, '0103': 19, '0104': 19, '0105': 19, '0106': 19, '0107': 19, '02': 1, '04': 19, '07': 1, '95': 1, '03': 11}
+# giro del verde (Carlo 14/11): il giardino (01, e l'aiuola 04) e' il prato curato, tipo 19 del gioco (verde3.js pratoStile); il prato (02) resta 1
 # BOSCO_TY (p. 300): 01 conifere, 02 latifoglie, 03 piantagioni, 05 rimboschimenti, 95 altro -> bosco; 04 arbusteti e macchia (a Meda 0401,
 # "macchia mediterranea": arbusteti) -> cespugli
 BOSCO_T = {'04': 12, '0401': 12, '0402': 12}
@@ -290,7 +291,7 @@ class Verde:
         for t, p in self.sport: by_t[6 if t.startswith('01') else 3].append(p)
         for t, p in self.forest_new: by_t[11].append(p)
         nadd = Counter(); x0, z0, x1, z1 = cv.bounds
-        for t in (1, 18, 12, 11, 13, 3, 6):  # drawn in this order: incolti (18) after the lawns, pitches and pools over them
+        for t in (1, 19, 18, 12, 11, 13, 3, 6):  # drawn in this order: incolti (18) after the lawns, pitches and pools over them
             ps = by_t.get(t)
             if not ps: continue
             st = STRtree(ps)
@@ -450,7 +451,7 @@ class Verde:
         import dbgt_boschi, dbgt_manufatti
         CESP_PASSO, CESP_MIN, CESP_MAX = 1.8, 0.9, 4.0
         cv = self.cover
-        polys = [(t, q) for t, q in self.areas if t in (1, 12) and not q.is_empty]
+        polys = [(t, q) for t, q in self.areas if t in (1, 12, 19) and not q.is_empty]
         if zona is not None: zb = box(*zona); polys = [(t, q) for t, q in polys if q.intersects(zb)]
         out, nl, n12 = [], 0, 0
         if not polys or cv.is_empty: self.rep['cespugli'] = {'n': 0}; return out

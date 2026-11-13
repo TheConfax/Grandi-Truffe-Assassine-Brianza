@@ -697,7 +697,7 @@ function edgePts(a, b, off, e) { // e: the edge, whose lane may change along it 
 
 // ---------------------------------------------------------------- tile builder
 const CORTILE_COL = 0xb9b5ac; // a plain light grey (MAT.cortile); the yards and drives (tiles[t].cv) are drawn in the asphalt of the streets since 2/11
-const AREA_COL = { 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6', 17: '#b9b5ac' }; // 17: yards of the DBGT (AATT, dbgt_manufatti.py), a plain light grey paving (MAT.aatt)
+const AREA_COL = { 19: '#ffffff', 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6', 17: '#b9b5ac' }; // 17: yards of the DBGT (AATT, dbgt_manufatti.py), a plain light grey paving (MAT.aatt)
 const PAL_OLD = ['#dfae62', '#e8c98a', '#dba08a', '#ece4d3', '#d99060', '#c7c9a6', '#e3b98f', '#f0dcb0'];
 const PAL_MOD = ['#dcd7cd', '#cbc4b7', '#bdb5a8', '#e6e0d5', '#c9b9a0', '#d5cbbb'];
 const PAL_IND = ['#aaa69d', '#9d998f', '#b6ae9e', '#8f949a'];
@@ -1720,8 +1720,7 @@ function cellOwners(T, F) {
   const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && (underFree(w) || (F.ud2 && F.ud2[w])))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
-    if (a.t === 18) cover(outer, holes, 1, S('i', MAT.incoltoS, 12)); // incolti (DBGT PS_INC 04): dry grass and bare earth
-    else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
+    if (a.t === 18 || a.t <= 3 || a.t >= 11 && a.t !== 17) { const [k_, m_, c_] = pratoStile(a.t); cover(outer, holes, 1, S(k_, m_, k_ === 'i' ? 12 : 9, c_)); } // the lawns by kind (verde3.js pratoStile): kept, park, incolti (DBGT PS_INC 04) and scrub
     else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) cover(outer, holes, 2, S('w', MAT.waterS, 9)); } /* a lake is dug and drawn by acqua3.js */
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
     else if (a.t === 17) cover(outer, holes, 1.1, SF(a.m || 'n')); // yards of the DBGT (AATT): their material (src/fondi.py), or the neutral paving

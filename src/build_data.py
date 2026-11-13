@@ -2705,7 +2705,7 @@ PARCHEGGI_ATTACCATI = [
 if PARCHEGGI_ATTACCATI:
     _pa = unary_union([Polygon(pts_) for nome_, pts_ in PARCHEGGI_ATTACCATI]).difference(bunion)
     asph, pedz, side, foot = unary_union([asph, _pa]), pedz.difference(_pa), side.difference(_pa), foot.difference(_pa)
-    area_geoms[:] = [(at, g.difference(_pa) if (at in (1, 2, 3) and g.intersects(_pa)) else g) for at, g in area_geoms]
+    area_geoms[:] = [(at, g.difference(_pa) if (at in (1, 2, 3, 19) and g.intersects(_pa)) else g) for at, g in area_geoms]
     log('parcheggi attaccati a mano', len(PARCHEGGI_ATTACCATI), 'm2', round(_pa.area))
 _ap, _co = _op.impronte(_sott, 0.2)   # no paint in the open part of an underpass (src/opere.py), nor over the covered part what the DBGT has in gallery; the floor is drawn by the game
 _top = unary_union([p for nm in ('AC_VEI', 'AR_STR') for p, q in zip(_op.poligoni(_Dop, nm), _Dop[nm]['attr']['sed']) if q == '03' and any(p.intersects(c_) for c_ in _co)])
