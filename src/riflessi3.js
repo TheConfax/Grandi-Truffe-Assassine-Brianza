@@ -73,10 +73,19 @@ function rifFrag(q) {
   vec3 rfVw = inverseTransformDirection(rfVv, viewMatrix), rfNw = inverseTransformDirection(rfNb, viewMatrix), rfLw = normalize(uRfD);
   vec3 rfEnv = rfSky(rfRw, rfR, ${q.wet ? '0.0' : '1.0'}); /* the ground mirrors the sky only: a skyline drawn by direction would not match what stands round */
   ${q.wet ? `if (uPrOn > 0.5 && rfWet > 0.02) { /* realismo 3, fase D: what the wet ground really mirrors, the scene drawn from under the ground (bagnato3.js), bent by the relief and the rings */
-    vec3 rfWq = (vec4(vRfP, 0.0) * viewMatrix).xyz + cameraPosition; vec4 rfPc = uPrMat * vec4(rfWq, 1.0); vec2 rfPu = rfPc.xy / rfPc.w + (rfNb.xy - normalize(vRfN).xy) * 0.05;
+    vec3 rfWq = (vec4(vRfP, 0.0) * viewMatrix).xyz + cameraPosition; vec4 rfPc = uPrMat * vec4(rfWq, 1.0);
+    /* Carlo 13/11, "forse fin troppo forti": on the asphalt the mirror is weak, blurred and drawn out vertically towards the viewer (the grain breaks it), only the strong
+       lights stand out of it (lamps, headlights, shop windows, lit windows); a sharp mirror only in the puddles */
+    vec2 rfJ = (rfNb.xy - normalize(vRfN).xy) * mix(0.12, 0.03, rfPd) + vec2((rfNoise(rfWq.xz * 6.0) - 0.5) * 0.012 * (1.0 - rfPd), 0.0);
+    vec2 rfPu = rfPc.xy / rfPc.w + rfJ;
     float rfIn = smoothstep(0.0, 0.03, min(min(rfPu.x, 1.0 - rfPu.x), min(rfPu.y, 1.0 - rfPu.y)));
-    if (rfIn > 0.0) { float rfBl = 0.004 + rfR * 0.05; vec3 rfPr = (texture2D(uPrTex, rfPu).rgb * 2.0 + texture2D(uPrTex, rfPu + vec2(rfBl, 0.0)).rgb + texture2D(uPrTex, rfPu - vec2(rfBl, 0.0)).rgb + texture2D(uPrTex, rfPu + vec2(0.0, rfBl * 1.6)).rgb + texture2D(uPrTex, rfPu - vec2(0.0, rfBl * 1.6)).rgb) / 6.0;
-      rfEnv = mix(rfEnv, rfPr, rfIn * clamp(rfWet * 1.6, 0.0, 1.0) * (1.0 - smoothstep(0.3, 0.75, rfR))); } }` : ''}
+    if (rfIn > 0.0) {
+      vec3 rfPs = texture2D(uPrTex, rfPu).rgb, rfSt = vec3(0.0); float rfSv = 0.03 + 0.12 * rfR, rfSu = 0.006;
+      for (int k = -3; k <= 3; k++) { float t = float(k) / 3.0; rfSt += texture2D(uPrTex, rfPu + vec2(rfSu * (k == 0 ? 0.0 : (fract(float(k) * 0.37) - 0.5)), rfSv * t)).rgb * (1.0 - 0.5 * abs(t)); }
+      rfSt /= 4.0; /* the streak: seven taps up and down the picture, the middle ones weigh more */
+      float rfLe = dot(rfEnv, vec3(0.2126, 0.7152, 0.0722)), rfLp = dot(rfSt, vec3(0.2126, 0.7152, 0.0722)), rfHl = smoothstep(rfLe * 1.3 + 0.02, rfLe * 4.0 + 0.1, rfLp);
+      vec3 rfAs = mix(mix(rfEnv, rfSt, 0.65) * 0.6, rfSt * 1.1, 0.9 * rfHl); /* the asphalt: dull and dim, the bright lights through */
+      rfEnv = mix(rfEnv, mix(rfAs, rfPs, rfPd), rfIn * clamp(rfWet * 1.6, 0.0, 1.0) * (1.0 - smoothstep(0.3, 0.75, rfR))); } }` : ''}
   vec3 rfAdd = rfEnv * rfFr * ${K} * ${q.wet ? '(1.0 - 0.3 * rfWet * (1.0 - rfPd))' : '1.0'}; /* wet: a little less of the sky's light at a grazing angle (the asphalt went nearly white, realismo 2) */
   float rfNl = max(dot(rfNw, rfLw), 0.0);
   if (rfNl > 0.0 && rfSh > 0.0) {
