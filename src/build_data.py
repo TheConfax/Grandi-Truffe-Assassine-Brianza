@@ -1453,6 +1453,7 @@ VARCO_PICCOLO = 3.0   # m: a gate this small (a footgate) is not straightened no
 VARCO_LARGO = 7.5   # m: wider than this, without a yard to drive into behind, an opening is closed by the fence (Carlo, 7/11: "è una cancellata, non un cancello")
 _vorig = {}   # the rule of the varchi: the subtype of each gate it adds (report_varchi.json, src/controllo_varchi.py)
 _gcc = {'porte': {'p': 0}, 'nuovi': 0, 'pedonali': 0, 'senza_strada': 0, 'senza_chiusure': 0, 'carreggiata_o_marciapiede': 0, 'strada_osm': 0, 'troppo_stretti': 0, 'gia_cancello': 0, 'fuori': 0, 'doppione_recinzione': 0, 'capo_nel_vuoto': 0, 'troppo_larghi': 0}
+_ac_extra = []   # the strips of the carriage androni (below): paved like the yard behind them
 if dbt_pc:
     _rr = [r_ for r_ in raw_roads if flat(r_) and r_['line'].length > 0.1 and not r_['x']]; _rrt = STRtree([r_['line'] for r_ in _rr])
     prepare(asph); prepare(side)
@@ -1692,6 +1693,99 @@ if dbt_pc:
     # at the end of the build, when the epoch is known (_gand)
     ACORTILE_MAX = 3000.0
     ACIECO_P = 6.0   # m: a covered passage closed at the back goes at least this deep into the block to be an androne (a porch, a doorway recess is less)
+    # ---- the carriage androne through a building (Carlo 13/11, via Tommaseo): a carriage entrance of the DBGT (a passo carraio) on the street front, and on the other side of the building, in line,
+    # a yard AC_VEI (STR.cv) that reaches the wall and stops there: the building has a covered passage between the two (a strip of the ground volumes goes, a raised volume of the same height from 4 m up covers it);
+    # the rule of the androni below (the gaps) then finds it and puts the door on the street side. Across at most ACARR_MAX m, the volumes all tall enough (ACARR_HMIN) to have a floor above
+    # GTA_ANDRONI_CARRAI: 'conta' (default: only the list, nothing changes), 'tutti', or 'x,z,r;x,z,r' (applied only within r m of those points, the list still counts everything); GTA_CARRAI_JSON: where the list is written
+    ACARR_MAX, ACARR_HMIN, ACARR_FRONTE, ACARR_ZB, ACARR_LAT = 25.0, 6.0, 8.0, 4.0, 7.5   # ACARR_LAT: how far to the side of the DBGT point the yard may be
+    _acm = os.environ.get('GTA_ANDRONI_CARRAI', 'conta').strip(); _acl = []; _acn = Counter()
+    if _cvG is not None and not _cvG.is_empty:
+        _acb = [(b_, g_) for b_, g_ in _bl if b_.get('zb') is None and g_ is not None and not g_.is_empty]; _acg = [g_ for b_, g_ in _acb]; _acgt = STRtree(_acg) if _acg else None
+        _acua = unary_union([P(b_['p'], b_.get('k', [])) for b_ in ED.alti if b_.get('zb') is not None]) if ED is not None and ED.alti else Polygon()
+        _acdone = []
+        def _acdbg(p_, why_):
+            if any(math.dist(p_, d_) < 14 for d_ in _VDBG): log('androne carraio debug', round(p_[0], 1), round(p_[1], 1), why_)
+        def _ac_rect(p_, nx_, nz_, a0_, a1_, c0_, c1_):
+            """the rectangle from a0_ to a1_ along (nx_, nz_) from p_, from c0_ to c1_ across it"""
+            ux_, uz_ = -nz_, nx_
+            return Polygon([(p_[0] + nx_ * a_ + ux_ * c_, p_[1] + nz_ * a_ + uz_ * c_) for a_, c_ in ((a0_, c0_), (a1_, c0_), (a1_, c1_), (a0_, c1_))])
+        def _ac_setp(rec_, pg_):
+            rec_['p'] = [tuple(c_) for c_ in list(pg_.exterior.coords)[:-1]]; ks_ = [[tuple(c_) for c_ in list(h_.coords)[:-1]] for h_ in pg_.interiors]
+            if ks_: rec_['k'] = ks_
+            else: rec_.pop('k', None)
+        for p_ in dbt_pc:
+            if _acgt is None: break
+            if not inside(p_, 0): continue
+            P0_ = Point(p_); cand_ = [r_ for r_ in (_rr[j_] for j_ in _rrt.query(P0_.buffer(25))) if r_['c'] <= 5]
+            if not cand_: _acn['senza_strada'] += 1; _acdbg(p_, 'senza_strada'); continue
+            st_ = min(cand_, key=lambda r_: r_['line'].distance(P0_)); q0_ = st_['line'].interpolate(st_['line'].project(P0_)); dd_ = math.dist(p_, (q0_.x, q0_.y))
+            if dd_ < 1.0 or dd_ - st_['w'] / 2 > 12: _acn['senza_fronte'] += 1; _acdbg(p_, 'senza_fronte'); continue
+            nx_, nz_ = (p_[0] - q0_.x) / dd_, (p_[1] - q0_.y) / dd_; ux_, uz_ = -nz_, nx_   # (nx_, nz_): from the street into the lot
+            Wb_ = _ac_rect(p_, nx_, nz_, -1.0, ACARR_FRONTE + ACARR_MAX + 4, -ACARR_LAT - 5, ACARR_LAT + 5)
+            Ub_ = unary_union([_acg[j_] for j_ in _acgt.query(Wb_)]).buffer(0.12, join_style=2)
+            if Ub_.is_empty: _acn['senza_edificio'] += 1; _acdbg(p_, 'senza_edificio'); continue
+            best_ = None; why_ = 'senza_edificio'   # the line across the building, from the front to the yard behind: tried at 0, then 0.5 m, 1 m ... to either side of the carriage entrance (the DBGT point is not always on the passage)
+            for c0_ in [0.0] + [sg_ * 0.5 * k_ for k_ in range(1, int(ACARR_LAT * 2) + 1) for sg_ in (1, -1)]:
+                C0_ = LineString([(p_[0] + ux_ * c0_ - nx_ * 1.0, p_[1] + uz_ * c0_ - nz_ * 1.0), (p_[0] + ux_ * c0_ + nx_ * (ACARR_FRONTE + ACARR_MAX + 4), p_[1] + uz_ * c0_ + nz_ * (ACARR_FRONTE + ACARR_MAX + 4))])
+                xs_ = C0_.intersection(Ub_); pcs_ = [s_ for s_ in getattr(xs_, 'geoms', [xs_]) if isinstance(s_, LineString) and not s_.is_empty]
+                pcs_ = [(((s_.coords[0][0] - p_[0]) * nx_ + (s_.coords[0][1] - p_[1]) * nz_), ((s_.coords[-1][0] - p_[0]) * nx_ + (s_.coords[-1][1] - p_[1]) * nz_)) for s_ in pcs_]
+                pcs_ = sorted((min(a_, b_), max(a_, b_)) for a_, b_ in pcs_ if min(a_, b_) <= ACARR_FRONTE)
+                if not pcs_: continue
+                d0_, d1_ = pcs_[0][0] + 0.12, pcs_[0][1] - 0.12   # in at the front wall, out at the back wall
+                if d1_ - d0_ < 2.5: why_ = 'troppo_sottile'; continue
+                if d1_ - d0_ > ACARR_MAX: why_ = 'troppo_lungo'; continue
+                Cw_ = _cvG.intersection(_ac_rect(p_, nx_, nz_, d1_ - 0.4, d1_ + 2.5, c0_ - 1.0, c0_ + 1.0))
+                Cp_ = [c_ for c_ in getattr(Cw_, 'geoms', [Cw_]) if isinstance(c_, Polygon) and c_.area > 0.8]
+                if not Cp_: why_ = 'senza_cortile_dietro'; continue
+                if not any(c_.intersects(_ac_rect(p_, nx_, nz_, d1_ - 0.5, d1_ + 0.6, c0_ - 1.0, c0_ + 1.0)) for c_ in Cp_): why_ = 'cortile_non_contro_il_muro'; continue
+                best_ = (c0_, d0_, d1_); break
+            if best_ is None: _acn[why_] += 1; _acdbg(p_, why_); continue
+            c0_, d0_, d1_ = best_
+            Cw_ = _cvG.intersection(_ac_rect(p_, nx_, nz_, d1_ - 0.4, d1_ + 2.5, c0_ - 5.0, c0_ + 5.0))
+            Rn_ = _ac_rect(p_, nx_, nz_, d1_ - 0.5, d1_ + 0.6, c0_ - 1.0, c0_ + 1.0)
+            Cb_ = max([c_ for c_ in getattr(Cw_, 'geoms', [Cw_]) if isinstance(c_, Polygon) and c_.area > 0.8 and c_.intersects(Rn_)], key=lambda c_: c_.intersection(Rn_).area)
+            lat_ = [((x_ - p_[0]) * ux_ + (y_ - p_[1]) * uz_) for x_, y_ in Cb_.exterior.coords]; la_, lb_ = max(min(lat_), c0_ - 5.0), min(max(lat_), c0_ + 5.0)
+            w_ = lb_ - la_; w_ = w_ if w_ <= 5.0 else 3.5; w_ = max(2.5, w_); c_ = min(max(c0_, la_ + w_ / 2), lb_ - w_ / 2)
+            S_ = _ac_rect(p_, nx_, nz_, d0_ - 0.15, d1_ + 0.15, c_ - w_ / 2, c_ + w_ / 2)
+            hit_ = [(b_, g_) for b_, g_ in _acb if g_.intersects(S_) and g_.intersection(S_).area > 0.3]
+            if not hit_: _acn['senza_edificio'] += 1; _acdbg(p_, 'senza_edificio'); continue
+            if any(not b_.get('dbgt') or b_.get('zt') is None or b_['h'] < ACARR_HMIN or b_.get('villa') for b_, g_ in hit_): _acn['edificio_basso'] += 1; _acdbg(p_, 'edificio_basso'); continue
+            if _acua.intersects(S_) and _acua.intersection(S_).area > 0.3 * S_.area: _acn['gia_rialzato'] += 1; _acdbg(p_, 'gia_rialzato'); continue
+            mid_ = (p_[0] + nx_ * (d0_ + d1_) / 2 + ux_ * c_, p_[1] + nz_ * (d0_ + d1_) / 2 + uz_ * c_)
+            if any(math.dist(mid_, o_) < 4.0 for o_ in _acdone): _acn['doppio'] += 1; _acdbg(p_, 'doppio'); continue
+            _acdone.append(mid_)
+            if _acm == 'tutti': ap_ = True
+            elif _acm == 'conta': ap_ = False
+            else: ap_ = any(len(v_) == 3 and math.dist(mid_, (v_[0], v_[1])) <= v_[2] for v_ in ([float(t_) for t_ in z_.split(',')] for z_ in _acm.split(';') if z_))
+            _acl.append(dict(x=round(mid_[0], 1), z=round(mid_[1], 1), pc=(round(p_[0], 1), round(p_[1], 1)), lungo=round(d1_ - d0_, 1), largo=round(w_, 1), n=(round(nx_, 2), round(nz_, 2)), h=[round(b_['h'], 1) for b_, g_ in hit_], cortile=round(Cb_.area), applicato=bool(ap_)))
+            _acn['candidati'] += 1
+            if not ap_: continue
+            _acn['applicati'] += 1; _ac_extra.append(S_)
+            if STR is not None: STR.cv = STR.cv.union(S_)
+            _idx = {id(g_): i_ for i_, g_ in enumerate(bgeoms)}; _bli = {id(b_): i_ for i_, (b_, g_) in enumerate(_bl)}
+            for b_, g_ in hit_:
+                rest_ = g_.difference(S_); pl_ = [r_ for r_ in getattr(rest_, 'geoms', [rest_]) if isinstance(r_, Polygon) and not r_.is_empty]
+                pcs2_ = sorted([r_ for r_ in pl_ if r_.area >= 1.0] or sorted(pl_, key=lambda r_: -r_.area)[:1], key=lambda r_: -r_.area)
+                bi_ = _bli[id(b_)]
+                for n_, pg_ in enumerate(pcs2_):
+                    if n_ == 0:
+                        _ac_setp(b_, pg_); _bl[bi_] = (b_, pg_)
+                        if id(g_) in _idx: bgeoms[_idx[id(g_)]] = pg_
+                    else: r2_ = dict(b_); _ac_setp(r2_, pg_); buildings.append(r2_); _bl.append((r2_, pg_)); bgeoms.append(pg_)
+                zg_ = b_['zt'] - b_['h']; zb_ = round(min(zg_ + ACARR_ZB, b_['zt'] - 0.5), 2); xi_ = g_.intersection(S_)
+                for pg_ in getattr(xi_, 'geoms', [xi_]):
+                    if not isinstance(pg_, Polygon) or pg_.area < 0.3: continue
+                    r3_ = dict(b_); _ac_setp(r3_, pg_); r3_['zg'] = round(zg_, 2); r3_['zb'] = zb_; r3_['h'] = round(b_['zt'] - zb_, 1); r3_['carraio'] = True; ED.alti.append(r3_)
+            Sc_ = S_.buffer(0.1); _nbc = []
+            for pts_, k_, h_ in bar_out:
+                Lb_ = LineString(pts_) if len(pts_) >= 2 else None
+                if Lb_ is None or not Lb_.intersects(Sc_): _nbc.append((pts_, k_, h_)); continue
+                dif_ = Lb_.difference(Sc_)
+                for part_ in getattr(dif_, 'geoms', [dif_]):
+                    if isinstance(part_, LineString) and part_.length > 0.5: _nbc.append((list(part_.coords), k_, h_))
+            bar_out[:] = _nbc
+        log('androni carrai', _acm, dict(_acn)); _gcc['androni_carrai'] = dict(_acn)
+        if os.environ.get('GTA_CARRAI_JSON'): json.dump(_acl, open(os.environ['GTA_CARRAI_JSON'], 'w'), indent=1)
     _acc = Counter(); _gnd = [g_ for b_, g_ in _bl if b_.get('zb') is None]; _gndt = STRtree(_gnd) if _gnd else None; _alti = [(b_, P(b_['p'], b_.get('k', []))) for b_ in (ED.alti if ED is not None else [])]
     _alti = [(b_, g_) for b_, g_ in _alti if g_ is not None and not g_.is_empty and b_.get('zb') is not None and b_['zb'] - b_.get('zg', 0.0) <= 7.0]; _altit = STRtree([g_ for b_, g_ in _alti]) if _alti else None
     _astr = [r_ for r_ in _rr if r_['c'] <= 3 or r_['c'] == 5]; _astrt = STRtree([r_['line'] for r_ in _astr]) if _astr else None
@@ -2576,7 +2670,7 @@ def _fuori_opera(pl_):
     d_ = g_.difference(_opf)
     return [list(q_.coords) for q_ in (d_.geoms if hasattr(d_, 'geoms') else [d_]) if not q_.is_empty and q_.geom_type == 'LineString']
 _cia_ost = [q_ for pl_ in _cia_ost for q_ in _fuori_opera(pl_)]
-_cia_asf = [unary_union([asph, _opf]), _cv_f.result()] if STR else None  # the asphalt drawn (AC_VEI, the OSM ways without it) and the paved yards
+_cia_asf = [unary_union([asph, _opf]), unary_union([_cv_f.result()] + _ac_extra)] if STR else None  # the asphalt drawn (AC_VEI, the OSM ways without it) and the paved yards
 if os.environ.get('GTA_DUMP_CORSIE'):  # development of src/corsie_ia.py: its inputs, to work on it without the whole build
     import pickle
     pickle.dump(dict(raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], nodes=nodes, deckH=deckH, ostacoli=_cia_ost, asfalto=_cia_asf, cover=dbt_cover if STR else None), open(os.environ['GTA_DUMP_CORSIE'], 'wb'))
@@ -2956,7 +3050,7 @@ import rotonde  # the aiuole of the roundabouts of Meda (src/rotonde.py, docs/ro
 ROT = rotonde.Rotonde(STR.isole, log) if STR else None
 if ROT: STR.md_dbgt = ROT.riempi(STR.md_dbgt); ROT.push_tiles(tid, polys_of, push, q)
 if STR:
-    STR.togli_cortili(VERDE.cons, _cv_f.result())
+    STR.togli_cortili(VERDE.cons, unary_union([_cv_f.result()] + _ac_extra))
     STR.cv_m = FONDI.dividi(STR.cv, [(_vei02, 'g')], ('auto', 'area'), base='a') if not STR.cv.is_empty else {}   # the yards AC_VEI 0307: unpaved where FON 02 or OSM says so
     FONDI.rep['cortili_ac_vei'] = {str(m_): round(g_.area) for m_, g_ in STR.cv_m.items()}; log('fondi: cortili AC_VEI', FONDI.rep['cortili_ac_vei'])
     STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)  # yards (cv) and the DBGT islands (md, g: 1)
