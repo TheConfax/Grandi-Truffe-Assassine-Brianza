@@ -680,7 +680,7 @@ function lsOrchardMeshes(G, ftrees, H) {
         const hits = ray.intersectObject(probe, false); let hit = null; for (let h = hits.length - 1; h >= 0; h--) if (!hits[h].uv || leafAt(hits[h].uv) >= 128) { hit = hits[h]; break; } if (!hit) continue;
         const d = Math.max(0, hit.distance - FR / 2 - 0.05); fruits.push([ro.x + rd.x * d, ro.y + rd.y * d, ro.z + rd.z * d, 1, 1, 1, t.pal[k % 3]]); }
     });
-    tr.castShadow = cr.castShadow = true; cr.receiveShadow = true; cr.customDepthMaterial = TREE_DEPTH; G.add(tr, cr);
+    tr.castShadow = cr.castShadow = true; cr.receiveShadow = true; cr.customDepthMaterial = TREE_DEPTH; G.add(tr, cr); ramiAggiungi(G, cr, true); /* bare in winter (stagioni3.js) */
   }
   lsInstances(G, LS_FRUIT_G, fruits);
 }

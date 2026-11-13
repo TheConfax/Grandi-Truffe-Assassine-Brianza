@@ -276,7 +276,7 @@ bool facIn(vec2 f, int c, int k) {
   diffuseColor.rgb *= vUv.y < vFac.z ? 0.7 : 1.0;`)
     .replace('#include <emissivemap_fragment>', `
   float paneM = facM.r * facW;
-  { float wh = fract( sin( dot( floor( vUv ) + 0.37, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ); totalEmissiveRadiance *= paneM * step( wh, uLit ) * ( 0.7 + 0.6 * fract( wh * 7.13 ) ); }`)
+  { float wh = fract( sin( dot( floor( vUv ) + 0.37, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ); totalEmissiveRadiance *= paneM * step( wh, uLit ) * ( 0.7 + 0.6 * fract( wh * 7.13 ) ) * ${WIN_TINTA('wh')}; /* sera3.js */ }`)
     .replace('vec3 outgoingLight =', `
   if ( paneM > 0.01 ) {
     float paneH = fract( sin( dot( floor( vUv ) + 0.37, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
@@ -477,7 +477,7 @@ const FAC_PARTS = (() => {
     Object.assign(s.uniforms, FOTO_FAC, { uLit: WIN_LIT });
     s.vertexShader = 'attribute float aLit;\nvarying float vLit;\nvarying vec3 vGW;\nvarying vec3 vGN;\n' + s.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvLit = aLit; { vec4 gw = vec4( transformed, 1.0 ); vec3 gn = objectNormal;\n#ifdef USE_INSTANCING\n gw = instanceMatrix * gw; gn = mat3( instanceMatrix ) * gn;\n#endif\n vGW = ( modelMatrix * gw ).xyz; vGN = normalize( mat3( modelMatrix ) * gn ); }');
     s.fragmentShader = 'uniform vec3 uSkyH;\nuniform vec3 uSkyZ;\nuniform vec3 uSunD;\nuniform vec3 uSunC;\nuniform float uLit;\nvarying float vLit;\nvarying vec3 vGW;\nvarying vec3 vGN;\n' + FAC_CAMGL + s.fragmentShader
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= step( vLit, uLit ) * ( 0.7 + 0.6 * fract( vLit * 7.13 ) );')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= step( vLit, uLit ) * ( 0.7 + 0.6 * fract( vLit * 7.13 ) ) * ' + WIN_TINTA('vLit') + ';')
       .replace('vec3 outgoingLight =', `{ vec3 Vd = normalize( vGW - facCamW() ), Np = normalize( vGN + vec3( 0.0, ( vLit - 0.5 ) * 0.1, 0.0 ) ), Rd = reflect( Vd, Np );
     float fres = 0.04 + 0.96 * pow( 1.0 - clamp( dot( -Vd, Np ), 0.0, 1.0 ), 5.0 );
     vec3 seen = Rd.y > 0.0 ? mix( uSkyH, uSkyZ, smoothstep( 0.0, 0.5, Rd.y ) ) : uSkyH * 0.3;
