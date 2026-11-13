@@ -696,7 +696,7 @@ rep("  if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,",
     "  } else if (camMode === 1) {\n    camVA = Math.PI;\n    const ht = inCar ? 58 + sp * 0.9 : 36,")
 # debug mode: cars never break (health back to full after every physics step, so nothing reaches zero and burns)
 rep("interpSnap(); step(1 / 60);", "interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100;")
-rep("  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);", "  const ipol = (running || titolo) && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);")
+rep("  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);", "  const ipol = (running || titolo) && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  if (ipol) fariPosiziona(); /* headlights on the car as drawn (Carlo 10/11) */\n  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);")
 rep("  renderer.render(scene, camera);\n}", "  renderer.render(scene, camera);\n  if (ipol) interpEnd(ipol);\n}")
 # ?x=..&z=.. in the address (START): the game starts there, on the nearest street, already at the wheel of the Ferari
 rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePed(p);\n}",

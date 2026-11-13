@@ -16,6 +16,8 @@ function luciInit() { // at the first frame: headSpot and the pools are made in 
     s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vLuciD;\nuniform float uLuciNear;').replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a *= uLuciNear < 0.0 ? 1.0 : smoothstep( uLuciNear, uLuciNear + 18.0, vLuciD );');
   };
 }
+function luciPosAuto(s) { const v = s.userData.v; if (!v) return; const fx = Math.sin(v.h), fz = Math.cos(v.h), hl = v.spec.L / 2; s.position.set(v.x + fx * hl, v.y + 0.75, v.z + fz * hl); s.target.position.set(v.x + fx * (hl + 20), v.y - 0.6, v.z + fz * (hl + 20)); s.target.updateMatrixWorld(); }
+function luciPosiziona() { if (LUCI.auto) for (const s of LUCI.auto) if (s.intensity > 0) luciPosAuto(s); } /* each frame after the interpolation: the lights follow the cars as drawn */
 function luciAggiorna(on) {
   if (!LUCI.init) luciInit(); if (!LUCI_ON) return;
   const cx = camera.position.x, cz = camera.position.z, k = on > 0.02 ? on : 0, C = LUCI._c; C.length = 0;
@@ -31,8 +33,8 @@ function luciAggiorna(on) {
   const A = []; if (k) for (const v of VEH) { if (v === P.car || !v.driver || v.health <= 0 || v.exploded || v.fallen || v.heli || v.spec.pedal || !v.m.g.visible) continue; const d = Math.hypot(v.x - cx, v.z - cz); if (d < LUCI_R_AUTO) A.push([d, v]); }
   A.sort((a, b) => a[0] - b[0]);
   LUCI.auto.forEach((s, i) => {
-    const e = A[i]; if (!e) { s.intensity = 0; return; }
-    const v = e[1], fx = Math.sin(v.h), fz = Math.cos(v.h), hl = v.spec.L / 2; s.position.set(v.x + fx * hl, v.y + 0.75, v.z + fz * hl); s.target.position.set(v.x + fx * (hl + 20), v.y - 0.6, v.z + fz * (hl + 20)); s.target.updateMatrixWorld();
+    const e = A[i]; if (!e) { s.intensity = 0; s.userData.v = null; return; }
+    s.userData.v = e[1]; luciPosAuto(s);
     s.intensity = 70 * LUCI.ka * k * clamp((LUCI_R_AUTO - e[0]) / 20, 0, 1);
   });
 }
