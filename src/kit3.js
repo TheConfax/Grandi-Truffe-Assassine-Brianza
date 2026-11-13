@@ -93,12 +93,14 @@ function kitCasa(b, B, outer, holes, top, planes, pitched, t, wallCol, raised, r
         if (!B._kitW) WALLS.add(x - 0.5, z - 0.5, x + 0.5, z + 0.5, { r: w * 0.6, x, z, y0: y0, y1: y0 + hgt + 0.3 }); /* the walker on the roof stops against it */
         KIT.comignoli++;
       }
+      if (fa >= 1 && fa <= 4) { const [ax, az] = got.length ? [got[0][0] + 0.8, got[0][1] + 0.3] : centroid(outer); if (inPoly(ax, az, outer)) kitAntenne(b, ax, az, top + yAt(ax, az), fa, hr(90), hr(91)); } /* the TV aerial by the chimney (realismo 3, fase E) */
     }
   } else if (fa >= 1 && fa !== 5) { /* a flat roof: the coping of the parapet */
     const cc = COL('#b8b6b0');
     for (let i = 0; i < n; i++) { const a = outer[i], c = outer[(i + 1) % n], [nx, nz, L, ux, uz] = nrm(a, c); if (L < 0.4) continue;
       const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; if (inBuilding(mx + nx * 0.3, mz + nz * 0.3, 0)) continue;
       addBox(b, mx + nx * 0.03, top + 0.06, mz + nz * 0.03, L + 0.06, 0.12, 0.3, cc, Math.atan2(-uz, ux)); KIT.cimase++; }
+    if (fa >= 1 && fa <= 4 && Math.abs(sArea(outer)) > 40) { const [ax, az] = centroid(outer); if (inPoly(ax, az, outer)) kitAntenne(b, ax, az, top, fa, hr(90), hr(91)); }
   }
   B._kitW = true;
 }
@@ -117,5 +119,26 @@ function kitZoccolo(b, B, ax, az, cx, cz, nx, nz, s0, s1, yTop, R, wallCol) {
     kitQuad(b, [[Ao[0], ga - 0.25, Ao[1]], [Co[0], gc - 0.25, Co[1]], [Co[0], yTop, Co[1]], [Ao[0], yTop, Ao[1]]], [nx, 0, nz], col);
     kitQuad(b, [[A[0], yTop, A[1]], [C[0], yTop, C[1]], [Co[0], yTop, Co[1]], [Ao[0], yTop, Ao[1]]], [0, 1, 0], col);
     KIT.zoccoli = (KIT.zoccoli || 0) + 1;
+  }
+}
+// the TV aerial: a mast 2-3 m over the roof, one or two Yagi booms turned to the south-west (the transmitters of the Po valley side), and on some roofs a dish turned to
+// the satellite (Hot Bird from Brianza: almost due south, 37 degrees up) on a short arm. Generic, as on most Italian roofs; &strada=0 off
+function kitAntenne(b, x, z, y, fa, h1, h2) {
+  if (typeof STRADA3 === 'undefined' || !STRADA3.on) return;
+  const ant = COL('#9ea3a8'), hm = 2.0 + h1 * 1.2, az = Math.PI * 1.25 + (h2 - 0.5) * 0.4; /* boom direction: south-west, more or less */
+  addBox(b, x, y + hm / 2 - 0.2, z, 0.045, hm + 0.4, 0.045, ant);
+  const ux = Math.cos(az), uz = Math.sin(az), ry = Math.atan2(-uz, ux);
+  for (const [yy, L] of h1 < 0.5 ? [[y + hm - 0.05, 1.5]] : [[y + hm - 0.05, 1.5], [y + hm - 0.75, 0.9]]) {
+    addBox(b, x + ux * L * 0.3, yy, z + uz * L * 0.3, L, 0.025, 0.025, ant, ry);
+    for (let k = 0; k < Math.round(L / 0.2); k++) { const t = -0.2 + k * 0.2, ex = x + ux * (t + L * 0.3 - L * 0.5 + 0.2), ez = z + uz * (t + L * 0.3 - L * 0.5 + 0.2), w = 0.48 - k * 0.025; addBox(b, ex, yy, ez, 0.015, 0.015, w, ant, ry); }
+  }
+  STRADA3.antenne++;
+  if (h2 < (fa >= 3 ? 0.55 : 0.3)) { /* a dish */
+    const dx = x + 0.7, dz = z + 0.4, dy = y + 0.9, n = new THREE.Vector3(0.07, 0.6, 0.8).normalize(), e1 = new THREE.Vector3().crossVectors(n, new THREE.Vector3(0, 1, 0)).normalize(), e2 = new THREE.Vector3().crossVectors(e1, n), R = 0.4, col = COL('#dcdcd8');
+    addBox(b, dx, y + 0.45, dz, 0.04, 1.0, 0.04, ant);
+    const c0 = b.p.length / 3; vtx(b, dx - n.x * 0.08, dy - n.y * 0.08, dz - n.z * 0.08, n.x, n.y, n.z, 0, 0, col);
+    for (let k = 0; k <= 12; k++) { const a = k / 12 * TAU, px = dx + (e1.x * Math.cos(a) + e2.x * Math.sin(a)) * R, py = dy + (e1.y * Math.cos(a) + e2.y * Math.sin(a)) * R, pz = dz + (e1.z * Math.cos(a) + e2.z * Math.sin(a)) * R; vtx(b, px, py, pz, n.x, n.y, n.z, 0, 0, col); }
+    for (let k = 0; k < 12; k++) b.i.push(c0, c0 + 1 + k, c0 + 2 + k, c0, c0 + 2 + k, c0 + 1 + k);
+    addBox(b, dx + n.x * 0.35, dy + n.y * 0.35, dz + n.z * 0.35, 0.06, 0.06, 0.06, COL('#3a3b3d')); STRADA3.parabole++; /* the head */
   }
 }
