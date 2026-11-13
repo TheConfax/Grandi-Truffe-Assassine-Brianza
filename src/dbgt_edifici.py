@@ -66,6 +66,11 @@ CONF_DZ, CONF_D = 3.0, 40.0   # ... drawn at the DSM's height only where another
                    # of 27.1 m; at first within 2 m either way). Without it the volume stays (edificio 525 at x 210 z -605, Carlo:
                    # a block 19 m high under the DSM of 2008 and a volume as high 55 m away in the same big complex, chance; the farthest
                    # confirmation taken at Meda and Seveso is 30 m, x 477 z -328)
+GRONDA_MIN, GRONDA_MAX = 2.5, 6.0   # a whole volume whose eaves the DSM fits this far (m) over the top of its walls, and not more (above that: blocchi_alti
+                   # and its confirmation), is drawn low by the DBGT: the walls go up to those eaves (Carlo 13/11, via Verga x -559 z 862: UN_VOL_AV 4.07 m, a house of two floors)
+GRONDA_SPREAD = 1.0   # ... for a volume cut into wings: the eaves of its wings agree within this (m)
+GRONDA_AREA, GRONDA_RMS, GRONDA_ALB, GRONDA_IN = 25.0, 0.5, 0.15, 0.75   # ... a volume this big (m2), the roof fitted to this rms (m), at most this share of points
+                   # far over it (crowns) and at least this share of the cells that agree with it: not a tree, not a bit of the next building
 BASSO_A, BASSO_DZ, BASSO_SH, BASSO_MIN = 60.0, 8.0, 0.9, 2.0   # a ground volume this small (m2) whose top the DSM is BASSO_DZ m under on
                    # BASSO_SH of it comes down to the DSM, when the DSM sees a structure there (BASSO_MIN m over the ground; only ground: newer than 2008)
 
@@ -811,10 +816,55 @@ class Edifici:
                 else: rec.pop('k', None)
                 rec['zt'] = round(z_, 2); rec['h'] = round(z_ - g0, 1)
                 if n: nuovi.append(rec)
+        # too low, the whole volume: the DSM fits one roof over most of the plan with its eaves GRONDA_MIN to GRONDA_MAX m over the walls, so the walls
+        # go up to those eaves and the roof from the DSM is accepted by itself (tetti). Not the volumes split above, nor the ones that came down
+        gia = set(conf) | {k for k, md in enumerate(bassi) if md is not None}
+        def sopra(k):
+            p = polys[k]
+            if k in gia or p is None or p.area < GRONDA_AREA or cand[k].get('tolto'): return False
+            q = p.buffer(-0.6)
+            if q.is_empty: return False
+            x0, z0, x1, z1 = q.bounds; gx, gz = np.meshgrid(np.arange(x0, x1, 1.0) + 0.5, np.arange(z0, z1, 1.0) + 0.5)
+            m = shapely.contains_xy(q, gx, gz)
+            if m.sum() < 8: return False
+            D = dsm.at(gx[m], gz[m]); D = D[np.isfinite(D)]
+            return len(D) >= 8 and float(np.median(D)) - (cand[k]['zt'] + B) >= GRONDA_MIN - 0.5
+        pre = [k for k, ok in enumerate(in_parallelo(sopra, range(len(cand)))) if ok]
+        fg = self._dsm([((k,), np.asarray(polys[k].exterior.coords)[:-1], len(polys[k].interiors) > 0, cand[k]['zt'] + B, cand[k]['zt'] - cand[k]['h'] + B, False) for k in pre])
+        ng = Counter(); alz_g = []
+        def esito(f):
+            """(eaves over the walls, None) when the fit is a roof we trust, else (None, reason)"""
+            if f.get('k') not in ('flat', 'gable', 'hip', 'shed'): return None, 'non_un_tetto'
+            if f.get('cover', 0) < DSM_COVER: return None, 'non_copre'
+            if f['rms'] > GRONDA_RMS or f['alberi'] > GRONDA_ALB: return None, 'chiome_o_rumore'
+            return f['eave'], None
+        # a volume that is not one roof (an L, two houses in a row, a fit that does not hold) is tried wing by wing (ali): the raise is for the whole volume,
+        # only when every wing fits a roof and their eaves agree within GRONDA_SPREAD m
+        ali_k = {}
+        for k in pre:
+            f = fg.get((k,)) or {}
+            e, mot = esito(f)
+            if mot in ('non_un_tetto', 'chiome_o_rumore') or (e is not None and e < GRONDA_MIN and f['rms'] > 0.35):
+                ps = ali(polys[k]) if polys[k].geom_type == 'Polygon' else []
+                if len(ps) >= 2: ali_k[k] = ps
+        fa = self._dsm([((k, n), np.asarray(q.exterior.coords)[:-1], len(q.interiors) > 0, cand[k]['zt'] + B, cand[k]['zt'] - cand[k]['h'] + B, False) for k, ps in ali_k.items() for n, q in enumerate(ps)])
+        for k in pre:
+            r, p = cand[k], polys[k]; f = fg.get((k,)) or {}; g0 = r['zt'] - r['h']
+            e, mot = esito(f); kk = f.get('k')
+            if k in ali_k:
+                es = [esito(fa.get((k, n)) or {}) for n in range(len(ali_k[k]))]
+                if all(x[0] is not None for x in es) and max(x[0] for x in es) - min(x[0] for x in es) <= GRONDA_SPREAD:
+                    e, mot, kk = float(np.median([x[0] for x in es])), None, 'ali'
+                elif mot is None and e >= GRONDA_MIN: pass
+                else: ng['ali_' + (next((x[1] for x in es if x[1]), 'gronde_diverse'))] += 1; continue
+            elif mot: ng[mot + '_' + str(f.get('k', f.get('m')))] += 1; continue
+            if not GRONDA_MIN <= e <= GRONDA_MAX: ng['gronda_fuori_%s' % ('sotto' if e < GRONDA_MIN else 'sopra')] += 1; continue
+            alz_g.append(riga(r, p, r['zt'] + e, 'gronda_dal_dsm', k=kk, aggiunti=round(e, 2), rms=f.get('rms')))
+            r['zt'] = round(r['zt'] + e, 2); r['h'] = round(r['zt'] - g0, 1)
         self.terra = [r for r in self.terra if not r.get('tolto')] + nuovi
         sc = Counter(x['motivo'] for x in rep['scartati'])
-        self.rep['altezze_dal_dsm'] = dict(n=dict(alzati=len(rep['alzati']), abbassati=len(rep['abbassati']), tolti=len(rep['tolti']), **{'scartati_' + m: v for m, v in sc.items()}), **{k: v[:400] for k, v in rep.items()})
-        self.log('dbgt edifici: altezze dal DSM, alzati', len(rep['alzati']), 'abbassati', len(rep['abbassati']), 'tolti', len(rep['tolti']), 'scartati', dict(sc), '%.0fs' % (time.time() - t0))
+        self.rep['altezze_dal_dsm'] = dict(n=dict(alzati=len(rep['alzati']), abbassati=len(rep['abbassati']), tolti=len(rep['tolti']), alzati_gronda=len(alz_g), **{'gronda_no_' + m: v for m, v in ng.items()}, **{'scartati_' + m: v for m, v in sc.items()}), **{k: v[:400] for k, v in rep.items()}, alzati_gronda=alz_g)
+        self.log('dbgt edifici: altezze dal DSM, alzati', len(rep['alzati']), 'abbassati', len(rep['abbassati']), 'tolti', len(rep['tolti']), 'alzati_gronda', len(alz_g), dict(ng), 'scartati', dict(sc), '%.0fs' % (time.time() - t0))
         return nuovi
 
     def tetti(self):
