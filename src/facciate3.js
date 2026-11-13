@@ -7,6 +7,7 @@
 // frame and the glass; the shutters, the sills, the roller blinds stand on and in it; the balconies are 3D a little further (FAC_RB). Further away the
 // painted cell, as before. The 3D parts are instanced: every few metres the windows round the camera are written into one mesh per part
 const FAC_R = 150, FAC_RB = 150, FAC_FL = 3.1;
+const FAC_GAR_FR = 0.12; /* the plaster frame round a garage door, m */
 const FAC_COLS = 8, FAC_ROWS = 16, FAC_CPX = 256, FAC_PAD = 8, FAC_IN = FAC_CPX - 2 * FAC_PAD;
 const FAC_EP_NOMI = ['A', 'B', 'C', 'D'];
 // ---- the windows, the balconies, the materials of the cells. Sizes in metres; u in the bay 0..1 (centre of the window), lo/hi over the floor
@@ -122,7 +123,7 @@ function facCell(spec, tile) {
       let fw = null;
       if (win.length) { const w0 = win[0], k = w0.sh === 'pe' ? 1 : 0.5, half = Math.min(0.5, w0.w * (0.5 + 0.5 * k) / st.tile); fw = [w0.lo, w0.hi, Math.max(0, w0.u - half), Math.min(1, w0.u + half)]; if (win.length > 1) { fw[2] = 0.05; fw[3] = 0.95; } }
       else if (lg) fw = [0.0, 2.6, 0.5 - lg.w / 2 / st.tile, 0.5 + lg.w / 2 / st.tile];
-      st[side] = Object.assign({}, src); st[side + 'c'] = { P: cP, U: cU < 0 ? cP : cU, G: cG < 0 ? cP : cG, fw, code: (cU < 0 ? cP : cU) + 128 * (cG < 0 ? cP : cG) + 16384 * cP, spU: U, spG: G };
+      st[side] = Object.assign({}, src); st[side + 'c'] = { P: cP, U: cU < 0 ? cP : cU, G: cG < 0 ? cP : cG, fw, code: (cU < 0 ? cP : cU) + 128 * (cG < 0 ? cP : cG) + 16384 * cP, codeN: (cU < 0 ? cP : cU) + 128 * (cU < 0 ? cP : cU) + 16384 * cP /* the ground floor with the window of the upper ones, where a garage door has no place (facGarAcc) */, spU: U, spG: G };
     }
   }
 })();
@@ -213,6 +214,7 @@ const FAC_ATLAS = (() => {
       if (w.bow) put(2 + i, [w.u - hw - 0.03, w.u + hw + 0.03, v(w.lo - 0.1), v(w.hi + 0.1)]);
     });
     if (sp.lg) put(0, [0.5 - sp.lg.w / 2 / t + 0.004, 0.5 + sp.lg.w / 2 / t - 0.004, 0.004, v(2.6)]);
+    if (sp.gar) { const hw = sp.gar.w / 2 / t, fr = FAC_GAR_FR / t; put(0, [0.5 - hw + 0.004, 0.5 + hw - 0.004, 0.004, v(sp.gar.h) - 0.004]); put(2, [0.5 - hw - fr - 0.01, 0.5 + hw + fr + 0.01, -0.01, v(sp.gar.h + FAC_GAR_FR) + 0.01]); } /* the garage door: the hole, and its painted frame plain wall (the 3D frame stands there) */
   });
   const tex = new THREE.CanvasTexture(C); tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const msk = new THREE.CanvasTexture(M); msk.colorSpace = THREE.NoColorSpace; msk.anisotropy = tex.anisotropy;
@@ -338,13 +340,25 @@ function facFronte(ax, az, cx, cz, nx, nz) {
   for (const f of [0.25, 0.5, 0.75]) { const mx = ax + (cx - ax) * f, mz = az + (cz - az) * f; for (const d of [3, 7, 11, 15]) if (onAnyRoad(mx + nx * d, mz + nz * d, 1.0)) return true; }
   return false;
 }
+/* is there a place for a car right in front of this door (Carlo 12/11: the garage doors on the lawns)? The door gives straight onto a street, a car park or a hard
+   yard (1 m and 2.5 m out, nothing between: no railing, hedge, wall), or onto a pavement and just after it the street. A drive or a gap in the fence some metres
+   to the side is not enough. x, z: the middle of the door on the wall; n: where it looks */
+function facGarAcc(x, z, nx, nz) {
+  const cls = d => { const px = x + nx * d, pz = z + nz * d, k = H.kind(px, pz); if (k === 'side') return 1; return onAsph(px, pz) || k === 'plat' || (k !== 'road' && hardAt(px, pz)) ? 2 : 0; /* (the kind 'road' of the ground also covers the verges: only the asphalt counts) */ };
+  const clear = d => rayWalls(x + nx * 0.2, z + nz * 0.2, x + nx * d, z + nz * d, false) >= 1;
+  const c0 = cls(0.6), c1 = cls(1.0);
+  if (c0 === 2 && c1 === 2 && cls(2.5) === 2) return clear(2.5);
+  if (c1 !== 1 || c0 === 0) return false;
+  for (let d = 1.5; d <= 6; d += 0.5) { const c = cls(d); if (c === 1) continue; return c === 2 && clear(d); }
+  return false;
+}
 // ---- the 3D records of a tile, filled by the building loop of world3.js
 /* how deep the window stands in the wall, by the age of the house: the thick brick walls of the old courtyard houses, thinner and thinner after the war, the
    ribbon windows and the curtain walls of offices nearly flush */
 function facDepth(S, w) { if (w.cw) return 0.05; if (w.rib) return 0.12; return { A: 0.32, B: 0.26, C: 0.22, D: 0.18, W: 0.22 }[S.band] || 0.16; }
-function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gro) {
+function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gro, nog) {
   /* one bay (j) on one floor (k) of run R; e: its side [dx, dz, L, nx, nz]; s0: the bay's start along the run */
-  const cells = sty.S[side + 'c'], spec = gro ? cells.spG : cells.spU; if (!spec) return;
+  const cells = sty.S[side + 'c'], spec = gro && !nog ? cells.spG : cells.spU; if (!spec) return;
   const nx = e[3], nz = e[4], yF = F0 + FL * k, out = T.fwin || (T.fwin = []), bal = T.fbal || (T.fbal = []), det = T.fdet || (T.fdet = []);
   const h0 = hashRnd((B.e !== undefined ? B.e * 13.1 : B.pts[0][0]) + j * 7.7 + k * 3.3 + side.length);
   const at = s => { const p = R.at(s); return p; };
@@ -353,6 +367,11 @@ function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gr
     const lg = spec.lg, w = lg.w * bw / sty.S.tile, p = at(s0 + bw / 2);
     out.push({ x: p[0], y: yF, z: p[1], nx, nz, w, h: 2.6 * sc, D: lg.d, lg: 1, fr: COL(ANTR), wc: wallCol, rail: lg.rail, rc: lg.rc ? COL(lg.rc) : wallCol.clone().multiplyScalar(0.92), lit: h0 });
     if (h0 < 0.3) det.push({ k: 'pot', x: p[0] + nz * (w * 0.3) + nx * (-0.4), y: yF, z: p[1] - nx * (w * 0.3) + nz * (-0.4), nx, nz, R: FAC_R });
+    return;
+  }
+  if (spec.gar) { /* a garage door (Carlo 10/11): 3D near, like the windows (facGar) */
+    const g = spec.gar, p = at(s0 + bw / 2);
+    out.push({ gar: 1, x: p[0], y: yF, z: p[1], nx, nz, w: g.w * bw / sty.S.tile, h: g.h * sc, D: 0.2, wc: wallCol, fr: COL('#a39e94'), shc: COL(g.col), b: B, lit: 0 });
     return;
   }
   for (const w of spec.w || []) {
@@ -460,6 +479,15 @@ const FAC_GEO = (() => {
   G.fin = box(-0.5, 0.5, 0, 1, 0, 1);
   G.bow = (() => { const L = []; L.push([[-0.5, 0, 1], [0.5, 0, 1], [0.5, 1, 1], [-0.5, 1, 1], [0, 0, 1]]); L.push([[0.5, 0, 1], [0.5, 0, 0], [0.5, 1, 0], [0.5, 1, 1], [1, 0, 0]]); L.push([[-0.5, 0, 0], [-0.5, 0, 1], [-0.5, 1, 1], [-0.5, 1, 0], [-1, 0, 0]]); return quads(L); })();
   G.bowBox = box(-0.5, 0.5, 0, 1, 0, 1);
+  G.serr = (() => { /* the steel slats of a rolling shutter: unit width (x -0.5..0.5) and height (y 0..1, scaled by the door), the depth in metres: the face at z 0,
+       the joints 1.4 cm in. 22 slats, 10 cm on a door 2.2 m high. The normals of the unit shape: the instancing bends them as the door is scaled */
+    const NS = 22, dz = 0.014, prof = [[0, -dz], [0.1, -dz * 0.25], [0.18, 0], [0.8, 0], [0.9, -dz * 0.35], [1, -dz]], p = [], n = [], uv = [];
+    for (let s = 0; s < NS; s++) for (let k = 1; k < prof.length; k++) {
+      const [f0, z0] = prof[k - 1], [f1, z1] = prof[k], y0 = (s + f0) / NS, y1 = (s + f1) / NS, L = Math.hypot(y1 - y0, z1 - z0), ny = -(z1 - z0) / L, nz = (y1 - y0) / L;
+      for (const [x, y, z] of [[-0.5, y0, z0], [0.5, y0, z0], [0.5, y1, z1], [-0.5, y0, z0], [0.5, y1, z1], [-0.5, y1, z1]]) { p.push(x, y, z); n.push(0, ny, nz); uv.push(x + 0.5, y); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
+  })();
   G.ac = box(-0.4, 0.4, 0, 0.55, 0, 0.28);
   G.pot = (() => { const a = box(-0.15, 0.15, 0, 0.28, -0.15, 0.15), b = new THREE.IcosahedronGeometry(0.22, 0); b.scale(1, 0.8, 1); b.translate(0, 0.42, 0);
     const col = (g, c) => { const n = g.attributes.position.count, arr = []; for (let i = 0; i < n; i++) arr.push(...c); g.setAttribute('color', new THREE.Float32BufferAttribute(arr, 3)); return g.index ? g.toNonIndexed() : g; };
@@ -501,6 +529,7 @@ const FAC_PARTS = (() => {
   mk('glass', FAC_GEO.glass.clone(), glassMat, 24000, { noCol: true, lit: true, win: true });
   mk('bar', FAC_GEO.bar, lam({}), 160000, { win: true });
   mk('tapp', FAC_GEO.tapp, lam({ map: FAC_TAPP }), 24000, { win: true });
+  mk('serr', FAC_GEO.serr, lam({}), 3000, { win: true });
   /* parts on and out of the wall: they fade with the hole */
   mk('sill', FAC_GEO.sill, facFadeMat(lam({}), FAC_R), 24000, { cast: true });
   mk('leaf', FAC_GEO.leaf, facFadeMat(lam({ map: FAC_SLAT }), FAC_R), 48000, { cast: true });
@@ -542,6 +571,20 @@ function facWin(r) {
   const nx = r.nx, nz = r.nz, Xx = nz, Xz = -nx, w = r.w, h = r.h, D = r.D, x = r.x, y = r.y, z = r.z;
   const wd = _facC.copy(r.wc).multiplyScalar(0.93);
   const bar = (u, y0, bw, bh, zd, dd, col) => facPut('bar', x + Xx * u - nx * zd, y0, z + Xz * u - nz * zd, Xx, Xz, nx, nz, bw, bh, dd, col);
+  if (r.gar) { /* a garage door: the hole in the wall, the rolling shutter of steel slats set back in it, its two guides, the bottom rail with the lock, the plaster frame round it */
+    FAC_W = [x, y, z, w, nx, nz, h, D];
+    facPut('reveal', x, y, z, Xx, Xz, nx, nz, w, h, D, wd);
+    const zs = D - 0.05, gc = FAC_SHUT_C.copy(r.shc).multiplyScalar(0.7);
+    facPut('serr', x - nx * zs, y + 0.06, z - nz * zs, Xx, Xz, nx, nz, w - 0.12, h - 0.06, 1, r.shc);
+    bar(-w / 2 + 0.035, y, 0.07, h, zs - 0.035, 0.08, gc); bar(w / 2 - 0.035, y, 0.07, h, zs - 0.035, 0.08, gc); /* the guides, a little out of the slats */
+    bar(0, y, w - 0.14, 0.07, zs - 0.012, 0.04, gc); /* the bottom rail */
+    bar(0, y + 0.015, 0.1, 0.04, zs - 0.03, 0.02, FAC_SHUT_C.setRGB(0.16, 0.17, 0.18)); /* the lock */
+    FAC_W = null;
+    const fw = FAC_GAR_FR, fo = 0.03; /* the frame 3 cm out of the wall */
+    for (const s of [-1, 1]) facPut('sill', x + Xx * s * (w / 2 + fw / 2) + nx * fo, y + h + fw, z + Xz * s * (w / 2 + fw / 2) + nz * fo, Xx, Xz, nx, nz, fw, h + fw, fo + 0.02, r.fr);
+    facPut('sill', x + nx * fo, y + h + fw, z + nz * fo, Xx, Xz, nx, nz, w, fw, fo + 0.02, r.fr);
+    return;
+  }
   if (r.lg) { /* a loggia: deep reveal, the back wall with its French window, the parapet at the front */
     FAC_W = [x, y, z, w, nx, nz, h, D];
     facPut('reveal', x, y, z, Xx, Xz, nx, nz, w, h, D, wd);

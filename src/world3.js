@@ -2346,7 +2346,7 @@ function* buildTileGen(T) {
             const bw = n ? Math.min(x / n, FAC.MAX) * tile : Lr, pad = n ? (Lr - n * bw) / 2 : 0, span = (s0, s1, ss, bay) => { const g = ss.map(gAt); sp.push([s0, s1, Math.max(...g), Math.min(...g), bay]); };
             if (!n) span(0, Lr, [0, Lr / 2, Lr], false);
             else { if (pad > 0.01) span(0, pad, [0, pad], false); for (let j = 0; j < n; j++) { const s0 = pad + j * bw; span(s0, s0 + bw, [s0 + fw[2] * bw, s0 + bw / 2, s0 + fw[3] * bw], true); } if (pad > 0.01) span(Lr - pad, Lr, [Lr - pad, Lr], false); }
-            const R = { ed, off, Lr, at, rp, n, bw, pad, sp, fw, side, tile, code: bare || !fw ? cells.P + 128 * cells.P + 16384 * cells.P : cells.code, uoff: Math.floor(hashRnd(Math.round(ring[i0][0] * 31 + ring[i0][1] * 17)) * 32) };
+            const R = { ed, off, Lr, at, rp, n, bw, pad, sp, fw, side, tile, code: bare || !fw ? cells.P + 128 * cells.P + 16384 * cells.P : cells.code, codeN: bare || !fw ? cells.P + 128 * cells.P + 16384 * cells.P : cells.codeN, uoff: Math.floor(hashRnd(Math.round(ring[i0][0] * 31 + ring[i0][1] * 17)) * 32) };
             ed.forEach((i, q) => { W[i] = [R, off[q]]; }); return R;
           });
           return { ring, nr, E, W, runs };
@@ -2424,12 +2424,21 @@ function* buildTileGen(T) {
       if (fw) { const t1 = fw[1] / FAC.FL; let fb = null; for (let nf = 1; nf < 60; nf++) { const f = hRef / (nf - 1 + t1); if (f < FAC.FMIN) break; if (f <= FAC.FMAX && (fb === null || Math.abs(f - FAC.FL) < Math.abs(fb - FAC.FL))) fb = f; } FL = fb || (hRef > t1 * FAC.FMAX ? FAC.FMAX : FAC.FL); }
       const sc = FL / FAC.FL, wLo = fw ? fw[0] * sc : 0.9, wHi = fw ? fw[1] * sc : 0, wbot = raised ? bot : Math.min(bot, gLo - 0.6), voff = Math.floor(hashRnd(Math.round(outer[0][0] * 3.7 + outer[0][1] * 11.3)) * 16), vOf = y => (y - F0) / FL + voff;
       const kLoAt = g => { let k = -4; while (k < 60 && ((!raised && F0 + k * FL + FAC.ZH < g) || F0 + k * FL + wLo < wbot + 0.3)) k++; return k; }; // the plinth's top over the ground, the window over the base of a raised volume
+      /* the garage doors of this house (Carlo 12/11): only where a car can stand right in front (facGarAcc), and not all of the bays: about half of them, chosen by the house's number, never none where there is a place. A garage building (OSM garages) keeps all its doors. R.gar: bay -> 1 door, 0 window */
+      if (!bare && !raised) { const GE = window.GAR_ED || (window.GAR_ED = {}), cand = [];
+        for (const rg of rings) for (const R of rg.runs) { const spg = S0[R.side + 'c'].spG; if (!R.n || !spg || !spg.gar) continue; R.gar = new Map();
+          for (let j = 0; j < R.n; j++) { if (R.noG && R.noG.has(j)) continue; const s0 = R.pad + j * R.bw, p = R.at(s0 + R.bw / 2), sm = s0 + R.bw / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + rg.E[R.ed[q]][2]) q++; const e = rg.E[R.ed[q]];
+            const spB = R.sp.find(q => q[4] && Math.abs(q[0] - s0) < 1e-6), gapB = spB ? F0 + kLoAt(spB[2]) * FL - spB[3] : 0; /* the floor of the door over the lowest ground of the bay: a door that cannot touch the ground is a window */
+            cand.push({ R, j, ok: B.t === 1 || (gapB <= 0.25 && facGarAcc(p[0], p[1], e[3], e[4])), h: facHashB(B, 7) * 997 + j * 3.1 + cand.length * 7.7 }); } }
+        if (cand.length) { const ok = cand.filter(c => c.ok).sort((a, b) => hashRnd(a.h) - hashRnd(b.h)), keep = B.t === 1 ? ok.length : Math.min(Math.ceil(ok.length / 2), 4); ok.forEach((c, i) => { if (i < keep) c.R.gar.set(c.j, 1); }); for (const c of cand) if (!c.R.gar.has(c.j)) c.R.gar.set(c.j, 0);
+          GE[B.e !== undefined ? 'e' + B.e : B.pts[0][0].toFixed(1) + ',' + B.pts[0][1].toFixed(1)] = B._gk = { c: cand.length, ok: ok.length, keep, gap: [] }; }
+      }
       for (const { ring, nr, E, W, runs } of rings) {
         // each span's floors with windows (kLo..kTop, plus voff) and the plinth's top; a span the same as the one before makes one piece of wall with it
         for (const R of runs) {
           const { rp, bw, sp } = R, rlAt = s => { for (let k = 1; k < rp.length; k++) if (s <= rp[k][0] || k === rp.length - 1) { const [p0, y0] = rp[k - 1], [p1, y1] = rp[k]; return y0 + (y1 - y0) * clamp((s - p0) / ((p1 - p0) || 1), 0, 1); } return rp[0][1]; };
           R.rlAt = rlAt; const grp = R.grp = [];
-          for (const [s0, s1, g, , bay] of sp) {
+          for (const [s0, s1, g, gn, bay] of sp) {
             const kl = kLoAt(g); let f = [999, -999], covK = () => false;
             const rfw = R.fw || fw; if (bay) { const w0 = s0 + rfw[2] * bw, w1 = s0 + rfw[3] * bw; let rl = Math.min(rlAt(w0), rlAt(w1)); for (const [p, y] of rp) if (p > w0 && p < w1) rl = Math.min(rl, y); const kt = Math.floor((rl - FAC.EM - Math.max(rfw[1], 1.2) * sc - F0) / FL + 1e-4); if (kt >= kl) f = [kl, kt]; }
             if (bay && f[0] <= f[1]) { /* a floor of this bay behind another building (a lower one built onto it, a volume inside another), or on a wall another volume shares (a house the DBGT has twice, one over the other): no window there, painted or 3D (Carlo 8/11, via Farga) */
@@ -2446,13 +2455,15 @@ function* buildTileGen(T) {
             }
             /* the covered floors between the first and the last window: their bits (from the first) go to the wall, which draws no window and opens no hole there (Carlo 8/11: "restano i buchi") */
             let mask = 0; if (f[0] < 900) for (let k = f[0]; k <= Math.min(f[1], f[0] + 22); k++) if (covK(k)) mask += 2 ** (k - f[0]);
-            f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : vOf(F0 + kl * FL + FAC.ZH), mask];
+            let gOn = -1; if (bay && f[0] === kl && !dropped && R.gar) { const gv = R.gar.get(Math.round((s0 - R.pad) / bw)); if (gv !== undefined) gOn = gv; } /* 1: a garage door here, 0: a window instead, -1: no garage in this bay */
+            if (gOn === 1 && B._gk) B._gk.gap.push(Math.round((F0 + kl * FL - gn) * 100) / 100); /* debug: how far over the ground the door's floor stands */
+            f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : gOn === 1 ? vOf(F0 + kl * FL) + 0.0005 : vOf(F0 + kl * FL + FAC.ZH), mask, gOn === 0 ? 1 : 0]; /* a garage door stands on the ground, with no plinth under it */
             const last = grp[grp.length - 1];
-            if (last && last[2][0] === f[0] && last[2][1] === f[1] && Math.abs(last[2][2] - f[2]) < 1e-6 && last[2][3] === f[3]) last[1] = s1; else grp.push([s0, s1, f]);
+            if (last && last[2][0] === f[0] && last[2][1] === f[1] && Math.abs(last[2][2] - f[2]) < 1e-6 && last[2][3] === f[3] && last[2][4] === f[4]) last[1] = s1; else grp.push([s0, s1, f]);
             if (bay && f[0] < 900) { /* the 3D windows, balconies and details of this bay (facciate3.js): the same floors the texture draws */
               const j = Math.round((s0 - R.pad) / bw), sm = (s0 + s1) / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + E[R.ed[q]][2]) q++;
               const e = E[R.ed[q]], kTop = f[1] - voff;
-              for (let k = f[0] - voff; k <= kTop; k++) if (!(k - (f[0] - voff) <= 22 && covK(k))) facWinRecs(T, R, e, B, sty, R.side, j, k, s0, bw, F0, FL, sc, wallCol, !raised && k === kl); /* the same floors the wall draws (mask) */
+              for (let k = f[0] - voff; k <= kTop; k++) if (!(k - (f[0] - voff) <= 22 && covK(k))) facWinRecs(T, R, e, B, sty, R.side, j, k, s0, bw, F0, FL, sc, wallCol, !raised && k === kl, f[4]); /* the same floors the wall draws (mask) */
               if (S0.ang && R.side === 'f' && R.n >= 3 && (j === 0 || j === R.n - 1)) for (let k = kl + 1; k <= kTop; k++) if (!covK(k)) facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, 'ang');
               if (S0.bc && R.side === 'f' && j % 2 === 0 && kl + 1 <= kTop && !covK(kl + 1)) facExtraBal(T, R, e, sty, kl + 1, s0, bw, F0, FL, wallCol, j, 'bc');
             }
@@ -2473,13 +2484,13 @@ function* buildTileGen(T) {
             // occlusion: height over the ground, depth under the eaves, distance from the inside corners at either end (linear along the wall, so exact per pixel)
             const ga = raised ? wbot - 3 : H.ground(ax, az), gc = raised ? wbot - 3 : H.ground(cx, cz);
             b.ao.push(wbot - ga, pitched ? ya - wbot : 99, ia + e0, ic + L - e0, wbot - gc, pitched ? yc - wbot : 99, ia + e1, ic + L - e1, yc - gc, pitched ? 0 : 99, ia + e1, ic + L - e1, ya - ga, pitched ? 0 : 99, ia + e0, ic + L - e0);
-            for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
+            for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], f[4] ? R.codeN : R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
             if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
             if (B.st === 2) { // a ruin has no roof: the inside of its walls shows from above
               const bi = b.p.length / 3;
               vtx(b, ax, wbot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, wbot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, vOf(yc), wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, vOf(ya), wallCol);
               b.ao.push(wbot - ga, 99, 99, 99, wbot - gc, 99, 99, 99, yc - gc, 99, 99, 99, ya - ga, 99, 99, 99);
-              for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
+              for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], f[4] ? R.codeN : R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
               if (nx * (-dz) + nz * dx > 0) b.i.push(bi, bi + 2, bi + 1, bi, bi + 3, bi + 2); else b.i.push(bi, bi + 1, bi + 2, bi, bi + 2, bi + 3);
             }
           }

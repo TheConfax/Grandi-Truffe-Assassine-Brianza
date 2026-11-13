@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 9831e85f · assemblato 13/11 21:21 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo e3037f24 · assemblato 13/11 21:58 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -4393,7 +4393,7 @@ function* buildTileGen(T) {
             const bw = n ? Math.min(x / n, FAC.MAX) * tile : Lr, pad = n ? (Lr - n * bw) / 2 : 0, span = (s0, s1, ss, bay) => { const g = ss.map(gAt); sp.push([s0, s1, Math.max(...g), Math.min(...g), bay]); };
             if (!n) span(0, Lr, [0, Lr / 2, Lr], false);
             else { if (pad > 0.01) span(0, pad, [0, pad], false); for (let j = 0; j < n; j++) { const s0 = pad + j * bw; span(s0, s0 + bw, [s0 + fw[2] * bw, s0 + bw / 2, s0 + fw[3] * bw], true); } if (pad > 0.01) span(Lr - pad, Lr, [Lr - pad, Lr], false); }
-            const R = { ed, off, Lr, at, rp, n, bw, pad, sp, fw, side, tile, code: bare || !fw ? cells.P + 128 * cells.P + 16384 * cells.P : cells.code, uoff: Math.floor(hashRnd(Math.round(ring[i0][0] * 31 + ring[i0][1] * 17)) * 32) };
+            const R = { ed, off, Lr, at, rp, n, bw, pad, sp, fw, side, tile, code: bare || !fw ? cells.P + 128 * cells.P + 16384 * cells.P : cells.code, codeN: bare || !fw ? cells.P + 128 * cells.P + 16384 * cells.P : cells.codeN, uoff: Math.floor(hashRnd(Math.round(ring[i0][0] * 31 + ring[i0][1] * 17)) * 32) };
             ed.forEach((i, q) => { W[i] = [R, off[q]]; }); return R;
           });
           return { ring, nr, E, W, runs };
@@ -4471,12 +4471,21 @@ function* buildTileGen(T) {
       if (fw) { const t1 = fw[1] / FAC.FL; let fb = null; for (let nf = 1; nf < 60; nf++) { const f = hRef / (nf - 1 + t1); if (f < FAC.FMIN) break; if (f <= FAC.FMAX && (fb === null || Math.abs(f - FAC.FL) < Math.abs(fb - FAC.FL))) fb = f; } FL = fb || (hRef > t1 * FAC.FMAX ? FAC.FMAX : FAC.FL); }
       const sc = FL / FAC.FL, wLo = fw ? fw[0] * sc : 0.9, wHi = fw ? fw[1] * sc : 0, wbot = raised ? bot : Math.min(bot, gLo - 0.6), voff = Math.floor(hashRnd(Math.round(outer[0][0] * 3.7 + outer[0][1] * 11.3)) * 16), vOf = y => (y - F0) / FL + voff;
       const kLoAt = g => { let k = -4; while (k < 60 && ((!raised && F0 + k * FL + FAC.ZH < g) || F0 + k * FL + wLo < wbot + 0.3)) k++; return k; }; // the plinth's top over the ground, the window over the base of a raised volume
+      /* the garage doors of this house (Carlo 12/11): only where a car can stand right in front (facGarAcc), and not all of the bays: about half of them, chosen by the house's number, never none where there is a place. A garage building (OSM garages) keeps all its doors. R.gar: bay -> 1 door, 0 window */
+      if (!bare && !raised) { const GE = window.GAR_ED || (window.GAR_ED = {}), cand = [];
+        for (const rg of rings) for (const R of rg.runs) { const spg = S0[R.side + 'c'].spG; if (!R.n || !spg || !spg.gar) continue; R.gar = new Map();
+          for (let j = 0; j < R.n; j++) { if (R.noG && R.noG.has(j)) continue; const s0 = R.pad + j * R.bw, p = R.at(s0 + R.bw / 2), sm = s0 + R.bw / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + rg.E[R.ed[q]][2]) q++; const e = rg.E[R.ed[q]];
+            const spB = R.sp.find(q => q[4] && Math.abs(q[0] - s0) < 1e-6), gapB = spB ? F0 + kLoAt(spB[2]) * FL - spB[3] : 0; /* the floor of the door over the lowest ground of the bay: a door that cannot touch the ground is a window */
+            cand.push({ R, j, ok: B.t === 1 || (gapB <= 0.25 && facGarAcc(p[0], p[1], e[3], e[4])), h: facHashB(B, 7) * 997 + j * 3.1 + cand.length * 7.7 }); } }
+        if (cand.length) { const ok = cand.filter(c => c.ok).sort((a, b) => hashRnd(a.h) - hashRnd(b.h)), keep = B.t === 1 ? ok.length : Math.min(Math.ceil(ok.length / 2), 4); ok.forEach((c, i) => { if (i < keep) c.R.gar.set(c.j, 1); }); for (const c of cand) if (!c.R.gar.has(c.j)) c.R.gar.set(c.j, 0);
+          GE[B.e !== undefined ? 'e' + B.e : B.pts[0][0].toFixed(1) + ',' + B.pts[0][1].toFixed(1)] = B._gk = { c: cand.length, ok: ok.length, keep, gap: [] }; }
+      }
       for (const { ring, nr, E, W, runs } of rings) {
         // each span's floors with windows (kLo..kTop, plus voff) and the plinth's top; a span the same as the one before makes one piece of wall with it
         for (const R of runs) {
           const { rp, bw, sp } = R, rlAt = s => { for (let k = 1; k < rp.length; k++) if (s <= rp[k][0] || k === rp.length - 1) { const [p0, y0] = rp[k - 1], [p1, y1] = rp[k]; return y0 + (y1 - y0) * clamp((s - p0) / ((p1 - p0) || 1), 0, 1); } return rp[0][1]; };
           R.rlAt = rlAt; const grp = R.grp = [];
-          for (const [s0, s1, g, , bay] of sp) {
+          for (const [s0, s1, g, gn, bay] of sp) {
             const kl = kLoAt(g); let f = [999, -999], covK = () => false;
             const rfw = R.fw || fw; if (bay) { const w0 = s0 + rfw[2] * bw, w1 = s0 + rfw[3] * bw; let rl = Math.min(rlAt(w0), rlAt(w1)); for (const [p, y] of rp) if (p > w0 && p < w1) rl = Math.min(rl, y); const kt = Math.floor((rl - FAC.EM - Math.max(rfw[1], 1.2) * sc - F0) / FL + 1e-4); if (kt >= kl) f = [kl, kt]; }
             if (bay && f[0] <= f[1]) { /* a floor of this bay behind another building (a lower one built onto it, a volume inside another), or on a wall another volume shares (a house the DBGT has twice, one over the other): no window there, painted or 3D (Carlo 8/11, via Farga) */
@@ -4493,13 +4502,15 @@ function* buildTileGen(T) {
             }
             /* the covered floors between the first and the last window: their bits (from the first) go to the wall, which draws no window and opens no hole there (Carlo 8/11: "restano i buchi") */
             let mask = 0; if (f[0] < 900) for (let k = f[0]; k <= Math.min(f[1], f[0] + 22); k++) if (covK(k)) mask += 2 ** (k - f[0]);
-            f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : vOf(F0 + kl * FL + FAC.ZH), mask];
+            let gOn = -1; if (bay && f[0] === kl && !dropped && R.gar) { const gv = R.gar.get(Math.round((s0 - R.pad) / bw)); if (gv !== undefined) gOn = gv; } /* 1: a garage door here, 0: a window instead, -1: no garage in this bay */
+            if (gOn === 1 && B._gk) B._gk.gap.push(Math.round((F0 + kl * FL - gn) * 100) / 100); /* debug: how far over the ground the door's floor stands */
+            f = [f[0] + voff, f[1] + voff, raised ? vOf(wbot) - 1 : gOn === 1 ? vOf(F0 + kl * FL) + 0.0005 : vOf(F0 + kl * FL + FAC.ZH), mask, gOn === 0 ? 1 : 0]; /* a garage door stands on the ground, with no plinth under it */
             const last = grp[grp.length - 1];
-            if (last && last[2][0] === f[0] && last[2][1] === f[1] && Math.abs(last[2][2] - f[2]) < 1e-6 && last[2][3] === f[3]) last[1] = s1; else grp.push([s0, s1, f]);
+            if (last && last[2][0] === f[0] && last[2][1] === f[1] && Math.abs(last[2][2] - f[2]) < 1e-6 && last[2][3] === f[3] && last[2][4] === f[4]) last[1] = s1; else grp.push([s0, s1, f]);
             if (bay && f[0] < 900) { /* the 3D windows, balconies and details of this bay (facciate3.js): the same floors the texture draws */
               const j = Math.round((s0 - R.pad) / bw), sm = (s0 + s1) / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + E[R.ed[q]][2]) q++;
               const e = E[R.ed[q]], kTop = f[1] - voff;
-              for (let k = f[0] - voff; k <= kTop; k++) if (!(k - (f[0] - voff) <= 22 && covK(k))) facWinRecs(T, R, e, B, sty, R.side, j, k, s0, bw, F0, FL, sc, wallCol, !raised && k === kl); /* the same floors the wall draws (mask) */
+              for (let k = f[0] - voff; k <= kTop; k++) if (!(k - (f[0] - voff) <= 22 && covK(k))) facWinRecs(T, R, e, B, sty, R.side, j, k, s0, bw, F0, FL, sc, wallCol, !raised && k === kl, f[4]); /* the same floors the wall draws (mask) */
               if (S0.ang && R.side === 'f' && R.n >= 3 && (j === 0 || j === R.n - 1)) for (let k = kl + 1; k <= kTop; k++) if (!covK(k)) facExtraBal(T, R, e, sty, k, s0, bw, F0, FL, wallCol, j, 'ang');
               if (S0.bc && R.side === 'f' && j % 2 === 0 && kl + 1 <= kTop && !covK(kl + 1)) facExtraBal(T, R, e, sty, kl + 1, s0, bw, F0, FL, wallCol, j, 'bc');
             }
@@ -4520,13 +4531,13 @@ function* buildTileGen(T) {
             // occlusion: height over the ground, depth under the eaves, distance from the inside corners at either end (linear along the wall, so exact per pixel)
             const ga = raised ? wbot - 3 : H.ground(ax, az), gc = raised ? wbot - 3 : H.ground(cx, cz);
             b.ao.push(wbot - ga, pitched ? ya - wbot : 99, ia + e0, ic + L - e0, wbot - gc, pitched ? yc - wbot : 99, ia + e1, ic + L - e1, yc - gc, pitched ? 0 : 99, ia + e1, ic + L - e1, ya - ga, pitched ? 0 : 99, ia + e0, ic + L - e0);
-            for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
+            for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], f[4] ? R.codeN : R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
             if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
             if (B.st === 2) { // a ruin has no roof: the inside of its walls shows from above
               const bi = b.p.length / 3;
               vtx(b, ax, wbot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, wbot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, vOf(yc), wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, vOf(ya), wallCol);
               b.ao.push(wbot - ga, 99, 99, 99, wbot - gc, 99, 99, 99, yc - gc, 99, 99, 99, ya - ga, 99, 99, 99);
-              for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
+              for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], f[4] ? R.codeN : R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
               if (nx * (-dz) + nz * dx > 0) b.i.push(bi, bi + 2, bi + 1, bi, bi + 3, bi + 2); else b.i.push(bi, bi + 1, bi + 2, bi, bi + 2, bi + 3);
             }
           }
@@ -13076,6 +13087,7 @@ for (const k in NG_WIN.mat) rifMat(NG_WIN.mat[k], 'shop');
 // frame and the glass; the shutters, the sills, the roller blinds stand on and in it; the balconies are 3D a little further (FAC_RB). Further away the
 // painted cell, as before. The 3D parts are instanced: every few metres the windows round the camera are written into one mesh per part
 const FAC_R = 150, FAC_RB = 150, FAC_FL = 3.1;
+const FAC_GAR_FR = 0.12; /* the plaster frame round a garage door, m */
 const FAC_COLS = 8, FAC_ROWS = 16, FAC_CPX = 256, FAC_PAD = 8, FAC_IN = FAC_CPX - 2 * FAC_PAD;
 const FAC_EP_NOMI = ['A', 'B', 'C', 'D'];
 // ---- the windows, the balconies, the materials of the cells. Sizes in metres; u in the bay 0..1 (centre of the window), lo/hi over the floor
@@ -13191,7 +13203,7 @@ function facCell(spec, tile) {
       let fw = null;
       if (win.length) { const w0 = win[0], k = w0.sh === 'pe' ? 1 : 0.5, half = Math.min(0.5, w0.w * (0.5 + 0.5 * k) / st.tile); fw = [w0.lo, w0.hi, Math.max(0, w0.u - half), Math.min(1, w0.u + half)]; if (win.length > 1) { fw[2] = 0.05; fw[3] = 0.95; } }
       else if (lg) fw = [0.0, 2.6, 0.5 - lg.w / 2 / st.tile, 0.5 + lg.w / 2 / st.tile];
-      st[side] = Object.assign({}, src); st[side + 'c'] = { P: cP, U: cU < 0 ? cP : cU, G: cG < 0 ? cP : cG, fw, code: (cU < 0 ? cP : cU) + 128 * (cG < 0 ? cP : cG) + 16384 * cP, spU: U, spG: G };
+      st[side] = Object.assign({}, src); st[side + 'c'] = { P: cP, U: cU < 0 ? cP : cU, G: cG < 0 ? cP : cG, fw, code: (cU < 0 ? cP : cU) + 128 * (cG < 0 ? cP : cG) + 16384 * cP, codeN: (cU < 0 ? cP : cU) + 128 * (cU < 0 ? cP : cU) + 16384 * cP /* the ground floor with the window of the upper ones, where a garage door has no place (facGarAcc) */, spU: U, spG: G };
     }
   }
 })();
@@ -13282,6 +13294,7 @@ const FAC_ATLAS = (() => {
       if (w.bow) put(2 + i, [w.u - hw - 0.03, w.u + hw + 0.03, v(w.lo - 0.1), v(w.hi + 0.1)]);
     });
     if (sp.lg) put(0, [0.5 - sp.lg.w / 2 / t + 0.004, 0.5 + sp.lg.w / 2 / t - 0.004, 0.004, v(2.6)]);
+    if (sp.gar) { const hw = sp.gar.w / 2 / t, fr = FAC_GAR_FR / t; put(0, [0.5 - hw + 0.004, 0.5 + hw - 0.004, 0.004, v(sp.gar.h) - 0.004]); put(2, [0.5 - hw - fr - 0.01, 0.5 + hw + fr + 0.01, -0.01, v(sp.gar.h + FAC_GAR_FR) + 0.01]); } /* the garage door: the hole, and its painted frame plain wall (the 3D frame stands there) */
   });
   const tex = new THREE.CanvasTexture(C); tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const msk = new THREE.CanvasTexture(M); msk.colorSpace = THREE.NoColorSpace; msk.anisotropy = tex.anisotropy;
@@ -13407,13 +13420,25 @@ function facFronte(ax, az, cx, cz, nx, nz) {
   for (const f of [0.25, 0.5, 0.75]) { const mx = ax + (cx - ax) * f, mz = az + (cz - az) * f; for (const d of [3, 7, 11, 15]) if (onAnyRoad(mx + nx * d, mz + nz * d, 1.0)) return true; }
   return false;
 }
+/* is there a place for a car right in front of this door (Carlo 12/11: the garage doors on the lawns)? The door gives straight onto a street, a car park or a hard
+   yard (1 m and 2.5 m out, nothing between: no railing, hedge, wall), or onto a pavement and just after it the street. A drive or a gap in the fence some metres
+   to the side is not enough. x, z: the middle of the door on the wall; n: where it looks */
+function facGarAcc(x, z, nx, nz) {
+  const cls = d => { const px = x + nx * d, pz = z + nz * d, k = H.kind(px, pz); if (k === 'side') return 1; return onAsph(px, pz) || k === 'plat' || (k !== 'road' && hardAt(px, pz)) ? 2 : 0; /* (the kind 'road' of the ground also covers the verges: only the asphalt counts) */ };
+  const clear = d => rayWalls(x + nx * 0.2, z + nz * 0.2, x + nx * d, z + nz * d, false) >= 1;
+  const c0 = cls(0.6), c1 = cls(1.0);
+  if (c0 === 2 && c1 === 2 && cls(2.5) === 2) return clear(2.5);
+  if (c1 !== 1 || c0 === 0) return false;
+  for (let d = 1.5; d <= 6; d += 0.5) { const c = cls(d); if (c === 1) continue; return c === 2 && clear(d); }
+  return false;
+}
 // ---- the 3D records of a tile, filled by the building loop of world3.js
 /* how deep the window stands in the wall, by the age of the house: the thick brick walls of the old courtyard houses, thinner and thinner after the war, the
    ribbon windows and the curtain walls of offices nearly flush */
 function facDepth(S, w) { if (w.cw) return 0.05; if (w.rib) return 0.12; return { A: 0.32, B: 0.26, C: 0.22, D: 0.18, W: 0.22 }[S.band] || 0.16; }
-function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gro) {
+function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gro, nog) {
   /* one bay (j) on one floor (k) of run R; e: its side [dx, dz, L, nx, nz]; s0: the bay's start along the run */
-  const cells = sty.S[side + 'c'], spec = gro ? cells.spG : cells.spU; if (!spec) return;
+  const cells = sty.S[side + 'c'], spec = gro && !nog ? cells.spG : cells.spU; if (!spec) return;
   const nx = e[3], nz = e[4], yF = F0 + FL * k, out = T.fwin || (T.fwin = []), bal = T.fbal || (T.fbal = []), det = T.fdet || (T.fdet = []);
   const h0 = hashRnd((B.e !== undefined ? B.e * 13.1 : B.pts[0][0]) + j * 7.7 + k * 3.3 + side.length);
   const at = s => { const p = R.at(s); return p; };
@@ -13422,6 +13447,11 @@ function facWinRecs(T, R, e, B, sty, side, j, k, s0, bw, F0, FL, sc, wallCol, gr
     const lg = spec.lg, w = lg.w * bw / sty.S.tile, p = at(s0 + bw / 2);
     out.push({ x: p[0], y: yF, z: p[1], nx, nz, w, h: 2.6 * sc, D: lg.d, lg: 1, fr: COL(ANTR), wc: wallCol, rail: lg.rail, rc: lg.rc ? COL(lg.rc) : wallCol.clone().multiplyScalar(0.92), lit: h0 });
     if (h0 < 0.3) det.push({ k: 'pot', x: p[0] + nz * (w * 0.3) + nx * (-0.4), y: yF, z: p[1] - nx * (w * 0.3) + nz * (-0.4), nx, nz, R: FAC_R });
+    return;
+  }
+  if (spec.gar) { /* a garage door (Carlo 10/11): 3D near, like the windows (facGar) */
+    const g = spec.gar, p = at(s0 + bw / 2);
+    out.push({ gar: 1, x: p[0], y: yF, z: p[1], nx, nz, w: g.w * bw / sty.S.tile, h: g.h * sc, D: 0.2, wc: wallCol, fr: COL('#a39e94'), shc: COL(g.col), b: B, lit: 0 });
     return;
   }
   for (const w of spec.w || []) {
@@ -13529,6 +13559,15 @@ const FAC_GEO = (() => {
   G.fin = box(-0.5, 0.5, 0, 1, 0, 1);
   G.bow = (() => { const L = []; L.push([[-0.5, 0, 1], [0.5, 0, 1], [0.5, 1, 1], [-0.5, 1, 1], [0, 0, 1]]); L.push([[0.5, 0, 1], [0.5, 0, 0], [0.5, 1, 0], [0.5, 1, 1], [1, 0, 0]]); L.push([[-0.5, 0, 0], [-0.5, 0, 1], [-0.5, 1, 1], [-0.5, 1, 0], [-1, 0, 0]]); return quads(L); })();
   G.bowBox = box(-0.5, 0.5, 0, 1, 0, 1);
+  G.serr = (() => { /* the steel slats of a rolling shutter: unit width (x -0.5..0.5) and height (y 0..1, scaled by the door), the depth in metres: the face at z 0,
+       the joints 1.4 cm in. 22 slats, 10 cm on a door 2.2 m high. The normals of the unit shape: the instancing bends them as the door is scaled */
+    const NS = 22, dz = 0.014, prof = [[0, -dz], [0.1, -dz * 0.25], [0.18, 0], [0.8, 0], [0.9, -dz * 0.35], [1, -dz]], p = [], n = [], uv = [];
+    for (let s = 0; s < NS; s++) for (let k = 1; k < prof.length; k++) {
+      const [f0, z0] = prof[k - 1], [f1, z1] = prof[k], y0 = (s + f0) / NS, y1 = (s + f1) / NS, L = Math.hypot(y1 - y0, z1 - z0), ny = -(z1 - z0) / L, nz = (y1 - y0) / L;
+      for (const [x, y, z] of [[-0.5, y0, z0], [0.5, y0, z0], [0.5, y1, z1], [-0.5, y0, z0], [0.5, y1, z1], [-0.5, y1, z1]]) { p.push(x, y, z); n.push(0, ny, nz); uv.push(x + 0.5, y); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
+  })();
   G.ac = box(-0.4, 0.4, 0, 0.55, 0, 0.28);
   G.pot = (() => { const a = box(-0.15, 0.15, 0, 0.28, -0.15, 0.15), b = new THREE.IcosahedronGeometry(0.22, 0); b.scale(1, 0.8, 1); b.translate(0, 0.42, 0);
     const col = (g, c) => { const n = g.attributes.position.count, arr = []; for (let i = 0; i < n; i++) arr.push(...c); g.setAttribute('color', new THREE.Float32BufferAttribute(arr, 3)); return g.index ? g.toNonIndexed() : g; };
@@ -13570,6 +13609,7 @@ const FAC_PARTS = (() => {
   mk('glass', FAC_GEO.glass.clone(), glassMat, 24000, { noCol: true, lit: true, win: true });
   mk('bar', FAC_GEO.bar, lam({}), 160000, { win: true });
   mk('tapp', FAC_GEO.tapp, lam({ map: FAC_TAPP }), 24000, { win: true });
+  mk('serr', FAC_GEO.serr, lam({}), 3000, { win: true });
   /* parts on and out of the wall: they fade with the hole */
   mk('sill', FAC_GEO.sill, facFadeMat(lam({}), FAC_R), 24000, { cast: true });
   mk('leaf', FAC_GEO.leaf, facFadeMat(lam({ map: FAC_SLAT }), FAC_R), 48000, { cast: true });
@@ -13611,6 +13651,20 @@ function facWin(r) {
   const nx = r.nx, nz = r.nz, Xx = nz, Xz = -nx, w = r.w, h = r.h, D = r.D, x = r.x, y = r.y, z = r.z;
   const wd = _facC.copy(r.wc).multiplyScalar(0.93);
   const bar = (u, y0, bw, bh, zd, dd, col) => facPut('bar', x + Xx * u - nx * zd, y0, z + Xz * u - nz * zd, Xx, Xz, nx, nz, bw, bh, dd, col);
+  if (r.gar) { /* a garage door: the hole in the wall, the rolling shutter of steel slats set back in it, its two guides, the bottom rail with the lock, the plaster frame round it */
+    FAC_W = [x, y, z, w, nx, nz, h, D];
+    facPut('reveal', x, y, z, Xx, Xz, nx, nz, w, h, D, wd);
+    const zs = D - 0.05, gc = FAC_SHUT_C.copy(r.shc).multiplyScalar(0.7);
+    facPut('serr', x - nx * zs, y + 0.06, z - nz * zs, Xx, Xz, nx, nz, w - 0.12, h - 0.06, 1, r.shc);
+    bar(-w / 2 + 0.035, y, 0.07, h, zs - 0.035, 0.08, gc); bar(w / 2 - 0.035, y, 0.07, h, zs - 0.035, 0.08, gc); /* the guides, a little out of the slats */
+    bar(0, y, w - 0.14, 0.07, zs - 0.012, 0.04, gc); /* the bottom rail */
+    bar(0, y + 0.015, 0.1, 0.04, zs - 0.03, 0.02, FAC_SHUT_C.setRGB(0.16, 0.17, 0.18)); /* the lock */
+    FAC_W = null;
+    const fw = FAC_GAR_FR, fo = 0.03; /* the frame 3 cm out of the wall */
+    for (const s of [-1, 1]) facPut('sill', x + Xx * s * (w / 2 + fw / 2) + nx * fo, y + h + fw, z + Xz * s * (w / 2 + fw / 2) + nz * fo, Xx, Xz, nx, nz, fw, h + fw, fo + 0.02, r.fr);
+    facPut('sill', x + nx * fo, y + h + fw, z + nz * fo, Xx, Xz, nx, nz, w, fw, fo + 0.02, r.fr);
+    return;
+  }
   if (r.lg) { /* a loggia: deep reveal, the back wall with its French window, the parapet at the front */
     FAC_W = [x, y, z, w, nx, nz, h, D];
     facPut('reveal', x, y, z, Xx, Xz, nx, nz, w, h, D, wd);
