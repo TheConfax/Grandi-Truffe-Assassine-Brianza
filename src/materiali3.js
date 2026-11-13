@@ -106,32 +106,85 @@ const R3_ROOF = s => {
     .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  if (r3K > 0.) normal = normalize((viewMatrix * vec4(r3W, 0.)).xyz);');
 };
 if (R3.on) { const m = MAT.roof, before = m.onBeforeCompile, prev = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; m.onBeforeCompile = (s, r) => { if (before) before.call(m, s, r); R3_ROOF(s); }; m.customProgramCacheKey = () => prev + '|r3roof'; m.needsUpdate = true; }
-// the covers in the asphalt (realismo 3, fase A; Carlo: "i tombini che mancano"), flush with the road, photos of ambientCG (CC0) in one atlas, tex/chiusini.png.
-// The data have almost none (Mapillary sees 118 on the whole map, OSM none), so a cautious rule, the same for every town, on the roads of the town (class 1-3, asphalt, on the
-// ground, at least 4 m wide): a sewer cover in a lane every 40 m on average, a drain grate at the kerb every 22 m where a pavement runs beside, a double utility cover
-// near the edge every 90 m. The place along each piece of road from a hash of its ends, so the same in every build and in both tiles a piece crosses. &tombini=0 turns them off
-const CHIUSINI = window.__CH = { on: !/[?&]tombini=0/.test(location.search), n: 0, slot: [[0.78, 0.77], [0.75, 0.75], [0.9, 0.48], [0.6, 0.38]] };
-const chiusiniMat = (() => { const t = r3Load('chiusini', true); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.loader = new THREE.TextureLoader().load('tex/chiusini.png', i => { t.image = i.image; t.needsUpdate = true; }); return t; })();
+// the covers in the asphalt (realismo 3; Carlo 13/11: "i tombini che mancano", then "sembrano messi a caso, la fila non segue mai la strada"), flush with the road,
+// photos of ambientCG (CC0) in one atlas, tex/chiusini.png (src/tex_pbr.py). The same rule for every town, on the roads of the town (class 1-3, asphalt, on the ground,
+// at least 4 m wide), along the true axis of each road (its whole line, curve by curve, by the length along it):
+//  - the sewer: a big round cast-iron cover in the middle of one lane, between the wheel tracks, always the same lane along a road, every 30-50 m, and one in
+//    the middle of every junction; a square patch of paler asphalt round it; now and then a slotted grate beside it;
+//  - the drain grates: always at the edges, by the kerb: every 20-25 m, one at each corner of a junction, one before every zebra crossing, one in every low point
+//    of the road (from its heights); along the edge of the car parks too;
+//  - utilities: small round covers and square diamond plates near the edge, here and there;
+//  - where Mapillary saw a cover (data/mapillary_grande, object--manhole, object--catch-basin: T.d.mh) it goes there, put on its lane or its kerb, in place of the rule
+//    nearby. No writing, no painted crosses. &tombini=0 turns them off
+const CHIUSINI = window.__CH = { on: !/[?&]tombini=0/.test(location.search), n: 0, fogna: 0, caditoie: 0, servizi: 0, mapillary: 0,
+  slot: [[0.68, 0.67], [0.46, 0.46], [0.55, 0.36], [0.45, 0.45], [1.25, 1.25]] }; /* metres: sewer, small round, grate, diamond square, patch */
+const chiusiniMat = (() => { const t = new THREE.TextureLoader().load('tex/chiusini.png'); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); return t; })();
 const CHIUSINI_MAT = new THREE.MeshLambertMaterial({ map: chiusiniMat, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
-r3Ground(CHIUSINI_MAT, 'chiusini', 'plain', 1); rifMat(CHIUSINI_MAT, 'stone');
+const TOPPA_MAT = new THREE.MeshLambertMaterial({ map: chiusiniMat, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }); /* the patch under the cover */
+r3Ground(CHIUSINI_MAT, 'chiusini', 'plain', 1); rifMat(CHIUSINI_MAT, 'stone'); rifMat(TOPPA_MAT, 'asphalt');
+const CH_NS = 5;
+/* the line of a road: its nodes and the length along it at each (once per road) */
+const chLinea = r => r._cl || (r._cl = (() => { const P = r.g.map(i => N[i]), S = [0]; for (let k = 1; k < P.length; k++) S.push(S[k - 1] + hyp(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1])); return { P, S, L: S[S.length - 1] }; })());
+const chAt = (cl, d) => { const { P, S } = cl; let k = 1; while (k < P.length - 1 && S[k] < d) k++; const l = S[k] - S[k - 1] || 1, f = clamp((d - S[k - 1]) / l, 0, 1), ux = (P[k][0] - P[k - 1][0]) / l, uz = (P[k][1] - P[k - 1][1]) / l; return [P[k - 1][0] + (P[k][0] - P[k - 1][0]) * f, P[k - 1][1] + (P[k][1] - P[k - 1][1]) * f, ux, uz]; };
+const chHash = (r, k) => hashRnd((r.g[0] * 0.731 + r.g[r.g.length - 1] * 1.37) % 9973 + k * 17.3);
+/* how far the asphalt goes from a point of the axis along (nx, nz): the drawn carriageway (the DBGT's) is often wider than the road's width, and off its axis */
+const chBordo = (x, z, nx, nz, max) => { let d = 0.25; while (d < max && onAsph(x + nx * d, z + nz * d)) d += 0.25; return d - 0.25; };
+const chRoadOk = r => r.c >= 1 && r.c <= 3 && !r.d && !(r.m && r.m !== 'a') && r.w >= 4;
 function buildChiusini(T, G) {
   if (!CHIUSINI.on) return;
-  const x0 = T.cx - TS / 2, z0 = T.cz - TS / 2, x1 = T.cx + TS / 2, z1 = T.cz + TS / 2, seen = new Set(), b = Object.assign(FBuf(), { noclip: true }), cw = COL('#ffffff'), placed = [];
-  const put = (x, z, ux, uz, k) => {
-    if (x < x0 || x >= x1 || z < z0 || z >= z1 || !onAsph(x, z) || inBuilding(x, z, 0.3) || H.inPit(x, z, 0.5) || placed.some(([px, pz]) => hyp(px - x, pz - z) < 1.5)) return;
-    const [W, L] = CHIUSINI.slot[k], nx = -uz, nz = ux, i0 = b.p.length / 3, u0 = k / 4;
-    const fu = 0.125 * (W >= L ? 1 : W / L), fv = 0.5 * (L >= W ? 1 : L / W); /* the photo fills its square cell along its longer side */
-    for (const [s, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) vtx(b, x + ux * s * W / 2 + nx * v * L / 2, 0.02, z + uz * s * W / 2 + nz * v * L / 2, 0, 1, 0, u0 + 0.125 + s * fu, 0.5 + v * fv, cw);
-    b.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); placed.push([x, z]); CHIUSINI.n++;
+  const x0 = T.cx - TS / 2, z0 = T.cz - TS / 2, x1 = T.cx + TS / 2, z1 = T.cz + TS / 2, b = Object.assign(FBuf(), { noclip: true }), bt = Object.assign(FBuf(), { noclip: true }), cw = COL('#ffffff'), placed = [];
+  const inT = (x, z) => x >= x0 && x < x1 && z >= z0 && z < z1;
+  const quad = (B, x, z, ux, uz, k, y) => { const [W, L] = CHIUSINI.slot[k], nx = -uz, nz = ux, i0 = B.p.length / 3, u0 = k / CH_NS, fu = 0.5 / CH_NS * (W >= L ? 1 : W / L), fv = 0.5 * (L >= W ? 1 : L / W);
+    for (const [s, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) vtx(B, x + ux * s * W / 2 + nx * v * L / 2, y, z + uz * s * W / 2 + nz * v * L / 2, 0, 1, 0, u0 + 0.5 / CH_NS + s * fu, 0.5 + v * fv, cw);
+    B.i.push(i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); };
+  const put = (x, z, ux, uz, k, sep = 1.2, kind = 'servizi', grp = kind) => { /* sep: the least distance from another of the same group (sewer, grates, utilities), 1 m from any */
+    if (!inT(x, z) || !onAsph(x, z) || inBuilding(x, z, 0.3) || H.inPit(x, z, 0.5) || placed.some(([px, pz, s, g]) => hyp(px - x, pz - z) < (g === grp ? Math.max(s, sep) : 1.0))) return false;
+    if (k === 0) { if (!onAsph(x + 0.6, z) || !onAsph(x - 0.6, z) || !onAsph(x, z + 0.6) || !onAsph(x, z - 0.6)) return false; quad(bt, x, z, ux, uz, 4, 0.015); } /* the patch, square to the road */
+    quad(b, x, z, k === 0 || k === 1 ? Math.cos(trHash(x, z) * TAU) : ux, k === 0 || k === 1 ? Math.sin(trHash(x, z) * TAU) : uz, k, 0.025); placed.push([x, z, sep, grp]); CHIUSINI.n++; CHIUSINI[kind]++; return true;
   };
-  ROADSEG.each(x0 - 2, z0 - 2, x1 + 2, z1 + 2, s => {
-    const r = s.r; if (seen.has(s) || r.c < 1 || r.c > 3 || r.d || (r.m && r.m !== 'a') || r.w < 4 || !atGrade(s)) return; seen.add(s);
-    const ex = s.b[0] - s.a[0], ez = s.b[1] - s.a[1], L = hyp(ex, ez); if (L < 1) return; const ux = ex / L, uz = ez / L, nx = -uz, nz = ux;
-    const h = k => hashRnd(s.a[0] * 0.731 + s.a[1] * 1.37 + s.b[0] * 2.11 + s.b[1] * 0.53 + k * 17.3);
-    const along = (step, k, f) => { for (let d = h(k) * step; d < L; d += step * (0.7 + 0.6 * h(k + d))) f(s.a[0] + ux * d, s.a[1] + uz * d, d); };
-    along(40, 1, (x, z, d) => { const lane = [0, -1, 1][Math.floor(h(d + 3) * 3)] * r.w / 4, a = h(d + 5) * TAU; put(x + nx * lane, z + nz * lane, Math.cos(a), Math.sin(a), h(d + 7) < 0.55 ? 0 : 1); });
-    for (const sd of [-1, 1]) along(22, 10 + sd, (x, z) => { const o = sd * (r.w / 2 - 0.3), ox = sd * (r.w / 2 + 1.2); if (onSide(x + nx * ox, z + nz * ox)) put(x + nx * o, z + nz * o, ux, uz, 3); });
-    along(90, 20, (x, z, d) => { const sd = h(d + 9) < 0.5 ? -1 : 1, o = sd * (r.w / 2 - 0.8); put(x + nx * o, z + nz * o, ux, uz, 2); });
-  });
+  /* the ones Mapillary saw: first, each on its lane or at its kerb, and the rule keeps away from them */
+  const vere = [];
+  for (const [X, Z, k] of T.d.mh || []) {
+    const x = X / 10, z = Z / 10; let best = null, bd = 12;
+    ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (!chRoadOk(s.r) || !atGrade(s)) return; const d = segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) - s.r.w / 2; if (d < bd) { bd = d; best = s; } });
+    if (!best) continue;
+    const ex = best.b[0] - best.a[0], ez = best.b[1] - best.a[1], L = hyp(ex, ez) || 1, ux = ex / L, uz = ez / L, t = clamp(((x - best.a[0]) * ex + (z - best.a[1]) * ez) / (L * L), 0, 1), cx = best.a[0] + ex * t, cz = best.a[1] + ez * t;
+    const sd = (x - cx) * -uz + (z - cz) * ux >= 0 ? 1 : -1, off = k === 0 ? sd * (best.r.lane || best.r.w / 4) : sd * (best.r.w / 2 - 0.35);
+    vere.push([cx - uz * off, cz + ux * off, ux, uz, k]);
+  }
+  for (const [x, z, ux, uz, k] of vere) put(x, z, ux, uz, k === 0 ? 0 : 2, k === 0 ? 20 : 8, 'mapillary', k === 0 ? 'fogna' : 'caditoie');
+  /* the roads crossing the tile: each once, along its whole line */
+  const roads = new Set(); ROADSEG.each(x0 - 2, z0 - 2, x1 + 2, z1 + 2, s => { if (chRoadOk(s.r) && atGrade(s)) roads.add(s.r); });
+  for (const r of roads) {
+    const cl = chLinea(r); if (cl.L < 8) continue;
+    const side = 1, lane = r.lane > 0 ? r.lane : 0, kerb = r.w / 2 - 0.35; /* the sewer in the right lane of the road's own direction (a one-way: its middle) */
+    /* the sewer, every 30-50 m from a phase of its own */
+    for (let d = 8 + chHash(r, 1) * 25, k = 0; d < cl.L - 4; d += 30 + 20 * chHash(r, k + 2), k++) {
+      const [x, z, ux, uz] = chAt(cl, d), nx = -uz, nz = ux, ep = chBordo(x, z, nx, nz, r.w / 2 + 6), em = chBordo(x, z, -nx, -nz, r.w / 2 + 6), mid = (ep - em) / 2, hw = (ep + em) / 2; /* the middle and the half width of the asphalt here */
+      const lo = lane > 0 ? mid + side * hw / 2 : mid, px = x + nx * lo, pz = z + nz * lo; /* a two-way road: the middle of the right lane, between the wheel tracks; a one-way: its middle */
+      if (!inT(px, pz) || nearJunction(px, pz, 8)) continue;
+      if (put(px, pz, ux, uz, 0, 12, 'fogna') && chHash(r, k + 50) < 0.3) put(px + ux * 1.3 + nx * 0.6 * side, pz + uz * 1.3 + nz * 0.6 * side, ux, uz, 2, 1.0, 'fogna', 'griglia'); /* a grate beside it */
+    }
+    /* drain grates at both kerbs: every 20-25 m, and in the low points of the road (heights every 4 m) */
+    const lows = []; { let prev = null, pprev = null; for (let d = 2; d < cl.L - 2; d += 4) { const [x, z] = chAt(cl, d), y = H.surface(x, z); if (prev && pprev && prev[1] < pprev[1] - 0.02 && prev[1] < y - 0.02) lows.push(prev[0]); pprev = prev; prev = [d, y]; } }
+    for (const sd of [-1, 1]) {
+      const at = d => { const [x, z, ux, uz] = chAt(cl, d), e = chBordo(x, z, -uz * sd, ux * sd, r.w / 2 + 6), o = Math.max(0.3, e - 0.33); return [x - uz * o * sd, z + ux * o * sd, ux, uz]; }; /* at the kerb: the edge of the asphalt, 33 cm in */
+      for (let d = 4 + chHash(r, 10 + sd) * 18, k = 0; d < cl.L - 3; d += 20 + 5 * chHash(r, k + 20 + sd), k++) { const [x, z, ux, uz] = at(d); if (!nearJunction(x, z, 6)) put(x, z, ux, uz, 2, 4, 'caditoie'); }
+      for (const d of lows) { const [x, z, ux, uz] = at(d); put(x, z, ux, uz, 2, 3, 'caditoie'); }
+      /* the corners of the junctions at the ends: one at 5 m from the node */
+      for (const [d, i] of [[5, r.g[0]], [cl.L - 5, r.g[r.g.length - 1]]]) if (NODE_DEG[i] >= 3 && cl.L > 12) { const [x, z, ux, uz] = at(d); put(x, z, ux, uz, 2, 2.5, 'caditoie'); }
+    }
+    /* utilities near the edge, here and there */
+    for (let d = 15 + chHash(r, 30) * 40, k = 0; d < cl.L - 5; d += 45 + 40 * chHash(r, k + 31), k++) { const sd = chHash(r, k + 40) < 0.5 ? -1 : 1, [x, z, ux, uz] = chAt(cl, d), o = Math.max(0.3, chBordo(x, z, -uz * sd, ux * sd, r.w / 2 + 6) - 0.75) * sd; put(x - uz * o, z + ux * o, ux, uz, chHash(r, k + 45) < 0.5 ? 1 : 3, 3, 'servizi'); }
+  }
+  /* the sewer in the middle of the junctions */
+  NODEG.each(x0, z0, x1, z1, ({ i }) => { if (NODE_DEG[i] < 3) return; const [x, z] = N[i]; let ok = false, ux = 1, uz = 0; ROADSEG.each(x - 1, z - 1, x + 1, z + 1, s => { if (!ok && chRoadOk(s.r) && atGrade(s) && (s.ia === i || s.ib === i)) { ok = true; const l = hyp(s.b[0] - s.a[0], s.b[1] - s.a[1]) || 1; ux = (s.b[0] - s.a[0]) / l; uz = (s.b[1] - s.a[1]) / l; } }); if (ok) put(x, z, ux, uz, 0, 10, 'fogna'); });
+  /* before the zebra crossings: a grate at each kerb, 2.5 m before it on either side */
+  for (const [X, Z, dx, dz, w] of T.d.cr || []) { const cx = X / 10, cz = Z / 10, l = hyp(dx, dz) || 1, ux = dx / l, uz = dz / l, nx = -uz, nz = ux;
+    for (const sd of [-1, 1]) for (const e of [-1, 1]) put(cx + ux * 2.6 * e + nx * (w / 2 - 0.35) * sd, cz + uz * 2.6 * e + nz * (w / 2 - 0.35) * sd, ux, uz, 2, 2, 'caditoie'); }
+  /* the edges of the car parks: a grate every 25 m along the edge, 0.4 m in */
+  for (const a of T.d.a || []) { if (a.t !== 4) continue; const o = dec(a.p); for (let i = 0; i < o.length; i++) { const p = o[i], q = o[(i + 1) % o.length], L = hyp(q[0] - p[0], q[1] - p[1]); if (L < 6) continue; const ux = (q[0] - p[0]) / L, uz = (q[1] - p[1]) / L;
+      for (let d = 6 + trHash(p[0], p[1]) * 10; d < L - 3; d += 25) { let x = p[0] + ux * d - uz * 0.4, z = p[1] + uz * d + ux * 0.4; if (!inPoly(x, z, o)) { x = p[0] + ux * d + uz * 0.4; z = p[1] + uz * d - ux * 0.4; } put(x, z, ux, uz, 2, 4, 'caditoie'); } } }
+  if (bt.i.length) mkMesh(bt, TOPPA_MAT, 6, false, G);
   if (b.i.length) mkMesh(b, CHIUSINI_MAT, 6, false, G);
 }

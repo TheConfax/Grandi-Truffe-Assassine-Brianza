@@ -30,33 +30,48 @@ function kitCasa(b, B, outer, holes, top, planes, pitched, t, wallCol, raised, r
     const pl = planes ? roofPlanes(B) : null, rc = B.rc, cen = planes ? null : centroid(outer), rh = planes ? 0 : bldPitch(B);
     const raw = (x, z) => { let m = Infinity; for (const p of pl) m = Math.min(m, p[0] + p[1] * (x - rc[0]) + p[2] * (z - rc[1])); return m; };
     const E = []; for (let i = 0; i < n; i++) { const a = outer[i], c = outer[(i + 1) % n]; E.push(nrm(a, c)); }
-    const rows = [];
+    const rows = [], free = (x, z) => !inBuilding(x, z, 0) && !inPoly(x, z, outer);
     for (let i = 0; i < n; i++) {
-      const a = outer[i], c = outer[(i + 1) % n], [nx, nz, L, ux, uz] = E[i]; if (L < 1.2) { rows.push(null); continue; } /* a jog of the plan: no eave sticking out like a plank */
-      const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
-      if (inBuilding(mx + nx * (st.O + 0.3), mz + nz * (st.O + 0.3), 0) || inBuilding(mx + nx * 0.3, mz + nz * 0.3, 0)) { rows.push(null); continue; } /* a wall another building stands against: no eave over it */
+      const a0 = outer[i], c0 = outer[(i + 1) % n], [nx, nz, L0, ux, uz] = E[i]; if (L0 < 1.2) { rows.push(null); continue; } /* a jog of the plan: no eave sticking out like a plank */
+      /* the stretch of the edge whose eave stays in the air: from each end, while the eave's outer edge would go into another building (or this one, at an inside corner), it is cut back
+         (Carlo 13/11: the bits of eave sticking into the junctions of two roofs) */
+      const O = st.O, okAt = t => free(a0[0] + ux * L0 * t + nx * (O + 0.05), a0[1] + uz * L0 * t + nz * (O + 0.05)) && free(a0[0] + ux * L0 * t + nx * 0.25, a0[1] + uz * L0 * t + nz * 0.25);
+      const stp = Math.min(0.5, L0 / 4) / L0; let t0 = 0, t1 = 1; while (t0 < 1 && !okAt(Math.min(t0 + 0.02, 1))) t0 += stp; while (t1 > t0 && !okAt(Math.max(t1 - 0.02, 0))) t1 -= stp;
+      if ((t1 - t0) * L0 < 1.0 || !okAt((t0 + t1) / 2)) { rows.push(null); continue; }
+      const a = [a0[0] + ux * L0 * t0, a0[1] + uz * L0 * t0], c = [a0[0] + ux * L0 * t1, a0[1] + uz * L0 * t1], L = (t1 - t0) * L0, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
       let ya, yc, s;
       if (pl) { ya = Math.max(0, raw(a[0], a[1])); yc = Math.max(0, raw(c[0], c[1])); s = clamp((raw(mx, mz) - raw(mx + nx * 0.5, mz + nz * 0.5)) / 0.5, 0, 2); }
       else { ya = yc = 0; const d0 = Math.abs((cen[0] - a[0]) * nx + (cen[1] - a[1]) * nz) || 1; s = rh / d0; }
-      const O = st.O, dy = O * s, P = [[a[0], top + ya, a[1]], [c[0], top + yc, c[1]], [c[0] + nx * O, top + yc - dy, c[1] + nz * O], [a[0] + nx * O, top + ya - dy, a[1] + nz * O]];
+      const dy = O * s, P = [[a[0], top + ya, a[1]], [c[0], top + yc, c[1]], [c[0] + nx * O, top + yc - dy, c[1] + nz * O], [a[0] + nx * O, top + ya - dy, a[1] + nz * O]];
       const ny = Math.hypot(s, 1), up = [nx * s / ny, 1 / ny, nz * s / ny];
       kitQuad(b, P, up, roofCol || COL('#b0523a')); /* the eave: the pitch going on, coppi and all */
-      rows.push({ a, c, nx, nz, ux, uz, L, ya, yc, dy, s, P });
+      /* a gutter only along an eave line: the roof falls away from the wall (s) and the edge is level (not a gable, whose roof line climbs along it) */
+      const gut = fa !== 0 && s > 0.12 && Math.abs(ya - yc) / L < 0.04;
+      rows.push({ a, c, nx, nz, ux, uz, L, ya, yc, dy, s, P, gut, full0: t0 < 1e-6, full1: t1 > 1 - 1e-6 });
     }
     for (let i = 0; i < n; i++) { const r = rows[i]; if (!r) continue; KIT.gronde++;
       const [, , pc, pd] = r.P, Th = st.Th, O = st.O;
       kitQuad(b, [pd, pc, [pc[0], pc[1] - Th, pc[2]], [pd[0], pd[1] - Th, pd[2]]], [r.nx, 0, r.nz], fcol); /* fascia */
       kitQuad(b, [[pd[0], pd[1] - Th, pd[2]], [pc[0], pc[1] - Th, pc[2]], [r.c[0], top + r.yc - Th, r.c[1]], [r.a[0], top + r.ya - Th, r.a[1]]], [0, -1, 0], scol); /* soffit */
-      if (r.s > 0.12 && fa !== 0) { /* a gutter along an eave (not along a gable) */
-        const e0 = rows[(i - 1 + n) % n] ? O * 0.95 : 0, e1 = rows[(i + 1) % n] ? O * 0.95 : 0, sh = (e1 - e0) / 2; /* past the corner only where the next eave goes on: no gutter sticking out into the air */
-        const gx = (pc[0] + pd[0]) / 2 + r.nx * 0.06 + r.ux * sh, gz = (pc[2] + pd[2]) / 2 + r.nz * 0.06 + r.uz * sh, gy = (pc[1] + pd[1]) / 2 - 0.06;
-        addBox(b, gx, gy, gz, r.L + e0 + e1, 0.1, 0.11, gcol, Math.atan2(-r.uz, r.ux));
-        if (r.L > 6 && !raised) { const ex = r.a[0] + r.nx * 0.12 + r.ux * 0.25, ez = r.a[1] + r.nz * 0.12 + r.uz * 0.25, g0 = H.ground(ex, ez), y1 = top + r.ya - Th; if (y1 - g0 > 1.5 && y1 - g0 < 40) addBox(b, ex, (g0 + y1) / 2, ez, 0.08, y1 - g0, 0.08, gcol); } /* the downpipe at one end */
+      if (!r.gut) continue;
+      /* the gutter: hung just under the tiles at the outer edge of the eave, from end to end of it; at a corner it goes on to meet the next gutter only where an eave
+         line turns round it (a hip), otherwise it stops where the eave stops. A downpipe at one end: down from the gutter to the wall corner and along it to the ground */
+      const pv = rows[(i - 1 + n) % n], nx_ = rows[(i + 1) % n], cv = (r0, r1) => { const crs = r0.ux * r1.uz - r0.uz * r1.ux; return (ccw ? crs : -crs) > 0.05; };
+      const e0 = pv && pv.gut && r.full0 && pv.full1 && cv(pv, r) ? O : 0, e1 = nx_ && nx_.gut && r.full1 && nx_.full0 && cv(r, nx_) ? O : 0, sh = (e1 - e0) / 2;
+      const gy = (pc[1] + pd[1]) / 2 - 0.06, gx = (pc[0] + pd[0]) / 2 + r.nx * 0.05 + r.ux * sh, gz = (pc[2] + pd[2]) / 2 + r.nz * 0.05 + r.uz * sh;
+      addBox(b, gx, gy, gz, r.L + e0 + e1, 0.1, 0.11, gcol, Math.atan2(-r.uz, r.ux)); KIT.grondaie = (KIT.grondaie || 0) + 1;
+      if (r.L > 5 && !raised && !e0) { /* the downpipe at the end a, where the gutter ends (at a hip corner the next gutter's end takes it) */
+        const wx = r.a[0] + r.nx * 0.1 + r.ux * 0.18, wz = r.a[1] + r.nz * 0.1 + r.uz * 0.18, g0 = H.ground(wx, wz), y1 = gy - 0.05;
+        if (y1 - g0 > 1.5 && y1 - g0 < 40 && !inBuilding(wx, wz, 0)) {
+          addBox(b, wx, (g0 + y1) / 2, wz, 0.08, y1 - g0, 0.08, gcol); /* down the wall */
+          const ox = wx + r.nx * (O - 0.05) / 2, oz = wz + r.nz * (O - 0.05) / 2; addBox(b, ox, y1, oz, 0.08, 0.08, O - 0.05, gcol, Math.atan2(-r.uz, r.ux)); /* the elbow under the eave, out to the gutter */
+          KIT.pluviali = (KIT.pluviali || 0) + 1;
+        }
       }
     }
-    /* the corners: the triangle between two eaves that meet outside */
-    for (let i = 0; i < n; i++) { const r0 = rows[(i - 1 + n) % n], r1 = rows[i]; if (!r0 || !r1) continue; const crs = r0.ux * r1.uz - r0.uz * r1.ux; if ((ccw ? crs : -crs) <= 0.05) continue;
-      const p = r1.P[0], q0 = r0.P[2], q1 = r1.P[3], qm = [(q0[0] + q1[0]) / 2, (q0[1] + q1[1]) / 2, (q0[2] + q1[2]) / 2], i0 = b.p.length / 3, col = roofCol || COL('#b0523a');
+    /* the corners: the triangle between two eaves that meet outside, both whole to the corner */
+    for (let i = 0; i < n; i++) { const r0 = rows[(i - 1 + n) % n], r1 = rows[i]; if (!r0 || !r1 || !r0.full1 || !r1.full0) continue; const crs = r0.ux * r1.uz - r0.uz * r1.ux; if ((ccw ? crs : -crs) <= 0.05) continue;
+      const p = r1.P[0], q0 = r0.P[2], q1 = r1.P[3], i0 = b.p.length / 3, col = roofCol || COL('#b0523a');
       for (const v of [p, q0, q1]) vtx(b, v[0], v[1], v[2], 0, 1, 0, 0, 0, col); b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 1);
       kitQuad(b, [q0, q1, [q1[0], q1[1] - st.Th, q1[2]], [q0[0], q0[1] - st.Th, q0[2]]], [(r0.nx + r1.nx) / 2, 0, (r0.nz + r1.nz) / 2], fcol);
       const j0 = b.p.length / 3; for (const v of [[p[0], p[1] - st.Th, p[2]], [q0[0], q0[1] - st.Th, q0[2]], [q1[0], q1[1] - st.Th, q1[2]]]) vtx(b, v[0], v[1], v[2], 0, -1, 0, 0, 0, scol); b.i.push(j0, j0 + 1, j0 + 2, j0, j0 + 2, j0 + 1);

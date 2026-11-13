@@ -120,20 +120,36 @@ for name, size_m, gd in [('prato', 2.0, 0.006), ('terreno', 2.0, 0.004)]:
     save_nr(name, nx, ny, rough_from(img))
 print('ok')
 
-# --- tombini (realismo 3, fase A): ambientCG, CC0, i decal 1K-PNG (seconda cartella, secondo argomento): ManholeCover006 e 003 (chiusini tondi),
-# ManholeCover007 (pozzetto a due coperchi), Grate002 (caditoia). Un atlante di 4 caselle da 128 px: tex/chiusini.png (colore e opacita') e tex/chiusini_nr.jpg
+# --- tombini (realismo 3, fase A, rifatti su indicazione di Carlo 13/11): ambientCG, CC0, secondo argomento la cartella con i pacchetti scompattati.
+# Atlante di 5 caselle da 128 px, tex/chiusini.png (colore e opacita') e tex/chiusini_nr.jpg:
+#   0 chiusino della fogna, tondo, ghisa scura (ManholeCover006)    1 tondo piccolo dei servizi (ManholeCover003)
+#   2 caditoia a fessure / griglia (Grate002)                        3 quadrato pieno a rombi dei servizi (DiamondPlate008A, ricolorato ghisa, con la cornice)
+#   4 la toppa d'asfalto attorno al chiusino (la nostra foto dell'asfalto, schiarita, bordo irregolare)
 if len(sys.argv) > 2:
-    ACG = sys.argv[2]; S = 128
-    col = Image.new('RGBA', (4 * S, S), (0, 0, 0, 0)); nr = np.zeros((S, 4 * S, 3)); nr[..., 0] = nr[..., 1] = .5; nr[..., 2] = .5
-    for i, a in enumerate(['ManholeCover006', 'ManholeCover003', 'ManholeCover007', 'Grate002']):
-        base = os.path.join(ACG, a, a + '_1K-PNG_')
-        c = Image.open(base + 'Color.png').convert('RGB'); o = Image.open(base + 'Opacity.png').convert('L'); bb = o.point(lambda v: 255 if v > 128 else 0).getbbox()
-        c, o = c.crop(bb), o.crop(bb); n = Image.open(base + 'NormalGL.png').convert('RGB').crop(bb); r = Image.open(base + 'Roughness.png').convert('L').crop(bb)
+    ACG = sys.argv[2]; S = 128; NS = 5
+    col = Image.new('RGBA', (NS * S, S), (0, 0, 0, 0)); nr = np.zeros((S, NS * S, 3)); nr[..., 0] = nr[..., 1] = .5; nr[..., 2] = .5
+    def put(i, c, o, n, r):
         w, h = c.size; k = S / max(w, h); W, Hh = max(1, round(w * k)), max(1, round(h * k)); x0, y0 = i * S + (S - W) // 2, (S - Hh) // 2
-        if i == 2: c = c.point(lambda v: int(v * .7))  # il riempimento di cemento del pozzetto: la foto e' molto chiara, nel gioco sembrava una toppa bianca
         rgba = c.resize((W, Hh), Image.LANCZOS).convert('RGBA'); rgba.putalpha(o.resize((W, Hh), Image.LANCZOS)); col.paste(rgba, (x0, y0))
         na = np.asarray(n.resize((W, Hh), Image.LANCZOS)).astype(float) / 255; ra = np.asarray(r.resize((W, Hh), Image.LANCZOS)).astype(float) / 255
         nr[y0:y0 + Hh, x0:x0 + W, 0] = na[..., 0]; nr[y0:y0 + Hh, x0:x0 + W, 1] = na[..., 1]; nr[y0:y0 + Hh, x0:x0 + W, 2] = np.clip(ra / max(ra.mean(), 1e-3) * .5, 0, 1)
-        print(a, 'casella', i, 'pixel', W, Hh)
+        print('casella', i, 'pixel', W, Hh)
+    for i, a in enumerate(['ManholeCover006', 'ManholeCover003', 'Grate002']):
+        base = os.path.join(ACG, a, a + '_1K-PNG_')
+        c = Image.open(base + 'Color.png').convert('RGB'); o = Image.open(base + 'Opacity.png').convert('L'); bb = o.point(lambda v: 255 if v > 128 else 0).getbbox()
+        put(i, c.crop(bb), o.crop(bb), Image.open(base + 'NormalGL.png').convert('RGB').crop(bb), Image.open(base + 'Roughness.png').convert('L').crop(bb))
+    # 3: diamond plate, a 45 cm square: a third of the 1K photo, cast iron (dark grey-brown), a frame of 6 px
+    base = os.path.join(ACG, 'DiamondPlate008', 'DiamondPlate008A_1K-JPG_'); bb = (0, 0, 340, 340)
+    c = Image.open(base + 'Color.jpg').convert('L').crop(bb); ca = np.asarray(c).astype(float) / 255; ca = .25 + .5 * (ca - ca.mean()) / max(ca.std(), 1e-3) * .12 + .0
+    rgb = np.stack([ca * 1.05, ca * .97, ca * .9], -1); fr = np.zeros(ca.shape, bool); fr[:18] = fr[-18:] = True; fr[:, :18] = fr[:, -18:] = True; rgb[fr] *= .7
+    nn = np.asarray(Image.open(base + 'NormalGL.jpg').convert('RGB').crop(bb)).copy(); nn[fr] = (128, 128, 255)
+    put(3, Image.fromarray((np.clip(rgb, 0, 1) * 255).astype(np.uint8)), Image.new('L', c.size, 255), Image.fromarray(nn), Image.open(base + 'Roughness.jpg').convert('L').crop(bb))
+    # 4: the patch: the asphalt photo paler and rougher in a square with a ragged edge
+    a = Image.open(os.path.join(TEX, 'asfalto.jpg')).convert('RGB').resize((S, S), Image.LANCZOS); aa = np.asarray(a).astype(float) / 255  # our asphalt, a little paler
+    aa = np.clip(aa * 1.22 + .02, 0, 1)
+    yy, xx = np.mgrid[0:S, 0:S]; edge = np.minimum(np.minimum(xx, S - 1 - xx), np.minimum(yy, S - 1 - yy)).astype(float)
+    rng = np.random.default_rng(3); noise = np.asarray(Image.fromarray((rng.random((16, 16)) * 255).astype(np.uint8)).resize((S, S), Image.BICUBIC)).astype(float) / 255
+    alpha = ((edge - 3 - 5 * noise) > 0).astype(np.uint8) * 255
+    put(4, Image.fromarray((aa * 255).astype(np.uint8)), Image.fromarray(alpha), Image.new('RGB', (S, S), (128, 128, 255)), Image.new('L', (S, S), 200))
     col.save(os.path.join(TEX, 'chiusini.png'), optimize=True)
     Image.fromarray((nr * 255 + .5).astype(np.uint8)).save(os.path.join(TEX, 'chiusini_nr.jpg'), quality=90, subsampling=0)
