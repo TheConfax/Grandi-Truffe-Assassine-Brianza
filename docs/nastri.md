@@ -1,0 +1,169 @@
+# Nastri: il motore è adatto a un mondo su più livelli?
+
+Analisi del 13/11/2026, ramo `nastri` (solo questo documento, nessuna modifica al gioco). Chiesta da Carlo prima di estendere la mappa verso Seregno e la Valassina.
+
+## In breve
+
+- **Le fondamenta reggono.** Le quote, la fisica e la telecamera lavorano già su più livelli: un suolo unico più delle lastre sopra e sotto, e ogni cosa che si muove chiede "cosa ho sotto, vicino alla mia altezza". Non serve un motore nuovo.
+- **Il sospetto di Carlo è giusto per tutto il resto.** Quello che sta nel mondo (asfalto, righe, cordoli, spartitraffico, guardrail, recinzioni, alberi) è salvato come disegno in pianta, senza scritto a che livello sta. La quota la prende dopo, appoggiandosi al suolo. Dove ci sono due livelli ogni famiglia di oggetti indovina il suo con una regola propria: ne ho contate una decina, tutte diverse.
+- **Il ponte non è la strada.** È un oggetto a parte, nato dalla sagoma PONTE del DBGT e allungato a quadretti di 2 m per farlo arrivare al terreno. La strada che ci passa sopra ha un'altra forma e un'altra larghezza. Da qui i bordi seghettati e gli attacchi sbagliati: due verità sullo stesso bordo.
+- **Cosa cambierei:** la strada diventa un nastro unico nella build (asse con le quote, due bordi, e per ogni tratto se è a raso, su ponte o in galleria). Il ponte è lo stesso nastro in un tratto in cui sotto non c'è terra. Tutto ciò che appartiene alla strada porta scritto il nastro su cui sta e ne prende la quota. Il terreno si adatta al nastro, non il contrario.
+- I passi sono sette, ognuno si guarda nel gioco. Il primo che si vede (i ponti dritti, larghi come la strada) è il secondo.
+
+**Limite di questa analisi.** Il codice è 1,4 MB solo nei file che c'entrano e non l'ho letto riga per riga. Ho letto per intero la parte delle quote (`altezze3.js`), nel disegno le parti di `world3.js` che toccano ponti e livelli, e delle build (`impalcati.py`, `opere.py`, `build_data.py`, `dbgt_righe.py`, `guardrail.py` e le altre) le intestazioni e i commenti sui livelli. La fisica l'ho guardata nei punti in cui chiede la quota. I numeri di riga sono di `origin/dev` al commit `0706aa09`.
+
+---
+
+## 1. È adatto a un mondo 3D su più livelli?
+
+### Dove sì
+
+**Le quote (`src/altezze3.js`).** Il mondo è un suolo `S` a griglia di 2 m più tre tipi di lastre: impalcati sopra (`deckAt`, r. 333), fosse e rampe sotto (`pitY`, r. 402), tratti coperti dei sottopassi (`gallAt`, r. 359). La domanda che conta è `H.surface(x, z, cy)` (r. 481): "il piano più alto che sta sotto di me, entro 0,8 m sopra i miei piedi". Sotto un ponte risponde la strada di sotto, sul ponte risponde l'impalcato, in galleria il fondo. Funziona con quanti impalcati si vuole uno sopra l'altro.
+
+**La fisica (`src/fisica3.js`, blocchi in `src/assemble3.py`).** Ruote, scocca, pedoni e giocatore chiedono tutti `H.surface` con la propria altezza. Non c'è nessuna regola per posto: la fisica è già uguale ovunque. I muri hanno piede e cima (`y0`, `y1`) in 23 dei 35 punti in cui `world3.js` li crea, quindi un parapetto del ponte non ferma chi passa sotto.
+
+**La telecamera** conosce i soffitti (`camSlabs`, `camCeil` in `assemble3.py`): impalcati e coperture.
+
+**Il grafo delle strade.** Ogni nodo ha la sua quota, e sa su quale impalcato sta dalla lista delle strade di quell'impalcato (`decks[].ra`, `H.node` r. 495). Traffico e polizia nascono al livello giusto.
+
+Foto: da sotto, il cavalcavia della Milano-Meda su corso Isonzo è un ponte credibile (spalle, soletta, strada che passa).
+
+![corso Isonzo sotto la Milano-Meda](nastri_foto/isonzo_sotto_e.jpg)
+
+### Dove no
+
+**a) Gli oggetti del mondo non sanno a che livello stanno.** Nei pezzi della mappa asfalto, marciapiedi, righe, isole, barriere e alberi sono poligoni, linee e punti in pianta. Nel disegno la quota è quasi sempre `H.ground(x, z)`, cioè il suolo `S`, il livello più basso: circa 165 chiamate nei file del gioco (64 in `world3.js`, 54 in `paesaggio3.js`), contro 13 punti di `world3.js` che guardano gli impalcati. Quei 13 punti sono le pezze. Ognuno risponde a modo suo alla stessa domanda, "questa cosa sta sopra o sotto?":
+
+| Cosa | Come decide il livello | Dove |
+|---|---|---|
+| Spartitraffico | un segno messo dalla build (`dk`), altrimenti guarda se le carreggiate parallele vicine sono sopraelevate | `world3.js` r. 331-336 `medianDeck` |
+| Righe | livello 1 o 2 dalla build; poi "sul ponte se sotto non passa una strada, o se il ponte è a meno di 2,5 m dal suolo" | `world3.js` r. 2037-2044 `topS` |
+| Asfalto | sul ponte solo se sotto c'è acqua o campo (`free`) | `altezze3.js` r. 471-475 `H.street` |
+| Asfalto delle rampe | niente vernice nelle celle sotto l'impalcato, tranne dove passa un'altra strada entro mezza larghezza + 1 m | `world3.js` r. 1371-1380 `rampPaint`, `ud2` |
+| Cordoli | tagliati a pezzi di 1 m per saltare le celle sotto il ponte | `world3.js` r. 1083 |
+| Guardrail, piloni, binari vecchi | "l'impalcato più vicino alla quota vecchia, entro 3 m" | `world3.js` r. 1148-1155 `deckY` |
+| Piloni | non dove a terra c'è asfalto, alveo o binario entro 3,4 m | `world3.js` r. 1318-1325 `busyGround` |
+| Muri sopra un sottopasso | il piede del muro alzato sopra il soffitto, intercettando ogni muro creato | `world3.js` r. 1544-1546 |
+| Prati | terra nuda nelle celle sotto un impalcato | `world3.js` r. 1735-1737 |
+| Suolo sopra la bocca di un sottopasso | "almeno la cima dell'opera" nelle celle della trincea | `altezze3.js` r. 413-419 `sopraCoperto` |
+
+Lo stesso nella build: le regole lavorano con le distanze in pianta e il livello è stato aggiunto dopo, una regola alla volta, quasi sempre dopo una segnalazione di Carlo. In `build_data.py`: la recinzione della ferrovia che si apriva sotto la Milano-Meda perché la strada "attraversa" i binari in pianta (r. 934-938 e 991), i muri a terra sotto i ponti (r. 1294), le isole e i prati finiti sopra o sotto l'impalcato (r. 2721-2744). In `guardrail.py` i guardrail "si aprono sui ponti" (r. 11).
+
+È la prova più diretta: i casi segnati in `todo.md` sotto "Il gioco non è 2D" (strisce del ponte cancellate da quelle di sotto, guardrail della Milano-Meda su corso Isonzo, spartitraffico interrotto sotto la rampa) sono la stessa domanda che riceve risposte diverse da regole diverse.
+
+**b) Il ponte è un oggetto diverso dalla strada.** `impalcati.py` costruisce l'impalcato dalla sagoma PONTE (il "nucleo"), poi lo allunga con le celle da 2 m della griglia del terreno per farlo arrivare dove trova suolo alla sua quota: celle di spalla, prolungamenti fino a 12 m, rampe fino a 40 m (r. 25-36 e 445, 547, 569). Fuori dal nucleo il bordo dell'impalcato corre quindi sulle linee della griglia, a scalini. I parapetti seguono quel bordo (`deckOutline`, `world3.js` r. 1307-1316, il commento dice proprio "in 2 m steps"). La strada invece nasce dall'asse con la sua larghezza e l'asfalto dai poligoni AC_VEI. Tre geometrie per lo stesso bordo.
+
+![la Milano-Meda sopra corso Isonzo, dall'alto](nastri_foto/isonzo_alto.jpg)
+
+Dall'alto, x 346 z 1998: i due bordi dell'impalcato fanno i denti, il parapetto li segue, lo spartitraffico piega dove comincia il ponte.
+
+![il bordo dello stesso ponte](nastri_foto/isonzo_bordo.jpg)
+
+Lo stesso bordo dal ciglio: il parapetto a pezzi sfalsati dove dovrebbe continuare la linea della strada.
+
+![cavalcavia di via Vignazzola dall'alto](nastri_foto/vignazzola_alto.jpg)
+
+Via Vignazzola, x -20 z 769: il ponte è più largo della strada che ci arriva, al capo est c'è un dente, le righe di bordo della strada e del ponte non sono sulla stessa linea.
+
+![il capo est di via Vignazzola](nastri_foto/vignazzola_capo.jpg)
+
+I rami parcheggiati lo confermano. `ponti-come-strada` (largo come la strada) veniva stretto, `ponti-imbuto` (largo come il DBGT con un raccordo) veniva largo. Tutti e due correggono il bordo nel gioco, dopo che la build ha già prodotto due forme diverse: una delle due resta sempre sbagliata. Tutti e due, poi, cambiano solo `altezze3.js` e `world3.js`: la build non la toccano.
+
+**c) Il suolo ha una quota sola per punto e quadretti di 2 m.** Dove due livelli sono vicini in pianta (il fianco di un ponte, la bocca di un sottopasso, una rampa accanto alla strada di sotto) un quadretto ha un angolo su un livello e uno sull'altro e disegna un telo inclinato. Da qui: il gradino dei fianchi (`impalcati.py` r. 569-571, "a walker went up it in one frame"), i teli grigi nelle bocche (`sopraCoperto`), le celle senza vernice (`ud`). Le fosse bucano il terreno a celle intere (`F.pc`) e il gioco ridisegna a mano il suolo attorno. Sotto un ponte, poi, il LiDAR non vede: il suolo lì va ricostruito (`opere.py`, r. 15-19).
+
+**d) Sotto terra c'è un piano solo.** In un punto si trova una fossa oppure una galleria, la prima che capita (`pitY` e `gallAt` si fermano al primo triangolo). Un parcheggio interrato su due piani oggi non si può descrivere. Sopra terra invece gli impalcati si sommano senza limite.
+
+**e) Dove il DBGT non ha un PONTE la strada non ha ponte.** A corso Isonzo sul Seveso (x -684.7 z 1687.7) entro 70 m dal punto non c'è nessun impalcato: la strada è bruciata nel suolo e scende col terreno verso il torrente. È la "depressione importante" segnata da Carlo il 9/11.
+
+### Perché è nato così
+
+Il motore nuovo (`docs/motore.md`) è partito dal problema giusto di allora: cinque funzioni davano cinque quote diverse. La risposta è stata una superficie unica, con ponti e fosse come eccezioni ("gli unici oggetti che stanno sopra o sotto", §0). Per le quote ha funzionato. Ma il modello è rimasto "il suolo più alcune eccezioni", e ogni cosa disegnata è figlia del suolo. In un mondo su più livelli le strade devono essere cittadine di prima classe e il suolo deve stare loro attorno.
+
+---
+
+## 2. Cosa cambierei alla radice
+
+### Il nastro
+
+Nella build ogni carreggiata diventa un **nastro**:
+
+- un asse in 3D (gli assi EL_STR del DBGT hanno già la quota di ogni vertice, ponti compresi: `build_data.py` r. 283);
+- due bordi, misurati di traverso all'asse a ogni metro sulla carreggiata AC_VEI (lo fa già `dbgt_righe.py` per le righe, r. 7-10: linea di mezzo e due bordi lisciati);
+- per ogni tratto la **sede**: a raso, su ponte, in galleria o trincea. Il DBGT la scrive su assi e aree (`SED` e `LIV`, già letti da `dbgt_quote.py` r. 28-35);
+- un numero suo.
+
+Da qui quattro regole.
+
+1. **Il ponte è un tratto del nastro.** Dove la sede è "ponte" la build non brucia la strada nel suolo e produce l'impalcato dalla sezione del nastro: stessa larghezza, stessi bordi lisci, soletta sotto, parapetti sul bordo. Il ponte comincia e finisce a una stazione dell'asse, con un taglio dritto di traverso: lì c'è la spalla. Spariscono le celle di spalla, i prolungamenti, le rampe a quadretti, la correzione dei fianchi. La sagoma PONTE resta come controllo (dice dove deve esserci un ponte e quanto è lungo).
+2. **Il sottopasso è un tratto del nastro.** Dove la sede è "galleria" o l'asse sta sotto il suolo, la build produce fondo, pareti e soletta dalla sezione del nastro. `opere.py` fa già così ("l'opera è un pezzo solo, e prima viene lei; poi il terreno e la vernice si tagliano attorno al suo contorno", r. 10-11): diventa la regola di tutti, non un flusso a parte.
+3. **Ogni cosa della strada porta scritto il suo nastro.** Righe, spartitraffico, cordoli, marciapiedi, guardrail, lampioni, cartelli escono dalla build con il numero del nastro (o 0 per "a terra"). Il gioco chiede la quota a quel nastro, senza indovinare. Le dieci regole della tabella sopra diventano una.
+4. **Una sola funzione "stesso livello" nella build.** Due cose si toccano, si tagliano o si escludono solo se sono allo stesso livello: stesso nastro, o quote entro una tolleranza nel punto in cui si incontrano. Recinzioni, muri, cancelli, alberi, doppioni usano quella, e non la distanza in pianta.
+
+### Nel gioco
+
+- **Una lastra sola al posto di tre.** Impalcati, fosse e gallerie diventano lo stesso oggetto: triangoli con un piano di sopra e, se c'è, un soffitto. `H.surface(x, z, cy)` resta com'è, guarda tutte le lastre. Un parcheggio su tre piani sono tre lastre e i nastri delle rampe, sopra o sotto terra.
+- **Il terreno si taglia sul contorno, non a quadretti.** Dove un nastro scende sotto il suolo la maglia del terreno si ritaglia lungo il suo bordo. Il ritaglio dei poligoni sulla griglia esiste già (`clipPoly`, `altezze3.js` r. 279) e oggi serve a stendere le superfici: va usato anche per bucare.
+- `H.on(livello, x, z)` per chi disegna: la quota del nastro o della lastra indicata.
+
+### Il terreno sotto e attorno
+
+Il suolo `S` resta la griglia di oggi, ma è il nastro che comanda: a raso la strada si brucia nel suolo come ora; su ponte e in galleria il suolo resta quello che c'è sotto o sopra (un altro nastro, o il terreno del DBGT e del LiDAR). Dove una strada passa su un corso d'acqua il nastro tiene il suo profilo e l'alveo continua sotto.
+
+### Alternative considerate
+
+| Alternativa | Perché la scarto |
+|---|---|
+| **Mondo tutto a maglie 3D con un motore fisico generico** (collisioni su triangoli) | Butta la fisica dell'auto che Carlo ha messo a punto e che già lavora su più livelli. I dati sono in pianta con la quota (DBGT, LiDAR): un suolo più lastre li rappresenta esattamente. Costo molto alto, nessun difetto di oggi viene da lì. |
+| **Più griglie del suolo, una per livello** | I livelli non sono globali: il "piano 1" di un cavalcavia non è quello di un parcheggio. I bordi resterebbero a quadretti di 2 m, che è proprio il difetto. |
+| **Griglia più fitta attorno ai ponti** (0,5 m) | I denti diventano più piccoli ma restano, e i quadretti continuano a mescolare due livelli. Più dati per lo stesso errore. |
+| **Continuare a correggere nel gioco** (`ponti-imbuto`, `ponti-come-strada`) | Già provato due volte: con due forme diverse dello stesso bordo una resta sbagliata. E ogni comune nuovo porta casi nuovi. |
+| **Sistemare solo i ponti e lasciare il resto in pianta** | Toglie i denti, ma righe, spartitraffico e guardrail continuerebbero a indovinare il livello. Sugli svincoli della Valassina (rampe sopra rampe) le dieci regole si contraddicono. |
+| **Livello scritto a mano o per coordinate nei casi difficili** | Contro la regola: niente pezze, niente coordinate per comune. |
+
+---
+
+## 3. Cosa terrei com'è
+
+- **`H.surface(x, z, cy)` e tutta la fisica.** È il pezzo già 3D. Cambia solo da dove arrivano le lastre.
+- **Il suolo `S`** (griglia, pezzi, cucitura, materiali per cella) e il **ritaglio delle superfici sulla griglia**: asfalto e prati a raso stanno esattamente sul terreno, ed è giusto così.
+- **La lettura del DBGT**: pulizia delle quote, aggancio delle vie OSM agli assi EL_STR (`dbgt_strade.py`), misura dei bordi della carreggiata (`dbgt_righe.py`). Il nastro è fatto con questi pezzi: vanno messi insieme, non riscritti.
+- **I binari.** `binari.py` dà già ai binari un profilo proprio, liscio, e il gioco ci disegna sopra rotaie e massicciata (`altezze3.js` r. 122-139). È un nastro, fatto dopo gli stessi problemi, e ha funzionato.
+- **`opere.py`** come idea: l'opera prima, terreno e vernice tagliati attorno.
+- **I muri con piede e cima**, da estendere ai 12 punti che ancora non li hanno.
+- **I controlli** (`controlli_ponti.py`, `controllo_strisce_ponti.py`, il controllo `di_traverso`): diventano il collaudo di ogni passo.
+- **Il caricamento a pezzi**, la build attorno al punto, i rapporti.
+
+---
+
+## 4. I passi
+
+Ogni passo finisce con qualcosa che Carlo guarda. I punti di prova fissi: Milano-Meda su corso Isonzo (x 346 z 1998), via Vignazzola (x -20 z 769), Milano-Meda sulla ferrovia (x 417 z 2243), corso Isonzo sul Seveso (x -685 z 1688), bocca sud del sottopasso della Milano-Meda (x -769 z 118), via Montecassino (x 754 z 2132), più i sei casi `di_traverso` di `todo.md`.
+
+**0. Il metro.** Un controllo su tutta la mappa che conta le cose disegnate a un livello che non è il loro (una riga, un cordolo, un guardrail, una recinzione entro pochi centimetri da una lastra o dal suolo di un altro livello), con il link di ogni caso. Nessuna correzione. *Si vede:* un numero di partenza e l'elenco; è l'"elenco delle regole in pianta" chiesto da Carlo, fatto dai casi e dalla tabella del §1.
+
+**1. Il nastro nella build, senza cambiare il gioco.** Un modulo nuovo produce i nastri (asse, bordi, sede per tratto) e il gioco, con un parametro nel link, li disegna come due linee colorate alla loro quota. *Si vede:* le linee seguono il bordo dell'asfalto in tutta la mappa, sui ponti stanno in alto e dritte, nei sottopassi in basso. Dove non combaciano, si capisce prima di costruirci sopra.
+
+**2. Il ponte dal nastro.** Impalcato, spalle e parapetti dalla sezione del nastro; via l'allungamento a quadretti. *Si vede:* ai punti di prova i bordi sono dritti e in linea con la strada, sopra e sotto; `controlli_ponti` a 0; i sei casi `di_traverso` chiusi. È il passo che risponde a "tirarlo bello dritto come la strada di fianco".
+
+**3. Le cose della strada sul loro nastro.** Righe, spartitraffico, cordoli, marciapiedi, guardrail, lampioni e cartelli prendono il numero del nastro nella build e la quota da lì. Una famiglia alla volta, togliendo ogni volta la regola vecchia della tabella. *Si vede:* stesso oggetto cercato sopra e sotto ogni ponte; il numero del passo 0 scende a ogni famiglia.
+
+**4. Una lastra sola e il terreno tagliato sul contorno.** Impalcati, fosse e gallerie diventano lo stesso oggetto; il terreno si buca lungo il bordo del nastro. *Si vede:* le bocche dei sottopassi senza teli né gradini (x -769 z 118, via Montecassino, scale della stazione).
+
+**5. I corsi d'acqua.** Una strada che passa sull'acqua è un tratto su ponte anche dove il DBGT non ha la sagoma PONTE, con una regola unica (domanda 4). *Si vede:* corso Isonzo sul Seveso senza conca, con un ponte riconoscibile.
+
+**6. Le regole della build con "stesso livello".** Recinzioni, muri, cancelli, alberi, doppioni. *Si vede:* il numero del passo 0 a zero su tutta la mappa, e resta nei rapporti della build come soglia.
+
+**7. La prova vera.** Il primo svincolo della Valassina a Seregno, senza regole nuove. Se servono pezze, il modello non è finito. Poi il primo parcheggio su più piani (domanda 5).
+
+Quanto è grosso: i passi 1 e 2 sono quasi tutti nella build e sono il cuore; il 3 è lungo ma meccanico (una famiglia per volta); il 4 tocca il terreno ed è il più delicato. Ogni passo vuole una build completa. Non do una stima in giorni: dipende da quante famiglie del passo 3 si fanno per giro.
+
+---
+
+## 5. Domande per Carlo
+
+1. **Larghezza del ponte.** Propongo: la carreggiata del nastro (i bordi AC_VEI misurati dal DBGT, gli stessi delle righe), più il marciapiede dove il DBGT lo dà, e il parapetto subito fuori. La sagoma PONTE serve solo a dire dove comincia e finisce il ponte. Va bene, o vuoi che il ponte resti largo come la sagoma PONTE con la strada che ci si adatta?
+2. **Da dove partire.** L'ordine che avevi detto era elenco, nastro, conversione, controllo. Lo tengo, ma propongo di convertire per primi i ponti (passo 2) così vedi subito un risultato su corso Isonzo, e le altre famiglie dopo. D'accordo?
+3. **Comuni senza DBGT.** Il nastro prende forma e quote dal DBGT. I comuni che aggiungiamo (Seregno e gli altri) lo hanno tutti? Dove manca, il nastro si farebbe dall'asse OSM con larghezza OSM e quote dal LiDAR: i ponti lì avrebbero la quota stimata fra le due spalle.
+4. **Strade sull'acqua senza PONTE nel DBGT.** Regola proposta: se una carreggiata passa sopra un alveo, quel tratto è un ponte (profilo della strada dritto fra le due sponde, alveo che continua sotto, parapetti). Oppure preferisci il tombino: strada a raso e acqua che entra in un tubo, coi parapetti sopra le bocche?
+5. **Parcheggi su più piani.** I dati dicono che esistono (OSM) e la sagoma dell'edificio, non come sono fatti dentro: piani, rampe, pilastri. Costruirli vuol dire inventare l'interno con una regola. Si fa (interno neutro, uguale per tutti) o restano scatole chiuse finché non c'è una fonte?
+6. **Misure che il DBGT non dà.** Spessore della soletta e tipo di parapetto oggi sono valori generici (0,9 m; parapetto di cemento con corrimano, ringhiera sulle passerelle). Li tengo così?
