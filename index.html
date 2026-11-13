@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo e3037f24 · assemblato 13/11 21:58 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo 1e39f435 · assemblato 13/11 23:13 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1446,11 +1446,20 @@ function propRifai(p, meshes, i) {
   if (p.broken) { M.makeScale(0, 0, 0); for (const m of meshes) m.setMatrixAt(i, M); }
   else if (p.inst.mf) meshes.forEach((m, j) => m.setMatrixAt(i, p.inst.mf[j] || p.inst.mf[0]));
 }
-function propSpingi(p, v) { // pushed: it takes the vehicle's way at part of its speed (a bale more, a block less), the vehicle loses some
-  const l = hyp(v.vx, v.vz) || 1, k = p.via === 'rotola' ? 0.8 : 0.6;
-  p.vx = v.vx / l * v.speed * k; p.vz = v.vz / l * v.speed * k;
-  if (!p.moving) { p.moving = true; PROP_MOVE.push(p); if (p.inst) { p.mo = new THREE.Object3D(); p.mo.position.set(p.x, p.y, p.z); p.mo.updateMatrix(); p.m0 = propMatrici(p); p.p0 = [p.x, p.y, p.z]; } }
-  propUrto(v);
+function propSpingi(p, v) { // pushed: a block takes the vehicle's way at part of its speed; a bale (heavy, 300-500 kg) rolls only across its axis like a wheel, or grinds a little along it
+  const l = hyp(v.vx, v.vz) || 1, prima = !p.moving;
+  if (p.via === 'rotola') {
+    const ry = p.inst ? p.inst.ry : 0, ax = Math.cos(ry), az = -Math.sin(ry), nx = Math.sin(ry), nz = Math.cos(ry); /* axis of the cylinder, and the way it rolls (across it) */
+    p.vx = p.vx || 0; p.vz = p.vz || 0;
+    const vn = v.vx * nx + v.vz * nz, va = v.vx * ax + v.vz * az;
+    let bn = p.vx * nx + p.vz * nz, ba = p.vx * ax + p.vz * az;
+    const tn = clamp(vn * 0.7, -6, 6), ta = clamp(va * 0.25, -2, 2);
+    if (Math.abs(tn) > Math.abs(bn)) bn = tn; if (Math.abs(ta) > Math.abs(ba)) ba = ta;
+    p.vx = nx * bn + ax * ba; p.vz = nz * bn + az * ba;
+  } else { const k = 0.6; p.vx = v.vx / l * v.speed * k; p.vz = v.vz / l * v.speed * k; }
+  const cy = p.cy || 0;
+  if (!p.moving) { p.moving = true; PROP_MOVE.push(p); if (p.inst) { p.mo = new THREE.Object3D(); p.mo.position.set(p.x, p.y + cy, p.z); p.mo.updateMatrix(); p.m0 = propMatrici(p); p.p0 = [p.x, p.y + cy, p.z]; } }
+  if (prima || p.via !== 'rotola') propUrto(v); else { v.vx *= 0.985; v.vz *= 0.985; } /* one blow, then it is only pushed along */
 }
 function propHits(v) {
   tombHits(v);
@@ -1513,8 +1522,13 @@ function updProps(dt) {
     if (f.giu && hyp(f.vx, f.vz) < 0.01 || f.giu && f.t > 30) PROP_FALL.splice(i, 1);
   }
   for (let i = PROP_MOVE.length - 1; i >= 0; i--) { // rolling and sliding: friction, the walls round it, its own wall going with it
-    const p = PROP_MOVE[i], sp = hyp(p.vx, p.vz), ns = Math.max(0, sp - (p.via === 'rotola' ? 5 : 7) * dt), k = sp > 1e-6 ? ns / sp : 0;
-    p.vx *= k; p.vz *= k;
+    const p = PROP_MOVE[i]; let sp = hyp(p.vx, p.vz), ns, k;
+    if (p.via === 'rotola') { /* rolling on grass stops soon (4.5 m/s2); grinding on its flat side stops at once (9) */
+      const ry = p.inst ? p.inst.ry : 0, ax = Math.cos(ry), az = -Math.sin(ry), nx = Math.sin(ry), nz = Math.cos(ry);
+      let bn = p.vx * nx + p.vz * nz, ba = p.vx * ax + p.vz * az;
+      bn = Math.sign(bn) * Math.max(0, Math.abs(bn) - 4.5 * dt); ba = Math.sign(ba) * Math.max(0, Math.abs(ba) - 9 * dt);
+      p.vx = nx * bn + ax * ba; p.vz = nz * bn + az * ba; ns = hyp(p.vx, p.vz); k = 1; p.nx = nx; p.nz = nz;
+    } else { ns = Math.max(0, sp - 7 * dt); k = sp > 1e-6 ? ns / sp : 0; p.vx *= k; p.vz *= k; }
     const q = { x: p.x + p.vx * dt, z: p.z + p.vz * dt }, gq = H.ground(q.x, q.z);
     if (collideStatic(q, p.r, gq + 0.4, true, new Set([p.wall, ...(p.pw || [])]))) { p.vx *= 0.3; p.vz *= 0.3; }
     const mx = q.x - p.x, mz = q.z - p.z, w = p.wall, r = p.r + 0.2;
@@ -1522,8 +1536,8 @@ function updProps(dt) {
     p.x = q.x; p.z = q.z; const gy = H.ground(p.x, p.z), dy = gy - p.y; p.y = gy; w.x = p.x; w.z = p.z; w.y0 += dy; w.y1 += dy; if (w.sali) w.sali.top += dy;
     WALLS.add(p.x - r, p.z - r, p.x + r, p.z + r, w); PROPG.add(p.x - 3, p.z - 3, p.x + 3, p.z + 3, p);
     if (p.mo) {
-      p.mo.position.set(p.x, p.y, p.z); const d = hyp(mx, mz);
-      if (p.via === 'rotola' && d > 1e-6) p.mo.rotateOnWorldAxis(new THREE.Vector3(mz / d, 0, -mx / d), d / Math.max(0.3, p.r));
+      p.mo.position.set(p.x, p.y + (p.cy || 0), p.z); const dn = mx * (p.nx || 0) + mz * (p.nz || 0);
+      if (p.via === 'rotola' && Math.abs(dn) > 1e-7) p.mo.rotateOnWorldAxis(new THREE.Vector3(p.nz, 0, -p.nx), dn / 0.75); /* turns about its own axis, as a wheel: only the way across it is rolling */
       propScrivi(p, p.mo, p.m0, p.p0[0], p.p0[1], p.p0[2]);
     }
     if (ns < 0.05) { p.moving = false; PROP_MOVE.splice(i, 1); if (p.inst) p.inst.mf = propMatrici(p); }
@@ -8367,7 +8381,7 @@ function* buildPaesaggio(T, G) {
   };
   { const im = inst(LS_BALE_G, LS_BALE_M, bales); if (im) bales.forEach(([x, z, r], i) => { /* a bale rolls away under a hard blow (props3.js FORZA.medio, via) and is solid again where it stops */
     const id = T.t + ':' + i, p = LS_BALE_PROPS.get(id), gy = H.ground(x, z);
-    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'medio', via: 'rotola', inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
+    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'leggero', via: 'rotola', cy: 0.75, inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
     else propRifai(p, [im], i);
   }); }
   yield 'terreni balle';
