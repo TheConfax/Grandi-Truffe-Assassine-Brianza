@@ -75,8 +75,9 @@ Dal 1/11 la build legge `mapillary_grande/oggetti.json` (tutta la mappa grande) 
 - Tutti CC0 (pubblico dominio, nessun obbligo di citazione; li citiamo lo stesso). Scaricati il 13/11/2026 a 1K da Poly Haven (`dl.polyhaven.org`, licenza <https://polyhaven.com/license>) e ambientCG (`ambientcg.com/get`, licenza <https://docs.ambientcg.com/license/>), ridotti da `src/tex_pbr.py` a 512 px (128 per i tombini). In ogni `_nr.jpg`: R e G la normale, B la ruvidità rispetto alla media.
 - Poly Haven: `asphalt_04` (asfalto, stessa foto di `tex/asfalto.jpg`), `white_stucco_02` (intonaco), `concrete_floor_02` (pavimento), `gravel_floor_02` (ghiaia), `brown_mud_dry` (terra), `clay_roof_tiles_02` di Amal Kumar (coppi: `tex/tegole.jpg` è la foto divisa per la sua media, così il tetto tiene il suo colore).
 - Ricavati dalle nostre foto, senza fonte nuova: marciapiede (fughe della griglia dei masselli), porfido e ciottoli (fughe da `tex/<nome>_id.png`), prato e terreno (grana della foto).
-- ambientCG: `ManholeCover006`, `ManholeCover003` (chiusini tondi), `ManholeCover007` (pozzetto a due coperchi, scurito del 30%), `Grate002` (caditoia), in un atlante di 4 caselle.
-- Dove stanno i tombini: nessun dato (Mapillary ne vede 118 su tutta la mappa, OSM nessuno): regola prudente in `materiali3.js` (`buildChiusini`).
+- ambientCG: `ManholeCover006` (chiusino della fogna), `ManholeCover003` (tondo piccolo dei servizi), `Grate002` (caditoia e griglia), `DiamondPlate008A` (quadrato a rombi dei servizi, ricolorato ghisa con la cornice), in un atlante di 5 caselle con la toppa d'asfalto (dalla nostra foto, schiarita).
+- Dove stanno i tombini: regola in `materiali3.js` (`buildChiusini`, rifatta il 13/11 con le foto di riferimento di Carlo) e, dove ci sono, quelli di Mapillary (`mapillary_grande/oggetti.json`, `object--manhole` 118 e `object--catch-basin` 31, chiave di tile `mh` scritta da `build_data.py`).
+- Cespugli (`dbgt_verde.py cespugli`, chiave di tile `cs`): LiDAR DSM - DTM (`terreno/lidar_dsm`, 2008) e ESA WorldCover 2021 dentro il verde del DBGT, vedi sopra le loro licenze.
 
 ## Non usati da nessuno script
 

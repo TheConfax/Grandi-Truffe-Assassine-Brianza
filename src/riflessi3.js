@@ -7,7 +7,7 @@
 //  - the metals tint what they mirror with their own colour.
 // The kinds (RIF_KIND): paint (car bodies), glass (car panes), shop (shop windows), metal (guardrails, lamp posts, railings, gates, rails), asphalt.
 // RIF.wet: 0 dry .. 1 soaked, for the day it rains: the asphalt then darkens and goes smoother (sharper, stronger reflections). It follows WX.wet (weather3.js, fase 3)
-const RIF = { wet: { value: 0 }, t: { value: 0 }, rain: { value: 0 }, pre: [], cache: {} }; // t, rain: the rings of the drops in the puddles (realismo 2, fase C)
+const RIF = { wet: { value: 0 }, t: { value: 0 }, rain: { value: 0 }, pre: [], cache: {}, pr: { tex: { value: null }, mat: { value: new THREE.Matrix4() }, on: { value: 0 } } }; /* pr: the planar reflection of the wet ground (bagnato3.js) */ // t, rain: the rings of the drops in the puddles (realismo 2, fase C)
 // Realismo 2, fase C: what a body or a pane mirrors near the horizon is the town, not the sky: a skyline of houses all round (by direction, lit as a wall
 // in the open, blurred with the roughness), so a car going by shows the houses sliding over its sides. And in the rain the asphalt gets puddles: where the
 // ground is a little lower (a noise in metres, the same for all), they grow with the wet, mirror like water (smooth, dark under) and ring with the drops
@@ -28,6 +28,9 @@ uniform vec3 uRfC;
 uniform float uRfWet;
 uniform float uRfT;
 uniform float uRfRain;
+uniform sampler2D uPrTex;
+uniform mat4 uPrMat;
+uniform float uPrOn;
 varying vec3 vRfP;
 varying vec3 vRfN;
 float rfHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -61,14 +64,20 @@ function rifFrag(q) {
     } }` : ''}
   rfNb = normalize(mix(rfNv, rfNb, 0.5 * (1.0 - rfPd))); /* half the relief for the lobes (all of it lit the rough setts like glass at a grazing angle); a puddle is flat water */
   float rfNdv = clamp(dot(rfNv, -rfVv), 0.001, 1.0);
-  ${q.far ? 'if (rfNdv < 0.5 || rfPd > 0.0) {' : '{'}
+  ${q.far ? 'if (rfNdv < 0.5 + 0.35 * rfWet || rfPd > 0.0) {' : '{'} /* wet: the mirror is seen at steeper angles too (realismo 3) */
   float rfR = mix(clamp(${RO} * mix(1.0, r3R, 0.5), 0.04, 1.0) * (1.0 - 0.75 * rfWet), 0.03, rfPd);
   float rfF0 = ${F0} + 0.03 * rfWet - 0.05 * rfPd;
   vec3 rfFv0 = mix(vec3(rfF0), clamp(diffuseColor.rgb * 0.95, 0.0, 1.0), ${ME});
   vec3 rfFr = rfFv0 + (max(vec3(1.0 - rfR), rfFv0) - rfFv0) * pow(1.0 - rfNdv, 5.0);
   vec3 rfRw = inverseTransformDirection(reflect(rfVv, rfNv), viewMatrix);
   vec3 rfVw = inverseTransformDirection(rfVv, viewMatrix), rfNw = inverseTransformDirection(rfNb, viewMatrix), rfLw = normalize(uRfD);
-  vec3 rfAdd = rfSky(rfRw, rfR, ${q.wet ? '0.0' : '1.0'}) * rfFr * ${K}; /* the ground mirrors the sky only: a skyline drawn by direction would not match what stands round */
+  vec3 rfEnv = rfSky(rfRw, rfR, ${q.wet ? '0.0' : '1.0'}); /* the ground mirrors the sky only: a skyline drawn by direction would not match what stands round */
+  ${q.wet ? `if (uPrOn > 0.5 && rfWet > 0.02) { /* realismo 3, fase D: what the wet ground really mirrors, the scene drawn from under the ground (bagnato3.js), bent by the relief and the rings */
+    vec3 rfWq = (vec4(vRfP, 0.0) * viewMatrix).xyz + cameraPosition; vec4 rfPc = uPrMat * vec4(rfWq, 1.0); vec2 rfPu = rfPc.xy / rfPc.w + (rfNb.xy - normalize(vRfN).xy) * 0.05;
+    float rfIn = smoothstep(0.0, 0.03, min(min(rfPu.x, 1.0 - rfPu.x), min(rfPu.y, 1.0 - rfPu.y)));
+    if (rfIn > 0.0) { float rfBl = 0.004 + rfR * 0.05; vec3 rfPr = (texture2D(uPrTex, rfPu).rgb * 2.0 + texture2D(uPrTex, rfPu + vec2(rfBl, 0.0)).rgb + texture2D(uPrTex, rfPu - vec2(rfBl, 0.0)).rgb + texture2D(uPrTex, rfPu + vec2(0.0, rfBl * 1.6)).rgb + texture2D(uPrTex, rfPu - vec2(0.0, rfBl * 1.6)).rgb) / 6.0;
+      rfEnv = mix(rfEnv, rfPr, rfIn * clamp(rfWet * 1.6, 0.0, 1.0) * (1.0 - smoothstep(0.3, 0.75, rfR))); } }` : ''}
+  vec3 rfAdd = rfEnv * rfFr * ${K} * ${q.wet ? '(1.0 - 0.3 * rfWet * (1.0 - rfPd))' : '1.0'}; /* wet: a little less of the sky's light at a grazing angle (the asphalt went nearly white, realismo 2) */
   float rfNl = max(dot(rfNw, rfLw), 0.0);
   if (rfNl > 0.0 && rfSh > 0.0) {
     vec3 rfHw = normalize(rfLw - rfVw); float rfNh = max(dot(rfNw, rfHw), 0.0), rfLh = max(dot(rfLw, rfHw), 0.0);
@@ -78,7 +87,7 @@ function rifFrag(q) {
     vec3 rfFh = rfFv0 + (1.0 - rfFv0) * pow(1.0 - rfLh, 5.0);
     rfAdd += uRfC * rfFh * (rfD * rfV * rfNl * rfSh * ${SU});
   }
-  ${q.far ? 'rfAdd *= max(smoothstep(0.5, 0.3, rfNdv), rfPd) * (1.0 - 0.3 * rfPd);' : ''}
+  ${q.far ? 'rfAdd *= max(smoothstep(0.5 + 0.35 * rfWet, 0.3 * (1.0 - rfWet), rfNdv), rfPd) * (1.0 - 0.3 * rfPd);' : ''}
   totalEmissiveRadiance += rfAdd;
   }
   ${q.wet ? `#if NUM_SPOT_LIGHTS > 0
@@ -105,7 +114,7 @@ const RIF_LFB = (() => {
   return c.slice(0, i) + '{ float rfS_ = ' + sh + '; directLight.color *= rfS_; rfSh = min( rfSh, rfS_ ); }' + c.slice(j + 1);
 })();
 function rifShader(s, q) {
-  s.uniforms.uRfH = FOTO_FAC.uSkyH; s.uniforms.uRfZ = FOTO_FAC.uSkyZ; s.uniforms.uRfD = FOTO_FAC.uSunD; s.uniforms.uRfC = FOTO_FAC.uSunC; s.uniforms.uRfWet = RIF.wet; s.uniforms.uRfT = RIF.t; s.uniforms.uRfRain = RIF.rain;
+  s.uniforms.uRfH = FOTO_FAC.uSkyH; s.uniforms.uRfZ = FOTO_FAC.uSkyZ; s.uniforms.uRfD = FOTO_FAC.uSunD; s.uniforms.uRfC = FOTO_FAC.uSunC; s.uniforms.uRfWet = RIF.wet; s.uniforms.uRfT = RIF.t; s.uniforms.uRfRain = RIF.rain; s.uniforms.uPrTex = RIF.pr.tex; s.uniforms.uPrMat = RIF.pr.mat; s.uniforms.uPrOn = RIF.pr.on;
   s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + RIF_VERT_DECL).replace('#include <project_vertex>', '#include <project_vertex>\nvRfP = mvPosition.xyz; vRfN = transformedNormal;');
   s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n#ifdef R3_NRM\n#define RF_NRM normal\n#else\n#define RF_NRM vRfN\n#endif\n' + RIF_FRAG_DECL).replace('void main() {', 'void main() {\n  float rfSh = 1.0;' + (/float r3R = /.test(s.fragmentShader) ? '' : '\n  vec3 r3N = vec3(0., 0., 1.); float r3R = 1.;')) /* RF_NRM, r3R: the normal bent by the relief and the roughness of the texel (materiali3.js, realismo 3) */
     .replace('#include <lights_fragment_begin>', RIF_LFB || '#include <lights_fragment_begin>').replace('vec3 outgoingLight =', rifFrag(q) + '  vec3 outgoingLight =');
