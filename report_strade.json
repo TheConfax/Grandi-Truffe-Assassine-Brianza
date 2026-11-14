@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 6.0,
+  "tempo_s": 4.5,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 49.0,
+  "tempo_s": 35.4,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -1760,12 +1760,14 @@
  },
  "lotti_chiusi": {
   "pilastri_liberi": 894,
-  "chiusi": 384,
-  "metri": 4405,
-  "senza_fine": 380,
-  "senza_stile": 50,
-  "attraversa_la_carreggiata": 65,
-  "doppio": 15
+  "chiusi": 437,
+  "tratti": 440,
+  "metri": 3898,
+  "senza_fine": 309,
+  "senza_stile": 56,
+  "attraversa_la_carreggiata": 66,
+  "doppio": 26,
+  "sotto_un_cancello": 9
  },
  "chiusure_a_t": {
   "capi_liberi": 21195,
@@ -1796,7 +1798,7 @@
    "2": 30,
    "imbocco": 0
   },
-  "divisori": 294
+  "divisori": 235
  },
  "recinzioni_controllo": {
   "coppie_doppie_rimaste": 0,
@@ -2071,8 +2073,8 @@
    "dove": []
   },
   "barriere_in_carreggiata": {
-   "n": 23,
-   "metri": 86.2,
+   "n": 25,
+   "metri": 89.4,
    "dove": [
     "?x=783&z=-114",
     "?x=-867&z=695",
@@ -2852,6 +2854,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 17.1
+  "tempo_s": 11.4
  }
 }
