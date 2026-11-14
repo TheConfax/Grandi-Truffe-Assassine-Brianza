@@ -182,9 +182,10 @@ function tileLimiti(T, G) {
   B.expandByScalar(CULL_MARGINE);
 }
 const _vistaF = new THREE.Frustum(), _vistaM = new THREE.Matrix4();
+const _ombraF = { intersectsBox: B => sun.shadow.getFrustum(0).intersectsBox(B) || sun.shadow.getFrustum(1).intersectsBox(B), intersectsSphere: S => sun.shadow.getFrustum(0).intersectsSphere(S) || sun.shadow.getFrustum(1).intersectsSphere(S) };
 scene.onBeforeRender = (r, sc, cam) => { // after the matrices of the frame, before the renderer walks the scene
   _vistaF.setFromProjectionMatrix(_vistaM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
-  const om = sun.castShadow && sun.visible; let SF = null; if (om) { sun.shadow.updateMatrices(sun); SF = sun.shadow.getFrustum(); }
+  const om = sun.castShadow && sun.visible; let SF = null; if (om) { sun.shadow.updateMatrices(sun, cam); SF = sun.isSunLight ? _ombraF : sun.shadow.getFrustum(); } /* the sun's two cascades (realismo 2): what either sees */
   for (const T of VIVI) { const G = T.group; if (!G || !T.ready || !T.box || T.dist >= 860 || T.box.isEmpty()) continue; G.visible = _vistaF.intersectsBox(T.box) || (om && SF.intersectsBox(T.box)); }
   fusiDisegna(_vistaF, om ? SF : null);
 };

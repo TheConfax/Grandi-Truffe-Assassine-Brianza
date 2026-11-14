@@ -434,6 +434,7 @@ rep("#start h1 em { display: block; font-style: normal; font-size: .34em; letter
 rep("#start h1 { font-family: var(--display);", "#start h1 { color: var(--ocra) !important; font-family: var(--display);")
 # ---- day & night, car damage
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'luce3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'luci3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'extras.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")  # luce3.js: the daylight (fase 2); luci3.js: the real lights at night (fase 3)
+rep("function updVisuals(dt) {", open(os.path.join(HERE, 'sera3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")  # sera3.js: the lights of the evening (realismo 2, fase B)
 rep("updSignals(); updGates(dt); updFountains();", "updSignals(); updGates(dt); updFountains(); updDayNight(dt); updWrecks(dt); updFuel(dt); updProps(dt); updOggetti(dt);")
 rep("  updCamera(dt);", "  updCamera(dt); updGlow();")
 rep("    add(boxG(S.W, S.bh, S.L), paint, 0, by, 0);", "    var bm = add(new THREE.BoxGeometry(S.W, S.bh, S.L, 3, 2, 6), paint, 0, by, 0);")
@@ -461,7 +462,7 @@ async function reportSpot() {
   const v = P.mode === 'car' ? P.car : null, x = v ? v.x : P.x, z = v ? v.z : P.z, y = v ? v.y : P.y;
   const lat = META.lat0 - z / 110540, lon = META.lon0 + x / (111320 * Math.cos(META.lat0 * Math.PI / 180));
   const rec = { x: +x.toFixed(1), z: +z.toFixed(1), y: +y.toFixed(1), suolo: +H.ground(x, z).toFixed(1), lat: +lat.toFixed(6), lon: +lon.toFixed(6), via: streetAt(x, z) || '', zona: placeAt(x, z) || '', direzione: Math.round(((v ? v.h : P.h) * 180 / Math.PI + 360) % 360), modo: P.mode, velocita: v ? Math.round(v.speed * 3.6) : 0, cam: camMode, ora: $('clock') ? $('clock').textContent : '', quando: new Date().toISOString(), versione: 'v16' };
-  let foto = ''; try { renderer.render(scene, camera); foto = canvas.toDataURL('image/jpeg', 0.85); } catch (e) { } /* photo of what Carlo sees, taken before the toast and in the same task as the render (no preserveDrawingBuffer) */
+  let foto = ''; try { disegna(); foto = canvas.toDataURL('image/jpeg', 0.85); } catch (e) { } /* photo of what Carlo sees, taken before the toast and in the same task as the render (no preserveDrawingBuffer) */
   spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }
   let saved = false; if (spotDb) { try { await spotDb.collection('segnalazioni').add(rec); saved = true; } catch (e) { saved = false; } }
   if (!saved && /^(localhost|127\\.0\\.0\\.1)$/.test(location.hostname)) { try { const r = await fetch('/segnala', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(foto ? Object.assign({}, rec, { fotob64: foto }) : rec) }); saved = r.ok; } catch (e) { } } /* local game: straight to the dev server, Claude reads it live */
@@ -609,6 +610,7 @@ rep("if (v === 'DEBUG') setDebug(!DEBUG); else if (v) toast('Codice sconosciuto'
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'weather3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")
 rep("function updVisuals(dt) {", open(os.path.join(HERE, 'foto3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'pattern3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'riflessi3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'facciate3.js'), encoding='utf-8').read() + "\n" + open(os.path.join(HERE, 'neve3.js'), encoding='utf-8').read() + "\nfunction updVisuals(dt) {")  # neve3.js: snow on what faces up (fase 3)
 rep("// ---------------------------------------------------------------- renderer\n", open(os.path.join(HERE, 'foto3_colori.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- renderer\n")
+rep("// ---------------------------------------------------------------- geometry buffers\n", open(os.path.join(HERE, 'post3.js'), encoding='utf-8').read() + "\n// ---------------------------------------------------------------- geometry buffers\n")  # post3.js: the passes after the scene (realismo 2)
 rep('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>', '<script type="importmap">\n{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.186.1/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }\n</script>')  # three.js 0.186.1: the module and its addons (the sky of foto3.js); the addons import 'three' through the map, one copy of three
 rep("updDayNight(dt);", "updDayNight(dt); updWeather(dt); luceEsp();")  # luceEsp: the exposure, after the weather (luce3.js)
 rep("lat *= Math.exp(-(i.hand ? 1.1 : S.grip) * dt);", "lat *= Math.exp(-(i.hand ? 1.1 : S.grip * (1 - 0.3 * WX.wet)) * dt);")
@@ -696,8 +698,8 @@ rep("  if (camMode === 1) {\n    const ht = inCar ? 58 + sp * 0.9 : 36,",
     "  } else if (camMode === 1) {\n    camVA = Math.PI;\n    const ht = inCar ? 58 + sp * 0.9 : 36,")
 # debug mode: cars never break (health back to full after every physics step, so nothing reaches zero and burns)
 rep("interpSnap(); step(1 / 60);", "interpSnap(); step(1 / 60); if (DEBUG) for (const v of VEH) if (v.health < 100) v.health = 100;")
-rep("  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);", "  const ipol = (running || titolo) && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);")
-rep("  renderer.render(scene, camera);\n}", "  renderer.render(scene, camera);\n  if (ipol) interpEnd(ipol);\n}")
+rep("  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);", "  const ipol = (running || titolo) && !paused ? interpBegin(clamp(acc * 60, 0, 1)) : null;\n  if (ipol) fariPosiziona(); /* headlights on the car as drawn (Carlo 10/11) */\n  updVisuals((running || titolo) && !paused ? dt : 0); updRadio(dt);")
+rep("  disegna();\n}", "  disegna();\n  if (ipol) interpEnd(ipol);\n}")
 # ?x=..&z=.. in the address (START): the game starts there, on the nearest street, already at the wheel of the Ferari
 rep("  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePed(p);\n}",
     "  for (const p of PEDS.slice()) if (hyp(p.x - P.x, p.z - P.z) < 5) removePed(p);\n"
@@ -790,10 +792,36 @@ rep("async function reportSpot() {", open(os.path.join(HERE, 'misure3.js'), enco
 rep("  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();", "  const m_ = DEBUG ? dbgBegin(t) : null;\n  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();")
 rep("  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running &&", "  if (m_) dbgMk(m_, 'sim');\n  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (m_) dbgMk(m_, 'tile'); if (running &&")
 rep("  const ipol = (running || titolo) && !paused ? interpBegin(", "  if (m_) dbgMk(m_, 'sim');\n  const ipol = (running || titolo) && !paused ? interpBegin(")
-rep("  renderer.render(scene, camera);\n  if (ipol) interpEnd(ipol);\n}", "  if (m_) dbgMk(m_, 'vis');\n  const g_ = m_ ? dbgGpuBegin() : 0;\n  renderer.render(scene, camera);\n  if (m_) { dbgGpuEnd(g_); dbgMk(m_, 'draw'); }\n  if (ipol) interpEnd(ipol);\n  if (m_) dbgEnd(m_);\n}")
+rep("  disegna();\n  if (ipol) interpEnd(ipol);\n}", "  if (m_) dbgMk(m_, 'vis');\n  const g_ = m_ ? dbgGpuBegin() : 0;\n  disegna();\n  if (m_) { dbgGpuEnd(g_); dbgMk(m_, 'draw'); }\n  if (ipol) interpEnd(ipol);\n  if (m_) dbgEnd(m_);\n}")
 rep("if (!DEBUG) { el.hidden = true; return; }", "if (!DEBUG) { el.hidden = true; if (MIS.el && !MIS.el.hidden) dbgOff(); return; }")
 rep("  spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }", "  rec.misure = MIS.txt; spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }")
 rep("  if (e.code === 'KeyB') reportSpot();", "  if (e.code === 'KeyB') reportSpot();\n  if (e.code === 'KeyK' && DEBUG) dbgCopy();")
+# ---- debug teleport (key T, only with debug on): paste a game link or "x z", Enter = go there without reloading; same jump as the respawn (teletrasporto), tiles round the point first
+rep("#dbghud { position: fixed;", "#dbgtele { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 10; width: min(520px, calc(100vw - 32px)); box-sizing: border-box; padding: 14px 16px; background: rgba(14,15,20,.88); border: 2px solid var(--ocra); border-radius: 6px; text-align: center; }\n#dbgtele h3 { font-family: var(--display); font-size: 22px; margin: 0 0 8px; color: var(--ocra); font-weight: 400; }\n#dbgtele input { width: 100%; box-sizing: border-box; font: 600 20px var(--body); padding: 7px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,.3); background: #15161c; color: #fff; -webkit-user-select: text; user-select: text; }\n#dbgtele p { font: 500 15px var(--body); margin: 6px 0 0; color: rgba(255,255,255,.7); }\n#dbghud { position: fixed;")
+rep("<div id=\"dbghud\" hidden></div>", "<div id=\"dbgtele\" hidden><h3>Teletrasporto</h3><input id=\"dbgteleq\" type=\"text\" spellcheck=\"false\" autocomplete=\"off\" placeholder=\"link del gioco oppure: x z\"><p id=\"dbgtelem\">Invio = vai &middot; Esc = chiudi</p></div><div id=\"dbghud\" hidden></div>")
+rep("function updVisuals(dt) {", r"""let teleAperta = false;
+function teleChiudi() { teleAperta = false; $('dbgtele').hidden = true; $('dbgteleq').blur(); }
+function teleApri() { if (!DEBUG || !running) return; for (const k in K) K[k] = false; teleAperta = true; $('dbgtele').hidden = false; $('dbgtelem').textContent = 'Invio = vai \u00b7 Esc = chiudi'; const q = $('dbgteleq'); q.value = ''; setTimeout(() => q.focus(), 0); }
+function teleLeggi(t) { /* a game link (x= and z=) or two numbers, "x z", "x 12 z 34", commas as separators */
+  const m = /[?&]x=(-?\d+(?:\.\d+)?)/.exec(t), n = /[?&]z=(-?\d+(?:\.\d+)?)/.exec(t); if (m && n) return [parseFloat(m[1]), parseFloat(n[1])];
+  const a = t.match(/-?\d+(?:\.\d+)?/g); return a && a.length >= 2 ? [parseFloat(a[0]), parseFloat(a[1])] : null; }
+async function teleVai(x, z) {
+  if (TELE) return; const v = P.car, eraAuto = P.mode === 'car' && v && !v.heli; teleChiudi();
+  await teletrasporto(x, z, 260);
+  /* the ground at the exact point (decks and roofs too), and never inside a wall: the nearest free spot round it */
+  let px = x, pz = z; if (inBuilding(px, pz, 0.5)) { let ok = false; for (let r = 1.5; r <= 40 && !ok; r += 1.5) for (let a = 0; a < 16 && !ok; a++) { const qx = x + Math.cos(a * Math.PI / 8) * r, qz = z + Math.sin(a * Math.PI / 8) * r; if (!inBuilding(qx, qz, 0.5)) { px = qx; pz = qz; ok = true; } } }
+  P.x = px; P.z = pz; P.y = walkGround(px, pz, H.surface(px, pz)); P.vx = P.vz = P.vy = 0; camInit = false;
+  if (eraAuto && !v.dead) { /* it was in a car: the same car, next to him, and he gets in */
+    const h = P.h; v.x = px + Math.cos(h) * 2.4; v.z = pz - Math.sin(h) * 2.4; if (inBuilding(v.x, v.z, 1.5)) { v.x = px; v.z = pz; } v.y = H.surface(v.x, v.z); v.vx = v.vz = 0; v.sleep = false; v.sync();
+    enterExit(); }
+  toast('Teletrasporto: ' + Math.round(x) + ', ' + Math.round(z)); }
+(() => { const q = $('dbgteleq'); if (!q) return;
+  ['keydown', 'keyup', 'keypress'].forEach(k => q.addEventListener(k, e => { e.stopPropagation(); if (k !== 'keydown') return;
+    if (e.key === 'Escape') { e.preventDefault(); teleChiudi(); }
+    else if (e.key === 'Enter') { e.preventDefault(); const p = teleLeggi(q.value); if (!p) { $('dbgtelem').textContent = 'Servono due numeri: x z'; return; }
+      if (!(p[0] > ZONA[0] && p[0] < ZONA[2] && p[1] > ZONA[1] && p[1] < ZONA[3])) { $('dbgtelem').textContent = 'Fuori dalla mappa'; return; } teleVai(p[0], p[1]); } })); })();
+function updVisuals(dt) {""")
+rep("  if (e.code === 'KeyB') reportSpot();\n  if (e.code === 'KeyK' && DEBUG) dbgCopy();", "  if (e.code === 'KeyB') reportSpot();\n  if (e.code === 'KeyT' && DEBUG && !teleAperta) { e.preventDefault(); teleApri(); }\n  if (e.code === 'KeyK' && DEBUG) dbgCopy();")
 rep("window.__G = { FIS, VIVI,", "window.__G = { acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI,")
 # ---- GPS (gps3.js): the route follows the waypoint, drawn above the roads on the big map too
 rep("  // places and landmarks\n", "  gpsDraw(g, px_(6)); /* the GPS route: above the roads, under the icons */\n  // places and landmarks\n")

@@ -13,7 +13,7 @@ for (const [k, kind] of [['old', 'old'], ['mod', 'modern']]) {
   MAT[k].emissiveMap = WIN_EMI(kind); MAT[k].emissive = new THREE.Color(0xffc870); MAT[k].emissiveIntensity = 0;
   MAT[k].onBeforeCompile = sh => {
     sh.uniforms.uLit = WIN_LIT; sh.uniforms.uSky = WIN_SKY;
-    sh.fragmentShader = 'uniform float uLit;\nuniform vec3 uSky;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float wh = fract(sin(dot(floor(vUv) + 0.37, vec2(12.9898, 78.233))) * 43758.5453);\n  totalEmissiveRadiance *= step(wh, uLit) * (0.7 + 0.6 * fract(wh * 7.13));\n  totalEmissiveRadiance += uSky * emissiveColor.r * (0.45 + 0.8 * fract(wh * 3.71)) * (0.75 + 0.25 * vUv.y - 0.25 * floor(vUv.y));');
+    sh.fragmentShader = 'uniform float uLit;\nuniform vec3 uSky;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float wh = fract(sin(dot(floor(vUv) + 0.37, vec2(12.9898, 78.233))) * 43758.5453);\n  totalEmissiveRadiance *= step(wh, uLit) * (0.7 + 0.6 * fract(wh * 7.13)) * ' + WIN_TINTA('wh') + ';\n  totalEmissiveRadiance += uSky * emissiveColor.r * (0.45 + 0.8 * fract(wh * 3.71)) * (0.75 + 0.25 * vUv.y - 0.25 * floor(vUv.y));');
   };
   MAT[k].needsUpdate = true;
 }
@@ -91,6 +91,12 @@ function lightTones() {
   const elDeg = Math.asin(U) * 180 / Math.PI, day = clamp((elDeg + 4) / 12, 0, 1), dusk = Math.exp(-(((elDeg - 1) / 6) ** 2));
   return { E, Nn, U, elDeg, elev: U, day, night: 1 - day, dusk };
 }
+/* the headlight sits on the car as it is DRAWN: updDayNight runs inside step() on the raw state, the car is drawn between the last two steps (interp3.js), so called there it lagged and swung at speed; frame() calls this after interpBegin */
+function fariPosiziona() {
+  const v = P.mode === 'car' ? P.car : null;
+  if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); headSpot.target.updateMatrixWorld(); }
+  if (typeof luciPosiziona === 'function') luciPosiziona();
+}
 function updDayNight(dt) {
   TOD = (TOD + dt / 60) % 24;
   const L = lightTones(); nightK = L.night;
@@ -114,7 +120,7 @@ function updDayNight(dt) {
   M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn;
   const v = P.mode === 'car' ? P.car : null;
   headSpot.intensity = v && v.health > 0 ? (LUCI_ON ? 90 : 2.4) * lampsOn : 0; luciAggiorna(lampsOn); /* luci3.js: the real lights of the lamps and the cars */
-  if (v) { const fx = Math.sin(v.h), fz = Math.cos(v.h); headSpot.position.set(v.x + fx * 2, v.y + 1.0, v.z + fz * 2); headSpot.target.position.set(v.x + fx * 22, v.y - 0.5, v.z + fz * 22); }
+  fariPosiziona();
   const mm = Math.floor(TOD * 60); if (mm !== updDayNight.mm) { updDayNight.mm = mm; const el2 = $('clock'); if (el2) el2.textContent = String((mm / 60) | 0).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0') + ' ' + (WX.icon || ''); }
 }
 function skipTime(h) { TOD = (TOD + h) % 24; skyT = -1; updDayNight(0); toast('Ora: ' + String(TOD | 0).padStart(2, '0') + ':' + String(Math.floor((TOD % 1) * 60)).padStart(2, '0')); }

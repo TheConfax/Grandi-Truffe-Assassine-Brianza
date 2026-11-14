@@ -1,8 +1,13 @@
 import * as THREE_NS from 'three';
 import { Sky as THREE_SKY } from 'three/addons/objects/Sky.js';
+import { SunLight as THREE_SUN } from 'three/addons/lights/SunLight.js';
+import { GTAOPass as THREE_GTAO } from 'three/addons/postprocessing/GTAOPass.js';
+import { SMAAPass as THREE_SMAA } from 'three/addons/postprocessing/SMAAPass.js';
+import { OutputPass as THREE_OUT } from 'three/addons/postprocessing/OutputPass.js';
+import { UnrealBloomPass as THREE_BLOOM } from 'three/addons/postprocessing/UnrealBloomPass.js';
 // three.js 0.186.1, loaded as a module through the import map (assemble3.py). The game was written on r128, where three was a global: THREE is a copy of
 // the module's namespace (a module namespace is frozen, and foto3_colori.js swaps THREE.CanvasTexture), and window.THREE stays for the test scripts
-const THREE = Object.assign({}, THREE_NS, { Sky: THREE_SKY }); window.THREE = THREE;
+const THREE = Object.assign({}, THREE_NS, { Sky: THREE_SKY, SunLight: THREE_SUN, GTAOPass: THREE_GTAO, SMAAPass: THREE_SMAA, OutputPass: THREE_OUT, UnrealBloomPass: THREE_BLOOM }); window.THREE = THREE; /* the sun with cascaded shadows and the passes after the scene: post3.js (realismo 2) */
 {
   // r128 made every InstancedMesh with frustumCulled = false; r186 culls it on a sphere round its instances computed once, so what moves after (objects knocked
   // down, pieces of barrier) would vanish. pezzi3.js puts its own culling sphere (cullS) on the tiles, as before

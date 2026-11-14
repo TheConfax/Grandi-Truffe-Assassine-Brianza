@@ -369,7 +369,7 @@ function* buildPaesaggio(T, G) {
   };
   { const im = inst(LS_BALE_G, LS_BALE_M, bales); if (im) bales.forEach(([x, z, r], i) => { /* a bale rolls away under a hard blow (props3.js FORZA.medio, via) and is solid again where it stops */
     const id = T.t + ':' + i, p = LS_BALE_PROPS.get(id), gy = H.ground(x, z);
-    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'medio', via: 'rotola', inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
+    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'leggero', via: 'rotola', cy: 0.75, inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
     else propRifai(p, [im], i);
   }); }
   yield 'terreni balle';
@@ -680,7 +680,7 @@ function lsOrchardMeshes(G, ftrees, H) {
         const hits = ray.intersectObject(probe, false); let hit = null; for (let h = hits.length - 1; h >= 0; h--) if (!hits[h].uv || leafAt(hits[h].uv) >= 128) { hit = hits[h]; break; } if (!hit) continue;
         const d = Math.max(0, hit.distance - FR / 2 - 0.05); fruits.push([ro.x + rd.x * d, ro.y + rd.y * d, ro.z + rd.z * d, 1, 1, 1, t.pal[k % 3]]); }
     });
-    tr.castShadow = cr.castShadow = true; cr.receiveShadow = true; cr.customDepthMaterial = TREE_DEPTH; G.add(tr, cr);
+    tr.castShadow = cr.castShadow = true; cr.receiveShadow = true; cr.customDepthMaterial = TREE_DEPTH; G.add(tr, cr); ramiAggiungi(G, cr, true); /* bare in winter (stagioni3.js) */
   }
   lsInstances(G, LS_FRUIT_G, fruits);
 }
