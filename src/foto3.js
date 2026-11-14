@@ -83,7 +83,7 @@ renderer.toneMapping = THREE.AgXToneMapping; renderer.toneMappingExposure = 1.1;
 // the sky: three's Preetham model (Sky.js r128, loaded beside three.min.js), with the sun's disc and the glow round it, the blue
 // deepening overhead and paling to the horizon, red and orange at sunset. It is drawn first, over the old gradient, and fades out
 // at night, under cloud and in fog, where the gradient (greyed by the weather) takes over. The haze takes the sky's colour at the
-// horizon the camera faces: a strip of sky is rendered small and read back every half second
+// horizon the camera faces: a strip of sky worked out every half second (fotoSkyMedia)
 const FOTO_SKY = (() => {
   if (!THREE.Sky) return null; // the script did not load: the old sky stays
   const s = new THREE.Sky(), m = s.material;
@@ -94,27 +94,43 @@ const FOTO_SKY = (() => {
     .replace('gl_FragColor = vec4( texColor, 1.0 );', 'vec3 retColor = texColor; /* linear, into the tone mapping and the sRGB output like everything else (r128 had a pow here in place of both) */\n gl_FragColor = vec4( max( mix( vec3( dot( retColor, vec3( 0.2126, 0.7152, 0.0722 ) ) ), retColor, uSkyS ), 0.0 ) * vec3( 0.86, 0.95, 1.16 ) * uSkyK, uSkyA );'); // saturated, the model leans to teal: the tint takes it back towards blue
   Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, fog: false }); // opaque list, drawn first, blended on the gradient
   s.scale.setScalar(SKY_R * 1.6); s.renderOrder = -100; s.frustumCulled = false; scene.add(s);
-  const probe = new THREE.Mesh(s.geometry, Object.assign(m.clone(), { uniforms: m.uniforms, blending: THREE.NoBlending })); probe.scale.copy(s.scale); probe.frustumCulled = false;
-  const ps = new THREE.Scene(); ps.add(probe);
-  return { s, probe, ps, rt: new THREE.WebGLRenderTarget(8, 2), cam: new THREE.PerspectiveCamera(12, 4, 1, SKY_R * 2), px: new Uint8Array(64), att: [], pbo: [], col: new THREE.Color(0xc9ced4), zen: new THREE.Color(0x6f8fbf), t: -1e9, tod: -1, yaw: 0, a: 0 };
+  return { s, cam: new THREE.PerspectiveCamera(12, 4, 1, SKY_R * 2), col: new THREE.Color(0xc9ced4), zen: new THREE.Color(0x6f8fbf), t: -1e9, tod: -1, yaw: 0, a: 0 };
 })();
 function fotoSkyHorizon() { // the mean colour of the sky just over the horizon ahead (linear, before the filmic curve: as the fog needs it)
-  const F = FOTO_SKY, d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z);
-  F.probe.position.copy(camera.position); F.cam.position.copy(camera.position); F.cam.lookAt(camera.position.x + d.x, camera.position.y + Math.tan(0.05) * Math.hypot(d.x, d.z), camera.position.z + d.z);
-  const gl = renderer.getContext(), asinc = renderer.capabilities.isWebGL2 && F.t > 0, leggi = (c, px) => { let r = 0, g = 0, b = 0; for (let i = 0; i < 16; i++) { r += px[i * 4]; g += px[i * 4 + 1]; b += px[i * 4 + 2]; } c.setRGB(r / 4080, g / 4080, b / 4080); };
-  if (asinc && F.att.length) { F.t = performance.now(); return; } /* the last answer has not come yet: no second question on top of it */
-  const was = renderer.getRenderTarget(), read = c => { renderer.setRenderTarget(F.rt); renderer.render(F.ps, F.cam);
-    if (!asinc) { renderer.readRenderTargetPixels(F.rt, 0, 0, 8, 2, F.px); leggi(c, F.px); return; } /* the first of all, before the first frame: it can wait */
-    /* a read from the GPU waits for all the GPU has yet to draw, 20 ms and more twice a second: asked here, the answer is picked up a frame or two later (fotoSkyArrivi) */
-    const pbo = F.pbo.pop() || gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, 64, gl.STREAM_READ); gl.readPixels(0, 0, 8, 2, gl.RGBA, gl.UNSIGNED_BYTE, 0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-    F.att.push({ c, pbo, s: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0), leggi }); gl.flush(); };
-  read(F.col);
-  F.cam.lookAt(camera.position.x + d.x * 0.6, camera.position.y + 1, camera.position.z + d.z * 0.6); read(F.zen); // and higher up, for the panes
-  renderer.setRenderTarget(was); F.t = performance.now(); F.tod = TOD; F.yaw = yaw;
+  const F = FOTO_SKY, d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z), cp = camera.position;
+  F.cam.position.copy(cp); F.cam.lookAt(cp.x + d.x, cp.y + Math.tan(0.05) * Math.hypot(d.x, d.z), cp.z + d.z); fotoSkyMedia(F.col);
+  F.cam.lookAt(cp.x + d.x * 0.6, cp.y + 1, cp.z + d.z * 0.6); fotoSkyMedia(F.zen); // and higher up, for the panes
+  F.t = performance.now(); F.tod = TOD; F.yaw = yaw;
 }
-function fotoSkyArrivi() { // the answers that have come: the colours, a frame or two after the question
-  const F = FOTO_SKY, A = F.att; if (!A.length) return; const gl = renderer.getContext();
-  while (A.length) { const q = A[0], st = gl.clientWaitSync(q.s, 0, 0); if (st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) return; gl.deleteSync(q.s); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, q.pbo); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, F.px); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); q.leggi(q.c, F.px); F.pbo.push(q.pbo); A.shift(); }
+/* the strip of sky (8x2 pixels seen by F.cam, 12 degrees high and 4 times as wide) worked out here with the sky shader's own sums (three 0.186.1's Sky.js, with
+   the ending of FOTO_SKY: saturation, tint, exposure), each pixel at its centre, clamped and rounded to 8 bits as the old render target was, then the mean:
+   the same colour the GPU gave back, without asking the GPU (reading it back stalled 2-3 ms a frame, indagine FPS 14/11) */
+const _fsV = new THREE.Vector3(), _fsS = new THREE.Vector3(), _fsR = [0, 0, 0], _fsM = [0, 0, 0], _fsF = [0, 0, 0], _fsT = [0, 0, 0];
+const FS_RAY = [5.804542996261093E-6, 1.3562911419845635E-5, 3.0265902468824876E-5], FS_MIE = [1.8399918514433978E14, 2.7798023919660528E14, 4.0790479543861094E14], FS_TINT = [0.86, 0.95, 1.16], FS_AGG = [0, 0.0003, 0.00075];
+function fotoSkyMedia(c) {
+  const u = FOTO_SKY.s.material.uniforms, sp = u.sunPosition.value, sd = _fsS.copy(sp).normalize(), cam = FOTO_SKY.cam;
+  /* the vertex shader: the same for every pixel */
+  const sunE = 1000 * Math.max(0, 1 - Math.exp(-((1.6110731556870734 - Math.acos(clamp(sd.y, -1, 1))) / 1.5)));
+  const sunfade = 1 - clamp(1 - Math.exp(sp.y / 450000), 0, 1), rc = u.rayleigh.value - (1 - sunfade), mc = 0.434 * (0.2 * u.turbidity.value) * 10E-18 * u.mieCoefficient.value;
+  for (let k = 0; k < 3; k++) { _fsR[k] = FS_RAY[k] * rc; _fsM[k] = FS_MIE[k] * mc; }
+  const g = u.mieDirectionalG.value, g2 = g * g, disc = u.showSunDisc.value, mixK = clamp(Math.pow(1 - sd.y, 5), 0, 1), S = u.uSkyS.value, K = u.uSkyK.value;
+  const th = Math.tan(6 * Math.PI / 180); cam.updateMatrixWorld(); let r = 0, gg = 0, bb = 0;
+  for (let j = 0; j < 2; j++) for (let i = 0; i < 8; i++) {
+    const v = _fsV.set(((i + 0.5) / 4 - 1) * th * 4, (j - 0.5) * th, -1).applyQuaternion(cam.quaternion).normalize();
+    /* the fragment shader */
+    const za = Math.acos(Math.max(0, v.y)), inv = 1 / (Math.cos(za) + 0.15 * Math.pow(93.885 - za * 180 / Math.PI, -1.253)), sR = 8.4E3 * inv, sM = 1.25E3 * inv;
+    const cosT = v.x * sd.x + v.y * sd.y + v.z * sd.z, rP = 0.05968310365946075 * (1 + Math.pow(cosT * 0.5 + 0.5, 2)), mP = 0.07957747154594767 * ((1 - g2) / Math.pow(1 - 2 * g * cosT + g2, 1.5));
+    const sun = clamp((cosT - 0.999956676946448443553574619906976478926848692873900859324) * 50000, 0, 1) * disc;
+    for (let k = 0; k < 3; k++) {
+      const Fex = Math.exp(-(_fsR[k] * sR + _fsM[k] * sM)), q = sunE * ((_fsR[k] * rP + _fsM[k] * mP) / (_fsR[k] + _fsM[k]));
+      let Lin = Math.pow(q * (1 - Fex), 1.5); Lin *= 1 + (Math.sqrt(q * Fex) - 1) * mixK;
+      _fsF[k] = (Lin + 0.1 * Fex) * 0.04 + 760 * sun * Math.min(sunE * Fex, 80) + FS_AGG[k];
+    }
+    const lum = _fsF[0] * 0.2126 + _fsF[1] * 0.7152 + _fsF[2] * 0.0722;
+    for (let k = 0; k < 3; k++) _fsT[k] = Math.round(clamp(Math.max(lum + (_fsF[k] - lum) * S, 0) * FS_TINT[k] * K, 0, 1) * 255);
+    r += _fsT[0]; gg += _fsT[1]; bb += _fsT[2];
+  }
+  c.setRGB(r / 4080, gg / 4080, bb / 4080);
 }
 const _fotoV = new THREE.Vector3();
 // in linear light the sky's fill counts for less than in the old sums, and the fog took the curve's warm cast: more fill in the
@@ -131,7 +147,7 @@ const FOTO_HEMI = 1, FOTO_SUN = 1, /* the light is luce3.js's now */ FOTO_FOGGRE
       F.s.material.uniforms.uSkyA.value = F.a; F.s.visible = F.a > 0.01;
       F.s.material.uniforms.uSkyS.value = 1.2 + 0.6 * clamp(L.elDeg / 15, 0, 1); // less boost with the sun low: twilight would turn teal
       F.s.material.uniforms.uSkyK.value = 0.06 * (1 + 2.5 * (1 - clamp((L.elDeg + 2) / 22, 0, 1)) ** 2); /* the model's sky darkens much faster than the light on the ground as the sun goes down: an eye (and r128's pow) keeps it readable */
-      if (F.s.visible) { fotoSkyArrivi();
+      if (F.s.visible) {
         const d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z), dy = Math.abs(((yaw - F.yaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
         if (performance.now() - F.t > 500 || Math.abs(TOD - F.tod) > 0.05 || dy > 0.4) fotoSkyHorizon();
       }
