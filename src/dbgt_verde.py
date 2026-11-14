@@ -27,10 +27,10 @@ VRD_T = {'01': 19, '0101': 19, '0102': 19, '0103': 19, '0104': 19, '0105': 19, '
 # BOSCO_TY (p. 300): 01 conifere, 02 latifoglie, 03 piantagioni, 05 rimboschimenti, 95 altro -> bosco; 04 arbusteti e macchia (a Meda 0401,
 # "macchia mediterranea": arbusteti) -> cespugli
 BOSCO_T = {'04': 12, '0401': 12, '0402': 12}
-# CL_AGR_TY (p. 310): 07 seminativi -> campo, 08 orti, 09 vivai, 01-02 vigneti e frutteti -> frutteto, 05 prati. Il 04 per la specifica sono
+# CL_AGR_TY (p. 310): 07 seminativi -> campo, 08 orti, 09 vivai, 01-02 vigneti e frutteti -> frutteto, 05 prati. Il 05 e' il prato stabile: anche terreno 'prato' (giro del verde: erba alta, sfalci e rotoballe) Il 04 per la specifica sono
 # gli oliveti: a Meda sono 8 pezzi in centro e lungo la Milano-Meda, OSM e WorldCover ci hanno bosco e la foto Mapillary dalla rampa della
 # Milano-Meda (2019) mostra un bosco fitto di latifoglie con l'edera, nessun olivo: bosco
-AGR_T = {'01': (13, 'frutteto'), '02': (13, 'frutteto'), '03': (13, 'frutteto'), '04': (11, None), '05': (1, None), '06': (13, 'campo'),
+AGR_T = {'01': (13, 'frutteto'), '02': (13, 'frutteto'), '03': (13, 'frutteto'), '04': (11, None), '05': (1, 'prato'), '06': (13, 'campo'),
          '07': (13, 'campo'), '0701': (13, 'campo'), '0702': (13, 'campo'), '08': (13, 'orti'), '09': (13, 'vivaio'), '95': (13, None)}
 # PS_INC (p. 308): 01 pascolo, 04 incolti, 05 radura. Le foto Mapillary degli incolti (via Vignazzola e le rampe della Milano-Meda) sono
 # scarpate e margini d'erba alta con qualche cespuglio: prato, senza alberi inventati
