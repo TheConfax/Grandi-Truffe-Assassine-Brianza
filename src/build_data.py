@@ -1697,12 +1697,13 @@ if dbt_pc:
     # a yard AC_VEI (STR.cv) that reaches the wall and stops there: the building has a covered passage between the two (a strip of the ground volumes goes, a raised volume of the same height from 4 m up covers it);
     # the rule of the androni below (the gaps) then finds it and puts the door on the street side. Across at most ACARR_MAX m, the volumes all tall enough (ACARR_HMIN) to have a floor above
     # GTA_ANDRONI_CARRAI: 'conta' (default: only the list, nothing changes), 'tutti', or 'x,z,r;x,z,r' (applied only within r m of those points, the list still counts everything); GTA_CARRAI_JSON: where the list is written
-    ACARR_MAX, ACARR_HMIN, ACARR_FRONTE, ACARR_ZB, ACARR_LAT, ACARR_LARGO, ACARR_DOPPIONE = 25.0, 6.0, 8.0, 4.0, float(os.environ.get('GTA_CARRAI_LAT', 3.0)), 3.0, 6.5   # ACARR_LAT: how far to the side of the DBGT point the passage may be (Carlo 14/11: on the carriage entrance, 2-3 m); ACARR_LARGO: narrowest passage; ACARR_DOPPIONE: a gate that is not the entrance's own this near the mouth is already the way in
-    _acm = os.environ.get('GTA_ANDRONI_CARRAI', 'conta').strip(); _acl = []; _acn = Counter()
+    ACARR_MAX, ACARR_HMIN, ACARR_FRONTE, ACARR_ZB, ACARR_LAT, ACARR_LARGO, ACARR_DOPPIONE, ACARR_FESSURA, ACARR_POI, ACARR_COP = 25.0, 6.0, 8.0, 4.0, float(os.environ.get('GTA_CARRAI_LAT', 3.0)), 3.0, 6.5, float(os.environ.get('GTA_CARRAI_FESSURA', 7.5)), 12.0, 0.8   # ACARR_LAT: how far to the side of the DBGT point the passage may be (Carlo 14/11: on the carriage entrance, 2-3 m) unless it runs along the seam of two touching volumes (a crack in the DBGT between two houses), where it may be up to ACARR_FESSURA; ACARR_POI: a shop, an office or an amenity this near the mouth (or a building that has a use of its own in OSM) is not a private passage; ACARR_COP: share of the hole that must be inside buildings; ACARR_LARGO: narrowest passage; ACARR_DOPPIONE: a gate that is not the entrance's own this near the mouth is already the way in
+    _acm = os.environ.get('GTA_ANDRONI_CARRAI', 'conta').strip(); _acl = []; _acn = Counter(); _acdiag = bool(os.environ.get('GTA_CARRAI_DIAG'))   # GTA_CARRAI_DIAG=1: the filters of the clean hole and of the double gate only write their numbers in the list, they reject nothing
     if _cvG is not None and not _cvG.is_empty:
         _acb = [(b_, g_) for b_, g_ in _bl if b_.get('zb') is None and g_ is not None and not g_.is_empty]; _acg = [g_ for b_, g_ in _acb]; _acgt = STRtree(_acg) if _acg else None
         _acua = unary_union([P(b_['p'], b_.get('k', [])) for b_ in ED.alti if b_.get('zb') is not None]) if ED is not None and ED.alti else Polygon()
         _acdone = []
+        _acpoi = [(nodes[r_][0], nodes[r_][1]) for r_, t_ in ntags.items() if r_ in nodes and (t_.get('shop') or t_.get('office') or t_.get('craft') or (t_.get('amenity') and t_.get('amenity') not in ('bench', 'waste_basket', 'parking', 'bicycle_parking', 'post_box', 'recycling', 'drinking_water', 'fountain', 'shelter', 'parking_entrance', 'parking_space', 'charging_station', 'vending_machine', 'clock', 'bbq', 'grit_bin', 'waste_disposal', 'toilets', 'telephone', 'hunting_stand', 'give_box', 'lounger')))]
         def _acdbg(p_, why_):
             if any(math.dist(p_, d_) < 14 for d_ in _VDBG): log('androne carraio debug', round(p_[0], 1), round(p_[1], 1), why_)
         def _ac_rect(p_, nx_, nz_, a0_, a1_, c0_, c1_):
@@ -1721,11 +1722,11 @@ if dbt_pc:
             st_ = min(cand_, key=lambda r_: r_['line'].distance(P0_)); q0_ = st_['line'].interpolate(st_['line'].project(P0_)); dd_ = math.dist(p_, (q0_.x, q0_.y))
             if dd_ < 1.0 or dd_ - st_['w'] / 2 > 12: _acn['senza_fronte'] += 1; _acdbg(p_, 'senza_fronte'); continue
             nx_, nz_ = (p_[0] - q0_.x) / dd_, (p_[1] - q0_.y) / dd_; ux_, uz_ = -nz_, nx_   # (nx_, nz_): from the street into the lot
-            Wb_ = _ac_rect(p_, nx_, nz_, -1.0, ACARR_FRONTE + ACARR_MAX + 4, -ACARR_LAT - 5, ACARR_LAT + 5)
+            Wb_ = _ac_rect(p_, nx_, nz_, -1.0, ACARR_FRONTE + ACARR_MAX + 4, -ACARR_FESSURA - 5, ACARR_FESSURA + 5)
             Ub_ = unary_union([_acg[j_] for j_ in _acgt.query(Wb_)]).buffer(0.12, join_style=2)
             if Ub_.is_empty: _acn['senza_edificio'] += 1; _acdbg(p_, 'senza_edificio'); continue
             best_ = None; why_ = 'senza_edificio'   # the line across the building, from the front to the yard behind: tried at 0, then 0.5 m, 1 m ... to either side of the carriage entrance (the DBGT point is not always on the passage)
-            for c0_ in [0.0] + [sg_ * 0.5 * k_ for k_ in range(1, int(ACARR_LAT * 2) + 1) for sg_ in (1, -1)]:
+            for c0_ in [0.0] + [sg_ * 0.5 * k_ for k_ in range(1, int(ACARR_FESSURA * 2) + 1) for sg_ in (1, -1)]:
                 C0_ = LineString([(p_[0] + ux_ * c0_ - nx_ * 1.0, p_[1] + uz_ * c0_ - nz_ * 1.0), (p_[0] + ux_ * c0_ + nx_ * (ACARR_FRONTE + ACARR_MAX + 4), p_[1] + uz_ * c0_ + nz_ * (ACARR_FRONTE + ACARR_MAX + 4))])
                 xs_ = C0_.intersection(Ub_); pcs_ = [s_ for s_ in getattr(xs_, 'geoms', [xs_]) if isinstance(s_, LineString) and not s_.is_empty]
                 pcs_ = [(((s_.coords[0][0] - p_[0]) * nx_ + (s_.coords[0][1] - p_[1]) * nz_), ((s_.coords[-1][0] - p_[0]) * nx_ + (s_.coords[-1][1] - p_[1]) * nz_)) for s_ in pcs_]
@@ -1748,12 +1749,19 @@ if dbt_pc:
             w_ = lb_ - la_; w_ = w_ if w_ <= 5.0 else 3.5; w_ = max(ACARR_LARGO, w_); c_ = min(max(c0_, la_ + w_ / 2), lb_ - w_ / 2)
             S_ = _ac_rect(p_, nx_, nz_, d0_ - 0.15, d1_ + 0.15, c_ - w_ / 2, c_ + w_ / 2)
             core_ = _ac_rect(p_, nx_, nz_, d0_ + 0.3, d1_ - 0.3, c_ - w_ / 2 - 0.3, c_ + w_ / 2 + 0.3)   # a clean rectangular hole: the building stands on both sides of it all along, not a corner or an edge eroded
-            if core_.is_empty or core_.intersection(Ub_).area < 0.985 * core_.area: _acn['spigolo_eroso'] += 1; _acdbg(p_, 'spigolo_eroso'); continue
+            cop_ = 0.0 if core_.is_empty else core_.intersection(Ub_).area / core_.area
             mc_ = (p_[0] + nx_ * d0_ + ux_ * c_, p_[1] + nz_ * d0_ + uz_ * c_)
-            if any(g_[4] == 'g' and math.dist(((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20), mc_) <= ACARR_DOPPIONE and math.dist(((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20), p_) > 3.5 for g_ in gate_out): _acn['doppione_cancello'] += 1; _acdbg(p_, 'doppione_cancello'); continue
+            dop_ = min([math.dist(((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20), mc_) for g_ in gate_out if g_[4] == 'g' and math.dist(((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20), p_) > 3.5] or [99.0])
+            if not _acdiag and cop_ < ACARR_COP: _acn['spigolo_eroso'] += 1; _acdbg(p_, 'spigolo_eroso'); continue
+            if not _acdiag and dop_ <= ACARR_DOPPIONE: _acn['doppione_cancello'] += 1; _acdbg(p_, 'doppione_cancello'); continue
             hit_ = [(b_, g_) for b_, g_ in _acb if g_.intersects(S_) and g_.intersection(S_).area > 0.3]
             if not hit_: _acn['senza_edificio'] += 1; _acdbg(p_, 'senza_edificio'); continue
             if any(not b_.get('dbgt') or b_.get('zt') is None or b_['h'] < ACARR_HMIN or b_.get('villa') for b_, g_ in hit_): _acn['edificio_basso'] += 1; _acdbg(p_, 'edificio_basso'); continue
+            ar_ = [g_.intersection(S_).area for b_, g_ in hit_]; fes_ = len(hit_) == 2 and min(ar_) >= 0.2 * sum(ar_)   # the passage runs along the seam of two volumes
+            poi_ = min([math.dist(po_, mc_) for po_ in _acpoi] or [99.0]); tgk_ = sorted({k_ for b_, g_ in hit_ for k_ in (b_.get('tg') or {}) if k_ in ('amenity', 'office', 'shop', 'craft', 'tourism', 'leisure', 'healthcare', 'government')})
+            if not _acdiag and abs(c_) > ACARR_LAT and not fes_: _acn['lato_senza_fessura'] += 1; _acdbg(p_, 'lato_senza_fessura'); continue
+            if not _acdiag and poi_ <= ACARR_POI: _acn['attivita_vicina'] += 1; _acdbg(p_, 'attivita_vicina'); continue
+            if not _acdiag and tgk_: _acn['edificio_con_uso'] += 1; _acdbg(p_, 'edificio_con_uso'); continue
             if _acua.intersects(S_) and _acua.intersection(S_).area > 0.3 * S_.area: _acn['gia_rialzato'] += 1; _acdbg(p_, 'gia_rialzato'); continue
             mid_ = (p_[0] + nx_ * (d0_ + d1_) / 2 + ux_ * c_, p_[1] + nz_ * (d0_ + d1_) / 2 + uz_ * c_)
             if any(math.dist(mid_, o_) < 4.0 for o_ in _acdone): _acn['doppio'] += 1; _acdbg(p_, 'doppio'); continue
@@ -1761,7 +1769,9 @@ if dbt_pc:
             if _acm == 'tutti': ap_ = True
             elif _acm == 'conta': ap_ = False
             else: ap_ = any(len(v_) == 3 and math.dist(mid_, (v_[0], v_[1])) <= v_[2] for v_ in ([float(t_) for t_ in z_.split(',')] for z_ in _acm.split(';') if z_))
-            _acl.append(dict(x=round(mid_[0], 1), z=round(mid_[1], 1), pc=(round(p_[0], 1), round(p_[1], 1)), lungo=round(d1_ - d0_, 1), largo=round(w_, 1), n=(round(nx_, 2), round(nz_, 2)), h=[round(b_['h'], 1) for b_, g_ in hit_], cortile=round(Cb_.area), applicato=bool(ap_)))
+            Cf_ = max([g_ for g_ in getattr(_cvG, 'geoms', [_cvG]) if g_.intersects(Cb_)] or [Cb_], key=lambda g_: g_.intersection(Cb_).area)
+            ypc_ = sum(1 for o_ in dbt_pc if o_ != p_ and Cf_.distance(Point(o_)) < 4.0); pcv_ = sum(1 for o_ in dbt_pc if o_ != p_ and math.dist(o_, p_) < 8.0)
+            _acl.append(dict(fessura=bool(fes_), poi=round(poi_, 1), tgk=tgk_, lat=round(c_, 1), cop=round(cop_, 3), dop=round(dop_, 1), vol=len(hit_), cort_tot=round(Cf_.area), cort_pc=ypc_, cort_strada=round(float(asph.distance(Cf_)), 1), pc_vicini=pcv_, x=round(mid_[0], 1), z=round(mid_[1], 1), pc=(round(p_[0], 1), round(p_[1], 1)), lungo=round(d1_ - d0_, 1), largo=round(w_, 1), n=(round(nx_, 2), round(nz_, 2)), h=[round(b_['h'], 1) for b_, g_ in hit_], cortile=round(Cb_.area), applicato=bool(ap_)))
             _acn['candidati'] += 1
             if not ap_: continue
             _acn['applicati'] += 1; _ac_extra.append(S_)
