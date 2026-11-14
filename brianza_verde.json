@@ -13253,5 +13253,10 @@
  "siepi": {
   "filari_siepe": 4,
   "aggiunte": 4
+ },
+ "cespugli": {
+  "n": 210911,
+  "dal_lidar": 229258,
+  "negli_arbusteti": 7530
  }
 }
