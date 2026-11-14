@@ -796,6 +796,32 @@ rep("  disegna();\n  if (ipol) interpEnd(ipol);\n}", "  if (m_) dbgMk(m_, 'vis')
 rep("if (!DEBUG) { el.hidden = true; return; }", "if (!DEBUG) { el.hidden = true; if (MIS.el && !MIS.el.hidden) dbgOff(); return; }")
 rep("  spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }", "  rec.misure = MIS.txt; spotN++; try { sfxBlip(660, 990, 0.12); } catch (e) { }")
 rep("  if (e.code === 'KeyB') reportSpot();", "  if (e.code === 'KeyB') reportSpot();\n  if (e.code === 'KeyK' && DEBUG) dbgCopy();")
+# ---- debug teleport (key T, only with debug on): paste a game link or "x z", Enter = go there without reloading; same jump as the respawn (teletrasporto), tiles round the point first
+rep("#dbghud { position: fixed;", "#dbgtele { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 10; width: min(520px, calc(100vw - 32px)); box-sizing: border-box; padding: 14px 16px; background: rgba(14,15,20,.88); border: 2px solid var(--ocra); border-radius: 6px; text-align: center; }\n#dbgtele h3 { font-family: var(--display); font-size: 22px; margin: 0 0 8px; color: var(--ocra); font-weight: 400; }\n#dbgtele input { width: 100%; box-sizing: border-box; font: 600 20px var(--body); padding: 7px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,.3); background: #15161c; color: #fff; -webkit-user-select: text; user-select: text; }\n#dbgtele p { font: 500 15px var(--body); margin: 6px 0 0; color: rgba(255,255,255,.7); }\n#dbghud { position: fixed;")
+rep("<div id=\"dbghud\" hidden></div>", "<div id=\"dbgtele\" hidden><h3>Teletrasporto</h3><input id=\"dbgteleq\" type=\"text\" spellcheck=\"false\" autocomplete=\"off\" placeholder=\"link del gioco oppure: x z\"><p id=\"dbgtelem\">Invio = vai &middot; Esc = chiudi</p></div><div id=\"dbghud\" hidden></div>")
+rep("function updVisuals(dt) {", r"""let teleAperta = false;
+function teleChiudi() { teleAperta = false; $('dbgtele').hidden = true; $('dbgteleq').blur(); }
+function teleApri() { if (!DEBUG || !running) return; for (const k in K) K[k] = false; teleAperta = true; $('dbgtele').hidden = false; $('dbgtelem').textContent = 'Invio = vai \u00b7 Esc = chiudi'; const q = $('dbgteleq'); q.value = ''; setTimeout(() => q.focus(), 0); }
+function teleLeggi(t) { /* a game link (x= and z=) or two numbers, "x z", "x 12 z 34", commas as separators */
+  const m = /[?&]x=(-?\d+(?:\.\d+)?)/.exec(t), n = /[?&]z=(-?\d+(?:\.\d+)?)/.exec(t); if (m && n) return [parseFloat(m[1]), parseFloat(n[1])];
+  const a = t.match(/-?\d+(?:\.\d+)?/g); return a && a.length >= 2 ? [parseFloat(a[0]), parseFloat(a[1])] : null; }
+async function teleVai(x, z) {
+  if (TELE) return; const v = P.car, eraAuto = P.mode === 'car' && v && !v.heli; teleChiudi();
+  await teletrasporto(x, z, 260);
+  /* the ground at the exact point (decks and roofs too), and never inside a wall: the nearest free spot round it */
+  let px = x, pz = z; if (inBuilding(px, pz, 0.5)) { let ok = false; for (let r = 1.5; r <= 40 && !ok; r += 1.5) for (let a = 0; a < 16 && !ok; a++) { const qx = x + Math.cos(a * Math.PI / 8) * r, qz = z + Math.sin(a * Math.PI / 8) * r; if (!inBuilding(qx, qz, 0.5)) { px = qx; pz = qz; ok = true; } } }
+  P.x = px; P.z = pz; P.y = walkGround(px, pz, H.surface(px, pz)); P.vx = P.vz = P.vy = 0; camInit = false;
+  if (eraAuto && !v.dead) { /* it was in a car: the same car, next to him, and he gets in */
+    const h = P.h; v.x = px + Math.cos(h) * 2.4; v.z = pz - Math.sin(h) * 2.4; if (inBuilding(v.x, v.z, 1.5)) { v.x = px; v.z = pz; } v.y = H.surface(v.x, v.z); v.vx = v.vz = 0; v.sleep = false; v.sync();
+    enterExit(); }
+  toast('Teletrasporto: ' + Math.round(x) + ', ' + Math.round(z)); }
+(() => { const q = $('dbgteleq'); if (!q) return;
+  ['keydown', 'keyup', 'keypress'].forEach(k => q.addEventListener(k, e => { e.stopPropagation(); if (k !== 'keydown') return;
+    if (e.key === 'Escape') { e.preventDefault(); teleChiudi(); }
+    else if (e.key === 'Enter') { e.preventDefault(); const p = teleLeggi(q.value); if (!p) { $('dbgtelem').textContent = 'Servono due numeri: x z'; return; }
+      if (!(p[0] > ZONA[0] && p[0] < ZONA[2] && p[1] > ZONA[1] && p[1] < ZONA[3])) { $('dbgtelem').textContent = 'Fuori dalla mappa'; return; } teleVai(p[0], p[1]); } })); })();
+function updVisuals(dt) {""")
+rep("  if (e.code === 'KeyB') reportSpot();\n  if (e.code === 'KeyK' && DEBUG) dbgCopy();", "  if (e.code === 'KeyB') reportSpot();\n  if (e.code === 'KeyT' && DEBUG && !teleAperta) { e.preventDefault(); teleApri(); }\n  if (e.code === 'KeyK' && DEBUG) dbgCopy();")
 rep("window.__G = { FIS, VIVI,", "window.__G = { acquaIn, POOLS, GPS, BIGV, drawBig, gpsCalc, gpsGraph, gpsSnap, gpsAStar, setWay: (x, z) => { WAYPT = x == null ? null : { x, z }; gpsTick(0); }, MIS, openGate, PROPS, FIS, VIVI,")
 # ---- GPS (gps3.js): the route follows the waypoint, drawn above the roads on the big map too
 rep("  // places and landmarks\n", "  gpsDraw(g, px_(6)); /* the GPS route: above the roads, under the icons */\n  // places and landmarks\n")
