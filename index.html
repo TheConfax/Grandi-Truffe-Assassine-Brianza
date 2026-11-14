@@ -118,6 +118,10 @@ body:has(#start:not([hidden])) :is(.hud, #osm, #touch, #fx, #dbghud, #pause) { d
 #pause p { font-size: 19px; margin: 6px 0; }
 body:not(.debug) .dbg { display: none !important; }
 #pause .dbgline { margin-top: 14px; font-size: 14px; } #pause .dbgline button { font: 600 14px system-ui; padding: 6px 12px; border-radius: 4px; border: 0; background: var(--ocra); color: #15161c; cursor: pointer; margin: 2px; } #dbgcode { width: 110px; font: 14px system-ui; padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,.25); background: #15161c; color: #fff; text-align: center; }
+#dbgtele { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 10; width: min(520px, calc(100vw - 32px)); box-sizing: border-box; padding: 14px 16px; background: rgba(14,15,20,.88); border: 2px solid var(--ocra); border-radius: 6px; text-align: center; }
+#dbgtele h3 { font-family: var(--display); font-size: 22px; margin: 0 0 8px; color: var(--ocra); font-weight: 400; }
+#dbgtele input { width: 100%; box-sizing: border-box; font: 600 20px var(--body); padding: 7px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,.3); background: #15161c; color: #fff; -webkit-user-select: text; user-select: text; }
+#dbgtele p { font: 500 15px var(--body); margin: 6px 0 0; color: rgba(255,255,255,.7); }
 #dbghud { position: fixed; left: 50%; transform: translateX(-50%); bottom: 6px; z-index: 8; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
 #osm { position: fixed; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(2px + env(safe-area-inset-bottom, 0px)); font-size: 11px; color: rgba(251,245,230,.7); text-shadow: 0 1px 0 #000; }
 #touch { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
@@ -148,7 +152,7 @@ body:not(.debug) .dbg { display: none !important; }
 <div id="touch" hidden></div>
 <div id="fx"><h2 id="fxt"></h2></div>
 <div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span id="bighint">Rotella o due dita: zoom · trascina: sposta · clic: segnaposto · M: torna in strada</span></div><button id="bigx" aria-label="Chiudi la mappa">×</button></div>
-<div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p><p class="ver" id="pver" hidden></p></div></div>
+<div id="dbgtele" hidden><h3>Teletrasporto</h3><input id="dbgteleq" type="text" spellcheck="false" autocomplete="off" placeholder="link del gioco oppure: x z"><p id="dbgtelem">Invio = vai &middot; Esc = chiudi</p></div><div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p><p class="ver" id="pver" hidden></p></div></div>
 
 <div id="fade"></div>
 <div id="start">
@@ -179,7 +183,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo 1e39f435 · assemblato 13/11 23:13 · porta ' + location.port;
+    const txt = 'locale · ramo teletrasporto · dopo 4d71782d · assemblato 14/11 01:35 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -10586,6 +10590,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyN') skipTime(2);
   if (e.code === 'KeyR') toggleRadio();
   if (e.code === 'KeyB') reportSpot();
+  if (e.code === 'KeyT' && DEBUG && !teleAperta) { e.preventDefault(); teleApri(); }
   if (e.code === 'KeyK' && DEBUG) dbgCopy();
   if (e.code === 'KeyJ' && DEBUG) { const r = H.check(); toast('H.check: ' + r.tile + ' tile, scarto ' + r.scarto_max_m.toFixed(3) + ' m (raggi ' + r.scarto_raggi_m.toFixed(3) + ')'); }
   if (e.code === 'KeyU') { AU.muted = !AU.muted; toast(AU.muted ? 'Audio spento' : 'Audio acceso'); }
@@ -13867,6 +13872,27 @@ function neveMat(m, k) {
 }
 for (const M of [MAT, RO_MAT]) for (const k in M) neveMat(M[k], NEVE_K[k] ?? 1);
 
+let teleAperta = false;
+function teleChiudi() { teleAperta = false; $('dbgtele').hidden = true; $('dbgteleq').blur(); }
+function teleApri() { if (!DEBUG || !running) return; for (const k in K) K[k] = false; teleAperta = true; $('dbgtele').hidden = false; $('dbgtelem').textContent = 'Invio = vai \u00b7 Esc = chiudi'; const q = $('dbgteleq'); q.value = ''; setTimeout(() => q.focus(), 0); }
+function teleLeggi(t) { /* a game link (x= and z=) or two numbers, "x z", "x 12 z 34", commas as separators */
+  const m = /[?&]x=(-?\d+(?:\.\d+)?)/.exec(t), n = /[?&]z=(-?\d+(?:\.\d+)?)/.exec(t); if (m && n) return [parseFloat(m[1]), parseFloat(n[1])];
+  const a = t.match(/-?\d+(?:\.\d+)?/g); return a && a.length >= 2 ? [parseFloat(a[0]), parseFloat(a[1])] : null; }
+async function teleVai(x, z) {
+  if (TELE) return; const v = P.car, eraAuto = P.mode === 'car' && v && !v.heli; teleChiudi();
+  await teletrasporto(x, z, 260);
+  /* the ground at the exact point (decks and roofs too), and never inside a wall: the nearest free spot round it */
+  let px = x, pz = z; if (inBuilding(px, pz, 0.5)) { let ok = false; for (let r = 1.5; r <= 40 && !ok; r += 1.5) for (let a = 0; a < 16 && !ok; a++) { const qx = x + Math.cos(a * Math.PI / 8) * r, qz = z + Math.sin(a * Math.PI / 8) * r; if (!inBuilding(qx, qz, 0.5)) { px = qx; pz = qz; ok = true; } } }
+  P.x = px; P.z = pz; P.y = walkGround(px, pz, H.surface(px, pz)); P.vx = P.vz = P.vy = 0; camInit = false;
+  if (eraAuto && !v.dead) { /* it was in a car: the same car, next to him, and he gets in */
+    const h = P.h; v.x = px + Math.cos(h) * 2.4; v.z = pz - Math.sin(h) * 2.4; if (inBuilding(v.x, v.z, 1.5)) { v.x = px; v.z = pz; } v.y = H.surface(v.x, v.z); v.vx = v.vz = 0; v.sleep = false; v.sync();
+    enterExit(); }
+  toast('Teletrasporto: ' + Math.round(x) + ', ' + Math.round(z)); }
+(() => { const q = $('dbgteleq'); if (!q) return;
+  ['keydown', 'keyup', 'keypress'].forEach(k => q.addEventListener(k, e => { e.stopPropagation(); if (k !== 'keydown') return;
+    if (e.key === 'Escape') { e.preventDefault(); teleChiudi(); }
+    else if (e.key === 'Enter') { e.preventDefault(); const p = teleLeggi(q.value); if (!p) { $('dbgtelem').textContent = 'Servono due numeri: x z'; return; }
+      if (!(p[0] > ZONA[0] && p[0] < ZONA[2] && p[1] > ZONA[1] && p[1] < ZONA[3])) { $('dbgtelem').textContent = 'Fuori dalla mappa'; return; } teleVai(p[0], p[1]); } })); })();
 function updVisuals(dt) {
   heliDraw(dt);
   const cx = camera.position.x, cz = camera.position.z;
