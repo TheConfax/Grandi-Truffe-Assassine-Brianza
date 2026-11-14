@@ -60,7 +60,7 @@ function layResto(T) { // what the world used to lay out at the start with the s
   layStrade(T); layFence(T);
   for (const r of RLT.get(T.t) || []) layRilevati(r);
   for (const r of RVT.get(T.t) || []) layFiume(r);
-  layCancelli(T); layPorte(T);
+  layCancelli(T); layPorte(T); ngRistringi(T);
   for (const f of FOUNT_T.get(T.t) || []) layFontana(f);
   for (const f of FUEL_T.get(T.t) || []) layPompe(f);
   tettiFuel(T); layDossi(T); layParcheggi(T);
