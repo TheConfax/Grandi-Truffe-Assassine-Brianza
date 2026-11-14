@@ -43,7 +43,7 @@
    "3": 68,
    "4": 26
   },
-  "tempo_s": 1.2
+  "tempo_s": 1.0
  },
  "banchine": {
   "tagliate": 4,
@@ -269,6 +269,6 @@
   "cartelli_di_paese": {
    "n": 15
   },
-  "tempo_s": 12.3
+  "tempo_s": 12.2
  }
 }

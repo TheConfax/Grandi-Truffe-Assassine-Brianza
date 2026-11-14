@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 10.5,
+  "tempo_s": 7.4,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 54.3,
+  "tempo_s": 36.8,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -1740,13 +1740,13 @@
  },
  "alberi_posto": {
   "alberi": 97308,
-  "spostati": 5046,
+  "spostati": 5047,
   "tolti": 415,
   "per_motivo": {}
  },
  "cancelli_ante_alberi": {
   "ante_girate": 216,
-  "alberi_spostati": 5046
+  "alberi_spostati": 5047
  },
  "chiusure_a_t": {
   "capi_liberi": 21193,
@@ -2826,6 +2826,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 12.3
+  "tempo_s": 8.0
  }
 }
