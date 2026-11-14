@@ -132,7 +132,7 @@ const FOTO_HEMI = 1, FOTO_SUN = 1, /* the light is luce3.js's now */ FOTO_FOGGRE
       F.s.material.uniforms.uSkyA.value = F.a; F.s.visible = F.a > 0.01;
       F.s.material.uniforms.uSkyS.value = 1.2 + 0.6 * clamp(L.elDeg / 15, 0, 1); // less boost with the sun low: twilight would turn teal
       F.s.material.uniforms.uSkyK.value = 0.06 * (1 + 2.5 * (1 - clamp((L.elDeg + 2) / 22, 0, 1)) ** 2); /* the model's sky darkens much faster than the light on the ground as the sun goes down: an eye (and r128's pow) keeps it readable */
-      if (F.s.visible) { fotoSkyArrivi();
+      if (F.s.visible && F.fr !== (window.__fot | 0)) { F.fr = window.__fot | 0; fotoSkyArrivi(); /* once a frame, not once a step (FPS 14/11: at 25 fps the steps are 2-3 a frame; verde3.js counts the frames) */
         const d = camera.getWorldDirection(_fotoV), yaw = Math.atan2(d.x, d.z), dy = Math.abs(((yaw - F.yaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
         if (performance.now() - F.t > 500 || Math.abs(TOD - F.tod) > 0.05 || dy > 0.4) fotoSkyHorizon();
       }

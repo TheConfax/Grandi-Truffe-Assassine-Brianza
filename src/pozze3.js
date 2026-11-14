@@ -13,6 +13,7 @@ const POZZE = window.__POZZE = { on: !/[?&]pozzeluce=0/.test(location.search), N
   pw: { value: Array.from({ length: 54 }, () => new THREE.Vector4()) }, pwn: { value: 0 }, init: false, _L: [], _A: [], _d: new THREE.Vector3() };
 const pzSm = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const POZZE_DECL = `
+vec3 pzAlb(vec3 a) { float l = max(dot(a, vec3(.2126, .7152, .0722)), 1e-4); return a * min(3., pow(l / .17, .45) * .17 / l); }
 uniform vec4 uFL[48]; uniform int uFLN; uniform vec3 uFLC;
 uniform vec4 uFCp[16]; uniform vec4 uFCd[16]; uniform int uFCN; uniform vec3 uFCC;
 `;
@@ -23,14 +24,26 @@ const POZZE_FRAG = `
       float at = 1.0 / max(d * d, 0.01) * pow2(saturate(1.0 - pow4(d / 26.0))); flE += uFLC * (L.w * at * smoothstep(0.40849, 0.98516, ld.y) * nl); }
     for (int i = 0; i < 16; i++) { if (i >= uFCN) break; vec4 L = uFCp[i]; vec3 lv = L.xyz - flP; float d = length(lv); if (d >= 55.0 || d < 1e-3) continue; vec3 ld = lv / d; float nl = dot(flN, ld); if (nl <= 0.0) continue;
       float at = 1.0 / max(d * d, 0.01) * pow2(saturate(1.0 - pow4(d / 55.0))); flE += uFCC * (L.w * at * smoothstep(0.87758, 0.97479, dot(-ld, uFCd[i].xyz)) * nl); }
-    reflectedLight.directDiffuse += flE * material.diffuseColor; }
+    reflectedLight.directDiffuse += flE * pzAlb(material.diffuseColor); }
 `;
+/* the lamps and the headlights on a pale ground (Carlo 14/11, piazza Vittorio Veneto: "box di luce", a patch of light with straight edges, and the lamp that hardly lights the
+   ground under it): nothing cut the light, it was the ground: the pale paving of a path (albedo 0.32) under a lamp or in the headlights burnt out white, three and a half
+   times the asphalt round it (0.09), which stayed dark; the edge of the patch was the edge of the path. As a camera's or the eye's response at night: for the light of the
+   lamps and the cars (real spot lights and computed ones alike) the ground answers with its albedo compressed towards a middle grey (power 0.45 round 0.17): the asphalt
+   under a lamp 1.4 times lighter, the pale paving 0.7, the same colours. The sun, the sky and the moon as before */
+let POZZE_CHUNK = null;
+function pozzeChunk() {
+  if (POZZE_CHUNK) return POZZE_CHUNK; let c = THREE.ShaderChunk.lights_fragment_begin; const k = '#if ( NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )', i0 = c.indexOf(k), i1 = i0 < 0 ? -1 : c.indexOf('#pragma unroll_loop_end', i0);
+  if (i0 >= 0 && i1 > i0) { const mid = c.slice(i0, i1); if (mid.includes('material, reflectedLight')) c = c.slice(0, i0) + 'LambertMaterial pzMat = material; pzMat.diffuseColor = pzAlb( material.diffuseColor );\n' + mid.split('material, reflectedLight').join('pzMat, reflectedLight') + c.slice(i1); }
+  return POZZE_CHUNK = c;
+}
 function pozzeMat(m) {
   if (!POZZE.on || !m || m.userData.pozze) return; m.userData.pozze = true;
   const before = m.onBeforeCompile, prev = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
   m.onBeforeCompile = (s, r) => { if (before) before.call(m, s, r);
     Object.assign(s.uniforms, { uFL: POZZE.fl, uFLN: POZZE.fln, uFLC: POZZE.flc, uFCp: POZZE.fcp, uFCd: POZZE.fcd, uFCN: POZZE.fcn, uFCC: POZZE.fcc });
-    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + POZZE_DECL).replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + POZZE_FRAG); };
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + POZZE_DECL).replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + POZZE_FRAG);
+    if (s.fragmentShader.includes('#include <lights_lambert_fragment>') && s.fragmentShader.includes('#include <lights_fragment_begin>')) s.fragmentShader = s.fragmentShader.replace('#include <lights_fragment_begin>', pozzeChunk()); };
   m.customProgramCacheKey = () => prev + '|pozze'; m.needsUpdate = true;
 }
 if (POZZE.on) {
