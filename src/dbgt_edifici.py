@@ -50,6 +50,9 @@ ALA_MIN = 15.0     # the smallest wing of a volume cut into wings for its roof (
 RECT_FILL = 0.8    # the pitched roofs are fitted on the volume's minimum rectangle: only where the volume fills this much of it
 RH_MAX = {1: 6.0, 2: 6.0, 3: 3.0}   # the highest ridge over the eaves (m): a steeper fit is the next, taller building seen by the DSM along a
                    # shared wall (a shed of 81 m2 came out with a single slope rising 17.9 m)
+RH_BUONO = 1.4    # a roof fitted to this rms or less (0.7 m) may stand this much higher over the eaves than RH_MAX (a steep old roof, Seveso: the neighbour's leak raises the rms)
+GRAD_CONF, GRAD_AREA, GRAD_BANDA, GRAD_MAXALZ, GRAD_MAXRH = 2.0, 40.0, 2.5, 9.0, 8.0   # steps (gradini): the game and the LiDAR differ by more than this (m) in the eaves or the ridge; a volume at least this big (m2);
+                   # the spread of the DSM in the band inside the walls at most this (m: not a tree over a low house); the walls never go up more than this (m)
 MIN_IN = 0.3       # a way inside the buildings for less than this (m) is left as it is
 CLEAR_FOOT, CLEAR_CAR = 0.6, 1.0   # how far from the walls a way that ran inside a building moves (footways, the others)
 PUSH_MAX = 2.5     # a stretch never deeper than this inside the walls moves out; a deeper one goes through the building and is cut
@@ -66,6 +69,15 @@ CONF_DZ, CONF_D = 3.0, 40.0   # ... drawn at the DSM's height only where another
                    # of 27.1 m; at first within 2 m either way). Without it the volume stays (edificio 525 at x 210 z -605, Carlo:
                    # a block 19 m high under the DSM of 2008 and a volume as high 55 m away in the same big complex, chance; the farthest
                    # confirmation taken at Meda and Seveso is 30 m, x 477 z -328)
+GRONDA_MIN, GRONDA_MAX = 2.5, 6.0   # a whole volume whose eaves the DSM fits this far (m) over the top of its walls, and not more (above that: blocchi_alti
+                   # and its confirmation), is drawn low by the DBGT: the walls go up to those eaves (Carlo 13/11, via Verga x -559 z 862: UN_VOL_AV 4.07 m, a house of two floors)
+GRONDA_SPREAD = 1.0   # ... for a volume cut into wings: the eaves of its wings agree within this (m)
+DIV_MIN, DIV_AREA, DIV_LARGO, DIV_PASSO, DIV_MAXP, DIV_GIRI = 120.0, 30.0, 3.0, 1.5, 6, 4   # a big volume whose DSM roof is rejected is cut by the DSM itself (second step): the volume this big (m2),
+                   # a part at least this big (m2) and wide (m), cuts every DIV_PASSO m along the volume's axes, at most DIV_MAXP parts, DIV_GIRI rounds of cuts
+DIV_RMS = 0.7   # ... and a part of a divided volume may fit its roof to this rms (a steep old roof with dormers, chimneys), and then stand RH_BUONO times higher
+DIV_MALE = ('forma', 'piccolo', 'senza_dsm', 'non_copre', 'chiome', 'troppo_ripido', 'complesso', 'irregolare')
+GRONDA_AREA, GRONDA_RMS, GRONDA_ALB, GRONDA_IN = 25.0, 0.5, 0.15, 0.75   # ... a volume this big (m2), the roof fitted to this rms (m), at most this share of points
+                   # far over it (crowns) and at least this share of the cells that agree with it: not a tree, not a bit of the next building
 BASSO_A, BASSO_DZ, BASSO_SH, BASSO_MIN = 60.0, 8.0, 0.9, 2.0   # a ground volume this small (m2) whose top the DSM is BASSO_DZ m under on
                    # BASSO_SH of it comes down to the DSM, when the DSM sees a structure there (BASSO_MIN m over the ground; only ground: newer than 2008)
 
@@ -165,6 +177,30 @@ def _tls(A, h, it=3, cut=0.8):
     return c, float(np.sqrt(np.mean(r[m] ** 2))), float(m.mean()), float(np.mean(r > 2.0))
 
 
+def tetto_buono(f, rms=None):
+    """the eaves (m over the top of the walls, as fit_tetto gives them) when the roof fitted on a volume is one we trust and its walls are right or
+    GRONDA_MIN to GRONDA_MAX m too low; else None"""
+    if not f or f.get('k') not in ('flat', 'gable', 'hip', 'shed') or f.get('m') in DIV_MALE: return None
+    if f.get('cover', 0) < DSM_COVER or f['rms'] > (rms or GRONDA_RMS) or f['alberi'] > GRONDA_ALB: return None
+    e = f['eave']
+    return e if (-0.6 <= e <= DSM_EAVE or GRONDA_MIN <= e <= GRONDA_MAX) else None
+
+
+def tagli(poly):
+    """the ways to cut a volume in parts along the axes of its minimum rectangle, every DIV_PASSO m: a list of lists of parts, each at least DIV_AREA m2 and DIV_LARGO m wide"""
+    c, u, v, a, b = rect_frame(poly)
+    P = np.asarray(poly.exterior.coords)[:-1] - c; R = 4 * max(a, b) + 10; out = []
+    for d, o in ((u, v), (v, u)):
+        q = P @ d
+        for t in np.arange(q.min() + DIV_LARGO, q.max() - DIV_LARGO + 1e-6, DIV_PASSO):
+            try: ps = _parts(shapely.ops.split(poly, LineString([c + d * t - o * R, c + d * t + o * R])))
+            except Exception: continue
+            if len(ps) < 2 or len(ps) > 3 or any(x.area < DIV_AREA for x in ps): continue
+            if any(2 * min(rect_frame(x)[3], rect_frame(x)[4]) < DIV_LARGO for x in ps): continue
+            out.append(ps)
+    return out
+
+
 def blocchi_alti(poly, top, dsm):
     """the blocks of a ground volume the DSM sees at least ALTO_DZ m over its top (m a.s.l.): [(polygon of the block grown to the walls,
     median of the DSM on its smooth cells)]. On a 1 m grid inside the walls (0.3 m in) along the axes of the volume's minimum rectangle (its
@@ -251,7 +287,7 @@ def fit_tetto(job):
         g = np.array([co[1], co[2]]); s = float(np.hypot(*g)); gw = (g[0] * u + g[1] * v) / s
         ctr, pl, rh = piani_tetto(3, poly, s, (c, gw, np.array([-gw[1], gw[0]]), a, b))
     kk = {'gable': 1, 'hip': 2, 'shed': 3}[k]
-    if rh > RH_MAX[kk] * (2 if church else 1): res['m'] = 'troppo_ripido'; res['rh'] = round(float(rh), 2); return vid, res
+    if rh > RH_MAX[kk] * (2 if church else (RH_BUONO if rm <= 0.7 else 1)): res['m'] = 'troppo_ripido'; res['rh'] = round(float(rh), 2); return vid, res
     res.update(rk=kk, rc=[round(float(ctr[0]), 2), round(float(ctr[1]), 2)], rf=[round(float(x), 3) for p in pl for x in p], rh=round(float(rh), 2))
     return vid, res
 
@@ -716,6 +752,39 @@ class Edifici:
             n += 1; self.log('dbgt edifici: cupola o guglia a x %.0f z %.0f, %.1f m sopra il muro piu alto, raggio %.1f m' % (cx, cz, pk - tmax, rr[-1]))
         return n
 
+    def dividi_dsm(self, items):
+        """items {k: (polygon, top, base of the walls, m a.s.l.)} of volumes whose roof the DSM does not fit as one: cut each in parts round by round (tagli),
+        the cut that leaves the best fits (area-weighted rms, a part without a roof we trust weighs more), the parts still bad cut again (DIV_GIRI rounds).
+        {k: [(part, eaves over the top)]} only where every part ends with a roof we trust (tetto_buono) and there are at most DIV_MAXP of them"""
+        st = {k: dict(open=[it[0]], done=[]) for k, it in items.items()}
+        for giro in range(DIV_GIRI):
+            jobs, piano = [], {}
+            for k, s_ in st.items():
+                if s_.get('no'): continue
+                for pi, q in enumerate(s_['open']):
+                    cuts = tagli(q); piano[(k, pi)] = cuts
+                    for ci, ps in enumerate(cuts):
+                        for si, x in enumerate(ps): jobs.append((('d', k, giro, pi, ci, si), np.asarray(x.exterior.coords)[:-1], len(x.interiors) > 0, items[k][1], items[k][2], False))
+            fit = self._dsm(jobs)
+            for k, s_ in st.items():
+                if s_.get('no'): continue
+                nuovi = []
+                for pi, q in enumerate(s_['open']):
+                    best = None
+                    for ci, ps in enumerate(piano[(k, pi)]):
+                        fs = [fit.get(('d', k, giro, pi, ci, si)) or {} for si in range(len(ps))]
+                        sc = sum(x.area * (f.get('rms', 3.0) + (0.0 if tetto_buono(f, DIV_RMS) is not None else 0.7)) for x, f in zip(ps, fs))
+                        if best is None or sc < best[0]: best = (sc, ps, fs)
+                    if best is None: s_['no'] = True; break
+                    for x, f in zip(best[1], best[2]):
+                        e = tetto_buono(f, DIV_RMS)
+                        if e is not None: s_['done'].append((x, e))
+                        else: nuovi.append(x)
+                else:
+                    s_['open'] = nuovi
+                    if len(s_['done']) + len(nuovi) > DIV_MAXP: s_['no'] = True
+        return {k: s_['done'] for k, s_ in st.items() if not s_.get('no') and not s_['open'] and len(s_['done']) >= 2}
+
     def altezze_dal_dsm(self):
         """The heights of the ground volumes (UN_VOL_POR 01) where the DSM says the DBGT's UN_VOL_AV is plainly wrong, before the roofs:
           - too low: a block the DSM sees smooth and ALTO_DZ m over the top of the walls (blocchi_alti) becomes a volume of its own of the same
@@ -811,11 +880,165 @@ class Edifici:
                 else: rec.pop('k', None)
                 rec['zt'] = round(z_, 2); rec['h'] = round(z_ - g0, 1)
                 if n: nuovi.append(rec)
+        # too low, the whole volume: the DSM fits one roof over most of the plan with its eaves GRONDA_MIN to GRONDA_MAX m over the walls, so the walls
+        # go up to those eaves and the roof from the DSM is accepted by itself (tetti). Not the volumes split above, nor the ones that came down
+        gia = set(conf) | {k for k, md in enumerate(bassi) if md is not None}
+        def sopra(k):
+            p = polys[k]
+            if k in gia or p is None or p.area < GRONDA_AREA or cand[k].get('tolto'): return False
+            q = p.buffer(-0.6)
+            if q.is_empty: return False
+            x0, z0, x1, z1 = q.bounds; gx, gz = np.meshgrid(np.arange(x0, x1, 1.0) + 0.5, np.arange(z0, z1, 1.0) + 0.5)
+            m = shapely.contains_xy(q, gx, gz)
+            if m.sum() < 8: return False
+            D = dsm.at(gx[m], gz[m]); D = D[np.isfinite(D)]
+            return len(D) >= 8 and float(np.median(D)) - (cand[k]['zt'] + B) >= GRONDA_MIN - 0.5
+        pre = [k for k, ok in enumerate(in_parallelo(sopra, range(len(cand)))) if ok]
+        fg = self._dsm([((k,), np.asarray(polys[k].exterior.coords)[:-1], len(polys[k].interiors) > 0, cand[k]['zt'] + B, cand[k]['zt'] - cand[k]['h'] + B, False) for k in pre])
+        ng = Counter(); alz_g = []; alzk = set()
+        def esito(f):
+            """(eaves over the walls, None) when the fit is a roof we trust, else (None, reason)"""
+            if f.get('k') not in ('flat', 'gable', 'hip', 'shed'): return None, 'non_un_tetto'
+            if f.get('cover', 0) < DSM_COVER: return None, 'non_copre'
+            if f['rms'] > GRONDA_RMS or f['alberi'] > GRONDA_ALB: return None, 'chiome_o_rumore'
+            return f['eave'], None
+        # a volume that is not one roof (an L, two houses in a row, a fit that does not hold) is tried wing by wing (ali): the raise is for the whole volume,
+        # only when every wing fits a roof and their eaves agree within GRONDA_SPREAD m
+        ali_k = {}
+        for k in pre:
+            f = fg.get((k,)) or {}
+            e, mot = esito(f)
+            if mot in ('non_un_tetto', 'chiome_o_rumore') or (e is not None and e < GRONDA_MIN and f['rms'] > 0.35):
+                ps = ali(polys[k]) if polys[k].geom_type == 'Polygon' else []
+                if len(ps) >= 2: ali_k[k] = ps
+        fa = self._dsm([((k, n), np.asarray(q.exterior.coords)[:-1], len(q.interiors) > 0, cand[k]['zt'] + B, cand[k]['zt'] - cand[k]['h'] + B, False) for k, ps in ali_k.items() for n, q in enumerate(ps)])
+        for k in pre:
+            r, p = cand[k], polys[k]; f = fg.get((k,)) or {}; g0 = r['zt'] - r['h']
+            e, mot = esito(f); kk = f.get('k')
+            if k in ali_k:
+                es = [esito(fa.get((k, n)) or {}) for n in range(len(ali_k[k]))]
+                if all(x[0] is not None for x in es) and max(x[0] for x in es) - min(x[0] for x in es) <= GRONDA_SPREAD:
+                    e, mot, kk = float(np.median([x[0] for x in es])), None, 'ali'
+                elif mot is None and e >= GRONDA_MIN: pass
+                else: ng['ali_' + (next((x[1] for x in es if x[1]), 'gronde_diverse'))] += 1; continue
+            elif mot: ng[mot + '_' + str(f.get('k', f.get('m')))] += 1; continue
+            if not GRONDA_MIN <= e <= GRONDA_MAX: ng['gronda_fuori_%s' % ('sotto' if e < GRONDA_MIN else 'sopra')] += 1; continue
+            alzk.add(k); alz_g.append(riga(r, p, r['zt'] + e, 'gronda_dal_dsm', k=kk, aggiunti=round(e, 2), rms=f.get('rms')))
+            r['zt'] = round(r['zt'] + e, 2); r['h'] = round(r['zt'] - g0, 1)
+        # a big volume whose roof the DSM does not fit as one (a row of houses, an L with a garage): cut by the DSM itself, each part with its roof and eaves
+        gia |= alzk
+        grandi = [k for k in range(len(cand)) if k not in gia and polys[k] is not None and polys[k].area >= DIV_MIN and not cand[k].get('tolto')]
+        fw = self._dsm([((k,), np.asarray(polys[k].exterior.coords)[:-1], len(polys[k].interiors) > 0, cand[k]['zt'] + B, cand[k]['zt'] - cand[k]['h'] + B, False) for k in grandi])
+        cnd, nd = {}, Counter()
+        for k in grandi:
+            f = fw.get((k,)) or {}
+            if tetto_buono(f) is not None or f.get('m') in ('non_copre', 'chiome', 'senza_dsm', 'forma', 'piccolo') or f.get('cover', 0) < DSM_COVER: continue
+            if f.get('m') in ('irregolare', 'complesso') and len(ali(polys[k]) if polys[k].geom_type == 'Polygon' else []) >= 2: nd['lasciato_alle_ali'] += 1; continue
+            cnd[k] = (polys[k], cand[k]['zt'] + B, cand[k]['zt'] - cand[k]['h'] + B)
+        div = self.dividi_dsm(cnd)
+        nd['provati'] = len(cnd); nd['divisi'] = len(div); nd['parti'] = sum(len(v) for v in div.values()); nd['non_divisi'] = len(cnd) - len(div)
+        rep['divisi'] = []
+        for k, parts in div.items():
+            r, p = cand[k], polys[k]; g0 = r['zt'] - r['h']
+            hs = sorted([[x, (r['zt'] + e) if e >= GRONDA_MIN else r['zt']] for x, e in parts], key=lambda t: -t[1])
+            for i, h_ in enumerate(hs):
+                if i: h_[0] = h_[0].difference(unary_union([q[0] for q in hs[:i]]).buffer(0.05))
+            out = [(x, z_) for h_, z_ in hs for x in _parts(h_) if x.area >= MIN_VOL]
+            if len(out) < 2: continue
+            rep['divisi'].append(riga(r, p, None, 'diviso_dal_dsm', parti=[[round(x.area), round(z_ - g0, 1)] for x, z_ in out]))
+            for n, (x, z_) in enumerate(out):
+                rec = r if n == 0 else dict(r)
+                rec['p'] = [tuple(c) for c in np.asarray(x.exterior.coords)[:-1]]
+                ho = [list(map(tuple, np.asarray(h.coords)[:-1])) for h in x.interiors if len(h.coords) >= 4]
+                if ho: rec['k'] = ho
+                else: rec.pop('k', None)
+                rec['zt'] = round(z_, 2); rec['h'] = round(z_ - g0, 1)
+                if n: nuovi.append(rec)
+        ng.update({'div_' + m: v for m, v in nd.items()})
         self.terra = [r for r in self.terra if not r.get('tolto')] + nuovi
         sc = Counter(x['motivo'] for x in rep['scartati'])
-        self.rep['altezze_dal_dsm'] = dict(n=dict(alzati=len(rep['alzati']), abbassati=len(rep['abbassati']), tolti=len(rep['tolti']), **{'scartati_' + m: v for m, v in sc.items()}), **{k: v[:400] for k, v in rep.items()})
-        self.log('dbgt edifici: altezze dal DSM, alzati', len(rep['alzati']), 'abbassati', len(rep['abbassati']), 'tolti', len(rep['tolti']), 'scartati', dict(sc), '%.0fs' % (time.time() - t0))
+        self.rep['altezze_dal_dsm'] = dict(n=dict(alzati=len(rep['alzati']), abbassati=len(rep['abbassati']), tolti=len(rep['tolti']), alzati_gronda=len(alz_g), **{'gronda_no_' + m: v for m, v in ng.items()}, **{'scartati_' + m: v for m, v in sc.items()}), **{k: v[:400] for k, v in rep.items()}, alzati_gronda=alz_g)
+        self.log('dbgt edifici: altezze dal DSM, alzati', len(rep['alzati']), 'abbassati', len(rep['abbassati']), 'tolti', len(rep['tolti']), 'alzati_gronda', len(alz_g), dict(ng), 'scartati', dict(sc), '%.0fs' % (time.time() - t0))
         return nuovi
+
+    def misura_lidar(self, p, g0, dsm):
+        """what the LiDAR (DSM) says of the volume with plan p whose ground is g0 (m a.s.l.): the eaves (median of the DSM in the band 0.6-1.7 m inside the walls),
+        the ridge (90th percentile over the plan), how much of the plan stands over 1.5 m, the spread of the band; heights over the ground. None when there is too little"""
+        q = p.buffer(-0.6)
+        if q.is_empty or q.area < 6: return None
+        x0, z0, x1, z1 = q.bounds; gx, gz = np.meshgrid(np.arange(x0, x1, 1.0) + 0.5, np.arange(z0, z1, 1.0) + 0.5)
+        m = shapely.contains_xy(q, gx, gz)
+        if m.sum() < 8: return None
+        X, Z = gx[m], gz[m]; D = dsm.at(X, Z); ok = np.isfinite(D)
+        if ok.sum() < 8: return None
+        X, Z, D = X[ok], Z[ok], D[ok] - g0
+        inner = p.buffer(-1.7); band = ~shapely.contains_xy(inner, X, Z) if not inner.is_empty else np.ones(len(D), bool)
+        Db = D[band] if band.sum() >= 4 else D
+        return dict(eave=float(np.median(Db)), spread=float(np.percentile(Db, 75) - np.percentile(Db, 25)), ridge=float(np.percentile(D, 90)), cover=float(np.mean(D > 1.5)), n=int(len(D)))
+
+    def confronto_lidar(self, tag, dsm):
+        """the heights of the game (eaves h, ridge h + the roof's rise) against the LiDAR's, volume by volume (ground volumes, not ruins or shells, over 25 m2 where the
+        DSM sees a structure over 70% of the plan): those that differ by more than GRAD_CONF m in the eaves or the ridge, by the reason the roof does not come from the DSM.
+        In the report (confronto_<tag>); every row: x, z, m2, eaves and ridge of the game, eaves and ridge of the LiDAR, reason"""
+        B = self.base; recs = [r for r in self.terra if ('vid' in r and self.vol[r['vid']]['por'] == '01') and not r.get('st') and not r.get('wt') and r.get('bt') not in ('church', 'cathedral', 'chapel')]
+        def mis(r):
+            p = Polygon(r['p'], r.get('k') or []).buffer(0)
+            if p.geom_type != 'Polygon' or p.area < 25: return None
+            return self.misura_lidar(p, r['zt'] - r['h'] + B, dsm), p
+        ms = in_parallelo(mis, recs)
+        n = Counter(); righe = []
+        for r, mp in zip(recs, ms):
+            if mp is None or mp[0] is None or mp[0]['cover'] < 0.7: n['senza_misura'] += 1; continue
+            m, p = mp; n['misurati'] += 1
+            rid = r['h'] + (r.get('_rh') or 0.0)
+            de, dr = m['eave'] - r['h'], m['ridge'] - rid
+            if abs(de) > GRAD_CONF or abs(dr) > GRAD_CONF:
+                mot = r.get('_mot', '?'); n['diff_' + mot] += 1; n['diff'] += 1; n['sotto' if max(de, dr) > GRAD_CONF else 'sopra'] += 1
+                c = p.centroid; righe.append([round(c.x, 1), round(c.y, 1), round(p.area), round(r['h'], 1), round(rid, 1), round(m['eave'], 1), round(m['ridge'], 1), mot])
+        righe.sort(key=lambda t: -max(abs(t[5] - t[3]), abs(t[6] - t[4])))
+        self.rep['confronto_' + tag] = dict(n=dict(n), righe=righe)
+        self.log('dbgt edifici: confronto col LiDAR', tag, dict(n))
+        out = os.environ.get('GTA_CONFRONTO_OUT')
+        if out:
+            import json as _json
+            _json.dump(dict(n=dict(n), righe=righe), open(out.replace('.json', '_' + tag + '.json'), 'w'))
+
+    def gradini(self, dsm):
+        """a roof the DSM could not be rebuilt on never goes back to the DBGT's height when the LiDAR says another (steps, as the city models from the LiDAR do): the eaves
+        from the edge of the LiDAR (the band inside the walls), the ridge from its high percentile, and between them a plain roof for the plan (a hip, a gable on a
+        long one). Only upwards (the DSM is of 2008, the DBGT of 2015: lower may be a building pulled down) and only where the DSM sees the structure over 70% of
+        the plan and the band is even (a tree over a low house is not a roof). Volumes with a roof from the DSM (rebuilt, or in wings) stay as they are"""
+        B = self.base; cand = [r for r in self.terra if ('vid' in r and self.vol[r['vid']]['por'] == '01') and not r.get('st') and not r.get('wt') and r.get('bt') not in ('church', 'cathedral', 'chapel', 'roof', 'carport')
+                               and r.get('_mot') not in ('dsm', 'ali_dsm', 'chiome', 'non_copre', 'senza_dsm', 'piccolo', 'basso', 'costruzione', 'rudere')]
+        def mis(r):
+            p = Polygon(r['p'], r.get('k') or []).buffer(0)
+            if p.geom_type != 'Polygon' or p.area < GRAD_AREA: return None
+            return self.misura_lidar(p, r['zt'] - r['h'] + B, dsm), p
+        ms = in_parallelo(mis, cand); n = Counter(); righe = []
+        for r, mp in zip(cand, ms):
+            if mp is None or mp[0] is None: n['senza_misura'] += 1; continue
+            m, p = mp
+            if m['cover'] < 0.7: n['non_copre'] += 1; continue
+            if m['spread'] > GRAD_BANDA: n['banda_irregolare'] += 1; continue
+            rid = r['h'] + (r.get('_rh') or 0.0)
+            if not (m['eave'] - r['h'] > GRAD_CONF or m['ridge'] - rid > GRAD_CONF): n['gia_a_posto'] += 1; continue
+            eave = m['eave'] if m['eave'] - r['h'] >= 0.5 else r['h']; rh = m['ridge'] - eave   # the walls go up to the LiDAR's eaves (half a metre or more); else they stay and only the roof rises
+            if rh < 0.8: n['colmo_basso'] += 1; continue
+            if rh > GRAD_MAXRH: n['colmo_troppo_alto'] += 1; continue   # a roof rising more than this over the eaves is a tree or the next tower in the plan
+            if eave - r['h'] > GRAD_MAXALZ: n['troppo_alto'] += 1; continue
+            c0, u, v, a, b = rect_frame(p); kind = 1 if a >= 1.5 * b else 2
+            _, _, rh1 = piani_tetto(kind, p, 1.0)
+            if rh1 < 0.3: n['pianta_stretta'] += 1; continue
+            s = float(min(S_MAX, max(S_MIN, min(rh, RH_MAX[kind] * 1.5) / rh1)))
+            if r.get('k'): n['con_buchi'] += 1; continue
+            ctr, pl, rh2 = piani_tetto(kind, p, s)
+            g0 = r['zt'] - r['h']
+            righe.append([round(p.centroid.x, 1), round(p.centroid.y, 1), round(p.area), round(r['h'], 1), round(rid, 1), round(eave, 1), round(eave + rh2, 1), r.get('_mot', '?')])
+            r['zt'] = round(g0 + eave, 2); r['h'] = round(eave, 1)
+            r['rk'] = kind; r['rf'] = [round(float(x), 3) for q in pl for x in q]; r['rc'] = [round(float(ctr[0]), 2), round(float(ctr[1]), 2)]; r['_rh'] = float(rh2); r['_mot'] = 'gradini'
+            n['gradini_' + ('a_falde' if kind == 1 else 'a_padiglione')] += 1
+        self.rep['gradini'] = dict(n=dict(n), righe=righe)
+        self.log('dbgt edifici: tetti a gradini dal LiDAR', dict(n))
 
     def tetti(self):
         """the roof of every DBGT volume from the DSM (in its own processes), or from OSM roof:shape; the reasons in the report.
@@ -859,6 +1082,7 @@ class Edifici:
                     rec['rk'] = x['rk']
                     if x['rk'] != 4: rec['rf'] = x['rf']; rec['rc'] = x['rc']
                 else: rec['rk'] = 4; nw['ali_piane_senza_dsm'] += 1   # a wing the DSM does not fit: flat, as the whole volume was
+                rec['_mot'] = 'ali_dsm' if x.get('rk') else 'ala_senza_dsm'; rec['_rh'] = float(x.get('rh') or 0.0) if x.get('rk') in (1, 2, 3) else 0.0
                 nw[{1: 'ala_a_falde', 2: 'ala_a_padiglione', 3: 'ala_a_una_falda', 4: 'ala_piana'}[rec['rk']]] += 1
                 if n: (new_a if 'zb' in r else new_t).append(rec)
             res[k] = dict(rk=-1)
@@ -866,21 +1090,22 @@ class Edifici:
         cnt, mot = Counter(), Counter(); rhs = []
         for k, r in enumerate(recs):
             f = res.get(k)
-            if r.get('st') == 1: r['rk'] = 4; cnt['in_costruzione_piano'] += 1; continue   # a shell under construction: a flat roof
+            if r.get('st') == 1: r['rk'] = 4; r['_mot'] = 'costruzione'; cnt['in_costruzione_piano'] += 1; continue   # a shell under construction: a flat roof
             if r.get('st') == 2:   # a ruin keeps the roof the DSM (2008) sees over it (st 3), otherwise it has none
                 if f and f.get('rk'):
                     r['st'] = 3; r['rk'] = f['rk']
                     if f['rk'] != 4: r['rf'] = f['rf']; r['rc'] = f['rc']
                     cnt['rudere_con_tetto_dal_dsm'] += 1
                 else: cnt['rudere_senza_tetto'] += 1
-                continue
+                r['_mot'] = 'rudere'; continue
             if f and f.get('rk') == -1: cnt['in_ali'] += 1; continue
             if f and f.get('rk'):
                 r['rk'] = f['rk']
-                if f['rk'] != 4: r['rf'] = f['rf']; r['rc'] = f['rc']; rhs.append(f['rh'])
+                if f['rk'] != 4: r['rf'] = f['rf']; r['rc'] = f['rc']; rhs.append(f['rh']); r['_rh'] = float(f['rh'])
+                r['_mot'] = 'dsm'
                 cnt[{1: 'a_falde', 2: 'a_padiglione', 3: 'a_una_falda', 4: 'piano'}[f['rk']]] += 1
                 continue
-            m = (f or {}).get('m', 'senza_dsm'); mot[m] += 1
+            m = (f or {}).get('m', 'senza_dsm'); mot[m] += 1; r['_mot'] = m
             # not from the DSM: OSM's roof shape where it gives one, otherwise the game's rule (r['rk'] absent)
             rs = r.get('rs')
             if rs in ('gabled', 'hipped', 'pyramidal', 'skillion', 'flat'):
@@ -890,9 +1115,15 @@ class Edifici:
                     else:
                         kk = {'gabled': 1, 'hipped': 2, 'pyramidal': 2, 'skillion': 3}[rs]
                         c, pl, rh = piani_tetto(kk, p, OSM_SLOPE)
-                        r['rk'] = kk; r['rf'] = [round(float(x), 3) for q in pl for x in q]; r['rc'] = [round(float(c[0]), 2), round(float(c[1]), 2)]
-                    cnt['da_osm_roof_shape'] += 1
+                        r['rk'] = kk; r['rf'] = [round(float(x), 3) for q in pl for x in q]; r['rc'] = [round(float(c[0]), 2), round(float(c[1]), 2)]; r['_rh'] = float(rh)
+                    cnt['da_osm_roof_shape'] += 1; r['_mot'] = m + '+osm'
         cnt['cupole_e_guglie_dal_dsm'] = self.cupole(self.terra + self.alti)
+        if os.path.isdir(self.dsm_dir):
+            dsm_ = dq.Lidar(self.dsm_dir)
+            self.confronto_lidar('prima', dsm_)
+            if os.environ.get('GTA_SOLO_CONFRONTO'): os._exit(0)
+            if not os.environ.get('GTA_SENZA_GRADINI'):
+                self.gradini(dsm_); self.confronto_lidar('dopo', dsm_)
         self.rep['tetti'] = dict(dal_dsm=dict(cnt), non_dal_dsm=dict(mot), ali=dict(nw), colmo_sulla_gronda=dict(p50=round(float(np.median(rhs)), 2), p90=round(float(np.percentile(rhs, 90)), 2), max=round(float(max(rhs)), 2)) if rhs else None)
         self.log('dbgt edifici: tetti dal DSM', dict(cnt), 'no', dict(mot), 'ali', dict(nw), '%.0fs' % (time.time() - t0))
         return pezzi + new_t
