@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo verde · dopo 3ac518eb · assemblato 14/11 01:41 · porta ' + location.port;
+    const txt = 'locale · ramo verde · dopo c8cba69a · assemblato 14/11 01:47 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -13578,12 +13578,13 @@ const PR_MIX = `
 float prN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(prH(i), prH(i + vec2(1, 0)), f.x), mix(prH(i + vec2(0, 1)), prH(i + vec2(1, 1)), f.x), f.y); }
 vec4 prPesi(vec2 P, float kind) { /* the weights of E, S, T over G, and the tone */
   float n1 = prN(P / 6.5 + 1.3) * .6 + prN(P / 2.3 + 7.1) * .4, n2 = prN(P / 23. + 17.) * .6 + prN(P / 41. + 5.) * .4, n3 = prN(P / 1.3 + 3.3) * .55 + prN(P / .55 + 9.1) * .45, n4 = prN(P / 11. + 21.7);
-  if (kind < .5) return vec4(smoothstep(.62, .88, n1) * .4, 0., smoothstep(.84, .97, n3) * smoothstep(.6, .85, n1) * .3, (n2 - .5) * .14 + (n1 - .5) * .06);
-  if (kind < 1.5) return vec4(smoothstep(.3, .7, n2 * .55 + n1 * .45), smoothstep(.56, .8, n1 * .65 + n4 * .35) * .7, smoothstep(.7, .88, n3 * .55 + n1 * .45) * .75, (n4 - .5) * .3 + (n2 - .5) * .1);
+  vec4 pk = vec4(smoothstep(.3, .7, n2 * .55 + n1 * .45), smoothstep(.56, .8, n1 * .65 + n4 * .35) * .7, smoothstep(.7, .88, n3 * .55 + n1 * .45) * .75, (n4 - .5) * .3 + (n2 - .5) * .1);
+  if (kind < .5) return vec4(pk.x, pk.y * .3, pk.z * .25, pk.w * .45); /* the garden: the park's lawn with gentler patches (the same base: no step where the cells change kind) */
+  if (kind < 1.5) return pk;
   return vec4(.55 + .45 * smoothstep(.3, .7, n1 * .7 + n2 * .3), smoothstep(.35, .75, n1 * .6 + n4 * .4) * .62, smoothstep(.6, .82, n3 * .5 + n2 * .5) * .55, (n4 - .5) * .26); /* incolto: the weedy grass, dry in patches */
 }
 vec3 prMix(vec3 G, vec3 E, vec3 S, vec3 T, vec4 w, vec2 P, float kind) { vec3 c = mix(G, E, w.x); c = mix(c, S, w.y); c = mix(c, T, w.z);
-  float yl = smoothstep(.55, .8, prN(P / 9. + 33.)) * (kind < .5 ? .12 : .5), gr = smoothstep(.6, .85, prN(P / 7.3 + 51.)) * (kind < .5 ? .25 : .55); /* yellower and greener patches */
+  float yl = smoothstep(.55, .8, prN(P / 9. + 33.)) * (kind < .5 ? .2 : .5), gr = smoothstep(.6, .85, prN(P / 7.3 + 51.)) * (kind < .5 ? .3 : .55); /* yellower and greener patches */
   return c * (1. + w.w) * mix(vec3(1.), vec3(1.12, 1.03, .74), yl) * mix(vec3(1.), vec3(.9, 1.07, .86), gr); }
 `;
 const PR_GLSL = `
@@ -13612,6 +13613,7 @@ if (PRATO.on) {
   MAT.incoltoS.map = MAT.incolto.map = grassTex; /* the dry grass is drawn by the shader now; the season tints it too */
   for (const [m, k] of [[MAT.pratoGiardS, 0], [MAT.grassS, 1], [MAT.grass, 1], [MAT.embank, 1], [MAT.terrainS, 1], [MAT.terrain, 1], [MAT.incoltoS, 2], [MAT.incolto, 2], [typeof RO_MAT !== 'undefined' ? RO_MAT.prato : null, 0]]) pratoMat(m, k);
   try { stagCalcola(); } catch (e) { }
+  acquaSuoloMasch(MAT.pratoGiardS); /* the ground does not draw over a pool (acqua3.js lays its mask on the MAT of its time; fix 14/11, Seveso x -543 z 838) */
 }
 /* the look of a green area of the map by its type (world3.js cellOwners): [key, material, tint]. 19 gardens of the DBGT (AR_VRD 01), 16 residential, 15 schools,
    14 cemeteries, 3 pitches: kept lawns; 18 incolti and 12 scrub: dry; the rest (lawns, parks, woods, farmland) keeps its tint on the park's lawn */
@@ -13628,7 +13630,7 @@ function pratoStile(t) {
 // thin out (each tuft has its rank and goes when the density falls under it, shrinking first), the few left a little bigger, none past 46 m. Each tuft takes
 // the colour of the ground under it (PR_MIX, the same masks), so where the tufts end the ground goes on in the same colour. The wind (stagioni3.js VENTO)
 // bends them, more at the top, in waves that run with the gusts. &erba=0 (or &ciuffi=0) turns them off
-const ERBA = window.__ERBA = { on: VERDE3.on && !/[?&](erba|ciuffi)=0/.test(location.search), CH: 10, R: 46, F0: 11, F1: 44, sp: 0.27, cap: 60000, chunks: new Map(), n: 0, cx: 1e9, cz: 1e9, dirty: true };
+const ERBA = window.__ERBA = { on: VERDE3.on && !/[?&](erba|ciuffi)=0/.test(location.search), CH: 10, R: 140, F0: 10, F1: 140, sp: 0.27, cap: 60000, chunks: new Map(), n: 0, cx: 1e9, cz: 1e9, dirty: true };
 const ERBA_G = (() => {
   const P = [], N = [], UV = [], W = [], I = []; let sd = 7; const r = () => (sd = sd * 16807 % 2147483647) / 2147483647;
   for (let b = 0; b < 10; b++) {
@@ -13643,15 +13645,16 @@ const ERBA_G = (() => {
 const ERBA_VERT = `
 attribute vec4 iP; attribute vec4 iS; attribute vec3 iC; attribute vec3 aW;
 uniform vec3 uCam; uniform vec4 uVento; uniform vec3 uErF; uniform sampler2D uPrG; uniform sampler2D uPrE; uniform sampler2D uPrS; uniform sampler2D uPrT;
-varying vec3 vErC; varying float vErH;
+varying vec3 vErC; varying float vErH; varying float vErD;
 float prH(vec2 p) { vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 ` + PR_MIX;
 const ERBA_BEGIN = `
-  float erD = length(iP.xz - uCam.xz), erDen = 1. - smoothstep(uErF.x, uErF.y, erD), erK = smoothstep(0., .1, erDen - iP.w); /* this tuft's rank against the density here */
-  float erHt = iS.x * uErF.z * mix(.55, 1., erK), erWd = (1. + 2.2 * smoothstep(8., uErF.y, erD)) * erK; /* far ones wider (a blade under a pixel flickers), going ones lower and thinner */
+  float erD = length(iP.xz - uCam.xz), erDen = erD <= uErF.x ? 1. : pow(uErF.x / erD, 1.8) * (1. - smoothstep(.75 * uErF.y, uErF.y, erD)), erK = smoothstep(0., .25 * erDen + .005, erDen - iP.w); /* this tuft's rank against the density here (fix 14/11: out to 140 m, thinning slowly) */
+  float erSW = clamp(1. + .75 * (inversesqrt(max(erDen, .05)) - 1.), 1., 3.6); /* the few far ones wider: the same cover */
+  float erHt = iS.x * uErF.z * mix(.55, 1., erK), erWd = (1. + 2.2 * smoothstep(8., 60., erD)) * erK * erSW; vErD = smoothstep(15., 70., erD); /* far ones wider (a blade under a pixel flickers), going ones lower and thinner */
   float erC = cos(iS.y), erS = sin(iS.y); mat2 erR = mat2(erC, erS, -erS, erC);
   float erUp = iS.z > 2.5 ? .4 : 1.; if (iS.z > 3.5 && iS.z < 4.5) erWd *= mix(1., 2.6, smoothstep(.55, .72, uv.y)); /* crops stand upright; the ears of the wheat */
-  vec3 transformed = position; transformed.xz = erR * (transformed.xz * mix(.6, 1.15, iS.w) * erUp + aW.xz * erWd); transformed.y *= erHt;
+  vec3 transformed = position; transformed.xz = erR * (transformed.xz * mix(.6, 1.15, iS.w) * erUp * erSW + aW.xz * erWd); transformed.y *= erHt;
   { float t = uv.y, ph = dot(iP.xz, uVento.xy) * .32 - uVento.w * 1.9, g = uVento.z * (.6 + .4 * sin(ph) + .25 * sin(ph * 2.3 + 1.7)) + .06 * sin(uVento.w * 3.3 + iP.x * 1.9 + iP.z * 1.3 + position.x * 9.);
     float bnd = clamp(g, 0., 2.2) * .38 * t * t * erHt; transformed.xz += uVento.xy * bnd; transformed.y -= bnd * bnd * .35 / max(erHt, .2); }
   transformed += iP.xyz; vErH = uv.y;
@@ -13666,7 +13669,7 @@ ERBA.mat = (() => {
   m.onBeforeCompile = s => {
     Object.assign(s.uniforms, PR_U); s.uniforms.uCam = { value: camera.position }; s.uniforms.uVento = VENTO.u; s.uniforms.uErF = ERBA.uF = ERBA.uF || { value: new THREE.Vector3(ERBA.F0, ERBA.F1, 1) };
     s.vertexShader = ERBA_VERT + s.vertexShader.replace('#include <begin_vertex>', ERBA_BEGIN);
-    s.fragmentShader = 'varying vec3 vErC; varying float vErH;\n' + s.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= vErC * mix(.68, 1.28, smoothstep(0., .85, vErH)); /* dark in the thick of the tuft, lit at the tips */');
+    s.fragmentShader = 'varying vec3 vErC; varying float vErH; varying float vErD;\n' + s.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= vErC * mix(mix(.68, 1.28, smoothstep(0., .85, vErH)), 1., vErD * .85); /* dark in the thick of the tuft, lit at the tips */');
   };
   m.customProgramCacheKey = () => 'erba-alta'; return m;
 })();
@@ -13713,36 +13716,39 @@ function erbaQui(x, z, campi) {
   if (F.m) { for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < c && jj < c && F.m[jj * c + ii] === 4) return [1, sy && sy.col, 0.5]; } } /* a stream's bank */
   return -1;
 }
-function erbaChunk(ci, cj) {
+const erbaDen = d => d <= ERBA.F0 ? 1 : Math.pow(ERBA.F0 / d, 1.8) * (1 - (t => t * t * (3 - 2 * t))(clamp((d - 0.75 * ERBA.R) / (0.25 * ERBA.R), 0, 1))); /* as the shader (ERBA_BEGIN) */
+/* a chunk: the tufts with a rank under rmax (the density its nearest point can reach from where the camera is; a far chunk asks for few) */
+function erbaChunk(ci, cj, rmax) {
   const E = ERBA, CH = E.CH, x0 = ci * CH, z0 = cj * CH, n = Math.round(CH / E.sp), campi = erbaCampi(x0, z0, x0 + CH, z0 + CH), L = []; if (!campi) return null;
   for (let gj = 0; gj < n; gj++) for (let gi = 0; gi < n; gi++) {
-    const qi = ci * n + gi, qj = cj * n + gj, x = (qi + trHash(qi * 0.37, qj * 1.13)) * E.sp, z = (qj + trHash(qj * 0.71, qi * 0.53)) * E.sp;
-    const q = erbaQui(x, z, campi); if (q === null) return null; if (q === -1) continue;
-    const cl = trHash(Math.floor(x / 3.1) * 1.7, Math.floor(z / 2.9) * 0.9); if (q[0] === 2 && cl < 0.08) continue; /* a few clearings */
-    if (inBuilding(x, z, 0.15)) continue;
+    const qi = ci * n + gi, qj = cj * n + gj, x = (qi + trHash(qi * 0.37, qj * 1.13)) * E.sp, z = (qj + trHash(qj * 0.71, qi * 0.53)) * E.sp, rk = trHash(x * 3.7, z * 5.3); if (rk > rmax) continue;
+    const wx = (vn2(x * 0.55, z * 0.55) - 0.5) * 2.2, wz = (vn2(z * 0.55 + 9.1, x * 0.55 - 3.3) - 0.5) * 2.2; /* the edges read through a warp of a metre: organic, never the steps of the 2 m cells (fix 14/11) */
+    const q = erbaQui(x + wx, z + wz, campi); if (q === null) return null; if (q === -1) continue;
+    if (inBuilding(x, z, 0.15) || onAnyRoad(x, z, 0.1)) continue;
     const y = H.surface(x, z), hv = (Math.sin(x * 0.53 + Math.cos(z * 0.31) * 2.1) * 0.5 + 0.5) * 0.5 + trHash(x * 1.9, z * 2.7) * 0.5; /* heights: in patches, and each its own */
-    L.push([trHash(x * 3.7, z * 5.3), x, y - 0.03, z, q[2] * (0.6 + 0.8 * hv), trHash(x, z) * TAU, q[0], trHash(z * 2.1, x), q[1]]);
+    L.push([rk, x, y - 0.03, z, q[2] * (0.6 + 0.8 * hv), trHash(x, z) * TAU, q[0], trHash(z * 2.1, x), q[1]]);
   }
   L.sort((a, b) => a[0] - b[0]); /* by rank: the first ones stay farthest */
   const N = L.length, P = new Float32Array(N * 4), S = new Float32Array(N * 4), C = new Float32Array(N * 3);
   L.forEach(([r, x, y, z, h, a, k, s, col], i) => { P.set([x, y, z, r], i * 4); S.set([h, a, k, s], i * 4); if (col) C.set([col.r, col.g, col.b], i * 3); else C.set([1, 1, 1], i * 3); });
-  return { ci, cj, N, P, S, C, R: L.map(l => l[0]) };
+  return { ci, cj, N, P, S, C, R: L.map(l => l[0]), rmax };
 }
 function erbaAggiorna() {
   const E = ERBA, cam = camera.position, CH = E.CH;
-  if (cam.y - H.surface(cam.x, cam.z) > 45) { E.mesh.geometry.instanceCount = 0; E.cx = 1e9; return; }
+  if (cam.y - H.surface(cam.x, cam.z) > 60) { E.mesh.geometry.instanceCount = 0; E.cx = 1e9; return; }
   if (E.uF) E.uF.value.z = 1 - 0.35 * (STAG.bare || 0) - 0.15 * (STAG.spring || 0); /* winter: low and flattened; spring: still growing */
   E.mesh.material.color.copy(MAT.incoltoS.color); /* the tint of the season, as the ground */
   const i0 = Math.floor((cam.x - E.R) / CH), i1 = Math.floor((cam.x + E.R) / CH), j0 = Math.floor((cam.z - E.R) / CH), j1 = Math.floor((cam.z + E.R) / CH), want = [];
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const dx = Math.max(i * CH - cam.x, 0, cam.x - (i + 1) * CH), dz = Math.max(j * CH - cam.z, 0, cam.z - (j + 1) * CH), d = Math.hypot(dx, dz); if (d < E.R) want.push([d, i, j]); }
-  want.sort((a, b) => a[0] - b[0]); let made = 0;
-  for (const [, i, j] of want) { const k = i + ',' + j; if (E.chunks.has(k)) continue; if (made >= 3) break; const c = erbaChunk(i, j); made++; if (c) { E.chunks.set(k, c); E.dirty = true; } }
+  want.sort((a, b) => a[0] - b[0]); let work = 0;
+  for (const [d, i, j] of want) { const k = i + ',' + j, need = Math.min(1, erbaDen(d) * 1.3 + 0.02), c0 = E.chunks.get(k); if (c0 && c0.rmax >= need - 1e-6) continue; if (work >= 3) break;
+    const rm = Math.min(1, need * 1.6 + 0.02), c = erbaChunk(i, j, rm); work += 0.15 + rm; if (c) { E.chunks.set(k, c); E.dirty = true; } }
   for (const [k, c] of E.chunks) { const dx = Math.max(c.ci * CH - cam.x, 0, cam.x - (c.ci + 1) * CH), dz = Math.max(c.cj * CH - cam.z, 0, cam.z - (c.cj + 1) * CH); if (Math.hypot(dx, dz) > E.R + 2 * CH) E.chunks.delete(k); }
   if (!E.dirty && Math.hypot(cam.x - E.cx, cam.z - E.cz) < 2) return;
   E.dirty = false; E.cx = cam.x; E.cz = cam.z; let n = 0; const aP = E.aP.array, aS = E.aS.array, aC = E.aC.array;
   for (const [d, i, j] of want) {
-    const c = E.chunks.get(i + ',' + j); if (!c || !c.N) continue; const den = 1 - clamp((d - E.F0) / (E.F1 - E.F0), 0, 1); if (den <= 0) continue;
-    const t = den + 0.1; let m = c.N; if (t < 1) { let lo = 0, hi = c.N; while (lo < hi) { const mid = (lo + hi) >> 1; if (c.R[mid] < t) lo = mid + 1; else hi = mid; } m = lo; } /* the tufts whose rank is under the density at the chunk's nearest point */
+    const c = E.chunks.get(i + ',' + j); if (!c || !c.N) continue; const t = Math.min(1, erbaDen(d) * 1.3 + 0.01); if (t <= 0.003) continue;
+    let lo = 0, hi = c.N; while (lo < hi) { const mid = (lo + hi) >> 1; if (c.R[mid] < t) lo = mid + 1; else hi = mid; } let m = lo; /* the tufts whose rank is under the density at the chunk's nearest point */
     m = Math.min(m, E.cap - n); if (m <= 0) break;
     aP.set(c.P.subarray(0, m * 4), n * 4); aS.set(c.S.subarray(0, m * 4), n * 4); aC.set(c.C.subarray(0, m * 3), n * 3); n += m;
   }
@@ -13787,11 +13793,22 @@ function siepeDraw(B, br, a, c, acc, cap, ga, gc, la, lc) {
   if (acc === 0) SIEPI[lib ? 'libere' : 'potate']++;
   const n = Math.max(1, Math.ceil(L / (lib ? 0.4 : 0.5))), W0 = lib ? 0.8 : 0.42, H0 = br.h * (lib ? 1.12 : 1);
   /* the ring at s along the segment, the shell off metres out, salt for its noise: [x, y, z, nx, ny, nz, shade] per point of the section */
+  /* the joins (fix 14/11, Carlo, via Carducci: "la parte finale è sparita", teeth at the base): where the line turns, the sections at the join are laid on
+     the bisector (the mitre), so the two pieces meet with no wedge; only the true ends of the hedge (and the sides of a cut) close, rounded over 0.6 m */
+  const PT = br.pts, last = PT.length - 1, ring0 = hyp(PT[0][0] - PT[last][0], PT[0][1] - PT[last][1]) < 0.05, idx = q => { for (let i = 0; i <= last; i++) if (Math.abs(PT[i][0] - q[0]) < 0.01 && Math.abs(PT[i][1] - q[1]) < 0.01) return i; return -1; };
+  const ia = idx(a), ic = idx(c), endA = !!(cap & 1) && (ia < 0 || (ia === 0 && !ring0)), endC = !!(cap & 2) && (ic < 0 || (ic === last && !ring0));
+  const segN = (i, j) => { const dx = PT[j][0] - PT[i][0], dz = PT[j][1] - PT[i][1], l = hyp(dx, dz) || 1; return [dz / l, -dx / l]; };
+  const mitre = (other) => { if (!other) return [nx, nz, 1]; let mx = nx + other[0], mz = nz + other[1]; const l = hyp(mx, mz); if (l < 0.2) return [nx, nz, 1]; mx /= l; mz /= l; return [mx, mz, Math.min(2, 1 / Math.max(0.5, mx * nx + mz * nz))]; };
+  const mA = endA || ia < 0 ? [nx, nz, 1] : mitre(ia > 0 ? segN(ia - 1, ia) : ring0 && last > 1 ? segN(last - 1, last) : null), mC = endC || ic < 0 ? [nx, nz, 1] : mitre(ic < last ? segN(ic, ic + 1) : ring0 && last > 1 ? segN(0, 1) : null);
   const ring = (s, off, salt) => {
     const x0 = a[0] + ux * s, z0 = a[1] + uz * s, gy = ga + (gc - ga) * s / L, fy = Math.min(gy, la + (lc - la) * s / L) - 0.12;
-    const hump = lib ? 1.5 * Math.pow(Math.max(0, vn2(x0 / 9 + 3.1, z0 / 9 - 1.7) - 0.62) / 0.38, 1.6) : 0, Hs = H0 * (lib ? 0.88 + 0.3 * vn2(x0 / 5.3, z0 / 5.3) : 1) + hump, Ws = W0 * (lib ? 0.92 + 0.16 * vn2(x0 / 6.1 + 7, z0 / 6.1) + 0.25 * hump / 1.5 : 1);
+    const hump = lib ? 1.5 * Math.pow(Math.max(0, vn2(x0 / 9 + 3.1, z0 / 9 - 1.7) - 0.62) / 0.38, 1.6) : 0;
+    const te = Math.min(endA ? Math.sqrt(clamp(s / 0.6, 0, 1)) : 1, endC ? Math.sqrt(clamp((L - s) / 0.6, 0, 1)) : 1); /* rounded at a true end */
+    const Hs = (H0 * (lib ? 0.88 + 0.3 * vn2(x0 / 5.3, z0 / 5.3) : 1) + hump) * (0.72 + 0.28 * te), Ws = W0 * (lib ? 0.92 + 0.16 * vn2(x0 / 6.1 + 7, z0 / 6.1) + 0.25 * hump / 1.5 : 1) * (0.12 + 0.88 * te);
+    const fa = clamp(1 - s / Math.min(1, L / 2), 0, 1), fc = clamp(1 - (L - s) / Math.min(1, L / 2), 0, 1); /* the mitre near the ends of the segment, the plain normal in between */
+    let mx = nx * (1 - fa - fc) + mA[0] * fa + mC[0] * fc, mz = nz * (1 - fa - fc) + mA[1] * fa + mC[1] * fc; const ml = hyp(mx, mz) || 1, mk = 1 + (mA[2] - 1) * fa + (mC[2] - 1) * fc; mx /= ml; mz /= ml;
     return P.map(([pu, py], i) => {
-      const [qu, qy] = NR[i], y = gy + py * Hs, X = x0 + nx * pu * Ws, Z = z0 + nz * pu * Ws;
+      const [qu, qy] = NR[i], y = gy + py * Hs, X = x0 + mx * pu * Ws * mk, Z = z0 + mz * pu * Ws * mk, nx = mx, nz = mz;
       const d = lib ? (vn2(X / 1.1 + y * 0.7, Z / 1.1 - y * 0.5) - 0.5) * 0.42 + (vn2(X / 0.5, Z / 0.5 + y * 1.1) - 0.5) * 0.2 : (vn2(X / 0.9 + y * 0.8, Z / 0.9 - y * 0.5) - 0.5) * 0.1 + (vn2(X / 0.35, Z / 0.35 + y * 1.3) - 0.5) * 0.06 + (py > 0.9 ? (vn2(X / 0.6 + 5, Z / 0.6) - 0.5) * 0.1 : 0); /* the same lumps for every layer: the shells stand round the core; a clipped top uneven by a few cm */
       const o = off * (0.8 + 0.4 * vn2(X / 0.3 + salt, Z / 0.3 + y)) + d * (0.4 + 0.6 * Math.min(1, py * 1.6)), wx = nx * qu, wz = nz * qu; /* less at the foot: the hedge stands on its line */
       return [X + wx * o, i === 0 || i === P.length - 1 ? fy : y + qy * o, Z + wz * o, wx, qy, wz, 0.5 + 0.5 * Math.min(1, py * 1.25)];
@@ -13809,11 +13826,7 @@ function siepeDraw(B, br, a, c, acc, cap, ga, gc, la, lc) {
   if (lib) for (let s = 0.5; s < L; s += 1) { const x = a[0] + ux * s, z = a[1] + uz * s; if (trHash(Math.round(x) * 1.3, Math.round(z) * 0.7) > 0.22) continue;
     const t = SIEPI.T ?? tileOf(x, z), key = Math.round(x) + ',' + Math.round(z); let m = SIEPI.arb.get(t); if (!m) SIEPI.arb.set(t, m = new Map()); if (m.has(key) || [...m.values()].some(q => hyp(q[0] - x, q[1] - z) < 4)) continue;
     const h = trHash(x * 2.1, z * 1.3), tree = h < 0.25, gy = ga + (gc - ga) * s / L; m.set(key, [x + nx * (h - 0.5) * 0.6, z + nz * (h - 0.5) * 0.6, tree ? 3.5 + 1.5 * trHash(z, x) : H0 * (1.35 + 0.5 * trHash(z, x)), gy, tree]); }
-  /* the ends (of the hedge, and of a cut): the section closed */
-  for (const [e, s] of [[1, 0], [2, L]]) if (cap & e) { const R = ring(s, 0, 0), i0 = B.hd.p.length / 3; let cx = 0, cy = 0, cz = 0; for (const q of R) { cx += q[0]; cy += q[1]; cz += q[2]; }
-    const sg = e === 1 ? -1 : 1, t = tint(s); vtx(B.hd, cx / R.length, cy / R.length, cz / R.length, ux * sg, 0, uz * sg, 0, 0, col.setRGB(t[0] * 0.5, t[1] * 0.5, t[2] * 0.5));
-    for (const q of R) vtx(B.hd, q[0], q[1], q[2], ux * sg, 0, uz * sg, 0, 0, col.setRGB(t[0] * q[6] * 0.8, t[1] * q[6] * 0.8, t[2] * q[6] * 0.8));
-    for (let i = 0; i + 1 < R.length; i++) B.hd.i.push(i0, i0 + 1 + i, i0 + 2 + i, i0, i0 + 2 + i, i0 + 1 + i); }
+  /* the ends: closed by the rounding of the sections (ring te) */
   /* sprigs: a spray of narrow leafy strips (a twig with its leaves) out of the top, and of the sides of a free hedge, leaning out; short fresh growth on a clipped one */
   if (B.hdF) { const step = lib ? 0.3 : 0.35;
     for (let s = step * 0.5; s < L; s += step) { const x0 = a[0] + ux * s, z0 = a[1] + uz * s, h1 = trHash(x0 * 3.1, z0 * 1.7), h2 = trHash(z0 * 2.3, x0 * 0.9), h3 = trHash(x0 * 0.7 + 5, z0 * 4.1); if (!lib && h1 > 0.7) continue; if (lib && h2 >= 0.45 && h3 > 0.4) continue; /* a free hedge: a spray on the top here and there, not in a row */
@@ -13899,7 +13912,7 @@ MAT.campo = (() => {
   const U = { uZo: { value: prTex('zolle') }, uZoN: { value: (() => { const t = new THREE.TextureLoader().load('tex/zolle_nr.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; return t; })() }, uPa: { value: prTex('paglia') }, uPrG: PR_U.uPrG, uPrS: PR_U.uPrS };
   m.onBeforeCompile = s => { VAR_VERT(s); Object.assign(s.uniforms, U);
     s.fragmentShader = VAR_GLSL + CAMPO_GLSL + s.fragmentShader.replace('#include <color_fragment>', CAMPO_FRAG).replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + CAMPO_NRM); };
-  m.customProgramCacheKey = () => 'campo-verde'; return m;
+  m.customProgramCacheKey = () => 'campo-verde'; acquaSuoloMasch(m); return m;
 })();
 /* the drape of a seminativo (paesaggio3.js), and the roof of a maize field seen from afar (past the plants round the camera: a surface at the height of the
    crop and its sides at the edge, faded out near the camera where the true plants stand) */
