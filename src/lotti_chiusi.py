@@ -2,14 +2,16 @@
 edificio, cancello o porta entro ATT m) lascia il lotto aperto da quel lato: dal pilastro si prolunga la recinzione lungo la linea del cancello fino al primo muro, edificio o
 cancello (fino a LMAX m), dello stile della recinzione accanto al cancello. Non attraversa una carreggiata. Funzione pura (shapely).
 Ritorna ([(pts, kind, h, punto della linea di cui prende lo stile)], contatori)."""
-import math
+import math, os
 from collections import Counter
 import shapely
 from shapely.geometry import LineString, Point
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
-ATT = 1.3      # m: un pilastro con qualcosa entro questa distanza e' attaccato
+_DBG = tuple(map(float, os.environ['GTA_DBG_LC'].split(','))) if os.environ.get('GTA_DBG_LC') else None
+ATT = 1.3      # m: un pilastro con qualcosa entro questa distanza e' attaccato (provato 0.5: raddoppia i pilastri liberi e non chiude il varco di b1)
+RAGGIO = 0.15  # m: mezza larghezza della fascia lungo la linea del cancello in cui cerchiamo il primo ostacolo
 LMAX = 35.0    # m: oltre non e' piu' un lotto (Carlo 13/11: fino a 35 si chiude, oltre resta aperto, verso strada come verso piazzale o altro lotto)
 GATE_CUT = 0.3 # m: sotto un cancello il tratto nuovo non passa: lo si toglie (taglio piatto, come i divisori della build); contro il capo di un cancello arriva fino al pilastro
 LMIN = 0.8     # m: sotto non serve
@@ -41,22 +43,27 @@ def chiudi_dal_cancello(lines, edifici, gates, doors, carr, punti, rep=None):
             att = [j for j in T.query(P.buffer(ATT)) if j != nl + nb + gi and obst[j].distance(P) < ATT]
             sides.append((p, q, att))
         for p, q, att in sides:
+            if _DBG and math.dist(p, _DBG) < 2.5: print('LC DBG pilastro', p, 'att', [(j, round(obst[j].distance(Point(p)), 2), obst[j].geom_type, [tuple(round(v, 1) for v in c) for c in obst[j].coords][:4]) for j in att], flush=True)
             if att: continue
             rep['pilastri_liberi'] += 1
             dx, dz = p[0] - q[0], p[1] - q[1]; L = math.hypot(dx, dz); dx /= L; dz /= L
             ray = LineString([(p[0] + dx * 0.05, p[1] + dz * 0.05), (p[0] + dx * LMAX, p[1] + dz * LMAX)])
             best = None
-            for j in T.query(ray):
+            rayb = ray.buffer(RAGGIO, cap_style=2)   # un capo che sfiora la linea di pochi cm la ferma lo stesso
+            for j in T.query(rayb):
                 if j == nl + nb + gi: continue
-                x = obst[j].intersection(ray)
+                x = obst[j].intersection(rayb)
                 if x.is_empty: continue
-                pts = [c for gg in getattr(x, 'geoms', [x]) for c in gg.coords]
+                pts = [c for gg in getattr(x, 'geoms', [x]) if hasattr(gg, 'coords') for c in gg.coords]
+                if not pts: continue
                 d = min(ray.project(Point(c)) for c in pts)
                 if d > 0.05 and (best is None or d < best[0]): best = (d, j)
             if best is None: rep['senza_fine'] += 1; continue   # oltre LMAX: resta aperto
             d, j = best
+            if _DBG and math.dist(p, _DBG) < 2.5: print('LC DBG hit d', round(d, 2), 'j', j, 'nl nb ng', nl, nb, ng, obst[j].geom_type, [tuple(round(v, 1) for v in c) for c in obst[j].coords][:4], flush=True)
             if d < LMIN: rep['troppo_corto'] += 1; continue
             e = ray.interpolate(d).coords[0]; S = LineString([p, e])
+            if _DBG and math.dist(p, _DBG) < 2.5: print('LC DBG S', S.wkt, flush=True)
             if CT is not None and sum(_taglia(carr[k], S).intersection(S).length for k in CT.query(S)) > CARR_MAX: rep['attraversa_la_carreggiata'] += 1; continue
             if any(S.distance(f) < 0.2 for f in fatti): rep['doppio'] += 1; continue
             # lo stile: la recinzione (non un edificio) piu' vicina all'altro pilastro del cancello
