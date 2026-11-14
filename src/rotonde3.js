@@ -63,17 +63,18 @@ function rotondeTile(T, put, G) {
   put(an, RO_MAT.ciottoli, 10); put(fa, RO_MAT.fascia, 10); put(cu, RO_MAT.prato, 10, 'cast'); put(cem, MAT.median, 10); put(pr, MAT.grass, 10); put(pv, MAT.piazza, 10); put(kb, MAT.kerb, 10);
   put(bo, RO_MAT.bordo, 10, 'cast'); put(boT, RO_MAT.bordo, 10); put(fiT, RO_MAT.fiori, 10); put(fiS, RO_MAT.fiori, 10); put(te, RO_MAT.terra, 10);
   if (bush.length) { // round shrubs: a lumpy clump of balls each (not one squashed ball: Carlo, 25/10, "sembrano meloni"), sunk a little into the lawn; the car breaks them (sfondabili3.js)
-    const im = new THREE.InstancedMesh(roCespugliGeo(), RO_MAT.cespuglio, bush.length), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), eu = new THREE.Euler();
+    const im = new THREE.InstancedMesh(bendGeo(roCespugliGeo(), bush.length), RO_BEND_MAT(), bush.length), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), eu = new THREE.Euler();
     T.roIm = im; if (!T.roWalls) T.roWalls = bush.map(([x, y, z, hw, h]) => { const w = { r: hw * 0.85, x, z, y0: y - 3, y1: y + h, off: false }; WALLS.add(x - w.r, z - w.r, x + w.r, z + w.r, w); return w; });
     bush.forEach(([x, y, z, hw, h, col], i) => {
       const w = T.roWalls[i]; w.off = false; qq.setFromEuler(eu.set(0, (x * 12.9 + z * 7.7) % 6.28, 0)); m4.compose(p.set(x, y - 0.05, z), qq, sc.set(hw, h, hw)); im.setMatrixAt(i, m4); im.setColorAt(i, COL(col));
-      BUSH_G.add(x - hw, z - hw, x + hw, z + hw, { T, im, i, x, y, z, hw, h, w, m: m4.clone(), off: false });
+      const rb = T.roBush || (T.roBush = []), e = rb[i] || (rb[i] = (() => { const q = { T, x, y, z, hw, h, w }; BUSH_G.add(x - hw, z - hw, x + hw, z + hw, q); return q; })()); Object.assign(e, { im, i, off: false, w }); /* one entry per shrub for good (they piled up at every reload) */
     });
-    im.castShadow = true; im.receiveShadow = true; G.add(im);
+    im.castShadow = true; im.receiveShadow = true; im.customDepthMaterial = RO_BEND_DEPTH(); G.add(im);
   }
 }
 /* a shrub in a unit box (x, z in -1..1, y in 0..1): a middle ball and four round it, a little lumpy, scaled by half width and height */
 let _roCesp = null;
+let _roBendM = null, _roBendD = null; const RO_BEND_MAT = () => _roBendM || (_roBendM = bendMat(RO_MAT.cespuglio, 0, 1, 'ro')), RO_BEND_DEPTH = () => _roBendD || (_roBendD = bendMat(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), 0, 1, 'rod')); /* the roundabout shrubs bend too, their shadows with them (verde3.js) */
 function roCespugliGeo() {
   if (_roCesp) return _roCesp;
   const parts = [[0, 0.5, 0, 0.78, 0.5], [0.52, 0.36, 0.18, 0.55, 0.36], [-0.45, 0.34, 0.3, 0.52, 0.34], [0.12, 0.33, -0.55, 0.5, 0.33], [-0.2, 0.3, -0.42, 0.42, 0.3]], pos = [];

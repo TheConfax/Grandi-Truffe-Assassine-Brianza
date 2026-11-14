@@ -48,19 +48,20 @@ function buildVerde(T, G) {
   for (const [X, Z, HH] of T.d.cs) { const x = X / 10, z = Z / 10, h = HH / 10; if (inBuilding(x, z, 0.3) || onAnyRoad(x, z, 0.5) || H.inPit(x, z, 0.5)) continue; const gy = H.ground(x, z); if (inWater(x, z, gy)) continue; L.push([x, z, h, gy, L.length]); }
   if (!L.length) return;
   /* Carlo 14/11: a shrub is not a wall, it goes like the hedges and the shrubs of the roundabouts (sfondabili3.js bushHits): the car goes through, flattens it, slows down a little */
+  if (!T.vrBush) T.vrBush = [];
   if (!T.vrWalls) T.vrWalls = L.map(([x, z, h, gy]) => { const w = { r: Math.min(0.9, 0.3 + 0.25 * h), x, z, y0: gy - 1, y1: gy + h, off: false }; WALLS.add(x - 1, z - 1, x + 1, z + 1, w); return w; });
   T.vrIms = [];
   const by = [[], [], [], [], [], []]; for (const s of L) by[Math.floor(trHash(s[0], s[1]) * 6) % 6].push(s); /* three shapes, evergreen (laurel, privet) or with the season's leaves */
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3(), c = new THREE.Color();
   by.forEach((list, v) => {
     if (!list.length) return;
-    const im = new THREE.InstancedMesh(TREE_G.crownS[v % 3], v < 3 ? MAT.crownSemp : MAT.crown, list.length); im.castShadow = true; im.receiveShadow = true; im.customDepthMaterial = TREE_DEPTH;
+    const im = new THREE.InstancedMesh(bendGeo(TREE_G.crownS[v % 3], list.length), v < 3 ? BEND_MAT.semp : BEND_MAT.stag, list.length); im.castShadow = true; im.receiveShadow = true; im.customDepthMaterial = BEND_MAT.depth; /* they bend when a car goes into them (BEND) */
     T.vrIms.push(im);
     list.forEach(([x, z, h, gy, li], i) => {
       const k = trHash(x * 1.7, z * 2.3), wx = (0.55 + 0.35 * k) * Math.max(h, 1.1) / 2.25 * 1.15, wy = h / 4.1; /* the crown is 4.5 m across and 4.1 m high */
       m4.compose(p.set(x, gy + h * 0.5 - 0.1, z), q.setFromEuler(e.set(0, k * TAU, 0)), sc.set(wx, wy, wx * (0.85 + 0.3 * trHash(z, x)))); im.setMatrixAt(i, m4);
       im.setColorAt(i, c.copy(COL(CESP_COL[Math.floor(k * 6) % 6])).multiplyScalar(0.95 + 0.3 * trHash(x + 3, z)));
-      const w = T.vrWalls[li]; w.off = false; BUSH_G.add(x - w.r, z - w.r, x + w.r, z + w.r, { T, im, i, x, y: gy, z, hw: w.r / 0.85, h, w, m: m4.clone(), off: false, vr: true, flatY: gy + 0.12 }); /* the walker still stops at it; a car breaks through */
+      const w = T.vrWalls[li]; w.off = false; const bb = T.vrBush[li] || (T.vrBush[li] = (() => { const e = { T, x, y: gy, z, hw: w.r / 0.85, h, w, vr: true }; BUSH_G.add(x - w.r, z - w.r, x + w.r, z + w.r, e); return e; })()); Object.assign(bb, { im, i, off: false }); /* one entry per shrub for good: drawn again, it is whole again (the walker still stops at it; a car breaks through) */
     });
     im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; G.add(im); VERDE3.cespugli += list.length;
   });
@@ -112,14 +113,55 @@ function areaTinta(T, a) {
   if (a.tc !== undefined) return a.tc; a.tc = a.t;
   if (!VERDE3.on || (a.t !== 1 && a.t !== 12)) return a.tc;
   const o = dec(a.p); if (o.length < 3 || Math.abs(sArea(o)) > 800) return a.tc;
-  const woods = []; for (const U of [T, ...vicini(T)]) if (U && U.d && U.d.a) for (const b of U.d.a) if (b.t === 11) { if (!b._o) { b._o = dec(b.p); b._k = b.k.map(dec); b._b = bbox(b._o); } woods.push(b); }
+  const woods = [], small = []; for (const U of [T, ...vicini(T)]) if (U && U.d && U.d.a) for (const b of U.d.a) if (b.t === 11 || ((b.t === 1 || b.t === 12) && b !== a)) { if (!b._o) { b._o = dec(b.p); b._k = b.k.map(dec); b._b = bbox(b._o); } if (b.t === 11) woods.push(b); else if (Math.abs(sArea(b._o)) <= 800) small.push(b); } /* small: the other small pieces of lawn, which do not count either way (two pieces side by side in the wood, Seveso) */
   if (!woods.length) return a.tc;
   let n = 0, w = 0;
   for (let i = 0; i < o.length; i++) { const p = o[i], q = o[(i + 1) % o.length], L = hyp(q[0] - p[0], q[1] - p[1]); if (L < 0.2) continue;
     for (let s = 0.5; s < L; s += 2) { const x = p[0] + (q[0] - p[0]) * s / L, z = p[1] + (q[1] - p[1]) * s / L, nx = -(q[1] - p[1]) / L * 0.8, nz = (q[0] - p[0]) / L * 0.8;
       const [ox, oz] = inPoly(x + nx, z + nz, o) ? [x - nx, z - nz] : [x + nx, z + nz]; n++;
-      if (woods.some(b => ox >= b._b[0] && ox <= b._b[2] && oz >= b._b[1] && oz <= b._b[3] && inPoly(ox, oz, b._o) && !b._k.some(h => inPoly(ox, oz, h)))) w++; } }
+      const inA = b => ox >= b._b[0] && ox <= b._b[2] && oz >= b._b[1] && oz <= b._b[3] && inPoly(ox, oz, b._o) && !b._k.some(h => inPoly(ox, oz, h));
+      if (woods.some(inA)) w++; else if (small.some(inA)) n--; } }
   if (n && w / n >= 0.6) a.tc = 11;
   return a.tc;
 }
-window.__VR_TEST = { bushHits: (v, cs, R) => bushHits(v, cs, R), BUSH_G }; /* for the checks (Playwright) */
+window.__VR_TEST = { bushHits: (v, cs, R) => bushHits(v, cs, R), BUSH_G, WALLS, rayWalls: (a, b, c, d) => rayWalls(a, b, c, d, true) }; /* for the checks (Playwright) */
+// ---- shrubs that bend (Carlo 14/11, "si romperanno pure ma senza alcuna animazione"): as in the open-world games. Each instance carries aBend (xy: the direction
+// it is pushed, world; z: how far it bends; w: how much of its height stands, 1 whole), read in the vertex shader (the top bends most, the base stays); a light
+// knock sways it and it comes back up, a hard one bends it down and flattens it over a few tenths of a second, with a spray of leaves and twigs. The shrubs of
+// verde3.js and those of the roundabouts (rotonde3.js), the same code
+const BEND = { anim: [], uB: { crown: [-2.05, 4.1], ro: [0, 1] } };
+const BEND_VERT = (b0, bh) => s => {
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aBend;').replace('#include <begin_vertex>', `#include <begin_vertex>
+#ifdef USE_INSTANCING
+  { float bdH = clamp((transformed.y - (${b0.toFixed(3)})) / ${bh.toFixed(3)}, 0.0, 1.0); mat3 bdM = mat3(instanceMatrix); float bdW = length(bdM[1]) * ${bh.toFixed(3)};
+    transformed += inverse(bdM) * vec3(aBend.x, 0.0, aBend.y) * (aBend.z * bdH * bdH * bdW * 0.8);
+    transformed.y = ${b0.toFixed(3)} + (transformed.y - (${b0.toFixed(3)})) * aBend.w; }
+#endif`);
+};
+/* a material (and its shadow) that bends: a copy of the given one, the patch on top of its own */
+function bendMat(m, b0, bh, key) {
+  const c = m.clone(), before = m.onBeforeCompile, prev = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; c.userData = {};
+  c.onBeforeCompile = (s, r) => { if (before) before.call(c, s, r); BEND_VERT(b0, bh)(s); }; c.customProgramCacheKey = () => prev + '|piega-' + key; return c;
+}
+const BEND_MAT = { semp: bendMat(MAT.crownSemp, -2.05, 4.1, 'c'), stag: bendMat(MAT.crown, -2.05, 4.1, 'c'), depth: bendMat(TREE_DEPTH, -2.05, 4.1, 'd') };
+/* the geometry of an instanced shrub mesh with its own aBend (whole: 0, 0, 0, 1) */
+function bendGeo(g, n) { const c = g.clone(), a = new Float32Array(n * 4); for (let i = 0; i < n; i++) a[i * 4 + 3] = 1; c.setAttribute('aBend', new THREE.InstancedBufferAttribute(a, 4)); return c; }
+function bendStart(b, v, hard) {
+  const l = hyp(v.vx, v.vz) || 1; BEND.anim = BEND.anim.filter(e => e.b !== b);
+  BEND.anim.push({ b, t0: performance.now() / 1000, dx: v.vx / l, dz: v.vz / l, hard, amp: hard ? 1.25 : clamp(0.25 + 0.05 * v.speed, 0.25, 0.55) });
+}
+function bendAggiorna() {
+  if (!BEND.anim.length) return; const now = performance.now() / 1000;
+  BEND.anim = BEND.anim.filter(e => {
+    const t = now - e.t0, a = e.b.im.geometry.getAttribute('aBend'); if (!a || !e.b.im.parent) return false;
+    let bend, w;
+    if (e.hard) { const k = clamp(t / 0.3, 0, 1); bend = e.amp * (k * k * (3 - 2 * k)) * (1 + 0.15 * Math.sin(t * 14) * Math.exp(-6 * t)); w = 1 - 0.75 * clamp((t - 0.05) / 0.4, 0, 1); } /* it goes down in 0.3-0.45 s and stays */
+    else { bend = e.amp * Math.exp(-3.2 * t) * Math.cos(t * 9.5); w = 1; } /* it sways and comes back */
+    a.setXYZW(e.b.i, e.dx, e.dz, bend, w); a.needsUpdate = true;
+    let keep = e.hard ? t < 0.6 : t < 1.6;
+    if (!keep && !e.hard) { /* sprung back: its wall again, unless a vehicle still stands in it (then it waits, bent a little) */
+      if (VEH.some(q => hyp(q.x - e.b.x, q.z - e.b.z) < e.b.hw + (q.rad || 1) + 0.6)) { keep = true; e.t0 = now - 1.2; } else { e.b.w.off = false; a.setXYZW(e.b.i, e.dx, e.dz, 0, 1); a.needsUpdate = true; } }
+    return keep;
+  });
+}
+{ const d0 = disegna; disegna = function () { bendAggiorna(); d0(); }; }
