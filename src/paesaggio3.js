@@ -384,6 +384,7 @@ function* buildPaesaggio(T, G) {
   if (drape.i.length) mkMesh(drape, MAT.mark, 2, false, G);
   if (campoB.i.length && MAT.campo) mkMesh(campoB, MAT.campo, 2, false, G);
   if (tettoB.cards && typeof maisCarte === 'function') maisCarte(G, tettoB.cards); /* the maize past the true plants (verde3.js) */
+  if (tettoB.edge && typeof maisBordo === 'function') maisBordo(G, tettoB.edge); /* the edge of the maize fields: the true plants, always */
   for (const a of d.a || []) { const P = lagoDi(a, T); if (P) lago(P, T, TL); }
   acquaMesh(TL, G);
   yield 'terreni fondo';
