@@ -2173,6 +2173,7 @@ function* buildTileGen(T) {
   yield 'walls';
   // walls, fences, hedges and the expressway median
   {
+    if (typeof SIEPI !== 'undefined') SIEPI.T = T.t; /* the shrubs of the free hedges go with the tile that draws them (verde3.js) */
     const B = barBufs(), md = Buf(); // the walls, fences and hedges (sfondabili3.js barDraw): each piece a car can break knows where it is in them
     for (const br of T.ba || []) {
       // the slabs closed at their ends (Carlo, 26/10: a hedge or a wall open at its end showed its empty inside): the two ends of the barrier and
