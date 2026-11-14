@@ -1697,7 +1697,7 @@ if dbt_pc:
     # a yard AC_VEI (STR.cv) that reaches the wall and stops there: the building has a covered passage between the two (a strip of the ground volumes goes, a raised volume of the same height from 4 m up covers it);
     # the rule of the androni below (the gaps) then finds it and puts the door on the street side. Across at most ACARR_MAX m, the volumes all tall enough (ACARR_HMIN) to have a floor above
     # GTA_ANDRONI_CARRAI: 'conta' (default: only the list, nothing changes), 'tutti', or 'x,z,r;x,z,r' (applied only within r m of those points, the list still counts everything); GTA_CARRAI_JSON: where the list is written
-    ACARR_MAX, ACARR_HMIN, ACARR_FRONTE, ACARR_ZB, ACARR_LAT = 25.0, 6.0, 8.0, 4.0, 7.5   # ACARR_LAT: how far to the side of the DBGT point the yard may be
+    ACARR_MAX, ACARR_HMIN, ACARR_FRONTE, ACARR_ZB, ACARR_LAT, ACARR_LARGO, ACARR_DOPPIONE = 25.0, 6.0, 8.0, 4.0, float(os.environ.get('GTA_CARRAI_LAT', 3.0)), 3.0, 6.5   # ACARR_LAT: how far to the side of the DBGT point the passage may be (Carlo 14/11: on the carriage entrance, 2-3 m); ACARR_LARGO: narrowest passage; ACARR_DOPPIONE: a gate that is not the entrance's own this near the mouth is already the way in
     _acm = os.environ.get('GTA_ANDRONI_CARRAI', 'conta').strip(); _acl = []; _acn = Counter()
     if _cvG is not None and not _cvG.is_empty:
         _acb = [(b_, g_) for b_, g_ in _bl if b_.get('zb') is None and g_ is not None and not g_.is_empty]; _acg = [g_ for b_, g_ in _acb]; _acgt = STRtree(_acg) if _acg else None
@@ -1745,8 +1745,12 @@ if dbt_pc:
             Rn_ = _ac_rect(p_, nx_, nz_, d1_ - 0.5, d1_ + 0.6, c0_ - 1.0, c0_ + 1.0)
             Cb_ = max([c_ for c_ in getattr(Cw_, 'geoms', [Cw_]) if isinstance(c_, Polygon) and c_.area > 0.8 and c_.intersects(Rn_)], key=lambda c_: c_.intersection(Rn_).area)
             lat_ = [((x_ - p_[0]) * ux_ + (y_ - p_[1]) * uz_) for x_, y_ in Cb_.exterior.coords]; la_, lb_ = max(min(lat_), c0_ - 5.0), min(max(lat_), c0_ + 5.0)
-            w_ = lb_ - la_; w_ = w_ if w_ <= 5.0 else 3.5; w_ = max(2.5, w_); c_ = min(max(c0_, la_ + w_ / 2), lb_ - w_ / 2)
+            w_ = lb_ - la_; w_ = w_ if w_ <= 5.0 else 3.5; w_ = max(ACARR_LARGO, w_); c_ = min(max(c0_, la_ + w_ / 2), lb_ - w_ / 2)
             S_ = _ac_rect(p_, nx_, nz_, d0_ - 0.15, d1_ + 0.15, c_ - w_ / 2, c_ + w_ / 2)
+            core_ = _ac_rect(p_, nx_, nz_, d0_ + 0.3, d1_ - 0.3, c_ - w_ / 2 - 0.3, c_ + w_ / 2 + 0.3)   # a clean rectangular hole: the building stands on both sides of it all along, not a corner or an edge eroded
+            if core_.is_empty or core_.intersection(Ub_).area < 0.985 * core_.area: _acn['spigolo_eroso'] += 1; _acdbg(p_, 'spigolo_eroso'); continue
+            mc_ = (p_[0] + nx_ * d0_ + ux_ * c_, p_[1] + nz_ * d0_ + uz_ * c_)
+            if any(g_[4] == 'g' and math.dist(((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20), mc_) <= ACARR_DOPPIONE and math.dist(((g_[0] + g_[2]) / 20, (g_[1] + g_[3]) / 20), p_) > 3.5 for g_ in gate_out): _acn['doppione_cancello'] += 1; _acdbg(p_, 'doppione_cancello'); continue
             hit_ = [(b_, g_) for b_, g_ in _acb if g_.intersects(S_) and g_.intersection(S_).area > 0.3]
             if not hit_: _acn['senza_edificio'] += 1; _acdbg(p_, 'senza_edificio'); continue
             if any(not b_.get('dbgt') or b_.get('zt') is None or b_['h'] < ACARR_HMIN or b_.get('villa') for b_, g_ in hit_): _acn['edificio_basso'] += 1; _acdbg(p_, 'edificio_basso'); continue
