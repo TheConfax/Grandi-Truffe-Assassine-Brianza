@@ -672,7 +672,8 @@ function facAggiorna(force) {
     for (const r of T.fbal || []) { const d = Math.hypot(r.x - cp.x, r.y - cp.y, r.z - cp.z); if (d < RB) { facBal(r); nb++; } }
     for (const r of T.fdet || []) { const d = Math.hypot(r.x - cp.x, r.y - cp.y, r.z - cp.z); if (d < (r.R || FAC_R) + 8) facDet(r); }
   }
-  for (const k in FAC_PARTS) { const P = FAC_PARTS[k]; P.m.count = P.n; P.m.visible = P.n > 0; P.m.instanceMatrix.needsUpdate = true; if (P.m.instanceColor) P.m.instanceColor.needsUpdate = true; if (P.lit) P.lit.needsUpdate = true; if (P.wo) { P.wo.needsUpdate = true; P.wn.needsUpdate = true; } }
+  for (const k in FAC_PARTS) { const P = FAC_PARTS[k]; P.m.count = P.n; P.m.visible = P.n > 0; if (!P.n) continue; /* nothing drawn: nothing to send (the next write sends its own first n) */
+    for (const a of [P.m.instanceMatrix, P.m.instanceColor, P.lit, P.wo, P.wn]) if (a) { a.clearUpdateRanges(); a.addUpdateRange(0, P.n * a.itemSize); a.needsUpdate = true; } } /* only the instances in use go to the GPU, not the whole array (bar alone holds 160.000): as the grass does */
   S.wins = nw; S.bals = nb;
 }
 function facTick() {
