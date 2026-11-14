@@ -1,0 +1,572 @@
+{
+ "definizione": "i nastri delle carreggiate (src/nastri.py, docs/nastri.md passo 1): asse EL_STR con le quote, bordi misurati sull AC_VEI alla stessa quota, sede per stazione",
+ "nastri": 866,
+ "km": 195.96,
+ "km_per_sede": {
+  "raso": 195.007,
+  "ponte": 0.602,
+  "galleria": 0.073,
+  "sotto": 0.282
+ },
+ "stazioni": 196830,
+ "stazioni_nel_file": 44580,
+ "kb": 871,
+ "larghezza_m": {
+  "mediana": 7.28,
+  "p5": 3.52,
+  "p95": 11.58
+ },
+ "asse_fuori_dall_asfalto": {
+  "definizione": "tratti di almeno 10 m in cui l asse non sta su nessun AC_VEI: lì il nastro non ha bordi misurati (portati dai tratti vicini, 0 se non ce ne sono)",
+  "tratti": 0,
+  "m": 0,
+  "posti": []
+ },
+ "bordo_portato": {
+  "definizione": "tratti di almeno 10 m in cui un bordo non segue l asfalto perché si apre (imbocchi, incroci, piazzali): portato dritto fra prima e dopo",
+  "tratti": 1942,
+  "m": 30951,
+  "posti": [
+   {
+    "nastro": 474,
+    "nome": "Corso Isonzo",
+    "lato": "sx",
+    "m": 110,
+    "x": 752.8,
+    "z": 2132.6,
+    "link": "?x=753&z=2133&debug=1&nastri=1"
+   },
+   {
+    "nastro": 474,
+    "nome": "Corso Isonzo",
+    "lato": "dx",
+    "m": 104,
+    "x": 756.6,
+    "z": 2133.7,
+    "link": "?x=757&z=2134&debug=1&nastri=1"
+   },
+   {
+    "nastro": 821,
+    "nome": "",
+    "lato": "sx",
+    "m": 50,
+    "x": -419.8,
+    "z": 1250.1,
+    "link": "?x=-420&z=1250&debug=1&nastri=1"
+   },
+   {
+    "nastro": 501,
+    "nome": "Via Redipuglia",
+    "lato": "sx",
+    "m": 42,
+    "x": -1163.5,
+    "z": 1228.9,
+    "link": "?x=-1164&z=1229&debug=1&nastri=1"
+   },
+   {
+    "nastro": 101,
+    "nome": "Via Libertà",
+    "lato": "sx",
+    "m": 40,
+    "x": -874.2,
+    "z": -372.4,
+    "link": "?x=-874&z=-372&debug=1&nastri=1"
+   },
+   {
+    "nastro": 209,
+    "nome": "Via Zara",
+    "lato": "sx",
+    "m": 40,
+    "x": 1127.4,
+    "z": -1084.1,
+    "link": "?x=1127&z=-1084&debug=1&nastri=1"
+   },
+   {
+    "nastro": 476,
+    "nome": "Via Giosuè Carducci",
+    "lato": "sx",
+    "m": 40,
+    "x": -697.3,
+    "z": 1572.4,
+    "link": "?x=-697&z=1572&debug=1&nastri=1"
+   },
+   {
+    "nastro": 519,
+    "nome": "Corso Isonzo",
+    "lato": "dx",
+    "m": 40,
+    "x": -555.7,
+    "z": 1723.6,
+    "link": "?x=-556&z=1724&debug=1&nastri=1"
+   },
+   {
+    "nastro": 617,
+    "nome": "Via Vignone",
+    "lato": "dx",
+    "m": 40,
+    "x": 1711.8,
+    "z": 2001.1,
+    "link": "?x=1712&z=2001&debug=1&nastri=1"
+   },
+   {
+    "nastro": 715,
+    "nome": "Via Ruffilli",
+    "lato": "sx",
+    "m": 40,
+    "x": 728.5,
+    "z": 1555.1,
+    "link": "?x=728&z=1555&debug=1&nastri=1"
+   },
+   {
+    "nastro": 186,
+    "nome": "Via degli Angeli Custodi",
+    "lato": "sx",
+    "m": 39,
+    "x": -709.1,
+    "z": -834.2,
+    "link": "?x=-709&z=-834&debug=1&nastri=1"
+   },
+   {
+    "nastro": 344,
+    "nome": "Via Conciliazione",
+    "lato": "sx",
+    "m": 39,
+    "x": -735.8,
+    "z": -149.1,
+    "link": "?x=-736&z=-149&debug=1&nastri=1"
+   },
+   {
+    "nastro": 458,
+    "nome": "Via della Cavalla",
+    "lato": "dx",
+    "m": 39,
+    "x": 1309.3,
+    "z": 1160.7,
+    "link": "?x=1309&z=1161&debug=1&nastri=1"
+   },
+   {
+    "nastro": 512,
+    "nome": "Via Vigorelli",
+    "lato": "dx",
+    "m": 39,
+    "x": 1629.0,
+    "z": 1492.7,
+    "link": "?x=1629&z=1493&debug=1&nastri=1"
+   },
+   {
+    "nastro": 535,
+    "nome": "Via Cacciatori delle Alpi",
+    "lato": "dx",
+    "m": 39,
+    "x": -2034.5,
+    "z": 1648.8,
+    "link": "?x=-2034&z=1649&debug=1&nastri=1"
+   },
+   {
+    "nastro": 632,
+    "nome": "",
+    "lato": "dx",
+    "m": 39,
+    "x": -436.2,
+    "z": 1224.8,
+    "link": "?x=-436&z=1225&debug=1&nastri=1"
+   },
+   {
+    "nastro": 711,
+    "nome": "Via Monte Cevedale",
+    "lato": "dx",
+    "m": 39,
+    "x": -896.3,
+    "z": 2148.8,
+    "link": "?x=-896&z=2149&debug=1&nastri=1"
+   },
+   {
+    "nastro": 108,
+    "nome": "Via Raffaello Sanzio",
+    "lato": "sx",
+    "m": 38,
+    "x": 763.5,
+    "z": -212.8,
+    "link": "?x=764&z=-213&debug=1&nastri=1"
+   },
+   {
+    "nastro": 162,
+    "nome": "Via del Falò",
+    "lato": "dx",
+    "m": 38,
+    "x": 398.7,
+    "z": -994.3,
+    "link": "?x=399&z=-994&debug=1&nastri=1"
+   },
+   {
+    "nastro": 183,
+    "nome": "Via Generale Lamarmora",
+    "lato": "sx",
+    "m": 38,
+    "x": 901.4,
+    "z": -795.4,
+    "link": "?x=901&z=-795&debug=1&nastri=1"
+   },
+   {
+    "nastro": 535,
+    "nome": "Via Cacciatori delle Alpi",
+    "lato": "dx",
+    "m": 38,
+    "x": -1862.8,
+    "z": 1633.5,
+    "link": "?x=-1863&z=1634&debug=1&nastri=1"
+   },
+   {
+    "nastro": 53,
+    "nome": "Via Luigi Einaudi",
+    "lato": "sx",
+    "m": 37,
+    "x": 1943.0,
+    "z": -631.7,
+    "link": "?x=1943&z=-632&debug=1&nastri=1"
+   },
+   {
+    "nastro": 99,
+    "nome": "Via Consorziale dei Casarilli",
+    "lato": "sx",
+    "m": 37,
+    "x": 1167.3,
+    "z": -341.1,
+    "link": "?x=1167&z=-341&debug=1&nastri=1"
+   },
+   {
+    "nastro": 378,
+    "nome": "Via Vignazzola",
+    "lato": "sx",
+    "m": 37,
+    "x": -407.9,
+    "z": 659.2,
+    "link": "?x=-408&z=659&debug=1&nastri=1"
+   },
+   {
+    "nastro": 482,
+    "nome": "Corso Giuseppe Garibaldi",
+    "lato": "sx",
+    "m": 37,
+    "x": -1235.4,
+    "z": 2342.4,
+    "link": "?x=-1235&z=2342&debug=1&nastri=1"
+   },
+   {
+    "nastro": 526,
+    "nome": "Via Papa Pio XI",
+    "lato": "dx",
+    "m": 37,
+    "x": 951.2,
+    "z": 1902.5,
+    "link": "?x=951&z=1902&debug=1&nastri=1"
+   },
+   {
+    "nastro": 533,
+    "nome": "Via Sondrio",
+    "lato": "sx",
+    "m": 37,
+    "x": 1586.1,
+    "z": 1446.6,
+    "link": "?x=1586&z=1447&debug=1&nastri=1"
+   },
+   {
+    "nastro": 572,
+    "nome": "Via Feltre",
+    "lato": "sx",
+    "m": 37,
+    "x": -2938.3,
+    "z": 1737.9,
+    "link": "?x=-2938&z=1738&debug=1&nastri=1"
+   },
+   {
+    "nastro": 736,
+    "nome": "Via Monte Rosa",
+    "lato": "sx",
+    "m": 37,
+    "x": -1764.5,
+    "z": 1531.9,
+    "link": "?x=-1764&z=1532&debug=1&nastri=1"
+   },
+   {
+    "nastro": 48,
+    "nome": "Via delle Colline",
+    "lato": "dx",
+    "m": 36,
+    "x": 238.9,
+    "z": -1262.2,
+    "link": "?x=239&z=-1262&debug=1&nastri=1"
+   },
+   {
+    "nastro": 96,
+    "nome": "Via San Giuseppe",
+    "lato": "sx",
+    "m": 36,
+    "x": 441.4,
+    "z": -1053.2,
+    "link": "?x=441&z=-1053&debug=1&nastri=1"
+   },
+   {
+    "nastro": 116,
+    "nome": "Via Calabria",
+    "lato": "dx",
+    "m": 36,
+    "x": 1588.1,
+    "z": -652.1,
+    "link": "?x=1588&z=-652&debug=1&nastri=1"
+   },
+   {
+    "nastro": 160,
+    "nome": "Via Consorziale dei boschi",
+    "lato": "dx",
+    "m": 36,
+    "x": 874.2,
+    "z": 13.5,
+    "link": "?x=874&z=14&debug=1&nastri=1"
+   },
+   {
+    "nastro": 198,
+    "nome": "Via Trieste",
+    "lato": "dx",
+    "m": 36,
+    "x": 1571.6,
+    "z": -1000.2,
+    "link": "?x=1572&z=-1000&debug=1&nastri=1"
+   },
+   {
+    "nastro": 352,
+    "nome": "",
+    "lato": "dx",
+    "m": 36,
+    "x": 56.6,
+    "z": 327.6,
+    "link": "?x=57&z=328&debug=1&nastri=1"
+   },
+   {
+    "nastro": 469,
+    "nome": "Via Brennero",
+    "lato": "sx",
+    "m": 36,
+    "x": -1103.1,
+    "z": 477.1,
+    "link": "?x=-1103&z=477&debug=1&nastri=1"
+   },
+   {
+    "nastro": 474,
+    "nome": "Corso Isonzo",
+    "lato": "dx",
+    "m": 36,
+    "x": 309.0,
+    "z": 1987.5,
+    "link": "?x=309&z=1988&debug=1&nastri=1"
+   },
+   {
+    "nastro": 532,
+    "nome": "Via Preposto Mezzera",
+    "lato": "sx",
+    "m": 36,
+    "x": -1130.7,
+    "z": 1843.8,
+    "link": "?x=-1131&z=1844&debug=1&nastri=1"
+   },
+   {
+    "nastro": 532,
+    "nome": "Via Preposto Mezzera",
+    "lato": "dx",
+    "m": 36,
+    "x": -1135.4,
+    "z": 1805.1,
+    "link": "?x=-1135&z=1805&debug=1&nastri=1"
+   },
+   {
+    "nastro": 533,
+    "nome": "Via Sondrio",
+    "lato": "dx",
+    "m": 36,
+    "x": 1585.3,
+    "z": 1449.5,
+    "link": "?x=1585&z=1450&debug=1&nastri=1"
+   },
+   {
+    "nastro": 555,
+    "nome": "Via Pavia",
+    "lato": "sx",
+    "m": 36,
+    "x": 1310.0,
+    "z": 1528.7,
+    "link": "?x=1310&z=1529&debug=1&nastri=1"
+   },
+   {
+    "nastro": 3,
+    "nome": "Via Vicenza",
+    "lato": "sx",
+    "m": 35,
+    "x": 382.6,
+    "z": 690.6,
+    "link": "?x=383&z=691&debug=1&nastri=1"
+   },
+   {
+    "nastro": 4,
+    "nome": "Via Marco Polo",
+    "lato": "dx",
+    "m": 35,
+    "x": -64.5,
+    "z": 528.1,
+    "link": "?x=-64&z=528&debug=1&nastri=1"
+   },
+   {
+    "nastro": 15,
+    "nome": "Via Bernardino Luini",
+    "lato": "sx",
+    "m": 35,
+    "x": 890.6,
+    "z": -438.7,
+    "link": "?x=891&z=-439&debug=1&nastri=1"
+   },
+   {
+    "nastro": 20,
+    "nome": "Vicolo Luigi Rho",
+    "lato": "sx",
+    "m": 35,
+    "x": 785.8,
+    "z": -1270.0,
+    "link": "?x=786&z=-1270&debug=1&nastri=1"
+   },
+   {
+    "nastro": 22,
+    "nome": "Via Verona",
+    "lato": "dx",
+    "m": 35,
+    "x": 467.7,
+    "z": 461.6,
+    "link": "?x=468&z=462&debug=1&nastri=1"
+   },
+   {
+    "nastro": 76,
+    "nome": "Via Vignazzola",
+    "lato": "dx",
+    "m": 35,
+    "x": -100.2,
+    "z": 488.9,
+    "link": "?x=-100&z=489&debug=1&nastri=1"
+   },
+   {
+    "nastro": 168,
+    "nome": "Strada provinciale ex SS 35 Milano-Meda",
+    "lato": "sx",
+    "m": 35,
+    "x": -197.6,
+    "z": 239.0,
+    "link": "?x=-198&z=239&debug=1&nastri=1"
+   },
+   {
+    "nastro": 328,
+    "nome": "Via San Giusto",
+    "lato": "sx",
+    "m": 35,
+    "x": 1407.8,
+    "z": -762.0,
+    "link": "?x=1408&z=-762&debug=1&nastri=1"
+   },
+   {
+    "nastro": 411,
+    "nome": "Via Capuana",
+    "lato": "dx",
+    "m": 35,
+    "x": -788.0,
+    "z": 12.9,
+    "link": "?x=-788&z=13&debug=1&nastri=1"
+   },
+   {
+    "nastro": 461,
+    "nome": "Viale Vittorio Veneto",
+    "lato": "dx",
+    "m": 35,
+    "x": -1336.1,
+    "z": 1051.7,
+    "link": "?x=-1336&z=1052&debug=1&nastri=1"
+   },
+   {
+    "nastro": 469,
+    "nome": "Via Brennero",
+    "lato": "dx",
+    "m": 35,
+    "x": -1176.2,
+    "z": 1206.0,
+    "link": "?x=-1176&z=1206&debug=1&nastri=1"
+   },
+   {
+    "nastro": 472,
+    "nome": "Corso Giacomo Matteotti",
+    "lato": "sx",
+    "m": 35,
+    "x": -954.2,
+    "z": 1496.7,
+    "link": "?x=-954&z=1497&debug=1&nastri=1"
+   },
+   {
+    "nastro": 504,
+    "nome": "Via Ortles",
+    "lato": "sx",
+    "m": 35,
+    "x": -245.4,
+    "z": 1700.3,
+    "link": "?x=-245&z=1700&debug=1&nastri=1"
+   },
+   {
+    "nastro": 519,
+    "nome": "Corso Isonzo",
+    "lato": "sx",
+    "m": 35,
+    "x": -1294.6,
+    "z": 1559.5,
+    "link": "?x=-1295&z=1560&debug=1&nastri=1"
+   },
+   {
+    "nastro": 542,
+    "nome": "Via Raffaello Sanzio",
+    "lato": "dx",
+    "m": 35,
+    "x": -1022.5,
+    "z": 1044.2,
+    "link": "?x=-1022&z=1044&debug=1&nastri=1"
+   },
+   {
+    "nastro": 572,
+    "nome": "Via Feltre",
+    "lato": "dx",
+    "m": 35,
+    "x": -2976.5,
+    "z": 1974.2,
+    "link": "?x=-2976&z=1974&debug=1&nastri=1"
+   },
+   {
+    "nastro": 588,
+    "nome": "Strada provinciale ex SS 35 Milano-Meda",
+    "lato": "dx",
+    "m": 35,
+    "x": 397.4,
+    "z": 2205.0,
+    "link": "?x=397&z=2205&debug=1&nastri=1"
+   },
+   {
+    "nastro": 77,
+    "nome": "Viale Francia",
+    "lato": "dx",
+    "m": 34,
+    "x": 274.5,
+    "z": -423.4,
+    "link": "?x=274&z=-423&debug=1&nastri=1"
+   },
+   {
+    "nastro": 137,
+    "nome": "Via Pietro Orsi",
+    "lato": "sx",
+    "m": 34,
+    "x": 380.8,
+    "z": -562.5,
+    "link": "?x=381&z=-562&debug=1&nastri=1"
+   }
+  ]
+ }
+}
