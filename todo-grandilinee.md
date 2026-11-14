@@ -40,7 +40,7 @@ Deciso con Carlo il 9/11/2026 notte, aggiornato il 13/11 sera. I dettagli e lo s
 ## 5. Sistemi
 - Meteo vero (niente pioggia sotto i ripari, nebbia e nuvole rifatte, pioggia più bella), stagioni.
 - Suoni (pioggia, vento, traffico, campane).
-- Menu delle opzioni; title screen con inquadrature su posti belli; via il codice morto (riga della versione).
+- Menu delle opzioni; title screen con inquadrature su posti belli; via il codice morto (riga della versione) e tutte le funzioni di debug (elenco in `todo.md`, "Funzioni di debug da TOGLIERE").
 
 ## 6. Missioni e storia (insieme)
 - Idee già segnate: salto sulla ferrovia a Meredo (x 1728 z 530), fuga dall'elicottero nel cantiere di Meredo (x 1637 z 933).
