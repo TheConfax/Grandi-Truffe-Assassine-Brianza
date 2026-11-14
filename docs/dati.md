@@ -70,6 +70,22 @@ Dal 1/11 la build legge `mapillary_grande/oggetti.json` (tutta la mappa grande) 
 - CC BY-SA 3.0, autore Flanker (5): `fermarsi e dare precedenza - stop`, `passaggio obbligatorio a destra`, `rotatoria`, `divieto di fermata`, `direzione obbligatoria dritto`. Attribuzione nella riga dei crediti del gioco.
 - Non coperti, restano disegnati a mano: `paese` (cartello di localita') e `via` (nome della strada), che sono testi, e i limiti di velocita' fuori da 10-130 in passi da 10.
 
+## Materiali con rilievo e tombini (`tex/*_nr.jpg`, `tex/tegole.jpg`, `tex/chiusini.png`, dal 13/11, realismo 3, `src/materiali3.js`)
+
+- Tutti CC0 (pubblico dominio, nessun obbligo di citazione; li citiamo lo stesso). Scaricati il 13/11/2026 a 1K da Poly Haven (`dl.polyhaven.org`, licenza <https://polyhaven.com/license>) e ambientCG (`ambientcg.com/get`, licenza <https://docs.ambientcg.com/license/>), ridotti da `src/tex_pbr.py` a 512 px (128 per i tombini). In ogni `_nr.jpg`: R e G la normale, B la ruvidità rispetto alla media.
+- Poly Haven: `asphalt_04` (asfalto, stessa foto di `tex/asfalto.jpg`), `white_stucco_02` (intonaco), `concrete_floor_02` (pavimento), `gravel_floor_02` (ghiaia), `brown_mud_dry` (terra), `clay_roof_tiles_02` di Amal Kumar (coppi: `tex/tegole.jpg` è la foto divisa per la sua media, così il tetto tiene il suo colore).
+- Ricavati dalle nostre foto, senza fonte nuova: marciapiede (fughe della griglia dei masselli), porfido e ciottoli (fughe da `tex/<nome>_id.png`), prato e terreno (grana della foto).
+- ambientCG: `ManholeCover006` (chiusino della fogna), `ManholeCover003` (tondo piccolo dei servizi), `Grate002` (caditoia e griglia), `DiamondPlate008A` (quadrato a rombi dei servizi, ricolorato ghisa con la cornice), in un atlante di 5 caselle con la toppa d'asfalto (dalla nostra foto, schiarita).
+- Dove stanno i tombini: regola in `materiali3.js` (`buildChiusini`, rifatta il 13/11 con le foto di riferimento di Carlo) e, dove ci sono, quelli di Mapillary (`mapillary_grande/oggetti.json`, `object--manhole` 118 e `object--catch-basin` 31, chiave di tile `mh` scritta da `build_data.py`).
+- Cespugli (`dbgt_verde.py cespugli`, chiave di tile `cs`): LiDAR DSM - DTM (`terreno/lidar_dsm`, 2008) e ESA WorldCover 2021 dentro il verde del DBGT, vedi sopra le loro licenze.
+
+## Prato, erba e campi (`tex/prato_*.jpg`, `tex/zolle*.jpg`, `tex/paglia.jpg`, dal 14/11, giro del verde, `src/verde3.js`)
+
+- Tutti CC0 (nessun obbligo di citazione; li citiamo lo stesso), scaricati il 14/11/2026 a 1K e ridotti da `src/tex_verde.py` (fonti e misure nel suo commento in testa).
+- ambientCG (`ambientcg.com/get`, licenza <https://docs.ambientcg.com/license/>): `Grass004` (prato rasato, `prato_g.jpg`), `Grass007` (prato con trifoglio e terra rada, `prato_e.jpg`), `Ground037` (terra con erba rada, `prato_t.jpg`).
+- Poly Haven (`dl.polyhaven.org`, licenza <https://polyhaven.com/license>): `grass_ground` di Charlotte Baglioni (erba secca e rada, `prato_s.jpg`), `farm_soil` di Amal Kumar (terra arata, `zolle.jpg` e il suo rilievo `zolle_nr.jpg`), `reed_roof_03` (paglia, solo la parte di paglia ritagliata e resa ripetibile, `paglia.jpg`).
+- Il tipo di prato viene dalla mappa: giardino del DBGT (AR_VRD 01 e l'aiuola 04, tipo 19 del gioco), aree residenziali, scuole, cimiteri e campi sportivi = prato curato; prati e parchi = prato irregolare; incolti (PS_INC 04) e arbusteti = incolto. L'erba alta 3D solo dove dal vero è alta: incolti e arbusteti, bordo dei campi e dei prati (1,6 m), sponde dei corsi d'acqua (4 m dall'alveo), scarpate (celle `M_SCARP` di `superficie.py`).
+
 ## Non usati da nessuno script
 
 - `_vecchi/map.osm` (2,5 MB): primo estratto OSM dal sito di openstreetmap.org (17/10/2026), un riquadro di circa 1,3 × 0,7 km sul centro di Meda. Sostituito da `osm/maplarge.osm`.

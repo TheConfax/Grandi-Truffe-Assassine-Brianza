@@ -2533,8 +2533,10 @@ for nome_, x_, z_, r_ in SIEPI_TOLTE:
     _nb0 = len(bar_out); _pt = Point(x_, z_)
     bar_out = [b_ for b_ in bar_out if not (b_[1] == 3 and len(b_[0]) >= 2 and LineString(b_[0]).length < 6 and LineString(b_[0]).centroid.distance(_pt) <= r_)]
     log('siepi tolte a mano', nome_, _nb0 - len(bar_out))
-VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 trees = MANUF.alberi(trees, VERDE.forest_u, isole=STR.isole if STR else ())
+CESP = VERDE.cespugli(trees)  # realismo 3: the shrubs where the LiDAR sees them in the green of the DBGT (src/dbgt_verde.py cespugli), tile key 'cs' [x, z, h] dm
+VERDE.rep.setdefault('cespugli', {'n': len(CESP)})
+VERDE.scrivi(os.path.splitext(dst)[0] + '_verde.json')
 # the holes of the railway fences towards the tracks (src/barriere.py varchi_binari): where a line of the data ends or a cut took a piece, on the map; a true passage stays open
 from barriere import varchi_binari
 _vl6 = [b_ for b_ in bar_out if b_[1] == 6]; _vl = [b_[0] for b_ in _vl6] + list(fences)
@@ -2713,7 +2715,7 @@ PARCHEGGI_ATTACCATI = [
 if PARCHEGGI_ATTACCATI:
     _pa = unary_union([Polygon(pts_) for nome_, pts_ in PARCHEGGI_ATTACCATI]).difference(bunion)
     asph, pedz, side, foot = unary_union([asph, _pa]), pedz.difference(_pa), side.difference(_pa), foot.difference(_pa)
-    area_geoms[:] = [(at, g.difference(_pa) if (at in (1, 2, 3) and g.intersects(_pa)) else g) for at, g in area_geoms]
+    area_geoms[:] = [(at, g.difference(_pa) if (at in (1, 2, 3, 19) and g.intersects(_pa)) else g) for at, g in area_geoms]
     log('parcheggi attaccati a mano', len(PARCHEGGI_ATTACCATI), 'm2', round(_pa.area))
 _ap, _co = _op.impronte(_sott, 0.2)   # no paint in the open part of an underpass (src/opere.py), nor over the covered part what the DBGT has in gallery; the floor is drawn by the game
 _top = unary_union([p for nm in ('AC_VEI', 'AR_STR') for p, q in zip(_op.poligoni(_Dop, nm), _Dop[nm]['attr']['sed']) if q == '03' and any(p.intersects(c_) for c_ in _co)])
@@ -3003,6 +3005,7 @@ for pts, w_, caps in riv_out:
                 e = [int(caps[0] and math.dist(cc[0], s0) < 0.05 or caps[1] and math.dist(cc[0], s1) < 0.05), int(caps[1] and math.dist(cc[-1], s1) < 0.05 or caps[0] and math.dist(cc[-1], s0) < 0.05)]
                 push(t, 'rv', {'p': enc(cc), 'w': w_, 'e': e})
 for t_ in trees: push(tid(t_[0], t_[1]), 'tr', [q(t_[0]), q(t_[1])] + [q(v) for v in t_[2:4]])  # [x, z] or [x, z, height, crown] (dm, dbgt_manufatti.py)
+for c_ in CESP: push(tid(c_[0], c_[1]), 'cs', [q(c_[0]), q(c_[1]), q(c_[2])])  # the shrubs (verde3.js)
 for ri, r in enumerate(raw_roads):  # road pieces per tile (for markings and decks)
     pts = [nodes[n_] for n_ in r['refs']]
     hs = [deckH.get(n_) for n_ in r['refs']] if r.get('deck') else None
@@ -3100,6 +3103,15 @@ log('CONTROLLO oggetti della via dentro un muro, una recinzione o un edificio (d
 if STR: STR.rep['oggetti_della_via_nei_muri'] = {'conta': dict(_ps_n), 'restano_dentro': _ps_resto, 'dove': _ps_dove[:60]}
 signals_extra = [node_index[r_] for r_ in MAPI['sf']]
 for s_ in MAPI['sm']: push(tid(s_[1], s_[2]), 'sm', s_)
+# realismo 3: the covers Mapillary saw (object--manhole, object--catch-basin; the big download where there is one), raw positions: the game puts them on the road (materiali3.js)
+_mh_f = next((f_ for f_ in (os.path.join(DATA, 'mapillary_grande', 'oggetti.json'), os.path.join(DATA, 'mapillary', 'oggetti.json')) if os.path.exists(f_)), None); _mh_n = [0, 0]
+for o_ in (json.load(open(_mh_f, encoding='utf-8')) if _mh_f else []):
+    k_ = {'object--manhole': 0, 'object--catch-basin': 1}.get(o_.get('object_value'))
+    if k_ is None: continue
+    x_, z_ = proj(o_['geometry']['coordinates'][1], o_['geometry']['coordinates'][0])  # proj(lat, lon)
+    if not inside((x_, z_), 0): continue
+    push(tid(x_, z_), 'mh', [q(x_), q(z_), k_]); _mh_n[k_] += 1
+log('tombini Mapillary: chiusini', _mh_n[0], 'caditoie', _mh_n[1])
 if GUARD: lamps, STR.rep['guardrail']['lampioni'] = GRD.lampioni(lamps, GUARD, _gr_x[3], log)   # the lamps of the expressway: on the new jersey, one per source (src/guardrail.py)
 for x, z in lamps: push(tid(x, z), 'lp', [q(x), q(z)])
 for o in ogg: push(tid(o[1] / 10, o[2] / 10), 'og', o)

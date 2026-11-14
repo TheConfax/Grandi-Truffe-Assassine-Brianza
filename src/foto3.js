@@ -8,6 +8,7 @@
 const ASF_FILE = 'asfalto', ASF_M = 4.04;
 const ASF_PAT = { value: new THREE.TextureLoader().load('tex/asfalto_toppa.jpg', t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; }) }; /* new asphalt for the patches: ambientCG Asphalt020S (CC0), recoloured, 512 px */
 const ASF_U = { value: /[?&]asfsh=0/.test(location.search) ? 0 : 1 }; window.__ASFU = ASF_U;
+const ASF_US = { value: /[?&]usura=0/.test(location.search) ? 0 : 1 }; /* realismo 3: the light wear of the asphalt, &usura=0 off */
 const ASF_T = { value: +((/[?&]asftono=([0-9.]+)/.exec(location.search) || [0, '1'])[1]) || 1 }; /* &asftono=N: multiplier of the asphalt brightness (default 1) */
 const FOTO_TEX = [[asphaltTex, 'asfalto', 9 / 3], [grassTex, 'prato', 9 / 2], [groundTex, 'terreno', 10 / 2], [sidewalkTex, 'marciapiede', 4 / 2], [porfidoTex, 'porfido', 4 / 1], [ciottoliTex, 'ciottoli', 4 / 4]];
 {
@@ -187,7 +188,7 @@ for (const [k, m, tile] of [['old', MAT.old, 3.4], ['mod', MAT.mod, 4.2], ['plai
    tone variation over 20-40 m, rare sealed cracks (edges of a Voronoi net, 12 m cells, only some edges kept, warped to wander, 2-4 cm wide), rare patches
    (rectangles of 1-4 m, a little turned, darker and blacker, sharp edge). All in world coordinates. The wheel tracks are not done: the asphalt UVs do not know the road direction */
 const ASF_GLSL = `
-uniform float uAsf, uAsT;
+uniform float uAsf, uAsT, uUsura;
 uniform sampler2D uPat;
 vec2 h22(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); q += dot(q, q.yzx + 33.33); return fract((q.xx + q.yz) * q.zy); }
 `;
@@ -244,12 +245,26 @@ const ASF_FRAG = `
         float m = 1. - smoothstep(-px, px + .005, sd);
         if (m > 0.) texelColor.rgb = mix(texelColor.rgb, pow(texture2D(uPat, P / 2.).rgb, vec3(2.2)) * (.9 + .2 * r3.y), m); /* the photo, 2 m a repeat, in linear */
       } }
+    /* realismo 3, light wear (Carlo: "non troppa"; &usura=0 off): oil drips, dark ovals of 0.3-1 m stretched along the road, one cell of 7 m in eight; hairline cracks, a finer
+       net of 3.5 m cells with one edge in seven kept, only in some stretches (slow noise), so most of the road stays as it was */
+    if (uUsura > .5) {
+      { vec2 gc = floor(P / 7.), lp = P - gc * 7. - 3.5; vec2 q1 = h22(gc + 71.), q2 = h22(gc + 83.);
+        if (q1.x < .125) { vec2 nd = vec2(-rd.y, rd.x), d = lp - (q2 - .5) * 4.; float a = .15 + .35 * q1.y, b = a * (hasDir > .5 ? .45 : 1.);
+          float e = length(vec2(dot(d, rd) / a, dot(d, nd) / b)) + .25 * (vn(P * 3.1 + 7.) - .5); float ms = 1. - smoothstep(.75, 1.05, e);
+          texelColor.rgb *= 1. - .4 * ms * far; } }
+      { float zone = smoothstep(.62, .78, slowN(P + 311., 1.)) * far;
+        if (zone > 0.) { vec2 Q = P + vec2(vn(P / 1.3 + 2.), vn(P / 1.3 + 9.)) * .6; vec2 ig = floor(Q / 3.5), fg = Q / 3.5 - ig; float d1 = 9., d2 = 9.; vec2 id1 = vec2(0.), id2 = vec2(0.);
+          for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) { vec2 g = vec2(float(i), float(j)), c = ig + g, pt = g + .15 + .7 * h22(c + 9.7); float d = length(pt - fg);
+            if (d < d1) { d2 = d1; id2 = id1; d1 = d; id1 = c; } else if (d < d2) { d2 = d; id2 = c; } }
+          float keep = step(.86, h21(id1 + id2 + 5.)), wd = .006, dm = (d2 - d1) * .5 * 3.5;
+          texelColor.rgb *= 1. - .55 * (1. - smoothstep(wd - px, wd + px, dm)) * min(1., wd * 2. / px) * keep * zone; } }
+    }
   }
   texelColor.rgb *= uAsT;
   diffuseColor *= texelColor;`;
 /* dir: the colour of the mesh is the direction of the road (cos 2a, sin 2a, 1; asp buffer of world3.js), not a tint: it is read, and not multiplied in */
 const ASF_PATCH = dir => s => {
-  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T; s.uniforms.uPat = ASF_PAT;
+  VAR_VERT(s); s.uniforms.uAsf = ASF_U; s.uniforms.uAsT = ASF_T; s.uniforms.uPat = ASF_PAT; s.uniforms.uUsura = ASF_US;
   let f = s.fragmentShader.replace('#include <map_fragment>', ASF_FRAG);
   if (dir) f = '#define ASF_DIR\n' + f.replace('#include <color_fragment>', '');
   s.fragmentShader = ASF_GLSL + VAR_GLSL + f;

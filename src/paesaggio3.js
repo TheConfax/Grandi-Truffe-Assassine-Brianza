@@ -81,7 +81,34 @@ const LS_DOOR_COLS = ['#c9ccd1', '#9da1a6', '#b8ad95', '#6b7a6b', '#8a6a52', '#d
 const LS_GLASS = new THREE.MeshLambertMaterial({ color: 0xe4f0ee, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
 // the film of a plastic tunnel: milky, or the colour the photo shows (green shade cloth, the clear cover of a pool), per vertex
 const LS_FILM = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
-const LS_BALE_G = (() => { const g = new THREE.CylinderGeometry(0.75, 0.75, 1.2, 12); g.rotateZ(Math.PI / 2); g.translate(0, 0.75, 0); return g; })(), LS_BALE_M = lam(0xc9ab62);
+// the round bales (giro del verde, Carlo: "ultra PS1"): 1.2 m long, 1.5 m across, a little flattened under their weight and rounded at the edges; the side
+// straw rolled round (tex/paglia.jpg, the fibres going round), the ends the spiral of the roll; held by a net (pale threads in diamonds), or wrapped in a
+// film (white or pale green, instance colour not white). Same frame as before (axis along x, middle 0.75 m up): props3.js rolls it round its axis. &campi=0: the old one
+const LS_BALE_NEW = !/[?&](campi|verde|prato)=0/.test(location.search);
+const LS_BALE_G = (() => {
+  if (!LS_BALE_NEW) { const g = new THREE.CylinderGeometry(0.75, 0.75, 1.2, 12); g.rotateZ(Math.PI / 2); g.translate(0, 0.75, 0); return g; }
+  const PRF = [[-0.6, 0], [-0.6, 0.3], [-0.6, 0.6], [-0.592, 0.69], [-0.565, 0.735], [-0.52, 0.75], [-0.2, 0.755], [0.2, 0.755], [0.52, 0.75], [0.565, 0.735], [0.592, 0.69], [0.6, 0.6], [0.6, 0.3], [0.6, 0]], NA = 28, P = [], I = [];
+  for (const [x, r] of PRF) for (let k = 0; k <= NA; k++) { const a = k / NA * TAU, cy = Math.cos(a), sz = Math.sin(a), bu = 1 + 0.025 * Math.sin(a * 3 + x * 4); P.push(x, Math.max(0.005, 0.75 + cy * r * bu * (cy < 0 ? 0.985 : 1)), sz * r * bu * (cy < -0.5 ? 1 + 0.06 * (-cy - 0.5) : 1)); } /* the foot a little flattened and wider */
+  for (let i = 0; i + 1 < PRF.length; i++) for (let k = 0; k < NA; k++) { const a = i * (NA + 1) + k, c = a + NA + 1; I.push(a, c, a + 1, a + 1, c, c + 1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+  return g;
+})();
+const LS_BALE_M = (() => {
+  if (!LS_BALE_NEW) return lam(0xc9ab62);
+  const t = new THREE.TextureLoader().load('tex/paglia.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const m = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  m.onBeforeCompile = s => { s.uniforms.uPa = { value: t };
+    s.vertexShader = 'varying vec3 vBlO;\nvarying vec3 vBlN;\n' + s.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBlO = position; vBlN = normal;');
+    s.fragmentShader = 'uniform sampler2D uPa;\nvarying vec3 vBlO;\nvarying vec3 vBlN;\nfloat blH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' + s.fragmentShader.replace('#include <color_fragment>', `
+  { vec2 q = vBlO.yz - vec2(.75, 0.); float r = length(q), a = atan(q.y, q.x), u = a / 6.2832 + .5; bool film = vColor.r < .98 || vColor.g < .98;
+    vec3 st = abs(vBlN.x) > .7 ? texture2D(uPa, vec2(r * 1.3, u * 3.)).rgb * (.82 + .25 * smoothstep(.2, .8, fract(r * 13. - u))) * mix(.75, 1., smoothstep(0., .2, r)) /* the end: the spiral of the roll */
+                               : texture2D(uPa, vec2(u * 3.4, vBlO.x * .7 + .2)).rgb; /* the side: straw going round */
+    st *= vec3(1.08, .98, .74);
+    if (film) { float w = .9 + .1 * sin(u * 70. + vBlO.x * 9.) * sin(vBlO.x * 23. + u * 31.); diffuseColor.rgb *= vColor.rgb * w; } /* wrapped: the film with its creases */
+    else { float s1 = abs(fract((u * 4.7 + vBlO.x * .9) * 5.) - .5), s2 = abs(fract((u * 4.7 - vBlO.x * .9) * 5.) - .5), net = abs(vBlN.x) > .7 ? smoothstep(.62, .68, r / .75) : 1.;
+      net *= smoothstep(.05, .0, min(s1, s2)); diffuseColor.rgb *= mix(st, vec3(.85, .86, .8), net * .7); } } /* the net in diamonds over the straw, round the edge of the ends */`); };
+  m.customProgramCacheKey = () => 'rotoballa'; return m;
+})();
 // a hoarding panel 1 m long (stretched to its length along x), 2 m high, with its post at one end; the colour comes per instance
 const LS_PANEL_G = (() => { const b = Buf(), F = lmFrame(new THREE.Matrix4()); F.geo(b, lmBox(1, 2, 0.05, 0, 1, 0), null, COL('#ffffff')); F.geo(b, lmBox(0.05, 2.1, 0.07, -0.5, 1.05, 0), null, COL('#8f949a'));
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(b.c, 3)); g.setIndex(b.i); return g; })();
@@ -93,6 +120,7 @@ function* buildPaesaggio(T, G) {
   const box = (w, h, dd, x, y, z, col, ry = 0) => F0.geo(solid, lmBox(w, h, dd, x, y, z, ry), null, COL(col));
   const cyl = (r, h, x, y, z, col, seg = 10) => F0.geo(solid, new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z), null, COL(col));
   const solids = [], bales = [], pots = [], panels = [], ftrees = [], potPlants = [], crops = [], stakes = [], fruitG = [];
+  const campoB = Object.assign(VBuf(), { noclip: !!H.tile(T.t) }), tettoB = Object.assign(VBuf(), { noclip: !!H.tile(T.t), w: Buf() }); /* the ground of the fields and the roof of the maize (verde3.js) */
   const solidAt = (x, z, r, h) => solids.push([x, z, r, h]);
   // ---- garages: doors on the open side, one per box
   for (const B of T.bld) {
@@ -153,13 +181,15 @@ function* buildPaesaggio(T, G) {
     const P = dec(L0.p); if (P.length < 3) continue;
     const kind = L0.s, A = lsAxis(P), [cx, cz] = [A.cx, A.cz], h = LS_HASH(cx, cz, kind), area = Math.abs(sArea(P));
     if (kind === 'campo' || kind === 'prato') {
-      if (kind === 'campo') { // furrows the long way: ploughed, green, ripe or stubble, the hash decides
+      if (kind === 'campo' && !(typeof PRATO !== 'undefined' && PRATO.on)) { // furrows the long way: ploughed, green, ripe or stubble, the hash decides (the old flat stripes: with the new lawn no more, giro del verde)
         const pal = [['#8f6e4e', '#7d5f42'], ['#8fae5a', '#7c9a4b'], ['#d6bf72', '#c8b064'], ['#d9cf9e', '#cbbf8c']][Math.floor(h * 4)];
         for (let v = A.v0 + 1.4, k = 0; v < A.v1 - 0.7; v += 1.4, k++) for (const [a, b] of lsSpans(A.Q, v)) if (b - a > 1 && lsFlat(A, a + 0.4, b - 0.4, v, 1.42)) lsStrip(drape, A, a + 0.4, b - 0.4, v, 1.42, COL(pal[k % 2]), 0.04);
       }
-      if (h > (kind === 'campo' ? 0.6 : 0.75) && area > 1500) { // round bales left in the field
-        const n = Math.min(10, Math.floor(area / 2500) + 2); let got = 0;
-        for (let k = 0; k < n * 4 && got < n && bales.length < 40; k++) {
+      const st = typeof CAMPI !== 'undefined' && CAMPI.on ? campoStato(P, kind) : null; /* giro del verde: what is sown and how it is today (verde3.js) */
+      if (st) { CAMPI.stati[st.stato] = (CAMPI.stati[st.stato] || 0) + 1; campoSuolo(P, st, campoB, tettoB); } /* the meadows too: their tall grass seen from afar (fix2) */
+      if (st ? st.balle && area > 1200 : h > (kind === 'campo' ? 0.6 : 0.75) && area > 1500) { // round bales left in the field (giro del verde: on the mown meadow and the cut wheat, summer and autumn)
+        const n = st ? Math.min(14, Math.floor(area / 1800) + 2) : Math.min(10, Math.floor(area / 2500) + 2); let got = 0;
+        for (let k = 0; k < n * 4 && got < n && bales.length < 60; k++) {
           const s = A.s0 + (A.s1 - A.s0) * LS_HASH(cx + k, cz, 'b'), v = A.v0 + (A.v1 - A.v0) * LS_HASH(cx, cz + k, 'b'), [x, z] = A.at(s, v);
           if (!inPoly(x, z, P) || !lsFreeAt(x, z, 3) || bales.some(([bx, bz]) => hyp(bx - x, bz - z) < 4)) continue;
           bales.push([x, z, LS_HASH(x, z, 'r') * TAU]); got++;
@@ -352,6 +382,9 @@ function* buildPaesaggio(T, G) {
   if (net.i.length) mkMesh(net, MAT.net, 10, false, G);
   yield 'terreni reti';
   if (drape.i.length) mkMesh(drape, MAT.mark, 2, false, G);
+  if (campoB.i.length && MAT.campo) mkMesh(campoB, MAT.campo, 2, false, G);
+  if (tettoB.cards && typeof maisCarte === 'function') maisCarte(G, tettoB.cards); /* the maize past the true plants (verde3.js) */
+  if (tettoB.edge && typeof maisBordo === 'function') maisBordo(G, tettoB.edge); /* the edge of the maize fields: the true plants, always */
   for (const a of d.a || []) { const P = lagoDi(a, T); if (P) lago(P, T, TL); }
   acquaMesh(TL, G);
   yield 'terreni fondo';
@@ -367,7 +400,7 @@ function* buildPaesaggio(T, G) {
     list.forEach(([x, z, r], i) => { o3.position.set(x, H.ground(x, z), z); o3.rotation.set(0, r || 0, 0); const k = sc ? sc(x, z) : 1; o3.scale.set(k, k, k); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); if (colOf) im.setColorAt(i, COL(colOf(x, z))); });
     G.add(im); return im;
   };
-  { const im = inst(LS_BALE_G, LS_BALE_M, bales); if (im) bales.forEach(([x, z, r], i) => { /* a bale rolls away under a hard blow (props3.js FORZA.medio, via) and is solid again where it stops */
+  { const im = inst(LS_BALE_G, LS_BALE_M, bales, null, LS_BALE_NEW ? (x, z) => { const q = LS_HASH(x, z, 'telo'); return q < 0.6 ? '#ffffff' : q < 0.85 ? '#e9ece6' : '#a9c49a'; } : null); if (im) bales.forEach(([x, z, r], i) => { /* 6 in 10 held by a net, the others wrapped in a white or pale green film */ /* a bale rolls away under a hard blow (props3.js FORZA.medio, via) and is solid again where it stops */
     const id = T.t + ':' + i, p = LS_BALE_PROPS.get(id), gy = H.ground(x, z);
     if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'leggero', via: 'rotola', cy: 0.75, inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
     else propRifai(p, [im], i);

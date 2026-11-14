@@ -22,14 +22,15 @@ TILE = 250.0
 # area types of build_data.py (AREA_T; colours in world3.js AREA_COL): 1 grass, 3 pitch, 6 water, 11 wood, 12 scrub, 13 farmland
 # AR_VRD_TY (Specifiche di contenuto regionali, p. 312): 01 giardino, 02 prato, 04 aiuola -> prato; 03 alberi, "area alberata non sufficiente a
 # definirsi bosco (sotto i 2000 m2)", l'inviluppo delle chiome -> bosco
-VRD_T = {'01': 1, '0101': 1, '0102': 1, '0103': 1, '0104': 1, '0105': 1, '0106': 1, '0107': 1, '02': 1, '04': 1, '07': 1, '95': 1, '03': 11}
+VRD_T = {'01': 19, '0101': 19, '0102': 19, '0103': 19, '0104': 19, '0105': 19, '0106': 19, '0107': 19, '02': 1, '04': 19, '07': 1, '95': 1, '03': 11}
+# giro del verde (Carlo 14/11): il giardino (01, e l'aiuola 04) e' il prato curato, tipo 19 del gioco (verde3.js pratoStile); il prato (02) resta 1
 # BOSCO_TY (p. 300): 01 conifere, 02 latifoglie, 03 piantagioni, 05 rimboschimenti, 95 altro -> bosco; 04 arbusteti e macchia (a Meda 0401,
 # "macchia mediterranea": arbusteti) -> cespugli
 BOSCO_T = {'04': 12, '0401': 12, '0402': 12}
-# CL_AGR_TY (p. 310): 07 seminativi -> campo, 08 orti, 09 vivai, 01-02 vigneti e frutteti -> frutteto, 05 prati. Il 04 per la specifica sono
+# CL_AGR_TY (p. 310): 07 seminativi -> campo, 08 orti, 09 vivai, 01-02 vigneti e frutteti -> frutteto, 05 prati. Il 05 e' il prato stabile: anche terreno 'prato' (giro del verde: erba alta, sfalci e rotoballe) Il 04 per la specifica sono
 # gli oliveti: a Meda sono 8 pezzi in centro e lungo la Milano-Meda, OSM e WorldCover ci hanno bosco e la foto Mapillary dalla rampa della
 # Milano-Meda (2019) mostra un bosco fitto di latifoglie con l'edera, nessun olivo: bosco
-AGR_T = {'01': (13, 'frutteto'), '02': (13, 'frutteto'), '03': (13, 'frutteto'), '04': (11, None), '05': (1, None), '06': (13, 'campo'),
+AGR_T = {'01': (13, 'frutteto'), '02': (13, 'frutteto'), '03': (13, 'frutteto'), '04': (11, None), '05': (1, 'prato'), '06': (13, 'campo'),
          '07': (13, 'campo'), '0701': (13, 'campo'), '0702': (13, 'campo'), '08': (13, 'orti'), '09': (13, 'vivaio'), '95': (13, None)}
 # PS_INC (p. 308): 01 pascolo, 04 incolti, 05 radura. Le foto Mapillary degli incolti (via Vignazzola e le rampe della Milano-Meda) sono
 # scarpate e margini d'erba alta con qualche cespuglio: prato, senza alberi inventati
@@ -290,7 +291,7 @@ class Verde:
         for t, p in self.sport: by_t[6 if t.startswith('01') else 3].append(p)
         for t, p in self.forest_new: by_t[11].append(p)
         nadd = Counter(); x0, z0, x1, z1 = cv.bounds
-        for t in (1, 18, 12, 11, 13, 3, 6):  # drawn in this order: incolti (18) after the lawns, pitches and pools over them
+        for t in (1, 19, 18, 12, 11, 13, 3, 6):  # drawn in this order: incolti (18) after the lawns, pitches and pools over them
             ps = by_t.get(t)
             if not ps: continue
             st = STRtree(ps)
@@ -438,6 +439,61 @@ class Verde:
             if cov < 0.5 * L.length: out.append((list(L.simplify(0.15).coords), 3, 1.5))
         self.rep['siepi'] = {'filari_siepe': len(self.hedge), 'aggiunte': len(out)}
         self.log('dbgt verde: siepi FIL_AL', len(self.hedge), 'aggiunte', len(out))
+        return out
+
+    def cespugli(self, trees=(), zona=None):
+        """realismo 3, fase C (Carlo 13/11, via Colombara a Meda: la scarpata e' piena di alberi e cespugli, nel gioco e' prato liscio): le macchie
+        di arbusti dove ci sono davvero. Dentro il verde del DBGT (giardino, prato, incolto, arbusteto: tipi 1 e 12), a 0,8 m dal bordo, su una griglia
+        di CESP_PASSO m con un piccolo scarto, un cespuglio dove il LiDAR (DSM - DTM, 2008) vede vegetazione sopra CESP_MIN m e WorldCover 2021 dice
+        alberi, arbusti o erba (non costruito ne' suolo nudo: la vegetazione c'e' ancora), lontano dagli alberi del gioco; altezza quella del LiDAR,
+        al massimo CESP_MAX. Negli arbusteti (12) senza LiDAR o con vegetazione bassa: cespugli di 1-1,8 m alla stessa griglia, uno su due.
+        zona: (x0, z0, x1, z1) per la build attorno al punto. -> [(x, z, h)]"""
+        import dbgt_boschi, dbgt_manufatti
+        CESP_PASSO, CESP_MIN, CESP_MAX = 1.8, 0.9, 4.0
+        cv = self.cover
+        polys = [(t, q) for t, q in self.areas if t in (1, 12, 19) and not q.is_empty]
+        if zona is not None: zb = box(*zona); polys = [(t, q) for t, q in polys if q.intersects(zb)]
+        out, nl, n12 = [], 0, 0
+        if not polys or cv.is_empty: self.rep['cespugli'] = {'n': 0}; return out
+        data = os.environ.get('GTA_DATA') or dq_data()
+        dtm = dbgt_manufatti.dq.Lidar(None); dsm = dbgt_manufatti.dq.Lidar(os.path.join(data, 'terreno', 'lidar_dsm'))
+        wc = dbgt_boschi._worldcover(data)
+        T = np.array([(t_[0], t_[1]) for t_ in trees]) if len(trees) else np.zeros((0, 2)); tt = STRtree([Point(p) for p in T]) if len(T) else None
+        cl = {}
+        for k, (t, q) in enumerate(polys): c = q.centroid; cl.setdefault((int(c.x // 1500), int(c.y // 1500)), []).append(k)
+        for key in sorted(cl):
+            P = [polys[k] for k in cl[key]]; U = unary_union([q.buffer(-0.8) for t, q in P]); U12 = unary_union([q.buffer(-0.8) for t, q in P if t == 12])
+            if U.is_empty: continue
+            prepare(U); prepare(U12)
+            x0, z0, x1, z1 = U.bounds
+            if zona is not None: x0, z0, x1, z1 = max(x0, zona[0]), max(z0, zona[1]), min(x1, zona[2]), min(z1, zona[3])
+            if x1 <= x0 or z1 <= z0: continue
+            xs = np.arange(math.floor(x0 / CESP_PASSO) * CESP_PASSO, x1, CESP_PASSO); zs = np.arange(math.floor(z0 / CESP_PASSO) * CESP_PASSO, z1, CESP_PASSO)
+            XX, ZZ = np.meshgrid(xs, zs); X, Z = XX.ravel(), ZZ.ravel()
+            hsh = np.modf(np.sin(X * 12.9898 + Z * 78.233) * 43758.5453)[0]; hsh2 = np.modf(np.sin(X * 39.346 + Z * 11.135) * 23421.631)[0]
+            X = X + (np.abs(hsh) - 0.5) * CESP_PASSO * 0.6; Z = Z + (np.abs(hsh2) - 0.5) * CESP_PASSO * 0.6
+            ins = shapely.contains_xy(U, X, Z); X, Z, hsh = X[ins], Z[ins], np.abs(hsh[ins])
+            if not len(X): continue
+            N = np.full(len(X), np.nan)
+            if dtm.t and dsm.t:
+                G = dbgt_manufatti.Grid((X.min(), Z.min(), X.max(), Z.max()), pad=4.0, dtm=dtm, dsm=dsm)
+                if G.ok: N = np.asarray(G.near(G.N.astype(np.float32), X, Z), float)
+            okw = np.ones(len(X), bool)
+            if wc is not None:
+                WCa, wlon0, wlat0, wsx = wc; lon, lat = dbgt_manufatti.dq.game_to_lonlat(X, Z)
+                ci = np.floor((lon - wlon0) / wsx).astype(int); ri = np.floor((wlat0 - lat) / wsx).astype(int)
+                inb = (ci >= 0) & (ci < WCa.shape[1]) & (ri >= 0) & (ri < WCa.shape[0]); w = np.zeros(len(X), np.uint8); w[inb] = WCa[ri[inb], ci[inb]]
+                okw = np.isin(w, (10, 20, 30))
+            veg = np.isfinite(N) & (N > CESP_MIN) & okw
+            in12 = shapely.contains_xy(U12, X, Z) if not U12.is_empty else np.zeros(len(X), bool)
+            for i in range(len(X)):
+                if veg[i]: h = min(float(N[i]), CESP_MAX); nl += 1
+                elif in12[i] and hsh[i] < 0.5: h = 1.0 + 0.8 * hsh[i] * 2; n12 += 1
+                else: continue
+                if tt is not None and len(tt.query(Point(X[i], Z[i]), predicate='dwithin', distance=2.2)): continue
+                out.append((float(X[i]), float(Z[i]), round(h, 1)))
+        self.rep['cespugli'] = {'n': len(out), 'dal_lidar': nl, 'negli_arbusteti': n12}
+        self.log('dbgt verde: cespugli', len(out), 'dal LiDAR', nl, 'negli arbusteti', n12)
         return out
 
     def scrivi(self, path):

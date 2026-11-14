@@ -697,7 +697,7 @@ function edgePts(a, b, off, e) { // e: the edge, whose lane may change along it 
 
 // ---------------------------------------------------------------- tile builder
 const CORTILE_COL = 0xb9b5ac; // a plain light grey (MAT.cortile); the yards and drives (tiles[t].cv) are drawn in the asphalt of the streets since 2/11
-const AREA_COL = { 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6', 17: '#b9b5ac' }; // 17: yards of the DBGT (AATT, dbgt_manufatti.py), a plain light grey paving (MAT.aatt)
+const AREA_COL = { 19: '#ffffff', 15: '#d6e2b4', 16: '#d2e2b2', 1: '#ffffff', 2: '#e8f0dc', 3: '#cfe8c8', 4: '#7b7c7a', 5: '#b3ada2', 6: '#3f6f8c', 7: '#a88f6c', 8: '#9d978c', 9: '#a9a398', 10: '#ffffff', 11: '#7d9a6a', 12: '#c9d7a8', 13: '#e2dca0', 14: '#c3cdb6', 17: '#b9b5ac' }; // 17: yards of the DBGT (AATT, dbgt_manufatti.py), a plain light grey paving (MAT.aatt)
 const PAL_OLD = ['#dfae62', '#e8c98a', '#dba08a', '#ece4d3', '#d99060', '#c7c9a6', '#e3b98f', '#f0dcb0'];
 const PAL_MOD = ['#dcd7cd', '#cbc4b7', '#bdb5a8', '#e6e0d5', '#c9b9a0', '#d5cbbb'];
 const PAL_IND = ['#aaa69d', '#9d998f', '#b6ae9e', '#8f949a'];
@@ -1720,8 +1720,7 @@ function cellOwners(T, F) {
   const cover = (o, k, rank, st, street) => { if (o.length < 3) return; lay.push([o, k, rank, st]); H.coverCells(o, k, T.t, w => { if (rank < own[w] || (street && (underFree(w) || (F.ud2 && F.ud2[w])))) return; own[w] = rank; sty[w] = st; }); };
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
-    if (a.t === 18) cover(outer, holes, 1, S('i', MAT.incoltoS, 12)); // incolti (DBGT PS_INC 04): dry grass and bare earth
-    else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
+    if (a.t === 18 || a.t <= 3 || a.t >= 11 && a.t !== 17) { const [k_, m_, c_] = pratoStile(a.t); cover(outer, holes, 1, S(k_, m_, k_ === 'i' ? 12 : 9, c_)); } // the lawns by kind (verde3.js pratoStile): kept, park, incolti (DBGT PS_INC 04) and scrub
     else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) cover(outer, holes, 2, S('w', MAT.waterS, 9)); } /* a lake is dug and drawn by acqua3.js */
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
     else if (a.t === 17) cover(outer, holes, 1.1, SF(a.m || 'n')); // yards of the DBGT (AATT): their material (src/fondi.py), or the neutral paving
@@ -2174,6 +2173,7 @@ function* buildTileGen(T) {
   yield 'walls';
   // walls, fences, hedges and the expressway median
   {
+    if (typeof SIEPI !== 'undefined') SIEPI.T = T.t; /* the shrubs of the free hedges go with the tile that draws them (verde3.js) */
     const B = barBufs(), md = Buf(); // the walls, fences and hedges (sfondabili3.js barDraw): each piece a car can break knows where it is in them
     for (const br of T.ba || []) {
       // the slabs closed at their ends (Carlo, 26/10: a hedge or a wall open at its end showed its empty inside): the two ends of the barrier and
@@ -2488,6 +2488,7 @@ function* buildTileGen(T) {
             b.ao.push(wbot - ga, pitched ? ya - wbot : 99, ia + e0, ic + L - e0, wbot - gc, pitched ? yc - wbot : 99, ia + e1, ic + L - e1, yc - gc, pitched ? 0 : 99, ia + e1, ic + L - e1, ya - ga, pitched ? 0 : 99, ia + e0, ic + L - e0);
             for (let q = 0; q < 4; q++) b.fac.push(f[0], f[1], f[2], f[4] ? R.codeN : R.code); for (let q = 0; q < 4; q++) b.facX.push(f[3] || 0);
             if (nx * (-dz) + nz * dx > 0) b.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else b.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
+            if (!raised && !B.st) kitZoccolo(roofB, B, ax, az, cx, cz, nx, nz, s0, s1, (f[2] - voff) * FL + F0, R, wallCol); /* the plinth in 3D (kit3.js, realismo 3) */
             if (B.st === 2) { // a ruin has no roof: the inside of its walls shows from above
               const bi = b.p.length / 3;
               vtx(b, ax, wbot, az, -nx, 0, -nz, u0, v0, wallCol); vtx(b, cx, wbot, cz, -nx, 0, -nz, u1, v0, wallCol); vtx(b, cx, yc, cz, -nx, 0, -nz, u1, vOf(yc), wallCol); vtx(b, ax, ya, az, -nx, 0, -nz, u0, vOf(ya), wallCol);
@@ -2503,9 +2504,10 @@ function* buildTileGen(T) {
       if (raised) soffit(roofB, outer, holes, bot, COL('#9a958c'));
       if (B.cu) domeFaces(roofB, B.cu, COL('#8e928c')); // lead grey: the DSM does not say the colour
       if (B.st === 2) continue;
-      if (planes) roofFaces(roofB, B, top, colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
+      let rcolK = null; /* the colour of the roof, for its eaves (kit3.js) */
+      if (planes) roofFaces(roofB, B, top, rcolK = colOr(B.rcol, () => pcB(t === 1 || t === 2 ? ROOF_FLAT : ROOF_COTTO, 1))); // sheds and warehouses: grey sheet, houses: cotto
       else if (pitched) {
-        const [cx, cz] = centroid(outer), rh = bldPitch(B), col = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
+        const [cx, cz] = centroid(outer), rh = bldPitch(B), col = rcolK = colOr(B.rcol, () => pcB(ROOF_COTTO, 1));
         for (let i = 0; i < outer.length; i++) {
           const a = outer[i], c = outer[(i + 1) % outer.length];
           const v1 = new THREE.Vector3(a[0], top, a[1]), v2 = new THREE.Vector3(c[0], top, c[1]), v3 = new THREE.Vector3(cx, top + rh, cz);
@@ -2515,6 +2517,7 @@ function* buildTileGen(T) {
           triUp(roofB, base, base + 1, base + 2);
         }
       } else { try { polyFill(roofB, outer, holes, top, 10, B.st === 1 ? COL('#a9a6a0') : colOr(B.rcol, () => pcB(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT, 1))); } catch (e) { } }
+      kitCasa(roofB, B, outer, holes, top, planes, pitched, t, wallCol, raised, rcolK); /* eaves, gutters, chimneys, copings (kit3.js, realismo 3) */
     }
     for (const d of T.doors || []) if (!d.skip && facBloccaPorta(T, (d.ax + d.bx) / 2, (d.az + d.bz) / 2, d.W / 2 + 0.3)) facVC().porte_sopra_dopo++;
     T.porteFatte = (T.doors || []).filter(d => !d.skip).map(d => ({ ax: d.ax, az: d.az, bx: d.bx, bz: d.bz, ux: d.ux, uz: d.uz, W: d.W, h: d.h, gy: d.gy, sty: d.sty, fit: d.fit })); /* the doors as this build drew them, for the checks (T.doors can be laid again by the time one counts) */
@@ -2523,7 +2526,7 @@ function* buildTileGen(T) {
     if (aoB.i.length) mkMesh(aoB, AO_GROUND_MAT, 11, false, G);
     put(roofB, MAT.roof, 10, 'cast'); put(canopyB, MAT.canopy, 10, 'cast'); put(postB, MAT.roof, 10, 'cast');
   }
-  for (const f of [confineMesh, buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti]) {
+  for (const f of [confineMesh, buildSignals, buildSegnali, buildGates, buildDoors, buildFountains, buildSigns, buildNegozi, buildPaesaggio, buildFuel, buildCemetery, buildPlatforms, buildParkingLines, buildParkFurniture, buildOggetti, buildManufatti, buildChiusini, buildVerde, buildCavi]) {
     const s = srndT; yield f.name; srndT = s; const r = f(T, G);
     if (r && r.next) for (const v of r) { const s = srndT; yield v || f.name; srndT = s; }
   }
