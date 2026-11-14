@@ -324,7 +324,7 @@ const H = (() => {
     let o = DECK_ORD.get(d.ord); if (o) { o.refs++; return o; }
     const tri = new Float64Array(d.tri.length); for (let i = 0; i < tri.length; i += 3) { tri[i] = d.tri[i]; tri[i + 1] = d.tri[i + 1]; tri[i + 2] = d.tri[i + 2] - B0; }
     const free = d.tipo !== 'copertura' && !(d.sotto && (d.sotto.strade || d.sotto.ferrovia)); // nothing passes under it but water or field
-    o = { id: d.id, ord: d.ord, tiles: d.tiles, refs: 1, reg: [], tipo: d.tipo, fonte: d.fonte, sp: d.sp, luce: d.luce - B0, tri, imp: d.imp, nucleo: d.nucleo || null, spalle: d.spalle || [], ra: d.ra || [], free };
+    o = { id: d.id, ord: d.ord, tiles: d.tiles, refs: 1, reg: [], tipo: d.tipo, fonte: d.fonte, sp: d.sp, luce: d.luce - B0, tri, imp: d.imp, nucleo: d.nucleo || null, spalle: d.spalle || [], ra: d.ra || [], free, nastro: d.nastro || null, capi: d.capi || [] }; // nastro: a deck made from its ribbons (src/ponti_nastro.py): imp is the section of the road, capi its end cuts
     DECKS.push(o); DECK_ORD.set(d.ord, o);
     const rec0 = GRID_REC; GRID_REC = o.reg;
     for (let i = 0; i < tri.length; i += 9) { const xs = [tri[i], tri[i + 3], tri[i + 6]], zs = [tri[i + 1], tri[i + 4], tri[i + 7]]; DKG.add(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), { d: o, i }); }

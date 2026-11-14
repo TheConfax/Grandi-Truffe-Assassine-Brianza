@@ -93,50 +93,64 @@
   }
  },
  "A2": {
-  "punti": 2,
-  "m2": 0.5,
+  "punti": 5,
+  "m2": 1.2,
   "abbassamento": {
-   "n": 2,
-   "p50": 1.094,
-   "p90": 1.104,
-   "p99": 1.106,
-   "max": 1.107
+   "n": 5,
+   "p50": 1.524,
+   "p90": 1.795,
+   "p99": 1.865,
+   "max": 1.873
   },
   "luoghi": [
+   {
+    "punti": 2,
+    "x": -1310.2,
+    "z": 1541.8,
+    "v": 1.68,
+    "link": "?x=-1310.2&z=1541.8"
+   },
    {
     "punti": 2,
     "x": -1076.2,
     "z": 2457.8,
     "v": 1.11,
     "link": "?x=-1076.2&z=2457.8"
+   },
+   {
+    "punti": 1,
+    "x": -1309.8,
+    "z": 1544.8,
+    "v": 1.87,
+    "link": "?x=-1309.8&z=1544.8"
    }
   ],
-  "n_luoghi": 1,
-  "punti_controllati": 11356,
-  "bordo_punti": 80,
+  "n_luoghi": 3,
+  "punti_controllati": 11379,
+  "bordo_punti": 108,
   "bordo_luoghi": 21
  },
  "A3": {
-  "celle_sotto_impalcati_con_strada_disegnata": 202,
+  "celle_sotto_impalcati_con_strada_disegnata": 287,
   "dipinte": 0,
   "m2": 0.0,
   "impalcati": [],
   "impalcati_prima_della_regola": [
    3,
+   4,
    5,
    6,
-   7,
-   10,
-   12,
-   20,
-   28,
-   32,
+   9,
+   11,
+   18,
+   26,
+   30,
+   34,
    36,
-   38,
-   39,
-   40
+   37,
+   38
   ],
-  "celle_segnate_sotto_impalcato": 1135,
+  "celle_segnate_sotto_impalcato": 1179,
   "luoghi": []
  },
  "A4": {
@@ -358,7 +372,7 @@
     "z": 203.2,
     "m": 13.0,
     "strada": 218.17,
-    "S_min": 218.08,
+    "S_min": 218.17,
     "sfondato": false,
     "link": "?x=-250.2&z=203.2"
    },
@@ -843,9 +857,9 @@
  "sintesi": {
   "acqua_sulle_strade_m2": 1.9,
   "acqua_sulle_strade_luoghi": 3,
-  "strade_sfondate_punti": 2,
-  "strade_sfondate_luoghi": 1,
-  "strade_sfondate_bordo_punti": 80,
+  "strade_sfondate_punti": 5,
+  "strade_sfondate_luoghi": 3,
+  "strade_sfondate_bordo_punti": 108,
   "dipinte_sotto_impalcati_celle": 0,
   "dipinte_sotto_impalcati_ponti": 0,
   "ringhiere_m": 0,
@@ -856,6 +870,6 @@
   "tombini_sotto_strade": 48,
   "tombini_sotto_strade_sfondati": 1,
   "prove_fisse_ok": "4 su 4",
-  "tempo_s": 24.8
+  "tempo_s": 32.1
  }
 }

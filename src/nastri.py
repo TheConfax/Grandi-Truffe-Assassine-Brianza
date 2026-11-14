@@ -16,6 +16,7 @@ usa come riferimento.
   python src/nastri.py [cartella con brianza.json, di default il repo]        (build.py lo lancia dopo build_data.py)
 calcola(D, base) rende i nastri interi (una stazione al metro) a chi nella build li vuole usare."""
 import os, sys, json, gzip, io, time
+import collections
 from collections import Counter
 import numpy as np, shapely
 from shapely.geometry import Polygon
@@ -34,6 +35,7 @@ DZ = 2.5          # stesso livello: quote entro questo
 APRE = 41         # un bordo che si apre per meno di questi metri...
 APRE_DI = 1.0     # ...di oltre questo: portato dritto
 LISCIA = 3.0      # i bordi lisciati su questi metri
+CUCI = 15.0       # due capi liberi dell'asse che si guardano entro tanto: ricuciti (m)
 FINO = 0.04       # lo sfoltimento delle stazioni nel file: entro 4 cm
 RASO, PONTE, GALLERIA, SOTTO = 0, 1, 2, 3
 SEDI = ['raso', 'ponte', 'galleria', 'sotto']
@@ -148,6 +150,26 @@ def _sfoltisci(V, fissi, tol):
     return np.nonzero(keep)[0]
 
 
+def _ricuci(els, log=print):
+    """Dove l'asse si interrompe (al confine fra due comuni ognuno finisce il suo, e in mezzo resta un buco: via Vignazzola x -260 z 689, proprio su un
+    ponte): due capi liberi che si guardano entro CUCI m, ognuno nella direzione dell'altro (entro 20 gradi) e alla stessa quota, sono la stessa
+    strada. Rende gli elementi che li uniscono, a raso (se sotto non c'è terra lo dice il terreno, ponti_nastro.py)"""
+    key = lambda p: (int(round(p[0] * 20)), int(round(p[1] * 20))); n = collections.Counter(); capi = []
+    for e in els: n[key(e['xy'][0])] += 1; n[key(e['xy'][-1])] += 1
+    for e in els:
+        for p, q, z in ((e['xy'][0], e['xy'][1], e['z'][0]), (e['xy'][-1], e['xy'][-2], e['z'][-1])):
+            if n[key(p)] == 1 and not np.isnan(z): v = np.subtract(p, q); capi.append((np.asarray(p, float), v / (np.hypot(*v) or 1), float(z)))
+    if len(capi) < 2: return []
+    P = np.array([c[0] for c in capi]); T = cKDTree(P); out = []; usati = set()
+    for i, j in sorted(T.query_pairs(CUCI), key=lambda ij: np.hypot(*(P[ij[0]] - P[ij[1]]))):
+        if i in usati or j in usati: continue
+        d = P[j] - P[i]; L = np.hypot(*d)
+        if L < 0.06 or capi[i][1] @ d / L < 0.94 or capi[j][1] @ -d / L < 0.94 or abs(capi[i][2] - capi[j][2]) > 1.5: continue
+        usati |= {i, j}; out.append(dict(xy=np.array([P[i], P[j]]), z=np.array([capi[i][2], capi[j][2]]), sede=RASO, id=-1 - len(out)))
+    log('nastri: assi ricuciti dove si interrompono: %d (%s)' % (len(out), ', '.join('x %.0f z %.0f %.0f m' % (*((e['xy'][0] + e['xy'][1]) / 2), np.hypot(*(e['xy'][1] - e['xy'][0]))) for e in out[:12])))
+    return out
+
+
 def calcola(D, base=0.0, log=print):
     """i nastri dal DBGT letto da dbgt_quote (EL_STR e AC_VEI): [{i, el, xy, y, s, sede, n, sx, dx, portato_sx, portato_dx, fuori}], una stazione al
     metro; y in m sopra base, n il versore a sinistra di chi va lungo l'asse, sx e dx le distanze dei due bordi dall'asse (0 dove non c'è carreggiata)"""
@@ -156,6 +178,7 @@ def calcola(D, base=0.0, log=print):
         a, b = E['off'][i], E['off'][i + 1]
         if b - a < 2: continue
         els.append(dict(xy=E['xy'][a:b], z=E['z'][a:b], sede=_sede(E['attr']['sed'][i], E['attr']['liv'][i]), id=int(E['id'][i])))
+    els += _ricuci(els, log)
     V = D['AC_VEI']; zon = np.array([str(z or '') for z in V['attr']['zon']]); sed = np.array([str(s_ or '') for s_ in V['attr']['sed']])
     carr = np.array([z[:2] in ('01', '02') for z in zon]); su = {PONTE: sed == '02', GALLERIA: sed == '03'}; raso = ~(su[PONTE] | su[GALLERIA])
     C = _Carreggiata({RASO: _poligoni(V, carr & raso), PONTE: _poligoni(V, carr & su[PONTE]), GALLERIA: _poligoni(V, carr & su[GALLERIA])})

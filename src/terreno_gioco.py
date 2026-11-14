@@ -48,6 +48,8 @@ def main(argv=None):
         if d.get('nucleo'): e['nucleo'] = [[r2(x), r2(z)] for x, z in d['nucleo']]
         if d.get('fondo') is not None: e['fondo'] = r2(d['fondo'])
         if d.get('tn'): e['tn'] = d['tn']
+        if d.get('nastro'): e['nastro'] = d['nastro']; e['capi'] = d.get('capi', [])   # a deck from its ribbons (src/ponti_nastro.py)
+        if d.get('buchi'): e['buchi'] = d['buchi']
         if d.get('dir'): e['dir'] = d['dir']   # the direction of the deck (src/controlli_ponti.py: its two ends)
         decks.append(e)
     # the cells under a deck where S is not a street at its own level: bit 7 of the material (the game paints no street there; fiumi-ponti, 28/10)

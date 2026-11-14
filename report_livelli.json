@@ -1,24 +1,36 @@
 {
- "numero": 115,
+ "numero": 106,
  "per_famiglia": {
   "righe": {
-   "guardati": 40805,
+   "guardati": 40503,
    "senza_nastro": 408,
-   "di_traverso": 838,
-   "sbagliati": 178,
-   "casi": 34,
+   "di_traverso": 826,
+   "sbagliati": 171,
+   "casi": 39,
    "posti": [
     {
-     "x": 1401.9,
-     "z": 490.1,
-     "y": 34,
-     "dy": -1.6,
+     "x": 1401,
+     "z": 492.9,
+     "y": 35,
+     "dy": -0.8,
      "nastro": 91,
      "nome": "Via Ravenna",
      "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34",
-     "n": 23,
-     "link": "?x=1402&z=490&debug=1"
+     "dove": "appoggiato su un piano a quota 35",
+     "n": 15,
+     "link": "?x=1401&z=493&debug=1"
+    },
+    {
+     "x": -547.3,
+     "z": 126.3,
+     "y": 29,
+     "dy": -1.5,
+     "nastro": 275,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "raso",
+     "dove": "appoggiato su un piano a quota 29",
+     "n": 12,
+     "link": "?x=-547&z=126&debug=1"
     },
     {
      "x": 44.3,
@@ -45,18 +57,6 @@
      "link": "?x=328&z=1984&debug=1"
     },
     {
-     "x": 1436.3,
-     "z": 417,
-     "y": 31.9,
-     "dy": -0.9,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 31.9",
-     "n": 10,
-     "link": "?x=1436&z=417&debug=1"
-    },
-    {
      "x": 1399.9,
      "z": 496,
      "y": 34.6,
@@ -81,6 +81,18 @@
      "link": "?x=343&z=1985&debug=1"
     },
     {
+     "x": 1420.4,
+     "z": 466.3,
+     "y": 34.9,
+     "dy": -1.7,
+     "nastro": 91,
+     "nome": "Via Ravenna",
+     "sede": "raso",
+     "dove": "appoggiato su un piano a quota 34.9",
+     "n": 9,
+     "link": "?x=1420&z=466&debug=1"
+    },
+    {
      "x": -516.9,
      "z": 143.3,
      "y": 23,
@@ -93,88 +105,28 @@
      "link": "?x=-517&z=143&debug=1"
     },
     {
-     "x": 1420.3,
-     "z": 466.3,
-     "y": 34.9,
-     "dy": -2.4,
+     "x": 1436.3,
+     "z": 417,
+     "y": 31.9,
+     "dy": -0.7,
      "nastro": 91,
      "nome": "Via Ravenna",
      "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34.9",
+     "dove": "appoggiato su un piano a quota 31.9",
      "n": 7,
-     "link": "?x=1420&z=466&debug=1"
-    },
-    {
-     "x": 1403,
-     "z": 486.8,
-     "y": 32.5,
-     "dy": -3.2,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 32.5",
-     "n": 7,
-     "link": "?x=1403&z=487&debug=1"
-    },
-    {
-     "x": 1411.9,
-     "z": 491.9,
-     "y": 34.9,
-     "dy": -0.8,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34.9",
-     "n": 7,
-     "link": "?x=1412&z=492&debug=1"
+     "link": "?x=1436&z=417&debug=1"
     },
     {
      "x": -41.2,
      "z": 770.4,
      "y": 25.8,
-     "dy": -0.8,
-     "nastro": 389,
+     "dy": -0.9,
+     "nastro": 378,
      "nome": "Via Vignazzola",
      "sede": "raso",
      "dove": "appoggiato su un piano a quota 25.8",
      "n": 7,
      "link": "?x=-41&z=770&debug=1"
-    },
-    {
-     "x": 52.5,
-     "z": 394.7,
-     "y": 32.1,
-     "dy": -0.7,
-     "nastro": 204,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 32.1",
-     "n": 6,
-     "link": "?x=53&z=395&debug=1"
-    },
-    {
-     "x": 1410.8,
-     "z": 464,
-     "y": 34.9,
-     "dy": -3,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34.9",
-     "n": 6,
-     "link": "?x=1411&z=464&debug=1"
-    },
-    {
-     "x": 58,
-     "z": 396.2,
-     "y": 31.7,
-     "dy": -4.7,
-     "nastro": 204,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 31.7",
-     "n": 5,
-     "link": "?x=58&z=396&debug=1"
     },
     {
      "x": 32.5,
@@ -189,11 +141,23 @@
      "link": "?x=33&z=452&debug=1"
     },
     {
+     "x": 57.8,
+     "z": 397.1,
+     "y": 31.9,
+     "dy": -4.6,
+     "nastro": 204,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 32.5)",
+     "n": 4,
+     "link": "?x=58&z=397&debug=1"
+    },
+    {
      "x": -37.3,
      "z": 767,
      "y": 20.6,
      "dy": -6,
-     "nastro": 389,
+     "nastro": 378,
      "nome": "Via Vignazzola",
      "sede": "raso",
      "dove": "appoggiato su un piano a quota 20.6",
@@ -205,7 +169,7 @@
      "z": 774.7,
      "y": 26,
      "dy": -5.9,
-     "nastro": 389,
+     "nastro": 378,
      "nome": "Via Vignazzola",
      "sede": "raso",
      "dove": "appoggiato su un piano a quota 26",
@@ -217,7 +181,7 @@
      "z": 91,
      "y": 28.4,
      "dy": -1.7,
-     "nastro": 401,
+     "nastro": 400,
      "nome": "Strada provinciale ex SS 35 Milano-Meda",
      "sede": "raso",
      "dove": "appoggiato su un piano a quota 28.4",
@@ -249,16 +213,28 @@
      "link": "?x=-512&z=137&debug=1"
     },
     {
-     "x": -543.2,
-     "z": 127,
-     "y": 29.7,
-     "dy": -0.7,
-     "nastro": 275,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "x": 1421.8,
+     "z": 461.8,
+     "y": 34.6,
+     "dy": -0.9,
+     "nastro": 91,
+     "nome": "Via Ravenna",
      "sede": "raso",
-     "dove": "appoggiato su un piano a quota 29.7",
+     "dove": "appoggiato su un piano a quota 34.6",
      "n": 3,
-     "link": "?x=-543&z=127&debug=1"
+     "link": "?x=1422&z=462&debug=1"
+    },
+    {
+     "x": 1412.2,
+     "z": 459.9,
+     "y": 34.7,
+     "dy": -0.9,
+     "nastro": 91,
+     "nome": "Via Ravenna",
+     "sede": "raso",
+     "dove": "appoggiato su un piano a quota 34.7",
+     "n": 3,
+     "link": "?x=1412&z=460&debug=1"
     },
     {
      "x": 1396.5,
@@ -313,7 +289,7 @@
      "z": 91.2,
      "y": 29.3,
      "dy": -0.8,
-     "nastro": 401,
+     "nastro": 400,
      "nome": "Strada provinciale ex SS 35 Milano-Meda",
      "sede": "raso",
      "dove": "appoggiato su un piano a quota 29.3",
@@ -333,16 +309,76 @@
      "link": "?x=75&z=199&debug=1"
     },
     {
-     "x": 1434,
-     "z": 424.1,
-     "y": 32.2,
-     "dy": -0.7,
+     "x": 1428.9,
+     "z": 440,
+     "y": 33,
+     "dy": -1.8,
      "nastro": 91,
      "nome": "Via Ravenna",
      "sede": "raso",
-     "dove": "appoggiato su un piano a quota 32.2",
+     "dove": "su nessun piano (sotto ha 31.4)",
      "n": 2,
-     "link": "?x=1434&z=424&debug=1"
+     "link": "?x=1429&z=440&debug=1"
+    },
+    {
+     "x": 1418,
+     "z": 442.9,
+     "y": 33.4,
+     "dy": -1.9,
+     "nastro": 91,
+     "nome": "Via Ravenna",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 31.7)",
+     "n": 2,
+     "link": "?x=1418&z=443&debug=1"
+    },
+    {
+     "x": 53.5,
+     "z": 479.7,
+     "y": 30.7,
+     "dy": -0.8,
+     "nastro": 221,
+     "nome": "",
+     "sede": "raso",
+     "dove": "appoggiato su un piano a quota 30.7",
+     "n": 2,
+     "link": "?x=54&z=480&debug=1"
+    },
+    {
+     "x": 53.4,
+     "z": 480.2,
+     "y": 30.9,
+     "dy": -0.6,
+     "nastro": 221,
+     "nome": "",
+     "sede": "raso",
+     "dove": "appoggiato su un piano a quota 30.9",
+     "n": 2,
+     "link": "?x=53&z=480&debug=1"
+    },
+    {
+     "x": 1409.4,
+     "z": 468.1,
+     "y": 34.3,
+     "dy": -2.8,
+     "nastro": 91,
+     "nome": "Via Ravenna",
+     "sede": "raso",
+     "dove": "appoggiato su un piano a quota 34.3",
+     "n": 2,
+     "link": "?x=1409&z=468&debug=1"
+    },
+    {
+     "x": -1311.1,
+     "z": 1557.6,
+     "y": 15.4,
+     "dy": -0.8,
+     "nastro": 517,
+     "nome": "Corso Isonzo",
+     "sede": "ponte",
+     "dove": "su nessun piano (sotto ha 11.8)",
+     "n": 2,
+     "link": "?x=-1311&z=1558&debug=1"
     },
     {
      "x": 361,
@@ -369,6 +405,18 @@
      "link": "?x=357&z=2014&debug=1"
     },
     {
+     "x": 408.4,
+     "z": 2221.8,
+     "y": 22.2,
+     "dy": -2.9,
+     "nastro": 585,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 22.8)",
+     "n": 2,
+     "link": "?x=408&z=2222&debug=1"
+    },
+    {
      "x": 418.5,
      "z": 2218.6,
      "y": 21.1,
@@ -379,6 +427,18 @@
      "dove": "su nessun piano (sotto ha 19.5)",
      "n": 2,
      "link": "?x=419&z=2219&debug=1"
+    },
+    {
+     "x": 404.6,
+     "z": 2223.4,
+     "y": 22.6,
+     "dy": -2,
+     "nastro": 585,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 23.5)",
+     "n": 2,
+     "link": "?x=405&z=2223&debug=1"
     },
     {
      "x": 1400,
@@ -393,18 +453,6 @@
      "link": "?x=1400&z=496&debug=1"
     },
     {
-     "x": 1412.1,
-     "z": 460,
-     "y": 35,
-     "dy": -0.5,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 34.6)",
-     "n": 1,
-     "link": "?x=1412&z=460&debug=1"
-    },
-    {
      "x": 341.1,
      "z": 2007.8,
      "y": 19.4,
@@ -415,34 +463,94 @@
      "dove": "appoggiato su un piano a quota 19.4",
      "n": 1,
      "link": "?x=341&z=2008&debug=1"
+    },
+    {
+     "x": 414.2,
+     "z": 2265.3,
+     "y": 20.9,
+     "dy": -2.4,
+     "nastro": 32,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "ponte",
+     "dove": "su nessun piano (sotto ha 16.1)",
+     "n": 1,
+     "link": "?x=414&z=2265&debug=1"
     }
    ]
   },
   "cordoli": {
-   "guardati": 17193,
-   "senza_nastro": 10492,
-   "di_traverso": 915,
-   "sbagliati": 59,
-   "casi": 12,
+   "guardati": 17441,
+   "senza_nastro": 10476,
+   "di_traverso": 954,
+   "sbagliati": 96,
+   "casi": 15,
    "posti": [
     {
      "x": -984,
      "z": 87.9,
      "y": 24.9,
      "dy": 3.1,
-     "nastro": 584,
-     "nome": "Via Farga",
+     "nastro": 466,
+     "nome": "Via Pietro Mascagni",
      "sede": "raso",
      "dove": "appoggiato su un piano a quota 24.9",
      "n": 25,
      "link": "?x=-984&z=88&debug=1"
     },
     {
+     "x": -1237.2,
+     "z": 1092.2,
+     "y": 15.9,
+     "dy": -2,
+     "nastro": 459,
+     "nome": "Viale Vittorio Veneto",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 16.3)",
+     "n": 18,
+     "link": "?x=-1237&z=1092&debug=1"
+    },
+    {
+     "x": 28.6,
+     "z": 961.8,
+     "y": 19.7,
+     "dy": -5.9,
+     "nastro": 616,
+     "nome": "Via Senofonte",
+     "sede": "ponte",
+     "dove": "appoggiato su un piano a quota 19.9",
+     "n": 8,
+     "link": "?x=29&z=962&debug=1"
+    },
+    {
+     "x": 53.8,
+     "z": 354.5,
+     "y": 32,
+     "dy": -7.4,
+     "nastro": 204,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 32.3)",
+     "n": 6,
+     "link": "?x=54&z=355&debug=1"
+    },
+    {
+     "x": -21.5,
+     "z": 764.5,
+     "y": 20.5,
+     "dy": -6.1,
+     "nastro": 378,
+     "nome": "Via Vignazzola",
+     "sede": "ponte",
+     "dove": "appoggiato su un piano a quota 20.7",
+     "n": 6,
+     "link": "?x=-21&z=765&debug=1"
+    },
+    {
      "x": -1245.5,
      "z": 1088.4,
      "y": 17,
      "dy": -1.2,
-     "nastro": 461,
+     "nastro": 459,
      "nome": "Viale Vittorio Veneto",
      "sede": "raso",
      "dove": "su nessun piano (sotto ha 17.5)",
@@ -454,7 +562,7 @@
      "z": 1094.7,
      "y": 16.8,
      "dy": -1.4,
-     "nastro": 461,
+     "nastro": 459,
      "nome": "Viale Vittorio Veneto",
      "sede": "raso",
      "dove": "su nessun piano (sotto ha 17.2)",
@@ -462,36 +570,60 @@
      "link": "?x=-1249&z=1095&debug=1"
     },
     {
-     "x": -1237.3,
-     "z": 1092.2,
-     "y": 16.1,
-     "dy": -1.9,
-     "nastro": 461,
-     "nome": "Viale Vittorio Veneto",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 16.4)",
-     "n": 6,
-     "link": "?x=-1237&z=1092&debug=1"
-    },
-    {
-     "x": -533.4,
-     "z": 127.6,
-     "y": 29.8,
-     "dy": -0.5,
+     "x": -544.5,
+     "z": 125.8,
+     "y": 28.1,
+     "dy": -2.2,
      "nastro": 275,
      "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "ponte",
-     "dove": "appoggiato su un piano a quota 30",
+     "sede": "raso",
+     "dove": "appoggiato su un piano a quota 28.2",
+     "n": 5,
+     "link": "?x=-544&z=126&debug=1"
+    },
+    {
+     "x": -513.2,
+     "z": 143.5,
+     "y": 29.5,
+     "dy": -0.9,
+     "nastro": 32,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 30.2)",
+     "n": 4,
+     "link": "?x=-513&z=144&debug=1"
+    },
+    {
+     "x": -542.5,
+     "z": 126.1,
+     "y": 29.2,
+     "dy": -2,
+     "nastro": 275,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 29.6)",
      "n": 3,
-     "link": "?x=-533&z=128&debug=1"
+     "link": "?x=-542&z=126&debug=1"
+    },
+    {
+     "x": 26.2,
+     "z": 952.1,
+     "y": 19.7,
+     "dy": -6,
+     "nastro": 616,
+     "nome": "Via Senofonte",
+     "sede": "ponte",
+     "dove": "appoggiato su un piano a quota 19.8",
+     "n": 3,
+     "link": "?x=26&z=952&debug=1"
     },
     {
      "x": -984.1,
      "z": 87.9,
      "y": 24.6,
      "dy": 1.6,
-     "nastro": 584,
-     "nome": "Via Farga",
+     "nastro": 466,
+     "nome": "Via Pietro Mascagni",
      "sede": "raso",
      "dove": "su nessun piano (sotto ha 25.1)",
      "n": 2,
@@ -502,93 +634,117 @@
      "z": 88.2,
      "y": 24.6,
      "dy": 1.6,
-     "nastro": 584,
-     "nome": "Via Farga",
+     "nastro": 466,
+     "nome": "Via Pietro Mascagni",
      "sede": "raso",
      "dove": "su nessun piano (sotto ha 25)",
      "n": 2,
      "link": "?x=-984&z=88&debug=1"
     },
     {
-     "x": -21.7,
-     "z": 766.4,
-     "y": 20.5,
-     "dy": -6.1,
-     "nastro": 389,
-     "nome": "Via Vignazzola",
-     "sede": "ponte",
-     "dove": "appoggiato su un piano a quota 20.8",
-     "n": 2,
-     "link": "?x=-22&z=766&debug=1"
-    },
-    {
-     "x": 0.2,
-     "z": 775.6,
-     "y": 25.5,
-     "dy": -1.1,
-     "nastro": 389,
-     "nome": "Via Vignazzola",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 25.8)",
-     "n": 2,
-     "link": "?x=0&z=776&debug=1"
-    },
-    {
-     "x": -1.2,
-     "z": 775.5,
-     "y": 25.5,
-     "dy": -1.1,
-     "nastro": 389,
-     "nome": "Via Vignazzola",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 24.2)",
-     "n": 2,
-     "link": "?x=-1&z=776&debug=1"
-    },
-    {
-     "x": 405.9,
-     "z": 2247.3,
-     "y": 23.4,
-     "dy": 7.6,
-     "nastro": 637,
-     "nome": "Via don Luigi Sturzo",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 23.5",
-     "n": 2,
-     "link": "?x=406&z=2247&debug=1"
-    },
-    {
      "x": -984,
      "z": 88.2,
      "y": 24.9,
      "dy": 1.6,
-     "nastro": 584,
-     "nome": "Via Farga",
+     "nastro": 466,
+     "nome": "Via Pietro Mascagni",
      "sede": "raso",
      "dove": "appoggiato su un piano a quota 24.8",
      "n": 1,
      "link": "?x=-984&z=88&debug=1"
+    },
+    {
+     "x": 25.3,
+     "z": 951.9,
+     "y": 19.7,
+     "dy": -6,
+     "nastro": 616,
+     "nome": "Via Senofonte",
+     "sede": "ponte",
+     "dove": "appoggiato su un piano a quota 19.9",
+     "n": 1,
+     "link": "?x=25&z=952&debug=1"
     }
    ]
   },
   "spartitraffico": {
-   "guardati": 2565,
+   "guardati": 2588,
    "senza_nastro": 98,
-   "di_traverso": 865,
-   "sbagliati": 15,
-   "casi": 10,
+   "di_traverso": 866,
+   "sbagliati": 29,
+   "casi": 11,
    "posti": [
     {
-     "x": 26,
-     "z": 955.2,
+     "x": -515.7,
+     "z": 140.4,
+     "y": 23.1,
+     "dy": -7.3,
+     "nastro": 275,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "ponte",
+     "dove": "appoggiato su un piano a quota 23.1",
+     "n": 4,
+     "link": "?x=-516&z=140&debug=1"
+    },
+    {
+     "x": -21.9,
+     "z": 764.2,
+     "y": 20.8,
+     "dy": -5.9,
+     "nastro": 378,
+     "nome": "Via Vignazzola",
+     "sede": "ponte",
+     "dove": "appoggiato su un piano a quota 20.8",
+     "n": 4,
+     "link": "?x=-22&z=764&debug=1"
+    },
+    {
+     "x": 26.5,
+     "z": 952,
      "y": 19.9,
      "dy": -5.7,
-     "nastro": 619,
+     "nastro": 616,
+     "nome": "Via Senofonte",
+     "sede": "ponte",
+     "dove": "appoggiato su un piano a quota 19.9",
+     "n": 4,
+     "link": "?x=27&z=952&debug=1"
+    },
+    {
+     "x": 28.1,
+     "z": 961.6,
+     "y": 19.9,
+     "dy": -5.7,
+     "nastro": 616,
+     "nome": "Via Senofonte",
+     "sede": "ponte",
+     "dove": "appoggiato su un piano a quota 19.9",
+     "n": 4,
+     "link": "?x=28&z=962&debug=1"
+    },
+    {
+     "x": 26.3,
+     "z": 951.4,
+     "y": 19.9,
+     "dy": -5.7,
+     "nastro": 616,
      "nome": "Via Senofonte",
      "sede": "ponte",
      "dove": "appoggiato su un piano a quota 19.9",
      "n": 3,
-     "link": "?x=26&z=955&debug=1"
+     "link": "?x=26&z=951&debug=1"
+    },
+    {
+     "x": 340.8,
+     "z": 1984.6,
+     "y": 20,
+     "dy": -4.5,
+     "nastro": 168,
+     "nome": "Strada provinciale ex SS 35 Milano-Meda",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 21.7)",
+     "n": 3,
+     "link": "?x=341&z=1985&debug=1"
     },
     {
      "x": -539.2,
@@ -603,23 +759,11 @@
      "link": "?x=-539&z=138&debug=1"
     },
     {
-     "x": -515.7,
-     "z": 140.4,
-     "y": 23.1,
-     "dy": -7.3,
-     "nastro": 275,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "ponte",
-     "dove": "appoggiato su un piano a quota 23.1",
-     "n": 2,
-     "link": "?x=-516&z=140&debug=1"
-    },
-    {
      "x": -21.8,
      "z": 769.8,
      "y": 20.7,
      "dy": -5.9,
-     "nastro": 389,
+     "nastro": 378,
      "nome": "Via Vignazzola",
      "sede": "ponte",
      "dove": "appoggiato su un piano a quota 20.7",
@@ -631,7 +775,7 @@
      "z": 102.3,
      "y": 30.3,
      "dy": 6.5,
-     "nastro": 471,
+     "nastro": 469,
      "nome": "Piazza del Seminario",
      "sede": "galleria",
      "dove": "appoggiato su un piano a quota 30.3",
@@ -639,47 +783,11 @@
      "link": "?x=-771&z=102&debug=1"
     },
     {
-     "x": -22,
-     "z": 767.7,
-     "y": 20.7,
-     "dy": -5.9,
-     "nastro": 389,
-     "nome": "Via Vignazzola",
-     "sede": "ponte",
-     "dove": "appoggiato su un piano a quota 20.7",
-     "n": 1,
-     "link": "?x=-22&z=768&debug=1"
-    },
-    {
-     "x": 26.3,
-     "z": 951.4,
-     "y": 19.9,
-     "dy": -5.7,
-     "nastro": 619,
-     "nome": "Via Senofonte",
-     "sede": "ponte",
-     "dove": "appoggiato su un piano a quota 19.9",
-     "n": 1,
-     "link": "?x=26&z=951&debug=1"
-    },
-    {
-     "x": 28,
-     "z": 961.7,
-     "y": 19.9,
-     "dy": -5.7,
-     "nastro": 619,
-     "nome": "Via Senofonte",
-     "sede": "ponte",
-     "dove": "appoggiato su un piano a quota 19.9",
-     "n": 1,
-     "link": "?x=28&z=962&debug=1"
-    },
-    {
      "x": 174,
      "z": 1441.1,
      "y": 17.8,
      "dy": -6.6,
-     "nastro": 579,
+     "nastro": 577,
      "nome": "Via dei Vignee",
      "sede": "ponte",
      "dove": "appoggiato su un piano a quota 17.8",
@@ -691,7 +799,7 @@
      "z": 1447.3,
      "y": 17.7,
      "dy": -6.5,
-     "nastro": 579,
+     "nastro": 577,
      "nome": "Via dei Vignee",
      "sede": "ponte",
      "dove": "appoggiato su un piano a quota 17.8",
@@ -701,64 +809,28 @@
    ]
   },
   "guardrail": {
-   "guardati": 20986,
-   "senza_nastro": 2559,
-   "di_traverso": 684,
-   "sbagliati": 44,
-   "casi": 12,
+   "guardati": 19940,
+   "senza_nastro": 2346,
+   "di_traverso": 304,
+   "sbagliati": 16,
+   "casi": 4,
    "posti": [
     {
-     "x": -47.6,
-     "z": 472.8,
-     "y": 28.5,
-     "dy": 6.8,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "sotto",
-     "dove": "su nessun piano (sotto ha 28)",
-     "n": 6,
-     "link": "?x=-48&z=473&debug=1"
-    },
-    {
-     "x": 407.1,
-     "z": 2246.9,
-     "y": 24,
-     "dy": 8.3,
-     "nastro": 637,
-     "nome": "Via don Luigi Sturzo",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 23.4)",
-     "n": 6,
-     "link": "?x=407&z=2247&debug=1"
-    },
-    {
-     "x": -72.1,
-     "z": 477.7,
+     "x": -71.9,
+     "z": 478.5,
      "y": 24.5,
-     "dy": 4.5,
+     "dy": 2.7,
      "nastro": 32,
      "nome": "Strada provinciale ex SS 35 Milano-Meda",
      "sede": "sotto",
      "dove": "su nessun piano (sotto ha 22.1)",
-     "n": 5,
-     "link": "?x=-72&z=478&debug=1"
-    },
-    {
-     "x": -506.6,
-     "z": 128.3,
-     "y": 31,
-     "dy": 8,
-     "nastro": 77,
-     "nome": "Viale Francia",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 30.4)",
      "n": 4,
-     "link": "?x=-507&z=128&debug=1"
+     "link": "?x=-72&z=479&debug=1"
     },
     {
-     "x": 49.9,
-     "z": 465.7,
-     "y": 28.2,
+     "x": 50,
+     "z": 465.8,
+     "y": 28.3,
      "dy": 2.9,
      "nastro": 4,
      "nome": "Via Marco Polo",
@@ -768,8 +840,20 @@
      "link": "?x=50&z=466&debug=1"
     },
     {
+     "x": 48.4,
+     "z": 474.1,
+     "y": 28.2,
+     "dy": 2.6,
+     "nastro": 4,
+     "nome": "Via Marco Polo",
+     "sede": "raso",
+     "dove": "su nessun piano (sotto ha 25.9)",
+     "n": 4,
+     "link": "?x=48&z=474&debug=1"
+    },
+    {
      "x": -44.4,
-     "z": 490.3,
+     "z": 490.1,
      "y": 24.4,
      "dy": 2.5,
      "nastro": 168,
@@ -778,285 +862,57 @@
      "dove": "su nessun piano (sotto ha 22)",
      "n": 4,
      "link": "?x=-44&z=490&debug=1"
-    },
-    {
-     "x": 363.6,
-     "z": 2011.9,
-     "y": 25.1,
-     "dy": 6.4,
-     "nastro": 474,
-     "nome": "Corso Isonzo",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 24.5)",
-     "n": 4,
-     "link": "?x=364&z=2012&debug=1"
-    },
-    {
-     "x": -72,
-     "z": 478.4,
-     "y": 26.5,
-     "dy": 4.7,
-     "nastro": 32,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "sotto",
-     "dove": "su nessun piano (sotto ha 22.1)",
-     "n": 3,
-     "link": "?x=-72&z=478&debug=1"
-    },
-    {
-     "x": 59.2,
-     "z": 466.4,
-     "y": 32.1,
-     "dy": 6.4,
-     "nastro": 4,
-     "nome": "Via Marco Polo",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 31.5)",
-     "n": 2,
-     "link": "?x=59&z=466&debug=1"
-    },
-    {
-     "x": -47.9,
-     "z": 471.6,
-     "y": 24.5,
-     "dy": 2.8,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 22.1)",
-     "n": 2,
-     "link": "?x=-48&z=472&debug=1"
-    },
-    {
-     "x": 48.1,
-     "z": 474,
-     "y": 28.2,
-     "dy": 2.5,
-     "nastro": 4,
-     "nome": "Via Marco Polo",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 25.9)",
-     "n": 2,
-     "link": "?x=48&z=474&debug=1"
-    },
-    {
-     "x": 47.9,
-     "z": 474,
-     "y": 28.2,
-     "dy": 2.5,
-     "nastro": 4,
-     "nome": "Via Marco Polo",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 25.9)",
-     "n": 2,
-     "link": "?x=48&z=474&debug=1"
     }
    ]
   },
   "parapetti": {
-   "guardati": 2251,
-   "senza_nastro": 547,
-   "di_traverso": 176,
-   "sbagliati": 30,
-   "casi": 15,
+   "guardati": 2857,
+   "senza_nastro": 522,
+   "di_traverso": 94,
+   "sbagliati": 2,
+   "casi": 2,
    "posti": [
     {
-     "x": -4.5,
-     "z": 765.5,
-     "y": 26.5,
-     "dy": 5.8,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "sotto",
-     "dove": "appoggiato su un piano a quota 26.5",
-     "n": 5,
-     "link": "?x=-4&z=766&debug=1"
-    },
-    {
-     "x": 51.7,
-     "z": 461.6,
-     "y": 31.3,
-     "dy": 5.8,
-     "nastro": 4,
-     "nome": "Via Marco Polo",
-     "sede": "sotto",
-     "dove": "appoggiato su un piano a quota 31.2",
-     "n": 3,
-     "link": "?x=52&z=462&debug=1"
-    },
-    {
-     "x": 334.3,
-     "z": 2007.6,
-     "y": 24.3,
-     "dy": 5.9,
-     "nastro": 474,
-     "nome": "Corso Isonzo",
-     "sede": "sotto",
-     "dove": "appoggiato su un piano a quota 24.3",
-     "n": 3,
-     "link": "?x=334&z=2008&debug=1"
-    },
-    {
-     "x": 407,
-     "z": 2246.9,
-     "y": 23.4,
-     "dy": 7.7,
-     "nastro": 637,
-     "nome": "Via don Luigi Sturzo",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 23.4",
-     "n": 3,
-     "link": "?x=407&z=2247&debug=1"
-    },
-    {
-     "x": -506.7,
-     "z": 128.4,
-     "y": 30.4,
-     "dy": 7.4,
-     "nastro": 77,
-     "nome": "Viale Francia",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 30.4",
-     "n": 2,
-     "link": "?x=-507&z=128&debug=1"
-    },
-    {
-     "x": -527.7,
-     "z": 155.1,
-     "y": 30.4,
-     "dy": 7.5,
-     "nastro": 77,
-     "nome": "Viale Francia",
-     "sede": "sotto",
-     "dove": "appoggiato su un piano a quota 30.4",
-     "n": 2,
-     "link": "?x=-528&z=155&debug=1"
-    },
-    {
-     "x": -37.6,
-     "z": 761.7,
-     "y": 26.6,
-     "dy": 5.9,
-     "nastro": 32,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 26.6",
-     "n": 2,
-     "link": "?x=-38&z=762&debug=1"
-    },
-    {
-     "x": -0.8,
-     "z": 776.6,
-     "y": 26.4,
-     "dy": 6,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 26.5",
-     "n": 2,
-     "link": "?x=-1&z=777&debug=1"
-    },
-    {
-     "x": 363.5,
-     "z": 2011.9,
-     "y": 24.5,
-     "dy": 5.8,
-     "nastro": 474,
-     "nome": "Corso Isonzo",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 24.5",
-     "n": 2,
-     "link": "?x=364&z=2012&debug=1"
-    },
-    {
-     "x": 59.3,
-     "z": 466.4,
-     "y": 31.5,
-     "dy": 5.9,
-     "nastro": 4,
-     "nome": "Via Marco Polo",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 31.5",
-     "n": 1,
-     "link": "?x=59&z=466&debug=1"
-    },
-    {
-     "x": 47.1,
-     "z": 475.7,
-     "y": 31.3,
-     "dy": 5.3,
-     "nastro": 4,
-     "nome": "Via Marco Polo",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 31.3",
-     "n": 1,
-     "link": "?x=47&z=476&debug=1"
-    },
-    {
-     "x": -40.1,
-     "z": 490.1,
-     "y": 27.7,
-     "dy": 5.6,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "sotto",
-     "dove": "appoggiato su un piano a quota 27.7",
-     "n": 1,
-     "link": "?x=-40&z=490&debug=1"
-    },
-    {
-     "x": -38.8,
-     "z": 772,
-     "y": 26.6,
-     "dy": 6,
+     "x": -68.5,
+     "z": 494.7,
+     "y": 28.3,
+     "dy": 6.4,
      "nastro": 32,
      "nome": "Strada provinciale ex SS 35 Milano-Meda",
      "sede": "sotto",
-     "dove": "appoggiato su un piano a quota 26.6",
+     "dove": "appoggiato su un piano a quota 28.3",
      "n": 1,
-     "link": "?x=-39&z=772&debug=1"
+     "link": "?x=-68&z=495&debug=1"
     },
     {
-     "x": 42.9,
-     "z": 966,
-     "y": 25.4,
-     "dy": 5.6,
-     "nastro": 168,
+     "x": -60.3,
+     "z": 492.8,
+     "y": 28.1,
+     "dy": 6.1,
+     "nastro": 32,
      "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 25.4",
+     "sede": "sotto",
+     "dove": "appoggiato su un piano a quota 28",
      "n": 1,
-     "link": "?x=43&z=966&debug=1"
-    },
-    {
-     "x": 327.1,
-     "z": 1985.5,
-     "y": 24.6,
-     "dy": 5.9,
-     "nastro": 474,
-     "nome": "Corso Isonzo",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 24.6",
-     "n": 1,
-     "link": "?x=327&z=1986&debug=1"
+     "link": "?x=-60&z=493&debug=1"
     }
    ]
   },
   "recinzioni": {
-   "guardati": 9211,
+   "guardati": 9284,
    "senza_nastro": 0,
    "di_traverso": 0,
-   "sbagliati": 46,
-   "casi": 32,
+   "sbagliati": 54,
+   "casi": 35,
    "posti": [
     {
-     "x": -1235.3,
-     "z": 1088.3,
-     "y": 16.4,
-     "dy": -1.4,
-     "dove": "il piano sotto è a 17.9",
+     "x": -1238.7,
+     "z": 969.6,
+     "y": 17.1,
+     "dy": -1.5,
+     "dove": "il piano sotto è a 18.5",
      "n": 4,
-     "link": "?x=-1235&z=1088&debug=1"
+     "link": "?x=-1239&z=970&debug=1"
     },
     {
      "x": 1.4,
@@ -1068,15 +924,6 @@
      "link": "?x=1&z=777&debug=1"
     },
     {
-     "x": -1252.6,
-     "z": 1097.6,
-     "y": 17.1,
-     "dy": -1.2,
-     "dove": "il piano sotto è a 18",
-     "n": 3,
-     "link": "?x=-1253&z=1098&debug=1"
-    },
-    {
      "x": 257.5,
      "z": 1796,
      "y": 17.6,
@@ -1084,6 +931,15 @@
      "dove": "il piano sotto è a 19.1",
      "n": 3,
      "link": "?x=258&z=1796&debug=1"
+    },
+    {
+     "x": 769.1,
+     "z": -1457.9,
+     "y": 35.2,
+     "dy": -1.2,
+     "dove": "il piano sotto è a 36.3",
+     "n": 2,
+     "link": "?x=769&z=-1458&debug=1"
     },
     {
      "x": 726.3,
@@ -1095,13 +951,67 @@
      "link": "?x=726&z=-1416&debug=1"
     },
     {
-     "x": -1238.7,
-     "z": 969.2,
-     "y": 17.1,
-     "dy": -1.4,
-     "dove": "il piano sotto è a 18.5",
+     "x": 759.6,
+     "z": -1453.3,
+     "y": 34.9,
+     "dy": -1.6,
+     "dove": "il piano sotto è a 36.4",
      "n": 2,
-     "link": "?x=-1239&z=969&debug=1"
+     "link": "?x=760&z=-1453&debug=1"
+    },
+    {
+     "x": 536.3,
+     "z": -989.6,
+     "y": 31.4,
+     "dy": -1.5,
+     "dove": "il piano sotto è a 32.8",
+     "n": 2,
+     "link": "?x=536&z=-990&debug=1"
+    },
+    {
+     "x": -104.2,
+     "z": -115.8,
+     "y": 26.7,
+     "dy": -0.9,
+     "dove": "il piano sotto è a 27.5",
+     "n": 2,
+     "link": "?x=-104&z=-116&debug=1"
+    },
+    {
+     "x": 1420.6,
+     "z": 467.3,
+     "y": 34.5,
+     "dy": -0.8,
+     "dove": "il piano sotto è a 35.3",
+     "n": 2,
+     "link": "?x=1421&z=467&debug=1"
+    },
+    {
+     "x": -1239.4,
+     "z": 962.3,
+     "y": 17.5,
+     "dy": -1.1,
+     "dove": "il piano sotto è a 18.6",
+     "n": 2,
+     "link": "?x=-1239&z=962&debug=1"
+    },
+    {
+     "x": -1250.5,
+     "z": 1098.5,
+     "y": 16.7,
+     "dy": -1.5,
+     "dove": "il piano sotto è a 18.2",
+     "n": 2,
+     "link": "?x=-1250&z=1099&debug=1"
+    },
+    {
+     "x": -1253.4,
+     "z": 962.2,
+     "y": 18.3,
+     "dy": -0.8,
+     "dove": "il piano sotto è a 18.9",
+     "n": 2,
+     "link": "?x=-1253&z=962&debug=1"
     },
     {
      "x": -1309.8,
@@ -1129,15 +1039,6 @@
      "dove": "il piano sotto è a 18.5",
      "n": 2,
      "link": "?x=254&z=1794&debug=1"
-    },
-    {
-     "x": 769,
-     "z": -1457.7,
-     "y": 35,
-     "dy": -1.4,
-     "dove": "il piano sotto è a 36.4",
-     "n": 1,
-     "link": "?x=769&z=-1458&debug=1"
     },
     {
      "x": 443.6,
@@ -1194,11 +1095,20 @@
      "link": "?x=84&z=228&debug=1"
     },
     {
+     "x": -1348.5,
+     "z": 675.4,
+     "y": 20.9,
+     "dy": -1,
+     "dove": "il piano sotto è a 21.9",
+     "n": 1,
+     "link": "?x=-1348&z=675&debug=1"
+    },
+    {
      "x": -256.1,
      "z": 694.4,
      "y": 20,
-     "dy": -1.3,
-     "dove": "il piano sotto è a 21.3",
+     "dy": -1.4,
+     "dove": "il piano sotto è a 21.5",
      "n": 1,
      "link": "?x=-256&z=694&debug=1"
     },
@@ -1206,10 +1116,19 @@
      "x": -255.5,
      "z": 694.6,
      "y": 20.3,
-     "dy": -1.1,
-     "dove": "il piano sotto è a 21.3",
+     "dy": -1.2,
+     "dove": "il piano sotto è a 21.5",
      "n": 1,
      "link": "?x=-255&z=695&debug=1"
+    },
+    {
+     "x": 1410.5,
+     "z": 463.6,
+     "y": 34.6,
+     "dy": -0.8,
+     "dove": "il piano sotto è a 35.3",
+     "n": 1,
+     "link": "?x=1411&z=464&debug=1"
     },
     {
      "x": -0.7,
@@ -1221,40 +1140,22 @@
      "link": "?x=-1&z=777&debug=1"
     },
     {
-     "x": -1250.9,
-     "z": 962.8,
-     "y": 18.1,
-     "dy": -0.7,
-     "dove": "il piano sotto è a 18.8",
-     "n": 1,
-     "link": "?x=-1251&z=963&debug=1"
-    },
-    {
-     "x": -1239.4,
-     "z": 962.8,
-     "y": 17.7,
-     "dy": -0.7,
-     "dove": "il piano sotto è a 18.4",
-     "n": 1,
-     "link": "?x=-1239&z=963&debug=1"
-    },
-    {
-     "x": -1249.3,
-     "z": 969.5,
-     "y": 17.3,
-     "dy": -1.5,
-     "dove": "il piano sotto è a 18.8",
-     "n": 1,
-     "link": "?x=-1249&z=970&debug=1"
-    },
-    {
      "x": -1237.2,
      "z": 1087.4,
      "y": 16.8,
-     "dy": -1.1,
-     "dove": "il piano sotto è a 17.9",
+     "dy": -0.9,
+     "dove": "il piano sotto è a 17.8",
      "n": 1,
      "link": "?x=-1237&z=1087&debug=1"
+    },
+    {
+     "x": 48.4,
+     "z": 959,
+     "y": 23.8,
+     "dy": -1.5,
+     "dove": "il piano sotto è a 25.4",
+     "n": 1,
+     "link": "?x=48&z=959&debug=1"
     },
     {
      "x": -660.7,
@@ -1282,15 +1183,6 @@
      "dove": "il piano sotto è a 15.4",
      "n": 1,
      "link": "?x=-1336&z=1487&debug=1"
-    },
-    {
-     "x": -1309.7,
-     "z": 1558.9,
-     "y": 14.1,
-     "dy": -1.5,
-     "dove": "il piano sotto è a 15.6",
-     "n": 1,
-     "link": "?x=-1310&z=1559&debug=1"
     },
     {
      "x": -1313.3,
@@ -1324,23 +1216,14 @@
      "z": 2262.7,
      "y": 11.6,
      "dy": -0.8,
-     "dove": "il piano sotto è a 12.5",
+     "dove": "il piano sotto è a 12.4",
      "n": 1,
      "link": "?x=-765&z=2263&debug=1"
-    },
-    {
-     "x": 415.1,
-     "z": 2270.8,
-     "y": 21.9,
-     "dy": -1.4,
-     "dove": "il piano sotto è a 23.3",
-     "n": 1,
-     "link": "?x=415&z=2271&debug=1"
     }
    ]
   },
   "alberi": {
-   "guardati": 1320,
+   "guardati": 1301,
    "senza_nastro": 0,
    "di_traverso": 0,
    "sbagliati": 0,
@@ -1349,10 +1232,10 @@
   }
  },
  "strada_fuori_quota": {
-  "stazioni": 105501,
+  "stazioni": 105543,
   "fuori": 122,
-  "m": 193,
-  "tratti": 17,
+  "m": 196,
+  "tratti": 16,
   "posti": [
    {
     "nastro": 281,
@@ -1365,17 +1248,17 @@
     "link": "?x=-192&z=-2597&debug=1"
    },
    {
-    "nastro": 713,
+    "nastro": 709,
     "nome": "Via Cascina Bricola",
     "sede": "raso",
-    "m": 19.63598339477402,
+    "m": 28.84903163821237,
     "dy": -1.6,
-    "x": -1319.7,
+    "x": -1319.8,
     "z": 2320.4,
     "link": "?x=-1320&z=2320&debug=1"
    },
    {
-    "nastro": 772,
+    "nastro": 768,
     "nome": "Via Marziali",
     "sede": "raso",
     "m": 13.961584512686068,
@@ -1405,7 +1288,7 @@
     "link": "?x=-203&z=-2587&debug=1"
    },
    {
-    "nastro": 772,
+    "nastro": 768,
     "nome": "Via Marziali",
     "sede": "raso",
     "m": 7.98535196222727,
@@ -1415,17 +1298,7 @@
     "link": "?x=-1421&z=1057&debug=1"
    },
    {
-    "nastro": 712,
-    "nome": "Via Cascina Bricola",
-    "sede": "raso",
-    "m": 6.725526827774253,
-    "dy": 1.1,
-    "x": -1334.2,
-    "z": 2317.5,
-    "link": "?x=-1334&z=2318&debug=1"
-   },
-   {
-    "nastro": 514,
+    "nastro": 512,
     "nome": "Via Vilfredo Pareto",
     "sede": "raso",
     "m": 8.00422596201504,
@@ -1475,17 +1348,17 @@
     "link": "?x=-594&z=-858&debug=1"
    },
    {
-    "nastro": 712,
+    "nastro": 709,
     "nome": "Via Cascina Bricola",
     "sede": "raso",
-    "m": 5.712148984348552,
+    "m": 5.9721436687340566,
     "dy": -0.9,
     "x": -1376.4,
     "z": 2313.4,
     "link": "?x=-1376&z=2313&debug=1"
    },
    {
-    "nastro": 728,
+    "nastro": 724,
     "nome": "Via Luigi Galvani",
     "sede": "raso",
     "m": 4.001815768304177,
@@ -1505,7 +1378,7 @@
     "link": "?x=-214&z=-2578&debug=1"
    },
    {
-    "nastro": 783,
+    "nastro": 779,
     "nome": "Via Boves",
     "sede": "raso",
     "m": 4.0046010345100225,
@@ -1528,6 +1401,6 @@
  },
  "definizione": "il metro dei livelli (docs/nastri.md passo 0): cose della strada disegnate sotto o sopra il nastro a cui appartengono, recinzioni col piede fuori dal piano che hanno sotto, alberi sotto un impalcato, nei posti a più livelli; numero = somma dei casi (celle di 8 m per famiglia). strada_fuori_quota: tratti di nastro senza un piano del gioco entro 0,6 m dalla sua quota, su tutta la mappa",
  "tolleranze": "righe 0,5 m; cordoli da -0,5 a +0,8; spartitraffico e guardrail da -0,5/-0,6 a +1,6; parapetti 0,8; recinzioni 0,6",
- "tile_guardati": 82,
+ "tile_guardati": 83,
  "errori": []
 }

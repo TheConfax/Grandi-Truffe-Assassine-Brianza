@@ -228,3 +228,68 @@ Cosa c'è dentro, per tipo (i casi non li ho guardati tutti uno per uno: ho cont
 - recinzioni col piede 1-3 m sopra o sotto il piano (32 casi): la più sparsa, da guardare al passo 6.
 
 **Limiti del metro.** Vede le cose al livello sbagliato, non quelle che mancano (per le strisce che mancano sui ponti c'è `controllo_strisce_ponti.py`). Asfalto, lampioni e cartelli non hanno ancora la loro misura: l'asfalto è coperto in quota dalla strada fuori quota; lampioni e cartelli entrano quando prendono il numero del nastro (passo 3). Dove due nastri corrono paralleli uno sopra l'altro sceglie il più vicino in quota, quindi lì non può sbagliare a favore: sugli svincoli della Valassina andrà riguardato.
+
+---
+
+## 7. Passo 2: i ponti dal nastro (14/11, tag `nastri/passo2`)
+
+L'impalcato di un ponte stradale non nasce più dalla sagoma PONTE allungata a quadretti: nasce dai nastri che ci passano sopra (`src/ponti_nastro.py`, chiamato da `impalcati.py`). Terreno, build e pezzi rifatti su tutta la mappa.
+
+### La regola
+
+- **Dove sta il ponte.** Un nastro è sul ponte nelle stazioni dentro la sagoma PONTE *alla quota del suo piano* (entro 1,5 m: la strada che passa sotto è dentro la sagoma in pianta ma a un'altra quota e non conta). Da lì il tratto continua una stazione alla volta finché sotto la sezione il suolo sta più di 0,5 m sotto il nastro o non è un piano solo (un pezzo della sezione è già sul vuoto: il ciglio della spalla). Finisce alla prima stazione con il suolo alla sua quota: lì c'è il capo, un taglio dritto di traverso all'asse.
+- **La sezione.** I due bordi del nastro (la carreggiata misurata sull'AC_VEI), il marciapiede dove il DBGT lo dà accanto alla carreggiata alla stessa quota, più 0,6 m per lato: il cordolo che porta il parapetto, subito fuori.
+- **Più nastri sullo stesso PONTE** (le due carreggiate della Milano-Meda) fanno un impalcato solo: la fessura fra due strisce fino a 6 m si chiude, lo spartitraffico sta sul ponte.
+- **La quota.** Il profilo del nastro, portato sul suolo ai due capi: lo scarto fra nastro e suolo lungo il taglio di un capo (con la sua pendenza di traverso) sposta l'impalcato di quel tanto, da un capo all'altro in linea retta. I vertici sul taglio prendono la quota del suolo esatta: fra ponte e strada non c'è gradino né fessura.
+- **I ponti che il DBGT non segna.** Lo stesso: un tratto di nastro in aria dove il terreno dice che la strada non poggia (i nodi AIR di `superficie.py`), lungo almeno 6 m e alto almeno 1,5 m, è un ponte. La Milano-Meda sul Taro (x -248 z 210) ora è fatta così; la campata nord del cavalcaferrovia di via Ravenna (x 1418 z 440), che il DBGT non segna, è un pezzo solo col suo PONTE.
+- **Un PONTE stradale senza nastro suo** che sta dentro un impalcato fatto dal nastro è un pezzo di quel ponte e non fa un impalcato (il PONTE doppio al confine fra Meda e Seveso in via Vignazzola, le strisce di marciapiede lungo la Milano-Meda sulla ferrovia).
+- **I parapetti** seguono il contorno dell'impalcato, cioè il bordo liscio del nastro, 0,3 m dentro il bordo (sul cordolo). Mai sul taglio di un capo né di traverso a una strada che entra sul ponte alla sua quota. Per tipo di strada: sulle superstrade (`roads[].x`) new jersey di cemento con la rete sopra fino a 2,2 m; sulle altre strade muretto di cemento con corrimano; sulle passerelle ringhiera.
+- **Le spalle** (i muri sotto) restano dove il terreno le ha scavate, lungo la sagoma PONTE: è lei che dice dove comincia e finisce il ponte. Il guardrail della superstrada si attacca al capo del parapetto nuovo.
+- **Assi ricuciti.** Al confine fra due comuni l'asse EL_STR di ognuno finisce al suo confine e in mezzo resta un buco, in via Vignazzola (x -260 z 689) proprio su un ponte. Due capi liberi che si guardano entro 15 m, nella stessa direzione e alla stessa quota, ora sono la stessa strada: 6 in tutta la mappa (`nastri.py` `_ricuci`). I nastri passano da 866 a 860.
+
+Via dai ponti stradali: celle di spalla, prolungamenti, rampe a quadretti, celle sotto la via OSM, correzione dei fianchi. Nel codice restano per i ponti che non sono ancora fatti dal nastro (sotto).
+
+### I numeri
+
+| | prima (passo 1) | dopo |
+|---|---|---|
+| ponti stradali fatti dal nastro | 0 | 23 sui PONTE + 1 non segnato (31 strisce) |
+| capi dei ponti fuori soglia (`controlli_ponti.py`: gradino o vuoto al capo) | 5 | 2 (tutti e due su ponti non ancora dal nastro) |
+| angoli a scatto dei parapetti (`controlli_ponti.mjs`) | 108 | 17 (nessuno sui ponti dal nastro) |
+| parapetti di traverso a una strada | 12 | 5 (nessuno sui ponti dal nastro; uno è il PONTE 2 abbuonato) |
+| muri sotto i ponti con asfalto dai due lati | 8 | 8 |
+| parapetti, metri | 1881 | 1928 |
+| **metro dei livelli** | **115** | **106** |
+| di cui righe / cordoli / spartitraffico | 34 / 12 / 10 | 39 / 15 / 11 |
+| di cui guardrail / parapetti | 12 / 15 | 4 / 2 |
+| di cui recinzioni | 32 | 35 |
+| strada fuori quota | 17 tratti, 193 m | 16 tratti, 196 m |
+
+Righe, cordoli e spartitraffico salgono di poco: sono le cose disegnate sul suolo nei tratti dove ora c'è l'impalcato vero (prima c'era un impalcato largo a quadretti e la regola "sopra o sotto" indovinava diverso). Le sistema il passo 3, famiglia per famiglia.
+
+I sei casi `di_traverso` di `todo.md`: chiusi PONTE 10000020 (x -1328 z 672), PONTE 6 (x 1422 z 462), PONTE 16 (x 79 z -205), PONTE 8 (x 54 z 356). Restano il ponticello nel bosco PONTE 10000027 (x -2593 z 1479) e la rampa senza nome (x 261 z 1794): sono una passerella e un pezzo di rampa senza asse nel DBGT, non hanno un nastro.
+
+### Le foto
+
+Contorno dell'impalcato evidenziato in magenta. In `docs/nastri_foto/`:
+
+| Punto | Sopra | Sotto |
+|---|---|---|
+| Milano-Meda su corso Isonzo (x 346 z 1998) | `passo2_isonzo_alto.jpg`, `passo2_isonzo_lato.jpg` | `passo2_isonzo_sotto.jpg` |
+| via Vignazzola (x -20 z 769) | `passo2_vignazzola_alto.jpg`, `passo2_vignazzola_lato.jpg` | `passo2_vignazzola_sotto.jpg` |
+| Milano-Meda sulla ferrovia (x 417 z 2243) | `passo2_ferrovia_alto.jpg` | `passo2_ferrovia_sotto.jpg` |
+| i sei `di_traverso` | `passo2_t1_…` fino a `passo2_t6_…` (`_alto`) | `passo2_t2_ponte6_sotto.jpg`, `passo2_t5_ponte8_sotto.jpg` |
+
+![corso Isonzo dall'alto](nastri_foto/passo2_isonzo_alto.jpg)
+
+![corso Isonzo da sotto](nastri_foto/passo2_isonzo_sotto.jpg)
+
+![via Vignazzola dall'alto](nastri_foto/passo2_vignazzola_alto.jpg)
+
+### Cosa resta aperto
+
+- **Ponti non ancora dal nastro (metodo vecchio, coi quadretti):** le 14 passerelle, i 3 ponti della ferrovia, il PONTE 10000005 (x -1298 z 1664, solo marciapiede nel DBGT) e la rampa senza nome di x 254 z 1793. Non hanno un nastro perché i nastri sono le carreggiate EL_STR. Servono i nastri dei binari (EL_FER) e dei percorsi pedonali: stessa regola, altro asse. Da qui vengono i 2 capi fuori soglia, i 17 scatti e 4 dei 5 parapetti di traverso che restano.
+- **Ponti di sbieco.** Ogni carreggiata finisce con un taglio dritto di traverso al suo asse: su un ponte molto di sbieco (Milano-Meda sul viale Francia, x -530 z 140) l'impalcato copre anche i due triangoli sopra le spalle, e le due carreggiate finiscono sfalsate. Da sopra la strada è dritta; da sotto si vedono le spalle di sbieco con la soletta che le scavalca.
+- **Sul ponte di corso Isonzo** il new jersey dello spartitraffico si interrompe e le righe della campata nord di via Ravenna stanno ancora sul suolo sotto l'impalcato: famiglie del passo 3.
+- **PONTE 16 (x 79 z -205):** il parapetto di traverso non c'è più, ma in mezzo all'asfalto è rimasto un muretto con la rete a Z: è un divisore del DBGT (famiglia recinzioni, passo 6).
+- Controlli del terreno: le spalle combaciano (p99 0,013 m), un lato a 0,26 m sul ponte del Taro (soglia 0,2); 4 nodi AIR restano senza impalcato sopra (x -1311 z 1542).

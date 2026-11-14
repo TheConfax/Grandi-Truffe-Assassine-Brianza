@@ -544,24 +544,51 @@ class Impalcati:
 
     def build(s, pits=()):
         t0 = time.time(); s.nuclei(); s.assegna(pits)
+        # the road bridges from the ribbons that run on them (docs/nastri.md passo 2, src/ponti_nastro.py): no cells for them
+        import nastri, ponti_nastro as PN
+        s.N = nastri.calcola(s.D, 0.0, log); s.dn, s.dn_liberi, s.info['ponti_dal_nastro'] = PN.trova(s, s.N, log)
+        nastrati = shapely.union_all([t['g'] for t in list(s.dn.values()) + s.dn_liberi]) if (s.dn or s.dn_liberi) else Polygon()
+        gn = nastrati.buffer(DENTRO_BUF); shapely.prepare(gn); s.dn_dentro = set()
+        for k, c in enumerate(s.cores):   # a road PONTE with no ribbon of its own that lies in a deck made from a ribbon is a piece of that bridge (the PONTE of the next comune, a strip of its sidewalk)
+            if k not in s.dn and c['tipo'] == 'strada' and c['g'].intersection(gn).area > 0.5 * c['g'].area: s.dn_dentro.add(k)
+        s.info['ponti_dal_nastro']['ponte_dentro_un_altro'] = sorted(s.cores[k]['pid'] for k in s.dn_dentro)
+        # the AIR nodes under a deck made from a ribbon are that deck: what is left of a patch of an unflagged bridge is one only if it is still a patch
+        if not nastrati.is_empty:
+            gn2 = nastrati.buffer(SF); shapely.prepare(gn2); lib = []
+            for idx in s.liberi:
+                idx = idx[~shapely.contains_xy(gn2, s.R.x0 + s.air_cc[idx] * SF, s.R.z0 + s.air_rr[idx] * SF)]
+                if len(idx) >= 3: lib.append(idx)
+            s.info['ponti_dal_nastro']['pezze_air_assorbite'] = len(s.liberi) - len(lib); s.liberi = lib
+            sotto_n = shapely.contains_xy(gn2, s.R.x0 + s.air_cc * SF, s.R.z0 + s.air_rr * SF)
+            s.info['ponti_dal_nastro']['nodi_air_sotto_i_nastri'] = int(sotto_n.sum()); s.air_own = np.where(sotto_n & (s.air_own >= 0), -3, s.air_own)   # (nor of another PONTE beside it)
+            orf = (s.air_own >= 0) & np.isin(s.air_own, list(s.dn) + list(s.dn_dentro))
+            s.info['ponti_dal_nastro']['nodi_air_fuori_dai_nastri'] = int(orf.sum()); s.air_orfani = np.column_stack((s.R.x0 + s.air_cc[orf] * SF, s.R.z0 + s.air_rr[orf] * SF))
         # cells of each deck; a cell belongs to one deck only (an AIR corner first, else the nearest core)
         want = {}
         for k, c in enumerate(s.cores):
+            if k in s.dn or k in s.dn_dentro: continue
             m = s.air_own == k
             for rc in s.celle(s.air_rr[m], s.air_cc[m]): want.setdefault(rc, {})[('c', k)] = 0
             for rc in s.celle_spalla(c): want.setdefault(rc, {}).setdefault(('c', k), 1)
         for j, idx in enumerate(s.liberi):
             for rc in s.celle(s.air_rr[idx], s.air_cc[idx]): want.setdefault(rc, {})[('l', j)] = 0
+        if not nastrati.is_empty and want:   # no cell of another deck inside a deck made from a ribbon (the cells under the OSM way beside a strip of PONTE along it took the whole bridge)
+            rcs = list(want); cx = np.array([s.R.x0 + c * SF + SF / 2 for r, c in rcs]); cz = np.array([s.R.z0 + r * SF + SF / 2 for r, c in rcs])
+            for rc, dentro in zip(rcs, shapely.contains_xy(gn, cx, cz)):
+                if dentro: del want[rc]
         by = {}
         for rc, ks in want.items():
             ctr = s.cbox(rc).centroid
             q = min(ks, key=lambda q: (ks[q], s.cores[q[1]]['g'].distance(ctr) if q[0] == 'c' else 0.0)); by.setdefault(q, ([], []))[ks[q]].append(rc)
         for k, c in enumerate(s.cores):
+            if k in s.dn: s._deck_nastro(c, s.dn[k], 'PONTE %d' % c['pid']); continue
+            if k in s.dn_dentro: continue
             ca, cs = by.get(('c', k), ([], []))
             s._deck(c, ca, cs, 'PONTE %d' % c['pid'], np.nonzero(s.air_own == k)[0])
         for j, idx in enumerate(s.liberi):
             ca, _ = by.get(('l', j), ([], []))
             s._deck(None, ca, [], 'ponte non segnato', idx)
+        for tn in s.dn_liberi: s._deck_nastro(None, tn, 'ponte non segnato')
         s.fianchi()
         s.info['t_impalcati'] = round(time.time() - t0, 1)
         return s.decks
@@ -575,7 +602,7 @@ class Impalcati:
         n = 0; geoms = [d['imp'] for d in s.decks]
         for i, d in enumerate(s.decks):
             P, T, Hv = d['P'], d['T'], d['Hv']
-            if not len(T) or d['tipo'] == 'copertura': continue
+            if not len(T) or d['tipo'] == 'copertura' or d.get('nastro'): continue   # (a deck from its ribbon has the sides of the ribbon)
             E = bordi(T); vi = np.unique(E[:, :2])
             if d['core'] is not None: vi = vi[shapely.distance(d['core']['g'], shapely.points(P[vi, 0], P[vi, 1])) > 0.05]   # the DBGT bridge keeps its sides
             if not len(vi): continue
@@ -613,6 +640,25 @@ class Impalcati:
                 s.info['pezzi_lasciati'] = s.info.get('pezzi_lasciati', 0) + 1; continue
             cr = core if (core is not None and n == 0) else None
             s._emit(p, cr, fonte if (cr is not None or core is None) else fonte + ' (pezzo staccato)', own, air_idx, core['tipo'] if core else None, core)
+
+    def _deck_nastro(s, core, tn, fonte):
+        """the deck of a road bridge from its ribbons (src/ponti_nastro.py): the footprint is the section of the ribbons along the bridge, its ends straight cuts across
+        them; the vertices on a cut that rests on the ground take S (the cut carries the points where it meets the lattice lines, so the two fit). core None: a bridge
+        the DBGT does not flag"""
+        import ponti_nastro as PN
+        ps = sorted(parts(pulito(tn['g'])), key=lambda p: -(p.intersection(core['g']).area if core else p.area))
+        dv = core['dir'] if core else direzione([(t['xy'][j], t['xy'][j + 1]) for t in tn['strisce'] for j in range(len(t['xy']) - 1)])
+        for n, p in enumerate(ps):
+            if p.area < 6.0: continue
+            p = Polygon(PN.anello_coi_nodi(p.exterior.coords, tn['capi'], s.R), [PN.anello_coi_nodi(r.coords, tn['capi'], s.R) for r in p.interiors])
+            if not p.is_valid: p = pulito(p); p = max(parts(p), key=lambda q: q.area)
+            P, T = triangola(p, s.R); Hv = tn['F'](P); k = PN.sul_capo(P, tn['capi'])
+            Sk = s.Sat(P[k, 0], P[k, 1]); Hv[k] = np.where(np.abs(Sk - Hv[k]) < PN.SUL_SUOLO, Sk, Hv[k])   # (past the carriageway the cut may hang over the bank: there it keeps its height)
+            capi = [(A, B, ap) for A, B, ap in tn['capi'] if p.distance(shapely.Point((A + B) / 2)) < 0.5]
+            cr = core if n == 0 else None
+            s.decks.append(dict(id=len(s.decks), tipo='strada', fonte=fonte if (n == 0 or core is None) else fonte + ' (pezzo staccato)', imp=p, P=P, T=T, Hv=Hv, F=tn['F'], core=cr, sp=SP['strada'],
+                                dbgt=dict(ponte=core['pid'], assi_sopra=core['assi'], aree_sopra=core['aree'], z_ponte=core['z_dbgt']) if cr else None,
+                                area_nucleo=round(core['g'].area, 1) if cr else 0.0, dir=dv if dv is not None else dir_rect(p), nastro=sorted({t['nastro'] for t in tn['strisce']}), capi=capi))
 
     def _emit(s, g, core, fonte, own, air_idx, tipo, parent):  # core: the PONTE whose top this piece carries; parent: the PONTE it comes from
         if tipo is None:  # a bridge the DBGT does not flag: what its AIR nodes are
@@ -749,7 +795,9 @@ def controlli(imp, decks, pits, osm, conf, bj, SB, nb):
         q = m + nrm * 0.75; hm = (Hv[E[:, 0]] + Hv[E[:, 1]]) / 2
         ri, ci = np.clip(np.round((q[:, 1] - R.z0) / SF).astype(int), 0, R.nz - 1), np.clip(np.round((q[:, 0] - R.x0) / SF).astype(int), 0, R.nx - 1)
         sq = S_(q[:, 0], q[:, 1]); ha, hb = Hv[E[:, 0]], Hv[E[:, 1]]
-        sp_ = spalla_lati(imp, d, a, b, SB); strada = sp_ & imp.ROAD[ri, ci]
+        if d.get('nastro'): import ponti_nastro as PN; sp_ = PN.sul_capo(a, d['capi']) & PN.sul_capo(b, d['capi']) & PN.sul_capo(m, d['capi']) & (np.abs(ha - imp.Sat(a[:, 0], a[:, 1])) < 1e-6) & (np.abs(hb - imp.Sat(b[:, 0], b[:, 1])) < 1e-6)   # its ends that rest on the ground
+        else: sp_ = spalla_lati(imp, d, a, b, SB)
+        strada = sp_ & imp.ROAD[ri, ci]
         d['lati'] = dict(n=int(len(E)), spalla=int(sp_.sum()), spalla_su_strada=int(strada.sum()), salto_sui_lati=pct(hm[~sp_] - sq[~sp_], (10, 50)))
         for e in np.nonzero(sp_)[0]:
             A, B = a[e], b[e]; ha, hb = Hv[E[e, 0]], Hv[E[e, 1]]
@@ -871,6 +919,7 @@ def scrivi_json(decks, pits, path, info):
                  dir=[round(float(v), 4) for v in d['dir']])
         if list(d['imp'].interiors): e['buchi'] = [np.round(np.asarray(r.coords)[:-1], 2).tolist() for r in d['imp'].interiors]
         if d['core'] is not None: e['nucleo'] = np.round(np.asarray(d['core']['g'].exterior.coords)[:-1], 2).tolist()   # the PONTE outline: parapets go here
+        if d.get('nastro'): e['nastro'] = d['nastro']; e['capi'] = [[round(float(A[0]), 2), round(float(A[1]), 2), round(float(B[0]), 2), round(float(B[1]), 2), int(ap)] for A, B, ap in d['capi']]   # from its ribbons: the parapets follow imp, capi are its end cuts
         for k in ('dbgt', 'fondo', 'fosse', 'tn', 'franco', 'sotto'):
             if d.get(k) is not None: e[k] = d[k]
         out.append(e)

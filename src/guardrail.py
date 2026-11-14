@@ -70,6 +70,11 @@ def _angoli_parapetti(UXb=None):
         # Milano-Meda's guardrail drawn on the carriageway of the bridge over it)
         if UXb is None or UXb.is_empty or Polygon(d['nucleo']).buffer(0).intersection(UXb).area < 0.3 * Polygon(d['nucleo']).buffer(0).area: continue
         T = np.asarray(d['tri'], float).reshape(-1, 3)
+        if d.get('nastro'):   # a deck made from its ribbons (src/ponti_nastro.py): its parapets end at the two ends of each end cut, PAR_DENTRO m inside the edge (world3.js)
+            for ax, az, bx, bz, _ in d.get('capi', []):
+                L = math.hypot(bx - ax, bz - az) or 1.0
+                for q in ((ax + (bx - ax) / L * 0.3, az + (bz - az) / L * 0.3), (bx - (bx - ax) / L * 0.3, bz - (bz - az) / L * 0.3)): V.append((q[0], q[1], T[np.argmin(np.hypot(T[:, 0] - q[0], T[:, 1] - q[1])), 2]))
+            continue
         for q in d['nucleo']: V.append((q[0], q[1], T[np.argmin(np.hypot(T[:, 0] - q[0], T[:, 1] - q[1])), 2]))   # (x, z, the top of the deck there, m)
     return np.asarray(V, float) if V else None
 

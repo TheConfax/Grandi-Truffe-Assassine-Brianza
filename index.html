@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo nastri · dopo 0216203c · assemblato 14/11 00:12 · porta ' + location.port;
+    const txt = 'locale · ramo nastri · dopo 39e234cf · assemblato 14/11 04:43 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -968,7 +968,7 @@ const H = (() => {
     let o = DECK_ORD.get(d.ord); if (o) { o.refs++; return o; }
     const tri = new Float64Array(d.tri.length); for (let i = 0; i < tri.length; i += 3) { tri[i] = d.tri[i]; tri[i + 1] = d.tri[i + 1]; tri[i + 2] = d.tri[i + 2] - B0; }
     const free = d.tipo !== 'copertura' && !(d.sotto && (d.sotto.strade || d.sotto.ferrovia)); // nothing passes under it but water or field
-    o = { id: d.id, ord: d.ord, tiles: d.tiles, refs: 1, reg: [], tipo: d.tipo, fonte: d.fonte, sp: d.sp, luce: d.luce - B0, tri, imp: d.imp, nucleo: d.nucleo || null, spalle: d.spalle || [], ra: d.ra || [], free };
+    o = { id: d.id, ord: d.ord, tiles: d.tiles, refs: 1, reg: [], tipo: d.tipo, fonte: d.fonte, sp: d.sp, luce: d.luce - B0, tri, imp: d.imp, nucleo: d.nucleo || null, spalle: d.spalle || [], ra: d.ra || [], free, nastro: d.nastro || null, capi: d.capi || [] }; // nastro: a deck made from its ribbons (src/ponti_nastro.py): imp is the section of the road, capi its end cuts
     DECKS.push(o); DECK_ORD.set(d.ord, o);
     const rec0 = GRID_REC; GRID_REC = o.reg;
     for (let i = 0; i < tri.length; i += 9) { const xs = [tri[i], tri[i + 3], tri[i + 6]], zs = [tri[i + 1], tri[i + 4], tri[i + 7]]; DKG.add(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), { d: o, i }); }
@@ -3368,7 +3368,7 @@ function deckTopAt(dk, x, z) { for (const o of H.deckAt(x, z)) if (o.d === dk) r
 // the edges the parapets follow: the PONTE footprint (nucleo), straight, and the boundary edges of the triangles off it (the spalla cells, the
 // extensions and the approach ramps, in 2 m steps: past the end of the parapet of PONTE 16 a walker fell 3.3 m off them into the Seveso)
 function deckOutline(dk) {
-  const out = [], o = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null;
+  const out = [], o = !dk.nastro && dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null; // (a deck from its ribbons, docs/nastri.md passo 2: its outline is the section of the road, the parapets follow it; the PONTE outline only places the abutments)
   if (o) for (let i = 0; i < o.length; i++) out.push([o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1], 1]);
   const onO = (x, z) => { for (let i = 0; i < o.length; i++) if (segDist(x, z, o[i][0], o[i][1], o[(i + 1) % o.length][0], o[(i + 1) % o.length][1]) < 0.35) return true; return false; };
   const along = (ax, az, bx, bz) => o && (inPoly((ax + bx) / 2, (az + bz) / 2, o) || (onO(ax, az) && onO(bx, bz) && onO((ax + bx) / 2, (az + bz) / 2))); // inside the core or along its outline
@@ -3386,30 +3386,36 @@ function busyGround(dk, x, z) {
 }
 // how high the guardrails, the new jersey and the parapets are for the walker: as drawn (drawGuard, drawBarriers), so he goes over them as over any barrier of
 // that height (salto3.js). A car meets them ALTO_VERO.auto over the road: it does not fly over a guardrail (Carlo, 6/11)
+const PAR_RETE = 2.2; /* m over the road: the top of the net on the new jersey of a bridge of an expressway */ const PAR_DENTRO = 0.3; // m: on a deck from its ribbons the parapet stands this far inside the edge of the deck
 const ALTO_VERO = { guardrail: 0.8, newJersey: 0.82, parapetto: 0.95, passerella: 1.1, auto: 2.5 };
 // what a deck adds to the world, once, when all the tiles under it are here (pezzi3.js): its parapets, pillars, ramp walls. They go with it
 function deckInit(dk) { if (dk.pronto) return; dk.pronto = true; dk.bar = { rails: [], pillars: [] }; const r0 = GRID_REC; GRID_REC = dk.reg; try { deckInit2(dk); } finally { GRID_REC = r0; } }
 function deckInit2(dk) {
   if (dk.tipo === 'copertura') return;
   const ring = dk.nucleo && dk.nucleo.length >= 3 ? dk.nucleo : null; rampWalls(dk); spalleCapi(dk); // the walls of its approach ramps and their collisions, once
-  for (const [ax, az, bx, bz, core] of deckOutline(dk)) {
+  // the parapet by the kind of road (Carlo 13/11): on an expressway a concrete new jersey with a net over it (3), on the other streets a low concrete wall with a rail (1), on a footbridge a railing (2)
+  const tipoPar = dk.tipo === 'pedonale' ? 2 : dk.nastro && dk.ra.some(i => D.roads[i] && D.roads[i].x) ? 3 : 1, dentro = dk.nastro ? PAR_DENTRO : 0;
+  for (let [ax, az, bx, bz, core] of deckOutline(dk)) {
     const L = hyp(bx - ax, bz - az); if (L < 0.05) continue;
     let nx = (bz - az) / L, nz = -(bx - ax) / L; const mx = (ax + bx) / 2, mz = (az + bz) / 2;
     if (core ? inPoly(mx + nx * 0.3, mz + nz * 0.3, ring) : !!deckTopAt(dk, mx + nx * 0.3, mz + nz * 0.3)) { nx = -nx; nz = -nz; } // outward
+    if (dentro) { if (dk.capi.some(c => segDist(mx, mz, c[0], c[1], c[2], c[3]) < 0.05)) continue; /* an end cut: the road goes on, never a parapet across it */ ax -= nx * dentro; az -= nz * dentro; bx -= nx * dentro; bz -= nz * dentro; } // on the strip the build leaves for it past the carriageway (ponti_nastro.py CORDOLO)
     const n = Math.max(1, Math.round(L)), ys = [];
     for (let k = 0; k <= n; k++) { const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n, o = deckTopAt(dk, x - nx * 0.25, z - nz * 0.25) || deckTopAt(dk, x - nx * 0.6, z - nz * 0.6); ys.push(o ? o.top : null); }
     for (let k = 0; k < n; k++) {
       const y0 = ys[k], y1 = ys[k + 1]; if (y0 === null || y1 === null) continue;
-      const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, qx = x + nx * 0.7, qz = z + nz * 0.7, top = (y0 + y1) / 2;
-      if (H.deckAt(x + nx * 0.25, z + nz * 0.25).some(o => o.tipo !== 'copertura' && Math.abs(o.top - top) < 0.6)) continue; // the deck goes on (its ramps, another deck)
+      const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, qx = x + nx * (dentro + 0.7), qz = z + nz * (dentro + 0.7), top = (y0 + y1) / 2;
+      if (H.deckAt(x + nx * (dentro + 0.25), z + nz * (dentro + 0.25)).some(o => o.tipo !== 'copertura' && Math.abs(o.top - top) < 0.6)) continue; // the deck goes on (its ramps, another deck)
       if (top - H.base(qx, qz) < 0.8) continue; // it rests on the ground there (a spalla)
-      { let att = false; const own = roadsOn(dk); ROADSEG.each(x - 10, z - 10, x + 10, z + 10, s => { if (att || !own.has(s.r) || segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]) > s.r.w / 2 + 0.3) return; const sx = s.b[0] - s.a[0], sz = s.b[1] - s.a[1], sl = hyp(sx, sz) || 1; if (Math.abs(((bx - ax) * sx + (bz - az) * sz) / (L * sl)) < 0.5) att = true; });
-        if (att) continue; } /* never across the way that runs on the deck: its end goes on as a street (Carlo 6/11, the east end of via Vignazzola) */
+      { let att = false; const own = roadsOn(dk); ROADSEG.each(x - 12, z - 12, x + 12, z + 12, s => { if (att || s.r.t) return; const sx = s.b[0] - s.a[0], sz = s.b[1] - s.a[1], sl = hyp(sx, sz) || 1, u = clamp(((x - s.a[0]) * sx + (z - s.a[1]) * sz) / (sl * sl), 0, 1);
+          if (hyp(x - s.a[0] - sx * u, z - s.a[1] - sz * u) > s.r.w / 2 + 0.3) return; const c_ = Math.abs(((bx - ax) * sx + (bz - az) * sz) / (L * sl));
+          if (own.has(s.r) ? c_ < (dk.nastro ? 0.87 : 0.5) : dk.nastro && c_ < 0.87 && s.ia !== undefined && Math.abs(lerp(H.node(s.ia), H.node(s.ib), u) - top) < 1.0) att = true; });
+        if (att) continue; } /* never across the way that runs on the deck: its end goes on as a street (Carlo 6/11, the east end of via Vignazzola); on a deck from its ribbons nor across another street at its level (one that joins it at the end of the bridge: the edge of a ribbon runs straight across its mouth) */
       const seg = { ax: ax + (bx - ax) * k / n, az: az + (bz - az) * k / n, bx: ax + (bx - ax) * (k + 1) / n, bz: az + (bz - az) * (k + 1) / n };
       { const ux = (seg.bx - seg.ax), uz = (seg.bz - seg.az), ul = hyp(ux, uz) || 1, mx = (seg.ax + seg.bx) / 2, mz = (seg.az + seg.bz) / 2; // (one row of parapets: a piece beside one already there, parallel and under 0.8 m from it, is the same parapet, Carlo 6/11 via Vignazzola)
         if (dk.bar.rails.some(r => { const vx = r[3] - r[0], vz = r[4] - r[1], vl = hyp(vx, vz) || 1; if (Math.abs((ux * vx + uz * vz) / (ul * vl)) < 0.94) return false; const dx = mx - (r[0] + r[3]) / 2, dz = mz - (r[1] + r[4]) / 2; return Math.abs((-vz * dx + vx * dz) / vl) < 0.8 && Math.abs((vx * dx + vz * dz) / vl) < (ul + vl) / 2 - 0.1; })) continue; }
-      dk.bar.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, dk.tipo === 'pedonale' ? 2 : 1, nx, nz]);
-      WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + (dk.tipo === 'pedonale' ? ALTO_VERO.passerella : ALTO_VERO.parapetto), yv: Math.max(y0, y1) + ALTO_VERO.auto, deckw: true });
+      dk.bar.rails.push([seg.ax, seg.az, y0, seg.bx, seg.bz, y1, tipoPar, nx, nz]);
+      WALLS.add(seg.ax, seg.az, seg.bx, seg.bz, { ...seg, nx: -nx, nz: -nz, two: true, y0: Math.min(y0, y1) - 0.6, y1: Math.max(y0, y1) + (tipoPar === 3 ? PAR_RETE : dk.tipo === 'pedonale' ? ALTO_VERO.passerella : ALTO_VERO.parapetto), yv: Math.max(y0, y1) + ALTO_VERO.auto, deckw: true });
     }
   }
   // pillars: on the long axis of the footprint (two lines on a wide deck), every PIL_STEP m, where the deck stands more than 2.5 m over
@@ -3476,7 +3482,7 @@ function* roadBarriers(T) {
           let rail = null;
           if (!nearJ(cx, cz, hw + 8) && !nearAsph(cx + ex * offS, cz + ez * offS, 0.1) && !nearDeckCarr(cx + ex * offS, cz + ez * offS, yc, 0.1)) {
             const gx = cx + ex * offS, gz = cz + ez * offS, yE = H.surface(gx, gz, yc + 0.3);
-            const onCore = H.deckAt(gx, gz).some(o => o.d.nucleo && inPoly(gx, gz, o.d.nucleo) && Math.abs(o.top - yc) < 0.6); // the parapets of the deck
+            const onCore = H.deckAt(gx, gz).some(o => (o.d.nastro || (o.d.nucleo && inPoly(gx, gz, o.d.nucleo))) && Math.abs(o.top - yc) < 0.6); // the parapets of the deck
             let other = false; ROADSEG.each(gx - 4, gz - 4, gx + 4, gz + 4, o => { if (!other && o.r !== r && o.r.c <= 5 && segDist(gx, gz, o.a[0], o.a[1], o.b[0], o.b[1]) < o.r.w / 2 + 0.3 && Math.abs(lerp(H.node(o.ia), H.node(o.ib), 0.5) - yE) < 1.5) other = true; });
             if (!onCore && !other && !H.inPit(gx, gz, 0.5) && !H.inPit(cx, cz, 0.5) && !H.gallAt(cx, cz)) { /* (in the trench of an underpass its walls hold the car) */
               if (Math.abs(yE - yc) < 0.5) {
@@ -3567,11 +3573,17 @@ function drawGuard(T, grail, pil) {
   }
 }
 // draw them: guardrail strips on posts, the parapets (a concrete kerb with a rail, a railing on the footbridges), the pillars
-function* drawBarriers(T, grail, pil) {
+function* drawBarriers(T, grail, pil, rete) {
   const rail = (x0, z0, y0, x1, z1, y1, a, b) => { const L = hyp(x1 - x0, z1 - z0) || 1, nx = (z1 - z0) / L, nz = -(x1 - x0) / L, b0 = grail.p.length / 3; vtx(grail, x0, y0 + a, z0, nx, 0, nz, 0, 0); vtx(grail, x1, y1 + a, z1, nx, 0, nz, 0, 0); vtx(grail, x1, y1 + b, z1, nx, 0, nz, 0, 0); vtx(grail, x0, y0 + b, z0, nx, 0, nz, 0, 0); grail.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
   for (const dk of H.DECKS) if (dk.bar) for (const [x0, z0, y0, x1, z1, y1, kind] of dk.bar.rails) {
     if (tileOf((x0 + x1) / 2, (z0 + z1) / 2) !== T.t) continue;
     const L = hyp(x1 - x0, z1 - z0) || 1, ry = Math.atan2(-(z1 - z0), x1 - x0);
+    if (kind === 3) { // an expressway: the new jersey (its profile, as in the median) and over it a wire net on posts
+      const nx = (z1 - z0) / L, nz = -(x1 - x0) / L;
+      for (let j = 1; j < NJ_PROF.length; j++) { const [o0, h0] = NJ_PROF[j - 1], [o1, h1] = NJ_PROF[j], dl = hyp(o1 - o0, h1 - h0) || 1, sx = -(h1 - h0) / dl, sy = (o1 - o0) / dl, b0 = pil.p.length / 3;
+        vtx(pil, x0 + nx * o0, y0 + h0, z0 + nz * o0, nx * sx, sy, nz * sx, 0, 0); vtx(pil, x1 + nx * o0, y1 + h0, z1 + nz * o0, nx * sx, sy, nz * sx, 0, 0); vtx(pil, x1 + nx * o1, y1 + h1, z1 + nz * o1, nx * sx, sy, nz * sx, 0, 0); vtx(pil, x0 + nx * o1, y0 + h1, z0 + nz * o1, nx * sx, sy, nz * sx, 0, 0); pil.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); }
+      if (rete) { const b0 = rete.p.length / 3, u0 = (x0 * nz - z0 * nx) / 2, h0 = 0.82, h1 = PAR_RETE; vtx(rete, x0, y0 + h0, z0, nx, 0, nz, u0, 0); vtx(rete, x1, y1 + h0, z1, nx, 0, nz, u0 + L / 2, 0); vtx(rete, x1, y1 + h1, z1, nx, 0, nz, u0 + L / 2, (h1 - h0) / 2); vtx(rete, x0, y0 + h1, z0, nx, 0, nz, u0, (h1 - h0) / 2); rete.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); }
+      addBox(pil, x0, y0 + (0.82 + PAR_RETE) / 2, z0, 0.07, PAR_RETE - 0.82, 0.07, null); addBox(pil, (x0 + x1) / 2, (y0 + y1) / 2 + PAR_RETE - 0.03, (z0 + z1) / 2, L + 0.02, 0.06, 0.06, null, ry); continue; } /* (its posts and its top bar) */
     if (kind === 2) { rail(x0, z0, y0, x1, z1, y1, 1.0, 1.1); rail(x0, z0, y0, x1, z1, y1, 0.45, 0.5); addBox(pil, x0, y0 + 0.55, z0, 0.08, 1.1, 0.08, null); continue; } // a footbridge: a handrail and a bar on posts
     addBox(pil, (x0 + x1) / 2, (y0 + y1) / 2 + 0.2, (z0 + z1) / 2, L + 0.02, 0.5, 0.3, null, ry); rail(x0, z0, y0, x1, z1, y1, 0.6, 0.95); // a concrete kerb and a rail
   }
@@ -4094,7 +4106,7 @@ function* buildTileGen(T) {
       }
     }
     // markings and elevated roads
-    const deck = Buf(), dside = Buf(), emb = Buf(), grail = Buf(), dmark = Buf(), pil = Buf();
+    const deck = Buf(), dside = Buf(), emb = Buf(), grail = Buf(), dmark = Buf(), pil = Buf(), rete = Buf();
     // the markings drawn from the edges of the carriageway AC_VEI where the DBGT has them (tiles[t].sg, src/dbgt_righe.py): [type, level, s0,
     // points in cm delta-encoded]; type 0 edge line, 1 continuous centre line, 2 dashed (3 m every 7.5 m, the phase from s0, the length of the
     // line before this tile in dm); level 2 on a bridge: on the top of its deck. The streets that have them (roads[].sg) draw nothing on their axis
@@ -4220,7 +4232,7 @@ function* buildTileGen(T) {
     }
     // the old guardrails and pillars (old engine); in a tile of S the parapets, pillars and guardrails of sBarriers
     for (const sp of T.solidi || []) if (sp.k === 'pillar') { const g0 = H.ground(sp.x, sp.z), h = sp.y - 0.9 - g0; if (h > 0.5) addBox(pil, sp.x, g0 + h / 2, sp.z, 0.9, h, 0.9, null); }
-    if (T.fine) { const s_ = srndT; yield* drawBarriers(T, grail, pil); srndT = s_; }
+    if (T.fine) { const s_ = srndT; yield* drawBarriers(T, grail, pil, rete); srndT = s_; }
     for (const sp of (T.solidi || []).concat((T.flat || []).map(f => ({ k: 'rail', ...f })))) if (sp.k === 'rail') {
       const b0 = grail.p.length / 3, nx = sp.z1 - sp.z0, nz = -(sp.x1 - sp.x0), L = hyp(nx, nz) || 1, y0 = sp.y0, y1 = sp.y1;
       vtx(grail, sp.x0, y0 + 0.4, sp.z0, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, y1 + 0.4, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x1, y1 + 0.85, sp.z1, nx / L, 0, nz / L, 0, 0); vtx(grail, sp.x0, y0 + 0.85, sp.z0, nx / L, 0, nz / L, 0, 0);
@@ -4230,7 +4242,7 @@ function* buildTileGen(T) {
     { const s_ = srndT; yield 'streets put'; srndT = s_; } 
     for (const b of [mark, lett, lettB]) senzaStrisce(T, b); put(asp, MAT.asph, 5); put(por, MAT.piazza, 5); put(foot, MAT.foot, 3); for (const b of FB.values()) put(b, fondoLook(b.fm).F, b.rk >= 5 ? 5 : 3); FB.clear(); { const s_ = srndT; yield 'marks put'; srndT = s_; } put(mark, MAT.mark, 6, undefined, 'righe'); if (lett.i.length) put(lett, segStopMat(), 7); if (lettB.i.length) put(lettB, segBusMat(), 7);
     put(sw, MAT.side, 9); put(kerb, MAT.kerb, 9, undefined, 'cordoli'); put(kerbS, MAT.kerb, 9, undefined, 'cordoli');
-    put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10, undefined, 'guardrail'); put(dmark, MAT.deckMark, 10, undefined, 'righe'); put(pil, MAT.deckSide, 10, 'cast');
+    put(deck, MAT.deck, 9, 'cast'); put(dside, MAT.deckSide, 10, 'cast'); put(emb, MAT.embank, 8); put(grail, MAT.rail, 10, undefined, 'guardrail'); put(dmark, MAT.deckMark, 10, undefined, 'righe'); put(pil, MAT.deckSide, 10, 'cast'); put(rete, MAT.railPanel, 10);
   }
   yield 'walls';
   // walls, fences, hedges and the expressway median
