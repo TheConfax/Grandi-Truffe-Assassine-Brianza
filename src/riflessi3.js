@@ -7,7 +7,7 @@
 //  - the metals tint what they mirror with their own colour.
 // The kinds (RIF_KIND): paint (car bodies), glass (car panes), shop (shop windows), metal (guardrails, lamp posts, railings, gates, rails), asphalt.
 // RIF.wet: 0 dry .. 1 soaked, for the day it rains: the asphalt then darkens and goes smoother (sharper, stronger reflections). It follows WX.wet (weather3.js, fase 3)
-const RIF = { wet: { value: 0 }, t: { value: 0 }, rain: { value: 0 }, pre: [], cache: {}, pr: { tex: { value: null }, mat: { value: new THREE.Matrix4() }, on: { value: 0 } } }; /* pr: the planar reflection of the wet ground (bagnato3.js) */ // t, rain: the rings of the drops in the puddles (realismo 2, fase C)
+const RIF = { wet: { value: 0 }, t: { value: 0 }, rain: { value: 0 }, pre: [], cache: {}, pr: { tex: { value: null }, mat: { value: new THREE.Matrix4() }, on: { value: 0 } } }; /* pr: the planar reflection of the wet ground (bagnato3.js) */ window.__RIFW = RIF.wet; /* extras.js: the painted pools of light dim on the wet */ // t, rain: the rings of the drops in the puddles (realismo 2, fase C)
 // Realismo 2, fase C: what a body or a pane mirrors near the horizon is the town, not the sky: a skyline of houses all round (by direction, lit as a wall
 // in the open, blurred with the roughness), so a car going by shows the houses sliding over its sides. And in the rain the asphalt gets puddles: where the
 // ground is a little lower (a noise in metres, the same for all), they grow with the wet, mirror like water (smooth, dark under) and ring with the drops

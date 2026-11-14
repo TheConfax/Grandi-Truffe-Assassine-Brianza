@@ -461,19 +461,23 @@ class Verde:
         T = np.array([(t_[0], t_[1]) for t_ in trees]) if len(trees) else np.zeros((0, 2)); tt = STRtree([Point(p) for p in T]) if len(T) else None
         cl = {}
         for k, (t, q) in enumerate(polys): c = q.centroid; cl.setdefault((int(c.x // 1500), int(c.y // 1500)), []).append(k)
-        for key in sorted(cl):
-            P = [polys[k] for k in cl[key]]; U = unary_union([q.buffer(-0.8) for t, q in P]); U12 = unary_union([q.buffer(-0.8) for t, q in P if t == 12])
-            if U.is_empty: continue
+        # the build's cache (src/build_cache.py, table cespugli): a group of green depends only on its polygons, the trees near it, the LiDAR, WorldCover and the code
+        import build_cache as BC, time as _t
+        t0_ = _t.time()
+        tab = BC.Tabella('cespugli', BC.sorgenti('dbgt_verde.py', 'dbgt_manufatti.py', 'dbgt_quote.py', 'dbgt_boschi.py') + BC.dati(os.path.join(data, 'terreno', 'lidar')) + BC.dati(os.path.join(data, 'terreno', 'lidar_dsm')) + BC.dati(os.path.join(data, 'worldcover', 'wc')))
+        def calc(P):
+            U = unary_union([q.buffer(-0.8) for t, q in P]); U12 = unary_union([q.buffer(-0.8) for t, q in P if t == 12])
+            if U.is_empty: return [], 0, 0
             prepare(U); prepare(U12)
             x0, z0, x1, z1 = U.bounds
             if zona is not None: x0, z0, x1, z1 = max(x0, zona[0]), max(z0, zona[1]), min(x1, zona[2]), min(z1, zona[3])
-            if x1 <= x0 or z1 <= z0: continue
+            if x1 <= x0 or z1 <= z0: return [], 0, 0
             xs = np.arange(math.floor(x0 / CESP_PASSO) * CESP_PASSO, x1, CESP_PASSO); zs = np.arange(math.floor(z0 / CESP_PASSO) * CESP_PASSO, z1, CESP_PASSO)
             XX, ZZ = np.meshgrid(xs, zs); X, Z = XX.ravel(), ZZ.ravel()
             hsh = np.modf(np.sin(X * 12.9898 + Z * 78.233) * 43758.5453)[0]; hsh2 = np.modf(np.sin(X * 39.346 + Z * 11.135) * 23421.631)[0]
             X = X + (np.abs(hsh) - 0.5) * CESP_PASSO * 0.6; Z = Z + (np.abs(hsh2) - 0.5) * CESP_PASSO * 0.6
             ins = shapely.contains_xy(U, X, Z); X, Z, hsh = X[ins], Z[ins], np.abs(hsh[ins])
-            if not len(X): continue
+            if not len(X): return [], 0, 0
             N = np.full(len(X), np.nan)
             if dtm.t and dsm.t:
                 G = dbgt_manufatti.Grid((X.min(), Z.min(), X.max(), Z.max()), pad=4.0, dtm=dtm, dsm=dsm)
@@ -486,12 +490,22 @@ class Verde:
                 okw = np.isin(w, (10, 20, 30))
             veg = np.isfinite(N) & (N > CESP_MIN) & okw
             in12 = shapely.contains_xy(U12, X, Z) if not U12.is_empty else np.zeros(len(X), bool)
+            res, nl_, n12_ = [], 0, 0
             for i in range(len(X)):
-                if veg[i]: h = min(float(N[i]), CESP_MAX); nl += 1
-                elif in12[i] and hsh[i] < 0.5: h = 1.0 + 0.8 * hsh[i] * 2; n12 += 1
+                if veg[i]: h = min(float(N[i]), CESP_MAX); nl_ += 1
+                elif in12[i] and hsh[i] < 0.5: h = 1.0 + 0.8 * hsh[i] * 2; n12_ += 1
                 else: continue
                 if tt is not None and len(tt.query(Point(X[i], Z[i]), predicate='dwithin', distance=2.2)): continue
-                out.append((float(X[i]), float(Z[i]), round(h, 1)))
+                res.append((float(X[i]), float(Z[i]), round(h, 1)))
+            return res, nl_, n12_
+        for key in sorted(cl):
+            P = [polys[k] for k in cl[key]]; bb_ = np.array([q.bounds for t, q in P]); bx = (bb_[:, 0].min(), bb_[:, 1].min(), bb_[:, 2].max(), bb_[:, 3].max())
+            tn = T[(T[:, 0] > bx[0] - 3) & (T[:, 0] < bx[2] + 3) & (T[:, 1] > bx[1] - 3) & (T[:, 1] < bx[3] + 3)] if len(T) else T
+            k_ = BC.chiave([(t, q.wkb) for t, q in P], np.round(tn, 3).tobytes(), CESP_PASSO, CESP_MIN, CESP_MAX, zona)
+            if k_ in tab: r_ = tab.get(k_)
+            else: r_ = calc(P); tab.put(k_, r_)
+            out += r_[0]; nl += r_[1]; n12 += r_[2]
+        tab.salva(); self.log('dbgt verde: cespugli in %.1fs, gruppi dalla cache %d su %d' % (_t.time() - t0_, tab.trovati(), len(cl)))
         self.rep['cespugli'] = {'n': len(out), 'dal_lidar': nl, 'negli_arbusteti': n12}
         self.log('dbgt verde: cespugli', len(out), 'dal LiDAR', nl, 'negli arbusteti', n12)
         return out

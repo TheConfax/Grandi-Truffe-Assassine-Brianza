@@ -315,18 +315,21 @@ function updBarriere(dt) {
 const _barUp = new THREE.Vector3(0, 1, 0), _barM = new THREE.Matrix4(), _barQ = new THREE.Quaternion(), _barZ = new THREE.Matrix4().makeScale(0, 0, 0), _barE = new THREE.Euler(), _barP = new THREE.Vector3(), _barS = new THREE.Vector3();
 
 // the shrubs of the roundabouts (rotonde3.js): solid until a car hits one fast enough, then crushed flat, a few leaves thrown, the car slowed
-const BUSH_G = new Grid(6), BUSH = { slow: 0.9, dmg: 0.6, bit: 0x4f7a3a };
-function bushHits(v, cs, R) {
+const BUSH_G = new Grid(6), BUSH = { slow: 0.9, dmg: 0.6, bit: 0x4f7a3a, twig: 0x5a4632, breakV: 6 }; /* breakV: m/s, under it a knock only sways the shrub */
+function bushHits(v, cs, R) { /* a light knock sways the shrub (it stays, the car stops against it), a hard one bends it down and the car goes through, slower (verde3.js BEND) */
+  const now = performance.now() / 1000;
   BUSH_G.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, b => {
-    if (b.off || b.T.roIm !== b.im || !b.T.ready || Math.abs(v.y - b.y) > 2.5) return;
+    if (b.off || (b.vr ? !(b.T.vrIms && b.T.vrIms.includes(b.im)) : b.T.roIm !== b.im) || !b.T.ready || Math.abs(v.y - b.y) > 2.5) return; /* vr: the shrubs of verde3.js */
     for (const c of cs) {
       const dx = b.x - c[0], dz = b.z - c[1], d = hyp(dx, dz); if (d >= b.hw * 0.85 + R || d < 1e-6) continue;
       if ((v.vx * dx + v.vz * dz) / d < BAR_VN_H) continue; // towards the shrub
-      b.off = true; b.w.off = true; const speed = v.speed;
-      const m = b.m.clone(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(); m.decompose(p, q, s); m.compose(p, q, s.set(s.x * 1.15, s.y * 0.12, s.z * 1.15)); b.im.setMatrixAt(b.i, m); b.im.instanceMatrix.needsUpdate = true;
+      const speed = v.speed;
+      if (speed < BUSH.breakV) { /* slow: it gives way under the car and springs back once the car has gone by (verde3.js bendAggiorna puts its wall back) */
+        if (!(now - (b.wob || 0) < 0.6)) { b.wob = now; b.w.off = true; bendStart(b, v, false); barBits(b.x, b.y + b.h * 0.6, b.z, v, BUSH.bit, 2); v.vx *= 0.92; v.vz *= 0.92; } return; }
+      b.off = true; b.w.off = true; bendStart(b, v, true);
       v.vx *= BUSH.slow; v.vz *= BUSH.slow; v.health = Math.max(0, v.health - BUSH.dmg);
       if (v === P.car) { sfxCrash(Math.min(4, 2 + speed * 0.1)); shake = Math.max(shake, 0.15); }
-      barBits(b.x, b.y + b.h * 0.5, b.z, v, BUSH.bit, 5); return;
+      barBits(b.x, b.y + b.h * 0.5, b.z, v, BUSH.bit, 8); barBits(b.x, b.y + b.h * 0.3, b.z, v, BUSH.twig, 4); return; /* leaves and twigs */
     }
   });
 }
