@@ -126,6 +126,48 @@ def togli_cancelli_doppi(gates, prio, dstr=None, edifici=None, varco=True, imboc
     return [g for k, g in enumerate(gates) if k not in tolti], per
 
 
+ARR_D = (2.0, 7.0)   # m: a quanto sta indietro il cancello arretrato dalla linea del cancello sul confine
+ARR_COS = 0.966      # parallelismo (15 gradi)
+ARR_SOV = 0.8        # quanto del cancello arretrato sta di fronte a quello sul confine
+ARR_LARG = 0.25      # differenza massima di larghezza fra i due, in proporzione
+
+
+def cancelli_arretrati(gates, linee, edifici):
+    """(Carlo 13/11, caso b2 x -830 z 312) Il doppione arretrato: un cancello 'g' che non tocca niente (nessun divisore ne' edificio entro 1 m dai due capi), a 2-7 m
+    dietro un altro cancello 'g' parallelo (15 gradi), della stessa larghezza (25%) e quasi tutto di fronte a lui (80%), che sta sul confine (i suoi due capi toccano un divisore,
+    un edificio o un altro cancello entro 1 m): e' lo stesso varco disegnato due volte, una volta sul confine e una nel cortile (un cancello nel cortile, in fondo a un passo carraio,
+    non e' un doppione: non e' parallelo e della stessa larghezza di uno sul confine). gates: gate_out ([x0, z0, x1, z1, tipo, ...] in dm); linee: [pts] dei divisori;
+    edifici: [Polygon]. Ritorna (cancelli rimasti, [(x, z, larghezza)] di quelli spostati). L'arretrato va sulla linea dell'altro e l'altro e' tolto"""
+    G = [(LineString([(g[0] / 10, g[1] / 10), (g[2] / 10, g[3] / 10)]) if g[4] == 'g' else None) for g in gates]
+    idx = [i for i, l in enumerate(G) if l is not None and l.length >= 1.5]
+    if len(idx) < 2: return gates, []
+    ob = [LineString(p) for p in linee if len(p) >= 2] + [b.boundary for b in edifici]
+    obt = STRtree(ob) if ob else None
+    gt = STRtree([G[i] for i in idx])
+
+    def tocca(P, escludi):
+        if obt is not None and any(ob[j].distance(P) < 1.0 for j in obt.query(P.buffer(1.0))): return True
+        return any(idx[jj] != escludi and G[idx[jj]].distance(P) < 1.0 for jj in gt.query(P.buffer(1.0)))
+
+    tolti = set(); out = []
+    for i in idx:
+        A = G[i]; a0, a1 = A.coords[0], A.coords[-1]
+        if tocca(Point(a0), i) or tocca(Point(a1), i): continue
+        ua = ((a1[0] - a0[0]) / A.length, (a1[1] - a0[1]) / A.length); m = A.interpolate(0.5, normalized=True)
+        for jj in gt.query(A.buffer(ARR_D[1] + 1)):
+            j = idx[jj]
+            if j == i or j in tolti or i in tolti: continue
+            B = G[j]; b0, b1 = B.coords[0], B.coords[-1]
+            ub = ((b1[0] - b0[0]) / B.length, (b1[1] - b0[1]) / B.length)
+            if abs(ua[0] * ub[0] + ua[1] * ub[1]) < ARR_COS or abs(A.length - B.length) > ARR_LARG * B.length: continue
+            if not ARR_D[0] <= B.distance(m) <= ARR_D[1]: continue
+            s0, s1 = sorted(((p[0] - b0[0]) * ub[0] + (p[1] - b0[1]) * ub[1]) for p in (a0, a1))
+            if (min(s1, B.length) - max(s0, 0)) < ARR_SOV * A.length: continue
+            if not (tocca(Point(b0), j) and tocca(Point(b1), j)): continue
+            tolti.add(j); out.append((round(m.x, 1), round(m.y, 1), round(A.length, 1))); gates[i][0:4] = gates[j][0:4]; break   # l'arretrato si sposta sul confine (un cancello OSM non sparisce), quello sul confine resta come suo doppione e va
+    return [g for k, g in enumerate(gates) if k not in tolti], out
+
+
 def osm_non_costruiti(osm, gates, porte=()):
     """osm: [(x, z, id, nome)]; gates, porte: [(x0, z0, x1, z1)] in m. Ritorna gli OSM senza un cancello o una porta a meno di OSM_D m"""
     segs = [LineString([(g[0], g[1]), (g[2], g[3])]) if math.dist(g[:2], g[2:4]) > 0.01 else Point(g[0], g[1]) for g in list(gates) + list(porte)]

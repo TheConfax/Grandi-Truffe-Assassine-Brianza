@@ -50,8 +50,8 @@
    "capo_recinzione"
   ]
  ],
- "dietro_recinzione": 45,
- "dietro_recinzione_regola": 45,
+ "dietro_recinzione": 48,
+ "dietro_recinzione_regola": 48,
  "dove_dietro_recinzione": [
   [
    589.2,
@@ -64,6 +64,11 @@
    "varco"
   ],
   [
+   308.9,
+   999.6,
+   "varco"
+  ],
+  [
    -2093.6,
    -1237.4,
    "varco"
@@ -71,6 +76,11 @@
   [
    1660.0,
    2177.2,
+   "varco"
+  ],
+  [
+   -383.6,
+   -789.0,
    "varco"
   ],
   [
@@ -206,6 +216,11 @@
   [
    1409.7,
    -615.6,
+   "capo_recinzione"
+  ],
+  [
+   144.6,
+   -369.1,
    "capo_recinzione"
   ],
   [

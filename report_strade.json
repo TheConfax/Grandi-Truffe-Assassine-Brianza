@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 4.1,
+  "tempo_s": 4.5,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 33.7,
+  "tempo_s": 35.4,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -1626,7 +1626,17 @@
   "osm": 293,
   "dedotto_varchi": 1636
  },
- "cancelli_stesso_imbocco_tolti": 448,
+ "cancelli_arretrati_spostati sul confine": {
+  "n": 1,
+  "dove": [
+   [
+    -823.5,
+    316.0,
+    4.8
+   ]
+  ]
+ },
+ "cancelli_stesso_imbocco_tolti": 447,
  "divisori_tagliati_da_cancelli": 185,
  "cancelli_in_carreggiata_spostati": {
   "spostati": 427,
@@ -1748,8 +1758,19 @@
   "ante_girate": 216,
   "alberi_spostati": 5041
  },
+ "lotti_chiusi": {
+  "pilastri_liberi": 894,
+  "chiusi": 437,
+  "tratti": 440,
+  "metri": 3898,
+  "senza_fine": 309,
+  "senza_stile": 56,
+  "attraversa_la_carreggiata": 66,
+  "doppio": 26,
+  "sotto_un_cancello": 9
+ },
  "chiusure_a_t": {
-  "capi_liberi": 21196,
+  "capi_liberi": 21195,
   "niente_davanti": 6672,
   "in_linea": 1912,
   "troppo_largo_in_linea": 1232,
@@ -1760,7 +1781,7 @@
   "chiusi_recinzione": 1737,
   "chiusi_in_linea": 293,
   "chiusi_edificio": 4510,
-  "via_nel_varco": 564,
+  "via_nel_varco": 563,
   "cancello_su_vialetto": 19,
   "cancello_nel_varco": 213,
   "pavimentato_nel_varco": 104,
@@ -1777,19 +1798,26 @@
    "2": 30,
    "imbocco": 0
   },
-  "divisori": 186
+  "divisori": 235
  },
  "recinzioni_controllo": {
   "coppie_doppie_rimaste": 0,
   "cancelli_doppi_rimasti": 0,
   "cancelli_osm_in_mappa": 293,
-  "cancelli_osm_non_costruiti": 0,
+  "cancelli_osm_non_costruiti": 1,
   "cancellate_isolate_disegnate": 0,
-  "cancelli_osm_non_costruiti_a_meda_seveso": 0,
+  "cancelli_osm_non_costruiti_a_meda_seveso": 1,
   "cancelli_osm_a_meda_seveso": 110,
   "dove_coppie_doppie": [],
   "dove_cancelli_doppi": [],
-  "dove_osm_non_costruiti": [],
+  "dove_osm_non_costruiti": [
+   [
+    -823.5,
+    316.0,
+    "2703883647",
+    "gate"
+   ]
+  ],
   "dove_cancellate_isolate": []
  },
  "oggetti_della_via_nei_muri": {
@@ -2045,8 +2073,8 @@
    "dove": []
   },
   "barriere_in_carreggiata": {
-   "n": 21,
-   "metri": 84.8,
+   "n": 25,
+   "metri": 89.4,
    "dove": [
     "?x=783&z=-114",
     "?x=-867&z=695",
@@ -2826,6 +2854,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 13.8
+  "tempo_s": 11.4
  }
 }

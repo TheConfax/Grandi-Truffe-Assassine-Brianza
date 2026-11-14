@@ -369,7 +369,7 @@ function* buildPaesaggio(T, G) {
   };
   { const im = inst(LS_BALE_G, LS_BALE_M, bales); if (im) bales.forEach(([x, z, r], i) => { /* a bale rolls away under a hard blow (props3.js FORZA.medio, via) and is solid again where it stops */
     const id = T.t + ':' + i, p = LS_BALE_PROPS.get(id), gy = H.ground(x, z);
-    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'medio', via: 'rotola', inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
+    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'leggero', via: 'rotola', cy: 0.75, inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
     else propRifai(p, [im], i);
   }); }
   yield 'terreni balle';

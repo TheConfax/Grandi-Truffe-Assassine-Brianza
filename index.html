@@ -118,6 +118,10 @@ body:has(#start:not([hidden])) :is(.hud, #osm, #touch, #fx, #dbghud, #pause) { d
 #pause p { font-size: 19px; margin: 6px 0; }
 body:not(.debug) .dbg { display: none !important; }
 #pause .dbgline { margin-top: 14px; font-size: 14px; } #pause .dbgline button { font: 600 14px system-ui; padding: 6px 12px; border-radius: 4px; border: 0; background: var(--ocra); color: #15161c; cursor: pointer; margin: 2px; } #dbgcode { width: 110px; font: 14px system-ui; padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,.25); background: #15161c; color: #fff; text-align: center; }
+#dbgtele { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 10; width: min(520px, calc(100vw - 32px)); box-sizing: border-box; padding: 14px 16px; background: rgba(14,15,20,.88); border: 2px solid var(--ocra); border-radius: 6px; text-align: center; }
+#dbgtele h3 { font-family: var(--display); font-size: 22px; margin: 0 0 8px; color: var(--ocra); font-weight: 400; }
+#dbgtele input { width: 100%; box-sizing: border-box; font: 600 20px var(--body); padding: 7px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,.3); background: #15161c; color: #fff; -webkit-user-select: text; user-select: text; }
+#dbgtele p { font: 500 15px var(--body); margin: 6px 0 0; color: rgba(255,255,255,.7); }
 #dbghud { position: fixed; left: 50%; transform: translateX(-50%); bottom: 6px; z-index: 8; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
 #osm { position: fixed; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(2px + env(safe-area-inset-bottom, 0px)); font-size: 11px; color: rgba(251,245,230,.7); text-shadow: 0 1px 0 #000; }
 #touch { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
@@ -148,7 +152,7 @@ body:not(.debug) .dbg { display: none !important; }
 <div id="touch" hidden></div>
 <div id="fx"><h2 id="fxt"></h2></div>
 <div id="big" hidden><canvas id="bigmap"></canvas><div class="cap">BRIANZA<span id="bighint">Rotella o due dita: zoom · trascina: sposta · clic: segnaposto · M: torna in strada</span></div><button id="bigx" aria-label="Chiudi la mappa">×</button></div>
-<div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p><p class="ver" id="pver" hidden></p></div></div>
+<div id="dbgtele" hidden><h3>Teletrasporto</h3><input id="dbgteleq" type="text" spellcheck="false" autocomplete="off" placeholder="link del gioco oppure: x z"><p id="dbgtelem">Invio = vai &middot; Esc = chiudi</p></div><div id="dbghud" hidden></div><div id="pause" hidden><div><h2>PAUSA</h2><p><kbd>W A S D</kbd> guida · <kbd>SPAZIO</kbd> freno a mano · <kbd>SHIFT</kbd> turbo · <kbd>F</kbd> sali/scendi</p><p><kbd>C</kbd> visuale · <kbd>M</kbd> mappa · <kbd>H</kbd> clacson · <kbd>N</kbd> +2 ore · <kbd>R</kbd> radio · <kbd>Q</kbd>/<kbd>E</kbd> peso in moto · <span class="dbg"><kbd>B</kbd> segnala punto · </span><kbd>U</kbd> audio</p><p id="padline" hidden></p><p class="dbgline"><span class="dbg"><button id="dbgdl" type="button">⬇ Scarica segnalazioni</button> <button id="dbgclr" type="button">🗑 Svuota</button> </span><input id="dbgcode" type="text" spellcheck="false" autocomplete="off" placeholder="codice" maxlength="12"></p><p>Premi <kbd>P</kbd> per riprendere</p><p class="ver" id="pver" hidden></p></div></div>
 
 <div id="fade"></div>
 <div id="start">
@@ -179,7 +183,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo dev · dopo e3037f24 · assemblato 13/11 21:58 · porta ' + location.port;
+    const txt = 'locale · ramo dev · dopo c67c7314 · assemblato 14/11 15:47 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1446,11 +1450,20 @@ function propRifai(p, meshes, i) {
   if (p.broken) { M.makeScale(0, 0, 0); for (const m of meshes) m.setMatrixAt(i, M); }
   else if (p.inst.mf) meshes.forEach((m, j) => m.setMatrixAt(i, p.inst.mf[j] || p.inst.mf[0]));
 }
-function propSpingi(p, v) { // pushed: it takes the vehicle's way at part of its speed (a bale more, a block less), the vehicle loses some
-  const l = hyp(v.vx, v.vz) || 1, k = p.via === 'rotola' ? 0.8 : 0.6;
-  p.vx = v.vx / l * v.speed * k; p.vz = v.vz / l * v.speed * k;
-  if (!p.moving) { p.moving = true; PROP_MOVE.push(p); if (p.inst) { p.mo = new THREE.Object3D(); p.mo.position.set(p.x, p.y, p.z); p.mo.updateMatrix(); p.m0 = propMatrici(p); p.p0 = [p.x, p.y, p.z]; } }
-  propUrto(v);
+function propSpingi(p, v) { // pushed: a block takes the vehicle's way at part of its speed; a bale (heavy, 300-500 kg) rolls only across its axis like a wheel, or grinds a little along it
+  const l = hyp(v.vx, v.vz) || 1, prima = !p.moving;
+  if (p.via === 'rotola') {
+    const ry = p.inst ? p.inst.ry : 0, ax = Math.cos(ry), az = -Math.sin(ry), nx = Math.sin(ry), nz = Math.cos(ry); /* axis of the cylinder, and the way it rolls (across it) */
+    p.vx = p.vx || 0; p.vz = p.vz || 0;
+    const vn = v.vx * nx + v.vz * nz, va = v.vx * ax + v.vz * az;
+    let bn = p.vx * nx + p.vz * nz, ba = p.vx * ax + p.vz * az;
+    const tn = clamp(vn * 0.7, -6, 6), ta = clamp(va * 0.25, -2, 2);
+    if (Math.abs(tn) > Math.abs(bn)) bn = tn; if (Math.abs(ta) > Math.abs(ba)) ba = ta;
+    p.vx = nx * bn + ax * ba; p.vz = nz * bn + az * ba;
+  } else { const k = 0.6; p.vx = v.vx / l * v.speed * k; p.vz = v.vz / l * v.speed * k; }
+  const cy = p.cy || 0;
+  if (!p.moving) { p.moving = true; PROP_MOVE.push(p); if (p.inst) { p.mo = new THREE.Object3D(); p.mo.position.set(p.x, p.y + cy, p.z); p.mo.updateMatrix(); p.m0 = propMatrici(p); p.p0 = [p.x, p.y + cy, p.z]; } }
+  if (prima || p.via !== 'rotola') propUrto(v); else { v.vx *= 0.985; v.vz *= 0.985; } /* one blow, then it is only pushed along */
 }
 function propHits(v) {
   tombHits(v);
@@ -1513,8 +1526,13 @@ function updProps(dt) {
     if (f.giu && hyp(f.vx, f.vz) < 0.01 || f.giu && f.t > 30) PROP_FALL.splice(i, 1);
   }
   for (let i = PROP_MOVE.length - 1; i >= 0; i--) { // rolling and sliding: friction, the walls round it, its own wall going with it
-    const p = PROP_MOVE[i], sp = hyp(p.vx, p.vz), ns = Math.max(0, sp - (p.via === 'rotola' ? 5 : 7) * dt), k = sp > 1e-6 ? ns / sp : 0;
-    p.vx *= k; p.vz *= k;
+    const p = PROP_MOVE[i]; let sp = hyp(p.vx, p.vz), ns, k;
+    if (p.via === 'rotola') { /* rolling on grass stops soon (4.5 m/s2); grinding on its flat side stops at once (9) */
+      const ry = p.inst ? p.inst.ry : 0, ax = Math.cos(ry), az = -Math.sin(ry), nx = Math.sin(ry), nz = Math.cos(ry);
+      let bn = p.vx * nx + p.vz * nz, ba = p.vx * ax + p.vz * az;
+      bn = Math.sign(bn) * Math.max(0, Math.abs(bn) - 4.5 * dt); ba = Math.sign(ba) * Math.max(0, Math.abs(ba) - 9 * dt);
+      p.vx = nx * bn + ax * ba; p.vz = nz * bn + az * ba; ns = hyp(p.vx, p.vz); k = 1; p.nx = nx; p.nz = nz;
+    } else { ns = Math.max(0, sp - 7 * dt); k = sp > 1e-6 ? ns / sp : 0; p.vx *= k; p.vz *= k; }
     const q = { x: p.x + p.vx * dt, z: p.z + p.vz * dt }, gq = H.ground(q.x, q.z);
     if (collideStatic(q, p.r, gq + 0.4, true, new Set([p.wall, ...(p.pw || [])]))) { p.vx *= 0.3; p.vz *= 0.3; }
     const mx = q.x - p.x, mz = q.z - p.z, w = p.wall, r = p.r + 0.2;
@@ -1522,8 +1540,8 @@ function updProps(dt) {
     p.x = q.x; p.z = q.z; const gy = H.ground(p.x, p.z), dy = gy - p.y; p.y = gy; w.x = p.x; w.z = p.z; w.y0 += dy; w.y1 += dy; if (w.sali) w.sali.top += dy;
     WALLS.add(p.x - r, p.z - r, p.x + r, p.z + r, w); PROPG.add(p.x - 3, p.z - 3, p.x + 3, p.z + 3, p);
     if (p.mo) {
-      p.mo.position.set(p.x, p.y, p.z); const d = hyp(mx, mz);
-      if (p.via === 'rotola' && d > 1e-6) p.mo.rotateOnWorldAxis(new THREE.Vector3(mz / d, 0, -mx / d), d / Math.max(0.3, p.r));
+      p.mo.position.set(p.x, p.y + (p.cy || 0), p.z); const dn = mx * (p.nx || 0) + mz * (p.nz || 0);
+      if (p.via === 'rotola' && Math.abs(dn) > 1e-7) p.mo.rotateOnWorldAxis(new THREE.Vector3(p.nz, 0, -p.nx), dn / 0.75); /* turns about its own axis, as a wheel: only the way across it is rolling */
       propScrivi(p, p.mo, p.m0, p.p0[0], p.p0[1], p.p0[2]);
     }
     if (ns < 0.05) { p.moving = false; PROP_MOVE.splice(i, 1); if (p.inst) p.inst.mf = propMatrici(p); }
@@ -4400,11 +4418,11 @@ function* buildTileGen(T) {
         });
         /* the doors on this house (Carlo 7/11, via Adua): a door takes the place of the ground-floor window of a bay, never sits over a window. It goes to the centre of the nearest free bay of its wall, flush on the wall, facing out; that bay draws no window on its lowest floor (R.noG). Where the wall has no bays the door stays where it is, put on the wall. PORTE_CNT counts the doors over a ground-floor window before and after (debug) */
         /* the shop fronts on this building (negozi3.js, decided by the bake: T.d.ngw) win over windows and doors (Carlo 8/11): no window in the bay of a front on the ground floor, no door under it */
-        for (const [bi, fx, fz, fwid, hS] of T.d && T.d.ngw ? T.d.ngw.filter(q => q[0] === B.bi) : []) {
+        for (const [bi, fx, fz, fwid, hS] of T.d && T.d.ngw ? T.d.ngw : []) { /* every front of the tile, not only those of this very building (Carlo 14/11, piazza della Chiesa: the front of a shop belongs to the building the OSM point falls in, the door to the next one along the same wall): the match by distance from the wall decides */
           let best = null; for (const rg of rings) for (let i = 0; i < rg.nr; i++) { const w = rg.W[i]; if (!w) continue; const a = rg.ring[i], [dx, dz, L] = rg.E[i], tt = clamp(((fx - a[0]) * dx + (fz - a[1]) * dz) / (L * L), 0, 1), dd = hyp(fx - a[0] - dx * tt, fz - a[1] - dz * tt); if (dd < 1.2 && (!best || dd < best.dd)) best = { dd, R: w[0], s: w[1] + tt * L }; }
           if (!best) continue; const R = best.R, v0 = best.s - fwid / 2 - 0.15, v1 = best.s + fwid / 2 + 0.15; const gF = gCasa(fx, fz), tF = bldTop(B) - gF, hV = Math.min(Math.max(tF - 1.0, 2.6), 3.6), shF = Math.min(Math.max(tF - hV - 0.35, 0), 0.75); /* the sign and its window are free of everything, like a door: up to the top of the sign (the widest model: the one with the bay window) */ (R.vt || (R.vt = [])).push([v0, v1, hS !== undefined ? gF + hS : tF < 2.7 ? gF : gF + hV + (shF >= 0.32 ? shF : 0)]); /* hS: the sign of that very front, from its own model (the bake, ngSignTop); without it (old data) the highest model */
-          const VC = window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0 }); VC.vetrine++;
-          if (R.n) { const noG = R.noG || (R.noG = new Set()); for (let j = 0; j < R.n; j++) { const b0 = R.pad + j * R.bw, b1 = b0 + R.bw; if (b1 > v0 && b0 < v1) { noG.add(j); VC.campate++; } } }
+          const VC = facVC(); VC.vetrine++;
+          if (R.n) { const noG = R.noG || (R.noG = new Set()); for (let j = 0; j < R.n; j++) { const b0 = R.pad + j * R.bw, b1 = b0 + R.bw; if (b1 > v0 && b0 < v1) { noG.add(j); (R.noV || (R.noV = new Set())).add(j); VC.campate++; } } }
         }
         for (const d of T.doors || []) {
           if (d.fit === T.fitN) continue; const mx = (d.ax + d.bx) / 2, mz = (d.az + d.bz) / 2; let best = null;
@@ -4412,22 +4430,23 @@ function* buildTileGen(T) {
             const w = rg.W[i]; if (!w) continue; const a = rg.ring[i], [dx, dz, L] = rg.E[i], t = clamp(((mx - a[0]) * dx + (mz - a[1]) * dz) / (L * L), 0, 1), dd = hyp(mx - a[0] - dx * t, mz - a[1] - dz * t);
             if (dd < 1.0 && (!best || dd < best.dd)) best = { dd, rg, i, R: w[0], s: w[1] + t * L };
           }
-          if (!best) continue; d.fit = T.fitN; const { R, rg } = best, e = rg.E[best.i], PC = window.PORTE_CNT || (window.PORTE_CNT = { porte: 0, sopra_prima: 0, sopra_dopo: 0, spostate: 0 });
+          if (!best) { if (!d.skip && !window.VP_OFF && facBloccaPorta(T, mx, mz, d.W / 2 + 0.3)) { d.skip = true; facVC().porte_tolte_senza_muro++; } continue; } d.fit = T.fitN; const { R, rg } = best, e = rg.E[best.i], PC = window.PORTE_CNT || (window.PORTE_CNT = { porte: 0, sopra_prima: 0, sopra_dopo: 0, spostate: 0 });
           const dh = facDoorBox(S0.door, d.W, d.h)[0]; /* half the door with its frame (the stone frame of an old door is 0.72 m wider than the door, the entry phone of a block of flats stands beside it) */
           const fw = R.fw, win = j => { const s0 = R.pad + j * R.bw; return [s0 + fw[2] * R.bw, s0 + fw[3] * R.bw]; }, ov = (j, s) => { const [w0, w1] = win(j); return s + dh > w0 && s - dh < w1; };
-          const underV = s => (R.vt || []).some(([v0, v1]) => s + dh > v0 && s - dh < v1), VC = window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0 }), wasV = underV(best.s);
+          const underV = s => (R.vt || []).some(([v0, v1]) => s + dh > v0 && s - dh < v1), VC = facVC(), wasV = underV(best.s);
           const noG = R.noG || (R.noG = new Set()); let sc = best.s; PC.porte++;
           if (R.n && R.fw) {
             const O = R.ovl || (R.ovl = new Set()); for (let j = 0; j < R.n; j++) if (ov(j, best.s)) O.add(j);
             const c = j => R.pad + (j + 0.5) * R.bw; let bj = -1;
             for (let j = 0; j < R.n; j++) if (!noG.has(j) && Math.abs(c(j) - best.s) < 2 * R.bw && (bj < 0 || Math.abs(c(j) - best.s) < Math.abs(c(bj) - best.s))) bj = j;
             if (bj < 0 && wasV) for (let j = 0; j < R.n; j++) if (!noG.has(j) && !underV(c(j)) && (bj < 0 || Math.abs(c(j) - best.s) < Math.abs(c(bj) - best.s))) bj = j; /* under a shop front: any free bay of the wall */
-            if (bj >= 0) { sc = c(bj); noG.add(bj); PC.spostate++; if (wasV) VC.porte_spostate++; }
+            if (bj >= 0) { sc = c(bj); noG.add(bj); (R.noD || (R.noD = new Set())).add(bj); PC.spostate++; if (wasV) VC.porte_spostate++; }
           }
+          { const m2 = R.at(sc); if (!window.VP_OFF && facBloccaPorta(T, m2[0], m2[1], dh)) { d.skip = true; VC.porte_tolte++; continue; } }
           if (underV(sc)) { d.skip = true; VC.porte_tolte++; continue; } /* no door under a shop front: it goes */
-          if (R.n && R.fw) for (let j = 0; j < R.n; j++) if (ov(j, sc)) noG.add(j); /* every ground-floor window the door and its frame would touch goes, the next bay's too */
+          if (R.n && R.fw) for (let j = 0; j < R.n; j++) if (ov(j, sc)) { noG.add(j); (R.noD || (R.noD = new Set())).add(j); } /* every ground-floor window the door and its frame would touch goes, the next bay's too */
           d.sty = S0.door; d.steps = S0.steps; if (S0.door === 'vil') d.col = S0.band === 'D' ? 0x2e3133 : S0.band === 'C' ? 0x6b4a2e : [0x7a5232, 0xece9e2, 0x5b3a26][Math.floor(facHashB(B, 5) * 3) % 3];
-          (R.dr || (R.dr = [])).push([sc, 2 * dh]); const mid = R.at(sc), ux = e[4], uz = -e[3]; /* e: [dx, dz, L, nx, nz]; the door faces along the outward normal (-uz, ux) = (nx, nz) */
+          (R.dr || (R.dr = [])).push([sc, 2 * dh, d]); const mid = R.at(sc), ux = e[4], uz = -e[3]; /* e: [dx, dz, L, nx, nz]; the door faces along the outward normal (-uz, ux) = (nx, nz) */
           d.ax = mid[0] - ux * d.W / 2; d.az = mid[1] - uz * d.W / 2; d.bx = mid[0] + ux * d.W / 2; d.bz = mid[1] + uz * d.W / 2; d.ux = ux; d.uz = uz; d.gy = Math.min(H.ground(d.ax, d.az), H.ground(d.bx, d.bz)); if (facCoperto(B, mid[0] + e[3] * 0.4, mid[1] + e[4] * 0.4, d.gy + 1.2)) d.skip = true; /* in front of it another volume: no door */
         }
         return { outer, holes, area, h, t, raised, gys, gmin, gmax, top, bot, R, pcB, colOr, sty, wallCol, bare, planes, pitched, S0, fwB, rings };
@@ -4474,10 +4493,11 @@ function* buildTileGen(T) {
       /* the garage doors of this house (Carlo 12/11): only where a car can stand right in front (facGarAcc), and not all of the bays: about half of them, chosen by the house's number, never none where there is a place. A garage building (OSM garages) keeps all its doors. R.gar: bay -> 1 door, 0 window */
       if (!bare && !raised) { const GE = window.GAR_ED || (window.GAR_ED = {}), cand = [];
         for (const rg of rings) for (const R of rg.runs) { const spg = S0[R.side + 'c'].spG; if (!R.n || !spg || !spg.gar) continue; R.gar = new Map();
-          for (let j = 0; j < R.n; j++) { if (R.noG && R.noG.has(j)) continue; const s0 = R.pad + j * R.bw, p = R.at(s0 + R.bw / 2), sm = s0 + R.bw / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + rg.E[R.ed[q]][2]) q++; const e = rg.E[R.ed[q]];
+          for (let j = 0; j < R.n; j++) { if ((R.noV && R.noV.has(j)) || (R.noG && R.noG.has(j) && !(R.noD && R.noD.has(j) && !window.VP_OFF))) continue; /* a shop front keeps its bay; a door gives way to a garage door */ const s0 = R.pad + j * R.bw, p = R.at(s0 + R.bw / 2), sm = s0 + R.bw / 2; let q = 0; while (q < R.ed.length - 1 && sm > R.off[q] + rg.E[R.ed[q]][2]) q++; const e = rg.E[R.ed[q]];
             const spB = R.sp.find(q => q[4] && Math.abs(q[0] - s0) < 1e-6), gapB = spB ? F0 + kLoAt(spB[2]) * FL - spB[3] : 0; /* the floor of the door over the lowest ground of the bay: a door that cannot touch the ground is a window */
             cand.push({ R, j, ok: B.t === 1 || (gapB <= 0.25 && facGarAcc(p[0], p[1], e[3], e[4])), h: facHashB(B, 7) * 997 + j * 3.1 + cand.length * 7.7 }); } }
         if (cand.length) { const ok = cand.filter(c => c.ok).sort((a, b) => hashRnd(a.h) - hashRnd(b.h)), keep = B.t === 1 ? ok.length : Math.min(Math.ceil(ok.length / 2), 4); ok.forEach((c, i) => { if (i < keep) c.R.gar.set(c.j, 1); }); for (const c of cand) if (!c.R.gar.has(c.j)) c.R.gar.set(c.j, 0);
+          for (const c of cand) if (c.R.gar.get(c.j) === 1 && c.R.dr) { const m = c.R.pad + (c.j + 0.5) * c.R.bw; for (const [sd, wd, dd] of c.R.dr) if (dd && !dd.skip && Math.abs(sd - m) < c.R.bw / 2 + wd / 2) { dd.skip = true; facVC().porte_tolte_garage++; } } /* the door over a garage door goes */
           GE[B.e !== undefined ? 'e' + B.e : B.pts[0][0].toFixed(1) + ',' + B.pts[0][1].toFixed(1)] = B._gk = { c: cand.length, ok: ok.length, keep, gap: [] }; }
       }
       for (const { ring, nr, E, W, runs } of rings) {
@@ -4561,6 +4581,7 @@ function* buildTileGen(T) {
         }
       } else { try { polyFill(roofB, outer, holes, top, 10, B.st === 1 ? COL('#a9a6a0') : colOr(B.rcol, () => pcB(t === 4 || t === 0 ? ROOF_FLAT.concat(ROOF_COTTO.slice(0, 1)) : ROOF_FLAT, 1))); } catch (e) { } }
     }
+    for (const d of T.doors || []) if (!d.skip && facBloccaPorta(T, (d.ax + d.bx) / 2, (d.az + d.bz) / 2, d.W / 2 + 0.3)) facVC().porte_sopra_dopo++;
     T.porteFatte = (T.doors || []).filter(d => !d.skip).map(d => ({ ax: d.ax, az: d.az, bx: d.bx, bz: d.bz, ux: d.ux, uz: d.uz, W: d.W, h: d.h, gy: d.gy, sty: d.sty, fit: d.fit })); /* the doors as this build drew them, for the checks (T.doors can be laid again by the time one counts) */
     if (wb.fac.i.length) { const g = mkMesh(wb.fac, MAT.fac, 10, 'cast', G).geometry; g.setAttribute('aoD', new THREE.Float32BufferAttribute(wb.fac.ao, 4)); g.setAttribute('facD', new THREE.Float32BufferAttribute(wb.fac.fac, 4)); g.setAttribute('facX', new THREE.Float32BufferAttribute(wb.fac.facX, 1)); }
     if (T.pinkB) { for (const [m, pb] of T.pinkB) if (pb.i.length) mkMesh(pb, m, 11, false, G); T.pinkB = null; }
@@ -4698,6 +4719,33 @@ function gateAntaLibera(o) { /* no vehicle, walker or pedestrian on the open lea
   return true;
 }
 /* doors drawn flush on a facade (gaps along a house wall): p front door, n large door, b garage door; solid like the wall */
+/* a door of a facade never sits over a shop front or a gate of an androne (Carlo 14/11: vetrina > portone dell'androne > serranda > porta): is the door (middle mx, mz, half width hw) over a front of the tile (T.d.ngw: centre and width, a circle as no normal is baked) or a gate (T.d.gt: a segment)? */
+function facVC() { return window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0, porte_tolte_senza_muro: 0, porte_tolte_garage: 0, porte_sopra_dopo: 0, dati_su_vetrina: 0, vetrine_ristrette: 0, porta_resta: 0, vetrina_vince: 0 }); }
+function facBloccaPorta(T, mx, mz, hw) {
+  const Ts = new Set([T]); for (const [ox, oz] of [[-14, -14], [14, -14], [-14, 14], [14, 14]]) { const U = TILES[tileOf(mx + ox, mz + oz)]; if (U && U.d) Ts.add(U); } /* the front belongs to the tile of its building, the door may be in the next tile */
+  for (const U of Ts) for (const q of U.d && U.d.ngw || []) if (hyp(q[1] - mx, q[2] - mz) < q[3] / 2 + hw + 0.15) return 1;
+  for (const U of Ts) for (const [X0, Z0, X1, Z1] of U.d && U.d.gt || []) { const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue; const ux = (bx - ax) / W, uz = (bz - az) / W, a = (mx - ax) * ux + (mz - az) * uz, pr = Math.abs(-(mx - ax) * uz + (mz - az) * ux); if (pr < 1.2 && a > -hw && a < W + hw) return 2; }
+  return 0;
+}
+/* a small door from the data over a shop front (Carlo 14/11): the front narrows on the side of the door, the door stays; if what is left of the front is under 2 m the front wins and the door goes (facBloccaPorta). The doors of the tile and of its neighbours against the fronts of the same tiles (T.d.ngf, the bake's fronts; T.d.ngw, what the facades read; T.ngr if already made), once per pair */
+function ngRistringi(T) {
+  const Ts = []; for (const dz of [-1, 0, 1]) for (const dx of [-1, 0, 1]) { const tx = T.t % NTX + dx, tz = Math.floor(T.t / NTX) + dz; if (tx < 0 || tz < 0 || tx >= NTX || tz >= NTZ) continue; const U = TILES[tx + NTX * tz]; if (U && U.d && U.d !== NOD) Ts.push(U); }
+  const VC = facVC();
+  for (const U of Ts) for (let i = 0; i < (U.d.ngf || []).length; i++) {
+    const r = U.d.ngf[i]; if (r.curved || r.big || !(r.w > 0)) continue; const vd = r.vd || (r.vd = new WeakSet());
+    for (const V of Ts) for (const d of V.doors || []) {
+      if (vd.has(d)) continue; const mx = (d.ax + d.bx) / 2, mz = (d.az + d.bz) / 2, ux = -r.nz, uz = r.nx, s = (mx - r.cx) * ux + (mz - r.cz) * uz, pr = Math.abs((mx - r.cx) * r.nx + (mz - r.cz) * r.nz);
+      if (pr > 1.2 || Math.abs(s) >= r.w / 2 + 0.6 + 0.15) continue;
+      vd.add(d); VC.dati_su_vetrina++;
+      const G = 1.25, lo = r.w / 2 + s - 0, a = -r.w / 2, b = r.w / 2, left = (s - G) - a, right = b - (s + G), keepL = left >= right, len = keepL ? left : right;
+      if (len < 2.0) { VC.vetrina_vince++; continue; }
+      const a2 = keepL ? a : s + G, b2 = keepL ? s - G : b, sh = (a2 + b2) / 2, cx = r.cx + ux * sh, cz = r.cz + uz * sh, ox = r.cx, oz = r.cz;
+      let q = null; for (const W of Ts) { q = (W.d.ngw || []).find(q => Math.abs(q[1] - ox) < 0.03 && Math.abs(q[2] - oz) < 0.03); if (q) break; } if (q) { q[1] = Math.round(cx * 100) / 100; q[2] = Math.round(cz * 100) / 100; q[3] = Math.round(len * 100) / 100; }
+      const g = U.ngr && U.ngr[i]; if (g) { g.cx = cx; g.cz = cz; g.w = len; }
+      (VC.log || (VC.log = [])).push([mx, mz, cx, cz, len, ux, uz, ox, oz, r.w]); r.cx = cx; r.cz = cz; r.w = len; VC.vetrine_ristrette++; VC.porta_resta++;
+    }
+  }
+}
 function layPorte(T) { T.doors = []; for (const [X0, Z0, X1, Z1, k, h] of T.d.dr || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
   const ux = (bx - ax) / W, uz = (bz - az) / W, gy = Math.min(H.ground(ax, az), H.ground(bx, bz));
@@ -8367,7 +8415,7 @@ function* buildPaesaggio(T, G) {
   };
   { const im = inst(LS_BALE_G, LS_BALE_M, bales); if (im) bales.forEach(([x, z, r], i) => { /* a bale rolls away under a hard blow (props3.js FORZA.medio, via) and is solid again where it stops */
     const id = T.t + ':' + i, p = LS_BALE_PROPS.get(id), gy = H.ground(x, z);
-    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'medio', via: 'rotola', inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
+    if (!p) LS_BALE_PROPS.set(id, addProp({ x, z, y: gy, r: 0.75, h: 1.5, forza: 'leggero', via: 'rotola', cy: 0.75, inst: { meshes: [im], i, ry: r || 0, base: gy }, sali: { rs: 0.55, dy: 1.5 } }));
     else propRifai(p, [im], i);
   }); }
   yield 'terreni balle';
@@ -9024,7 +9072,7 @@ function layResto(T) { // what the world used to lay out at the start with the s
   layStrade(T); layFence(T);
   for (const r of RLT.get(T.t) || []) layRilevati(r);
   for (const r of RVT.get(T.t) || []) layFiume(r);
-  layCancelli(T); layPorte(T);
+  layCancelli(T); layPorte(T); ngRistringi(T);
   for (const f of FOUNT_T.get(T.t) || []) layFontana(f);
   for (const f of FUEL_T.get(T.t) || []) layPompe(f);
   tettiFuel(T); layDossi(T); layParcheggi(T);
@@ -10572,6 +10620,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyN') skipTime(2);
   if (e.code === 'KeyR') toggleRadio();
   if (e.code === 'KeyB') reportSpot();
+  if (e.code === 'KeyT' && DEBUG && !teleAperta) { e.preventDefault(); teleApri(); }
   if (e.code === 'KeyK' && DEBUG) dbgCopy();
   if (e.code === 'KeyJ' && DEBUG) { const r = H.check(); toast('H.check: ' + r.tile + ' tile, scarto ' + r.scarto_max_m.toFixed(3) + ' m (raggi ' + r.scarto_raggi_m.toFixed(3) + ')'); }
   if (e.code === 'KeyU') { AU.muted = !AU.muted; toast(AU.muted ? 'Audio spento' : 'Audio acceso'); }
@@ -13853,6 +13902,27 @@ function neveMat(m, k) {
 }
 for (const M of [MAT, RO_MAT]) for (const k in M) neveMat(M[k], NEVE_K[k] ?? 1);
 
+let teleAperta = false;
+function teleChiudi() { teleAperta = false; $('dbgtele').hidden = true; $('dbgteleq').blur(); }
+function teleApri() { if (!DEBUG || !running) return; for (const k in K) K[k] = false; teleAperta = true; $('dbgtele').hidden = false; $('dbgtelem').textContent = 'Invio = vai \u00b7 Esc = chiudi'; const q = $('dbgteleq'); q.value = ''; setTimeout(() => q.focus(), 0); }
+function teleLeggi(t) { /* a game link (x= and z=) or two numbers, "x z", "x 12 z 34", commas as separators */
+  const m = /[?&]x=(-?\d+(?:\.\d+)?)/.exec(t), n = /[?&]z=(-?\d+(?:\.\d+)?)/.exec(t); if (m && n) return [parseFloat(m[1]), parseFloat(n[1])];
+  const a = t.match(/-?\d+(?:\.\d+)?/g); return a && a.length >= 2 ? [parseFloat(a[0]), parseFloat(a[1])] : null; }
+async function teleVai(x, z) {
+  if (TELE) return; const v = P.car, eraAuto = P.mode === 'car' && v && !v.heli; teleChiudi();
+  await teletrasporto(x, z, 260);
+  /* the ground at the exact point (decks and roofs too), and never inside a wall: the nearest free spot round it */
+  let px = x, pz = z; if (inBuilding(px, pz, 0.5)) { let ok = false; for (let r = 1.5; r <= 40 && !ok; r += 1.5) for (let a = 0; a < 16 && !ok; a++) { const qx = x + Math.cos(a * Math.PI / 8) * r, qz = z + Math.sin(a * Math.PI / 8) * r; if (!inBuilding(qx, qz, 0.5)) { px = qx; pz = qz; ok = true; } } }
+  P.x = px; P.z = pz; P.y = walkGround(px, pz, H.surface(px, pz)); P.vx = P.vz = P.vy = 0; camInit = false;
+  if (eraAuto && !v.dead) { /* it was in a car: the same car, next to him, and he gets in */
+    const h = P.h; v.x = px + Math.cos(h) * 2.4; v.z = pz - Math.sin(h) * 2.4; if (inBuilding(v.x, v.z, 1.5)) { v.x = px; v.z = pz; } v.y = H.surface(v.x, v.z); v.vx = v.vz = 0; v.sleep = false; v.sync();
+    enterExit(); }
+  toast('Teletrasporto: ' + Math.round(x) + ', ' + Math.round(z)); }
+(() => { const q = $('dbgteleq'); if (!q) return;
+  ['keydown', 'keyup', 'keypress'].forEach(k => q.addEventListener(k, e => { e.stopPropagation(); if (k !== 'keydown') return;
+    if (e.key === 'Escape') { e.preventDefault(); teleChiudi(); }
+    else if (e.key === 'Enter') { e.preventDefault(); const p = teleLeggi(q.value); if (!p) { $('dbgtelem').textContent = 'Servono due numeri: x z'; return; }
+      if (!(p[0] > ZONA[0] && p[0] < ZONA[2] && p[1] > ZONA[1] && p[1] < ZONA[3])) { $('dbgtelem').textContent = 'Fuori dalla mappa'; return; } teleVai(p[0], p[1]); } })); })();
 function updVisuals(dt) {
   heliDraw(dt);
   const cx = camera.position.x, cz = camera.position.z;
