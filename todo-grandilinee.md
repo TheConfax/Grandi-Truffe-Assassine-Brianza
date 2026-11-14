@@ -17,7 +17,7 @@ Deciso con Carlo il 9/11/2026 notte, aggiornato il 13/11 sera. I dettagli e lo s
 - Unire in `dev` i rami di adesso, una build sola.
 - Recinzioni e cancelli rimasti: doppioni e cancelli arretrati (caso b2), rete orfana di via Tommaseo (da decidere).
 - Case: il tetto delle case a L che il LiDAR scarta (via Verga); terreno ondulato a Seveso (x -653 z 891); alberi nei cantieri.
-- Prove FPS vere sul PC di Carlo quando è libero; si ottimizza dopo se serve ("questo risultato lo voglio").
+- **Giro di ottimizzazione, prima di espandere (Carlo 14/11):** sul ramo più pesante (verde + realismo-3) 100 FPS da fermo, ~20 veloci sulla Milano-Meda, ~15 col temporale (che costa ~10 FPS). Il risultato grafico si tiene ("questo risultato lo voglio"), si ottimizza dopo aver unito tutto.
 
 ## 2. Estensione della mappa
 - Prima verso **Seregno**, a est fino alla Valassina. Dati già pronti per tutta la mappa grande: DBGT di 30 comuni (mancano Cadorago, Inverigo, Vertemate), LiDAR, OSM, Mapillary, Overture.
