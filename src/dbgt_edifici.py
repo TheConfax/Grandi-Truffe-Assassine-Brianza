@@ -50,6 +50,7 @@ ALA_MIN = 15.0     # the smallest wing of a volume cut into wings for its roof (
 RECT_FILL = 0.8    # the pitched roofs are fitted on the volume's minimum rectangle: only where the volume fills this much of it
 RH_MAX = {1: 6.0, 2: 6.0, 3: 3.0}   # the highest ridge over the eaves (m): a steeper fit is the next, taller building seen by the DSM along a
                    # shared wall (a shed of 81 m2 came out with a single slope rising 17.9 m)
+RH_BUONO = 1.4    # a roof fitted to this rms or less (0.7 m) may stand this much higher over the eaves than RH_MAX (a steep old roof, Seveso: the neighbour's leak raises the rms)
 MIN_IN = 0.3       # a way inside the buildings for less than this (m) is left as it is
 CLEAR_FOOT, CLEAR_CAR = 0.6, 1.0   # how far from the walls a way that ran inside a building moves (footways, the others)
 PUSH_MAX = 2.5     # a stretch never deeper than this inside the walls moves out; a deeper one goes through the building and is cut
@@ -69,6 +70,10 @@ CONF_DZ, CONF_D = 3.0, 40.0   # ... drawn at the DSM's height only where another
 GRONDA_MIN, GRONDA_MAX = 2.5, 6.0   # a whole volume whose eaves the DSM fits this far (m) over the top of its walls, and not more (above that: blocchi_alti
                    # and its confirmation), is drawn low by the DBGT: the walls go up to those eaves (Carlo 13/11, via Verga x -559 z 862: UN_VOL_AV 4.07 m, a house of two floors)
 GRONDA_SPREAD = 1.0   # ... for a volume cut into wings: the eaves of its wings agree within this (m)
+DIV_MIN, DIV_AREA, DIV_LARGO, DIV_PASSO, DIV_MAXP, DIV_GIRI = 120.0, 30.0, 3.0, 1.5, 6, 4   # a big volume whose DSM roof is rejected is cut by the DSM itself (second step): the volume this big (m2),
+                   # a part at least this big (m2) and wide (m), cuts every DIV_PASSO m along the volume's axes, at most DIV_MAXP parts, DIV_GIRI rounds of cuts
+DIV_RMS = 0.7   # ... and a part of a divided volume may fit its roof to this rms (a steep old roof with dormers, chimneys), and then stand RH_BUONO times higher
+DIV_MALE = ('forma', 'piccolo', 'senza_dsm', 'non_copre', 'chiome', 'troppo_ripido', 'complesso', 'irregolare')
 GRONDA_AREA, GRONDA_RMS, GRONDA_ALB, GRONDA_IN = 25.0, 0.5, 0.15, 0.75   # ... a volume this big (m2), the roof fitted to this rms (m), at most this share of points
                    # far over it (crowns) and at least this share of the cells that agree with it: not a tree, not a bit of the next building
 BASSO_A, BASSO_DZ, BASSO_SH, BASSO_MIN = 60.0, 8.0, 0.9, 2.0   # a ground volume this small (m2) whose top the DSM is BASSO_DZ m under on
@@ -170,6 +175,30 @@ def _tls(A, h, it=3, cut=0.8):
     return c, float(np.sqrt(np.mean(r[m] ** 2))), float(m.mean()), float(np.mean(r > 2.0))
 
 
+def tetto_buono(f, rms=None):
+    """the eaves (m over the top of the walls, as fit_tetto gives them) when the roof fitted on a volume is one we trust and its walls are right or
+    GRONDA_MIN to GRONDA_MAX m too low; else None"""
+    if not f or f.get('k') not in ('flat', 'gable', 'hip', 'shed') or f.get('m') in DIV_MALE: return None
+    if f.get('cover', 0) < DSM_COVER or f['rms'] > (rms or GRONDA_RMS) or f['alberi'] > GRONDA_ALB: return None
+    e = f['eave']
+    return e if (-0.6 <= e <= DSM_EAVE or GRONDA_MIN <= e <= GRONDA_MAX) else None
+
+
+def tagli(poly):
+    """the ways to cut a volume in parts along the axes of its minimum rectangle, every DIV_PASSO m: a list of lists of parts, each at least DIV_AREA m2 and DIV_LARGO m wide"""
+    c, u, v, a, b = rect_frame(poly)
+    P = np.asarray(poly.exterior.coords)[:-1] - c; R = 4 * max(a, b) + 10; out = []
+    for d, o in ((u, v), (v, u)):
+        q = P @ d
+        for t in np.arange(q.min() + DIV_LARGO, q.max() - DIV_LARGO + 1e-6, DIV_PASSO):
+            try: ps = _parts(shapely.ops.split(poly, LineString([c + d * t - o * R, c + d * t + o * R])))
+            except Exception: continue
+            if len(ps) < 2 or len(ps) > 3 or any(x.area < DIV_AREA for x in ps): continue
+            if any(2 * min(rect_frame(x)[3], rect_frame(x)[4]) < DIV_LARGO for x in ps): continue
+            out.append(ps)
+    return out
+
+
 def blocchi_alti(poly, top, dsm):
     """the blocks of a ground volume the DSM sees at least ALTO_DZ m over its top (m a.s.l.): [(polygon of the block grown to the walls,
     median of the DSM on its smooth cells)]. On a 1 m grid inside the walls (0.3 m in) along the axes of the volume's minimum rectangle (its
@@ -256,7 +285,7 @@ def fit_tetto(job):
         g = np.array([co[1], co[2]]); s = float(np.hypot(*g)); gw = (g[0] * u + g[1] * v) / s
         ctr, pl, rh = piani_tetto(3, poly, s, (c, gw, np.array([-gw[1], gw[0]]), a, b))
     kk = {'gable': 1, 'hip': 2, 'shed': 3}[k]
-    if rh > RH_MAX[kk] * (2 if church else 1): res['m'] = 'troppo_ripido'; res['rh'] = round(float(rh), 2); return vid, res
+    if rh > RH_MAX[kk] * (2 if church else (RH_BUONO if rm <= 0.7 else 1)): res['m'] = 'troppo_ripido'; res['rh'] = round(float(rh), 2); return vid, res
     res.update(rk=kk, rc=[round(float(ctr[0]), 2), round(float(ctr[1]), 2)], rf=[round(float(x), 3) for p in pl for x in p], rh=round(float(rh), 2))
     return vid, res
 
@@ -721,6 +750,39 @@ class Edifici:
             n += 1; self.log('dbgt edifici: cupola o guglia a x %.0f z %.0f, %.1f m sopra il muro piu alto, raggio %.1f m' % (cx, cz, pk - tmax, rr[-1]))
         return n
 
+    def dividi_dsm(self, items):
+        """items {k: (polygon, top, base of the walls, m a.s.l.)} of volumes whose roof the DSM does not fit as one: cut each in parts round by round (tagli),
+        the cut that leaves the best fits (area-weighted rms, a part without a roof we trust weighs more), the parts still bad cut again (DIV_GIRI rounds).
+        {k: [(part, eaves over the top)]} only where every part ends with a roof we trust (tetto_buono) and there are at most DIV_MAXP of them"""
+        st = {k: dict(open=[it[0]], done=[]) for k, it in items.items()}
+        for giro in range(DIV_GIRI):
+            jobs, piano = [], {}
+            for k, s_ in st.items():
+                if s_.get('no'): continue
+                for pi, q in enumerate(s_['open']):
+                    cuts = tagli(q); piano[(k, pi)] = cuts
+                    for ci, ps in enumerate(cuts):
+                        for si, x in enumerate(ps): jobs.append((('d', k, giro, pi, ci, si), np.asarray(x.exterior.coords)[:-1], len(x.interiors) > 0, items[k][1], items[k][2], False))
+            fit = self._dsm(jobs)
+            for k, s_ in st.items():
+                if s_.get('no'): continue
+                nuovi = []
+                for pi, q in enumerate(s_['open']):
+                    best = None
+                    for ci, ps in enumerate(piano[(k, pi)]):
+                        fs = [fit.get(('d', k, giro, pi, ci, si)) or {} for si in range(len(ps))]
+                        sc = sum(x.area * (f.get('rms', 3.0) + (0.0 if tetto_buono(f, DIV_RMS) is not None else 0.7)) for x, f in zip(ps, fs))
+                        if best is None or sc < best[0]: best = (sc, ps, fs)
+                    if best is None: s_['no'] = True; break
+                    for x, f in zip(best[1], best[2]):
+                        e = tetto_buono(f, DIV_RMS)
+                        if e is not None: s_['done'].append((x, e))
+                        else: nuovi.append(x)
+                else:
+                    s_['open'] = nuovi
+                    if len(s_['done']) + len(nuovi) > DIV_MAXP: s_['no'] = True
+        return {k: s_['done'] for k, s_ in st.items() if not s_.get('no') and not s_['open'] and len(s_['done']) >= 2}
+
     def altezze_dal_dsm(self):
         """The heights of the ground volumes (UN_VOL_POR 01) where the DSM says the DBGT's UN_VOL_AV is plainly wrong, before the roofs:
           - too low: a block the DSM sees smooth and ALTO_DZ m over the top of the walls (blocchi_alti) becomes a volume of its own of the same
@@ -831,7 +893,7 @@ class Edifici:
             return len(D) >= 8 and float(np.median(D)) - (cand[k]['zt'] + B) >= GRONDA_MIN - 0.5
         pre = [k for k, ok in enumerate(in_parallelo(sopra, range(len(cand)))) if ok]
         fg = self._dsm([((k,), np.asarray(polys[k].exterior.coords)[:-1], len(polys[k].interiors) > 0, cand[k]['zt'] + B, cand[k]['zt'] - cand[k]['h'] + B, False) for k in pre])
-        ng = Counter(); alz_g = []
+        ng = Counter(); alz_g = []; alzk = set()
         def esito(f):
             """(eaves over the walls, None) when the fit is a roof we trust, else (None, reason)"""
             if f.get('k') not in ('flat', 'gable', 'hip', 'shed'): return None, 'non_un_tetto'
@@ -859,8 +921,38 @@ class Edifici:
                 else: ng['ali_' + (next((x[1] for x in es if x[1]), 'gronde_diverse'))] += 1; continue
             elif mot: ng[mot + '_' + str(f.get('k', f.get('m')))] += 1; continue
             if not GRONDA_MIN <= e <= GRONDA_MAX: ng['gronda_fuori_%s' % ('sotto' if e < GRONDA_MIN else 'sopra')] += 1; continue
-            alz_g.append(riga(r, p, r['zt'] + e, 'gronda_dal_dsm', k=kk, aggiunti=round(e, 2), rms=f.get('rms')))
+            alzk.add(k); alz_g.append(riga(r, p, r['zt'] + e, 'gronda_dal_dsm', k=kk, aggiunti=round(e, 2), rms=f.get('rms')))
             r['zt'] = round(r['zt'] + e, 2); r['h'] = round(r['zt'] - g0, 1)
+        # a big volume whose roof the DSM does not fit as one (a row of houses, an L with a garage): cut by the DSM itself, each part with its roof and eaves
+        gia |= alzk
+        grandi = [k for k in range(len(cand)) if k not in gia and polys[k] is not None and polys[k].area >= DIV_MIN and not cand[k].get('tolto')]
+        fw = self._dsm([((k,), np.asarray(polys[k].exterior.coords)[:-1], len(polys[k].interiors) > 0, cand[k]['zt'] + B, cand[k]['zt'] - cand[k]['h'] + B, False) for k in grandi])
+        cnd, nd = {}, Counter()
+        for k in grandi:
+            f = fw.get((k,)) or {}
+            if tetto_buono(f) is not None or f.get('m') in ('non_copre', 'chiome', 'senza_dsm', 'forma', 'piccolo') or f.get('cover', 0) < DSM_COVER: continue
+            if f.get('m') in ('irregolare', 'complesso') and len(ali(polys[k]) if polys[k].geom_type == 'Polygon' else []) >= 2: nd['lasciato_alle_ali'] += 1; continue
+            cnd[k] = (polys[k], cand[k]['zt'] + B, cand[k]['zt'] - cand[k]['h'] + B)
+        div = self.dividi_dsm(cnd)
+        nd['provati'] = len(cnd); nd['divisi'] = len(div); nd['parti'] = sum(len(v) for v in div.values()); nd['non_divisi'] = len(cnd) - len(div)
+        rep['divisi'] = []
+        for k, parts in div.items():
+            r, p = cand[k], polys[k]; g0 = r['zt'] - r['h']
+            hs = sorted([[x, (r['zt'] + e) if e >= GRONDA_MIN else r['zt']] for x, e in parts], key=lambda t: -t[1])
+            for i, h_ in enumerate(hs):
+                if i: h_[0] = h_[0].difference(unary_union([q[0] for q in hs[:i]]).buffer(0.05))
+            out = [(x, z_) for h_, z_ in hs for x in _parts(h_) if x.area >= MIN_VOL]
+            if len(out) < 2: continue
+            rep['divisi'].append(riga(r, p, None, 'diviso_dal_dsm', parti=[[round(x.area), round(z_ - g0, 1)] for x, z_ in out]))
+            for n, (x, z_) in enumerate(out):
+                rec = r if n == 0 else dict(r)
+                rec['p'] = [tuple(c) for c in np.asarray(x.exterior.coords)[:-1]]
+                ho = [list(map(tuple, np.asarray(h.coords)[:-1])) for h in x.interiors if len(h.coords) >= 4]
+                if ho: rec['k'] = ho
+                else: rec.pop('k', None)
+                rec['zt'] = round(z_, 2); rec['h'] = round(z_ - g0, 1)
+                if n: nuovi.append(rec)
+        ng.update({'div_' + m: v for m, v in nd.items()})
         self.terra = [r for r in self.terra if not r.get('tolto')] + nuovi
         sc = Counter(x['motivo'] for x in rep['scartati'])
         self.rep['altezze_dal_dsm'] = dict(n=dict(alzati=len(rep['alzati']), abbassati=len(rep['abbassati']), tolti=len(rep['tolti']), alzati_gronda=len(alz_g), **{'gronda_no_' + m: v for m, v in ng.items()}, **{'scartati_' + m: v for m, v in sc.items()}), **{k: v[:400] for k, v in rep.items()}, alzati_gronda=alz_g)
