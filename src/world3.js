@@ -2655,12 +2655,31 @@ function gateAntaLibera(o) { /* no vehicle, walker or pedestrian on the open lea
 }
 /* doors drawn flush on a facade (gaps along a house wall): p front door, n large door, b garage door; solid like the wall */
 /* a door of a facade never sits over a shop front or a gate of an androne (Carlo 14/11: vetrina > portone dell'androne > serranda > porta): is the door (middle mx, mz, half width hw) over a front of the tile (T.d.ngw: centre and width, a circle as no normal is baked) or a gate (T.d.gt: a segment)? */
-function facVC() { return window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0, porte_tolte_senza_muro: 0, porte_tolte_garage: 0, porte_sopra_dopo: 0 }); }
+function facVC() { return window.VETRINE_CNT || (window.VETRINE_CNT = { vetrine: 0, campate: 0, porte_tolte: 0, porte_spostate: 0, porte_tolte_senza_muro: 0, porte_tolte_garage: 0, porte_sopra_dopo: 0, dati_su_vetrina: 0, vetrine_ristrette: 0, porta_resta: 0, vetrina_vince: 0 }); }
 function facBloccaPorta(T, mx, mz, hw) {
   const Ts = new Set([T]); for (const [ox, oz] of [[-14, -14], [14, -14], [-14, 14], [14, 14]]) { const U = TILES[tileOf(mx + ox, mz + oz)]; if (U && U.d) Ts.add(U); } /* the front belongs to the tile of its building, the door may be in the next tile */
   for (const U of Ts) for (const q of U.d && U.d.ngw || []) if (hyp(q[1] - mx, q[2] - mz) < q[3] / 2 + hw + 0.15) return 1;
   for (const U of Ts) for (const [X0, Z0, X1, Z1] of U.d && U.d.gt || []) { const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue; const ux = (bx - ax) / W, uz = (bz - az) / W, a = (mx - ax) * ux + (mz - az) * uz, pr = Math.abs(-(mx - ax) * uz + (mz - az) * ux); if (pr < 1.2 && a > -hw && a < W + hw) return 2; }
   return 0;
+}
+/* a small door from the data over a shop front (Carlo 14/11): the front narrows on the side of the door, the door stays; if what is left of the front is under 2 m the front wins and the door goes (facBloccaPorta). The doors of the tile and of its neighbours against the fronts of the same tiles (T.d.ngf, the bake's fronts; T.d.ngw, what the facades read; T.ngr if already made), once per pair */
+function ngRistringi(T) {
+  const Ts = []; for (const dz of [-1, 0, 1]) for (const dx of [-1, 0, 1]) { const tx = T.t % NTX + dx, tz = Math.floor(T.t / NTX) + dz; if (tx < 0 || tz < 0 || tx >= NTX || tz >= NTZ) continue; const U = TILES[tx + NTX * tz]; if (U && U.d && U.d !== NOD) Ts.push(U); }
+  const VC = facVC();
+  for (const U of Ts) for (let i = 0; i < (U.d.ngf || []).length; i++) {
+    const r = U.d.ngf[i]; if (r.curved || r.big || !(r.w > 0)) continue; const vd = r.vd || (r.vd = new WeakSet());
+    for (const V of Ts) for (const d of V.doors || []) {
+      if (vd.has(d)) continue; const mx = (d.ax + d.bx) / 2, mz = (d.az + d.bz) / 2, ux = -r.nz, uz = r.nx, s = (mx - r.cx) * ux + (mz - r.cz) * uz, pr = Math.abs((mx - r.cx) * r.nx + (mz - r.cz) * r.nz);
+      if (pr > 1.2 || Math.abs(s) >= r.w / 2 + 0.6 + 0.15) continue;
+      vd.add(d); VC.dati_su_vetrina++;
+      const G = 1.25, lo = r.w / 2 + s - 0, a = -r.w / 2, b = r.w / 2, left = (s - G) - a, right = b - (s + G), keepL = left >= right, len = keepL ? left : right;
+      if (len < 2.0) { VC.vetrina_vince++; continue; }
+      const a2 = keepL ? a : s + G, b2 = keepL ? s - G : b, sh = (a2 + b2) / 2, cx = r.cx + ux * sh, cz = r.cz + uz * sh, ox = r.cx, oz = r.cz;
+      let q = null; for (const W of Ts) { q = (W.d.ngw || []).find(q => Math.abs(q[1] - ox) < 0.03 && Math.abs(q[2] - oz) < 0.03); if (q) break; } if (q) { q[1] = Math.round(cx * 100) / 100; q[2] = Math.round(cz * 100) / 100; q[3] = Math.round(len * 100) / 100; }
+      const g = U.ngr && U.ngr[i]; if (g) { g.cx = cx; g.cz = cz; g.w = len; }
+      (VC.log || (VC.log = [])).push([mx, mz, cx, cz, len, ux, uz, ox, oz, r.w]); r.cx = cx; r.cz = cz; r.w = len; VC.vetrine_ristrette++; VC.porta_resta++;
+    }
+  }
 }
 function layPorte(T) { T.doors = []; for (const [X0, Z0, X1, Z1, k, h] of T.d.dr || []) {
   const ax = X0 / 10, az = Z0 / 10, bx = X1 / 10, bz = Z1 / 10, W = hyp(bx - ax, bz - az); if (W < 0.5) continue;
