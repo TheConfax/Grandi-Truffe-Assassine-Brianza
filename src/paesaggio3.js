@@ -186,7 +186,7 @@ function* buildPaesaggio(T, G) {
         for (let v = A.v0 + 1.4, k = 0; v < A.v1 - 0.7; v += 1.4, k++) for (const [a, b] of lsSpans(A.Q, v)) if (b - a > 1 && lsFlat(A, a + 0.4, b - 0.4, v, 1.42)) lsStrip(drape, A, a + 0.4, b - 0.4, v, 1.42, COL(pal[k % 2]), 0.04);
       }
       const st = typeof CAMPI !== 'undefined' && CAMPI.on ? campoStato(P, kind) : null; /* giro del verde: what is sown and how it is today (verde3.js) */
-      if (st) { CAMPI.stati[st.stato] = (CAMPI.stati[st.stato] || 0) + 1; if (kind === 'campo') campoSuolo(P, st, campoB, tettoB); }
+      if (st) { CAMPI.stati[st.stato] = (CAMPI.stati[st.stato] || 0) + 1; campoSuolo(P, st, campoB, tettoB); } /* the meadows too: their tall grass seen from afar (fix2) */
       if (st ? st.balle && area > 1200 : h > (kind === 'campo' ? 0.6 : 0.75) && area > 1500) { // round bales left in the field (giro del verde: on the mown meadow and the cut wheat, summer and autumn)
         const n = st ? Math.min(14, Math.floor(area / 1800) + 2) : Math.min(10, Math.floor(area / 2500) + 2); let got = 0;
         for (let k = 0; k < n * 4 && got < n && bales.length < 60; k++) {
@@ -383,7 +383,7 @@ function* buildPaesaggio(T, G) {
   yield 'terreni reti';
   if (drape.i.length) mkMesh(drape, MAT.mark, 2, false, G);
   if (campoB.i.length && MAT.campo) mkMesh(campoB, MAT.campo, 2, false, G);
-  if (tettoB.i.length && MAT.maisTetto) mkMesh(tettoB, MAT.maisTetto, 3, false, G); if (tettoB.w.i.length && MAT.maisTetto) mkMesh(tettoB.w, MAT.maisTetto, 3, false, G);
+  if (tettoB.cards && typeof maisCarte === 'function') maisCarte(G, tettoB.cards); /* the maize past the true plants (verde3.js) */
   for (const a of d.a || []) { const P = lagoDi(a, T); if (P) lago(P, T, TL); }
   acquaMesh(TL, G);
   yield 'terreni fondo';

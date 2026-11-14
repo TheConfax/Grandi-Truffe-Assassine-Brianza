@@ -101,6 +101,14 @@ const PR_GLSL = `
 uniform sampler2D uPrG; uniform sampler2D uPrE; uniform sampler2D uPrS; uniform sampler2D uPrT;
 float prH(vec2 p) { vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 ` + PR_MIX + `
+/* tall grass seen from where the tufts are few or none (fix2 14/11, Carlo: "erba alta fin dove si vede"): the ground itself is the tall grass, clumps of 15-45 cm
+   and the streaks of the blades, lit by their own relief, its mean the colour of the tufts; the fine parts fade into their mean when a pixel is larger than them */
+float prClump(vec2 P, float fw) {
+  float a = prN(P / .45 + 3.1), b = prN(P / .17 + 8.7), c = prN(vec2(P.x + P.y, P.y - P.x) * vec2(20., 4.5) + 1.3);
+  return .5 + (a - .5) * .6 * (1. - smoothstep(.12, .35, fw)) + (b - .5) * .35 * (1. - smoothstep(.04, .12, fw)) + (c - .5) * .3 * (1. - smoothstep(.015, .05, fw));
+}
+float prAltoK(float cl) { return mix(.62, 1.3, smoothstep(.2, .8, cl)); } /* about .95 at the mean: the far tufts' colour (ERBA_BEGIN vErD) */
+
 vec3 prS(sampler2D m, vec2 uv, float salt) { /* mirrored tiles (pattern3.js patS) and a second sample turned by 30 degrees, 2.6 times larger, as the ground photos */
   vec2 dx = dFdx(uv), dy = dFdy(uv); float h; vec3 a = patS(m, uv, dx, dy, salt, h);
   const mat2 R2 = mat2(.866, -.5, .5, .866) * .385; vec3 b = patS(m, R2 * uv + vec2(.31, .77), R2 * dx, R2 * dy, salt + 7.7, h);
@@ -113,7 +121,11 @@ function pratoMat(m, kind) {
   const before = m.onBeforeCompile, prev = m.customProgramCacheKey ? m.customProgramCacheKey() : '', pat = PAT_FRAG(true);
   m.onBeforeCompile = (s, r) => {
     if (before) before.call(m, s, r); if (!s.fragmentShader.includes(pat)) return; Object.assign(s.uniforms, PR_U);
-    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + PR_GLSL).replace(pat, `\n  vec4 texelColor = vec4(prato(vWp.xz, ${kind.toFixed(1)}), 1.);\n  diffuseColor *= texelColor;`);
+    const alto = kind === 2 ? `\n  float prFw = length(fwidth(vWp.xz)), prCl = prClump(vWp.xz, prFw); texelColor.rgb *= prAltoK(prCl);` : '';
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + PR_GLSL).replace(pat, `\n  vec4 texelColor = vec4(prato(vWp.xz, ${kind.toFixed(1)}), 1.);${alto}\n  diffuseColor *= texelColor;`);
+    if (kind === 2) s.fragmentShader = s.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  { float e = .06, k = .45 * (1. - smoothstep(.1, .3, prFw)), gx = (prClump(vWp.xz + vec2(e, 0.), prFw) - prCl) / e, gz = (prClump(vWp.xz + vec2(0., e), prFw) - prCl) / e;
+    normal = normalize(normal + (viewMatrix * vec4(-gx * k, 0., -gz * k, 0.)).xyz); }`);
   };
   m.customProgramCacheKey = () => prev + '|prato' + kind; m.needsUpdate = true; return m;
 }
@@ -314,7 +326,7 @@ function siepeDraw(B, br, a, c, acc, cap, ga, gc, la, lc) {
     const x0 = a[0] + ux * s, z0 = a[1] + uz * s, gy = ga + (gc - ga) * s / L, fy = Math.min(gy, la + (lc - la) * s / L) - 0.12;
     const hump = lib ? 1.5 * Math.pow(Math.max(0, vn2(x0 / 9 + 3.1, z0 / 9 - 1.7) - 0.62) / 0.38, 1.6) : 0;
     const te = Math.min(endA ? Math.sqrt(clamp(s / 0.6, 0, 1)) : 1, endC ? Math.sqrt(clamp((L - s) / 0.6, 0, 1)) : 1); /* rounded at a true end */
-    const Hs = (H0 * (lib ? 0.88 + 0.3 * vn2(x0 / 5.3, z0 / 5.3) : 1) + hump) * (0.72 + 0.28 * te), Ws = W0 * (lib ? 0.92 + 0.16 * vn2(x0 / 6.1 + 7, z0 / 6.1) + 0.25 * hump / 1.5 : 1) * (0.12 + 0.88 * te);
+    const Hs = (H0 * (lib ? 0.88 + 0.3 * vn2(x0 / 5.3, z0 / 5.3) : 1) + hump) * (0.85 + 0.15 * te), Ws = W0 * (lib ? 0.92 + 0.16 * vn2(x0 / 6.1 + 7, z0 / 6.1) + 0.25 * hump / 1.5 : 1) * (0.4 + 0.6 * te);
     const fa = clamp(1 - s / Math.min(1, L / 2), 0, 1), fc = clamp(1 - (L - s) / Math.min(1, L / 2), 0, 1); /* the mitre near the ends of the segment, the plain normal in between */
     let mx = nx * (1 - fa - fc) + mA[0] * fa + mC[0] * fc, mz = nz * (1 - fa - fc) + mA[1] * fa + mC[1] * fc; const ml = hyp(mx, mz) || 1, mk = 1 + (mA[2] - 1) * fa + (mC[2] - 1) * fc; mx /= ml; mz /= ml;
     return P.map(([pu, py], i) => {
@@ -336,7 +348,14 @@ function siepeDraw(B, br, a, c, acc, cap, ga, gc, la, lc) {
   if (lib) for (let s = 0.5; s < L; s += 1) { const x = a[0] + ux * s, z = a[1] + uz * s; if (trHash(Math.round(x) * 1.3, Math.round(z) * 0.7) > 0.22) continue;
     const t = SIEPI.T ?? tileOf(x, z), key = Math.round(x) + ',' + Math.round(z); let m = SIEPI.arb.get(t); if (!m) SIEPI.arb.set(t, m = new Map()); if (m.has(key) || [...m.values()].some(q => hyp(q[0] - x, q[1] - z) < 4)) continue;
     const h = trHash(x * 2.1, z * 1.3), tree = h < 0.25, gy = ga + (gc - ga) * s / L; m.set(key, [x + nx * (h - 0.5) * 0.6, z + nz * (h - 0.5) * 0.6, tree ? 3.5 + 1.5 * trHash(z, x) : H0 * (1.35 + 0.5 * trHash(z, x)), gy, tree]); }
-  /* the ends: closed by the rounding of the sections (ring te) */
+  /* the ends: rounded by the sections (ring te) and closed, every layer (fix2 14/11, via Carducci: "la punta è un guscio vuoto"): the end section filled
+     from its middle, the core dark, the shells with their leaves; a little dome out past the end so the closing is not a flat wall */
+  for (const [e, s0, sg] of [[endA, 0, -1], [endC, L, 1]]) if (e) for (const [b, off, salt, dark] of layers) { if (!b) continue;
+    const R = ring(s0, off, salt), i0 = b.p.length / 3, t = tint(s0); let cx = 0, cy = 0, cz = 0; for (const q of R) { cx += q[0]; cy += q[1]; cz += q[2]; } cx /= R.length; cy /= R.length; cz /= R.length;
+    const bul = 0.1 + off * 0.8; vtx(b, cx + ux * sg * bul, cy, cz + uz * sg * bul, ux * sg, 0.3, uz * sg, 0, 0, col.setRGB(t[0] * 0.75 * dark, t[1] * 0.75 * dark, t[2] * 0.75 * dark));
+    for (const q of R) vtx(b, q[0], q[1], q[2], ux * sg * 0.7 + q[3] * 0.3, q[4] * 0.3 + 0.2, uz * sg * 0.7 + q[5] * 0.3, 0, 0, col.setRGB(t[0] * q[6] * dark, t[1] * q[6] * dark, t[2] * q[6] * dark));
+    for (let i = 0; i + 1 < R.length; i++) b.i.push(i0, i0 + 1 + i, i0 + 2 + i, i0, i0 + 2 + i, i0 + 1 + i); /* both faces */
+    { const j0 = b.p.length / 3; for (const q of [R[0], R[R.length - 1]]) vtx(b, q[0], q[1], q[2], ux * sg, 0, uz * sg, 0, 0, col.setRGB(t[0] * 0.5 * dark, t[1] * 0.5 * dark, t[2] * 0.5 * dark)); b.i.push(i0, j0, j0 + 1, i0, j0 + 1, j0); } } /* the foot: closed along the ground */
   /* sprigs: a spray of narrow leafy strips (a twig with its leaves) out of the top, and of the sides of a free hedge, leaning out; short fresh growth on a clipped one */
   if (B.hdF) { const step = lib ? 0.3 : 0.35;
     for (let s = step * 0.5; s < L; s += step) { const x0 = a[0] + ux * s, z0 = a[1] + uz * s, h1 = trHash(x0 * 3.1, z0 * 1.7), h2 = trHash(z0 * 2.3, x0 * 0.9), h3 = trHash(x0 * 0.7 + 5, z0 * 4.1); if (!lib && h1 > 0.7) continue; if (lib && h2 >= 0.45 && h3 > 0.4) continue; /* a free hedge: a spray on the top here and there, not in a row */
@@ -373,7 +392,7 @@ function siepeArbusti(T, G) {
 //  - prato stabile: tall grass, mown three times (June, August, September), the round bales on the mown meadow for some weeks.
 // The tile takes the state when it is laid out (a season changed by a code shows on the tiles laid out after). &campi=0: the fields as before
 const CAMPI = window.__CAMPI3 = { on: VERDE3.on && PRATO.on && !/[?&]campi=0/.test(location.search), stati: {} };
-const CAMPO_ID = { arato: 0, stoppie: 1, giovane: 2, verde: 3, oro: 4, mais: 5, stoppieMais: 6 };
+const CAMPO_ID = { arato: 0, stoppie: 1, giovane: 2, verde: 3, oro: 4, mais: 5, stoppieMais: 6, prato: 7, sfalciato: 8 };
 function campoStato(P, kind) {
   const [cx, cz] = centroid(P), h = trHash(cx * 0.131, cz * 0.293), d = STAG_DOY, A = lsRect(P) || lsAxis(P), r = { ux: A.ux, uz: A.uz, balle: false, h: 0, secco: 0 };
   if (kind === 'prato') {
@@ -395,6 +414,17 @@ const CAMPO_GLSL = `
 uniform sampler2D uZo; uniform sampler2D uZoN; uniform sampler2D uPa; uniform sampler2D uPrG; uniform sampler2D uPrS;
 float cpH(vec2 p) { vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 float cpN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(cpH(i), cpH(i + vec2(1, 0)), f.x), mix(cpH(i + vec2(0, 1)), cpH(i + vec2(1, 1)), f.x), f.y); }
+uniform sampler2D uPrE; uniform sampler2D uPrT;
+float prH(vec2 p) { vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+` + PR_MIX + `
+/* tall grass seen from where the tufts are few or none (fix2 14/11, Carlo: "erba alta fin dove si vede"): the ground itself is the tall grass, clumps of 15-45 cm
+   and the streaks of the blades, lit by their own relief, its mean the colour of the tufts; the fine parts fade into their mean when a pixel is larger than them */
+float prClump(vec2 P, float fw) {
+  float a = prN(P / .45 + 3.1), b = prN(P / .17 + 8.7), c = prN(vec2(P.x + P.y, P.y - P.x) * vec2(20., 4.5) + 1.3);
+  return .5 + (a - .5) * .6 * (1. - smoothstep(.12, .35, fw)) + (b - .5) * .35 * (1. - smoothstep(.04, .12, fw)) + (c - .5) * .3 * (1. - smoothstep(.015, .05, fw));
+}
+float prAltoK(float cl) { return mix(.62, 1.3, smoothstep(.2, .8, cl)); } /* about .95 at the mean: the far tufts' colour (ERBA_BEGIN vErD) */
+
 vec3 cpTex(sampler2D m, vec2 uv) { vec2 c = floor(uv), f = fract(uv), s = vec2(cpH(c) > .5 ? -1. : 1., cpH(c + 7.3) > .5 ? -1. : 1.); return textureGrad(m, f * s + (1. - s) * .5, dFdx(uv) * s, dFdy(uv) * s).rgb; } /* mirrored tiles: no repeat */
 `;
 const CAMPO_FRAG = `
@@ -404,9 +434,10 @@ const CAMPO_FRAG = `
   if (cpSt < .5) { float p = fract(cpR / .85); cpRid = smoothstep(0., .5, p) * smoothstep(1., .5, p); cpC = cpSoil * mix(.62, 1.08, mix(.5, cpRid, 1. - smoothstep(.04, .2, cpFw))); } /* ploughed: the furrows */
   else if (cpSt < 1.5) { vec3 pa = cpTex(uPa, cpP / 1.9) * vec3(1.05, .95, .7); float rw = smoothstep(.35, .0, abs(fract(cpR / .15) - .5)) * (1. - smoothstep(.015, .05, cpFw)); cpC = mix(cpSoil, pa, .6 + .2 * rw + .25 * (cpN(cpP / 2.3) - .5)); } /* wheat stubble: straw in the drill rows */
   else if (cpSt < 2.5) { float rw = smoothstep(.22, .0, abs(fract(cpR / .15) - .5)); rw = mix(.3, rw, 1. - smoothstep(.02, .08, cpFw)); cpC = mix(cpSoil, vec3(.11, .2, .05) * (.8 + .4 * cpN(cpP * 3.)), rw * .85); } /* young wheat: green rows on the earth */
-  else if (cpSt < 3.5) { cpC = mix(cpSoil, cpTex(uPrG, cpP / 2.4) * vec3(.85, 1.05, .7), .9); }
-  else if (cpSt < 4.5) { cpC = cpTex(uPa, vec2(cpS / .9, cpR / .9)) * vec3(1.15, 1., .62); }
+  else if (cpSt < 3.5) { cpC = vec3(.1, .21, .05) * (.82 + .36 * cpN(cpP * 1.3)) * prAltoK(prClump(cpP, cpFw)); } /* green wheat: the colour of its stalks (ERBA_BEGIN) */
+  else if (cpSt < 4.5) { cpC = vec3(.56, .43, .18) * (.82 + .36 * cpN(cpP * 1.3)) * prAltoK(prClump(cpP, cpFw)); } /* ripe wheat */
   else if (cpSt < 5.5) { float rw = smoothstep(.3, .0, abs(fract(cpR / .75) - .5)); cpC = cpSoil * (.75 + .1 * rw); cpC = mix(cpC, cpTex(uPrS, cpP / 2.2) * .7, .25 * rw); } /* under the maize */
+  else if (cpSt > 6.5) { cpC = prMix(cpTex(uPrG, cpP / 2.4), cpTex(uPrE, cpP / 2.6), cpTex(uPrS, cpP / 2.2), cpTex(uPrT, cpP / 2.8), prPesi(cpP, 1.), cpP, 1.); if (cpSt < 7.5) cpC *= prAltoK(prClump(cpP, cpFw)); } /* the meadow: its tall grass (as its tufts), or mown */
   else { vec3 pa = cpTex(uPa, vec2(cpS / .6, cpR / .6)) * vec3(.8, .66, .45); float rw = smoothstep(.25, .0, abs(fract(cpR / .75) - .5)) * (1. - smoothstep(.03, .12, cpFw)); cpC = mix(cpSoil * .9, pa, .3 + .25 * rw * step(.55, cpN(vec2(cpS * 4., cpR)))); } /* maize stubble: stalks cut in the rows, the leaves on the ground */
   diffuseColor.rgb *= cpC;
 `;
@@ -419,7 +450,7 @@ const CAMPO_NRM = `
 MAT.campo = (() => {
   if (!CAMPI.on) return null;
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
-  const U = { uZo: { value: prTex('zolle') }, uZoN: { value: (() => { const t = new THREE.TextureLoader().load('tex/zolle_nr.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; return t; })() }, uPa: { value: prTex('paglia') }, uPrG: PR_U.uPrG, uPrS: PR_U.uPrS };
+  const U = { uZo: { value: prTex('zolle') }, uZoN: { value: (() => { const t = new THREE.TextureLoader().load('tex/zolle_nr.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; return t; })() }, uPa: { value: prTex('paglia') }, uPrG: PR_U.uPrG, uPrS: PR_U.uPrS, uPrE: PR_U.uPrE, uPrT: PR_U.uPrT };
   m.onBeforeCompile = s => { VAR_VERT(s); Object.assign(s.uniforms, U);
     s.fragmentShader = VAR_GLSL + CAMPO_GLSL + s.fragmentShader.replace('#include <color_fragment>', CAMPO_FRAG).replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + CAMPO_NRM); };
   m.customProgramCacheKey = () => 'campo-verde'; acquaSuoloMasch(m); return m;
@@ -429,14 +460,18 @@ MAT.campo = (() => {
 function campoSuolo(P, st, fb, tb) {
   const col = new THREE.Color(st.ux * 0.5 + 0.5, st.uz * 0.5 + 0.5, (CAMPO_ID[st.stato] + 0.5) / 10);
   try { polyFill(fb, P, [], 0.03, 10, col); } catch (e) { return; }
-  if (st.stato === 'mais' && st.h > 0.8 && tb) {
-    const top = st.h * 0.93, q = col.clone(); q.b = st.secco; try { polyFill(tb, P, [], top, 10, q); } catch (e) { }
-    for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], L = hyp(c[0] - a[0], c[1] - a[1]); if (L < 0.2) continue; const n = Math.max(1, Math.ceil(L / 3));
-      for (let k = 0; k < n; k++) { const x0 = a[0] + (c[0] - a[0]) * k / n, z0 = a[1] + (c[1] - a[1]) * k / n, x1 = a[0] + (c[0] - a[0]) * (k + 1) / n, z1 = a[1] + (c[1] - a[1]) * (k + 1) / n, g0 = H.ground(x0, z0), g1 = H.ground(x1, z1), nx = (z1 - z0) / (L / n), nz = -(x1 - x0) / (L / n), i0 = tb.w.p.length / 3;
-        vtx(tb.w, x0, g0, z0, nx, 0, nz, 0, 0, q); vtx(tb.w, x1, g1, z1, nx, 0, nz, 0, 0, q); vtx(tb.w, x1, g1 + top, z1, nx, 0, nz, 0, 1, q); vtx(tb.w, x0, g0 + top, z0, nx, 0, nz, 0, 1, q);
-        tb.w.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3, i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2); } }
+  if (st.stato === 'mais' && st.h > 0.4 && tb && MAIS.on) { /* the maize past the true plants (fix2 14/11, Carlo: "lo stesso problema di visibilita'"): cards of a picture of
+     the plants themselves (MAIS_IMP), in the rows (every other one), one every 1.4 m, as far as the field is drawn; near the camera the true plants take their place */
+    const ux = st.ux, uz = st.uz, vx = -uz, vz = ux, Q = P.map(([x, z]) => [x * ux + z * uz, x * vx + z * vz]), s0 = Math.min(...Q.map(q => q[0])), s1 = Math.max(...Q.map(q => q[0])), r0 = Math.min(...Q.map(q => q[1])), r1 = Math.max(...Q.map(q => q[1]));
+    const cards = tb.cards || (tb.cards = []), bb = bbox(P);
+    for (let r = Math.ceil(r0 / 1.5) * 1.5 + 0.375; r < r1; r += 1.5) for (let s = Math.ceil(s0 / 1.4) * 1.4; s < s1 && cards.length < 240000; s += 1.4) {
+      const j1 = trHash(s * 1.7, r * 2.9), x = ux * (s + (j1 - 0.5) * 0.5) + vx * (r + (trHash(r, s) - 0.5) * 0.3), z = uz * (s + (j1 - 0.5) * 0.5) + vz * (r + (trHash(r, s) - 0.5) * 0.3);
+      if (x < bb[0] || x > bb[2] || z < bb[1] || z > bb[3] || !inPoly(x, z, P) || erbaBordo(x, z, P) < 1.2) continue;
+      cards.push(x, H.surface(x, z) - 0.05, z, st.h * (0.9 + 0.2 * trHash(x * 2.3, z * 5.1)), Math.atan2(uz, ux) + (j1 - 0.5) * 0.6, st.secco, trHash(x * 7.1, z * 0.3), 0);
+    }
   }
 }
+
 const MAIS_R = 40;
 MAT.maisTetto = (() => {
   if (!CAMPI.on) return null;
@@ -514,3 +549,41 @@ function maisAggiorna() {
   E.mesh.geometry.instanceCount = n; E.n = n;
 }
 { const u = updDayNight; updDayNight = function (dt) { u(dt); if (MAIS.mesh) maisAggiorna(); }; }
+/* the picture of a clump of maize (five plants in a row, from the side), drawn once from MAIS_G into a texture with its alpha: the cards' face */
+const MAIS_IMP = (() => {
+  if (!MAIS.on) return null;
+  const W = 2.6, Ht = 2.5, rt = new THREE.WebGLRenderTarget(512, 512, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(MAIS_G.P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(MAIS_G.C, 3)); g.setIndex(MAIS_G.I);
+  const sc = new THREE.Scene(), m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  for (let k = 0; k < 5; k++) { const me = new THREE.Mesh(g, m); me.position.set(-0.6 + k * 0.3, 0, (k % 2 - 0.5) * 0.2); me.rotation.y = k * 1.9; me.scale.setScalar(2.2 * (0.92 + 0.08 * ((k * 7) % 3))); sc.add(me); }
+  const cam = new THREE.OrthographicCamera(-W / 2, W / 2, Ht, 0, -5, 5); cam.position.set(0, 0, 0); cam.lookAt(0, 0, -1);
+  const prevT = renderer.getRenderTarget(), prevC = renderer.getClearColor(new THREE.Color()), prevA = renderer.getClearAlpha(), prevAC = renderer.autoClear;
+  renderer.setRenderTarget(rt); renderer.setClearColor(0x2a3a14, 0); renderer.autoClear = true; renderer.render(sc, cam);
+  renderer.setRenderTarget(prevT); renderer.setClearColor(prevC, prevA); renderer.autoClear = prevAC; g.dispose(); m.dispose();
+  return { tex: rt.texture, W, Ht };
+})();
+MAT.maisCarta = (() => {
+  if (!MAIS_IMP) return null;
+  const m = new THREE.MeshLambertMaterial({ map: MAIS_IMP.tex, alphaTest: 0.45, side: THREE.DoubleSide });
+  m.onBeforeCompile = s => { s.uniforms.uVento = VENTO.u;
+    s.vertexShader = 'attribute vec4 iP; attribute vec4 iS; uniform vec4 uVento; varying float vMcS; varying float vMcY;\n' + s.vertexShader.replace('#include <begin_vertex>', `
+  float mcD = length(iP.xz - cameraPosition.xz), mcK = smoothstep(${MAIS_R - 9}.0, ${MAIS_R - 2}.0, mcD + iS.z * 3.); /* gone near the camera, where the true plants are */
+  float mcC = cos(iS.x), mcS = sin(iS.x); vec3 transformed = position * vec3(1., iP.w / 2.2 * mcK, 1.); transformed.xz = mat2(mcC, mcS, -mcS, mcC) * transformed.xz;
+  transformed.xz += uVento.xy * uVento.z * .05 * transformed.y * transformed.y / 4.; transformed += iP.xyz; vMcS = iS.y; vMcY = uv.y;`)
+      .replace('#include <beginnormal_vertex>', 'vec3 objectNormal = vec3(0., 1., 0.);'); /* lit as the leaves, from above */
+    s.fragmentShader = 'varying float vMcS; varying float vMcY;\n' + s.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.42, .33, .17) * dot(diffuseColor.rgb, vec3(.6, 1.2, .3)) * 1.3, vMcS) * mix(.75, 1.05, vMcY); /* drying out; darker below */'); };
+  m.customProgramCacheKey = () => 'mais-carta'; return m;
+})();
+const MAIS_CARTA_G = (() => { if (!MAIS_IMP) return null; const W = MAIS_IMP.W, Ht = MAIS_IMP.Ht, P = [], UV = [], I = [];
+  for (const a of [0, Math.PI / 2]) { const c = Math.cos(a) * W / 2, sn = Math.sin(a) * W / 2, i0 = P.length / 3; P.push(-c, 0, -sn, c, 0, sn, c, Ht, sn, -c, Ht, -sn); UV.push(0, 0, 1, 0, 1, 1, 0, 1); I.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(P.map((v, i) => i % 3 === 1 ? 1 : 0), 3)); g.setIndex(I); return g; })();
+/* the cards of a tile (paesaggio3.js after its fields): [x, y, z, h, turn, dry, seed, -] each */
+function maisCarte(G, L) {
+  if (!MAT.maisCarta || !L.length) return; const N = L.length / 8, g = new THREE.InstancedBufferGeometry(); g.index = MAIS_CARTA_G.index;
+  for (const k of ['position', 'uv', 'normal']) g.setAttribute(k, MAIS_CARTA_G.attributes[k]);
+  const P = new Float32Array(N * 4), S = new Float32Array(N * 4); let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (let i = 0; i < N; i++) { const o = i * 8; P.set([L[o], L[o + 1], L[o + 2], L[o + 3]], i * 4); S.set([L[o + 4], L[o + 5], L[o + 6], 0], i * 4); x0 = Math.min(x0, L[o]); x1 = Math.max(x1, L[o]); z0 = Math.min(z0, L[o + 2]); z1 = Math.max(z1, L[o + 2]); y0 = Math.min(y0, L[o + 1]); y1 = Math.max(y1, L[o + 1] + 3); }
+  g.setAttribute('iP', new THREE.InstancedBufferAttribute(P, 4)); g.setAttribute('iS', new THREE.InstancedBufferAttribute(S, 4)); g.instanceCount = N;
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), Math.hypot(x1 - x0, y1 - y0, z1 - z0) / 2 + 3);
+  const me = new THREE.Mesh(g, MAT.maisCarta); me.receiveShadow = true; G.add(me); MAIS.carte = (MAIS.carte || 0) + N;
+}
