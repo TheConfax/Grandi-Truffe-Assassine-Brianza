@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 5.4,
+  "tempo_s": 10.5,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 38.6,
+  "tempo_s": 54.3,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -1522,16 +1522,16 @@
   ]
  },
  "muri_doppi_fusi": {
-  "linee": 1191,
-  "metri": 12318
+  "linee": 1187,
+  "metri": 12313
  },
  "muri_sul_confine": {
   "pezzi_corti_tenuti": 177,
   "dbgt": 39937,
   "metri_dbgt": 502311,
-  "metri_tenuti": 455108,
-  "spostati": 1437,
-  "metri_spostati": 8008,
+  "metri_tenuti": 455098,
+  "spostati": 1430,
+  "metri_spostati": 8045,
   "spostamento_m": {
    "p50": 0.5,
    "p90": 0.54,
@@ -1553,27 +1553,27 @@
  },
  "cancelli_passi_carrai": {
   "porte": {
-   "p": 2697
+   "p": 2746
   },
   "nuovi": 1178,
   "pedonali": 170,
-  "senza_strada": 4364,
-  "senza_chiusure": 4460,
-  "carreggiata_o_marciapiede": 2369,
-  "strada_osm": 699,
-  "troppo_stretti": 5471,
-  "gia_cancello": 16909,
+  "senza_strada": 4353,
+  "senza_chiusure": 4463,
+  "carreggiata_o_marciapiede": 2373,
+  "strada_osm": 700,
+  "troppo_stretti": 5477,
+  "gia_cancello": 16917,
   "fuori": 21,
   "doppione_recinzione": 137,
-  "capo_nel_vuoto": 946,
-  "troppo_larghi": 628,
-  "su_recinzione": 514,
-  "fronte_dal_bordo": 814,
+  "capo_nel_vuoto": 950,
+  "troppo_larghi": 622,
+  "su_recinzione": 515,
+  "fronte_dal_bordo": 816,
   "androni": {
    "passaggio:lontano_dalla_strada": 2885,
-   "passaggio:una_bocca": 3924,
-   "passaggio:cancello": 497,
-   "passaggio:non_in_un_cortile": 1896,
+   "passaggio:una_bocca": 3925,
+   "passaggio:cancello": 485,
+   "passaggio:non_in_un_cortile": 1910,
    "passaggio:collega_due_vie": 104,
    "passaggio:gia_cancello": 22,
    "passaggio:troppo_larga": 1,
@@ -1586,7 +1586,7 @@
    "porticato:gia_passaggio": 128,
    "porticato:cancellata": 53,
    "porticato:cancello": 81,
-   "porticato:lontano_dalla_strada": 29,
+   "porticato:lontano_dalla_strada": 28,
    "porticato:gia_cancello": 6,
    "porticato:una_bocca": 11,
    "porticato:stretta": 16,
@@ -1594,7 +1594,7 @@
    "porticato:stretta_extra": 1,
    "porticato:troppo_larga": 3
   },
-  "androni_tolti_vecchi": 120,
+  "androni_tolti_vecchi": 118,
   "per_origine": {
    "passo_carraio": 104,
    "rampa": 2,
@@ -1624,9 +1624,9 @@
   "dbgt_cancellata_02": 1594,
   "dedotto_cortile": 955,
   "osm": 293,
-  "dedotto_varchi": 1636
+  "dedotto_varchi": 1626
  },
- "cancelli_stesso_imbocco_tolti": 448,
+ "cancelli_stesso_imbocco_tolti": 446,
  "divisori_tagliati_da_cancelli": 185,
  "cancelli_in_carreggiata_spostati": {
   "spostati": 427,
@@ -1647,7 +1647,7 @@
   "nodi_aggiunti": 196,
   "punti_per_motivo": {
    "fuori asfalto": 513,
-   "muro o edificio": 1822,
+   "muro o edificio": 1821,
    "stretta fra i muri": 309
   },
   "sensi_unici_tolti_metri": 885,
@@ -1740,34 +1740,34 @@
  },
  "alberi_posto": {
   "alberi": 97308,
-  "spostati": 5043,
+  "spostati": 5046,
   "tolti": 415,
   "per_motivo": {}
  },
  "cancelli_ante_alberi": {
   "ante_girate": 216,
-  "alberi_spostati": 5043
+  "alberi_spostati": 5046
  },
  "chiusure_a_t": {
-  "capi_liberi": 21196,
-  "niente_davanti": 6672,
-  "in_linea": 1912,
-  "troppo_largo_in_linea": 1232,
-  "angolo_stretto": 972,
-  "troppo_largo": 2229,
-  "parallelo_a_un_altro": 409,
-  "chiuso": 7164,
-  "chiusi_recinzione": 1737,
-  "chiusi_in_linea": 293,
-  "chiusi_edificio": 4510,
+  "capi_liberi": 21193,
+  "niente_davanti": 6674,
+  "in_linea": 1916,
+  "troppo_largo_in_linea": 1235,
+  "angolo_stretto": 971,
+  "troppo_largo": 2227,
+  "parallelo_a_un_altro": 408,
+  "chiuso": 7162,
+  "chiusi_recinzione": 1732,
+  "chiusi_in_linea": 294,
+  "chiusi_edificio": 4512,
   "via_nel_varco": 564,
   "cancello_su_vialetto": 19,
-  "cancello_nel_varco": 213,
+  "cancello_nel_varco": 212,
   "pavimentato_nel_varco": 104,
-  "cancello_al_capo": 1195,
+  "cancello_al_capo": 1194,
   "chiusi_cancello": 624,
-  "doppio": 329,
-  "carreggiata_nel_varco": 52,
+  "doppio": 328,
+  "carreggiata_nel_varco": 53,
   "passo_carraio_vicino": 42
  },
  "doppioni_tolti_alla_fine": {
@@ -1777,7 +1777,7 @@
    "2": 30,
    "imbocco": 0
   },
-  "divisori": 186
+  "divisori": 183
  },
  "recinzioni_controllo": {
   "coppie_doppie_rimaste": 0,
@@ -2016,7 +2016,7 @@
  "controlli": {
   "oggetti_in_carreggiata": {
    "n": 9,
-   "di": 563,
+   "di": 564,
    "dove": [
     "?x=43&z=-846",
     "?x=-1180&z=1523",
@@ -2088,10 +2088,10 @@
   },
   "corsie_dentro_ac_vei": {
    "campioni": 92739,
-   "fuori": 2660,
+   "fuori": 2658,
    "quota": 0.0287,
    "fuori_per_motivo": {
-    "altro": 1550,
+    "altro": 1548,
     "incrocio": 383,
     "strettoia": 727
    },
@@ -2826,6 +2826,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 9.4
+  "tempo_s": 12.3
  }
 }

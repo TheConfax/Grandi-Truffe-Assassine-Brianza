@@ -341,13 +341,13 @@
     "x": 669.9,
     "z": -963.3,
     "m": 7.8,
-    "esito": "passaggio a livello"
+    "esito": "una via che attraversa"
    },
    {
     "x": 740.7,
     "z": 2127.4,
     "m": 8.5,
-    "esito": "una via che attraversa"
+    "esito": "passaggio a livello"
    },
    {
     "x": -211.4,
@@ -359,13 +359,13 @@
     "x": 844.6,
     "z": -1403.3,
     "m": 8.9,
-    "esito": "una via che attraversa"
+    "esito": "passaggio a livello"
    },
    {
     "x": 754.8,
     "z": 2131.9,
     "m": 9.1,
-    "esito": "una via che attraversa"
+    "esito": "passaggio a livello"
    },
    {
     "x": 318.8,
@@ -437,7 +437,7 @@
     "x": -142.0,
     "z": -155.0,
     "m": 11.0,
-    "esito": "passaggio a livello"
+    "esito": "una via che attraversa"
    },
    {
     "x": -2115.5,
@@ -509,7 +509,7 @@
     "x": -145.7,
     "z": -159.8,
     "m": 14.0,
-    "esito": "passaggio a livello"
+    "esito": "una via che attraversa"
    },
    {
     "x": -1106.3,
