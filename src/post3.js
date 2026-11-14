@@ -12,6 +12,7 @@ const POSTFX = (() => {
   if (!POST.on || !THREE.OutputPass) return null;
   const v = new THREE.Vector2(), dt = new THREE.DepthTexture(1, 1); dt.format = THREE.DepthStencilFormat; dt.type = THREE.UnsignedInt248Type; /* the pools of acqua3.js use the stencil */
   const rtS = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: POST.aa ? 4 : 0, depthTexture: dt, stencilBuffer: true });
+  rtS.resolveStencilBuffer = false; /* the stencil is only needed while the scene is drawn (the pools); resolving it out of the 4 samples cost 5-6 ms of GPU a frame at 1080p on ANGLE/D3D11 (indagine FPS 14/11): colour and depth only */
   const rtA = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false }), rtB = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false }); // rtB: the finished picture (sRGB, 8 bit), for SMAA
   let ao = null;
   if (POST.ao && THREE.GTAOPass) {
