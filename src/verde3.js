@@ -45,22 +45,25 @@ const CESP_COL = ['#5d8a3b', '#4f7a35', '#6b8f3e', '#47703a', '#7f9a45', '#5a804
 function buildVerde(T, G) {
   if (!VERDE3.on || !T.d.cs || !T.d.cs.length) return;
   const L = [];
-  for (const [X, Z, HH] of T.d.cs) { const x = X / 10, z = Z / 10, h = HH / 10; if (inBuilding(x, z, 0.3) || onAnyRoad(x, z, 0.5) || H.inPit(x, z, 0.5)) continue; const gy = H.ground(x, z); if (inWater(x, z, gy)) continue; L.push([x, z, h, gy]); }
+  for (const [X, Z, HH] of T.d.cs) { const x = X / 10, z = Z / 10, h = HH / 10; if (inBuilding(x, z, 0.3) || onAnyRoad(x, z, 0.5) || H.inPit(x, z, 0.5)) continue; const gy = H.ground(x, z); if (inWater(x, z, gy)) continue; L.push([x, z, h, gy, L.length]); }
   if (!L.length) return;
+  /* Carlo 14/11: a shrub is not a wall, it goes like the hedges and the shrubs of the roundabouts (sfondabili3.js bushHits): the car goes through, flattens it, slows down a little */
+  if (!T.vrWalls) T.vrWalls = L.map(([x, z, h, gy]) => { const w = { r: Math.min(0.9, 0.3 + 0.25 * h), x, z, y0: gy - 1, y1: gy + h, off: false }; WALLS.add(x - 1, z - 1, x + 1, z + 1, w); return w; });
+  T.vrIms = [];
   const by = [[], [], [], [], [], []]; for (const s of L) by[Math.floor(trHash(s[0], s[1]) * 6) % 6].push(s); /* three shapes, evergreen (laurel, privet) or with the season's leaves */
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3(), c = new THREE.Color();
   by.forEach((list, v) => {
     if (!list.length) return;
     const im = new THREE.InstancedMesh(TREE_G.crownS[v % 3], v < 3 ? MAT.crownSemp : MAT.crown, list.length); im.castShadow = true; im.receiveShadow = true; im.customDepthMaterial = TREE_DEPTH;
-    list.forEach(([x, z, h, gy], i) => {
+    T.vrIms.push(im);
+    list.forEach(([x, z, h, gy, li], i) => {
       const k = trHash(x * 1.7, z * 2.3), wx = (0.55 + 0.35 * k) * Math.max(h, 1.1) / 2.25 * 1.15, wy = h / 4.1; /* the crown is 4.5 m across and 4.1 m high */
       m4.compose(p.set(x, gy + h * 0.5 - 0.1, z), q.setFromEuler(e.set(0, k * TAU, 0)), sc.set(wx, wy, wx * (0.85 + 0.3 * trHash(z, x)))); im.setMatrixAt(i, m4);
       im.setColorAt(i, c.copy(COL(CESP_COL[Math.floor(k * 6) % 6])).multiplyScalar(0.95 + 0.3 * trHash(x + 3, z)));
-      if (!T.vrDone) WALLS.add(x - 1, z - 1, x + 1, z + 1, { r: Math.min(0.9, 0.3 + 0.25 * h), x, z, y0: gy - 1, y1: gy + h }); /* a thicket stops a car (Carlo 25/10: nothing a car goes through) */
+      const w = T.vrWalls[li]; w.off = false; BUSH_G.add(x - w.r, z - w.r, x + w.r, z + w.r, { T, im, i, x, y: gy, z, hw: w.r / 0.85, h, w, m: m4.clone(), off: false, vr: true, flatY: gy + 0.12 }); /* the walker still stops at it; a car breaks through */
     });
     im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; G.add(im); VERDE3.cespugli += list.length;
   });
-  T.vrDone = true;
 }
 // ---- tufts of grass round the camera: a pool that follows it, on the lawns and banks (cells 3 and 5 of S), on the old ground's green too
 const CIUFFI = (() => {
@@ -102,3 +105,21 @@ function ciuffiAggiorna() {
   C.im.count = n; C.im.instanceMatrix.needsUpdate = true; if (C.im.instanceColor) C.im.instanceColor.needsUpdate = true; VERDE3.ciuffi = n;
 }
 { const u = updDayNight; updDayNight = function (dt) { u(dt); ciuffiAggiorna(); }; }
+// the ground of a small lawn inside a wood (Carlo 14/11, Seveso x -375.6 z 1119.7: under the shrubs a paler patch): the DBGT has pieces of lawn of a few tens of m2
+// inside its woods, drawn with the lawn's tint while the wood's floor round them is darker; the shrubs grow just there, so the patch showed. A lawn (or scrub) under
+// 800 m2 whose edge is mostly wood (60% of the points 0.8 m outside it) takes the wood's floor. Same rule everywhere; &verde=0 off
+function areaTinta(T, a) {
+  if (a.tc !== undefined) return a.tc; a.tc = a.t;
+  if (!VERDE3.on || (a.t !== 1 && a.t !== 12)) return a.tc;
+  const o = dec(a.p); if (o.length < 3 || Math.abs(sArea(o)) > 800) return a.tc;
+  const woods = []; for (const U of [T, ...vicini(T)]) if (U && U.d && U.d.a) for (const b of U.d.a) if (b.t === 11) { if (!b._o) { b._o = dec(b.p); b._k = b.k.map(dec); b._b = bbox(b._o); } woods.push(b); }
+  if (!woods.length) return a.tc;
+  let n = 0, w = 0;
+  for (let i = 0; i < o.length; i++) { const p = o[i], q = o[(i + 1) % o.length], L = hyp(q[0] - p[0], q[1] - p[1]); if (L < 0.2) continue;
+    for (let s = 0.5; s < L; s += 2) { const x = p[0] + (q[0] - p[0]) * s / L, z = p[1] + (q[1] - p[1]) * s / L, nx = -(q[1] - p[1]) / L * 0.8, nz = (q[0] - p[0]) / L * 0.8;
+      const [ox, oz] = inPoly(x + nx, z + nz, o) ? [x - nx, z - nz] : [x + nx, z + nz]; n++;
+      if (woods.some(b => ox >= b._b[0] && ox <= b._b[2] && oz >= b._b[1] && oz <= b._b[3] && inPoly(ox, oz, b._o) && !b._k.some(h => inPoly(ox, oz, h)))) w++; } }
+  if (n && w / n >= 0.6) a.tc = 11;
+  return a.tc;
+}
+window.__VR_TEST = { bushHits: (v, cs, R) => bushHits(v, cs, R), BUSH_G }; /* for the checks (Playwright) */

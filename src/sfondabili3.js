@@ -315,12 +315,12 @@ const _barUp = new THREE.Vector3(0, 1, 0), _barM = new THREE.Matrix4(), _barQ = 
 const BUSH_G = new Grid(6), BUSH = { slow: 0.9, dmg: 0.6, bit: 0x4f7a3a };
 function bushHits(v, cs, R) {
   BUSH_G.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, b => {
-    if (b.off || b.T.roIm !== b.im || !b.T.ready || Math.abs(v.y - b.y) > 2.5) return;
+    if (b.off || (b.vr ? !(b.T.vrIms && b.T.vrIms.includes(b.im)) : b.T.roIm !== b.im) || !b.T.ready || Math.abs(v.y - b.y) > 2.5) return; /* vr: the shrubs of verde3.js */
     for (const c of cs) {
       const dx = b.x - c[0], dz = b.z - c[1], d = hyp(dx, dz); if (d >= b.hw * 0.85 + R || d < 1e-6) continue;
       if ((v.vx * dx + v.vz * dz) / d < BAR_VN_H) continue; // towards the shrub
       b.off = true; b.w.off = true; const speed = v.speed;
-      const m = b.m.clone(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(); m.decompose(p, q, s); m.compose(p, q, s.set(s.x * 1.15, s.y * 0.12, s.z * 1.15)); b.im.setMatrixAt(b.i, m); b.im.instanceMatrix.needsUpdate = true;
+      const m = b.m.clone(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(); m.decompose(p, q, s); if (b.flatY !== undefined) p.y = b.flatY; m.compose(p, q, s.set(s.x * 1.15, s.y * 0.12, s.z * 1.15)); b.im.setMatrixAt(b.i, m); b.im.instanceMatrix.needsUpdate = true;
       v.vx *= BUSH.slow; v.vz *= BUSH.slow; v.health = Math.max(0, v.health - BUSH.dmg);
       if (v === P.car) { sfxCrash(Math.min(4, 2 + speed * 0.1)); shake = Math.max(shake, 0.15); }
       barBits(b.x, b.y + b.h * 0.5, b.z, v, BUSH.bit, 5); return;

@@ -179,7 +179,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo realismo-3 · dopo f281bee7 · assemblato 14/11 00:04 · porta ' + location.port;
+    const txt = 'locale · ramo realismo-3 · dopo cf36f416 · assemblato 14/11 03:28 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -1856,12 +1856,12 @@ const _barUp = new THREE.Vector3(0, 1, 0), _barM = new THREE.Matrix4(), _barQ = 
 const BUSH_G = new Grid(6), BUSH = { slow: 0.9, dmg: 0.6, bit: 0x4f7a3a };
 function bushHits(v, cs, R) {
   BUSH_G.each(v.x - 4, v.z - 4, v.x + 4, v.z + 4, b => {
-    if (b.off || b.T.roIm !== b.im || !b.T.ready || Math.abs(v.y - b.y) > 2.5) return;
+    if (b.off || (b.vr ? !(b.T.vrIms && b.T.vrIms.includes(b.im)) : b.T.roIm !== b.im) || !b.T.ready || Math.abs(v.y - b.y) > 2.5) return; /* vr: the shrubs of verde3.js */
     for (const c of cs) {
       const dx = b.x - c[0], dz = b.z - c[1], d = hyp(dx, dz); if (d >= b.hw * 0.85 + R || d < 1e-6) continue;
       if ((v.vx * dx + v.vz * dz) / d < BAR_VN_H) continue; // towards the shrub
       b.off = true; b.w.off = true; const speed = v.speed;
-      const m = b.m.clone(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(); m.decompose(p, q, s); m.compose(p, q, s.set(s.x * 1.15, s.y * 0.12, s.z * 1.15)); b.im.setMatrixAt(b.i, m); b.im.instanceMatrix.needsUpdate = true;
+      const m = b.m.clone(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(); m.decompose(p, q, s); if (b.flatY !== undefined) p.y = b.flatY; m.compose(p, q, s.set(s.x * 1.15, s.y * 0.12, s.z * 1.15)); b.im.setMatrixAt(b.i, m); b.im.instanceMatrix.needsUpdate = true;
       v.vx *= BUSH.slow; v.vz *= BUSH.slow; v.health = Math.max(0, v.health - BUSH.dmg);
       if (v === P.car) { sfxCrash(Math.min(4, 2 + speed * 0.1)); shake = Math.max(shake, 0.15); }
       barBits(b.x, b.y + b.h * 0.5, b.z, v, BUSH.bit, 5); return;
@@ -3770,7 +3770,7 @@ function cellOwners(T, F) {
   for (const a of d.a || []) {
     const outer = dec(a.p), holes = a.k.map(dec); if (outer.length < 3 || a.t === 5 || waterInBed(a, outer, holes, T)) continue;
     if (a.t === 18) cover(outer, holes, 1, S('i', MAT.incoltoS, 12)); // incolti (DBGT PS_INC 04): dry grass and bare earth
-    else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[a.t] || '#ffffff')));
+    else if (a.t <= 3 || a.t >= 11 && a.t !== 17) cover(outer, holes, 1, S('g', MAT.grassS, 9, COL(AREA_COL[areaTinta(T, a)] || '#ffffff')));
     else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) cover(outer, holes, 2, S('w', MAT.waterS, 9)); } /* a lake is dug and drawn by acqua3.js */
     else if (a.t === 10) cover(outer, holes, 4, S('z', MAT.piazzaS, 4), true);
     else if (a.t === 17) cover(outer, holes, 1.1, SF(a.m || 'n')); // yards of the DBGT (AATT): their material (src/fondi.py), or the neutral paving
@@ -3895,7 +3895,7 @@ function* buildTileGen(T) {
       if (T.fine && waterInBed(a, outer, holes, T)) continue; // water inside the bed: the water level below draws it
       try {
         if (a.t === 18) polyFill(iB, outer, holes, 0.02 * fy, 12);
-        else if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[a.t] || '#ffffff'));
+        else if (a.t <= 3 || a.t >= 11 && a.t !== 17) polyFill(gB, outer, holes, 0.02 * fy, 9, COL(AREA_COL[areaTinta(T, a)] || '#ffffff'));
         else if (a.t === 6) { if (!lagoDi(a, T) && !lagoAnello(a, T)) polyFill(wB, outer, holes, 0.03 * fy, 9); }
         else if (a.t === 10) polyFill(zB, outer, holes, 0.05 * fy, 4);
         else if (a.t === 17) { const m = a.m || 'n'; polyFill(fbuf(m, 1.1, false, true), outer, holes, 0.025 * fy, fondoLook(m).vs, fondoLook(m).col); }
@@ -4650,7 +4650,7 @@ function freeTile(T) {
   for (const p of H.PITS) if (tileOf(p.c[0], p.c[1]) === T.t) { p.built = false; p.meshes = []; } else if (p.meshes) p.meshes = p.meshes.filter(M => M.parent && M.parent !== G); // its ramp is drawn again with it
   for (const p of PROPS) if (tileOf(p.x, p.z) === T.t) { p.obj = p.lx ? p.obj : null; if (p.inst) p.inst.meshes = []; } // the props stay, as what was knocked down, but not the meshes they drew
   for (const p of PROPS) if (p.tile === T) { p.onBreak = null; p.inst.meshes = []; } // a lamp may stand just past the edge of its tile
-  for (const k of ['terrMesh', 'ownMeshes', 'cellMesh', 'cellIdx', 'sill', 'roWalls', 'roIm', 'ngShut', 'layers', 'naP', 'matP', 'stalls', 'streetStalls', 'nSmall']) T[k] = undefined; /* nothing of the meshes stays on the tile; its stalls are worked out again */
+  for (const k of ['terrMesh', 'ownMeshes', 'cellMesh', 'cellIdx', 'sill', 'roWalls', 'roIm', 'vrIms', 'ngShut', 'layers', 'naP', 'matP', 'stalls', 'streetStalls', 'nSmall']) T[k] = undefined; /* nothing of the meshes stays on the tile; its stalls are worked out again */
   for (const f of FUEL) if (tileOf(f.x, f.z) === T.t) for (const q of f.pumps) { q.g = null; q.body = null; }
   for (const f of FOUNT) if (f.spray && tileOf(f.x, f.z) === T.t) f.spray = null;
 }
@@ -11954,7 +11954,7 @@ let TOD = 17.2; // ore del giorno, 1 ora di gioco = 1 minuto reale
 const WX = { cloud: 0.12, rain: 0, fog: 0, wet: 0, flash: 0 }; // weather mix, driven by weather3.js
 // glow textures are opaque, light on black, and only ever added: canvas alpha gradients upload as rainbow speckles on iOS Safari
 const glowTex = (stops, size = 64) => canvasTex(size, size, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); stops.forEach(([t, r, gg, b]) => gr.addColorStop(t, `rgb(${r | 0},${gg | 0},${b | 0})`)); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, false);
-const poolTex = (r, g, b, a) => glowTex([[0, r * a, g * a, b * a], [1, 0, 0, 0]]);
+const poolTex = (r, g, b, a) => glowTex(Array.from({ length: 13 }, (_, i) => { const t = i / 12, f = (Math.exp(-4.2 * t * t) - Math.exp(-4.2)) / (1 - Math.exp(-4.2)); return [t, r * a * f, g * a * f, b * a * f]; }), 128); /* realismo 3 (Carlo 14/11: "un cerchio piatto e netto"): a bell, not a cone: the pool of light fades out with no edge */
 const HEADPOOL_MAT = new THREE.MeshBasicMaterial({ map: poolTex(255, 236, 190, 0.9), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const LAMPPOOL_MAT = new THREE.MeshBasicMaterial({ map: poolTex(255, 214, 150, 0.85), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const WIN_EMI = (kind) => canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd890'; if (kind === 'old') g.fillRect(48, 32, 32, 54); else if (kind === 'modern') { g.fillRect(16, 28, 44, 52); g.fillStyle = '#c99a50'; g.fillRect(68, 28, 44, 52); } });
@@ -12066,9 +12066,9 @@ function updDayNight(dt) {
   WIN_SKY.value.copy(mixHex(SKY_C.night[1], SKY_C.day[1], L.day)).lerp(hexC(SKY_C.dusk[2]), L.dusk * 0.5).multiplyScalar(0.12 + 0.3 * L.day);
   for (const m of SIGN_MATS) m.emissiveIntensity = 0.05 + 0.75 * lampsOn;
   for (const g of LM_GLOW) g.m.emissiveIntensity = g.a + g.b * lampsOn;
-  MAT.lampHead.emissiveIntensity = 0.3 + 2.4 * lampsOn; LAMPPOOL_MAT.opacity = 0.75 * lampsOn;
+  MAT.lampHead.emissiveIntensity = 0.3 + 2.4 * lampsOn; LAMPPOOL_MAT.opacity = 0.75 * lampsOn * (1 - 0.6 * (window.__RIFW ? window.__RIFW.value : 0)); /* wet: the light goes into the mirror of the road (riflessi3.js), less of a painted pool */
   MAT.old.emissiveIntensity = MAT.mod.emissiveIntensity = 0.55 * lampsOn;
-  M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn;
+  M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn * (1 - 0.6 * (window.__RIFW ? window.__RIFW.value : 0));
   const v = P.mode === 'car' ? P.car : null;
   headSpot.intensity = v && v.health > 0 && !v.heli ? (LUCI_ON ? 90 : 2.4) * lampsOn : 0; luciAggiorna(lampsOn); /* luci3.js: the real lights of the lamps and the cars */
   fariPosiziona();
@@ -12983,7 +12983,7 @@ const PAT_PATCH = (org, idf) => s => { VAR_VERT(s); if (!org) { s.uniforms.uIdMa
 //  - the metals tint what they mirror with their own colour.
 // The kinds (RIF_KIND): paint (car bodies), glass (car panes), shop (shop windows), metal (guardrails, lamp posts, railings, gates, rails), asphalt.
 // RIF.wet: 0 dry .. 1 soaked, for the day it rains: the asphalt then darkens and goes smoother (sharper, stronger reflections). It follows WX.wet (weather3.js, fase 3)
-const RIF = { wet: { value: 0 }, t: { value: 0 }, rain: { value: 0 }, pre: [], cache: {}, pr: { tex: { value: null }, mat: { value: new THREE.Matrix4() }, on: { value: 0 } } }; /* pr: the planar reflection of the wet ground (bagnato3.js) */ // t, rain: the rings of the drops in the puddles (realismo 2, fase C)
+const RIF = { wet: { value: 0 }, t: { value: 0 }, rain: { value: 0 }, pre: [], cache: {}, pr: { tex: { value: null }, mat: { value: new THREE.Matrix4() }, on: { value: 0 } } }; /* pr: the planar reflection of the wet ground (bagnato3.js) */ window.__RIFW = RIF.wet; /* extras.js: the painted pools of light dim on the wet */ // t, rain: the rings of the drops in the puddles (realismo 2, fase C)
 // Realismo 2, fase C: what a body or a pane mirrors near the horizon is the town, not the sky: a skyline of houses all round (by direction, lit as a wall
 // in the open, blurred with the roughness), so a car going by shows the houses sliding over its sides. And in the rain the asphalt gets puddles: where the
 // ground is a little lower (a noise in metres, the same for all), they grow with the wet, mirror like water (smooth, dark under) and ring with the drops
@@ -13502,22 +13502,25 @@ const CESP_COL = ['#5d8a3b', '#4f7a35', '#6b8f3e', '#47703a', '#7f9a45', '#5a804
 function buildVerde(T, G) {
   if (!VERDE3.on || !T.d.cs || !T.d.cs.length) return;
   const L = [];
-  for (const [X, Z, HH] of T.d.cs) { const x = X / 10, z = Z / 10, h = HH / 10; if (inBuilding(x, z, 0.3) || onAnyRoad(x, z, 0.5) || H.inPit(x, z, 0.5)) continue; const gy = H.ground(x, z); if (inWater(x, z, gy)) continue; L.push([x, z, h, gy]); }
+  for (const [X, Z, HH] of T.d.cs) { const x = X / 10, z = Z / 10, h = HH / 10; if (inBuilding(x, z, 0.3) || onAnyRoad(x, z, 0.5) || H.inPit(x, z, 0.5)) continue; const gy = H.ground(x, z); if (inWater(x, z, gy)) continue; L.push([x, z, h, gy, L.length]); }
   if (!L.length) return;
+  /* Carlo 14/11: a shrub is not a wall, it goes like the hedges and the shrubs of the roundabouts (sfondabili3.js bushHits): the car goes through, flattens it, slows down a little */
+  if (!T.vrWalls) T.vrWalls = L.map(([x, z, h, gy]) => { const w = { r: Math.min(0.9, 0.3 + 0.25 * h), x, z, y0: gy - 1, y1: gy + h, off: false }; WALLS.add(x - 1, z - 1, x + 1, z + 1, w); return w; });
+  T.vrIms = [];
   const by = [[], [], [], [], [], []]; for (const s of L) by[Math.floor(trHash(s[0], s[1]) * 6) % 6].push(s); /* three shapes, evergreen (laurel, privet) or with the season's leaves */
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3(), c = new THREE.Color();
   by.forEach((list, v) => {
     if (!list.length) return;
     const im = new THREE.InstancedMesh(TREE_G.crownS[v % 3], v < 3 ? MAT.crownSemp : MAT.crown, list.length); im.castShadow = true; im.receiveShadow = true; im.customDepthMaterial = TREE_DEPTH;
-    list.forEach(([x, z, h, gy], i) => {
+    T.vrIms.push(im);
+    list.forEach(([x, z, h, gy, li], i) => {
       const k = trHash(x * 1.7, z * 2.3), wx = (0.55 + 0.35 * k) * Math.max(h, 1.1) / 2.25 * 1.15, wy = h / 4.1; /* the crown is 4.5 m across and 4.1 m high */
       m4.compose(p.set(x, gy + h * 0.5 - 0.1, z), q.setFromEuler(e.set(0, k * TAU, 0)), sc.set(wx, wy, wx * (0.85 + 0.3 * trHash(z, x)))); im.setMatrixAt(i, m4);
       im.setColorAt(i, c.copy(COL(CESP_COL[Math.floor(k * 6) % 6])).multiplyScalar(0.95 + 0.3 * trHash(x + 3, z)));
-      if (!T.vrDone) WALLS.add(x - 1, z - 1, x + 1, z + 1, { r: Math.min(0.9, 0.3 + 0.25 * h), x, z, y0: gy - 1, y1: gy + h }); /* a thicket stops a car (Carlo 25/10: nothing a car goes through) */
+      const w = T.vrWalls[li]; w.off = false; BUSH_G.add(x - w.r, z - w.r, x + w.r, z + w.r, { T, im, i, x, y: gy, z, hw: w.r / 0.85, h, w, m: m4.clone(), off: false, vr: true, flatY: gy + 0.12 }); /* the walker still stops at it; a car breaks through */
     });
     im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; G.add(im); VERDE3.cespugli += list.length;
   });
-  T.vrDone = true;
 }
 // ---- tufts of grass round the camera: a pool that follows it, on the lawns and banks (cells 3 and 5 of S), on the old ground's green too
 const CIUFFI = (() => {
@@ -13559,6 +13562,24 @@ function ciuffiAggiorna() {
   C.im.count = n; C.im.instanceMatrix.needsUpdate = true; if (C.im.instanceColor) C.im.instanceColor.needsUpdate = true; VERDE3.ciuffi = n;
 }
 { const u = updDayNight; updDayNight = function (dt) { u(dt); ciuffiAggiorna(); }; }
+// the ground of a small lawn inside a wood (Carlo 14/11, Seveso x -375.6 z 1119.7: under the shrubs a paler patch): the DBGT has pieces of lawn of a few tens of m2
+// inside its woods, drawn with the lawn's tint while the wood's floor round them is darker; the shrubs grow just there, so the patch showed. A lawn (or scrub) under
+// 800 m2 whose edge is mostly wood (60% of the points 0.8 m outside it) takes the wood's floor. Same rule everywhere; &verde=0 off
+function areaTinta(T, a) {
+  if (a.tc !== undefined) return a.tc; a.tc = a.t;
+  if (!VERDE3.on || (a.t !== 1 && a.t !== 12)) return a.tc;
+  const o = dec(a.p); if (o.length < 3 || Math.abs(sArea(o)) > 800) return a.tc;
+  const woods = []; for (const U of [T, ...vicini(T)]) if (U && U.d && U.d.a) for (const b of U.d.a) if (b.t === 11) { if (!b._o) { b._o = dec(b.p); b._k = b.k.map(dec); b._b = bbox(b._o); } woods.push(b); }
+  if (!woods.length) return a.tc;
+  let n = 0, w = 0;
+  for (let i = 0; i < o.length; i++) { const p = o[i], q = o[(i + 1) % o.length], L = hyp(q[0] - p[0], q[1] - p[1]); if (L < 0.2) continue;
+    for (let s = 0.5; s < L; s += 2) { const x = p[0] + (q[0] - p[0]) * s / L, z = p[1] + (q[1] - p[1]) * s / L, nx = -(q[1] - p[1]) / L * 0.8, nz = (q[0] - p[0]) / L * 0.8;
+      const [ox, oz] = inPoly(x + nx, z + nz, o) ? [x - nx, z - nz] : [x + nx, z + nz]; n++;
+      if (woods.some(b => ox >= b._b[0] && ox <= b._b[2] && oz >= b._b[1] && oz <= b._b[3] && inPoly(ox, oz, b._o) && !b._k.some(h => inPoly(ox, oz, h)))) w++; } }
+  if (n && w / n >= 0.6) a.tc = 11;
+  return a.tc;
+}
+window.__VR_TEST = { bushHits: (v, cs, R) => bushHits(v, cs, R), BUSH_G }; /* for the checks (Playwright) */
 
 // ---------------------------------------------------------------- realismo 3, fase D: the wet ground mirrors what stands on it (Carlo 13/11: "riflessi veri sul bagnato")
 // While the ground is wet (RIF.wet, weather3.js), each frame the scene is drawn again, at half size, from the camera mirrored under the plane of the ground beneath it

@@ -3,7 +3,7 @@ let TOD = 17.2; // ore del giorno, 1 ora di gioco = 1 minuto reale
 const WX = { cloud: 0.12, rain: 0, fog: 0, wet: 0, flash: 0 }; // weather mix, driven by weather3.js
 // glow textures are opaque, light on black, and only ever added: canvas alpha gradients upload as rainbow speckles on iOS Safari
 const glowTex = (stops, size = 64) => canvasTex(size, size, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); stops.forEach(([t, r, gg, b]) => gr.addColorStop(t, `rgb(${r | 0},${gg | 0},${b | 0})`)); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, false);
-const poolTex = (r, g, b, a) => glowTex([[0, r * a, g * a, b * a], [1, 0, 0, 0]]);
+const poolTex = (r, g, b, a) => glowTex(Array.from({ length: 13 }, (_, i) => { const t = i / 12, f = (Math.exp(-4.2 * t * t) - Math.exp(-4.2)) / (1 - Math.exp(-4.2)); return [t, r * a * f, g * a * f, b * a * f]; }), 128); /* realismo 3 (Carlo 14/11: "un cerchio piatto e netto"): a bell, not a cone: the pool of light fades out with no edge */
 const HEADPOOL_MAT = new THREE.MeshBasicMaterial({ map: poolTex(255, 236, 190, 0.9), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const LAMPPOOL_MAT = new THREE.MeshBasicMaterial({ map: poolTex(255, 214, 150, 0.85), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const WIN_EMI = (kind) => canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd890'; if (kind === 'old') g.fillRect(48, 32, 32, 54); else if (kind === 'modern') { g.fillRect(16, 28, 44, 52); g.fillStyle = '#c99a50'; g.fillRect(68, 28, 44, 52); } });
@@ -115,9 +115,9 @@ function updDayNight(dt) {
   WIN_SKY.value.copy(mixHex(SKY_C.night[1], SKY_C.day[1], L.day)).lerp(hexC(SKY_C.dusk[2]), L.dusk * 0.5).multiplyScalar(0.12 + 0.3 * L.day);
   for (const m of SIGN_MATS) m.emissiveIntensity = 0.05 + 0.75 * lampsOn;
   for (const g of LM_GLOW) g.m.emissiveIntensity = g.a + g.b * lampsOn;
-  MAT.lampHead.emissiveIntensity = 0.3 + 2.4 * lampsOn; LAMPPOOL_MAT.opacity = 0.75 * lampsOn;
+  MAT.lampHead.emissiveIntensity = 0.3 + 2.4 * lampsOn; LAMPPOOL_MAT.opacity = 0.75 * lampsOn * (1 - 0.6 * (window.__RIFW ? window.__RIFW.value : 0)); /* wet: the light goes into the mirror of the road (riflessi3.js), less of a painted pool */
   MAT.old.emissiveIntensity = MAT.mod.emissiveIntensity = 0.55 * lampsOn;
-  M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn;
+  M_HEAD.emissiveIntensity = 0.6 + 2.0 * lampsOn; M_TAIL.emissiveIntensity = 0.5 + 1.4 * lampsOn; HEADPOOL_MAT.opacity = 0.5 * lampsOn * (1 - 0.6 * (window.__RIFW ? window.__RIFW.value : 0));
   const v = P.mode === 'car' ? P.car : null;
   headSpot.intensity = v && v.health > 0 ? (LUCI_ON ? 90 : 2.4) * lampsOn : 0; luciAggiorna(lampsOn); /* luci3.js: the real lights of the lamps and the cars */
   fariPosiziona();
