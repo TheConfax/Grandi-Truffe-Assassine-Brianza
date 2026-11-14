@@ -183,7 +183,7 @@ body:not(.debug) .dbg { display: none !important; }
 <script>
 (async () => { // the commit GitHub Pages is serving now (the newest deployment that went through), not just the newest commit on main
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { /* played locally: the branch and commit this page was assembled from, not what main serves */
-    const txt = 'locale · ramo fps-a · dopo 37b35a45 · assemblato 14/11 16:08 · porta ' + location.port;
+    const txt = 'locale · ramo fps-a · dopo c30d4569 · assemblato 14/11 16:11 · porta ' + location.port;
     for (const id of ['ver', 'pver']) { const v = document.getElementById(id); v.textContent = txt; v.hidden = false; } return;
   }
   const API = 'https://api.github.com/repos/TheConfax/Grandi-Truffe-Assassine-Brianza', get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
@@ -12357,6 +12357,7 @@ function updDebugHud(dt) {
 /* misure del fotogramma (debug, &debug=1): valori mediati su circa 1 secondo, nella riga #dbgmis sopra quella di debug.
    A debug spento non gira niente: frame() non chiama queste funzioni e le query GPU vengono tolte.
    Tasto K (solo debug): copia la riga negli appunti. Tasto B: la riga finisce nella segnalazione (campo "misure"). */
+renderer.info.autoReset = false; /* three zeroes the counts at every render (scene, shadows, reflection, each pass): the row showed only the last pass (SMAA, 1 call). Zeroed once a frame at the top of frame() instead: calls and triangles of the whole frame */
 const MIS = { log: null, f: { sim: 0, tile: 0, vis: 0, draw: 0 }, a: { sim: 0, tile: 0, vis: 0, draw: 0 }, n: 0, sum: 0, max: 0, prev: 0, t0: 0, t1: 0, gpuSum: 0, gpuN: 0, txt: 'misure: in raccolta…', out: null, el: null, gpu: undefined, qs: [], cur: null };
 function dbgBegin(t) {
   const now_ = performance.now(); MIS.t0 = now_;
@@ -14088,6 +14089,7 @@ const CHEATS = { RESPAWN: cheatRespawn, FERARI: cheatFerari, POLIZIA: () => setP
 let last = performance.now(), acc = 0;
 function frame(t) {
   requestAnimationFrame(frame);
+  renderer.info.reset(); /* once a frame (misure3.js: autoReset off) */
   const m_ = DEBUG ? dbgBegin(t) : null;
   let dt = Math.min(0.1, (t - last) / 1000); last = t;
   pollPad();

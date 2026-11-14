@@ -1,6 +1,7 @@
 /* misure del fotogramma (debug, &debug=1): valori mediati su circa 1 secondo, nella riga #dbgmis sopra quella di debug.
    A debug spento non gira niente: frame() non chiama queste funzioni e le query GPU vengono tolte.
    Tasto K (solo debug): copia la riga negli appunti. Tasto B: la riga finisce nella segnalazione (campo "misure"). */
+renderer.info.autoReset = false; /* three zeroes the counts at every render (scene, shadows, reflection, each pass): the row showed only the last pass (SMAA, 1 call). Zeroed once a frame at the top of frame() instead: calls and triangles of the whole frame */
 const MIS = { log: null, f: { sim: 0, tile: 0, vis: 0, draw: 0 }, a: { sim: 0, tile: 0, vis: 0, draw: 0 }, n: 0, sum: 0, max: 0, prev: 0, t0: 0, t1: 0, gpuSum: 0, gpuN: 0, txt: 'misure: in raccolta…', out: null, el: null, gpu: undefined, qs: [], cur: null };
 function dbgBegin(t) {
   const now_ = performance.now(); MIS.t0 = now_;

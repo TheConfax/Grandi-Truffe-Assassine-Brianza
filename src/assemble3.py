@@ -789,7 +789,7 @@ rep("  const geo = m.bm.geometry, pos = geo.attributes.position, org = m.org", "
 rep("    VEH.push(this); this.sync();", "    this.m.g.fVeh = this; VEH.push(this); this.sync();")
 # ---- frame timing (debug only): misure3.js, row #dbgmis. Nothing runs with debug off.
 rep("async function reportSpot() {", open(os.path.join(HERE, 'misure3.js'), encoding='utf-8').read() + "\nasync function reportSpot() {")
-rep("  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();", "  const m_ = DEBUG ? dbgBegin(t) : null;\n  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();")
+rep("  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();", "  renderer.info.reset(); /* once a frame (misure3.js: autoReset off) */\n  const m_ = DEBUG ? dbgBegin(t) : null;\n  let dt = Math.min(0.1, (t - last) / 1000); last = t;\n  pollPad();")
 rep("  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (running &&", "  if (m_) dbgMk(m_, 'sim');\n  { const px = P.mode === 'car' ? P.car.x : P.x, pz = P.mode === 'car' ? P.car.z : P.z; tileTick(px, pz, running ? 7 : 12); if (m_) dbgMk(m_, 'tile'); if (running &&")
 rep("  const ipol = (running || titolo) && !paused ? interpBegin(", "  if (m_) dbgMk(m_, 'sim');\n  const ipol = (running || titolo) && !paused ? interpBegin(")
 rep("  disegna();\n  if (ipol) interpEnd(ipol);\n}", "  if (m_) dbgMk(m_, 'vis');\n  const g_ = m_ ? dbgGpuBegin() : 0;\n  disegna();\n  if (m_) { dbgGpuEnd(g_); dbgMk(m_, 'draw'); }\n  if (ipol) interpEnd(ipol);\n  if (m_) dbgEnd(m_);\n}")
