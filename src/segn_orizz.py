@@ -40,8 +40,82 @@ def _grande(r):
     return r['hw'] in ('trunk', 'primary', 'secondary') and (r.get('ms') or 0) >= 70
 
 
-def linee(nodes, ntags, car_nodes, osm_segn, crossings, STR, inside, log):
-    """car_nodes: nodo OSM -> [(via, indice)] delle vie per auto a livello; osm_segn: segnaletica.json; crossings: [x, z, dx, dz, w]"""
+TOCCO_M = 30       # la linea d'arresto col nastro: si cerca fino a tanti metri a monte dell'incrocio
+TOCCO_COS = 0.97   # l'altra strada incontra il ramo con un angolo: un nastro che al nodo corre lungo di lui (entro 14 gradi) è un ramo della stessa strada
+TOCCO_DZ = 2.5     # l'altra strada sta alla stessa quota entro tanto (un cavalcavia sopra l'incrocio non conta)
+def _tocco(NA, pts, cum, punto, oneway):
+    """La linea d'arresto col nastro (docs/nastri.md passo 3, Carlo 13/11, via Indipendenza x 437 z -406: "storta, troppo lunga e non all'ingresso
+    dell'incrocio"). Il ramo che si ferma corre su un nastro; l'altra strada è il nastro (i nastri) che passa per il nodo dell'incrocio alla stessa
+    quota. I bordi di un nastro attraversano dritti le aperture degli incroci: scendendo verso l'incrocio, la prima sezione in cui la corsia che
+    si ferma (dal bordo destro alla mezzeria, o all'altro bordo a senso unico) tocca la carreggiata dell'altra strada è l'ingresso dell'incrocio.
+    Rende (nastro, verso lungo il nastro +1/-1, distanza lungo il nastro di quella sezione, distanza lungo il nastro del nodo) o None"""
+    import shapely
+    from shapely.geometry import Point
+    voti = collections.Counter(); Lm = cum[-1]
+    for u in np.arange(3.0, min(Lm, 20.0) + 1e-6, 1.0):
+        P, d = punto(pts, cum, u); b = NA.lungo(P, d)
+        if b: voti[b[0]] += 1
+    if not voti: return None
+    i = voti.most_common(1)[0][0]; n = NA.N[i]; J = np.asarray(pts[0], float)
+    dJ = np.hypot(*(n['xy'] - J).T); kJ = int(np.argmin(dJ))
+    if dJ[kJ] > 8.0: return None
+    Pu, _ = punto(pts, cum, min(10.0, Lm)); ku = int(np.argmin(np.hypot(*(n['xy'] - np.asarray(Pu, float)).T)))
+    if ku == kJ: return None
+    sg = 1 if kJ > ku else -1; yJ = n['y'][kJ]
+    altri = {}
+    for ni, k in zip(*NA.stazioni(J, 5.0)):
+        nn_ = NA.N[ni]['n'][k]
+        if ni != i and abs(NA.N[ni]['y'][k] - yJ) < TOCCO_DZ and abs(nn_[0] * n['n'][kJ][0] + nn_[1] * n['n'][kJ][1]) < TOCCO_COS:   # (a ribbon that runs along this one at the node is a branch of the same road, not the road it meets)
+            dd = float(np.hypot(*(NA.N[ni]['xy'][k] - J)))
+            if ni not in altri or dd < altri[ni][0]: altri[int(ni)] = (dd, int(k))
+    if not altri: return None
+    U = shapely.union_all([NA.striscia(ni, k - 45, k + 45) for ni, (_, k) in altri.items()])
+    if U.is_empty: return None
+    shapely.prepare(U); S = n['s']
+    def tocca(st):
+        P, t, sx, dx, _ = NA.sezione(i, st); nl = (t[1], -t[0])   # a sinistra dell'asse del nastro
+        dr, dl = (dx, sx) if sg > 0 else (sx, dx); nr = (-nl[0] * sg, -nl[1] * sg)   # a destra di chi va verso l'incrocio
+        a = dr; b = -dl if oneway else (dr - dl) / 2
+        return any(U.contains(Point(P[0] + nr[0] * q, P[1] + nr[1] * q)) for q in (a - 0.05, (a + b) / 2, b + 0.05))
+    s0 = S[kJ] - sg * TOCCO_M; s0 = float(np.clip(s0, S[0], S[-1])); st = s0
+    if tocca(st): return None
+    passo = 0.25; fine = S[kJ] + sg * 3.0
+    while (fine - st) * sg > 0:
+        st += sg * passo
+        if tocca(st): return i, sg, float(st - sg * passo), float(S[kJ])
+    return None
+
+
+def _punto(pts, cum, u):
+    """il punto a u metri dal primo lungo la spezzata pts (cum: le distanze cumulate) e il verso verso il primo punto"""
+    k = 1
+    while k < len(pts) - 1 and cum[k] < u: k += 1
+    L = cum[k] - cum[k - 1] or 1.0; f = min(max((u - cum[k - 1]) / L, 0.0), 1.0)
+    a, b = pts[k - 1], pts[k]; return (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f), ((a[0] - b[0]) / L, (a[1] - b[1]) / L)
+
+
+def _riga_nastro(NA, nodes, v, iJ, monte, k):
+    """la riga 'la' di una linea d'arresto messa col nastro: il ramo arriva al nodo iJ della via v dal lato monte (+1/-1 lungo i suoi nodi). None se il
+    ramo non corre su un nastro o non incontra un'altra strada (_tocco)"""
+    refs = v['refs']; pts = [nodes[refs[iJ]]]; acc = 0.0; m = iJ
+    while 0 <= m + monte < len(refs) and acc < TOCCO_M:
+        m += monte; acc += math.dist(pts[-1], nodes[refs[m]]); pts.append(nodes[refs[m]])
+    if len(pts) < 2 or acc < 3: return None
+    cum = [0.0]
+    for a, b in zip(pts, pts[1:]): cum.append(cum[-1] + math.dist(a, b))
+    tn = _tocco(NA, pts, cum, _punto, v['o'])
+    if tn is None: return None
+    ni, sg, st, sJ = tn; P, tt, sx_, dx_, _y = NA.sezione(ni, st - sg * ARR / 2); d = (tt[0] * sg, tt[1] * sg); dr, dl = (dx_, sx_) if sg > 0 else (sx_, dx_)
+    s1 = dr; s0 = -dl if v['o'] else (dr - dl) / 2
+    if s1 - s0 < 1.5: return None
+    c = _tipo(v) | (4 if _grande(v) else 0)
+    if (s1 - s0) >= (STOP_W + 0.2 if k == 0 else (2.0 if _grande(v) else 1.0) + 0.2): c |= 8
+    return [k, round(float(P[0]), 1), round(float(P[1]), 1), round(float(d[0]), 3), round(float(d[1]), 3), round(float(s0), 2), round(float(s1), 2), c]
+
+
+def linee(nodes, ntags, car_nodes, osm_segn, crossings, STR, inside, log, NA=None):
+    """car_nodes: nodo OSM -> [(via, indice)] delle vie per auto a livello; osm_segn: segnaletica.json; crossings: [x, z, dx, dz, w]; NA: i nastri
+    (nastri.Indice): dove il ramo corre su un nastro la linea si mette col nastro (_tocco), di traverso al suo asse, all'ingresso dell'incrocio"""
     R = STR.R if STR is not None else None; CV = STR.CV if STR is not None else None
     deg = lambda n: sum(2 if 0 < i < len(r['refs']) - 1 else 1 for r, i in car_nodes.get(n, []))
     cnt = collections.Counter(); out = []; visti = set()
@@ -74,7 +148,9 @@ def linee(nodes, ntags, car_nodes, osm_segn, crossings, STR, inside, log):
         cum = [0.0]
         for a, b in zip(pts, pts[1:]): cum.append(cum[-1] + math.dist(a, b))
         Lm = cum[-1]
-        letto = R is not None
+        tn = _tocco(NA, pts, cum, punto, r['o']) if NA is not None else None
+        if tn is not None: u_l = abs(tn[3] - tn[2]) + ARR / 2   # the middle of the line, half its width before the entry of the junction
+        letto = R is not None and tn is None
         if letto:
             us = np.arange(0.0, min(Lm, 22.0) + 1e-6, 0.5); ws = []
             for u in us:
@@ -89,7 +165,7 @@ def linee(nodes, ntags, car_nodes, osm_segn, crossings, STR, inside, log):
                     if u < 2.5: continue
                     if all(w is None or w <= lim for w in ws[k:k + 7]): ts = u; break
                 u_l = min(ts, 14.0) + ARR / 2
-        if not letto:
+        if not letto and tn is None:
             altre = [r2['mh'] for r2, _i2 in car_nodes.get(r['refs'][i], []) if r2 is not r]
             u_l = max(3.0, (max(altre) if altre else r['mh']) + 1.5) + ARR / 2   # oltre il bordo della via che si attraversa
         P0, d0 = punto(pts, cum, 0)
@@ -106,7 +182,10 @@ def linee(nodes, ntags, car_nodes, osm_segn, crossings, STR, inside, log):
                 elif not semaforo and abs(uc - u_l) < ZEB_L / 2 + ARR / 2 + 0.3: u_l = uc + ZEB_L / 2 + 1.0 + ARR / 2
         if u_l > Lm - 0.5: cnt['saltato: ramo corto'] += 1; return
         P, d = punto(pts, cum, u_l)
-        if letto:
+        if tn is not None:   # on its ribbon: the point on the axis of the ribbon, across it, from its right edge
+            ni, sg = tn[0], tn[1]; Pn, tt, sx_, dx_, _y = NA.sezione(ni, tn[3] - sg * u_l)
+            P, d = Pn, (tt[0] * sg, tt[1] * sg); dr, dl = (dx_, sx_) if sg > 0 else (sx_, dx_); cnt['col nastro'] += 1
+        elif letto:
             if not dentro(P): cnt['saltato: asse fuori carreggiata'] += 1; return
             dl, dr = larghezza(P, d, r['w'])
         else: dl = dr = r['mh']
@@ -114,7 +193,7 @@ def linee(nodes, ntags, car_nodes, osm_segn, crossings, STR, inside, log):
         if s1 - s0 < 1.5: cnt['saltato: carreggiata stretta'] += 1; return
         n = (-d[1], d[0]); c = _tipo(r) | (4 if _grande(r) else 0)
         ok = (s1 - s0) >= STOP_W + 0.2 if kind == 0 else (s1 - s0) >= (2.0 if _grande(r) else 1.0) + 0.2
-        if ok and letto:   # la scritta o il simbolo stanno tutti sulla carreggiata
+        if ok and (letto or (tn is not None and R is not None)):   # la scritta o il simbolo stanno tutti sulla carreggiata
             sm = (s0 + s1) / 2; ext = (STOP_D + STOP_L + 0.3) if kind == 0 else (14.0 if _grande(r) else 5.5)
             for uu in (u_l, u_l + ext):
                 for ss in (sm - 0.9, sm, sm + 0.9):
@@ -816,7 +895,7 @@ OSM non e' fra quelle del gioco: linee() la mette sul ramo dell'incrocio, rotond
 (entro 30 m nel verso del traffico, parallela) e, se manca, la si mette sul nodo stesso, di traverso alla via, sulla carreggiata del DBGT."""
 
 
-def nodi_osm(nodes, ntags, vie_osm, la, lr, STR, inside, log, area=None, controllo=None):
+def nodi_osm(nodes, ntags, vie_osm, la, lr, STR, inside, log, area=None, controllo=None, NA=None):
     """la: le righe [k, x, z, dx, dz, s0, s1, c] gia' fatte; lr: le righe delle rotonde. Rende le righe 'la' da aggiungere"""
     from shapely.geometry import Point
     cnt = collections.Counter(); nuove = []
@@ -869,7 +948,7 @@ def nodi_osm(nodes, ntags, vie_osm, la, lr, STR, inside, log, area=None, control
         p = np.array(nodes[nid], float)
         if area is not None and not area.contains(Point(*p)): continue
         k = 0 if t['highway'] == 'stop' else 1
-        rami = []   # (punto, verso del traffico, via)
+        rami = []   # (punto, verso del traffico, via, [nodo dell'incrocio, lato a monte])
         if nid not in at: cnt['senza via per auto in OSM'] += 1; controllo is not None and controllo.append(dict(x=round(p[0], 1), z=round(p[1], 1), ok=False, motivo='il nodo non e\' su una via per auto')); continue
         if deg(nid) >= 3:   # sull'incrocio: le vie minori che ci arrivano
             peggio = max(RANGO.get(v['hw'], 6) for v, i_ in at[nid])
@@ -878,7 +957,7 @@ def nodi_osm(nodes, ntags, vie_osm, la, lr, STR, inside, log, area=None, control
                 for j in (i_ - 1, i_ + 1):
                     if not (0 <= j < len(v['refs'])) or (v['o'] and j > i_): continue
                     q = np.array(nodes[v['refs'][j]], float); L = float(np.hypot(*(p - q))) or 1.0; d = (p - q) / L
-                    rami.append((p - d * min(5, L * 0.6), d, v))
+                    rami.append((p - d * min(5, L * 0.6), d, v, i_, j - i_))
         else:
             v, i_ = at[nid][0]; refs = v['refs']; dirn = t.get('direction')
             cands = []
@@ -901,10 +980,15 @@ def nodi_osm(nodes, ntags, vie_osm, la, lr, STR, inside, log, area=None, control
                 if controllo is not None: controllo.append(dict(x=round(float(p[0]), 1), z=round(float(p[1]), 1), ok=True, scartato=True, motivo='nessun incrocio o rotonda entro %d m nel verso del traffico (%s)' % (NODO_AVANTI, 'fine della via' if deg(refs[j]) < 3 else '%d m' % acc_)))
                 continue
             q = np.array(nodes[refs[jn]], float); L = float(np.hypot(*(q - p))) or 1.0
-            rami.append((p, (q - p) / L, v))
+            rami.append((p, (q - p) / L, v, j, -passo))
         ok_tutti = True; motivi = []
-        for P, d, v in rami:
+        for P, d, v, iJ, monte in rami:
             if coperto(P, d): cnt['gia\' con la linea'] += 1; continue
+            # on its ribbon (docs/nastri.md passo 3, Carlo 13/11 via Indipendenza): across the axis of the ribbon, at the entry of the junction ahead, on the lane that stops
+            riga = _riga_nastro(NA, nodes, v, iJ, monte, k) if NA is not None else None
+            if riga is not None:
+                if coperto(np.array(riga[1:3], float), np.array(riga[3:5], float)): cnt['gia\' con la linea'] += 1; continue
+                nuove.append(riga); LA.append((np.array(riga[1:3], float), np.array(riga[3:5], float))); cnt['linea col nastro'] += 1; continue
             riga, perche = al_nodo(k, P, d, v)
             if riga is None: ok_tutti = False; motivi.append(perche); cnt['senza linea: ' + perche] += 1; continue
             nuove.append(riga); LA.append((np.array(riga[1:3], float), np.array(riga[3:5], float))); cnt['linea sul nodo'] += 1

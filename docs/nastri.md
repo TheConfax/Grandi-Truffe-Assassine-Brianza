@@ -293,3 +293,58 @@ Contorno dell'impalcato evidenziato in magenta. In `docs/nastri_foto/`:
 - **Sul ponte di corso Isonzo** il new jersey dello spartitraffico si interrompe e le righe della campata nord di via Ravenna stanno ancora sul suolo sotto l'impalcato: famiglie del passo 3.
 - **PONTE 16 (x 79 z -205):** il parapetto di traverso non c'è più, ma in mezzo all'asfalto è rimasto un muretto con la rete a Z: è un divisore del DBGT (famiglia recinzioni, passo 6).
 - Controlli del terreno: le spalle combaciano (p99 0,013 m), un lato a 0,26 m sul ponte del Taro (soglia 0,2); 4 nodi AIR restano senza impalcato sopra (x -1311 z 1542).
+
+---
+
+## 8. Passo 3, prima parte: linee d'arresto, guardrail, righe e spartitraffico sul loro nastro (14/11, tag `nastri/passo3-righe-guardrail-stop`)
+
+Il passo 3 non è finito: sono fatte quattro famiglie, restano cordoli e marciapiedi, lampioni e cartelli. Build e pezzi rifatti su tutta la mappa (il terreno è quello del passo 2).
+
+### Cosa c'è di nuovo sotto
+
+- **I nastri nella build** (`nastri.Indice`, in `build_data.py` `_NASTRI`): le regole che mettono le cose della strada cercano il nastro dal punto (`lungo`, `di_linea`, `accanto`, `bordi`, `sezione`). La build completa lascia i nastri in `cache_build/nastri.pkl`; la build attorno al punto prende quelli, così i numeri sono gli stessi di `mappa/nastri.bin`.
+- **I nastri nel gioco** (`nastri3.js`): si caricano all'avvio con il resto. `nastroY(nastri, x, z)` dà la quota del nastro; `nastroPiano(nastri, x, z)` dà il piano su cui sta la cosa: l'impalcato che porta quel nastro lì (entro 1,2 m dalla sua quota), altrimenti il suolo. È la regola unica "sopra o sotto".
+
+### Le famiglie
+
+- **Linee d'arresto** (`segn_orizz.py` `_tocco`, `_riga_nastro`). Il ramo che si ferma corre su un nastro; l'altra strada è il nastro che passa per il nodo dell'incrocio alla stessa quota. I bordi di un nastro attraversano dritti le aperture degli incroci: scendendo verso l'incrocio, la prima sezione in cui la corsia che si ferma tocca la carreggiata dell'altra strada è l'ingresso. La linea sta lì, di traverso all'asse del nastro, dal bordo destro alla mezzeria (o all'altro bordo a senso unico). Vale per gli stop e i dare precedenza dei cartelli, per i semafori e per i nodi `stop`/`give_way` di OSM, che prima mettevano la linea sul nodo. Dove il ramo non ha un nastro o non incontra un altro nastro resta la regola vecchia.
+  - Su 309 linee: 110 messe col nastro (105 + 5 sui nodi OSM); 207 non si sono mosse, 44 di meno di 2 m, 48 fra 2 e 6 m, 10 di più. Nessuna sparita.
+  - **Via Indipendenza (x 437 z -406):** era la linea sul nodo OSM, di traverso alla via OSM e lunga 9,7 m (i raggi finivano nell'incrocio aperto). Ora è di traverso al nastro, 4,5 m più a monte, dove il bordo di via Indipendenza taglia il ramo, lunga 7,7 m: tutta la carreggiata, perché OSM dà quel ramo a senso unico. Se dal vero è a doppio senso va corretto OSM (`oneway`), non la regola.
+- **Guardrail delle superstrade** (`guardrail.py` `_sul_nastro`; `world3.js` `guardRails`). Ogni punto va sul punto di bordo del nastro più vicino, 0,6 m fuori; dove il bordo del nastro è portato dritto su un'apertura resta dov'era. Nel gioco il guardrail tiene quella linea alla quota del nastro e non rientra più dopo ogni dente del terreno accanto all'asfalto: era questo rientro, punto per punto, a fare il serpente. Si ferma solo sopra un vuoto vero (3 m). 97% dei punti sul nastro.
+- **Righe della carreggiata** (`dbgt_righe.py`, `world3.js`): ogni riga porta il numero del suo nastro (2197 su 2199) e sta sull'impalcato che porta quel nastro, altrimenti sul suolo. Via le due regole `top` e `topS` per le righe che hanno un nastro.
+- **Spartitraffico e isole** (`build_data.py` `push_md`, `world3.js` `medianDeck`): ogni isola porta il nastro che corre lungo i suoi lati (196 su 242 pezzi) e sta sul suo piano. Il new jersey prende i nastri fra cui sta. Sul ponte di corso Isonzo spartitraffico e new jersey ora continuano.
+
+### I numeri
+
+| | passo 2 | ora |
+|---|---|---|
+| **metro dei livelli** | **106** | **79** |
+| righe | 39 | 16 |
+| guardrail | 4 | 0 |
+| spartitraffico | 11 | 11 |
+| cordoli | 15 | 15 |
+| parapetti | 2 | 2 |
+| recinzioni | 35 | 35 |
+| strada fuori quota | 16 tratti, 196 m | uguale |
+
+- **Righe, le 16 che restano:** quasi tutte a 0,6-0,8 m sotto il nastro e appoggiate su un piano: è lo scarto fra la quota dell'asse EL_STR e il suolo sulle rampe (via Ravenna x 1400 z 495, lo svincolo x 44 z 506), non righe al livello sbagliato. Due sono su ponti senza piano sotto (x -1311 z 1558, x 414 z 2265), da guardare.
+- **Spartitraffico, gli 11:** da guardare uno per uno. Almeno otto sono lo spartitraffico della strada che passa *sotto* un ponte (Milano-Meda sotto via Vignazzola, via Senofonte, via dei Vignee), appoggiato sul suo piano: il metro li dà al nastro del ponte perché i triangoli dell'isola corrono lungo di lui. È un limite del metro, che ora può usare il nastro scritto nell'isola invece di indovinarlo.
+
+### Le foto
+
+In `docs/nastri_foto/`, oggetto evidenziato in magenta: `passo3_prima_stop_alto.jpg` e `passo3_stop_alto.jpg`, `passo3_stop_obl.jpg`; `passo3_prima_guard_alto.jpg` e `passo3_guard_alto.jpg`, `passo3_guard_obl.jpg`; `passo3_isonzo_ponte.jpg`, `passo3_isonzo_alto.jpg`; `passo3_linee_campione0.jpg` e `1` (dodici linee d'arresto fra quelle che si sono mosse).
+
+![la linea dello STOP prima](nastri_foto/passo3_prima_stop_alto.jpg)
+
+![la linea dello STOP ora](nastri_foto/passo3_stop_alto.jpg)
+
+![il guardrail di Baruccana prima](nastri_foto/passo3_prima_guard_alto.jpg)
+
+![il guardrail di Baruccana ora](nastri_foto/passo3_guard_alto.jpg)
+
+### Cosa resta aperto
+
+- **Famiglie del passo 3 non fatte:** cordoli e marciapiedi (sono superfici ritagliate sulla griglia del suolo: vanno col passo 4), lampioni, cartelli. Le pezze `top`, `topS` e il vecchio `medianDeck` restano nel codice per le poche righe e isole senza nastro.
+- **A Baruccana l'asfalto sporge ancora a denti oltre il guardrail** (x 392 z 2125): il guardrail è dritto, l'asfalto è il poligono AC_VEI com'è. È la famiglia dell'asfalto.
+- **Linee d'arresto:** fra quelle mosse ne ho guardate dodici dall'alto (i due fogli campione), non tutte le 102. Lo stop di x -148 z 689 è lungo 12,1 m (ramo largo a senso unico): da guardare.
+- Il metro non misura ancora lampioni, cartelli e asfalto.

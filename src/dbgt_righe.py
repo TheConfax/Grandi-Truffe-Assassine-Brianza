@@ -696,7 +696,7 @@ def _lisciatore1(lines, U, raw_roads, tree, c):
 
 
 def push_tiles(lines, ntiles, tbox, push):
-    """the lines in the tiles: tiles[t].sg = [[t, lev, s0, [dx, dz, ...]]], points in centimetres delta-encoded (Douglas-Peucker 2 cm first),
+    """the lines in the tiles: tiles[t].sg = [[t, lev, s0, [dx, dz, ...], n]], points in centimetres delta-encoded (Douglas-Peucker 2 cm first), n the number of its ribbon (if it has one),
     s0 the length of the line before the piece in the tile (decimetres: the dashes go on across the edge of the tile)"""
     from shapely.strtree import STRtree as _T
     if not lines: return
@@ -711,4 +711,4 @@ def push_tiles(lines, ntiles, tbox, push):
                 q = part.simplify(0.02, preserve_topology=False); o = []; px = pz = 0
                 for x, z in q.coords:
                     X, Z = int(round(x * 100)), int(round(z * 100)); o += [X - px, Z - pz]; px, pz = X, Z
-                push(t, 'sg', [lines[i]['t'], lines[i]['lev'], int(round(s0 * 10)), o])
+                push(t, 'sg', [lines[i]['t'], lines[i]['lev'], int(round(s0 * 10)), o] + ([lines[i]['n']] if lines[i].get('n') is not None else []))   # (n: the ribbon it runs on, src/nastri.py)

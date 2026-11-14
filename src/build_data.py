@@ -2563,6 +2563,8 @@ _cia_ost = [b_[0] for b_ in bar_out] + list(fences) + [[(g_[0] / 10, g_[1] / 10)
 _cia_ost += [list(b_['p']) + [b_['p'][0]] for b_ in buildings if b_.get('t') != 9 and len(b_['p']) >= 3] + [list(h_) + [h_[0]] for b_ in buildings if b_.get('t') != 9 for h_ in b_.get('k', []) if len(h_) >= 3]
 import opere as _op, impalcati as _imp, dbgt_quote as _dq   # the underpasses (src/opere.py): their floor is asphalt for the lanes, what stands inside their outline is not in the way
 _lid = _dq.Lidar(); _Dop = _dq.load_dbgt_comuni(_dq.lista_comuni(None), _lid); _Dop.pop('_info', None)
+import nastri as _nastri   # the ribbons of the carriageways (docs/nastri.md passo 3): what belongs to a road is placed on its ribbon
+_NASTRI = _nastri.Indice(_nastri.per_la_build(_Dop, os.path.dirname(os.path.abspath(dst)), log)) if STR is not None else None
 _sott = _op.da_indice(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'terreno', 'indice.json')); log('opere dal terreno', len(_sott))   # one outline: the one the terrain made (the terrain comes first)
 _opf = unary_union([g_ for l_ in _op.impronte(_sott) for g_ in l_])
 # no gate in the mouth of an underpass: a short railing of the DBGT on the side of the trench became a gate across the sidewalk (Carlo 3/11, x -774 z 120)
@@ -2838,7 +2840,7 @@ if STR:
     import guardrail as GRD
     if os.environ.get('GTA_DUMP_GUARD'):
         import pickle; pickle.dump(dict(D=STR.D, cover=STR.cover, U_carr=STR.U_carr, raw_roads=[{k: v for k, v in r.items() if k != 'line'} for r in raw_roads], nodes=nodes, zh=globals().get('zh', {}), bar_out=bar_out), open(os.environ['GTA_DUMP_GUARD'], 'wb'))
-    GUARD, _gr_fatte, STR.rep['guardrail'], _gr_x = GRD.guardrail(STR.D, STR.cover, STR.U_carr, raw_roads, nodes, globals().get('zh', {}), log)
+    GUARD, _gr_fatte, STR.rep['guardrail'], _gr_x = GRD.guardrail(STR.D, STR.cover, STR.U_carr, raw_roads, nodes, globals().get('zh', {}), log, NA=_NASTRI)
     bar_out, STR.rep['guardrail']['divisori_sostituiti'] = GRD.sostituisci_divisori(bar_out, GUARD, _gr_x[0], log)
     for ri_ in _gr_fatte: out_roads[ri_]['gp'] = 1   # its guardrails are in tiles[].gr: the game makes none of its own along it
     STR.md_nj = _gr_x[2]   # the medians with a new jersey: paved (STR.push_tiles)
@@ -2947,11 +2949,19 @@ for i_, (pts, kind, hgt) in enumerate(bar_out):
         j = _bvt.nearest(cv_)
         if btree_geoms[j].distance(cv_) < 30: b_ = btree_geoms[j].centroid; v_ = round(h01('%.1f,%.1f' % (b_.x, b_.y)), 3)
     push(tid(c.x, c.y), 'ba', {'p': enc(pts), 't': kind, 'h': hgt, **({'v': v_} if v_ is not None else {})})
+# every median and island on its ribbon (docs/nastri.md passo 3): the ribbon that runs along its sides, the lower one where two lie one over the other (the game takes its level
+# from the ribbon: on the deck that carries it, else on the ground)
+from controlli_acqua import dec as _dec_md
+def push_md(t, k, v):
+    if k == 'md' and _NASTRI is not None and 'n' not in v:
+        o_ = _dec_md(v['p'])
+        if len(o_) >= 3: n_ = _NASTRI.di_linea(list(o_) + [o_[0]], False, fuori=8.0); v = dict(v, n=[n_]) if n_ is not None else v
+    push(t, k, v)
 for t in range(ntx * ntz):
     if median.is_empty: break
     bx = tbox(t)
     if not median.intersects(bx): continue
-    for p_ in polys_of(median.intersection(bx), 0.2, 3): push(t, 'md', p_)
+    for p_ in polys_of(median.intersection(bx), 0.2, 3): push_md(t, 'md', p_)
 import rotonde  # the aiuole of the roundabouts of Meda (src/rotonde.py, docs/rotonde.md): their islands filled, what stands on them in tiles[].ro
 ROT = rotonde.Rotonde(STR.isole, log) if STR else None
 if ROT: STR.md_dbgt = ROT.riempi(STR.md_dbgt); ROT.push_tiles(tid, polys_of, push, q)
@@ -2959,13 +2969,16 @@ if STR:
     STR.togli_cortili(VERDE.cons, _cv_f.result())
     STR.cv_m = FONDI.dividi(STR.cv, [(_vei02, 'g')], ('auto', 'area'), base='a') if not STR.cv.is_empty else {}   # the yards AC_VEI 0307: unpaved where FON 02 or OSM says so
     FONDI.rep['cortili_ac_vei'] = {str(m_): round(g_.area) for m_, g_ in STR.cv_m.items()}; log('fondi: cortili AC_VEI', FONDI.rep['cortili_ac_vei'])
-    STR.push_tiles(ntx * ntz, tbox, polys_of, push)  # yards (cv) and the DBGT islands (md, g: 1)  # yards (cv) and the DBGT islands (md, g: 1)
+    STR.push_tiles(ntx * ntz, tbox, polys_of, push_md)  # yards (cv) and the DBGT islands (md, g: 1)  # yards (cv) and the DBGT islands (md, g: 1)
 if _md_ponte is not None and not _md_ponte.is_empty:   # (dk: on the deck of the bridge, at its height: src/opere.py senza_strada_di_sopra, world3.js medianDeck)
     for t in range(ntx * ntz):
         bx = tbox(t)
         if _md_ponte.intersects(bx):
-            for p_ in polys_of(_md_ponte.intersection(bx), 0.15, 0.5): p_.update({'g': 1, 'dk': 1, 'v': 1}); push(t, 'md', p_)   # (grass, as it was on the ground)
+            for p_ in polys_of(_md_ponte.intersection(bx), 0.15, 0.5): p_.update({'g': 1, 'dk': 1, 'v': 1}); push_md(t, 'md', p_)   # (grass, as it was on the ground)
 if RIGHE: RIGHE = _op.righe_opere(_sott, RIGHE, log)   # the lines go on along the underpasses (src/opere.py)
+if RIGHE and _NASTRI is not None:   # each marking on its ribbon (docs/nastri.md passo 3): the game takes its level from the ribbon, not from what it finds over or under it
+    for l_ in RIGHE: l_['n'] = _NASTRI.di_linea(l_['p'], l_['lev'] == 2)
+    log('righe sul loro nastro: %d su %d' % (sum(1 for l_ in RIGHE if l_.get('n') is not None), len(RIGHE)))
 if RIGHE: dbgt_righe.push_tiles(RIGHE, ntx * ntz, tbox, push)  # the road markings (sg)
 if FER:  # the rail bed (sf)
     FER.disegno(None, None, pronto=_fer_f.result())  # = FER.disegno(the tracks, unary_union([asph, pedz, side, foot, platforms, bunion] + [STR.cv])), on a thread since the surfaces
@@ -2989,7 +3002,7 @@ for ri, r in enumerate(raw_roads):  # road pieces per tile (for markings and dec
 for x, z, dx, dz, w in crossings: push(tid(x, z), 'cr', [q(x), q(z), round(dx, 3), round(dz, 3), round(w, 1)])
 # stop lines, give way triangles and the lines at traffic lights (src/segn_orizz.py, DPR 495/1992 art. 144 and 148): tile key 'la'
 import segn_orizz
-_la = segn_orizz.linee(nodes, ntags, car_nodes, json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8')), crossings, STR, inside, log)
+_la = segn_orizz.linee(nodes, ntags, car_nodes, json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segnaletica.json'), encoding='utf-8')), crossings, STR, inside, log, NA=_NASTRI)
 _fermate_tolte = set()   # the same stop mapped twice on the same side: one zone, one shelter
 for r_ in segn_orizz.fermate(nodes, ntags, car_nodes, STR, inside, log, _banchine, _vie_nodo, crossings=crossings, tolte=_fermate_tolte): push(tid(r_[2][0] / 100, r_[2][1] / 100), 'fb', r_)
 # the give way at every entry of every roundabout, on the outer edge of the ring, with its sign (tile key lr, in the tile of the sign)
@@ -2997,7 +3010,7 @@ _ctl_rot, _ctl_nodi = [], []   # the check at the end (Carlo, 3/11): in Meda and
 _lr = segn_orizz.rotonde(nodes, _vie_osm, _anelli, STR, inside, log, crossings=crossings, area=STR.cover if STR else None, controllo=_ctl_rot)
 for r_ in _lr: push(tid(r_[3][0] / 100, r_[3][1] / 100), 'lr', r_)
 # the OSM give way and stop nodes without a line in front of them: the line on the node itself
-_la += segn_orizz.nodi_osm(nodes, ntags, _vie_osm, _la, _lr, STR, inside, log, area=STR.cover if STR else None, controllo=_ctl_nodi)
+_la += segn_orizz.nodi_osm(nodes, ntags, _vie_osm, _la, _lr, STR, inside, log, area=STR.cover if STR else None, controllo=_ctl_nodi, NA=_NASTRI)
 for k_, x_, z_, dx_, dz_, s0_, s1_, c_ in _la: push(tid(x_, z_), 'la', [k_, q(x_), q(z_), dx_, dz_, s0_, s1_, c_])
 segn_orizz.stampa_controllo(_ctl_rot, _ctl_nodi, log)
 # one sign for each roundabout entry (Carlo, 3/11): the signs of segnaletica.json that stand on its post (within 2 m) or say the same to the same drivers

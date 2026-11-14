@@ -1,37 +1,13 @@
 {
- "numero": 106,
+ "numero": 79,
  "per_famiglia": {
   "righe": {
-   "guardati": 40503,
-   "senza_nastro": 408,
-   "di_traverso": 826,
-   "sbagliati": 171,
-   "casi": 39,
+   "guardati": 39684,
+   "senza_nastro": 407,
+   "di_traverso": 884,
+   "sbagliati": 60,
+   "casi": 16,
    "posti": [
-    {
-     "x": 1401,
-     "z": 492.9,
-     "y": 35,
-     "dy": -0.8,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 35",
-     "n": 15,
-     "link": "?x=1401&z=493&debug=1"
-    },
-    {
-     "x": -547.3,
-     "z": 126.3,
-     "y": 29,
-     "dy": -1.5,
-     "nastro": 275,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 29",
-     "n": 12,
-     "link": "?x=-547&z=126&debug=1"
-    },
     {
      "x": 44.3,
      "z": 506.3,
@@ -45,64 +21,16 @@
      "link": "?x=44&z=506&debug=1"
     },
     {
-     "x": 328.3,
-     "z": 1984.4,
-     "y": 18.7,
-     "dy": -5.9,
-     "nastro": 32,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 18.7",
-     "n": 11,
-     "link": "?x=328&z=1984&debug=1"
-    },
-    {
-     "x": 1399.9,
-     "z": 496,
-     "y": 34.6,
+     "x": 1400.6,
+     "z": 494,
+     "y": 34.8,
      "dy": -0.8,
      "nastro": 91,
      "nome": "Via Ravenna",
      "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34.6",
-     "n": 10,
-     "link": "?x=1400&z=496&debug=1"
-    },
-    {
-     "x": 342.7,
-     "z": 1985.4,
-     "y": 23.8,
-     "dy": -5.9,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 23.8",
-     "n": 10,
-     "link": "?x=343&z=1985&debug=1"
-    },
-    {
-     "x": 1420.4,
-     "z": 466.3,
-     "y": 34.9,
-     "dy": -1.7,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34.9",
+     "dove": "appoggiato su un piano a quota 34.8",
      "n": 9,
-     "link": "?x=1420&z=466&debug=1"
-    },
-    {
-     "x": -516.9,
-     "z": 143.3,
-     "y": 23,
-     "dy": -7.5,
-     "nastro": 32,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 23",
-     "n": 7,
-     "link": "?x=-517&z=143&debug=1"
+     "link": "?x=1401&z=494&debug=1"
     },
     {
      "x": 1436.3,
@@ -117,16 +45,16 @@
      "link": "?x=1436&z=417&debug=1"
     },
     {
-     "x": -41.2,
-     "z": 770.4,
-     "y": 25.8,
-     "dy": -0.9,
-     "nastro": 378,
-     "nome": "Via Vignazzola",
+     "x": 1399.9,
+     "z": 496,
+     "y": 34.6,
+     "dy": -0.8,
+     "nastro": 91,
+     "nome": "Via Ravenna",
      "sede": "raso",
-     "dove": "appoggiato su un piano a quota 25.8",
+     "dove": "appoggiato su un piano a quota 34.6",
      "n": 7,
-     "link": "?x=-41&z=770&debug=1"
+     "link": "?x=1400&z=496&debug=1"
     },
     {
      "x": 32.5,
@@ -141,42 +69,6 @@
      "link": "?x=33&z=452&debug=1"
     },
     {
-     "x": 57.8,
-     "z": 397.1,
-     "y": 31.9,
-     "dy": -4.6,
-     "nastro": 204,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 32.5)",
-     "n": 4,
-     "link": "?x=58&z=397&debug=1"
-    },
-    {
-     "x": -37.3,
-     "z": 767,
-     "y": 20.6,
-     "dy": -6,
-     "nastro": 378,
-     "nome": "Via Vignazzola",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 20.6",
-     "n": 4,
-     "link": "?x=-37&z=767&debug=1"
-    },
-    {
-     "x": -0.4,
-     "z": 774.7,
-     "y": 26,
-     "dy": -5.9,
-     "nastro": 378,
-     "nome": "Via Vignazzola",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 26",
-     "n": 4,
-     "link": "?x=0&z=775&debug=1"
-    },
-    {
      "x": -761.5,
      "z": 91,
      "y": 28.4,
@@ -189,88 +81,16 @@
      "link": "?x=-761&z=91&debug=1"
     },
     {
-     "x": -507.2,
-     "z": 132.9,
-     "y": 23,
-     "dy": -7.4,
+     "x": -548.1,
+     "z": 126.2,
+     "y": 29.7,
+     "dy": -0.7,
      "nastro": 275,
      "nome": "Strada provinciale ex SS 35 Milano-Meda",
      "sede": "raso",
-     "dove": "appoggiato su un piano a quota 23",
+     "dove": "appoggiato su un piano a quota 29.7",
      "n": 3,
-     "link": "?x=-507&z=133&debug=1"
-    },
-    {
-     "x": -511.6,
-     "z": 136.5,
-     "y": 23,
-     "dy": -7.4,
-     "nastro": 275,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 23",
-     "n": 3,
-     "link": "?x=-512&z=137&debug=1"
-    },
-    {
-     "x": 1421.8,
-     "z": 461.8,
-     "y": 34.6,
-     "dy": -0.9,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34.6",
-     "n": 3,
-     "link": "?x=1422&z=462&debug=1"
-    },
-    {
-     "x": 1412.2,
-     "z": 459.9,
-     "y": 34.7,
-     "dy": -0.9,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34.7",
-     "n": 3,
-     "link": "?x=1412&z=460&debug=1"
-    },
-    {
-     "x": 1396.5,
-     "z": 506.4,
-     "y": 34.2,
-     "dy": -0.6,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34.2",
-     "n": 3,
-     "link": "?x=1397&z=506&debug=1"
-    },
-    {
-     "x": 344,
-     "z": 1989.8,
-     "y": 18.6,
-     "dy": -5.9,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 18.6",
-     "n": 3,
-     "link": "?x=344&z=1990&debug=1"
-    },
-    {
-     "x": 345.9,
-     "z": 2005.3,
-     "y": 18.7,
-     "dy": -5.9,
-     "nastro": 32,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 18.7",
-     "n": 3,
-     "link": "?x=346&z=2005&debug=1"
+     "link": "?x=-548&z=126&debug=1"
     },
     {
      "x": -775.4,
@@ -297,42 +117,6 @@
      "link": "?x=-760&z=91&debug=1"
     },
     {
-     "x": 74.5,
-     "z": 199.4,
-     "y": 33.6,
-     "dy": -2,
-     "nastro": 204,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 33.6",
-     "n": 2,
-     "link": "?x=75&z=199&debug=1"
-    },
-    {
-     "x": 1428.9,
-     "z": 440,
-     "y": 33,
-     "dy": -1.8,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 31.4)",
-     "n": 2,
-     "link": "?x=1429&z=440&debug=1"
-    },
-    {
-     "x": 1418,
-     "z": 442.9,
-     "y": 33.4,
-     "dy": -1.9,
-     "nastro": 91,
-     "nome": "Via Ravenna",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 31.7)",
-     "n": 2,
-     "link": "?x=1418&z=443&debug=1"
-    },
-    {
      "x": 53.5,
      "z": 479.7,
      "y": 30.7,
@@ -357,16 +141,16 @@
      "link": "?x=53&z=480&debug=1"
     },
     {
-     "x": 1409.4,
-     "z": 468.1,
-     "y": 34.3,
-     "dy": -2.8,
+     "x": 1396.5,
+     "z": 506.4,
+     "y": 34.2,
+     "dy": -0.5,
      "nastro": 91,
      "nome": "Via Ravenna",
      "sede": "raso",
-     "dove": "appoggiato su un piano a quota 34.3",
+     "dove": "appoggiato su un piano a quota 34.2",
      "n": 2,
-     "link": "?x=1409&z=468&debug=1"
+     "link": "?x=1397&z=506&debug=1"
     },
     {
      "x": -1311.1,
@@ -381,66 +165,6 @@
      "link": "?x=-1311&z=1558&debug=1"
     },
     {
-     "x": 361,
-     "z": 2011.5,
-     "y": 18.7,
-     "dy": -5.8,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 18.7",
-     "n": 2,
-     "link": "?x=361&z=2012&debug=1"
-    },
-    {
-     "x": 356.6,
-     "z": 2014,
-     "y": 21.5,
-     "dy": -3,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "appoggiato su un piano a quota 21.5",
-     "n": 2,
-     "link": "?x=357&z=2014&debug=1"
-    },
-    {
-     "x": 408.4,
-     "z": 2221.8,
-     "y": 22.2,
-     "dy": -2.9,
-     "nastro": 585,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 22.8)",
-     "n": 2,
-     "link": "?x=408&z=2222&debug=1"
-    },
-    {
-     "x": 418.5,
-     "z": 2218.6,
-     "y": 21.1,
-     "dy": -4.8,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 19.5)",
-     "n": 2,
-     "link": "?x=419&z=2219&debug=1"
-    },
-    {
-     "x": 404.6,
-     "z": 2223.4,
-     "y": 22.6,
-     "dy": -2,
-     "nastro": 585,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 23.5)",
-     "n": 2,
-     "link": "?x=405&z=2223&debug=1"
-    },
-    {
      "x": 1400,
      "z": 496.1,
      "y": 34.6,
@@ -453,16 +177,16 @@
      "link": "?x=1400&z=496&debug=1"
     },
     {
-     "x": 341.1,
-     "z": 2007.8,
-     "y": 19.4,
-     "dy": -5.3,
-     "nastro": 32,
+     "x": 342.8,
+     "z": 1985.5,
+     "y": 23.8,
+     "dy": -0.7,
+     "nastro": 168,
      "nome": "Strada provinciale ex SS 35 Milano-Meda",
      "sede": "raso",
-     "dove": "appoggiato su un piano a quota 19.4",
+     "dove": "appoggiato su un piano a quota 23.8",
      "n": 1,
-     "link": "?x=341&z=2008&debug=1"
+     "link": "?x=343&z=1986&debug=1"
     },
     {
      "x": 414.2,
@@ -479,7 +203,7 @@
    ]
   },
   "cordoli": {
-   "guardati": 17441,
+   "guardati": 17299,
    "senza_nastro": 10476,
    "di_traverso": 954,
    "sbagliati": 96,
@@ -668,9 +392,9 @@
    ]
   },
   "spartitraffico": {
-   "guardati": 2588,
-   "senza_nastro": 98,
-   "di_traverso": 866,
+   "guardati": 2308,
+   "senza_nastro": 97,
+   "di_traverso": 835,
    "sbagliati": 29,
    "casi": 11,
    "posti": [
@@ -809,61 +533,12 @@
    ]
   },
   "guardrail": {
-   "guardati": 19940,
-   "senza_nastro": 2346,
-   "di_traverso": 304,
-   "sbagliati": 16,
-   "casi": 4,
-   "posti": [
-    {
-     "x": -71.9,
-     "z": 478.5,
-     "y": 24.5,
-     "dy": 2.7,
-     "nastro": 32,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "sotto",
-     "dove": "su nessun piano (sotto ha 22.1)",
-     "n": 4,
-     "link": "?x=-72&z=479&debug=1"
-    },
-    {
-     "x": 50,
-     "z": 465.8,
-     "y": 28.3,
-     "dy": 2.9,
-     "nastro": 4,
-     "nome": "Via Marco Polo",
-     "sede": "sotto",
-     "dove": "su nessun piano (sotto ha 25.9)",
-     "n": 4,
-     "link": "?x=50&z=466&debug=1"
-    },
-    {
-     "x": 48.4,
-     "z": 474.1,
-     "y": 28.2,
-     "dy": 2.6,
-     "nastro": 4,
-     "nome": "Via Marco Polo",
-     "sede": "raso",
-     "dove": "su nessun piano (sotto ha 25.9)",
-     "n": 4,
-     "link": "?x=48&z=474&debug=1"
-    },
-    {
-     "x": -44.4,
-     "z": 490.1,
-     "y": 24.4,
-     "dy": 2.5,
-     "nastro": 168,
-     "nome": "Strada provinciale ex SS 35 Milano-Meda",
-     "sede": "sotto",
-     "dove": "su nessun piano (sotto ha 22)",
-     "n": 4,
-     "link": "?x=-44&z=490&debug=1"
-    }
-   ]
+   "guardati": 20009,
+   "senza_nastro": 2348,
+   "di_traverso": 179,
+   "sbagliati": 0,
+   "casi": 0,
+   "posti": []
   },
   "parapetti": {
    "guardati": 2857,
@@ -899,7 +574,7 @@
    ]
   },
   "recinzioni": {
-   "guardati": 9284,
+   "guardati": 9288,
    "senza_nastro": 0,
    "di_traverso": 0,
    "sbagliati": 54,

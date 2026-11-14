@@ -15,7 +15,7 @@ e report_nastri.json. Il gioco per ora li disegna soltanto, con &nastri=1 (src/n
 usa come riferimento.
   python src/nastri.py [cartella con brianza.json, di default il repo]        (build.py lo lancia dopo build_data.py)
 calcola(D, base) rende i nastri interi (una stazione al metro) a chi nella build li vuole usare."""
-import os, sys, json, gzip, io, time
+import os, sys, json, gzip, io, time, math
 import collections
 from collections import Counter
 import numpy as np, shapely
@@ -207,6 +207,100 @@ def calcola(D, base=0.0, log=print):
         k = len(n['xy']); n['i'] = i
         n['sx'], n['portato_sx'] = _bordo_pulito(dl[o:o + k]); n['dx'], n['portato_dx'] = _bordo_pulito(dr[o:o + k]); n['fuori'] = np.isnan(dl[o:o + k]); o += k
     log('nastri: %d, %.1f km; capi di ponte tolti dal contorno: %d tratti' % (len(N), sum(n['s'][-1] for n in N) / 1000, C.capi))
+    return N
+
+
+class Indice:
+    """i nastri cercati dal punto (per le regole della build che mettono le cose della strada sul loro nastro, docs/nastri.md passo 3)"""
+    def __init__(s, N):
+        s.N = N; s.P = np.vstack([n['xy'] for n in N]); s.ni = np.concatenate([np.full(len(n['xy']), i) for i, n in enumerate(N)])
+        s.k = np.concatenate([np.arange(len(n['xy'])) for n in N]); s.T = cKDTree(s.P)
+
+    def stazioni(s, p, r):
+        """(nastro, stazione) di tutte le stazioni entro r da p"""
+        j = s.T.query_ball_point(np.asarray(p, float), r); return s.ni[j], s.k[j]
+
+    def lungo(s, p, d, r=6.0, cos=0.8):
+        """il nastro che passa vicino a p e corre lungo d: (nastro, stazione più vicina), o None"""
+        p = np.asarray(p, float); best = None
+        for j in s.T.query_ball_point(p, r):
+            n = s.N[s.ni[j]]['n'][s.k[j]]
+            if abs(-n[1] * d[0] + n[0] * d[1]) < cos: continue
+            dd = float(np.hypot(*(s.P[j] - p)))
+            if best is None or dd < best[0]: best = (dd, int(s.ni[j]), int(s.k[j]))
+        return best[1:] if best else None
+
+    def striscia(s, i, a, b):
+        """la carreggiata del nastro i fra le stazioni a e b (un poligono)"""
+        n = s.N[i]; a = max(0, a); b = min(len(n['xy']) - 1, b)
+        if b - a < 1: return Polygon()
+        return Polygon(np.vstack((n['xy'][a:b + 1] + n['n'][a:b + 1] * n['sx'][a:b + 1, None], (n['xy'][a:b + 1] - n['n'][a:b + 1] * n['dx'][a:b + 1, None])[::-1]))).buffer(0)
+
+    def di_linea(s, P, alto=False, r=8.0, fuori=1.5):
+        """il nastro lungo cui corre la linea P (una riga, un cordolo): quello che ha più stazioni vicine e parallele a lei, entro i suoi bordi; se sono più d'uno uno
+        sopra l'altro (la strada su un ponte e quella sotto), il più alto se alto, altrimenti il più basso. None se non corre lungo nessun nastro. fuori: quanto
+        la linea può stare oltre il bordo del nastro (uno spartitraffico sta fuori dalla carreggiata)"""
+        P = np.asarray(P, float)
+        if len(P) < 2: return None
+        dd = np.r_[0, np.cumsum(np.hypot(*np.diff(P, axis=0).T))]
+        if dd[-1] < 0.5: return None
+        ss = np.linspace(0, dd[-1], max(3, min(40, int(dd[-1] / 4) + 2))); Q = np.column_stack((np.interp(ss, dd, P[:, 0]), np.interp(ss, dd, P[:, 1])))
+        d = np.gradient(Q, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]; voti = collections.Counter(); ys = collections.defaultdict(float)
+        for i, l in enumerate(s.T.query_ball_point(Q, r)):
+            best = {}
+            for j in l:
+                n = s.N[s.ni[j]]; k = s.k[j]; nn = n['n'][k]
+                if abs(-nn[1] * d[i][0] + nn[0] * d[i][1]) < 0.9: continue
+                lat = (Q[i] - s.P[j]) @ nn
+                if lat > n['sx'][k] + fuori or lat < -n['dx'][k] - fuori: continue
+                e = float(np.hypot(*(Q[i] - s.P[j])))
+                if s.ni[j] not in best or e < best[s.ni[j]][0]: best[int(s.ni[j])] = (e, float(n['y'][k]))
+            for ni, (e, y) in best.items(): voti[ni] += 1; ys[ni] += y
+        if not voti: return None
+        mx = max(voti.values()); cand = [ni for ni, v in voti.items() if v >= 0.6 * mx]; ym = {ni: ys[ni] / voti[ni] for ni in cand}
+        q = max(ym.values()) if alto else min(ym.values()); cand = [ni for ni in cand if abs(ym[ni] - q) < 1.5]
+        return int(s.N[max(cand, key=lambda ni: voti[ni])]['i'])
+
+    def accanto(s, P, r=3.5):
+        """i nastri che hanno un bordo misurato entro r dalla linea P e corrono lungo di lei (il new jersey fra due carreggiate: tutti e due)"""
+        P = np.asarray(P, float)
+        if len(P) < 2: return []
+        T, E, U, Tg, I, Y = s.bordi(); d = np.gradient(P, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]; v = collections.Counter(); st = max(1, len(P) // 30)
+        for i, l in zip(range(0, len(P), st), T.query_ball_point(P[::st], r)):
+            for ni in {int(I[j]) for j in l if abs(Tg[j] @ d[i]) > 0.9}: v[ni] += 1
+        if not v: return []
+        mx = max(v.values()); return sorted(int(s.N[ni]['i']) for ni, c in v.items() if c >= 0.4 * mx)
+
+    def bordi(s):
+        """i punti di bordo di tutti i nastri, misurati (non portati dritti su un'apertura): (albero, punti, versore verso fuori, versore lungo l'asse, nastro, quota)"""
+        if not hasattr(s, '_b'):
+            E, U, T_, I, Y = [], [], [], [], []
+            for i, n in enumerate(s.N):
+                tg = np.column_stack((-n['n'][:, 1], n['n'][:, 0]))
+                for sg, w, pt in ((1, n['sx'], n['portato_sx']), (-1, n['dx'], n['portato_dx'])):
+                    ok = ~pt & ~n['fuori'] & (w > 0.3)
+                    E.append(n['xy'][ok] + n['n'][ok] * sg * w[ok, None]); U.append(n['n'][ok] * sg); T_.append(tg[ok]); I.append(np.full(int(ok.sum()), i)); Y.append(n['y'][ok])
+            E = np.vstack(E); s._b = (cKDTree(E), E, np.vstack(U), np.vstack(T_), np.concatenate(I), np.concatenate(Y))
+        return s._b
+
+    def sezione(s, i, st):
+        """alla distanza st lungo il nastro i: (punto dell'asse, versore lungo l'asse, bordo a sinistra, bordo a destra, quota)"""
+        n = s.N[i]; S = n['s']; st = float(np.clip(st, S[0], S[-1])); f = lambda a: float(np.interp(st, S, a))
+        nx, nz = f(n['n'][:, 0]), f(n['n'][:, 1]); L = math.hypot(nx, nz) or 1.0
+        return (f(n['xy'][:, 0]), f(n['xy'][:, 1])), (-nz / L, nx / L), f(n['sx']), f(n['dx']), f(n['y'])
+
+
+def per_la_build(D, root, log=print):
+    """i nastri per le regole della build (build_data.py). La build completa li calcola e li lascia in cache_build/nastri.pkl; la build attorno al punto (src/zona.py,
+    che legge un DBGT ritagliato) prende quelli: gli stessi nastri con gli stessi numeri, che il gioco legge da mappa/nastri.bin della build completa"""
+    import pickle
+    f = os.path.join(root, 'cache_build', 'nastri.pkl')
+    if os.environ.get('GTA_COSTANTI_LEGGI'):
+        f = os.path.join(os.path.dirname(os.environ['GTA_COSTANTI_LEGGI']), 'cache_build', 'nastri.pkl')
+        if os.path.exists(f): N = pickle.load(open(f, 'rb')); log('nastri: %d dalla build completa' % len(N)); return N
+        log('ATTENZIONE: manca cache_build/nastri.pkl della build completa: i nastri si calcolano sul pezzo, i loro numeri possono non essere quelli di mappa/nastri.bin')
+        return calcola(D, 0.0, log)
+    N = calcola(D, 0.0, log); os.makedirs(os.path.dirname(f), exist_ok=True); pickle.dump(N, open(f, 'wb'))
     return N
 
 

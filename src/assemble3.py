@@ -27,7 +27,8 @@ const FRESCO = { cache: 'no-cache' }, PZ_DEC = new TextDecoder();
 const gunzip = async ab => new Uint8Array(await new Response(new Blob([ab]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
 const leggiGz = async u => { const r = await fetch(u, FRESCO); if (!r.ok) throw new Error(u + ': HTTP ' + r.status); return gunzip(await r.arrayBuffer()); };
 goBtn.disabled = true; goBtn.textContent = 'CARICO LA BRIANZA…';
-const [D, SUOLO] = await Promise.all([leggiGz('mappa/globale.bin').then(b => JSON.parse(PZ_DEC.decode(b))), leggiGz('mappa/suolo.bin').then(b => new Int16Array(b.buffer, b.byteOffset, b.byteLength >> 1))]);
+const [D, SUOLO, NASTRI_J] = await Promise.all([leggiGz('mappa/globale.bin').then(b => JSON.parse(PZ_DEC.decode(b))), leggiGz('mappa/suolo.bin').then(b => new Int16Array(b.buffer, b.byteOffset, b.byteLength >> 1)),
+  leggiGz('mappa/nastri.bin').then(b => JSON.parse(PZ_DEC.decode(b))).catch(() => null)]); /* the ribbons of the carriageways (src/nastri.py, nastri3.js): what belongs to a road takes its height from its ribbon */
 if (COTTURA) D.ng = (await (await fetch('mappa/solo_cottura.json', FRESCO)).json()).ng;
 const COT = TUTTO ? null : D.cotta;
 goBtn.textContent = 'COSTRUISCO LE STRADE…';

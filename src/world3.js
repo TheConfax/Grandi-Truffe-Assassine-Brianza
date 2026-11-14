@@ -324,14 +324,19 @@ D.roads.forEach((r, ri) => {
 });
 // the median between the two carriageways of an expressway as the tile draws it, or null (junction leftovers and slivers are not medians)
 function medianOf(q) {
-  const o = dec(q.p); if (o.length < 3) return null; if (q.g) return { o, k: q.k.map(dec), v: !!q.v, dk: !!q.dk }; /* q.g: an island or median of the DBGT (MAN_TR), drawn as it is */ let per = 0; for (let i = 0; i < o.length; i++) per += hyp(o[(i + 1) % o.length][0] - o[i][0], o[(i + 1) % o.length][1] - o[i][1]); const A = Math.abs(sArea(o)), c = centroid(o);
+  const o = dec(q.p); if (o.length < 3) return null; if (q.g) return { o, k: q.k.map(dec), v: !!q.v, dk: !!q.dk, n: q.n }; /* q.g: an island or median of the DBGT (MAN_TR), drawn as it is */ let per = 0; for (let i = 0; i < o.length; i++) per += hyp(o[(i + 1) % o.length][0] - o[i][0], o[(i + 1) % o.length][1] - o[i][1]); const A = Math.abs(sArea(o)), c = centroid(o);
   if (A < 30 || A / per < 0.6) return null; let local = false; ROADSEG.each(c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8, s => { if (!local && !s.r.x && s.r.c <= 5 && segDist(c[0], c[1], s.a[0], s.a[1], s.b[0], s.b[1]) < s.r.w / 2 + 0.5) local = true; });
-  return local ? null : { o, k: q.k.map(dec) };
+  return local ? null : { o, k: q.k.map(dec), n: q.n };
 }
 // in a tile of S, the height of a median that runs on a deck (the carriageways beside it, the road segments nearest and parallel to its long
 // axis, are old elevated ways that stand on a deck there), or null if it lies on S. A crossing bridge is not its road: the medians of the
 // Milano-Meda in its trench stay on S under the bridges, those of the ramps of the Motta overpass go on the deck
 function medianDeck(m) {
+  if (m.n && NASTRI.dati) { // on its ribbon (docs/nastri.md passo 3): on the deck that carries that ribbon where there is one, else on S
+    const lv = (x, z) => { const y = nastroPiano(m.n, x, z); return y === undefined || y === null ? H.base(x, z) : y; };
+    for (const ring of [m.o, ...m.k]) for (const [x, z] of ring) { const y = nastroPiano(m.n, x, z); if (y !== undefined && y !== null) return lv; }
+    return null;
+  }
   if (m.dk) return (x, z) => { let t = null; for (const o of H.deckAt(x, z)) if (o.tipo !== 'copertura' && (t === null || o.top > t)) t = o.top; return t === null ? H.base(x, z) : t; }; // an island of the road over a bridge (build: dk): on the deck top
   const o = m.o, c = centroid(o); let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of o) { sxx += (x - c[0]) ** 2; szz += (z - c[1]) ** 2; sxz += (x - c[0]) * (z - c[1]); }
   const an = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(an), uz = Math.sin(an);
@@ -1452,9 +1457,10 @@ function* roadBarriers(T) {
 // guardrail on posts, 2 a new jersey (the concrete barrier in the median of the Milano-Meda). Their height: the road they run by (H.node along
 // its axis, then its surface there), the surface at the line when it is within 0.6 m of it (else the road's: the edge of a drop, a bank higher
 // than the road). Worked out once per tile, with their collisions (two sided, as the guardrails of roadBarriers)
-const GUARD_PALO = 1.5, GUARD_LUNGHI = window.__GR_PALI = { lunghi: 0, pali: 0 }; /* the longest post of a guardrail (m), and the check: posts that would be longer */
+const GUARD_VUOTO = 3.0, GUARD_PALO = 1.5, GUARD_LUNGHI = window.__GR_PALI = { lunghi: 0, pali: 0 }; /* the longest post of a guardrail (m), and the check: posts that would be longer */
 const GUARD = new Map(), NJ_PROF = [[-0.3, 0], [-0.3, 0.08], [-0.2, 0.3], [-0.09, 0.82], [0.09, 0.82], [0.2, 0.3], [0.3, 0.08], [0.3, 0]];
-function guardRoadY(rs, x, z) {
+function guardRoadY(rs, x, z, ns) {
+  if (ns && ns.length && NASTRI.dati) { const q = nastroY(ns, x, z); if (q) return [H.surface(q[1], q[2], q[0] + 0.5), q[1], q[2]]; } /* on its ribbon (docs/nastri.md passo 3): the road it runs along is the ribbon the build wrote, at its height */
   let best = null, bd = 1e9, bx = 0, bz = 0;
   for (const ri of rs) { const r = D.roads[ri]; if (!r) continue; for (let k = 1; k < r.g.length; k++) { const A = N[r.g[k - 1]], B = N[r.g[k]], ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - A[0]) * ex + (z - A[1]) * ez) / L2, 0, 1), d = hyp(x - A[0] - ex * t, z - A[1] - ez * t); if (d < bd) { bd = d; best = lerp(H.node(r.g[k - 1]), H.node(r.g[k]), t); bx = A[0] + ex * t; bz = A[1] + ez * t; } } }
   return best === null ? null : [H.surface(bx, bz, best + 0.5), bx, bz];
@@ -1462,16 +1468,19 @@ function guardRoadY(rs, x, z) {
 function guardRails(T) {
   if (GUARD.has(T.t)) return GUARD.get(T.t);
   const out = [];
-  for (const [k, rs, o] of T.d.gr || []) {
+  for (const [k, rs, o, ns] of T.d.gr || []) {
     const raw = []; let x = 0, z = 0; for (let i = 0; i < o.length; i += 2) { x += o[i]; z += o[i + 1]; raw.push([x / 100, z / 100]); }
     if (raw.length < 2) continue;
     const P = []; for (let i = 1; i < raw.length; i++) { const a = raw[i - 1], c = raw[i], n = Math.max(1, Math.ceil(hyp(c[0] - a[0], c[1] - a[1]))); for (let m = 0; m < n; m++) P.push([lerp(a[0], c[0], m / n), lerp(a[1], c[1], m / n)]); } P.push(raw[raw.length - 1].slice()); // every metre: a drop between two far vertices is seen too
     // over a drop (the mouth of an underpass under the road, the edge of a bank) a point steps back towards the road, up to 1.5 m, to where the
     // ground is at the road's level: the guardrail stands on the edge. Where it cannot, it stops there (Carlo 6/11, corso Isonzo: never on long
     // posts over the road below, "non sa quando smettere"): a guardrail stands only at the road's level, on posts of normal height
-    const ok = [], y0 = P.map(p => { const q = guardRoadY(rs, p[0], p[1]); if (q === null) { ok.push(false); return H.surface(p[0], p[1]); } const [yr, bx, bz] = q; let yE = H.surface(p[0], p[1], yr + 0.3);
-      if (yE < yr - 0.6) { const dx = bx - p[0], dz = bz - p[1], L = hyp(dx, dz) || 1; for (let st = 0.1; st <= 1.5 + 1e-6; st += 0.1) { const x = p[0] + dx / L * st, z = p[1] + dz / L * st, y = H.surface(x, z, yr + 0.3); if (y >= yr - 0.3) { p[0] = x; p[1] = z; yE = y; break; } } }
-      ok.push(yE >= yr - GUARD_PALO + 0.75); return Math.abs(yE - yr) < 0.6 ? yE : yr; });
+    // on its ribbon (ns, docs/nastri.md passo 3; Carlo 13/11, Baruccana x 388 z 2104: the guardrail "a serpente") it keeps the line the build gave it, the smooth edge of the ribbon, at the
+    // height of the ribbon: it does not step back after every tooth of the ground beside the asphalt. Its posts stay of normal length (drawGuard); it stops only over a real drop (GUARD_VUOTO)
+    const suN = !!(ns && ns.length && NASTRI.dati);
+    const ok = [], y0 = P.map(p => { const q = guardRoadY(rs, p[0], p[1], ns); if (q === null) { ok.push(false); return H.surface(p[0], p[1]); } const [yr, bx, bz] = q; let yE = H.surface(p[0], p[1], yr + 0.3);
+      if (yE < yr - 0.6 && !suN) { const dx = bx - p[0], dz = bz - p[1], L = hyp(dx, dz) || 1; for (let st = 0.1; st <= 1.5 + 1e-6; st += 0.1) { const x = p[0] + dx / L * st, z = p[1] + dz / L * st, y = H.surface(x, z, yr + 0.3); if (y >= yr - 0.3) { p[0] = x; p[1] = z; yE = y; break; } } }
+      ok.push(yE >= yr - (suN ? GUARD_VUOTO : GUARD_PALO - 0.75)); return Math.abs(yE - yr) < 0.6 ? yE : yr; });
     for (let i = 0; i < P.length;) { // the runs it stands on, at least 4 m long
       if (!ok[i]) { i++; continue; } let j = i; while (j < P.length && ok[j]) j++;
       const pts = P.slice(i, j), ys0 = y0.slice(i, j); i = j; if (pts.length < 5) continue;
@@ -2054,7 +2063,7 @@ function* buildTileGen(T) {
     // there): the deck is the road there (the DBGT has the carriageway at grade where the deck of the terrain stands, at the ends of a bridge
     // or on a small one over a stream), the line goes on it; under a deck with a street under it, at its height, the line stays on S
     const topS = (x, z) => { let y = null; for (const o of H.deckAt(x, z)) if (o.tipo === 'strada' && (o.d.free || o.top - H.ground(x, z) < 2.5) && (y === null || o.top > y)) y = o.top; return y; };
-    for (const [ty, lev, s0, E] of d.sg || []) {
+    for (const [ty, lev, s0, E, nb] of d.sg || []) { /* nb: the ribbon the line runs on (src/nastri.py): it lies on the deck that carries that ribbon there, else on S; without a ribbon the old rules (top, topS) */
       const P = []; let px = 0, pz = 0; for (let i = 0; i < E.length; i += 2) { px += E[i]; pz += E[i + 1]; P.push([px / 100, pz / 100]); }
       if (P.length < 2) continue;
       if (H.PITS.length) { const ins = P.map(q => { const p_ = H.inPit(q[0], q[1], 0.1); return !!p_ && !(p_.src && p_.src.sotto); }); if (ins.some(v => v) && ins.some(v => !v)) { let bi = 0, bn = 0; for (let i = 0; i < P.length;) { let j = i; while (j < P.length && ins[j] === ins[i]) j++; if (j - i > bn) { bn = j - i; bi = i; } i = j; } const r_ = P.slice(bi, bi + bn); P.length = 0; P.push(...r_); if (P.length < 2) continue; } } /* a line does not climb the wall of a garage ramp: only the longest run on one side of it */
@@ -2066,8 +2075,9 @@ function* buildTileGen(T) {
       const runs = []; if (ty !== 2) runs.push([0, cum[cum.length - 1]]);
       else { const S0 = s0 / 10, L = cum[cum.length - 1]; for (let k = Math.floor(S0 / 7.5); k * 7.5 - S0 < L; k++) { const a = Math.max(0, k * 7.5 - S0), b = Math.min(L, k * 7.5 + 3 - S0); if (b - a > 0.2) runs.push([a, b]); } }
       const drawQ = Q => {
-        const tq = !T.fine || !H.DECKS.length ? null : lev === 2 ? top : lev === 1 ? topS : null;
-        if (tq && (lev === 2 || Q.some(q => tq(q[0], q[1]) !== null))) { // on the bridge: on the top of the deck where there is one (absolute heights, a vertex every 2 m at most), on S past its ends
+        const suN = nb !== undefined && NASTRI.dati ? (x, z) => { const y = nastroPiano([nb], x, z); return y === undefined ? null : y; } : null;
+        const tq = !T.fine || !H.DECKS.length ? null : suN || (lev === 2 ? top : lev === 1 ? topS : null);
+        if (tq && ((!suN && lev === 2) || Q.some(q => tq(q[0], q[1]) !== null))) { // on the bridge: on the top of the deck where there is one (absolute heights, a vertex every 2 m at most), on S past its ends
           const Q2 = [Q[0]]; for (let i = 1; i < Q.length; i++) { const p = Q[i - 1], q = Q[i], n = Math.max(1, Math.ceil(hyp(q[0] - p[0], q[1] - p[1]) / 2)); for (let k = 1; k <= n; k++) Q2.push([lerp(p[0], q[0], k / n), lerp(p[1], q[1], k / n)]); }
           const on = Q2.map(q => tq(q[0], q[1]) !== null);
           for (let i = 0; i < Q2.length;) {

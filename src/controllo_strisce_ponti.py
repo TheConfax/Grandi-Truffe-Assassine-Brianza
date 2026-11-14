@@ -17,7 +17,7 @@ def righe(d, lev):
     """i segmenti delle righe dei tile al livello lev: (A, B)"""
     A, B = [], []
     for T in d['tiles']:
-        for ty, lv, s0, E in T.get('sg', []) or []:
+        for ty, lv, s0, E in (r_[:4] for r_ in T.get('sg', []) or []):
             if lv != lev: continue
             px = pz = 0; P = []
             for i in range(0, len(E), 2): px += E[i]; pz += E[i + 1]; P.append((px / 100, pz / 100))

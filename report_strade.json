@@ -1088,7 +1088,7 @@
    "vms": 156,
    "cic": 63
   },
-  "tempo_s": 5.7,
+  "tempo_s": 4.3,
   "anelli_osm": {
    "n": 11,
    "dove": [
@@ -1181,7 +1181,7 @@
   "piazze_m2": 73153,
   "vialetti_m2": 41985,
   "isole_m2": 20500,
-  "tempo_s": 56.4,
+  "tempo_s": 36.2,
   "cortili_nei_cantieri_m2": 16051
  },
  "cancellate_isolate_non_disegnate": 266,
@@ -1707,6 +1707,8 @@
   "innesti": 57,
   "pezzi_corti_tolti": 7,
   "fessure_con_new_jersey": 3,
+  "punti_sul_nastro": 11132,
+  "punti_senza_nastro": 199,
   "guardrail_attaccati_ai_parapetti": 0,
   "controllo_guardrail_lontani": 0,
   "controllo_lontani_dove": [],
@@ -1749,8 +1751,8 @@
   "alberi_spostati": 5041
  },
  "chiusure_a_t": {
-  "capi_liberi": 21196,
-  "niente_davanti": 6672,
+  "capi_liberi": 21198,
+  "niente_davanti": 6674,
   "in_linea": 1912,
   "troppo_largo_in_linea": 1232,
   "angolo_stretto": 972,
@@ -2826,6 +2828,6 @@
   "attraversamenti": {
    "n": 669
   },
-  "tempo_s": 8.2
+  "tempo_s": 7.6
  }
 }

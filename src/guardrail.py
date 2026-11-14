@@ -95,7 +95,26 @@ def _al_parapetto(P, V, quota=None):
 _al_parapetto.n = 0
 
 
-def guardrail(D, cover, U_carr, raw_roads, nodes, zh=None, log=print, innesti=True):
+# (Carlo 13/11, la Milano-Meda a Baruccana x 388 z 2104: il guardrail "a serpente") il guardrail nasceva dal contorno dell'AC_VEI, che il DBGT disegna a
+# denti, e la lisciatura non bastava. Il bordo della strada è quello del suo nastro (src/nastri.py: misurato sull'AC_VEI e lisciato): ogni punto del
+# guardrail va sul punto di bordo del nastro più vicino (entro SUL_NASTRO m, un nastro che corre lungo di lui), OFF m fuori. Dove il bordo del nastro è
+# portato dritto su un'apertura (una piazzola, un imbocco) non c'è bordo misurato e il punto resta dov'era; lo scarto si raccorda lungo la linea
+SUL_NASTRO = 1.8
+def _sul_nastro(P, NA, rep):
+    if NA is None or len(P) < 3: return P, []
+    T, E, U, Tg, I, Y = NA.bordi(); d = np.gradient(P, axis=0); d /= np.maximum(np.hypot(*d.T), 1e-9)[:, None]
+    D = np.zeros_like(P); ok = np.zeros(len(P), bool); ni = np.full(len(P), -1)
+    for i, l in enumerate(T.query_ball_point(P, SUL_NASTRO)):
+        l = [j for j in l if abs(Tg[j] @ d[i]) > 0.9 and (P[i] - E[j]) @ U[j] > -0.3]   # (along it, and the guardrail on the outer side of that edge)
+        if not l: continue
+        j = min(l, key=lambda j: np.hypot(*(E[j] - P[i]))); D[i] = E[j] + U[j] * OFF - P[i]; ok[i] = True; ni[i] = I[j]
+    if not ok.any(): return P, []
+    D[:, 0] = gaussian_filter1d(D[:, 0], 1.5, mode='nearest'); D[:, 1] = gaussian_filter1d(D[:, 1], 1.5, mode='nearest')
+    rep['punti_sul_nastro'] += int(ok.sum()); rep['punti_senza_nastro'] += int((~ok).sum())
+    return P + D, sorted(set(int(v) for v in ni[ok]))
+
+
+def guardrail(D, cover, U_carr, raw_roads, nodes, zh=None, log=print, innesti=True, NA=None):
     """zh: la quota delle vie nodo per nodo (dal DBGT, build_data.py): un'altra strada a più di QUOTA m dalla superstrada passa sopra o sotto e non apre"""
     rep = Counter()
     xy = lambda r: np.array([nodes[n_] for n_ in r['refs']], float)
@@ -315,12 +334,15 @@ def guardrail(D, cover, U_carr, raw_roads, nodes, zh=None, log=print, innesti=Tr
             S[d < DENTRO] = P[d < DENTRO]
             if not closed: S[0], S[-1] = P[0], P[-1]
             P = S
+        P0 = P; P, nas = _sul_nastro(P, NA, rep)
+        if nas:   # never nearer the carriageway than before
+            dn = shapely.distance(UXp, shapely.points(P)); P = np.where((dn < DENTRO)[:, None], P0, P)
         if not closed: P = _al_parapetto(P, angoli, quota_x)
-        out.append(dict(k=1, p=[(round(float(x), 2), round(float(z), 2)) for x, z in P], r=vie_accanto(P)))
+        out.append(dict(k=1, p=[(round(float(x), 2), round(float(z), 2)) for x, z in P], r=vie_accanto(P), n=nas))
     rep['guardrail_attaccati_ai_parapetti'] = _al_parapetto.n
     for L in nj_out:
         P = _resample(np.asarray(L.coords), 1.0)
-        out.append(dict(k=2, p=[(round(float(x), 2), round(float(z), 2)) for x, z in P], r=vie_accanto(P)))
+        out.append(dict(k=2, p=[(round(float(x), 2), round(float(z), 2)) for x, z in P], r=vie_accanto(P), n=NA.accanto(P) if NA is not None else []))   # (the ribbons it stands between: its height)
     # le vie fatte qui: quelle della superstrada che stanno per almeno il 90% dove c'è il DBGT
     fatte = set(ri for ri in X if lin[ri].length > 0 and lin[ri].intersection(cover).length >= 0.9 * lin[ri].length)
     # il controllo: punti (ogni PASSO m) di un guardrail o di un new jersey dentro una carreggiata alla stessa quota (la superstrada e le altre
@@ -472,4 +494,4 @@ def push_tiles(linee, ntiles, tbox, push):
                 q = part.simplify(0.02, preserve_topology=False); o = []; px = pz = 0
                 for x, z in q.coords:
                     X_, Z_ = int(round(x * 100)), int(round(z * 100)); o += [X_ - px, Z_ - pz]; px, pz = X_, Z_
-                push(t, 'gr', [linee[i]['k'], linee[i]['r'], o])
+                push(t, 'gr', [linee[i]['k'], linee[i]['r'], o] + ([linee[i]['n']] if linee[i].get('n') else []))   # (n: the ribbons it runs along, src/nastri.py: the game takes its height from them)
